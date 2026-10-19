@@ -853,14 +853,9 @@ sorted by file and then path.
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 | `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
 | `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
+| `AXC0215` | The publisher stopped three times while running a publish or validate request. Reported on the request, with an empty file and path, see [lifecycle](authoring.md#lifecycle). |
 
-*(Planned for M10.)* `AXC0215` is not in the table above, because the table lists
-the codes that are built. It means that the publisher stopped three times while
-running a publish request. It is reported on the request, with an empty file and
-path, see [lifecycle](authoring.md#lifecycle). It joins the table when the
-publisher is built.
-
-*(Planned for M10.)* `AXC0216` is not in the table above either. It means that
+*(Planned for M10.)* `AXC0216` is not in the table above. It means that
 the main tenant has no preview tenant when a preview request runs, see
 [preview](authoring.md#preview). It is reported on the request, with an empty
 file and path. It joins the table when the publisher runs preview requests.
@@ -1177,8 +1172,8 @@ A tenant can be the preview tenant of another tenant, as
 [preview tenants](../architecture.md#preview-tenants) for how the hosts treat
 it. Under `Tenancy:Source=configuration`, the tenant setting
 `Tenants:{id}:PreviewOf` names the main tenant. As an environment variable it is
-`Tenants__<id>__PreviewOf`. A blank value counts as unset. *(Planned for M10:)*
-under `directory`, the operator sets it with
+`Tenants__<id>__PreviewOf`. A blank value counts as unset. Under `directory`,
+the operator sets it with
 [`tenant create --preview-of`](administration.md#tenant-create).
 
 ```json
@@ -1202,8 +1197,17 @@ under `directory`, the operator sets it with
   none. `PreviewOf` that names an unknown tenant or a preview tenant, and two
   tenants that name the same main tenant, stop the start. See
   [tenant configuration](../architecture.md#tenant-configuration).
-- **Development.** *(Planned for M10:)* Development, Docker Compose and the E2E
-  script configure one preview tenant.
+- **Development.** `appsettings.Development.json` of the server and of the
+  worker, Docker Compose and the E2E script configure one preview tenant,
+  `default-preview`, with `PreviewOf: default`. It has its own database
+  `axis_preview` and its own database roles, `axis_preview_schema` and
+  `axis_preview_runtime`, see [database roles](storage.md#database-roles). It has
+  no `Oidc` block and no bindings, so the purchase request sample logs `AXC0100`
+  warnings on it. Its host is `preview.localhost`, and `localhost` under the E2E
+  script, where `default` is on `127.0.0.1`. The worker gets only the runtime
+  connection string. The development Keycloak realm accepts the preview hosts as
+  redirect and sign-out addresses. An existing Compose volume has no
+  `axis_preview` database and needs `docker compose down -v` once.
 
 ## Forwarded headers
 

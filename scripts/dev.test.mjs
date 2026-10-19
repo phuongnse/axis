@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
+import http from 'node:http'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
@@ -253,6 +254,34 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     const purchasing = await fetch(`http://localhost:${ports.purchasing}/health`)
     assert.equal(purchasing.status, 200)
 
+    // The preview tenant default-preview resolves by its host. The request goes to 127.0.0.1 with the
+    // Host header, because Node does not always resolve *.localhost. An unknown host is not a tenant.
+    const siteStatus = (host) =>
+      new Promise((resolve, reject) => {
+        const request = http.request(
+          { host: '127.0.0.1', port: ports.server, path: '/api/site', headers: { Host: host } },
+          (response) => {
+            response.resume()
+            response.on('end', () => resolve(response.statusCode))
+          },
+        )
+        request.once('error', reject)
+        request.end()
+      })
+    assert.equal(await siteStatus(`preview.localhost:${ports.server}`), 200)
+    assert.equal(await siteStatus('unknown.localhost'), 404)
+
+    // The server activated both samples on the preview tenant, in its own database axis_preview.
+    for (const application of ['PurchaseRequests', 'LeaveRequests']) {
+      assert.match(run.stdout, new RegExp(`Activated application ${application} .* for tenant default-preview\\.`))
+    }
+    const previewReleases = execFileSync(
+      'docker',
+      ['compose', '-p', project, 'exec', '-T', 'postgres', 'psql', '-U', 'axis', '-d', 'axis_preview', '-tAc', 'select count(*) from axis.active_releases'],
+      { cwd: copy, encoding: 'utf8' },
+    )
+    assert.ok(Number(previewReleases.trim()) >= 2, `axis.active_releases in axis_preview holds ${previewReleases}`)
+
     // The worker starts only after the server has migrated the tenant databases.
     await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)
     const listening = run.stdout.search(/\[server\].*Now listening on/)
@@ -355,7 +384,9 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     const appCopy = path.join(scratch, 'app-copy')
     fs.cpSync(path.join(repoRoot, 'samples/apps/purchase-requests'), appCopy, { recursive: true })
     const texts = path.join(appCopy, 'texts/en.json')
-    const activations = () => run.stdout.split('Activated application PurchaseRequests').length - 1
+    // The preview tenant activates the same sample on each start, so only the main tenant's lines count.
+    const activations = () =>
+      run.stdout.split('\n').filter((line) => /Activated application PurchaseRequests .* for tenant default\.$/.test(line.trimEnd())).length
     const workerPids = () =>
       runProcs(run.child.pid)
         .filter((p) => /Axis\.Worker/.test(p.command) && !/dotnet[- ]watch/.test(p.command))

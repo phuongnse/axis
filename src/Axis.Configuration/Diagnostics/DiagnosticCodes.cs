@@ -202,4 +202,5 @@ public static class DiagnosticCodes
     public const string ReservedModulesFolder = "AXC0212";
     public const string NonAdditiveModuleUpgrade = "AXC0213";
     public const string MigrationOfModuleEntity = "AXC0214";
+    public const string PublishClaimsExhausted = "AXC0215";
 }

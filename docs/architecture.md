@@ -66,7 +66,8 @@ flowchart LR
   same host. It reads the tenants as the server does, connects to each tenant
   database with that tenant's schema role, and runs the publish requests that
   Studio stores. It has no HTTP endpoint, and the server holds no tenant schema
-  connection. Starting one in the production installs is planned for M10. See
+  connection. The production installs, `scripts/dev.sh`, Docker Compose and the E2E
+  script each start one. See
   [publisher](reference/administration.md#publisher) and
   [D47](decisions.md#d47-publishing-from-studio--agreed).
 - **Platform database** stores installation-level data: the
@@ -105,7 +106,7 @@ tests/
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
   keycloak/               the development Keycloak realm with the sample's users
-  postgres/               init-roles.sql, which creates the axis_schema and axis_runtime database roles
+  postgres/               init-roles.sql, which creates the axis_schema and axis_runtime database roles, and the preview tenant's database and roles
   packages/               the sample extension package payment-references and its unit tests
 deploy/
   compose/                production Compose example
@@ -194,8 +195,10 @@ Under `Tenancy:Source=directory` there is no `SchemaConnectionString`: the
 server and the worker hold only runtime database roles for tenant databases.
 The server builds none from the directory.
 `appsettings.Development.json` maps `localhost` to tenant `default` on the
-compose database; the E2E server maps `127.0.0.1` to a tenant on the E2E
-database. The `Platform` connection string is separate and still serves the
+compose database, and `preview.localhost` to its preview tenant `default-preview`
+on the `axis_preview` database. The E2E server maps `127.0.0.1` to a tenant on the E2E
+database, and `localhost` to its preview tenant. See
+[preview tenants](reference/configuration.md#preview-tenants). The `Platform` connection string is separate and still serves the
 readiness check.
 
 Startup fails with an `InvalidOperationException` naming every problem when:
@@ -341,9 +344,9 @@ What a host answers for a tenant, once the directory is in use:
 A preview tenant is a tenant that belongs to one main
 tenant. An author tries an application there before publishing it to the main
 tenant. See [D48](decisions.md#d48-preview-tenants--agreed). Under
-`Tenancy:Source=configuration`, `PreviewOf`, sign-in and bindings work. The
-`directory` source, the status rules and publishing are planned for M10, and
-their bullets say so.
+`Tenancy:Source=configuration` and under `directory`, `PreviewOf`, sign-in and
+bindings work. The status rules and publishing are planned for M10, and their
+bullets say so.
 
 - **One main tenant, one preview.** A preview tenant belongs to one main tenant,
   and a main tenant has at most one preview tenant. A preview tenant has no
@@ -354,9 +357,12 @@ their bullets say so.
   signed in on, see [tenant binding](#sign-in-and-the-session).
 - **Where it is set.** Under `configuration`, the tenant setting `PreviewOf`
   names the main tenant, see
-  [preview tenants](reference/configuration.md#preview-tenants). *(Planned for
-  M10:)* under `directory`, the entry names it, and the operator creates it with
-  [`tenant create --preview-of`](reference/administration.md#tenant-create).
+  [preview tenants](reference/configuration.md#preview-tenants). Under
+  `directory`, the entry names it in `platform.tenants.preview_of`, and the
+  operator creates it with
+  [`tenant create --preview-of`](reference/administration.md#tenant-create). The
+  entry stores no sign-in settings. The catalog copies the main tenant's at each
+  refresh.
 - **Sign-in.** A preview tenant uses its main tenant's authority, client id,
   client secret and claim names. It does not use `Oidc:EndpointAudience`, so it
   accepts no machine-caller token. The operator registers the preview host's
@@ -879,7 +885,7 @@ to the draft. Only another grant can make it readable.
 
 - **Workers.** Workers claim ready work with `FOR UPDATE SKIP LOCKED` and a
   lease. Commits check the claim token (fencing). Claims and fencing are
-  built for work items.
+  built for work items and publish requests.
 - **External operations.** These run outside the transaction, using the
   operation identity as their idempotency key. The result is recorded by a
   following transaction. A `callConnector` step stages its call in its

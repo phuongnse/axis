@@ -10,8 +10,13 @@
 # (default 5207) change the host ports.
 # PostgreSQL loads samples/postgres/init-roles.sql on its first start. It creates the two database
 # roles: the server runs startup activation as axis_schema and serves requests as axis_runtime, the
-# worker runs only as axis_runtime, and the publisher runs its steps as axis_schema. axis stays the bootstrap superuser. PostgreSQL runs that
-# file only on an empty volume, so a volume from before the roles needs `docker compose down -v`.
+# worker runs only as axis_runtime, and the publisher runs its steps as axis_schema. axis stays the
+# bootstrap superuser. It also creates the preview tenant's database axis_preview and its two roles,
+# axis_preview_schema and axis_preview_runtime, which the server and the worker use the same way for
+# the tenant default-preview. The server serves that tenant at http://preview.localhost:5206 and
+# activates both samples on it. It has no deployment bindings. The publisher serves only the tenant
+# default. PostgreSQL runs the file only on an empty volume, so a volume from before the roles or
+# before the preview database needs `docker compose down -v` once. That deletes its data.
 services:
   postgres:
     image: postgres:18-alpine
@@ -61,6 +66,9 @@ services:
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
       # Only the server reads this setting. Startup activation uses it.
       Tenants__default__SchemaConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_schema;Password=axis
+      # The preview tenant default-preview. Its other settings are in appsettings.Development.json.
+      Tenants__default-preview__ConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_runtime;Password=axis
+      Tenants__default-preview__SchemaConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_schema;Password=axis
       ActivateOnStartup__0: /samples/apps/purchase-requests
       ActivateOnStartup__1: /samples/apps/leave-requests
       # The sample extension package payment-references, which the image holds, that the sample declares.
@@ -99,6 +107,7 @@ services:
       # The sample module departments, which the image holds.
       Modules__Path: /modules
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
+      Tenants__default-preview__ConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_runtime;Password=axis
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
     # Healthy once the tenant database is migrated and the loop polls. The health address
     # http://127.0.0.1:5208 stays inside the container, so no port is published. The image has

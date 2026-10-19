@@ -33,8 +33,21 @@ const schemaConnectionString = required(
   'AXIS_E2E_SCHEMA_DATABASE',
   'the PostgreSQL connection string of the schema role',
 )
+const previewConnectionString = required(
+  'AXIS_E2E_PREVIEW_DATABASE',
+  'the PostgreSQL connection string of the preview tenant\'s runtime role',
+)
+const previewSchemaConnectionString = required(
+  'AXIS_E2E_PREVIEW_SCHEMA_DATABASE',
+  'the PostgreSQL connection string of the preview tenant\'s schema role',
+)
 const keycloakUrl = required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')
 const purchasingUrl = required('AXIS_E2E_PURCHASING_URL', 'the address of the purchasing system stub')
+
+/** The address of the preview tenant on the same server: the tenant's host is localhost, not 127.0.0.1. */
+export function previewURL(baseURL: string): string {
+  return baseURL.replace('127.0.0.1', 'localhost')
+}
 
 /**
  * The environment of a server that listens at `baseURL`. Only the applications to activate are left to the
@@ -51,6 +64,12 @@ export function serverEnv(baseURL: string): Record<string, string> {
     Tenants__default__Hosts__0: '127.0.0.1',
     Tenants__default__ConnectionString: connectionString,
     Tenants__default__SchemaConnectionString: schemaConnectionString,
+    // The preview tenant default-preview. The server reaches it as localhost. It has no Oidc block, so it
+    // takes the main tenant's, and no bindings. appsettings.Development.json would point it at localhost:5432.
+    'Tenants__default-preview__PreviewOf': 'default',
+    'Tenants__default-preview__Hosts__0': 'localhost',
+    'Tenants__default-preview__ConnectionString': previewConnectionString,
+    'Tenants__default-preview__SchemaConnectionString': previewSchemaConnectionString,
     // The development realm and its client, as in appsettings.Development.json.
     Tenants__default__Oidc__Authority: `${keycloakUrl}/realms/axis`,
     Tenants__default__Oidc__ClientId: 'axis',

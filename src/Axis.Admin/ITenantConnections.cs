@@ -11,6 +11,9 @@ internal interface ITenantConnections : IAsyncDisposable
     /// <summary>The open connection as the tenant's schema role.</summary>
     Task<NpgsqlConnection> SchemaConnectionAsync();
 
+    /// <summary>A new open connection as the tenant's schema role. The caller disposes it.</summary>
+    Task<NpgsqlConnection> OpenSchemaConnectionAsync();
+
     /// <summary>A new open connection as the tenant's runtime role. The caller disposes it.</summary>
     Task<NpgsqlConnection> OpenRuntimeConnectionAsync();
 }

@@ -40,6 +40,7 @@ internal static partial class AdminCommands
     private const string Usage =
         """
         Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>
+               tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...
                tenant backup <id> --out <file>
                tenant restore <file> --tenant <id> --host <host>...
                migrate [--tenant <id>] [--parallel <n>]
@@ -51,11 +52,21 @@ internal static partial class AdminCommands
                version
         """;
 
-    public static async Task<int> RunAsync(
+    public static Task<int> RunAsync(
         string[] args,
         IConfiguration configuration,
         TextWriter output,
         TextWriter error,
+        CancellationToken cancellationToken) =>
+        RunAsync(args, configuration, output, error, Publisher.DefaultLeaseDuration, cancellationToken);
+
+    // The publisher lease is a parameter so that tests can use a short one. The product has no setting for it.
+    internal static async Task<int> RunAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        TimeSpan publisherLease,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(args);
@@ -75,7 +86,7 @@ internal static partial class AdminCommands
 
         if (args.Length > 0 && args[0] == "publisher")
         {
-            return await PublisherAsync(args, configuration, output, error, cancellationToken);
+            return await PublisherAsync(args, configuration, output, error, publisherLease, cancellationToken);
         }
 
         if (args is ["version"])
@@ -106,7 +117,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        var settings = ReadCreateSettings(configuration, out var problem);
+        var settings = ReadCreateSettings(configuration, needsClientSecret: request.PreviewOf is null, out var problem);
         if (settings is null)
         {
             error.WriteLine(problem);
@@ -321,8 +332,10 @@ internal static partial class AdminCommands
         }
 
         var hosts = new List<string>();
+        var bindings = new List<KeyValuePair<string, string>>();
         string? authority = null;
         string? clientId = null;
+        string? previewOf = null;
         for (var i = 3; i < args.Length; i += 2)
         {
             if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
@@ -342,14 +355,40 @@ internal static partial class AdminCommands
                 case "--oidc-client-id" when clientId is null:
                     clientId = value;
                     break;
+                case "--preview-of" when previewOf is null:
+                    previewOf = value;
+                    break;
+                case "--binding":
+                    // The usage text never echoes an argument, so a binding value is never printed.
+                    var separator = value.IndexOf('=', StringComparison.Ordinal);
+                    if (separator <= 0)
+                    {
+                        return null;
+                    }
+
+                    bindings.Add(new(value[..separator], value[(separator + 1)..]));
+                    break;
                 default:
                     return null;
             }
         }
 
-        return hosts.Count == 0 || authority is null || clientId is null
+        if (hosts.Count == 0)
+        {
+            return null;
+        }
+
+        // A preview tenant takes the sign-in settings of its main tenant, so it takes no OIDC option. A binding is only for a preview.
+        if (previewOf is not null)
+        {
+            return authority is null && clientId is null
+                ? new TenantCreateRequest(args[2], hosts, null, null, previewOf, bindings)
+                : null;
+        }
+
+        return authority is null || clientId is null || bindings.Count > 0
             ? null
-            : new TenantCreateRequest(args[2], hosts, authority, clientId);
+            : new TenantCreateRequest(args[2], hosts, authority, clientId, null, bindings);
     }
 
     private static async Task<int> MigrateAsync(
@@ -524,6 +563,7 @@ internal static partial class AdminCommands
         IConfiguration configuration,
         TextWriter output,
         TextWriter error,
+        TimeSpan lease,
         CancellationToken cancellationToken)
     {
         if (args.Length != 1)
@@ -545,14 +585,15 @@ internal static partial class AdminCommands
         }
 
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, output, error, cancellationToken)
-            : await ConfigurationPublisherAsync(configuration, output, error, cancellationToken);
+            ? await DirectoryPublisherAsync(configuration, output, error, lease, cancellationToken)
+            : await ConfigurationPublisherAsync(configuration, output, error, lease, cancellationToken);
     }
 
     private static async Task<int> DirectoryPublisherAsync(
         IConfiguration configuration,
         TextWriter output,
         TextWriter error,
+        TimeSpan lease,
         CancellationToken cancellationToken)
     {
         TimeSpan refreshInterval;
@@ -576,6 +617,7 @@ internal static partial class AdminCommands
         return await new Publisher(
             new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit),
             new DirectoryPublisherTenants(settings.Platform, refreshInterval),
+            lease,
             output,
             error,
             cancellationToken).RunAsync();
@@ -585,6 +627,7 @@ internal static partial class AdminCommands
         IConfiguration configuration,
         TextWriter output,
         TextWriter error,
+        TimeSpan lease,
         CancellationToken cancellationToken)
     {
         ConfigurationTenantCatalog catalog;
@@ -616,6 +659,7 @@ internal static partial class AdminCommands
         return await new Publisher(
             settings,
             new ConfigurationPublisherTenants(catalog.Tenants, allowHttp, output),
+            lease,
             output,
             error,
             cancellationToken).RunAsync();
@@ -631,6 +675,10 @@ internal static partial class AdminCommands
         CancellationToken cancellationToken)
     {
         var bindingRows = await platform.TenantBindings.AsNoTracking().Where(binding => ids.Contains(binding.TenantId)).ToListAsync(cancellationToken);
+        var previewIds = await platform.Tenants.AsNoTracking()
+            .Where(tenant => ids.Contains(tenant.Id) && tenant.PreviewOf != null)
+            .Select(tenant => tenant.Id)
+            .ToListAsync(cancellationToken);
         var bindings = new Dictionary<string, ActivationBindings>(StringComparer.Ordinal);
         foreach (var id in ids)
         {
@@ -642,7 +690,7 @@ internal static partial class AdminCommands
                         binding.Kind,
                         binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Url!, UriKind.Absolute) : null),
                     StringComparer.OrdinalIgnoreCase);
-            bindings[id] = new ActivationBindings(id, named, AllowHttp: false);
+            bindings[id] = new ActivationBindings(id, named, AllowHttp: false, IsPreview: previewIds.Contains(id));
         }
 
         return bindings;
@@ -796,7 +844,7 @@ internal static partial class AdminCommands
     /// </summary>
     private static RestoreSettings? ReadRestoreSettings(IConfiguration configuration, out string problem)
     {
-        var create = ReadCreateSettings(configuration, out problem);
+        var create = ReadCreateSettings(configuration, needsClientSecret: true, out problem);
         if (create is null)
         {
             return null;
@@ -879,12 +927,15 @@ internal static partial class AdminCommands
         return new PlatformSettings(platformConnection, cipher);
     }
 
-    /// <summary>Reads the settings of <c>tenant create</c>: the common ones, the admin role and the OIDC client secret.</summary>
-    private static CreateSettings? ReadCreateSettings(IConfiguration configuration, out string problem)
+    /// <summary>
+    /// Reads the settings of <c>tenant create</c>: the common ones, the admin role and, unless it makes a preview tenant, the
+    /// OIDC client secret. A preview tenant never reads the secret, even when it is set.
+    /// </summary>
+    private static CreateSettings? ReadCreateSettings(IConfiguration configuration, bool needsClientSecret, out string problem)
     {
         problem = "";
         var admin = configuration[AdminSetting];
-        var secret = configuration[ClientSecretSetting];
+        var secret = needsClientSecret ? configuration[ClientSecretSetting] : null;
 
         if (string.IsNullOrWhiteSpace(admin))
         {
@@ -898,7 +949,7 @@ internal static partial class AdminCommands
             return null;
         }
 
-        if (string.IsNullOrEmpty(secret))
+        if (needsClientSecret && string.IsNullOrEmpty(secret))
         {
             problem = $"The environment variable {ClientSecretSetting} is required.";
             return null;
@@ -933,6 +984,13 @@ internal static partial class AdminCommands
             return problem;
         }
 
+        if (request.PreviewOf is not null)
+        {
+            return BindingsProblem(request.Bindings)
+                ?? await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken)
+                ?? await PreviewProblemAsync(settings.PlatformConnectionString, request, cancellationToken);
+        }
+
         if (!Uri.TryCreate(request.OidcAuthority, UriKind.Absolute, out var authority)
             || (authority.Scheme != Uri.UriSchemeHttp && authority.Scheme != Uri.UriSchemeHttps))
         {
@@ -945,6 +1003,82 @@ internal static partial class AdminCommands
         }
 
         return await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+    }
+
+    // A message names the binding and never its value.
+    private static string? BindingsProblem(IReadOnlyList<KeyValuePair<string, string>> bindings)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, value) in bindings)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return "A binding name must not be blank.";
+            }
+
+            if (!names.Add(name))
+            {
+                return $"The binding '{name}' is given more than once. Binding names are compared ignoring letter case.";
+            }
+
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var url)
+                || (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps))
+            {
+                return $"The binding '{name}' must be an absolute http or https URL.";
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the reason that the tenant cannot be a preview tenant of its main tenant, or null. A main tenant is known, is no
+    /// preview tenant and has no other preview tenant. A message names tenant ids only.
+    /// </summary>
+    private static async Task<string?> PreviewProblemAsync(string platformConnectionString, TenantCreateRequest request, CancellationToken cancellationToken)
+    {
+        var main = request.PreviewOf!;
+        if (main == request.Id)
+        {
+            return $"The tenant '{request.Id}' cannot be a preview tenant of itself.";
+        }
+
+        try
+        {
+            await using var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platformConnectionString).Options);
+            var mainRow = await platform.Tenants.AsNoTracking()
+                .Where(tenant => tenant.Id == main)
+                .Select(tenant => new { tenant.PreviewOf })
+                .FirstOrDefaultAsync(cancellationToken);
+            if (mainRow is null)
+            {
+                return $"The main tenant '{main}' does not exist.";
+            }
+
+            if (mainRow.PreviewOf is not null)
+            {
+                return $"The main tenant '{main}' is itself a preview tenant.";
+            }
+
+            var other = await platform.Tenants.AsNoTracking()
+                .Where(tenant => tenant.PreviewOf == main && tenant.Id != request.Id)
+                .Select(tenant => tenant.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (other is not null)
+            {
+                return $"The main tenant '{main}' already has the preview tenant '{other}'.";
+            }
+        }
+        catch (PostgresException exception)
+        {
+            return $"The setting {PlatformSetting} could not be used: {exception.MessageText}";
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+        {
+            return $"The setting {PlatformSetting} could not be used to connect to the platform database.";
+        }
+
+        return null;
     }
 
     /// <summary>The checks of <see cref="ValidateAsync"/> that do not depend on the OIDC options: the OIDC settings of a restore come from its archive.</summary>
@@ -1049,7 +1183,17 @@ internal static partial class AdminCommands
     private static partial Regex IdPattern();
 }
 
-internal sealed record TenantCreateRequest(string Id, IReadOnlyList<string> Hosts, string OidcAuthority, string OidcClientId);
+/// <summary>
+/// <c>tenant create</c>. A main tenant has the OIDC settings and no <paramref name="PreviewOf"/>. A preview tenant has
+/// <paramref name="PreviewOf"/>, no OIDC settings and any <paramref name="Bindings"/>.
+/// </summary>
+internal sealed record TenantCreateRequest(
+    string Id,
+    IReadOnlyList<string> Hosts,
+    string? OidcAuthority,
+    string? OidcClientId,
+    string? PreviewOf,
+    IReadOnlyList<KeyValuePair<string, string>> Bindings);
 
 internal sealed record MigrateRequest(string? Tenant, int Parallel);
 
@@ -1082,12 +1226,12 @@ internal sealed class AdminEnvironment(string environmentName) : IHostEnvironmen
 
 internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath);
 
-/// <summary>The settings of <c>tenant create</c>, which also needs the admin role and the OIDC client secret.</summary>
+/// <summary>The settings of <c>tenant create</c>, which also needs the admin role and, except for a preview tenant, the OIDC client secret.</summary>
 internal sealed record CreateSettings(
     NpgsqlConnectionStringBuilder Admin,
     string PlatformConnectionString,
     TenantSecretCipher Cipher,
-    string OidcClientSecret);
+    string? OidcClientSecret);
 
 /// <summary>The settings of <c>tenant restore</c>: those of <c>tenant create</c>, the <c>PATH</c> and the installed extension packages, which may be unset.</summary>
 internal sealed record RestoreSettings(CreateSettings Create, string SearchPath, string? ExtensionsPath);

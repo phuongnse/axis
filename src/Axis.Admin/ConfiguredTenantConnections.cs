@@ -24,11 +24,13 @@ internal sealed class ConfiguredTenantConnections(TenantEntry entry) : ITenantCo
     {
         if (_schemaConnection is null)
         {
-            _schemaConnection = await OpenAsync(entry.SchemaConnectionString!);
+            _schemaConnection = await OpenSchemaConnectionAsync();
         }
 
         return _schemaConnection;
     }
+
+    public Task<NpgsqlConnection> OpenSchemaConnectionAsync() => OpenAsync(entry.SchemaConnectionString!);
 
     public Task<NpgsqlConnection> OpenRuntimeConnectionAsync() => OpenAsync(entry.ConnectionString);
 

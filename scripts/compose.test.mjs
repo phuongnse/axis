@@ -106,6 +106,26 @@ test('the stack runs from source', { timeout }, async () => {
     'axis=axis_schema,entities=axis_schema',
   )
 
+  // The preview tenant default-preview has its own database and roles. The server activated both samples on
+  // it, and it warns about the purchasing system bindings that the preview does not have.
+  const previewPsql = (sql) =>
+    compose(['exec', '-T', 'postgres', 'psql', '-U', 'axis', '-d', 'axis_preview', '-tAc', sql]).stdout.trim()
+  assert.equal(
+    previewPsql("select datdba::regrole from pg_database where datname = 'axis_preview'"),
+    'axis_preview_schema',
+  )
+  assert.equal(
+    previewPsql(
+      "select string_agg(nspname || '=' || nspowner::regrole, ',' order by nspname) from pg_namespace where nspname in ('axis','entities')",
+    ),
+    'axis=axis_preview_schema,entities=axis_preview_schema',
+  )
+  const serverLogs = compose(['logs', 'server']).stdout
+  for (const application of ['PurchaseRequests', 'LeaveRequests']) {
+    assert.match(serverLogs, new RegExp(`Activated application ${application} .* for tenant default-preview\\.`), serverLogs)
+  }
+  assert.match(serverLogs, /AXC0100 in application folder .* for tenant default-preview/, serverLogs)
+
   // Both images hold the sample module departments, and the server loads it.
   for (const service of ['server', 'worker']) {
     const module = compose(['exec', '-T', service, 'test', '-f', '/modules/departments/1.0.0/module.json'])
@@ -192,6 +212,11 @@ test('the server and the publisher run on both database roles and the worker onl
   assert.match(server.ConnectionStrings__Platform, /Username=axis_runtime;/)
   assert.match(server.Tenants__default__ConnectionString, /Username=axis_runtime;/)
   assert.match(server.Tenants__default__SchemaConnectionString, /Username=axis_schema;/)
+  assert.match(server['Tenants__default-preview__ConnectionString'], /Database=axis_preview;Username=axis_preview_runtime;/)
+  assert.match(
+    server['Tenants__default-preview__SchemaConnectionString'],
+    /Database=axis_preview;Username=axis_preview_schema;/,
+  )
   const worker = services.worker.environment
   assert.deepEqual(
     Object.keys(worker).filter((key) => /SchemaConnectionString/.test(key)),
@@ -201,6 +226,7 @@ test('the server and the publisher run on both database roles and the worker onl
   const publisher = services.publisher.environment
   assert.match(publisher.Tenants__default__ConnectionString, /Username=axis_runtime;/)
   assert.match(publisher.Tenants__default__SchemaConnectionString, /Username=axis_schema;/)
+  assert.match(worker['Tenants__default-preview__ConnectionString'], /Database=axis_preview;Username=axis_preview_runtime;/)
 })
 
 test('the worker checks /health/ready and publishes no port', () => {
