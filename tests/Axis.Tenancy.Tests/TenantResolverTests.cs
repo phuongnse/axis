@@ -27,4 +27,17 @@ public sealed class TenantResolverTests
         Assert.False(_resolver.TryResolve(host, out var tenant));
         Assert.Null(tenant);
     }
+
+    [Fact]
+    public void A_host_of_a_known_tenant_that_is_not_served_resolves_no_tenant_and_is_unavailable()
+    {
+        var catalog = new DirectoryTenantCatalog([], ["off.example.test"], new Dictionary<string, string>());
+        var resolver = new TenantResolver(catalog);
+
+        Assert.False(resolver.TryResolve("off.example.test", out _));
+        Assert.True(resolver.IsUnavailable("OFF.example.test"));
+        Assert.False(resolver.IsUnavailable("unknown.example.test"));
+        Assert.False(resolver.IsUnavailable(null));
+        Assert.False(_resolver.IsUnavailable("a.example.test"));
+    }
 }

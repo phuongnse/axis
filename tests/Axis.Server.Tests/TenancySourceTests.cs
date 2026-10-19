@@ -54,6 +54,19 @@ public sealed class TenancySourceTests
         Assert.Contains("ActivateOnStartup", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("00:00:00")]
+    [InlineData("-00:00:01")]
+    [InlineData("abc")]
+    public async Task The_directory_source_with_a_refresh_interval_that_is_not_positive_stops_the_start_naming_the_setting(string interval)
+    {
+        await using var factory = CreateFactory(("Tenancy:Source", "directory"), ("Tenancy:RefreshInterval", interval));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("Tenancy:RefreshInterval", exception.Message, StringComparison.Ordinal);
+    }
+
     // No ActivateOnStartup folder is set, so the check does not depend on startup activation.
     private static WebApplicationFactory<Program> CreateFactory(params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

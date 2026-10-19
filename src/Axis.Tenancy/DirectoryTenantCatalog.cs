@@ -6,7 +6,7 @@ namespace Axis.Tenancy;
 
 /// <summary>
 /// The tenant catalog read from the tenant directory, the <c>directory</c> source. It holds the active tenants
-/// read at one moment. Each password and secret stays encrypted in memory and is decrypted only when a
+/// read at one moment, and the hosts of the other tenants, which resolve no tenant but are known. Each password and secret stays encrypted in memory and is decrypted only when a
 /// connection opens, the sign-in client is set up or a binding is resolved.
 /// </summary>
 public sealed class DirectoryTenantCatalog : ITenantCatalog
@@ -14,9 +14,23 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     private readonly Dictionary<string, TenantEntry> _tenantsById = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TenantEntry> _tenantsByHost = new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly HashSet<string> _unavailableHosts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly IReadOnlyDictionary<string, string> _databaseKeys;
+
     public DirectoryTenantCatalog(IEnumerable<TenantEntry> tenants)
+        : this(tenants, [], new Dictionary<string, string>())
+    {
+    }
+
+    internal DirectoryTenantCatalog(
+        IEnumerable<TenantEntry> tenants,
+        IEnumerable<string> unavailableHosts,
+        IReadOnlyDictionary<string, string> databaseKeys)
     {
         ArgumentNullException.ThrowIfNull(tenants);
+
+        _databaseKeys = databaseKeys;
+        _unavailableHosts.UnionWith(unavailableHosts);
 
         Tenants = [.. tenants.OrderBy(tenant => tenant.Id, StringComparer.Ordinal)];
         foreach (var tenant in Tenants)
@@ -35,8 +49,42 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
 
     public TenantEntry? FindByHost(string host) => _tenantsByHost.GetValueOrDefault(host);
 
+    /// <summary>Whether the host belongs to a tenant of the directory that is not active, or was withheld.</summary>
+    public bool IsUnavailableHost(string host) => _unavailableHosts.Contains(host);
+
     /// <summary>
-    /// Reads the active tenants, their hosts and their bindings over <paramref name="platformConnectionString"/>. The
+    /// Returns a catalog without the tenants of <paramref name="tenantIds"/>. Their hosts become unavailable, so they
+    /// answer that the tenant is not available.
+    /// </summary>
+    public DirectoryTenantCatalog Withhold(IReadOnlyCollection<string> tenantIds)
+    {
+        ArgumentNullException.ThrowIfNull(tenantIds);
+
+        var withheld = Tenants.Where(tenant => tenantIds.Contains(tenant.Id, StringComparer.Ordinal)).ToList();
+        return new DirectoryTenantCatalog(
+            Tenants.Except(withheld),
+            _unavailableHosts.Concat(withheld.SelectMany(tenant => tenant.Hosts)),
+            _databaseKeys.Where(pair => !tenantIds.Contains(pair.Key, StringComparer.Ordinal)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// The ids of the tenants of this catalog that <paramref name="previous"/> does not hold, or holds on other
+    /// database settings, in ordinal order. A tenant whose database host, port, name, runtime user or encrypted
+    /// runtime password differs counts, and nothing is decrypted to compare.
+    /// </summary>
+    public IReadOnlyList<string> DatabaseChanges(DirectoryTenantCatalog previous)
+    {
+        ArgumentNullException.ThrowIfNull(previous);
+
+        return [.. Tenants
+            .Select(tenant => tenant.Id)
+            .Where(id => !previous._databaseKeys.TryGetValue(id, out var before)
+                || !_databaseKeys.TryGetValue(id, out var now)
+                || !string.Equals(before, now, StringComparison.Ordinal))];
+    }
+
+    /// <summary>
+    /// Reads the tenants, their hosts and the bindings of the active tenants over <paramref name="platformConnectionString"/>. The
     /// catalog has no schema connection, because under the <c>directory</c> source the server holds only the runtime
     /// database role.
     /// </summary>
@@ -62,14 +110,11 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         {
             var options = new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platformConnectionString).Options;
             await using var context = new PlatformDbContext(options);
-            tenants = await context.Tenants.AsNoTracking()
-                .Where(tenant => tenant.Status == "active")
-                .ToListAsync(cancellationToken);
-            var ids = tenants.Select(tenant => tenant.Id).ToArray();
+            tenants = await context.Tenants.AsNoTracking().ToListAsync(cancellationToken);
             hosts = await context.TenantHosts.AsNoTracking()
-                .Where(host => ids.Contains(host.TenantId))
                 .OrderBy(host => host.Host)
                 .ToListAsync(cancellationToken);
+            var ids = tenants.Where(IsActive).Select(tenant => tenant.Id).ToArray();
             bindings = await context.TenantBindings.AsNoTracking()
                 .Where(binding => ids.Contains(binding.TenantId))
                 .ToListAsync(cancellationToken);
@@ -79,8 +124,9 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             throw new InvalidOperationException("The tenant directory could not be read over ConnectionStrings:Platform.", exception);
         }
 
+        var active = tenants.Where(IsActive).ToList();
         var problems = new List<string>();
-        foreach (var tenant in tenants.OrderBy(tenant => tenant.Id, StringComparer.Ordinal))
+        foreach (var tenant in active.OrderBy(tenant => tenant.Id, StringComparer.Ordinal))
         {
             foreach (var binding in bindings.Where(binding => binding.TenantId == tenant.Id).OrderBy(binding => binding.Name, StringComparer.Ordinal))
             {
@@ -97,12 +143,22 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             throw new InvalidOperationException($"The tenant directory is invalid. {string.Join(" ", problems)}");
         }
 
-        return new DirectoryTenantCatalog(tenants.Select(row => Entry(
-            row,
-            [.. hosts.Where(host => host.TenantId == row.Id).Select(host => host.Host)],
-            bindings.Where(binding => binding.TenantId == row.Id),
-            cipher)));
+        var activeIds = active.Select(row => row.Id).ToHashSet(StringComparer.Ordinal);
+        return new DirectoryTenantCatalog(
+            active.Select(row => Entry(
+                row,
+                [.. hosts.Where(host => host.TenantId == row.Id).Select(host => host.Host)],
+                bindings.Where(binding => binding.TenantId == row.Id),
+                cipher)),
+            hosts.Where(host => !activeIds.Contains(host.TenantId)).Select(host => host.Host),
+            active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal));
     }
+
+    private static bool IsActive(TenantRow row) => row.Status == "active";
+
+    // Compares the stored encrypted password, so nothing is decrypted to tell whether the database settings changed.
+    private static string DatabaseKey(TenantRow row) =>
+        $"{row.DatabaseHost}\n{row.DatabasePort}\n{row.DatabaseName}\n{row.RuntimeUser}\n{Convert.ToBase64String(row.RuntimePassword)}";
 
     private static TenantEntry Entry(TenantRow row, IReadOnlyList<string> hosts, IEnumerable<TenantBindingRow> bindingRows, TenantSecretCipher cipher)
     {

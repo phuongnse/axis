@@ -5,6 +5,7 @@ using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
+using Axis.Server.Tenancy;
 using Axis.Server.Tests;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
@@ -12,6 +13,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using static Axis.Integration.Tests.RecordApiFixture;
@@ -133,6 +135,143 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
         Assert.DoesNotContain("secretmarker", exception.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_tenant_added_to_the_directory_is_served_after_one_refresh_without_a_restart()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector());
+        using var client = factory.CreateClient().SignedInAs("anna");
+        using var before = await client.SendAsync(Request(Departments, "b.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, before.StatusCode);
+
+        await AddTenantsAsync(platform, b with { Host = "b.example.test" });
+        await RefreshAsync(factory);
+
+        await CreateDepartmentAsync(client, "b.example.test", "Sales-b");
+        Assert.Contains("Sales-b", await ListAsync(client, "b.example.test"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_suspended_tenant_answers_503_problem_details_that_name_no_tenant_and_no_host()
+    {
+        var role = NewRole();
+        var quiz = await PrepareTenantAsync("quiz", role);
+        var platform = await PreparePlatformAsync(quiz with { Host = "quiz.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector());
+        using var client = factory.CreateClient().SignedInAs("anna");
+        await ListAsync(client, "quiz.example.test");
+
+        await UpdateTenantAsync(platform, "quiz", row => row.Status = "suspended");
+        await RefreshAsync(factory);
+
+        using var response = await client.SendAsync(Request(Departments, "quiz.example.test"), CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("This tenant is not available.", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("quiz", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("example.test", body, StringComparison.OrdinalIgnoreCase);
+
+        await UpdateTenantAsync(platform, "quiz", row => row.Status = "active");
+        await RefreshAsync(factory);
+        await ListAsync(client, "quiz.example.test");
+    }
+
+    [Fact]
+    public async Task A_host_removed_from_a_tenant_is_404_after_a_refresh_and_its_other_host_still_serves()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        await using (var context = PlatformContext(platform))
+        {
+            context.TenantHosts.Add(new TenantHostRow { TenantId = "a", Host = "a2.example.test" });
+            await context.SaveChangesAsync(CancellationToken);
+        }
+
+        await using var factory = CreateFactory(platform, new LogCollector());
+        using var client = factory.CreateClient().SignedInAs("anna");
+        await ListAsync(client, "a2.example.test");
+
+        await using (var context = PlatformContext(platform))
+        {
+            await context.TenantHosts.Where(host => host.Host == "a2.example.test").ExecuteDeleteAsync(CancellationToken);
+        }
+
+        await RefreshAsync(factory);
+
+        using var removed = await client.SendAsync(Request(Departments, "a2.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, removed.StatusCode);
+        await ListAsync(client, "a.example.test");
+    }
+
+    [Fact]
+    public async Task A_new_tenant_on_a_runtime_user_that_owns_the_axis_schema_answers_503_until_it_passes_the_role_check()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector());
+        using var client = factory.CreateClient().SignedInAs("anna");
+        var unsafeRole = new Role(PostgreSqlServer.SchemaRole, PostgreSqlServer.RolePassword);
+
+        await AddTenantsAsync(platform, b with { Host = "b.example.test", Role = unsafeRole });
+        await RefreshAsync(factory);
+
+        using var refused = await client.SendAsync(Request(Departments, "b.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
+        await ListAsync(client, "a.example.test");
+
+        await SetRuntimeRoleAsync(platform, "b", role);
+        await RefreshAsync(factory);
+        await ListAsync(client, "b.example.test");
+    }
+
+    [Fact]
+    public async Task A_served_tenant_switched_to_a_runtime_user_that_owns_the_axis_schema_answers_503_until_it_passes_again()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector());
+        using var client = factory.CreateClient().SignedInAs("anna");
+        await ListAsync(client, "a.example.test");
+
+        await SetRuntimeRoleAsync(platform, "a", new Role(PostgreSqlServer.SchemaRole, PostgreSqlServer.RolePassword));
+        await RefreshAsync(factory);
+
+        using var refused = await client.SendAsync(Request(Departments, "a.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
+
+        await SetRuntimeRoleAsync(platform, "a", role);
+        await RefreshAsync(factory);
+        await ListAsync(client, "a.example.test");
+    }
+
+    [Fact]
+    public async Task A_tenant_whose_database_name_changes_gets_a_new_pool_and_lists_the_records_of_the_new_database()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" }, b with { Host = "b.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector());
+        using var client = factory.CreateClient().SignedInAs("anna");
+        await CreateDepartmentAsync(client, "a.example.test", "Sales-a");
+        await CreateDepartmentAsync(client, "b.example.test", "Sales-b");
+
+        await UpdateTenantAsync(platform, "a", row => row.DatabaseName = b.DatabaseName);
+        await RefreshAsync(factory);
+
+        var list = await ListAsync(client, "a.example.test");
+        Assert.Contains("Sales-b", list, StringComparison.Ordinal);
+        Assert.DoesNotContain("Sales-a", list, StringComparison.Ordinal);
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(string platform, LogCollector logs, params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -141,6 +280,9 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
             builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(platform));
             builder.UseSetting("ConnectionStrings:PlatformSchema", platform);
             builder.UseSetting("Platform:SecretKey", TestSecretKey);
+
+            // An hour, so the timer never races the refreshes that a test triggers itself.
+            builder.UseSetting("Tenancy:RefreshInterval", "01:00:00");
             builder.ConfigureLogging(logging => logging.AddProvider(logs));
             foreach (var (key, value) in settings)
             {
@@ -205,9 +347,20 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
     private async Task<string> PreparePlatformAsync(TenantBindingRow[] bindings, params DirectoryTenant[] tenants)
     {
         var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
-        var options = new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options;
-        await using var context = new PlatformDbContext(options);
-        await context.Database.MigrateAsync(CancellationToken);
+        await using (var context = PlatformContext(platform))
+        {
+            await context.Database.MigrateAsync(CancellationToken);
+        }
+
+        await AddTenantsAsync(platform, tenants, bindings);
+        return platform;
+    }
+
+    private static Task AddTenantsAsync(string platform, params DirectoryTenant[] tenants) => AddTenantsAsync(platform, tenants, []);
+
+    private static async Task AddTenantsAsync(string platform, DirectoryTenant[] tenants, TenantBindingRow[] bindings)
+    {
+        await using var context = PlatformContext(platform);
         foreach (var tenant in tenants)
         {
             context.Tenants.Add(new TenantRow
@@ -230,8 +383,29 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
 
         context.TenantBindings.AddRange(bindings);
         await context.SaveChangesAsync(CancellationToken);
-        return platform;
     }
+
+    private static async Task UpdateTenantAsync(string platform, string tenantId, Action<TenantRow> update)
+    {
+        await using var context = PlatformContext(platform);
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == tenantId, CancellationToken);
+        update(row);
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
+    private static Task SetRuntimeRoleAsync(string platform, string tenantId, Role role) =>
+        UpdateTenantAsync(platform, tenantId, row =>
+        {
+            row.RuntimeUser = role.Name;
+            row.RuntimePassword = _cipher.Encrypt(tenantId, TenantSecretFields.RuntimePassword, role.Password);
+        });
+
+    private static PlatformDbContext PlatformContext(string platform) =>
+        new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options);
+
+    /// <summary>Reads the directory once now, as the timer does, and waits for the swap.</summary>
+    private static Task RefreshAsync(WebApplicationFactory<Program> factory) =>
+        factory.Services.GetRequiredService<TenantDirectoryRefresh>().RefreshAsync(CancellationToken);
 
     private static async Task CreateDepartmentAsync(HttpClient client, string host, string name)
     {

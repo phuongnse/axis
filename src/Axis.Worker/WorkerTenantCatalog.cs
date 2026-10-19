@@ -38,6 +38,8 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
 
     public TenantEntry? FindByHost(string host) => _current?.FindByHost(host);
 
+    public bool IsUnavailableHost(string host) => _current?.IsUnavailableHost(host) ?? false;
+
     /// <summary>A catalog that is loaded from the start, such as the one of the <c>configuration</c> source.</summary>
     public static WorkerTenantCatalog Loaded(ITenantCatalog catalog)
     {

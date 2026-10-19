@@ -215,5 +215,7 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
         }
 
         public TenantEntry? FindByHost(string host) => inner.FindByHost(host);
+
+        public bool IsUnavailableHost(string host) => inner.IsUnavailableHost(host);
     }
 }

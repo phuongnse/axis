@@ -177,9 +177,10 @@ These are not decided yet.
   forwarded headers for secure cookies and OIDC redirect addresses. The server
   does not handle them today.
 - **The first install.** The server applies the platform migrations at start,
-  see [platform database](storage.md#platform-database). The docs do not yet
-  say how `migrate` and `tenant create` behave before the `platform` schema
-  exists, so the first-install order may change.
+  see [platform database](storage.md#platform-database). `tenant create` does
+  not create the `platform` tables and exits with code 2 without them, so start
+  the server once first. The docs do not yet say how `migrate` behaves before
+  the `platform` schema exists, so the first-install order may change.
 - **Deployment bindings.** No admin command sets a tenant's deployment
   bindings, see [administration](administration.md#not-in-m9). So an
   installation cannot set the purchasing system binding of the purchase request

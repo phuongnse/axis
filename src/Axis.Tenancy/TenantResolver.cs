@@ -23,4 +23,10 @@ public sealed class TenantResolver(ITenantCatalog catalog)
 
         return tenant is not null;
     }
+
+    /// <summary>
+    /// Whether the host belongs to a tenant the catalog knows but does not serve, so the host answers that the tenant
+    /// is not available, not that it is unknown.
+    /// </summary>
+    public bool IsUnavailable(string? host) => !string.IsNullOrEmpty(host) && catalog.IsUnavailableHost(host);
 }
