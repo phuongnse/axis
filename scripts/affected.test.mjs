@@ -85,6 +85,15 @@ describe('images', () => {
   })
 })
 
+describe('onprem', () => {
+  test('covers the Compose example and the admin host, but not a sample it does not activate', () => {
+    assert.equal(matches('deploy/compose/compose.yaml', smokeSuites.onprem), true)
+    assert.equal(matches('src/Axis.Admin/AdminCommands.cs', smokeSuites.onprem), true)
+    assert.equal(matches('samples/apps/leave-requests/application.json', smokeSuites.onprem), true)
+    assert.equal(matches('samples/apps/purchase-requests/application.json', smokeSuites.onprem), false)
+  })
+})
+
 describe('changedPaths', () => {
   let dir
 

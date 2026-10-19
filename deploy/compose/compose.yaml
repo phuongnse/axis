@@ -1,0 +1,86 @@
+# Production Compose example: the server and the worker run from the production images, and the admin
+# tool runs only on demand. PostgreSQL 18 and the OIDC provider run elsewhere. Tenants come from the
+# tenant directory. Every secret is a file under secrets:, mounted in /run/secrets. This file holds no
+# password, client secret or key. See docs/reference/installation.md#on-premises for the steps.
+#
+# AXIS_VERSION          Required. The tag of the three images.
+# AXIS_IMAGE_PREFIX     Optional. A registry prefix for the image names, such as registry.example.com/axis/.
+# AXIS_SECRETS_DIR      The folder with the secret files. Default ./secrets.
+# AXIS_EXTENSIONS_DIR   The extension packages, mounted at /extensions. Default ./extensions.
+# AXIS_MODULES_DIR      The modules, mounted at /modules. Default ./modules.
+# AXIS_APPS_DIR         The application folders for `activate`, mounted at /apps. Default ./apps.
+# AXIS_SERVER_PORT      The host port of the server, on 127.0.0.1 only. Default 8080. Without TLS, put a
+#                       reverse proxy on the same machine in front of it.
+# AXIS_WORKER_HEALTH_PORT  The host port of the worker's health endpoints, on 127.0.0.1 only. Default 5208.
+# AXIS_OIDC_CLIENT_SECRET  Passes through from the shell to `tenant create`. It is never stored here.
+x-host: &host
+  read_only: true
+  tmpfs:
+    - /tmp
+  environment: &host-environment
+    Tenancy__Source: directory
+    Extensions__Path: /extensions
+    Modules__Path: /modules
+
+services:
+  server:
+    <<: *host
+    image: ${AXIS_IMAGE_PREFIX:-}axis-server:${AXIS_VERSION:?Set AXIS_VERSION}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${AXIS_SERVER_PORT:-8080}:8080"
+    volumes:
+      - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
+      - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
+    secrets:
+      - ConnectionStrings__Platform
+      - ConnectionStrings__PlatformSchema
+      - Platform__SecretKey
+
+  worker:
+    <<: *host
+    image: ${AXIS_IMAGE_PREFIX:-}axis-worker:${AXIS_VERSION:?Set AXIS_VERSION}
+    restart: unless-stopped
+    environment:
+      <<: *host-environment
+      # All interfaces inside the container. The published port stays on 127.0.0.1.
+      Health__Urls: http://0.0.0.0:5208
+    ports:
+      - "127.0.0.1:${AXIS_WORKER_HEALTH_PORT:-5208}:5208"
+    volumes:
+      - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
+      - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
+    # The worker never gets the schema connection string.
+    secrets:
+      - ConnectionStrings__Platform
+      - Platform__SecretKey
+
+  # Runs only through `docker compose run --rm admin <command>`, so `docker compose up` does not start it.
+  admin:
+    <<: *host
+    image: ${AXIS_IMAGE_PREFIX:-}axis-admin:${AXIS_VERSION:?Set AXIS_VERSION}
+    profiles:
+      - admin
+    environment:
+      <<: *host-environment
+      # No value: it passes through from the shell.
+      AXIS_OIDC_CLIENT_SECRET:
+    volumes:
+      - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
+      - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
+      - ${AXIS_APPS_DIR:-./apps}:/apps:ro
+    secrets:
+      - Admin__ConnectionString
+      - ConnectionStrings__PlatformSchema
+      - Platform__SecretKey
+
+# One file per setting, named like the setting. Compose mounts each at /run/secrets/<name>.
+secrets:
+  Admin__ConnectionString:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/Admin__ConnectionString
+  ConnectionStrings__Platform:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/ConnectionStrings__Platform
+  ConnectionStrings__PlatformSchema:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/ConnectionStrings__PlatformSchema
+  Platform__SecretKey:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/Platform__SecretKey

@@ -2,11 +2,11 @@
 
 How to install and upgrade Axis on premises and in the cloud. It follows
 [D44](../decisions.md#d44-packaging-for-on-premises-and-cloud-installation--agreed).
-The three production images and the Helm chart are built. *(Planned for M9.)*
-The production Compose example is not built. The default target of the
-`Dockerfile` and `compose.yaml` build the development images instead. Those
-hold the samples and development credentials, and they are not for
-production. See [AGENTS.md](../../AGENTS.md#commands) for them.
+The three production images, the Compose example and the Helm chart are built.
+The default target of the `Dockerfile` and `compose.yaml` at the repository
+root build the development images instead. Those hold the samples and
+development credentials, and they are not for production. See
+[AGENTS.md](../../AGENTS.md#commands) for them.
 
 The conventions of [architecture.md](../architecture.md) apply, and Dn refers
 to [decisions.md](../decisions.md). In this page, "database role" always means
@@ -91,47 +91,119 @@ Read the rules of each setting in
 ## On premises
 
 This installs Axis on one machine with Docker Compose. PostgreSQL and the OIDC
-provider run elsewhere.
+provider run elsewhere. The example lives in `deploy/compose/`. Its
+`compose.yaml` has the server, the worker and the admin host. The server and
+the worker run the production images with a read-only root file system. The
+admin host runs only when asked, through `docker compose run --rm admin`, so
+`docker compose up` does not start it. The file holds no password, client
+secret or key.
+
+Set `AXIS_VERSION` to the tag of the three images. `AXIS_IMAGE_PREFIX` adds a
+registry prefix. The comment at the top of `compose.yaml` lists every variable.
 
 **Before the first start.** Create these database roles on the PostgreSQL
-server. See [database roles](storage.md#database-roles) for what each may do.
+server, and the platform database. See [database roles](storage.md#database-roles)
+for what each may do.
+
+```sql
+CREATE ROLE axis_platform_schema LOGIN PASSWORD '<password>';
+CREATE ROLE axis_platform LOGIN PASSWORD '<password>';
+CREATE ROLE axis_admin LOGIN PASSWORD '<password>' CREATEDB CREATEROLE;
+CREATE DATABASE axis_platform OWNER axis_platform_schema;
+```
 
 | Database role | Used for |
 | --- | --- |
-| Platform schema owner | `ConnectionStrings:PlatformSchema`. It owns the `platform` schema. |
-| Platform read-only role | `ConnectionStrings:Platform`. It reads the `platform` schema and nothing else. |
-| Admin role | `Admin:ConnectionString`. It has `CREATEDB` and `CREATEROLE` and is not a superuser. |
+| `axis_platform_schema` | `ConnectionStrings:PlatformSchema`. It owns the `platform` schema. |
+| `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema and nothing else. |
+| `axis_admin` | `Admin:ConnectionString`. It has `CREATEDB` and `CREATEROLE` and is not a superuser. |
 
-Create the tenant database roles through `tenant create`, not by hand. Also
-create the OIDC client for each tenant in your identity provider.
+The names are examples. Create the tenant database roles through
+`tenant create`, not by hand. Also create the OIDC client for each tenant in
+your identity provider.
 
-**The files.** The example lives in `deploy/compose/`. It holds a
-`compose.yaml` with the server, the worker and the admin host, and the
-`secrets:` entries that point at the secret files. The server and the worker
-run the production images with a read-only root file system. The admin host
-runs only when asked, so `docker compose up` does not start it.
+**The secret files.** Compose reads one file per secret from
+`AXIS_SECRETS_DIR`, which defaults to `./secrets` next to `compose.yaml`. Each
+file is named after its setting, and its content is the value.
+
+| File | Mounted in |
+| --- | --- |
+| `ConnectionStrings__Platform` | server, worker |
+| `ConnectionStrings__PlatformSchema` | server, admin |
+| `Platform__SecretKey` | server, worker, admin |
+| `Admin__ConnectionString` | admin |
+
+Write each file with `printf '%s'`, so it has no trailing newline. Make the
+folder and the files readable by UID 1654, the user the images run as. The
+worker never gets `ConnectionStrings__PlatformSchema`. Generate the key once
+with `openssl rand -base64 32`. The connection strings name the database server
+as the hosts reach it. The admin tool records the host and port of
+`Admin__ConnectionString` as the tenant database server, so the server and the
+worker must reach it there too.
+
+Put extension packages in `AXIS_EXTENSIONS_DIR` and modules in
+`AXIS_MODULES_DIR`, mounted read-only at `/extensions` and `/modules`. Put the
+application folders for `activate` in `AXIS_APPS_DIR`, mounted at `/apps` in
+the admin container only.
 
 **The order.**
 
 1. Put the secret files in place.
-2. Run `docker compose run --rm admin migrate`.
-3. Start the server and the worker.
+2. Run `docker compose run --rm admin migrate`. On a first install it has
+   nothing to migrate and exits with code 0.
+3. Start the server and the worker with `docker compose up -d server worker`.
+   Wait until `/health/ready` answers `200` on both. The server creates the
+   `platform` tables at start, and `tenant create` needs them.
 4. Create a tenant with
    `docker compose run --rm admin tenant create <id> --host <host> --oidc-authority <url> --oidc-client-id <id>`.
-   Put the client secret in `AXIS_OIDC_CLIENT_SECRET`.
+   Put the client secret in `AXIS_OIDC_CLIENT_SECRET`. It passes through from
+   your shell, so it is in no file and no command line.
 5. Activate an application with
-   `docker compose run --rm admin activate /apps/<folder>`. The folder is
-   mounted into the admin container at `/apps`.
+   `docker compose run --rm admin activate /apps/<folder>`.
 
-The hosts serve the tenant after their next refresh.
+The hosts serve a tenant after their next refresh. `Tenancy__RefreshInterval`
+sets it, 30 seconds by default.
 
-**The smoke test.** A planned test starts the example with a test PostgreSQL
-and Keycloak. It creates a tenant and activates the leave request sample,
-`samples/apps/leave-requests`. It checks that the tenant's host serves its site
-at `/leave` and that both hosts are ready. The leave request sample needs the
-`departments` module, so the test mounts it from `artifacts/modules` at
-`/modules` for the test only. The production images still hold no sample
-module.
+- **The OIDC authority must be `https`.** The server runs in `Production`,
+  which refuses an identity provider over plain `http`.
+- **A private certificate authority.** When the identity provider's certificate
+  comes from your own authority, add its certificate to the server's trust
+  store. Do not replace the store: pointing `SSL_CERT_FILE` at one file makes
+  the server trust only that file.
+- **Ports.** The server listens on `127.0.0.1:8080` of the host, and the
+  worker's health endpoints on `127.0.0.1:5208`. Without TLS in the server, put
+  a reverse proxy on the same machine in front of the server. See
+  [forwarded headers](#open-points). The images hold no `curl`, so the
+  example has no container health check. Probe `/health/ready` from the host.
+- **The purchase request sample** needs a purchasing system binding, which no
+  admin command sets, see [open points](#open-points). This guide activates
+  the leave request sample.
+
+**The smoke test.** `scripts/onprem.test.mjs` installs the example as the five
+steps say, and `scripts/e2e.sh` runs it. It builds the three production images
+and starts a test PostgreSQL and a Keycloak over HTTPS, with a certificate
+authority it makes for the run. An override file in a temporary folder holds
+everything the test adds, so `deploy/compose/compose.yaml` stays as an
+operator uses it. The test then:
+
+1. Creates the database roles with the SQL above and writes the secret files.
+2. Runs `migrate`, starts the server and the worker, and waits for `/health/ready`.
+3. Runs `tenant create` for two tenants, `one` and `two`, with their own hosts.
+4. Activates the leave request sample, `samples/apps/leave-requests`, for both.
+   The sample needs the `departments` module, so the test mounts it from
+   `artifacts/modules` at `/modules` for the test only. The production images
+   still hold no sample module.
+5. Checks that both hosts are ready, that each tenant's host serves `/leave`
+   and holds the active site in its database, and that each tenant's sign-in
+   redirects to Keycloak and returns to that tenant's host.
+6. Checks that a host no tenant holds answers `404`. Suspends tenant `two`,
+   checks that it answers `503` while `one` still serves, then resumes it and
+   checks that it serves again.
+
+The test checks sign-in up to the redirect and does not complete it. Another
+test checks that nothing under `deploy/compose/` holds a secret, and that the
+rendered configuration takes every connection string and the installation key
+only from `secrets:` files.
 
 ## In the cloud
 

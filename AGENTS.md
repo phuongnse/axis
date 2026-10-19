@@ -77,7 +77,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, the Markdown link and anchor check, and the Helm chart lint and schema check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
 | `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, which also run the test scenarios of every application under `samples/apps/` on that PostgreSQL, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
-| `scripts/e2e.sh` | Starts PostgreSQL, Keycloak, the built purchasing system stub, server and worker, runs Playwright in Chromium, then runs the Compose smoke test and the production images smoke test, each skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
+| `scripts/e2e.sh` | Starts PostgreSQL, Keycloak, the built purchasing system stub, server and worker, runs Playwright in Chromium, then runs the Compose smoke test, the production images smoke test and the on-premises smoke test, which installs `deploy/compose/` from the production images for two tenants, each skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
 
 The test, integration and E2E scripts run every suite even when one fails. The one
 exception is a smoke test that NexKit's `NEXKIT_BASE_SHA` shows no change can affect. It is
