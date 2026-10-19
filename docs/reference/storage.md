@@ -310,7 +310,7 @@ Which connection string each step uses. The server does this today:
 
 The server holds both connection strings for its whole life. It opens the
 schema connection only during startup activation, and closes it when each
-tenant is done. *(Planned for M9.)* Under `Tenancy:Source=directory`, the
+tenant is done. Under `Tenancy:Source=directory`, the
 server holds no tenant schema connection, see
 [under the directory source](#under-the-directory-source).
 
@@ -318,7 +318,7 @@ server holds no tenant schema connection, see
 
 *(Partly built for M9.)* See
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
-`tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`, `tenant restore` and `migrate` are built. Under `Tenancy:Source=directory`, `tenant create` creates
+`tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`, `tenant restore`, `migrate` and `activate` are built. Under `Tenancy:Source=directory`, `tenant create` creates
 the two database roles of a tenant, its database and the ownership, with no
 superuser. See [administration](administration.md). Each step below runs on one
 host with one database role:

@@ -203,8 +203,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
             var result = await scenario.RunAsync(
                 RestoreArgs(source, id, host ?? $"{id}.example.test"),
-                path: fixture.Tools.PathSetting,
-                extensionsPath: SamplePackages.Path);
+                path: fixture.Tools.PathSetting);
 
             Assert.True(result.Exit == 2, $"{name} exited with {result.Exit}");
             Assert.Single(result.Output);
@@ -231,8 +230,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
         var noTool = await scenario.RunAsync(
             ["tenant", "restore", file, "--tenant", noSecretId, "--host", $"{noSecretId}.example.test"],
-            path: folder.Path,
-            extensionsPath: SamplePackages.Path);
+            path: folder.Path);
         Assert.Equal(2, noTool.Exit);
         Assert.Empty(noTool.Output);
         Assert.Contains("pg_restore", noTool.Error[0], StringComparison.Ordinal);
@@ -240,7 +238,8 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
         var noPackages = await scenario.RunAsync(
             ["tenant", "restore", file, "--tenant", noSecretId, "--host", $"{noSecretId}.example.test"],
-            path: fixture.Tools.PathSetting);
+            path: fixture.Tools.PathSetting,
+            extra: new Dictionary<string, string?> { ["Extensions:Path"] = folder.Path });
         Assert.Equal(2, noPackages.Exit);
         Assert.Contains("payment-references", noPackages.Output.Single(), StringComparison.Ordinal);
         await AssertNothingCreatedAsync(noSecretId, entriesBefore);
@@ -254,7 +253,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         ];
         foreach (var usage in usages)
         {
-            var result = await scenario.RunAsync(usage, path: fixture.Tools.PathSetting, extensionsPath: SamplePackages.Path);
+            var result = await scenario.RunAsync(usage, path: fixture.Tools.PathSetting);
             Assert.Equal(2, result.Exit);
             Assert.Empty(result.Output);
             Assert.StartsWith("Usage:", result.Error[0], StringComparison.Ordinal);
@@ -300,8 +299,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
             RestoreArgs(file, id, host),
             new CancelOnLineWriter(stop),
             stop,
-            path: fixture.Tools.PathSetting,
-            extensionsPath: SamplePackages.Path);
+            path: fixture.Tools.PathSetting);
 
         Assert.Equal(1, stopped.Exit);
         Assert.Equal("provisioning", (await scenario.RowAsync(id)).Status);
@@ -316,7 +314,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         await scenario.SetStatusAsync(id, "provisioning");
         using var tools = new TemporaryFolder();
         PostgresClientTools.WriteScript(Path.Combine(tools.Path, "pg_restore"), "#!/bin/sh\nexit 3");
-        var again = await scenario.RunAsync(RestoreArgs(file, id, host), path: tools.Path, extensionsPath: SamplePackages.Path);
+        var again = await scenario.RunAsync(RestoreArgs(file, id, host), path: tools.Path);
         Assert.Equal(0, again.Exit);
         Assert.Equal("suspended", (await scenario.RowAsync(id)).Status);
 
@@ -338,8 +336,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
         var result = await scenario.RunAsync(
             RestoreArgs(file, id, $"{id}.example.test"),
-            path: tools.Path,
-            extensionsPath: SamplePackages.Path);
+            path: tools.Path);
 
         Assert.Equal(1, result.Exit);
         Assert.Equal($"{id} restore failed: pg_restore exited with code 3", result.Output[^1]);
@@ -356,8 +353,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         fixture.Scenario.RunAsync(
             RestoreArgs(file, id, host),
             withClientSecret: withClientSecret,
-            path: fixture.Tools.PathSetting,
-            extensionsPath: SamplePackages.Path);
+            path: fixture.Tools.PathSetting);
 
     private async Task AssertNothingCreatedAsync(string id, long entries)
     {

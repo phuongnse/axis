@@ -1,7 +1,11 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Data;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -19,7 +23,11 @@ internal static partial class AdminCommands
 
     public const string PlatformSetting = "ConnectionStrings:PlatformSchema";
 
+    public const string InlineRecomputeLimitSetting = "Activation:InlineRecomputeLimit";
+
     private const string Provisioning = "provisioning";
+
+    private const string ActiveStatus = "active";
 
     public const string ClientSecretSetting = "AXIS_OIDC_CLIENT_SECRET";
 
@@ -31,6 +39,7 @@ internal static partial class AdminCommands
                tenant backup <id> --out <file>
                tenant restore <file> --tenant <id> --host <host>...
                migrate [--tenant <id>] [--parallel <n>]
+               activate <folder> [--tenant <id>]
                tenant suspend <id>
                tenant resume <id>
                tenant list
@@ -52,6 +61,11 @@ internal static partial class AdminCommands
         if (args.Length > 0 && args[0] == "migrate")
         {
             return await MigrateAsync(args, configuration, output, error, cancellationToken);
+        }
+
+        if (args.Length > 0 && args[0] == "activate")
+        {
+            return await ActivateAsync(args, configuration, output, error, cancellationToken);
         }
 
         if (args is ["version"])
@@ -410,6 +424,193 @@ internal static partial class AdminCommands
         return await new TenantMigrate(settings, tenants, request.Parallel, output, cancellationToken).RunAsync();
     }
 
+    private static async Task<int> ActivateAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var request = ParseActivate(args);
+        if (request is null)
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        var settings = ReadActivateSettings(configuration, error, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        var folder = Path.GetFullPath(request.Folder);
+        if (!Directory.Exists(folder))
+        {
+            error.WriteLine($"The application folder '{request.Folder}' does not exist.");
+            return 2;
+        }
+
+        IReadOnlyList<TenantRow> tenants;
+        var bindings = new Dictionary<string, ActivationBindings>(StringComparer.Ordinal);
+        try
+        {
+            var tablesProblem = await PlatformTablesProblemAsync(settings.Platform.PlatformConnectionString, cancellationToken);
+            if (tablesProblem is not null)
+            {
+                error.WriteLine(tablesProblem);
+                return 2;
+            }
+
+            await using var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(settings.Platform.PlatformConnectionString).Options);
+            var rows = await platform.Tenants.AsNoTracking().ToListAsync(cancellationToken);
+            if (request.Tenant is not null)
+            {
+                var found = rows.FirstOrDefault(row => row.Id == request.Tenant);
+                if (found is null)
+                {
+                    error.WriteLine($"The tenant '{request.Tenant}' does not exist.");
+                    return 2;
+                }
+
+                if (found.Status == Provisioning)
+                {
+                    error.WriteLine($"The tenant '{request.Tenant}' is still provisioning. Finish it with tenant create.");
+                    return 2;
+                }
+
+                tenants = [found];
+            }
+            else
+            {
+                tenants = [.. rows.Where(row => row.Status == ActiveStatus).OrderBy(row => row.Id, StringComparer.Ordinal)];
+            }
+
+            var ids = tenants.Select(row => row.Id).ToArray();
+            var bindingRows = await platform.TenantBindings.AsNoTracking().Where(binding => ids.Contains(binding.TenantId)).ToListAsync(cancellationToken);
+            foreach (var id in ids)
+            {
+                // A secret's value stays encrypted: activation checks only that the binding exists.
+                var named = bindingRows
+                    .Where(binding => binding.TenantId == id)
+                    .ToDictionary(
+                        binding => binding.Name,
+                        binding => new ActivationBinding(
+                            binding.Kind,
+                            binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Url!, UriKind.Absolute) : null),
+                        StringComparer.OrdinalIgnoreCase);
+                bindings[id] = new ActivationBindings(id, named, AllowHttp: false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+        catch (PostgresException exception)
+        {
+            error.WriteLine($"The setting {PlatformSetting} could not be used: {exception.MessageText}");
+            return 2;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+        {
+            error.WriteLine($"The setting {PlatformSetting} could not be used to connect to the platform database.");
+            return 2;
+        }
+
+        return await new TenantActivate(
+            settings.Platform, tenants, bindings, folder, settings.Packages, settings.Modules, settings.InlineRecomputeLimit, output, error, cancellationToken).RunAsync();
+    }
+
+    private static ActivateRequest? ParseActivate(string[] args)
+    {
+        string? folder = null;
+        string? tenant = null;
+        for (var i = 1; i < args.Length; i++)
+        {
+            if (args[i] == "--tenant")
+            {
+                if (tenant is not null || i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                {
+                    return null;
+                }
+
+                tenant = args[++i];
+            }
+            else if (folder is null && !args[i].StartsWith("--", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(args[i]))
+            {
+                folder = args[i];
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        return folder is null ? null : new ActivateRequest(folder, tenant);
+    }
+
+    /// <summary>
+    /// Reads the settings of <c>activate</c>: the common ones, the extension package and module folders and the inline recompute limit.
+    /// A package or module folder that is not set gives an empty catalog, as on the server. One that is set but missing is a problem.
+    /// </summary>
+    private static ActivateSettings? ReadActivateSettings(IConfiguration configuration, TextWriter error, out string problem)
+    {
+        var platform = ReadPlatformSettings(configuration, out problem);
+        if (platform is null)
+        {
+            return null;
+        }
+
+        var limit = ReleaseActivator.DefaultInlineRecomputeLimit;
+        var limitText = configuration[InlineRecomputeLimitSetting];
+        if (!string.IsNullOrWhiteSpace(limitText)
+            && (!int.TryParse(limitText, NumberStyles.None, CultureInfo.InvariantCulture, out limit) || limit < 1))
+        {
+            problem = $"The setting {InlineRecomputeLimitSetting} must be a positive whole number.";
+            return null;
+        }
+
+        var packagesRoot = ResolveFolder(configuration[PackageCatalog.PathSetting]);
+        var modulesRoot = ResolveFolder(configuration[ModuleCatalog.PathSetting]);
+        if (packagesRoot is not null && !Directory.Exists(packagesRoot))
+        {
+            problem = $"The folder set by {PackageCatalog.PathSetting} does not exist.";
+            return null;
+        }
+
+        if (modulesRoot is not null && !Directory.Exists(modulesRoot))
+        {
+            problem = $"The folder set by {ModuleCatalog.PathSetting} does not exist.";
+            return null;
+        }
+
+        PackageCatalog packages;
+        ModuleCatalog modules;
+        try
+        {
+            packages = PackageCatalog.Load(packagesRoot);
+            modules = ModuleCatalog.Load(modulesRoot);
+        }
+        catch (InvalidOperationException)
+        {
+            // The catalogs' own messages name the folder, and a settings message never holds a value.
+            problem = $"The folder set by {PackageCatalog.PathSetting} or {ModuleCatalog.PathSetting} cannot be listed.";
+            return null;
+        }
+
+        foreach (var diagnostic in packages.Diagnostics.Concat(modules.Diagnostics))
+        {
+            error.WriteLine($"{diagnostic.Code} {diagnostic.File} {diagnostic.Path}: {diagnostic.Message}");
+        }
+
+        return new ActivateSettings(platform, packages, modules, limit);
+    }
+
+    private static string? ResolveFolder(string? setting) =>
+        string.IsNullOrWhiteSpace(setting) ? null : Path.GetFullPath(setting);
+
     private static MigrateRequest? ParseMigrate(string[] args)
     {
         string? tenant = null;
@@ -719,12 +920,17 @@ internal sealed record TenantCreateRequest(string Id, IReadOnlyList<string> Host
 
 internal sealed record MigrateRequest(string? Tenant, int Parallel);
 
+internal sealed record ActivateRequest(string Folder, string? Tenant);
+
 internal sealed record TenantBackupRequest(string Id, string Out);
 
 internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyList<string> Hosts);
 
 /// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
 internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
+
+/// <summary>The settings of <c>activate</c>: the common ones, the loaded packages and modules and the inline recompute limit.</summary>
+internal sealed record ActivateSettings(PlatformSettings Platform, PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit);
 
 internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath);
 

@@ -10,7 +10,7 @@ namespace Axis.Admin;
 
 /// <summary>
 /// The steps that bring one tenant database to the schema of this build: the grants, the EF Core migrations, the runtime
-/// role check and the read of the schema version. <c>tenant create</c> and <c>migrate</c> share them. Every step runs as
+/// role check and the read of the schema version. <c>tenant create</c>, <c>migrate</c> and <c>activate</c> share them. Every step runs as
 /// the tenant's schema role, except the role check, which runs as its runtime role. The schema connection opens at the
 /// first step that needs it and stays open until <see cref="DisposeAsync"/>.
 /// </summary>
@@ -61,10 +61,26 @@ internal sealed class TenantDatabaseSteps(
 
     public async Task CheckRuntimeRoleAsync()
     {
-        var password = cipher.Decrypt(row.Id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
-        await using var connection = new NpgsqlConnection(ConnectionString(row.RuntimeUser, password));
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await OpenRuntimeConnectionAsync();
         await RuntimeRoleCheck.CheckAsync(connection, row.Id, cancellationToken);
+    }
+
+    /// <summary>A new open connection as the tenant's runtime role. The caller disposes it.</summary>
+    public async Task<NpgsqlConnection> OpenRuntimeConnectionAsync()
+    {
+        var password = cipher.Decrypt(row.Id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
+        var connection = new NpgsqlConnection(ConnectionString(row.RuntimeUser, password));
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+
+        return connection;
     }
 
     /// <summary>The newest migration applied to the tenant database.</summary>

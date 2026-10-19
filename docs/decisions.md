@@ -1260,7 +1260,7 @@ The owner confirmed these points for issue #414 on 2026-10-16.
     storage and activation.
   - Only startup activation in the server uses it. The server keeps it for its
     whole life while tenants come from the `Tenants` section.
-  - *(Planned for M9.)* Under `Tenancy:Source=directory` only the admin host
+  - Under `Tenancy:Source=directory` only the admin host
     uses it, see [D43](#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
 - **Runtime database role:**
   - It reads and writes rows in entity tables and system tables, and uses their
@@ -2171,7 +2171,7 @@ serving from the last good directory while it still shows the problem.
 A platform operator creates tenants, migrates every tenant database and
 activates releases with a command-line admin host, `Axis.Admin`. This is
 planned for M9. Only `tenant create`, `tenant backup`, `tenant suspend`,
-`tenant resume`, `tenant list` and `migrate` are built. Until the rest is, tenants can
+`tenant resume`, `tenant list`, `migrate` and `activate` are built. Until the rest is, tenants can
 come from the `Tenants` section and the server migrates and activates at start, as in
 [D31](#d31-separate-database-roles--agreed). See
 [administration](reference/administration.md) for every command,

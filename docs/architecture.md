@@ -47,7 +47,7 @@ flowchart LR
   It runs the package operations that process steps call, see
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
-- **Axis.Admin** *(partly built for M9: `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`, `tenant restore` and `migrate`)* is the console host that the platform
+- **Axis.Admin** *(partly built for M9: `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`, `tenant restore`, `migrate` and `activate`)* is the console host that the platform
   operator runs. It creates tenants, migrates tenant databases, activates
   releases, and backs up and restores tenants. It is the only host that writes
   the [tenant directory](#tenant-directory), holds an admin connection to the
@@ -70,7 +70,7 @@ src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
   Axis.Scenarios/         console host that runs an application's test scenarios
-  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9; `tenant create`, `suspend`, `resume`, `list`, `backup` and `migrate` are built)
+  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9; `tenant create`, `suspend`, `resume`, `list`, `backup`, `migrate` and `activate` are built)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
