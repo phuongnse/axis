@@ -34,7 +34,7 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
         Assert.NotEmpty(row.SchemaVersion);
         Assert.Equal($"axis_{id}", row.DatabaseName);
 
-        await using (var factory = CreateFactory(scenario.Platform))
+        await using (var factory = AdminScenario.CreateServer(scenario.Platform))
         {
             using var client = factory.CreateClient().SignedInAs("anna");
             using var served = await client.SendAsync(Request("/api/me", "shop.example.test"), CancellationToken);
@@ -233,17 +233,6 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
 
         await scenario.AssertNoSecretsAsync();
     }
-
-    private static WebApplicationFactory<Program> CreateFactory(string platform) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Testing");
-            builder.UseSetting("Tenancy:Source", "directory");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(platform));
-            builder.UseSetting("ConnectionStrings:PlatformSchema", platform);
-            builder.UseSetting("Platform:SecretKey", AdminScenario.TestSecretKey);
-            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
-        });
 
     private Task<AdminScenario> NewScenarioAsync(bool migrate = true) => AdminScenario.NewAsync(database, migrate, CancellationToken);
 }

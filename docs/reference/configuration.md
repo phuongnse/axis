@@ -1134,7 +1134,7 @@ As environment variables they are `Tenancy__Source`,
 *(Partly built for M9.)* See
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
 and [administration](administration.md). `Axis.Admin` reads `Admin:ConnectionString`
-for `tenant create`, the only command built so far.
+for `tenant create`. `tenant suspend`, `tenant resume`, `tenant list` and `tenant backup` do not read it.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
