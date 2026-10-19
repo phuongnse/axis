@@ -30,8 +30,10 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
     throw new InvalidOperationException("Connection string 'Platform' is not configured.");
 }
 
-// Under directory, the platform migrations run before startup activation. Under configuration, nothing
-// about the platform schema is read.
+// Under directory, the platform migrations and the first directory load run now, before the services are
+// built, because sign-in registers one client per tenant. Under configuration, nothing about the platform
+// schema is read.
+ITenantCatalog tenants;
 if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
 {
     var platformSchemaConnectionString = builder.Configuration.GetConnectionString("PlatformSchema");
@@ -52,9 +54,33 @@ if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
             "Connection strings 'Platform' and 'PlatformSchema' name the same user. They must be different roles.");
     }
 
-    builder.Services.AddSingleton(TenantSecretCipher.Load(builder.Configuration));
-    builder.Services.AddSingleton(new PlatformMigrationOptions(platformSchemaConnectionString, readerRole));
-    builder.Services.AddHostedService<PlatformMigration>();
+    // Activation needs schema connections, which the directory source does not give. Axis.Admin activates releases.
+    var activateOnStartup = builder.Configuration.GetSection(StartupActivationOptions.SectionName).Get<string[]>() ?? [];
+    if (activateOnStartup.Any(folder => !string.IsNullOrWhiteSpace(folder)))
+    {
+        throw new InvalidOperationException(
+            "ActivateOnStartup must be empty when Tenancy:Source is 'directory'. Activate releases with Axis.Admin.");
+    }
+
+    var cipher = TenantSecretCipher.Load(builder.Configuration);
+    await PlatformMigration.ApplyAsync(new PlatformMigrationOptions(platformSchemaConnectionString, readerRole), CancellationToken.None);
+    tenants = await DirectoryTenantCatalog.LoadAsync(platformConnectionString, cipher, CancellationToken.None);
+
+    // Registered first, so it logs before the release check runs.
+    builder.Services.AddSingleton(cipher);
+    builder.Services.AddSingleton(new TenantDirectoryStart(
+        readerRole,
+        tenants.Tenants.Count,
+        builder.Configuration.GetSection(TenantOptions.SectionName).Exists()));
+    builder.Services.AddHostedService<TenantDirectoryStartLog>();
+}
+else
+{
+    tenants = ConfigurationTenantCatalog.Load(builder.Configuration, builder.Environment);
+
+    // Fails startup when a tenant has no schema connection string. Only startup activation uses it,
+    // and the worker never uses it.
+    builder.Services.AddSingleton(TenantSchemaConnections.Load(tenants));
 }
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
@@ -66,12 +92,7 @@ builder.Services.AddHealthChecks()
 // Every problem details answer carries the request's trace id.
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemTraceId.Apply);
 builder.Services.AddServerTelemetry(builder.Configuration);
-var tenants = ConfigurationTenantCatalog.Load(builder.Configuration, builder.Environment);
 builder.Services.AddTenancy(tenants);
-
-// Fails startup when a tenant has no schema connection string. Only startup activation uses it,
-// and the worker never uses it.
-builder.Services.AddSingleton(TenantSchemaConnections.Load(tenants));
 builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment);
 builder.Services.AddModules(builder.Configuration, builder.Environment);
 
