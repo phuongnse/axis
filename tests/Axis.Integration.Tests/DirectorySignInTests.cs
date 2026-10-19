@@ -18,14 +18,12 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Sign-in through Keycloak for two directory tenants. Tenant a is served at <c>localhost</c> and tenant b at
 /// <c>127.0.0.1</c>, and each signs in with the OIDC client of its own directory entry, whose secret is stored
-/// encrypted. The development realm accepts the callback of each host.
+/// encrypted. The development realm accepts the callback of each host. Each tenant has a migrated database, where
+/// a completed sign-in writes its audit record.
 /// </summary>
 public sealed partial class DirectorySignInTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
 {
     private const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-
-    // Port 1 on loopback refuses connections immediately. No test here reads a tenant database.
-    private const string UnreachableHost = "127.0.0.1";
 
     // The realm's client accepts redirects to these two addresses, whatever the port.
     private static readonly Uri _addressA = new("http://localhost:5206");
@@ -87,6 +85,23 @@ public sealed partial class DirectorySignInTests(PostgreSqlFixture database, Key
     {
         var authority = await keycloak.StartAsync();
         var platform = await database.CreateDatabaseAsync("signin_platform", CancellationToken);
+        var tenantDatabases = new Dictionary<string, NpgsqlConnectionStringBuilder>();
+        foreach (var id in new[] { "a", "b" })
+        {
+            var connectionString = await database.CreateDatabaseAsync($"signin_{id}", CancellationToken);
+            await using (var connection = new NpgsqlConnection(connectionString))
+            {
+                await connection.OpenAsync(CancellationToken);
+                await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+                await using var data = DataDatabaseFixture.CreateContext(connection);
+                await configuration.Database.MigrateAsync(CancellationToken);
+                await data.Database.MigrateAsync(CancellationToken);
+            }
+
+            await PostgreSqlServer.GrantRuntimeRoleAsync(connectionString, CancellationToken);
+            tenantDatabases[id] = new NpgsqlConnectionStringBuilder(connectionString);
+        }
+
         await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options))
         {
             await context.Database.MigrateAsync(CancellationToken);
@@ -97,9 +112,9 @@ public sealed partial class DirectorySignInTests(PostgreSqlFixture database, Key
                     Id = id,
                     Status = "active",
                     SchemaVersion = TenantSchemaVersion.Current,
-                    DatabaseHost = UnreachableHost,
-                    DatabasePort = 1,
-                    DatabaseName = $"signin_{id}",
+                    DatabaseHost = tenantDatabases[id].Host!,
+                    DatabasePort = tenantDatabases[id].Port,
+                    DatabaseName = tenantDatabases[id].Database!,
                     RuntimeUser = PostgreSqlServer.RuntimeRole,
                     SchemaUser = PostgreSqlServer.SchemaRole,
                     RuntimePassword = _cipher.Encrypt(id, TenantSecretFields.RuntimePassword, PostgreSqlServer.RolePassword),

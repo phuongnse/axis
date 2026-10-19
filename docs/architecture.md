@@ -504,12 +504,13 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     redirect to the identity provider as a page. The shell header's
     [account button](reference/frontend.md) offers sign-in and
     sign-out.
-- **Audit.** _(planned for M10)_ Sign-in writes
+- **Audit.** Sign-in writes
   [audit records](reference/storage.md#audit-records-and-sequence-counters)
   in the database of the tenant that the host resolves to, see
   [D50](decisions.md#d50-sign-in-audit-records-and-security-scanning-in-ci--agreed).
   - The callback writes `session.signedIn` when it creates a session. It writes
-    `session.signInRefused`, with a reason code, when it refuses.
+    `session.signInRefused`, with a reason code, when it refuses. A refused
+    callback still answers the `500` above.
   - `POST /api/auth/sign-out` writes `session.signedOut` only when a session
     existed.
   - An expired session writes nothing. A host that resolves to no tenant writes

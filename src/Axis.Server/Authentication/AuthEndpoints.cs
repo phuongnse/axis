@@ -1,4 +1,6 @@
 using Axis.Core.Tenancy;
+using Axis.Data.Audit;
+using Axis.Server.Users;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
@@ -44,6 +46,12 @@ internal static class AuthEndpoints
         IOptionsMonitor<OpenIdConnectOptions> oidcOptions,
         CancellationToken cancellationToken)
     {
+        // A session of another tenant, or an expired one, counts as none and writes no record.
+        if (await CurrentUsers.FindAsync(httpContext) is { } user)
+        {
+            await SessionAudit.AppendAsync(httpContext, AuditActions.SessionSignedOut, user.Id, user.DisplayName, reason: null, cancellationToken);
+        }
+
         await httpContext.SignOutAsync(Session.Scheme);
 
         var tenant = tenants.Current ?? throw new InvalidOperationException("No tenant context is set.");

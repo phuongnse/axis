@@ -1,4 +1,5 @@
 using Axis.Core.Tenancy;
+using Axis.Data.Audit;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -18,6 +19,9 @@ internal static class TenantSignIn
     public const string CallbackPath = "/api/auth/callback";
 
     public const string SchemePrefix = "oidc-";
+
+    /// <summary>The request item that <c>OnTokenValidated</c> sets when it rejects the ID token.</summary>
+    public const string TokenRejectedItem = "axis:sign_in_token_rejected";
 
     public static string SchemeName(string tenantId) => $"{SchemePrefix}{tenantId}";
 
@@ -51,7 +55,7 @@ internal static class TenantSignIn
 }
 
 /// <summary>Builds the options of a tenant's OIDC client from its settings, each time the options are created.</summary>
-internal sealed class TenantSignInOptions(TenantSignInSettings settings, CookieSecurePolicy securePolicy, bool allowHttp)
+internal sealed partial class TenantSignInOptions(TenantSignInSettings settings, CookieSecurePolicy securePolicy, bool allowHttp)
     : IConfigureNamedOptions<OpenIdConnectOptions>
 {
     public void Configure(OpenIdConnectOptions options) => Configure(Options.DefaultName, options);
@@ -111,6 +115,7 @@ internal sealed class TenantSignInOptions(TenantSignInSettings settings, CookieS
             var userId = principal?.FindFirst(tenant.Claims.UserId)?.Value;
             if (principal is null || string.IsNullOrWhiteSpace(userId))
             {
+                context.HttpContext.Items[TenantSignIn.TokenRejectedItem] = true;
                 context.Fail("The ID token has no user id claim.");
                 return Task.CompletedTask;
             }
@@ -124,5 +129,76 @@ internal sealed class TenantSignInOptions(TenantSignInSettings settings, CookieS
                 roles);
             return Task.CompletedTask;
         };
+        // A failure here fails the callback, so a sign-in never leaves a session without its record.
+        options.Events.OnTicketReceived = async context =>
+        {
+            var user = Session.Read(context.Principal!)
+                ?? throw new InvalidOperationException("The sign-in ticket holds no session user.");
+            await SessionAudit.AppendAsync(
+                context.HttpContext,
+                AuditActions.SessionSignedIn,
+                user.Id,
+                user.DisplayName,
+                reason: null,
+                context.HttpContext.RequestAborted);
+        };
+        // The response stays the handler's 500. The record is best effort, as the callback has already failed.
+        options.Events.OnRemoteFailure = async context =>
+        {
+            var httpContext = context.HttpContext;
+            try
+            {
+                var query = httpContext.Request.Query;
+                var stateRead = context.Properties is not null;
+                var otherTenantReadsState = !stateRead
+                    && query["state"].ToString() is { Length: > 0 } state
+                    && OtherTenantReadsState(httpContext, tenantId, state);
+                var providerError = !string.IsNullOrEmpty(query["error"].ToString());
+                var tokenRejected = httpContext.Items.ContainsKey(TenantSignIn.TokenRejectedItem);
+                var reason = SignInRefusals.Classify(stateRead, otherTenantReadsState, providerError, context.Failure, tokenRejected);
+                await SessionAudit.AppendAsync(
+                    httpContext,
+                    AuditActions.SessionSignInRefused,
+                    AuditActors.Anonymous,
+                    actorName: null,
+                    reason,
+                    httpContext.RequestAborted);
+            }
+            catch (Exception exception)
+            {
+                LogRefusalNotRecorded(httpContext.RequestServices.GetRequiredService<ILogger<TenantSignInOptions>>(), exception);
+            }
+        };
     }
+
+    // Each tenant's client protects its state with its own key purpose, so only a sign-in that
+    // another tenant started can pass this check.
+    private bool OtherTenantReadsState(HttpContext httpContext, string tenantId, string state)
+    {
+        var monitor = httpContext.RequestServices.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>();
+        foreach (var otherId in settings.Current.Keys)
+        {
+            if (otherId == tenantId)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (monitor.Get(TenantSignIn.SchemeName(otherId)).StateDataFormat.Unprotect(state) is not null)
+                {
+                    return true;
+                }
+            }
+            catch (Exception)
+            {
+                // A scheme that cannot read the state, or cannot be built, is not the sender.
+            }
+        }
+
+        return false;
+    }
+
+    [LoggerMessage(LogLevel.Warning, "The refused sign-in callback could not be written to the audit records.")]
+    private static partial void LogRefusalNotRecorded(ILogger logger, Exception exception);
 }
