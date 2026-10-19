@@ -33,6 +33,12 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
         Assert.Equal(0, result.Exit);
         Assert.Empty(result.Error);
         Assert.Equal(ids.SelectMany(id => _steps.Select(step => $"{id} {step} ok")), result.Output);
+        foreach (var id in ids)
+        {
+            Assert.Equal(1L, await CountAsync(scenario, id, "SELECT count(*) FROM axis.release_activations"));
+            Assert.Equal(1L, await CountAsync(scenario, id, "SELECT count(*) FROM axis.release_activations WHERE actor = 'operator' AND number = 1 AND request_id IS NULL"));
+        }
+
         await using var factory = CreateFactory(scenario.Platform);
         using var client = factory.CreateClient().SignedInAs("anna");
         foreach (var id in ids)

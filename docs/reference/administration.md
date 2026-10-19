@@ -513,7 +513,9 @@ Development, which uses startup activation.
    else runs for it.
 2. `compile`: compile the folder against the tenant database and store its
    release.
-3. `activate`: activate the release.
+3. `activate`: activate the release. This adds a row with the actor `operator`
+   to the [release history](storage.md#release-history), unless the release is
+   already the active one.
 4. `seed`: insert the seed records and write the schedule trigger state.
 
 Steps 2 and 3 run as the tenant's schema role. Step 4 runs as its runtime role.

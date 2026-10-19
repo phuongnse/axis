@@ -891,6 +891,9 @@ development or E2E server serves a real application without a separate step.
   `Modules:Path`, see [Modules](#modules). When a newer version in a range
   was installed since the last start, the folder compiles to a new release
   that pins it and holds its files, and that release is activated.
+- **Release history.** Each activation adds a row with the actor `startup` to
+  the [release history](storage.md#release-history), unless the release is
+  already the active one. A restart that finds the same release adds nothing.
 - **Before listening.** The step runs before any hosted service starts, so
   the server accepts no request until every tenant is done.
 - **Failures.** Any compile or activation diagnostic, or any error, stops the

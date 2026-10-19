@@ -263,9 +263,9 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         await using var configuration = database.CreateConfigurationContext();
         var store = new ActiveReleaseStore(configuration);
 
-        Assert.True((await store.TrySetAsync(_applicationId, _name, first.Release.Id, [], activatedAt, CancellationToken)).IsSet);
-        Assert.True((await store.TrySetAsync(_applicationId, _name, second.Release.Id, [], activatedAt.AddMinutes(1), CancellationToken)).IsSet);
-        var refused = await store.TrySetAsync(otherApplicationId, _name.ToUpperInvariant(), first.Release.Id, [], activatedAt, CancellationToken);
+        Assert.True((await store.TrySetAsync(_applicationId, _name, first.Release.Id, [], activatedAt, ActivationActor.Startup, CancellationToken)).IsSet);
+        Assert.True((await store.TrySetAsync(_applicationId, _name, second.Release.Id, [], activatedAt.AddMinutes(1), ActivationActor.Startup, CancellationToken)).IsSet);
+        var refused = await store.TrySetAsync(otherApplicationId, _name.ToUpperInvariant(), first.Release.Id, [], activatedAt, ActivationActor.Startup, CancellationToken);
         Assert.Equal(new SetActiveReleaseResult(ActiveReleaseConflict.Name), refused);
         Assert.False(refused.IsSet);
 
@@ -281,7 +281,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         var store = new ActiveReleaseStore(configuration);
 
         var exception = await Assert.ThrowsAsync<PostgresException>(
-            () => store.TrySetAsync(_applicationId, _name, Guid.NewGuid(), [_sitePath], DateTimeOffset.UtcNow, CancellationToken));
+            () => store.TrySetAsync(_applicationId, _name, Guid.NewGuid(), [_sitePath], DateTimeOffset.UtcNow, ActivationActor.Startup, CancellationToken));
 
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, exception.SqlState);
         Assert.Null(await store.FindByApplicationIdAsync(_applicationId, CancellationToken));
@@ -375,9 +375,9 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         await using var configuration = database.CreateConfigurationContext();
         var store = new ActiveReleaseStore(configuration);
 
-        Assert.True((await store.TrySetAsync(_applicationId, _name, compiled.Release.Id, [_sitePath], activatedAt, CancellationToken)).IsSet);
-        Assert.True((await store.TrySetAsync(otherApplicationId, otherName, otherCompiled.Release.Id, [otherPath], activatedAt, CancellationToken)).IsSet);
-        var refused = await store.TrySetAsync(Guid.NewGuid(), $"App{Guid.NewGuid():N}", compiled.Release.Id, [_sitePath], activatedAt, CancellationToken);
+        Assert.True((await store.TrySetAsync(_applicationId, _name, compiled.Release.Id, [_sitePath], activatedAt, ActivationActor.Startup, CancellationToken)).IsSet);
+        Assert.True((await store.TrySetAsync(otherApplicationId, otherName, otherCompiled.Release.Id, [otherPath], activatedAt, ActivationActor.Startup, CancellationToken)).IsSet);
+        var refused = await store.TrySetAsync(Guid.NewGuid(), $"App{Guid.NewGuid():N}", compiled.Release.Id, [_sitePath], activatedAt, ActivationActor.Startup, CancellationToken);
         Assert.Equal(new SetActiveReleaseResult(ActiveReleaseConflict.SitePath, _sitePath), refused);
 
         var active = new ActiveRelease(_applicationId, _name, compiled.Release.Id, activatedAt);

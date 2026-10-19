@@ -21,9 +21,10 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     on path), with history in `axis.__configuration_migrations`. It also owns
     `axis.release_computed_fingerprints`, the hash of the
     computed definitions of each entity in each release. It also owns
+    `axis.release_activations` (the activation history with release numbers),
+    see [Release history](#release-history). It will also own
     `axis.publish_requests` (the requests that Studio stores and the publisher
-    runs) and `axis.release_activations` (the activation history with release
-    numbers), both _(planned for M10)_, see
+    runs) _(planned for M10)_, see
     [Publish requests and release history](#publish-requests-and-release-history). The caller
     supplies the tenant database connection. Other modules read and set the
     active release and its site paths only through `IActiveReleaseStore`;
@@ -262,7 +263,7 @@ What each database role may do:
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                     | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                         | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests` _(planned for M10)_                                                                                                                                                                                                      | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |
-| `release_activations` _(planned for M10)_                                                                                                                                                                                                   | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
+| `release_activations`                                                                                                                                                                                                                       | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | Sequences in `axis` and `entities`                                                                                                                                                                                                          | Owns them                                                        | `USAGE`, `SELECT`                                                 |
 | Create, alter, drop                                                                                                                                                                                                                         | Yes                                                              | No                                                                |
 
@@ -328,7 +329,8 @@ Which connection string each step uses. The server does this today:
 | Grants for the runtime database role, before and after the migrations                                                              | `SchemaConnectionString` |
 | Schedule trigger state                                                                                                             | `ConnectionString`       |
 | Seed records                                                                                                                       | `ConnectionString`       |
-| Publish routes of the server _(planned for M10)_: insert a request, read requests and the release history                          | `ConnectionString`       |
+| Publish routes of the server _(planned for M10)_: insert a request, read requests                                                  | `ConnectionString`       |
+| Release history route of the server: read the release history                                                                      | `ConnectionString`       |
 | Publisher _(planned for M10)_: claim, renew and finish a request, compile, store, activate, write the history and the audit record | `SchemaConnectionString` |
 | Publisher _(planned for M10)_: seed records                                                                                        | `ConnectionString`       |
 | Start release check (`AXC0146`) and the runtime database role check, in the server and the worker                                  | `ConnectionString`       |
@@ -365,7 +367,8 @@ host with one database role:
 | Seeding and schedule trigger state                                                                                      | `Axis.Admin`                    | The tenant's runtime role          |
 | Claim, run and finish a publish request: compile, store, activate, release history and audit record _(planned for M10)_ | `axis-admin publisher`          | The tenant's schema role           |
 | Seeding of a publish request _(planned for M10)_                                                                        | `axis-admin publisher`          | The tenant's runtime role          |
-| Insert and read publish requests, read the release history _(planned for M10)_                                          | Server                          | The tenant's runtime role          |
+| Insert and read publish requests _(planned for M10)_                                                                    | Server                          | The tenant's runtime role          |
+| Read the release history                                                                                                | Server                          | The tenant's runtime role          |
 | Runtime role check                                                                                                      | `Axis.Admin`, server and worker | The tenant's runtime role          |
 | Requests and work items                                                                                                 | Server and worker               | The tenant's runtime role          |
 
@@ -1146,8 +1149,9 @@ schema of the tenant database.
 
 ## Publish requests and release history
 
-_(Planned for M10.)_ `Axis.Configuration` owns both tables, in the `axis`
-schema of each tenant database. See
+`Axis.Configuration` owns both tables, in the `axis` schema of each tenant
+database. The release history is built. The publish requests are
+_(planned for M10)_. See
 [D47](../decisions.md#d47-publishing-from-studio--agreed) and the
 [authoring API](authoring.md#publishing).
 
@@ -1221,7 +1225,9 @@ TRUNCATE` statement trigger raise SQLSTATE `23001`, as for `audit_records`.
   again therefore add nothing.
 - **Every path.** Startup activation, `axis-admin activate`, a publish and a
   rollback each add a row. The actor is the user for a publish and a rollback,
-  `startup` for a startup and `operator` for `axis-admin activate`.
+  `startup` for a startup and `operator` for `axis-admin activate`. A publish
+  and a rollback _(planned for M10)_ pass their user, label, note and request
+  to the activation, which stores them as given.
 - **Backfill.** The migration that creates the table adds one row for each
   application's current active release, with number 1, the actor `unknown`, the
   activation time of `axis.active_releases` and no request. Without it the

@@ -77,7 +77,7 @@ internal sealed class TenantActivate(
                 && await Step(id, "activate", async () =>
                 {
                     var activated = await ReleaseActivator.ActivateAsync(
-                        compiled!, new ActiveReleaseStore(configuration!), data!, bindings[id], OpenInstanceCounter.Instance, inlineRecomputeLimit, cancellationToken);
+                        compiled!, new ActiveReleaseStore(configuration!), data!, bindings[id], OpenInstanceCounter.Instance, inlineRecomputeLimit, ActivationActor.Operator, cancellationToken);
                     WriteWarnings(id, activated.Diagnostics);
                     if (activated.Diagnostics.Any(IsError))
                     {

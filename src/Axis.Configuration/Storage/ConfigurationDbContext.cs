@@ -42,6 +42,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
 
     public DbSet<ActiveSiteRow> ActiveSites => Set<ActiveSiteRow>();
 
+    public DbSet<ReleaseActivationRow> ReleaseActivations => Set<ReleaseActivationRow>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         GuardImmutability();
@@ -142,6 +144,31 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
                 .HasForeignKey(s => s.ApplicationId)
                 .HasConstraintName("fk_active_sites_active_releases_application_id")
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ReleaseActivationRow>(activation =>
+        {
+            activation.ToTable("release_activations");
+            activation.HasKey(a => a.Id).HasName("pk_release_activations");
+            activation.Property(a => a.Id).HasColumnName("id").ValueGeneratedNever();
+            activation.Property(a => a.ReleaseId).HasColumnName("release_id");
+            activation.Property(a => a.ApplicationId).HasColumnName("application_id");
+            activation.Property(a => a.Number).HasColumnName("number");
+            activation.Property(a => a.ContentHash).HasColumnName("content_hash").HasMaxLength(64);
+            activation.Property(a => a.ActivatedAt).HasColumnName("activated_at");
+            activation.Property(a => a.Actor).HasColumnName("actor");
+            activation.Property(a => a.ActorName).HasColumnName("actor_name");
+            activation.Property(a => a.Label).HasColumnName("label");
+            activation.Property(a => a.Note).HasColumnName("note");
+            activation.Property(a => a.RequestId).HasColumnName("request_id");
+            activation.HasIndex(a => a.ReleaseId).HasDatabaseName("ix_release_activations_release_id");
+            activation.HasIndex(a => new { a.ApplicationId, a.ReleaseId }).HasDatabaseName("ix_release_activations_application_id_release_id");
+            activation.HasIndex(a => new { a.ApplicationId, a.ActivatedAt, a.Id }).HasDatabaseName("ix_release_activations_application_id_activated_at");
+            activation.HasOne<Release>()
+                .WithMany()
+                .HasForeignKey(a => a.ReleaseId)
+                .HasConstraintName("fk_release_activations_releases_release_id")
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 
