@@ -23,6 +23,8 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
     private const string RecordKind = "test.record";
     private const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
     private const string LoadFailedLog = "Loading the tenant directory failed";
+    private const string RefreshedLog = "Read the tenant directory again";
+    private const string RefreshFailedLog = "could not be read again";
 
     private static readonly TenantSecretCipher _cipher = TenantSecretCipher.Load(
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [TenantSecretCipher.KeySetting] = TestSecretKey }).Build());
@@ -131,6 +133,100 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
         Assert.Contains(
             logs.Entries,
             entry => entry.StartsWith("Warning:", StringComparison.Ordinal) && entry.Contains("Tenants section is ignored", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_tenant_suspended_at_a_refresh_gets_no_new_work_claimed_while_another_tenant_runs()
+    {
+        var a = await PrepareTenantAsync("a");
+        var b = await PrepareTenantAsync("b");
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+        await SeedPlatformAsync(platform, a, b);
+        await GrantPlatformAsync(platform);
+        var logs = new LogCollector();
+        await using var app = BuildWorker(platform, logs, ("Tenancy:RefreshInterval", "00:00:00.2"));
+        await app.StartAsync(CancellationToken);
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Loaded 2 active tenant(s) from the tenant directory.")), "The first read did not work.");
+
+        await SetStatusAsync(platform, "a", "suspended");
+        await WaitForRefreshesAsync(logs, RefreshCount(logs) + 2);
+        await EnqueueAsync(a);
+        var itemB = await EnqueueAsync(b);
+        await WaitUntilAsync(async () => await RunsAsync(b) is { Count: 1 }, "The work of the active tenant did not run.");
+        await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken);
+
+        Assert.Equal(itemB, (await RunsAsync(b)).Single().ItemId);
+        Assert.Empty(await RunsAsync(a));
+        Assert.Equal(1L, await AdminCountAsync(a.SchemaConnectionString, "axis.process_work_items WHERE claim_token IS NULL"));
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_tenant_added_while_the_worker_runs_has_its_due_work_run_after_a_refresh()
+    {
+        var a = await PrepareTenantAsync("a");
+        var b = await PrepareTenantAsync("b");
+        var itemB = await EnqueueAsync(b);
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+        await SeedPlatformAsync(platform, a);
+        await GrantPlatformAsync(platform);
+        var logs = new LogCollector();
+        await using var app = BuildWorker(platform, logs, ("Tenancy:RefreshInterval", "00:00:00.2"));
+        await app.StartAsync(CancellationToken);
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Loaded 1 active tenant(s) from the tenant directory.")), "The first read did not work.");
+        Assert.Empty(await RunsAsync(b));
+
+        await SeedPlatformAsync(platform, b);
+
+        await WaitUntilAsync(async () => await RunsAsync(b) is { Count: 1 }, "The work of the new tenant did not run.");
+        Assert.Equal([new Run(itemB, "b", b.DatabaseName, b.Role.Name)], await RunsAsync(b));
+        Assert.Contains(logs.Entries, entry => entry.Contains("Tenant b is ready for work.", StringComparison.Ordinal));
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_failed_refresh_makes_the_worker_Degraded_and_a_working_one_makes_it_Healthy_again()
+    {
+        var a = await PrepareTenantAsync("a");
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+        var platformName = new NpgsqlConnectionStringBuilder(platform).Database!;
+        await SeedPlatformAsync(platform, a);
+        await GrantPlatformAsync(platform);
+        var logs = new LogCollector();
+        await using var app = BuildWorker(platform, logs, ("Tenancy:RefreshInterval", "00:00:00.2"));
+        await app.StartAsync(CancellationToken);
+        using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+        await WaitUntilAsync(async () => await GetAsync(client, "/health/ready") == (HttpStatusCode.OK, "Healthy"), "The worker did not become ready.");
+
+        // Another database holds the admin session, because nobody can connect to the platform database once it refuses.
+        await PostgreSqlServer.AdminScalarAsync(a.SchemaConnectionString, $"""ALTER DATABASE "{platformName}" ALLOW_CONNECTIONS false""", CancellationToken);
+        await PostgreSqlServer.AdminScalarAsync(
+            a.SchemaConnectionString,
+            $"SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname = '{platformName}'",
+            CancellationToken);
+
+        await WaitUntilAsync(async () => await GetAsync(client, "/health/ready") == (HttpStatusCode.OK, "Degraded"), "The worker did not become Degraded.");
+        Assert.Contains(logs.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal) && entry.Contains(RefreshFailedLog, StringComparison.Ordinal));
+        Assert.Equal((HttpStatusCode.OK, "Healthy"), await GetAsync(client, "/health/live"));
+
+        // The last good read stays in use.
+        var itemA = await EnqueueAsync(a);
+        await WaitUntilAsync(async () => await RunsAsync(a) is { Count: 1 }, "The work did not run during the outage.");
+        Assert.Equal(itemA, (await RunsAsync(a)).Single().ItemId);
+
+        await PostgreSqlServer.AdminScalarAsync(a.SchemaConnectionString, $"""ALTER DATABASE "{platformName}" ALLOW_CONNECTIONS true""", CancellationToken);
+
+        await WaitUntilAsync(async () => await GetAsync(client, "/health/ready") == (HttpStatusCode.OK, "Healthy"), "The worker did not become Healthy again.");
+    }
+
+    [Fact]
+    public async Task An_invalid_refresh_interval_stops_the_start_and_names_the_setting()
+    {
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => BuildWorker(platform, new LogCollector(), ("Tenancy:RefreshInterval", "0")));
+
+        Assert.Contains("Tenancy:RefreshInterval", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -255,6 +351,20 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
 
         await context.SaveChangesAsync(CancellationToken);
     }
+
+    private static async Task SetStatusAsync(string platform, string id, string status)
+    {
+        await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options);
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+        row.Status = status;
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
+    private static int RefreshCount(LogCollector logs) =>
+        logs.Entries.Count(entry => entry.Contains(RefreshedLog, StringComparison.Ordinal));
+
+    private static Task WaitForRefreshesAsync(LogCollector logs, int count) =>
+        WaitUntilAsync(() => Task.FromResult(RefreshCount(logs) >= count), "The worker did not refresh the tenant directory.");
 
     /// <summary>Lets the runtime role read the platform schema, in one step, so a read sees all the rows or none.</summary>
     private static async Task GrantPlatformAsync(string platform)

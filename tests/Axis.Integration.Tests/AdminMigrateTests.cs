@@ -20,7 +20,7 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
     [Fact]
     public async Task Migrate_with_parallel_2_migrates_the_tenants_that_can_be_reached_and_exits_1_for_the_one_that_cannot()
     {
-        await using var scenario = await AdminScenario.NewAsync(database);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var ids = new[] { scenario.NewTenantId(), scenario.NewTenantId(), scenario.NewTenantId() };
         foreach (var id in ids)
         {
@@ -50,7 +50,7 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
     [Fact]
     public async Task Migrate_skips_provisioning_tenants_migrates_suspended_ones_and_keeps_every_status()
     {
-        await using var scenario = await AdminScenario.NewAsync(database);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var active = scenario.NewTenantId();
         var suspended = scenario.NewTenantId();
         var provisioning = scenario.NewTenantId();
@@ -86,7 +86,7 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
     [Fact]
     public async Task Migrate_with_a_tenant_option_migrates_only_that_tenant()
     {
-        await using var scenario = await AdminScenario.NewAsync(database);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var one = scenario.NewTenantId();
         var other = scenario.NewTenantId();
         Assert.Equal(0, (await scenario.CreateAsync(one, $"{one}.example.test")).Exit);
@@ -107,7 +107,7 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
     [Fact]
     public async Task A_server_under_directory_answers_503_for_a_tenant_on_an_older_schema_until_migrate_has_run_and_the_directory_is_read_again()
     {
-        await using var scenario = await AdminScenario.NewAsync(database);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var id = scenario.NewTenantId();
         var host = $"{id}.example.test";
         Assert.Equal(0, (await scenario.CreateAsync(id, host)).Exit);
@@ -131,7 +131,7 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
     [Fact]
     public async Task Migrate_for_an_unknown_or_provisioning_tenant_or_with_a_bad_option_exits_2_and_changes_no_directory_row()
     {
-        await using var scenario = await AdminScenario.NewAsync(database);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var active = scenario.NewTenantId();
         var provisioning = scenario.NewTenantId();
         Assert.Equal(0, (await scenario.CreateAsync(active, $"{active}.example.test")).Exit);
@@ -163,7 +163,7 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
     [Fact]
     public async Task Migrate_before_the_platform_tables_exist_does_nothing_and_exits_0()
     {
-        await using var scenario = await AdminScenario.NewAsync(database, migrate: false);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: false, CancellationToken);
 
         var result = await scenario.RunAsync(["migrate"]);
 
@@ -177,7 +177,7 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
     [Fact]
     public async Task Migrate_needs_neither_the_admin_role_nor_the_client_secret()
     {
-        await using var scenario = await AdminScenario.NewAsync(database);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
 
         var result = await scenario.RunAsync(["migrate"], adminConnectionString: "", withClientSecret: false);
 

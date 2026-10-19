@@ -21,9 +21,14 @@ internal static partial class AdminCommands
 
     public const string ClientSecretSetting = "AXIS_OIDC_CLIENT_SECRET";
 
+    public const string PathSetting = "PATH";
+
     private const string Usage =
-        "Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>\n"
-        + "       migrate [--tenant <id>] [--parallel <n>]";
+        """
+        Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>
+               tenant backup <id> --out <file>
+               migrate [--tenant <id>] [--parallel <n>]
+        """;
 
     public static async Task<int> RunAsync(
         string[] args,
@@ -40,6 +45,11 @@ internal static partial class AdminCommands
         if (args.Length > 0 && args[0] == "migrate")
         {
             return await MigrateAsync(args, configuration, output, error, cancellationToken);
+        }
+
+        if (args.Length >= 2 && args[0] == "tenant" && args[1] == "backup")
+        {
+            return await BackupAsync(args, configuration, output, error, cancellationToken);
         }
 
         var request = ParseTenantCreate(args);
@@ -72,6 +82,62 @@ internal static partial class AdminCommands
         }
 
         return await new TenantCreate(settings, request, output, cancellationToken).RunAsync();
+    }
+
+    private static async Task<int> BackupAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var request = ParseTenantBackup(args);
+        if (request is null)
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        var settings = ReadBackupSettings(configuration, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        BackupPlan? plan;
+        try
+        {
+            plan = await TenantBackup.PrepareAsync(settings, request, error, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+
+        return plan is null ? 2 : await new TenantBackup(settings, plan, output, cancellationToken).RunAsync();
+    }
+
+    private static TenantBackupRequest? ParseTenantBackup(string[] args)
+    {
+        if (args.Length < 3 || args[2].StartsWith("--", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        string? file = null;
+        for (var i = 3; i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || args[i] != "--out" || file is not null || string.IsNullOrWhiteSpace(args[i + 1]))
+            {
+                return null;
+            }
+
+            file = args[i + 1];
+        }
+
+        return file is null ? null : new TenantBackupRequest(args[2], file);
     }
 
     private static TenantCreateRequest? ParseTenantCreate(string[] args)
@@ -133,7 +199,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        var settings = ReadSettings(configuration, out var problem);
+        var settings = ReadPlatformSettings(configuration, out var problem);
         if (settings is null)
         {
             error.WriteLine(problem);
@@ -143,7 +209,7 @@ internal static partial class AdminCommands
         IReadOnlyList<TenantRow> tenants;
         try
         {
-            if (!await PlatformTablesExistAsync(settings, cancellationToken))
+            if (!await PlatformTablesExistAsync(settings.PlatformConnectionString, cancellationToken))
             {
                 // With no directory there is no tenant to migrate, and the install runs this before the first server start.
                 error.WriteLine("The platform tables do not exist, so there is no tenant to migrate.");
@@ -222,8 +288,27 @@ internal static partial class AdminCommands
         return new MigrateRequest(tenant, parallel ?? 1);
     }
 
+    /// <summary><c>tenant backup</c> needs the platform database and the installation key, and <c>PATH</c> to find <c>pg_dump</c>. It needs no admin role and no client secret.</summary>
+    private static BackupSettings? ReadBackupSettings(IConfiguration configuration, out string problem)
+    {
+        var platform = ReadPlatformSettings(configuration, out problem);
+        if (platform is null)
+        {
+            return null;
+        }
+
+        var path = configuration[PathSetting];
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            problem = $"The environment variable {PathSetting} is required, to find pg_dump.";
+            return null;
+        }
+
+        return new BackupSettings(platform.PlatformConnectionString, platform.Cipher, path);
+    }
+
     /// <summary>Reads the settings that every command needs: the platform database and the key of the tenant secrets.</summary>
-    private static AdminSettings? ReadSettings(IConfiguration configuration, out string problem)
+    private static PlatformSettings? ReadPlatformSettings(IConfiguration configuration, out string problem)
     {
         problem = "";
         var platform = configuration[PlatformSetting];
@@ -264,7 +349,7 @@ internal static partial class AdminCommands
             return null;
         }
 
-        return new AdminSettings(platformConnection, cipher);
+        return new PlatformSettings(platformConnection, cipher);
     }
 
     /// <summary>Reads the settings of <c>tenant create</c>: the common ones, the admin role and the OIDC client secret.</summary>
@@ -280,7 +365,7 @@ internal static partial class AdminCommands
             return null;
         }
 
-        var common = ReadSettings(configuration, out problem);
+        var common = ReadPlatformSettings(configuration, out problem);
         if (common is null)
         {
             return null;
@@ -310,14 +395,6 @@ internal static partial class AdminCommands
         }
 
         return new CreateSettings(adminBuilder, common.PlatformConnectionString, common.Cipher, secret);
-    }
-
-    private static async Task<bool> PlatformTablesExistAsync(AdminSettings settings, CancellationToken cancellationToken)
-    {
-        await using var platform = new NpgsqlConnection(settings.PlatformConnectionString);
-        await platform.OpenAsync(cancellationToken);
-        await using var command = new NpgsqlCommand("SELECT to_regclass('platform.tenants') IS NOT NULL", platform);
-        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 
     /// <summary>Returns the reason to refuse the command, or null. It checks the admin role and the input before any tenant work.</summary>
@@ -375,9 +452,23 @@ internal static partial class AdminCommands
             return "--oidc-client-id must not be blank.";
         }
 
+        return await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+    }
+
+    private static async Task<bool> PlatformTablesExistAsync(string platformConnectionString, CancellationToken cancellationToken)
+    {
+        await using var platform = new NpgsqlConnection(platformConnectionString);
+        await platform.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("SELECT to_regclass('platform.tenants') IS NOT NULL", platform);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    /// <summary>Returns the reason that the platform database cannot be used, or null when its tables exist. The admin tool does not create them.</summary>
+    public static async Task<string?> PlatformTablesProblemAsync(string platformConnectionString, CancellationToken cancellationToken)
+    {
         try
         {
-            if (!await PlatformTablesExistAsync(settings, cancellationToken))
+            if (!await PlatformTablesExistAsync(platformConnectionString, cancellationToken))
             {
                 return "The platform tables do not exist. Start the server once under Tenancy:Source=directory, which creates them.";
             }
@@ -402,12 +493,16 @@ internal sealed record TenantCreateRequest(string Id, IReadOnlyList<string> Host
 
 internal sealed record MigrateRequest(string? Tenant, int Parallel);
 
+internal sealed record TenantBackupRequest(string Id, string Out);
+
 /// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
-internal record AdminSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
+internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
+
+internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath);
 
 /// <summary>The settings of <c>tenant create</c>, which also needs the admin role and the OIDC client secret.</summary>
 internal sealed record CreateSettings(
     NpgsqlConnectionStringBuilder Admin,
     string PlatformConnectionString,
     TenantSecretCipher Cipher,
-    string OidcClientSecret) : AdminSettings(PlatformConnectionString, Cipher);
+    string OidcClientSecret);

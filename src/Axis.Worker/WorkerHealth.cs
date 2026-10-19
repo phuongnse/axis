@@ -5,7 +5,7 @@ namespace Axis.Worker;
 
 /// <summary>
 /// What the health endpoints of the worker report. The loop says when it polled, when a tenant
-/// database counted as migrated and when a tenant waits for its schema version. A waiting tenant counts as ready,
+/// database counted as migrated, when a tenant waits for its schema version and when a tenant left the directory. A waiting tenant counts as ready,
 /// so one tenant whose migration failed does not keep the worker from being ready. The loop is stalled when it has not polled within twice the lease,
 /// because one work item can run for up to a lease. Before the first poll the time counts from the start.
 /// </summary>
@@ -36,5 +36,11 @@ internal sealed class WorkerHealth(TimeProvider time, WorkerOptions options, ITe
         {
             _waiting.TryRemove(tenantId, out _);
         }
+    }
+
+    public void TenantDropped(string tenantId)
+    {
+        _migrated.TryRemove(tenantId, out _);
+        _waiting.TryRemove(tenantId, out _);
     }
 }

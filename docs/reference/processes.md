@@ -2513,13 +2513,26 @@ Under `Tenancy:Source=directory`, the worker reads its tenants from the
 [tenant directory](../architecture.md#tenant-directory) instead, over
 `ConnectionStrings:Platform`, and ignores a `Tenants` section. It needs
 `ConnectionStrings:Platform` and `Platform:SecretKey` and stops at start without
-them. It never uses `ConnectionStrings:PlatformSchema`. It reads the directory
-once at start. If that read fails, it logs the failure once, retries every
-`Worker:PollInterval` and is not ready until a read works. A change to the
-directory applies after a restart of the worker, except the schema version of
-a tenant, which the worker reads again at each poll round. *(Planned for M9.)* The worker
-refreshes the directory, and it claims no new work for a tenant that is not
-`active`. Work it already claimed finishes.
+them, and it stops at start when `Tenancy:RefreshInterval` is invalid. It never
+uses `ConnectionStrings:PlatformSchema`. It reads the directory at start. If that
+read fails, it logs the failure once, retries every `Worker:PollInterval` and is
+not ready until a read works.
+
+Then it reads the directory again every `Tenancy:RefreshInterval`, without a
+restart. The refresh runs in the polling loop, between work items, so no
+connection pool is dropped while an item runs. A tenant that is `suspended`,
+`provisioning` or removed gets no new work item claimed after the next refresh.
+Work already claimed finishes. A tenant added as `active` is polled after the
+next refresh, once its runtime database role check passes. Until then the worker
+skips it, logs an error and runs the check again at each refresh. A tenant whose
+database settings change goes through the check again and gets a new connection
+pool. If a refresh fails, the worker keeps the last good read and logs an error,
+and `/health/ready` answers `200` with status `Degraded` until a refresh works.
+A long run of work items for one tenant delays the refresh until the run ends.
+
+The worker also reads the schema version of every tenant again at each poll
+round, and claims no new work for a tenant whose version is not its own. It runs
+that tenant's work again once `migrate` has brought the tenant to its version.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |

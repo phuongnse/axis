@@ -14,11 +14,6 @@ namespace Axis.Integration.Tests;
 
 public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
-    private const string TestSecretKey = AdminScenario.TestSecretKey;
-    private const string Authority = AdminScenario.Authority;
-
-    private static readonly TenantSecretCipher _cipher = AdminScenario.Cipher;
-
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -48,7 +43,7 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
             Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         }
 
-        var runtime = _cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
+        var runtime = AdminScenario.Cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
         await using var connection = new NpgsqlConnection(scenario.TenantConnectionString(id, row.RuntimeUser, runtime));
         await connection.OpenAsync(CancellationToken);
         await using var create = new NpgsqlCommand("CREATE TABLE entities.x(i int)", connection);
@@ -226,7 +221,7 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
         var id = scenario.NewTenantId();
 
         var noSecret = await scenario.RunAsync(AdminScenario.CreateArgs(id, "shop.example.test"), withClientSecret: false);
-        var noHost = await scenario.RunAsync(["tenant", "create", id, "--oidc-authority", Authority, "--oidc-client-id", "axis"]);
+        var noHost = await scenario.RunAsync(["tenant", "create", id, "--oidc-authority", AdminScenario.Authority, "--oidc-client-id", "axis"]);
         var unknown = await scenario.RunAsync(["tenant", "delete", id]);
 
         Assert.Equal(2, noSecret.Exit);
@@ -246,22 +241,9 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
             builder.UseSetting("Tenancy:Source", "directory");
             builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(platform));
             builder.UseSetting("ConnectionStrings:PlatformSchema", platform);
-            builder.UseSetting("Platform:SecretKey", TestSecretKey);
+            builder.UseSetting("Platform:SecretKey", AdminScenario.TestSecretKey);
             builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
         });
 
-    private Task<AdminScenario> NewScenarioAsync(bool migrate = true) => AdminScenario.NewAsync(database, migrate);
-
-    /// <summary>A line ends a stop request: the token is canceled once the database step has reported.</summary>
-    private sealed class CancelOnLineWriter(CancellationTokenSource source) : StringWriter
-    {
-        public override void WriteLine(string? value)
-        {
-            base.WriteLine(value);
-            if (value is not null && value.EndsWith(" database ok", StringComparison.Ordinal))
-            {
-                source.Cancel();
-            }
-        }
-    }
+    private Task<AdminScenario> NewScenarioAsync(bool migrate = true) => AdminScenario.NewAsync(database, migrate, CancellationToken);
 }

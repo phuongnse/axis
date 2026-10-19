@@ -11,7 +11,7 @@ namespace Axis.Admin;
 /// directory records for it.
 /// </summary>
 internal sealed class TenantMigrate(
-    AdminSettings settings,
+    PlatformSettings settings,
     IReadOnlyList<TenantRow> tenants,
     int parallel,
     TextWriter output,

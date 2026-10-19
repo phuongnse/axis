@@ -12,18 +12,27 @@ internal sealed record AdminResult(int Exit, string[] Output, string[] Error);
 /// <summary>One platform database and its admin roles. It drops the databases of the tenants it made.</summary>
 internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisposable
 {
-    public const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-    public const string Authority = "https://127.0.0.1:1/realms/axis";
-
-    public static readonly TenantSecretCipher Cipher = TenantSecretCipher.Load(
-        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [TenantSecretCipher.KeySetting] = TestSecretKey }).Build());
-
     private readonly string _clientSecret = $"client-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12))}";
     private readonly List<string> _adminPasswords = [];
     private readonly List<string> _texts = [];
     private readonly List<string> _tenants = [];
 
+    private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+
+    public const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+    public const string Authority = "https://127.0.0.1:1/realms/axis";
+
+    public static readonly TenantSecretCipher Cipher = TenantSecretCipher.Load(
+        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [TenantSecretCipher.KeySetting] = TestSecretKey }).Build());
+
     public string Platform { get; } = platform;
+
+    /// <summary>The OIDC client secret that <c>tenant create</c> gets, for tests that check it never leaks.</summary>
+    public string ClientSecret => _clientSecret;
+
+    /// <summary>The passwords of the admin roles this scenario made.</summary>
+    public IReadOnlyList<string> AdminPasswords => _adminPasswords;
 
     /// <summary>The connection string of the admin role that every command uses unless a test passes another.</summary>
     public string AdminConnection { get; private set; } = "";
@@ -36,17 +45,15 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         "--oidc-client-id", "axis",
     ];
 
-    private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
-
-    /// <summary>Creates the platform database, migrates it unless <paramref name="migrate"/> is false, and the admin role.</summary>
-    public static async Task<AdminScenario> NewAsync(PostgreSqlFixture database, bool migrate = true)
+    /// <summary>Creates a platform database, migrates it unless <paramref name="migrate"/> is false, and returns the scenario on it.</summary>
+    public static async Task<AdminScenario> NewAsync(PostgreSqlFixture database, bool migrate, CancellationToken cancellationToken)
     {
-        var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
+        var platform = await database.CreateDatabaseAsync("platform", cancellationToken);
         if (migrate)
         {
             var options = new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options;
             await using var context = new PlatformDbContext(options);
-            await context.Database.MigrateAsync(CancellationToken);
+            await context.Database.MigrateAsync(cancellationToken);
         }
 
         var scenario = new AdminScenario(platform, migrate);
@@ -85,7 +92,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         TextWriter? output = null,
         CancellationTokenSource? stop = null,
         string? adminConnectionString = null,
-        bool withClientSecret = true)
+        bool withClientSecret = true,
+        string? path = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -93,6 +101,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             ["ConnectionStrings:PlatformSchema"] = Platform,
             ["Platform:SecretKey"] = TestSecretKey,
             ["AXIS_OIDC_CLIENT_SECRET"] = withClientSecret ? _clientSecret : null,
+            ["PATH"] = path,
         };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         using var error = new StringWriter();
@@ -106,23 +115,6 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
     public string TenantConnectionString(string id, string user, string password) =>
         new NpgsqlConnectionStringBuilder(Platform) { Database = $"axis_{id}", Username = user, Password = password }.ConnectionString;
-
-    /// <summary>Sets the schema version recorded for a tenant, as if its database were on another schema.</summary>
-    public async Task SetSchemaVersionAsync(string id, string schemaVersion)
-    {
-        await using var context = NewContext();
-        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
-        row.SchemaVersion = schemaVersion;
-        await context.SaveChangesAsync(CancellationToken);
-    }
-
-    public async Task SetStatusAsync(string id, string status)
-    {
-        await using var context = NewContext();
-        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
-        row.Status = status;
-        await context.SaveChangesAsync(CancellationToken);
-    }
 
     public async Task<TenantRow> RowAsync(string id)
     {
@@ -162,6 +154,23 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 Convert.ToHexString(t.RuntimePassword), Convert.ToHexString(t.SchemaPassword), t.OidcAuthority, t.OidcClientId,
                 Convert.ToHexString(t.OidcClientSecret), t.SchemaVersion))
             .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}")));
+    }
+
+    /// <summary>Sets the schema version recorded for a tenant, as if its database were on another schema.</summary>
+    public async Task SetSchemaVersionAsync(string id, string schemaVersion)
+    {
+        await using var context = NewContext();
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+        row.SchemaVersion = schemaVersion;
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
+    public async Task SetStatusAsync(string id, string status)
+    {
+        await using var context = NewContext();
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+        row.Status = status;
+        await context.SaveChangesAsync(CancellationToken);
     }
 
     /// <summary>
@@ -206,4 +215,17 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
     private PlatformDbContext NewContext() => new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(Platform).Options);
 
     private static string[] Lines(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
+
+/// <summary>A line ends a stop request: the token is canceled once the database step has reported.</summary>
+internal sealed class CancelOnLineWriter(CancellationTokenSource source) : StringWriter
+{
+    public override void WriteLine(string? value)
+    {
+        base.WriteLine(value);
+        if (value is not null && value.EndsWith(" database ok", StringComparison.Ordinal))
+        {
+            source.Cancel();
+        }
+    }
 }
