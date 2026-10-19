@@ -44,6 +44,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
 
     public DbSet<ReleaseActivationRow> ReleaseActivations => Set<ReleaseActivationRow>();
 
+    public DbSet<PublishRequest> PublishRequests => Set<PublishRequest>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         GuardImmutability();
@@ -169,6 +171,32 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
                 .HasForeignKey(a => a.ReleaseId)
                 .HasConstraintName("fk_release_activations_releases_release_id")
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PublishRequest>(request =>
+        {
+            request.ToTable("publish_requests");
+            request.HasKey(r => r.Id).HasName("pk_publish_requests");
+            request.Property(r => r.Id).HasColumnName("id").ValueGeneratedNever();
+            request.Property(r => r.ApplicationId).HasColumnName("application_id");
+            request.Property(r => r.Kind).HasColumnName("kind");
+            request.Property(r => r.Status).HasColumnName("status");
+            request.Property(r => r.Snapshot).HasColumnName("snapshot").HasColumnType("jsonb");
+            request.Property(r => r.ReleaseId).HasColumnName("release_id");
+            request.Property(r => r.Label).HasColumnName("label");
+            request.Property(r => r.Note).HasColumnName("note");
+            request.Property(r => r.RequestedBy).HasColumnName("requested_by");
+            request.Property(r => r.RequestedByName).HasColumnName("requested_by_name");
+            request.Property(r => r.RequestedAt).HasColumnName("requested_at").HasDefaultValueSql("now()");
+            request.Property(r => r.ClaimedBy).HasColumnName("claimed_by");
+            request.Property(r => r.LeaseUntil).HasColumnName("lease_until");
+            request.Property(r => r.Claims).HasColumnName("claims").HasDefaultValue(0);
+            request.Property(r => r.StartedAt).HasColumnName("started_at");
+            request.Property(r => r.FinishedAt).HasColumnName("finished_at");
+            request.Property(r => r.Diagnostics).HasColumnName("diagnostics").HasColumnType("jsonb");
+            // Serves the publisher's claim of the oldest queued request of an application.
+            request.HasIndex(r => new { r.ApplicationId, r.Status, r.RequestedAt, r.Id })
+                .HasDatabaseName("ix_publish_requests_application_id_status_requested_at_id");
         });
     }
 

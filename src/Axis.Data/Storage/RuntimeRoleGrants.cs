@@ -6,7 +6,8 @@ namespace Axis.Data.Storage;
 /// <summary>
 /// Gives the runtime database role its rights in the <c>axis</c> and <c>entities</c> schemas, as the
 /// access table in the storage reference says: row access on every <c>entities</c> table and on the
-/// <see cref="RuntimeWrittenTables"/>, <c>SELECT</c> only on every other <c>axis</c> table, and no right
+/// <see cref="RuntimeWrittenTables"/>, <c>SELECT</c> and <c>INSERT</c> on the
+/// <see cref="RuntimeInsertedTables"/>, <c>SELECT</c> only on every other <c>axis</c> table, and no right
 /// to create, alter or drop anything. The role name comes from configuration, so an EF Core migration
 /// cannot hold it. The server runs this step both before and after the tenant migrations. The first run
 /// sets the default privileges that apply to the tables the migrations create, and the second run
@@ -36,6 +37,15 @@ public static class RuntimeRoleGrants
         "sequence_counters",
         "computed_field_errors",
         "pending_computed_fields",
+    };
+
+    /// <summary>
+    /// The <c>axis</c> tables that the runtime database role may insert into and read, but never update,
+    /// delete or truncate.
+    /// </summary>
+    public static readonly IReadOnlySet<string> RuntimeInsertedTables = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "publish_requests",
     };
 
     /// <summary>
@@ -89,9 +99,12 @@ public static class RuntimeRoleGrants
         foreach (var table in tables)
         {
             var qualified = $"{EntityNaming.Quote("axis")}.{EntityNaming.Quote(table)}";
-            await Execute(RuntimeWrittenTables.Contains(table)
-                ? $"GRANT SELECT, INSERT, UPDATE, DELETE ON {qualified} TO {role}"
-                : $"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON {qualified} FROM {role}");
+            await Execute(
+                RuntimeWrittenTables.Contains(table)
+                    ? $"GRANT SELECT, INSERT, UPDATE, DELETE ON {qualified} TO {role}"
+                    : RuntimeInsertedTables.Contains(table)
+                        ? $"GRANT SELECT, INSERT ON {qualified} TO {role}; REVOKE UPDATE, DELETE, TRUNCATE ON {qualified} FROM {role}"
+                        : $"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON {qualified} FROM {role}");
         }
 
         await transaction.CommitAsync(cancellationToken);

@@ -73,6 +73,92 @@ namespace Axis.Configuration.Storage.Migrations
                     b.ToTable("active_sites", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Configuration.Storage.PublishRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<string>("ClaimedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("claimed_by");
+
+                    b.Property<int>("Claims")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("claims");
+
+                    b.Property<string>("Diagnostics")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("diagnostics");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Label")
+                        .HasColumnType("text")
+                        .HasColumnName("label");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<Guid?>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("requested_by");
+
+                    b.Property<string>("RequestedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("requested_by_name");
+
+                    b.Property<string>("Snapshot")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_publish_requests");
+
+                    b.HasIndex("ApplicationId", "Status", "RequestedAt", "Id")
+                        .HasDatabaseName("ix_publish_requests_application_id_status_requested_at_id");
+
+                    b.ToTable("publish_requests", "axis");
+                });
+
             modelBuilder.Entity("Axis.Configuration.Storage.Release", b =>
                 {
                     b.Property<Guid>("Id")
