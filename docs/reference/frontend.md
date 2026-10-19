@@ -935,7 +935,8 @@ the diagnostics panel, and the reconnect message are built.
     resend a save that got no answer, so the author clicks Save again.
   - Save and Delete are off while the message shows.
   - A `401` from a reload starts sign-in, as elsewhere.
-- **Out of scope.** Visual process and page designers stay out of scope, see
-  [out of scope for now](../product-brief.md#out-of-scope-for-now).
+- **Designers.** Visual page, form and process designers are not built yet.
+  They are planned for M13 and M14, see
+  [D46](../decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
 - **Texts.** Its texts, including those of the lists above, are the platform
   texts under `shell.studio.*`, in `en` and `vi`, like the other shell texts.

@@ -2,8 +2,8 @@
 
 ## What Axis is
 
-Axis is a platform for building and running enterprise business applications
-through configuration. An application is a set of typed resources:
+Axis is a general-purpose low-code platform for building and running business
+applications of any domain through configuration. An application is a set of typed resources:
 
 - entities and fields
 - data sources
@@ -22,6 +22,10 @@ When a requirement cannot be expressed in configuration, it is written as an
 **extension package**: versioned, tested C# code that adds typed operations
 under explicit capability limits. The package is built and deployed on its
 own, separate from the configuration (see [decisions](decisions.md) D7).
+
+An author creates, configures, tests, publishes and runs an application
+through Studio, without editing JSON or code. Files stay the source of truth
+(D5). No domain gets platform code. See [D46](decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
 
 ## Who uses it
 
@@ -57,15 +61,16 @@ own, separate from the configuration (see [decisions](decisions.md) D7).
 These are expected later. They must not shape early milestones beyond keeping
 the agreed extension points (see [decisions](decisions.md)).
 
-- FAPI 2.0 conformance and formal security certification.
+- Formal security certification. FAPI 2.0 and ASVS verification come in the
+  Hardening milestone, M16 (see the [roadmap](roadmap.md#milestones)).
 - Provisioning many tenants self-service, and Axis-hosted SaaS operations.
-- Custom UI widgets.
-- Visual process and page designers.
+- Custom UI widgets. They come after the visual designers (D8, D46).
 - Migrating live business data between installations.
 
 ## First application: purchase requests
 
-The first application exercises the whole platform. It lives as
+The first application is the first proving sample of the platform. It exercises
+the whole platform. It lives as
 configuration in `samples/apps/purchase-requests/`. It is not platform code.
 
 ### Data
@@ -108,10 +113,13 @@ configuration in `samples/apps/purchase-requests/`. It is not platform code.
 
 ## Second application: leave requests
 
-A second, smaller application shows that the platform is
-reused with no platform code change. It lives as configuration in
-`samples/apps/leave-requests/`. It is not platform code. See
+A second, smaller application is the second proving sample, of the same
+shape. It shows that the platform is reused with no platform code change. It
+lives as configuration in `samples/apps/leave-requests/`. It is not platform
+code. See
 [D41](decisions.md#d41-leave-requests-as-the-second-sample-application--agreed).
+Later samples of different shapes, a service desk and asset management, follow
+from M11. See [D46](decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
 
 ### Data
 
