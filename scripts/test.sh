@@ -3,6 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
+source scripts/lib/tools.sh
 
 for project in Axis.Server.Tests Axis.Configuration.Tests Axis.Data.Tests Axis.Expressions.Tests Axis.Tenancy.Tests; do
   run_suite "$project" "tests/$project" dotnet test --project "tests/$project" -c Release \
@@ -13,9 +14,10 @@ run_suite PaymentReferences.Tests samples/packages/PaymentReferences.Tests dotne
 run_suite web web npm test --prefix web -- \
   --reporter=default --reporter=junit --outputFile.junit="$results_dir/web.xml"
 
-# The report, smoke test selection and link check scripts' own tests.
+# The report, smoke test selection, link check and Helm chart scripts' own tests.
 node --test scripts/test-report.test.mjs || status=1
 node --test scripts/affected.test.mjs || status=1
 node --test scripts/check-links.test.mjs || status=1
+HELM="$helm" node --test scripts/helm.test.mjs || status=1
 
 finish_report

@@ -72,9 +72,9 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 
 | Script | What it does | Needs |
 | --- | --- | --- |
-| `scripts/setup.sh` | Restores .NET packages, installs npm packages and the Playwright browser | Network |
+| `scripts/setup.sh` | Restores .NET packages, installs npm packages and the Playwright browser, and installs pinned Helm, kubeconform and the Kubernetes schemas into `~/.cache/axis-tools` | Network |
 | `scripts/build.sh` | Builds the SPA into the server web root, then the .NET solution, which installs the sample extension package in `artifacts/extensions`, then installs the sample modules in `artifacts/modules` | |
-| `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
+| `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, the Markdown link and anchor check, and the Helm chart lint and schema check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
 | `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, which also run the test scenarios of every application under `samples/apps/` on that PostgreSQL, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
 | `scripts/e2e.sh` | Starts PostgreSQL, Keycloak, the built purchasing system stub, server and worker, runs Playwright in Chromium, then runs the Compose smoke test and the production images smoke test, each skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |

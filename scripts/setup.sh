@@ -2,6 +2,7 @@
 # Installs every dependency the checks need. Safe to run repeatedly.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/lib/tools.sh
 
 dotnet restore Axis.slnx
 dotnet tool restore
@@ -12,3 +13,4 @@ if [[ "${CI:-}" == "true" ]]; then
 else
   npx --prefix tests/e2e playwright install chromium
 fi
+install_tools

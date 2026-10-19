@@ -1,0 +1,17 @@
+# Values for the lint, the schema check and the render tests. They name every
+# Secret and both volumes, so the checks cover every branch of the templates.
+secrets:
+  platformConnection:
+    name: axis-platform
+  platformSchemaConnection:
+    name: axis-platform
+  platformSecretKey:
+    name: axis-platform
+extensions:
+  volume:
+    persistentVolumeClaim:
+      claimName: axis-extensions
+modules:
+  volume:
+    persistentVolumeClaim:
+      claimName: axis-modules

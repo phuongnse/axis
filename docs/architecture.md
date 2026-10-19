@@ -96,7 +96,7 @@ samples/
   packages/               the sample extension package payment-references and its unit tests
 deploy/
   compose/                production Compose example (M9)
-  helm/axis/              Helm chart for Kubernetes (M9)
+  helm/axis/              Helm chart for Kubernetes
 ```
 
 Projects are created when the first issue needs them. The solution holds
@@ -1007,8 +1007,8 @@ checks, because the production images hold no `curl`.
 
 Axis ships as three production images, as
 [D44](decisions.md#d44-packaging-for-on-premises-and-cloud-installation--agreed)
-says. The images are built. *(Planned for M9.)* The Compose example and the
-chart are not.
+says. The images and the chart are built. *(Planned for M9.)* The Compose
+example is not.
 
 - `axis-server` and `axis-worker` run the hosts. They hold no sample and no
   development setting.

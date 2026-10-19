@@ -1,0 +1,6 @@
+apiVersion: v2
+name: axis
+description: Installs the Axis server and worker on Kubernetes, with a pre-upgrade Job that migrates the databases.
+type: application
+version: 0.1.0
+appVersion: "0.0.0-dev"
