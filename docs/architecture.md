@@ -991,9 +991,10 @@ checks, because the production images hold no `curl`.
 
 ## Installation
 
-*(Planned for M9.)* Axis ships as three production images, as
+Axis ships as three production images, as
 [D44](decisions.md#d44-packaging-for-on-premises-and-cloud-installation--agreed)
-says. None of it is built.
+says. The images are built. *(Planned for M9.)* The Compose example and the
+chart are not.
 
 - `axis-server` and `axis-worker` run the hosts. They hold no sample and no
   development setting.

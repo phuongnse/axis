@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.Configuration;
@@ -18,7 +19,7 @@ internal static partial class AdminCommands
     public const string ClientSecretSetting = "AXIS_OIDC_CLIENT_SECRET";
 
     private const string Usage =
-        "Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>";
+        "Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>\n       version";
 
     public static async Task<int> RunAsync(
         string[] args,
@@ -31,6 +32,12 @@ internal static partial class AdminCommands
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+
+        if (args is ["version"])
+        {
+            output.WriteLine(typeof(AdminCommands).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
+            return 0;
+        }
 
         var request = ParseTenantCreate(args);
         if (request is null)

@@ -77,7 +77,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/lint.sh` | `dotnet format` check, oxlint, TypeScript and Prettier checks, and the Markdown link and anchor check | |
 | `scripts/test.sh` | .NET unit tests and Vitest | |
 | `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, which also run the test scenarios of every application under `samples/apps/` on that PostgreSQL, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
-| `scripts/e2e.sh` | Starts PostgreSQL, Keycloak, the built purchasing system stub, server and worker, runs Playwright in Chromium, then runs the Compose smoke test, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
+| `scripts/e2e.sh` | Starts PostgreSQL, Keycloak, the built purchasing system stub, server and worker, runs Playwright in Chromium, then runs the Compose smoke test and the production images smoke test, each skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker |
 
 The test, integration and E2E scripts run every suite even when one fails. The one
 exception is a smoke test that NexKit's `NEXKIT_BASE_SHA` shows no change can affect. It is
@@ -94,6 +94,12 @@ Each application's test scenarios are a suite of their own, named `scenarios-<ap
 The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.
 A failure names the scenario and the step. To run them by hand, run
 `dotnet run --project src/Axis.Scenarios -- <folder> --server <cs> --extensions artifacts/extensions --modules artifacts/modules`.
+
+The `Dockerfile` also has three production targets, `axis-server`, `axis-worker` and `axis-admin`,
+which hold no samples or development settings. Build one with
+`docker build --target axis-server --build-arg AXIS_VERSION=<version> .`. `scripts/e2e.sh` builds
+and runs all three in the `images` suite, from `scripts/images.test.mjs`. The default target is still
+the development server.
 
 To run Axis, run `docker compose up --build`. It builds Axis from source and starts
 PostgreSQL, Keycloak with the `axis` development realm at http://localhost:8080, the server

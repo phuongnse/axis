@@ -1,11 +1,12 @@
 # Installation
 
-*(Planned for M9.)* How to install and upgrade Axis on premises and in the
-cloud. It follows
+How to install and upgrade Axis on premises and in the cloud. It follows
 [D44](../decisions.md#d44-packaging-for-on-premises-and-cloud-installation--agreed).
-None of it is built. Today only the development `Dockerfile` and
-`compose.yaml` exist. They hold the samples and development credentials, and
-they are not for production. See [AGENTS.md](../../AGENTS.md#commands) for them.
+The three production images are built. *(Planned for M9.)* The production
+Compose example and the Helm chart are not built. The default target of the
+`Dockerfile` and `compose.yaml` build the development images instead. Those
+hold the samples and development credentials, and they are not for
+production. See [AGENTS.md](../../AGENTS.md#commands) for them.
 
 The conventions of [architecture.md](../architecture.md) apply, and Dn refers
 to [decisions.md](../decisions.md). In this page, "database role" always means
@@ -27,6 +28,11 @@ does not ship either one for production.
 There are three production images: `axis-server`, `axis-worker` and
 `axis-admin`. They hold no sample, no sample extension package, no sample
 module, no development realm and no credential.
+
+Build one from the repository root with
+`docker build --target axis-server --build-arg AXIS_VERSION=<version> .`.
+Use `axis-worker` or `axis-admin` as the target for the other two. `AXIS_VERSION`
+defaults to `0.0.0-dev`.
 
 - **Environment.** They run the `Production` environment.
 - **User.** They run as a non-root user and work with a read-only root file

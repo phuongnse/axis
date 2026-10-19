@@ -56,6 +56,25 @@ export const smokeSuites = {
     'web/package.json',
     'web/package-lock.json',
   ],
+  images: [
+    'Dockerfile',
+    '.dockerignore',
+    'scripts/images.test.mjs',
+    'scripts/lib/',
+    'scripts/e2e.sh',
+    'samples/postgres/',
+    'global.json',
+    'Directory.Build.props',
+    'Directory.Packages.props',
+    'Axis.slnx',
+    /\.csproj$/,
+    /^src\/(.+\/)?appsettings[^/]*\.json$/,
+    'src/Axis.Server/Program.cs',
+    'src/Axis.Worker/Program.cs',
+    'src/Axis.Admin/',
+    'web/package.json',
+    'web/package-lock.json',
+  ],
 }
 
 /** Lists the paths changed since base, including untracked files. Throws when git fails. */
