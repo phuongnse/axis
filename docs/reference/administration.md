@@ -6,8 +6,8 @@ activate releases, and back up and restore tenants. It follows
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
 and
 [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
-Only `tenant create`, `tenant backup` and `version` are built. Every other command is
-still planned. Today a
+Only `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup` and
+`version` are built. Every other command is still planned. Today a
 tenant can also come from the `Tenants` section, where the server migrates and
 activates at start, see
 [startup activation](configuration.md#startup-activation).
@@ -40,6 +40,11 @@ connection. There is no HTTP API for provisioning in M9.
 A missing or invalid setting exits with code 2 before any tenant work. The
 message names the setting and never holds its value.
 
+`tenant suspend`, `tenant resume` and `tenant list` read only
+`ConnectionStrings:PlatformSchema`. They decrypt nothing and create no role or
+database, so they need neither `Platform:SecretKey`, `Admin:ConnectionString`
+nor `AXIS_OIDC_CLIENT_SECRET`.
+
 `tenant backup` reads only `ConnectionStrings:PlatformSchema`,
 `Platform:SecretKey` and `PATH`. It creates no role or database, so it needs
 neither `Admin:ConnectionString` nor `AXIS_OIDC_CLIENT_SECRET`. The tool looks
@@ -60,7 +65,7 @@ Every command writes one line per tenant and step to standard output:
 
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
 `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
-`check` and `restore`. A line names the
+`check`, `restore` and `status`. A line names the
 tenant and never a host, a password or a connection string. A `failed` message
 never holds one either. A failed `dump` step says only `pg_dump exited with code <n>`
 and never repeats the text that `pg_dump` wrote, because that text can name the
@@ -161,7 +166,7 @@ database.
 
 ## Tenant suspend
 
-*(Planned for M9.)* `tenant suspend <id>` sets the status of an `active` tenant to `suspended`
+*(Built for M9.)* `tenant suspend <id>` sets the status of an `active` tenant to `suspended`
 and raises its `version`.
 
 | Option | Meaning |
@@ -170,29 +175,33 @@ and raises its `version`.
 
 Hosts pick the change up at their next refresh. After that the tenant's hosts
 answer `503`, and the worker claims none of its new work. Work already claimed
-finishes. Suspending a `suspended` tenant is a no-op that exits `0`.
+finishes. It writes one `status` line. Suspending a `suspended` tenant is a no-op
+that exits `0` and does not raise the `version`. The status changes with one
+conditional update, so a `tenant create` that finishes at the same moment is
+never overwritten.
 
 **Exit codes.** `0` on success. `1` when the tenant is `provisioning`, or the
 write failed. `2` for an unknown tenant.
 
 ## Tenant resume
 
-*(Planned for M9.)* `tenant resume <id>` sets the status of a `suspended` tenant to `active` and
+*(Built for M9.)* `tenant resume <id>` sets the status of a `suspended` tenant to `active` and
 raises its `version`.
 
 | Option | Meaning |
 | --- | --- |
 | `<id>` | The tenant id. |
 
-Hosts pick the change up at their next refresh. Resuming an `active` tenant is a
-no-op that exits `0`.
+Hosts pick the change up at their next refresh. It writes one `status` line.
+Resuming an `active` tenant is a no-op that exits `0` and does not raise the
+`version`.
 
 **Exit codes.** `0` on success. `1` when the tenant is `provisioning`, or the
 write failed. `2` for an unknown tenant.
 
 ## Tenant list
 
-*(Planned for M9.)* `tenant list` prints a table with one row for each tenant, in ordinal order of
+*(Built for M9.)* `tenant list` prints a table with one row for each tenant, in ordinal order of
 the id:
 
 | Column | Meaning |
