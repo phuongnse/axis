@@ -1,0 +1,8 @@
+{
+  "message": "request to https://registry.npmjs.org/-/npm/v1/security/advisories/bulk failed",
+  "error": {
+    "code": "ENOTFOUND",
+    "summary": "request to the advisory service failed",
+    "detail": ""
+  }
+}
