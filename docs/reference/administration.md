@@ -575,9 +575,9 @@ Docker Compose, the E2E script and both production installs start one, see
 
 **What is built.** The command runs `publish` requests for
 `Tenancy:Source=directory`. These stay *(planned for M10)*: `validate` and
-`rollback` requests, the configuration source, preview requests, renewing a
-lease, claiming an expired one again, `AXC0215` and the release history. A
-request of a kind that is not built is never claimed, so it stays `queued`.
+`rollback` requests, the configuration source, preview requests and the release
+history. A request of a kind that is not built is never claimed, so it stays
+`queued`.
 
 **Settings.** It reads these, with the meaning they have for the other commands:
 
@@ -606,21 +606,25 @@ the worker does.
 
 **Claiming.** Each poll round, for each served tenant, it claims the oldest
 `queued` `publish` request with `FOR UPDATE SKIP LOCKED`. It sets the request
-`running`, `claimed_by` to its own name, `lease_until` and adds 1 to `claims`.
+`running`, `claimed_by` to its own name, `lease_until` and adds 1 to `claims`. A
+`running` request whose lease has run out is claimed the same way.
 
 - **One at a time.** For one tenant and application it runs one request at a
   time, oldest first, so when two publishes are queued the newer one ends up
   live. A claim skips an application that already has a `running` request.
-  Requests of other applications and tenants can run at the same time. Two
-  publishers can still claim two requests of one application at the same
-  moment, because that check does not lock the rows it reads.
-- **Lease.** The lease is five minutes, fixed. It is not renewed, and a
-  `running` request whose lease has run out is not claimed again, so a request
-  whose publisher died stays `running`. *(Planned for M10:)* The publisher
-  renews the lease while the request runs. A `running` request whose lease has
-  run out is claimed again, because its publisher died. A request that has been
-  claimed three times and whose lease runs out again ends `failed` with
-  `AXC0215`, see the [lifecycle](authoring.md#lifecycle).
+  Requests of other applications and tenants can run at the same time. Each
+  claim takes a lock of the tenant database before it reads the queue, so two
+  publishers cannot claim two requests of one application at the same moment.
+- **Lease.** The lease is five minutes, fixed. The publisher renews it every
+  third of the lease while the request runs, so a long publish is not claimed
+  twice. A `running` request whose lease has run out is claimed again by any
+  publisher, because its publisher died. A request that has been claimed three
+  times and whose lease runs out again ends `failed` with `AXC0215`, with a
+  `release.publishFailed` audit record, see the [lifecycle](authoring.md#lifecycle).
+  The `claims` count is the fencing token. Renewal and the final update change
+  the request only while its status is `running` and `claims` is still the value
+  this publisher claimed. A publisher that lost its claim writes a
+  `claim failed` line and no audit record.
 - **Two publishers.** More than one publisher is safe, because the claim skips
   rows that another publisher holds. The production installs run one.
 
@@ -682,8 +686,7 @@ stays active and the request ends `failed` with its `releaseId`, as with
 
 **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the
 request it is running, then exits. A stop that comes mid-request leaves a lease
-that runs out. *(Planned for M10:)* Another publisher then claims the request
-again. The platform's shutdown grace period must be longer than the longest
+that runs out. Another publisher then claims the request again. The platform's shutdown grace period must be longer than the longest
 request, or the request is claimed twice.
 
 **Exit codes.** `0` after a stop on `SIGTERM` or Ctrl+C. `1` when it cannot read

@@ -87,6 +87,24 @@ internal sealed class TenantDatabaseSteps(
     public async Task<string> ReadSchemaVersionAsync() =>
         await TenantSchemaVersion.ReadAsync(await SchemaConnectionAsync(), cancellationToken);
 
+    /// <summary>A new open connection as the tenant's schema role. The caller disposes it.</summary>
+    public async Task<NpgsqlConnection> OpenSchemaConnectionAsync()
+    {
+        var password = cipher.Decrypt(row.Id, TenantSecretFields.SchemaPassword, row.SchemaPassword).Reveal();
+        var connection = new NpgsqlConnection(ConnectionString(row.SchemaUser, password));
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+
+        return connection;
+    }
+
     public async Task<NpgsqlConnection> SchemaConnectionAsync()
     {
         if (_schemaConnection is null)

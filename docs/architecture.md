@@ -878,7 +878,7 @@ to the draft. Only another grant can make it readable.
 
 - **Workers.** Workers claim ready work with `FOR UPDATE SKIP LOCKED` and a
   lease. Commits check the claim token (fencing). Claims and fencing are
-  built for work items.
+  built for work items and publish requests.
 - **External operations.** These run outside the transaction, using the
   operation identity as their idempotency key. The result is recorded by a
   following transaction. A `callConnector` step stages its call in its
