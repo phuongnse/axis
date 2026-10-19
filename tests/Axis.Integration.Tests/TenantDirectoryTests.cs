@@ -6,6 +6,7 @@ using Axis.Data;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Server.Tests;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -116,6 +117,22 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
         Assert.DoesNotContain(wrongPassword, exception.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task The_start_stops_naming_the_tenant_and_the_binding_but_not_the_value_when_a_url_binding_is_not_a_url()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(
+            [new TenantBindingRow { TenantId = "a", Name = "PurchasingUrl", Kind = DeploymentBindingKinds.Url, Url = "not-a-url/secretmarker" }],
+            a with { Host = "a.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector());
+
+        var exception = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains("Tenant 'a' binding 'PurchasingUrl' is not an absolute http or https URL.", exception.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("secretmarker", exception.ToString(), StringComparison.Ordinal);
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(string platform, LogCollector logs, params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -182,7 +199,10 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
     }
 
     /// <summary>Creates a platform database with the directory tables and one active tenant row per tenant.</summary>
-    private async Task<string> PreparePlatformAsync(params DirectoryTenant[] tenants)
+    private Task<string> PreparePlatformAsync(params DirectoryTenant[] tenants) => PreparePlatformAsync([], tenants);
+
+    /// <summary>Creates a platform database with the directory tables, one active tenant row per tenant and the given bindings.</summary>
+    private async Task<string> PreparePlatformAsync(TenantBindingRow[] bindings, params DirectoryTenant[] tenants)
     {
         var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
         var options = new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options;
@@ -208,6 +228,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
             context.TenantHosts.Add(new TenantHostRow { TenantId = tenant.Id, Host = tenant.Host });
         }
 
+        context.TenantBindings.AddRange(bindings);
         await context.SaveChangesAsync(CancellationToken);
         return platform;
     }

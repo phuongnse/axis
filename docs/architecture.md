@@ -243,8 +243,9 @@ settings, OIDC settings and bindings once from the `platform` schema over
 `ConnectionStrings:Platform`. It uses them for host matching, tenant
 connections, deployment bindings and sign-in. A password, the client secret
 and a `secret` binding stay encrypted in memory and are decrypted only when a
-connection opens, the sign-in client is set up or a binding is resolved. If the
-first load fails, the start stops with an error that names
+connection opens, the sign-in client is set up or a binding is resolved. The
+binding check runs on each read. On failure it names the tenant and the binding,
+never the value. If the first load fails, the start stops with an error that names
 `ConnectionStrings:Platform` and holds no password. An empty directory starts,
 and every host answers `404` until tenants are added and the server restarts.
 Under `directory`, a non-empty `ActivateOnStartup` stops the start. Under
