@@ -252,6 +252,13 @@ command exits `1` at the end.
 when at least one tenant failed. `2` for a folder that does not exist, an
 unknown `--tenant`, a `--tenant` that is `provisioning` or a missing setting.
 
+## Version
+
+*(Planned for M9.)* `version` prints the Axis version on one line. It takes no
+option and needs no settings. It always exits `0`. The production image of the
+admin host carries the same version in its OCI label, see
+[installation](installation.md#images).
+
 ## Not in M9
 
 - Deleting a tenant.
