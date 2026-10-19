@@ -140,11 +140,14 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
 ## Platform database
 
-*(Planned for M9.)* See
+*(Partly built for M9.)* See
 [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
-None of it is built. The platform database holds no tables today, and its
-connection string only serves the readiness check. Under
-`Tenancy:Source=directory`, it holds the tenant directory, see
+The `platform` schema, its migrations and the read-only grant are built. The
+directory source and `Axis.Admin` are not, so nothing reads or writes the
+tables yet. Under `Tenancy:Source=configuration` the platform database holds no
+tables, and its connection string only serves the readiness check. Under
+`Tenancy:Source=directory` the server creates the tables at start, and they are
+meant to hold the tenant directory, see
 [tenant directory](../architecture.md#tenant-directory).
 
 - **The `platform` schema.** Its EF Core migrations ship with Axis, with their
@@ -153,7 +156,11 @@ connection string only serves the readiness check. Under
   nothing else.
 - **Read-only hosts.** Both hosts read the directory over
   `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
-  and `SELECT` on its tables, and nothing else.
+  and `SELECT` on its tables, and nothing else. The server sets this in one
+  transaction after the migrations, and revokes any wider right the role had
+  there. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
+  It does not yet check whether the role is a superuser, owns the schema or
+  inherits rights through membership.
 - **The writer.** `Axis.Admin` writes the directory over
   `ConnectionStrings:PlatformSchema`, see
   [administration](administration.md) and

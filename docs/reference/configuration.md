@@ -1073,10 +1073,15 @@ to show where a resource is used and what it uses.
 
 ## Tenancy settings
 
-*(Planned for M9.)* See
+*(Partly built for M9.)* See
 [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed)
-and [tenant directory](../architecture.md#tenant-directory). None of these
-settings exist yet.
+and [tenant directory](../architecture.md#tenant-directory). Only the server's
+reading of `Tenancy:Source` and `ConnectionStrings:PlatformSchema` exists. Under
+`directory` the server applies the platform migrations at start and limits the
+role of `ConnectionStrings:Platform` to reading the `platform` schema. It still
+reads its tenants from the `Tenants` section, and does not warn about that
+section, until the directory source is built. The other settings, and the
+worker's reading of `Tenancy:Source`, do not exist yet.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -1101,9 +1106,16 @@ As environment variables they are `Tenancy__Source`,
   `SchemaConnectionString`. The server and the worker hold only the runtime
   database role of each tenant. `Axis.Admin` migrates and activates tenant
   databases, see [database roles](storage.md#database-roles).
+- **Values.** `Tenancy:Source` matches exactly, in lower case. A blank value
+  counts as unset. Any other value stops the server's start, naming the
+  setting.
 - **Platform schema.** The server still applies the platform migrations at
   start over `ConnectionStrings:PlatformSchema`. So "no schema connection"
-  under `directory` means no tenant schema connection.
+  under `directory` means no tenant schema connection. Under `directory` the
+  server refuses a missing or blank `ConnectionStrings:PlatformSchema`, and a
+  `ConnectionStrings:Platform` that names no user or the same user as
+  `ConnectionStrings:PlatformSchema`. Under `configuration` it reads neither
+  `ConnectionStrings:PlatformSchema` nor any platform table.
 - **`ActivateOnStartup`.** It must be empty under `directory`, see
   [startup activation](#startup-activation).
 

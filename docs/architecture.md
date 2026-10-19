@@ -76,7 +76,7 @@ src/
   Axis.Processes/         work items, decision, task, operation and end steps, task API, the record command, connector calls, package operations, events, triggers and schedules, inbound endpoint starts
   Axis.Policy/            policy evaluation: entity, data source and process grants, record filters, field sets
   Axis.Presentation/      site/page/widget metadata served to the SPA
-  Axis.Tenancy/           tenant resolution, connection factory
+  Axis.Tenancy/           tenant resolution, connection factory, platform schema
   Axis.Extensions/        contracts for extension packages: operation interface, operation context
 web/                      React + TypeScript SPA (Vite), Ant Design, ProComponents
 tests/
@@ -229,10 +229,12 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
 
 *(Planned for M9.)* It follows
 [D42](decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
-Only the tenant catalog contract is built. The server and the worker read
-tenants through it, and only the `configuration` source answers it, from the
-`Tenants` section above. The `Tenancy:Source` setting, the directory source and
-the refresh are not built.
+The tenant catalog contract and the `platform` schema are built. The server and
+the worker read tenants through the contract, and only the `configuration`
+source answers it, from the `Tenants` section above. Under
+`Tenancy:Source=directory` the server creates the `platform` tables at start,
+but still reads its tenants from the `Tenants` section. The directory source
+and the refresh are not built.
 
 - **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
   default, or `directory`. Both answer through one tenant catalog contract, so

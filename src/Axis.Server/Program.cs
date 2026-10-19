@@ -29,6 +29,32 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
     throw new InvalidOperationException("Connection string 'Platform' is not configured.");
 }
 
+// Under directory, the platform migrations run before startup activation. Under configuration, nothing
+// about the platform schema is read.
+if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
+{
+    var platformSchemaConnectionString = builder.Configuration.GetConnectionString("PlatformSchema");
+    if (string.IsNullOrWhiteSpace(platformSchemaConnectionString))
+    {
+        throw new InvalidOperationException("Connection string 'PlatformSchema' is required when Tenancy:Source is 'directory'.");
+    }
+
+    var readerRole = new NpgsqlConnectionStringBuilder(platformConnectionString).Username;
+    if (string.IsNullOrWhiteSpace(readerRole))
+    {
+        throw new InvalidOperationException("Connection string 'Platform' must name a user when Tenancy:Source is 'directory'.");
+    }
+
+    if (string.Equals(readerRole, new NpgsqlConnectionStringBuilder(platformSchemaConnectionString).Username, StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException(
+            "Connection strings 'Platform' and 'PlatformSchema' name the same user. They must be different roles.");
+    }
+
+    builder.Services.AddSingleton(new PlatformMigrationOptions(platformSchemaConnectionString, readerRole));
+    builder.Services.AddHostedService<PlatformMigration>();
+}
+
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
 builder.Services.AddSingleton<TenantDatabaseGauge>();
 builder.Services.AddHealthChecks()
