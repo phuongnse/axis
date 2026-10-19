@@ -101,7 +101,7 @@ internal sealed partial class StartupActivation(
         await processes.Database.MigrateAsync(cancellationToken);
         await GrantRuntimeRoleAsync(schemaConnection, runtimeRole, tenantId, cancellationToken);
         await RuntimeRoleCheck.CheckAsync(await runtime.GetConnectionAsync(cancellationToken), tenantId, cancellationToken);
-        var bindings = Bindings(tenantId);
+        var bindings = TenantActivationBindings.For(tenants.Find(tenantId)!, environment.IsDevelopment());
 
         foreach (var folder in options.Folders)
         {
@@ -160,24 +160,6 @@ internal sealed partial class StartupActivation(
             throw new InvalidOperationException(
                 $"Tenant '{tenantId}': {exception.Message} Its ConnectionString and SchemaConnectionString must name different users.", exception);
         }
-    }
-
-    /// <summary>
-    /// The tenant's bindings as activation checks them. A secret's value stays behind, and a url
-    /// binding may use http only in Development.
-    /// </summary>
-    private ActivationBindings Bindings(string tenantId)
-    {
-        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (name, binding) in tenants.Find(tenantId)!.Bindings)
-        {
-            // The tenant check at startup already refused a binding without a kind, or a url binding that is not an absolute URL.
-            bindings[name] = new ActivationBinding(
-                binding.Kind,
-                binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Url!, UriKind.Absolute) : null);
-        }
-
-        return new ActivationBindings(tenantId, bindings, AllowHttp: environment.IsDevelopment());
     }
 
     /// <summary>Opens connections from one data source, whatever the current tenant is.</summary>

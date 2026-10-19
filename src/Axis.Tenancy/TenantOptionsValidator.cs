@@ -52,34 +52,41 @@ public static class TenantOptionsValidator
         return problems;
     }
 
-    // A binding's value never goes into a message, so a bad configuration cannot leak a secret.
     private static void AddBindingProblems(string tenantId, TenantSettings? settings, List<string> problems)
     {
         foreach (var (name, binding) in (settings?.Bindings ?? []).OrderBy(binding => binding.Key, StringComparer.Ordinal))
         {
-            var kind = binding?.Kind;
-            var value = binding?.Value;
-            if (string.IsNullOrWhiteSpace(kind))
-            {
-                problems.Add($"Tenant '{tenantId}' binding '{name}' has no kind: use '{DeploymentBindingKinds.Url}' or '{DeploymentBindingKinds.Secret}'.");
-            }
-            else if (kind is not (DeploymentBindingKinds.Url or DeploymentBindingKinds.Secret))
-            {
-                problems.Add($"Tenant '{tenantId}' binding '{name}' has kind '{kind}': use '{DeploymentBindingKinds.Url}' or '{DeploymentBindingKinds.Secret}'.");
-            }
-
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                problems.Add($"Tenant '{tenantId}' binding '{name}' has no value.");
-            }
-            else if (kind == DeploymentBindingKinds.Url && !IsAbsoluteHttpUrl(value))
-            {
-                problems.Add($"Tenant '{tenantId}' binding '{name}' is not an absolute http or https URL.");
-            }
+            AddBindingProblems(tenantId, name, binding?.Kind, !string.IsNullOrWhiteSpace(binding?.Value), binding?.Value, problems);
         }
     }
 
-    private static bool IsAbsoluteHttpUrl(string value) =>
+    /// <summary>
+    /// Adds the problems of one binding. <paramref name="hasValue"/> tells whether the binding holds a value, and
+    /// <paramref name="url"/> is the value a <c>url</c> binding is checked on. A binding's value never goes into a
+    /// message, so a bad configuration cannot leak a secret.
+    /// </summary>
+    internal static void AddBindingProblems(string tenantId, string name, string? kind, bool hasValue, string? url, List<string> problems)
+    {
+        if (string.IsNullOrWhiteSpace(kind))
+        {
+            problems.Add($"Tenant '{tenantId}' binding '{name}' has no kind: use '{DeploymentBindingKinds.Url}' or '{DeploymentBindingKinds.Secret}'.");
+        }
+        else if (kind is not (DeploymentBindingKinds.Url or DeploymentBindingKinds.Secret))
+        {
+            problems.Add($"Tenant '{tenantId}' binding '{name}' has kind '{kind}': use '{DeploymentBindingKinds.Url}' or '{DeploymentBindingKinds.Secret}'.");
+        }
+
+        if (!hasValue)
+        {
+            problems.Add($"Tenant '{tenantId}' binding '{name}' has no value.");
+        }
+        else if (kind == DeploymentBindingKinds.Url && !IsAbsoluteHttpUrl(url))
+        {
+            problems.Add($"Tenant '{tenantId}' binding '{name}' is not an absolute http or https URL.");
+        }
+    }
+
+    private static bool IsAbsoluteHttpUrl(string? value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
