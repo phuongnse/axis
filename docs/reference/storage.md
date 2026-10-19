@@ -24,7 +24,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.release_activations` (the activation history with release numbers),
     see [Release history](#release-history). It also owns
     `axis.publish_requests` (the requests that Studio stores and the publisher
-    runs). The routes and the publisher are _(planned for M10)_, see
+    runs). The publisher runs them. The routes are _(planned for M10)_, see
     [Publish requests and release history](#publish-requests-and-release-history). The caller
     supplies the tenant database connection. Other modules read and set the
     active release and its site paths only through `IActiveReleaseStore`;
