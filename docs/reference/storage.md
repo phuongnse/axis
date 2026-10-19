@@ -142,9 +142,9 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
 *(Partly built for M9.)* See
 [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
-The `platform` schema, its migrations and the read-only grant are built. The
-directory source and `Axis.Admin` are not, so nothing reads or writes the
-tables yet. Under `Tenancy:Source=configuration` the platform database holds no
+The `platform` schema, its migrations, the read-only grant and the secret
+cipher are built. The directory source and `Axis.Admin` are not, so nothing
+reads or writes the tables, or encrypts a stored value, yet. Under `Tenancy:Source=configuration` the platform database holds no
 tables, and its connection string only serves the readiness check. Under
 `Tenancy:Source=directory` the server creates the tables at start, and they are
 meant to hold the tenant directory, see
@@ -193,7 +193,11 @@ a tenant only when this value is the one the host was built for, see
   installation key `Platform:SecretKey`, see
   [tenancy settings](configuration.md#tenancy-settings). The associated data
   is the tenant id and the field name, so a value copied to another tenant or
-  field does not decrypt.
+  field does not decrypt. The associated data is the UTF-8 bytes of the tenant
+  id, one zero byte, and the UTF-8 bytes of the field name. The field names are
+  `runtime_password`, `schema_password`, `oidc_client_secret`, and `binding:`
+  followed by the binding name in lower case. Every writer must use these
+  exact bytes and names.
 - **Decryption.** A value is decrypted only at the moment of use, as
   `SecretValue` does today. No API, log, problem details or backup manifest
   holds a decrypted value.

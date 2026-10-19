@@ -236,8 +236,9 @@ The tenant catalog contract and the `platform` schema are built. The server and
 the worker read tenants through the contract, and only the `configuration`
 source answers it, from the `Tenants` section above. Under
 `Tenancy:Source=directory` the server creates the `platform` tables at start,
-but still reads its tenants from the `Tenants` section. The directory source
-and the refresh are not built.
+but still reads its tenants from the `Tenants` section. The secret cipher and
+the check of `Platform:SecretKey` at start are built, but nothing encrypts a
+stored value yet. The directory source and the refresh are not built.
 
 - **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
   default, or `directory`. Both answer through one tenant catalog contract, so

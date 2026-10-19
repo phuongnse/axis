@@ -1076,12 +1076,14 @@ to show where a resource is used and what it uses.
 *(Partly built for M9.)* See
 [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed)
 and [tenant directory](../architecture.md#tenant-directory). Only the server's
-reading of `Tenancy:Source` and `ConnectionStrings:PlatformSchema` exists. Under
-`directory` the server applies the platform migrations at start and limits the
-role of `ConnectionStrings:Platform` to reading the `platform` schema. It still
-reads its tenants from the `Tenants` section, and does not warn about that
-section, until the directory source is built. The other settings, and the
-worker's reading of `Tenancy:Source`, do not exist yet.
+reading of `Tenancy:Source` and `ConnectionStrings:PlatformSchema`, and both
+hosts' reading of `Platform:SecretKey`, exist. Under `directory` the server
+applies the platform migrations at start and limits the role of
+`ConnectionStrings:Platform` to reading the `platform` schema. Both hosts
+refuse a missing or invalid `Platform:SecretKey` at start. The worker reads
+`Tenancy:Source` only for that. Both hosts still read their tenants from the
+`Tenants` section, and do not warn about that section, until the directory
+source is built. The other settings do not exist yet.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -1107,8 +1109,8 @@ As environment variables they are `Tenancy__Source`,
   database role of each tenant. `Axis.Admin` migrates and activates tenant
   databases, see [database roles](storage.md#database-roles).
 - **Values.** `Tenancy:Source` matches exactly, in lower case. A blank value
-  counts as unset. Any other value stops the server's start, naming the
-  setting.
+  counts as unset. Any other value stops the start of the server and of the worker,
+  naming the setting.
 - **Platform schema.** The server still applies the platform migrations at
   start over `ConnectionStrings:PlatformSchema`. So "no schema connection"
   under `directory` means no tenant schema connection. Under `directory` the

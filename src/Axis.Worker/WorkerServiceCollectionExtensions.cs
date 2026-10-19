@@ -3,6 +3,7 @@ using Axis.Configuration.Packages;
 using Axis.Core.Telemetry;
 using Axis.Processes;
 using Axis.Tenancy;
+using Axis.Tenancy.Platform;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Axis.Worker;
@@ -16,7 +17,8 @@ public static class WorkerServiceCollectionExtensions
     /// that runs in Development sends connector calls to an <c>http</c> base URL.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker or health configuration is invalid, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist.
+    /// The tenant, worker or health configuration is invalid, <c>Tenancy:Source</c> is unknown, <c>Platform:SecretKey</c> is missing or invalid under
+    /// <c>directory</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
@@ -44,6 +46,11 @@ public static class WorkerServiceCollectionExtensions
         if (string.IsNullOrWhiteSpace(health.Urls))
         {
             throw new InvalidOperationException($"'{HealthOptions.SectionName}:{nameof(HealthOptions.Urls)}' must not be empty.");
+        }
+
+        if (TenancySettings.Source(configuration) == TenancySource.Directory)
+        {
+            services.AddSingleton(TenantSecretCipher.Load(configuration));
         }
 
         services.AddWorkerTelemetry(configuration);
