@@ -66,6 +66,8 @@ file.
 | `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker | yes | The read-only platform database role. |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it only at start. The worker never gets it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | server, worker, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
+| `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | *(planned for M10)* Optional. The IP addresses of your reverse proxies. See [several server replicas](#several-server-replicas). |
+| `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | *(planned for M10)* Optional. The CIDR ranges of your reverse proxies. |
 | `Admin:ConnectionString` | `Admin__ConnectionString` | admin | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of the new tenant. Only `tenant create` reads it. |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
@@ -173,7 +175,7 @@ sets it, 30 seconds by default.
 - **Ports.** The server listens on `127.0.0.1:8080` of the host, and the
   worker's health endpoints on `127.0.0.1:5208`. Without TLS in the server, put
   a reverse proxy on the same machine in front of the server. See
-  [forwarded headers](#open-points). The images hold no `curl`, so the
+  [forwarded headers](#several-server-replicas). The images hold no `curl`, so the
   example has no container health check. Probe `/health/ready` from the host.
 - **The purchase request sample** needs a purchasing system binding, which no
   admin command sets, see [open points](#open-points). This guide activates
@@ -199,6 +201,9 @@ operator uses it. The test then:
 6. Checks that a host no tenant holds answers `404`. Suspends tenant `two`,
    checks that it answers `503` while `one` still serves, then resumes it and
    checks that it serves again.
+7. *(planned for M10)* Starts two server replicas behind a TLS proxy, signs in
+   through the proxy, restarts one replica and checks that the session still
+   works on both.
 
 The test checks sign-in up to the redirect and does not complete it. Another
 test checks that nothing under `deploy/compose/` holds a secret, and that the
@@ -260,8 +265,9 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `image.pullPolicy` | `IfNotPresent` | Pull policy. |
 | `image.pullSecrets` | none | Names of image pull Secrets. |
 | `server.repository`, `worker.repository`, `migrate.repository` | `axis-server`, `axis-worker`, `axis-admin` | Repository of each image. |
-| `server.replicas` | 1 | Keep 1 until the [key ring](#open-points) is decided. |
+| `server.replicas` | 1 | Server replicas. *(planned for M10)* Any number works once the key ring is shared, see [several server replicas](#several-server-replicas). |
 | `worker.replicas` | 1 | Worker replicas. |
+| `studio.persistence` | none | *(planned for M10)* A Kubernetes volume source for the Studio folders, mounted on every server replica at the same path. Use it when Studio is on. It needs a `ReadWriteMany` storage class. |
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 80 | The Service of the server. Put your own Ingress in front of it. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
@@ -292,6 +298,43 @@ Job and the secret references. `scripts/setup.sh` installs the pinned Helm,
 kubeconform and Kubernetes schemas into `~/.cache/axis-tools`. Axis has no test
 against a live cluster.
 
+## Several server replicas
+
+*(planned for M10)* The server can run as several replicas behind a reverse
+proxy that ends TLS. See
+[D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+Nothing here is built yet.
+
+- **A shared key ring.** The server keeps its data protection keys in the
+  platform database, encrypted with `Platform:SecretKey`. See
+  [platform database](storage.md#platform-database). Sessions survive a
+  restart and work on every replica. Every replica needs the same
+  `Platform:SecretKey`.
+- **Forwarded headers.** Behind a proxy that ends TLS, the server sees plain
+  HTTP. Name your proxies so the server can read the real scheme and host:
+
+  | Setting | Environment variable | Meaning |
+  | --- | --- | --- |
+  | `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | IP addresses of the proxies. Use `__1`, `__2` and so on for more. |
+  | `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | CIDR ranges of the proxies, such as `10.0.0.0/8`. |
+
+- **What the proxy must send.** It must set `X-Forwarded-For`,
+  `X-Forwarded-Proto` and `X-Forwarded-Host`. It must replace any value a
+  client sent. The server reads these headers only from a named address, one
+  hop, and never reads `X-Forwarded-Prefix`. With both settings empty, it
+  reads none. Loopback is not trusted by default. The rules are in
+  [forwarded headers](configuration.md#forwarded-headers).
+- **Studio folders.** Put them on a shared volume. Mount it at the same path on
+  every replica, because the write lock is keyed by the folder path. In
+  Kubernetes that needs a `ReadWriteMany` storage class, set with
+  `studio.persistence`. See [Studio](configuration.md#studio).
+- **On premises.** The Compose example runs two server replicas behind a TLS
+  proxy.
+- **Platform settings under both tenant sources.** The server needs
+  `ConnectionStrings:PlatformSchema` and `Platform:SecretKey` also under
+  `Tenancy:Source=configuration`, because it creates the platform tables there
+  too. See [tenancy settings](configuration.md#tenancy-settings).
+
 ## Upgrade
 
 An upgrade has a fixed order. A host serves only tenants on its own schema
@@ -315,12 +358,6 @@ from step 1 and run the old images.
 
 These are not decided yet.
 
-- **The data protection key ring.** Sessions across replicas and restarts need
-  a shared ASP.NET data protection key ring. A read-only root file system has
-  nowhere to keep one. D44 does not decide where it lives.
-- **Forwarded headers.** A server behind a reverse proxy that ends TLS needs
-  forwarded headers for secure cookies and OIDC redirect addresses. The server
-  does not handle them today.
 - **The first install.** The server applies the platform migrations at start,
   see [platform database](storage.md#platform-database). `tenant create` does
   not create the `platform` tables and exits with code 2 without them, so start
