@@ -8,6 +8,20 @@ const serverCommand = 'dotnet run --project ../../src/Axis.Server --no-launch-pr
 const serverLog = process.env.AXIS_E2E_SERVER_LOG
 const quote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`
 
+// Playwright runs the command through a shell, and a shell drops an environment variable whose name has a
+// hyphen, such as Tenants__default-preview__ConnectionString. Those go through env in the command instead.
+const environment = {
+  ...serverEnv(baseURL),
+  ActivateOnStartup__0: e2eApp,
+  ActivateOnStartup__1: purchaseRequests,
+  ActivateOnStartup__2: leaveRequests,
+}
+const isShellName = (name: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)
+const hyphenated = Object.entries(environment).filter(([name]) => !isShellName(name))
+const command = hyphenated.length
+  ? `env ${hyphenated.map(([name, value]) => quote(`${name}=${value}`)).join(' ')} ${serverCommand}`
+  : serverCommand
+
 export default defineConfig({
   testDir: './specs',
   fullyParallel: true,
@@ -29,18 +43,13 @@ export default defineConfig({
   ],
   webServer: {
     // Playwright runs the command through a shell, so it can redirect the output.
-    command: serverLog ? `${serverCommand} >> ${quote(serverLog)} 2>&1` : serverCommand,
+    command: serverLog ? `${command} >> ${quote(serverLog)} 2>&1` : command,
     url: `${baseURL}/health/ready`,
     timeout: 120_000,
     reuseExistingServer: false,
     // The server compiles and activates all three applications in the tenant when it starts: the generic
     // test application, the purchase request sample and the leave request sample. Index 1 replaces the
     // entry of appsettings.Development.json, so the leave request sample is listed again at index 2.
-    env: {
-      ...serverEnv(baseURL),
-      ActivateOnStartup__0: e2eApp,
-      ActivateOnStartup__1: purchaseRequests,
-      ActivateOnStartup__2: leaveRequests,
-    },
+    env: Object.fromEntries(Object.entries(environment).filter(([name]) => isShellName(name))),
   },
 })

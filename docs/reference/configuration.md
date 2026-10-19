@@ -1197,8 +1197,17 @@ the operator sets it with
   none. `PreviewOf` that names an unknown tenant or a preview tenant, and two
   tenants that name the same main tenant, stop the start. See
   [tenant configuration](../architecture.md#tenant-configuration).
-- **Development.** *(Planned for M10:)* Development, Docker Compose and the E2E
-  script configure one preview tenant.
+- **Development.** `appsettings.Development.json` of the server and of the
+  worker, Docker Compose and the E2E script configure one preview tenant,
+  `default-preview`, with `PreviewOf: default`. It has its own database
+  `axis_preview` and its own database roles, `axis_preview_schema` and
+  `axis_preview_runtime`, see [database roles](storage.md#database-roles). It has
+  no `Oidc` block and no bindings, so the purchase request sample logs `AXC0100`
+  warnings on it. Its host is `preview.localhost`, and `localhost` under the E2E
+  script, where `default` is on `127.0.0.1`. The worker gets only the runtime
+  connection string. The development Keycloak realm accepts the preview hosts as
+  redirect and sign-out addresses. An existing Compose volume has no
+  `axis_preview` database and needs `docker compose down -v` once.
 
 ## Forwarded headers
 

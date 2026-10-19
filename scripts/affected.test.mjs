@@ -45,11 +45,11 @@ describe('matches', () => {
     assert.equal(matches('src/Axis.Server/appsettings.json', smokeSuites.compose), true)
   })
 
-  test('treats appsettings.Development.json as dev-script only', () => {
-    const path = 'src/Axis.Server/appsettings.Development.json'
-
-    assert.equal(matches(path, smokeSuites['dev-script']), true)
-    assert.equal(matches(path, smokeSuites.compose), false)
+  test('covers appsettings.Development.json under src for both suites', () => {
+    for (const path of ['src/Axis.Server/appsettings.Development.json', 'src/Axis.Worker/appsettings.Development.json']) {
+      assert.equal(matches(path, smokeSuites['dev-script']), true)
+      assert.equal(matches(path, smokeSuites.compose), true)
+    }
   })
 
   test('covers the sample extension packages for both suites', () => {

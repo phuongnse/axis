@@ -10,6 +10,10 @@
 # running.
 # The server runs startup activation as the database role axis_schema and serves requests as
 # axis_runtime. The worker runs only as axis_runtime. Docker Compose creates both roles.
+# The preview tenant default-preview serves at http://preview.localhost:5206 from the server and at
+# http://preview.localhost:5173 through the SPA. It has its own database axis_preview and its own
+# roles, axis_preview_schema and axis_preview_runtime, which Docker Compose creates, and no
+# deployment bindings. The server activates both samples on it too.
 # The sample extension package payment-references is built first, into artifacts/extensions,
 # which the server and the worker read through Extensions:Path. The sample modules under
 # samples/modules are installed into artifacts/modules, which they read through Modules:Path. A
@@ -51,6 +55,10 @@ log "Starting PostgreSQL on port $postgres_port, Keycloak on port $keycloak_port
 AXIS_POSTGRES_PORT="$postgres_port" AXIS_KEYCLOAK_PORT="$keycloak_port" AXIS_PURCHASING_PORT="$purchasing_port" \
   docker compose up -d --build --wait --wait-timeout 180 postgres keycloak purchasing
 schema_connection=""
+# Bash cannot export a name with a hyphen, like Tenants__default-preview__ConnectionString. These
+# overrides reach the server and the worker through env instead.
+server_env=()
+worker_env=()
 if [ -n "${AXIS_POSTGRES_PORT:-}" ]; then
   runtime_connection="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis;Username=axis_runtime;Password=axis"
   # The worker reads the same tenant connection string, so this export moves it too.
@@ -59,6 +67,11 @@ if [ -n "${AXIS_POSTGRES_PORT:-}" ]; then
   # Only the server reads the schema connection string, and startup activation uses it. It is
   # not exported, so the worker never holds the schema credentials.
   schema_connection="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis;Username=axis_schema;Password=axis"
+  # The preview tenant has its own database and roles. The worker gets only its runtime connection string.
+  preview_runtime="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis_preview;Username=axis_preview_runtime;Password=axis"
+  preview_schema="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis_preview;Username=axis_preview_schema;Password=axis"
+  server_env+=("Tenants__default-preview__ConnectionString=$preview_runtime" "Tenants__default-preview__SchemaConnectionString=$preview_schema")
+  worker_env+=("Tenants__default-preview__ConnectionString=$preview_runtime")
 fi
 if [ -n "${AXIS_KEYCLOAK_PORT:-}" ]; then
   # The server signs people in at the moved Keycloak.
@@ -201,7 +214,7 @@ start_server() {
   # With the default port the server reads the schema connection string from appsettings.Development.json.
   (cd src/Axis.Server && export ASPNETCORE_ENVIRONMENT=Development DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
     if [ -n "$schema_connection" ]; then export Tenants__default__SchemaConnectionString="$schema_connection"; fi
-    exec dotnet watch --non-interactive -- --urls "http://localhost:$server_port") \
+    exec env ${server_env[@]+"${server_env[@]}"} dotnet watch --non-interactive -- --urls "http://localhost:$server_port") \
     </dev/null > >(prefix server "$state/server-exited-$generation") 2>&1 &
   server=$!
   disown "$server"
@@ -216,7 +229,7 @@ start_server
 web=$!
 disown "$web"
 
-log "Server on http://localhost:$server_port, SPA on http://localhost:$web_port, Keycloak on http://localhost:$keycloak_port, purchasing system stub on http://localhost:$purchasing_port. Press Ctrl+C to stop."
+log "Server on http://localhost:$server_port, preview on http://preview.localhost:$server_port, SPA on http://localhost:$web_port (preview on http://preview.localhost:$web_port), Keycloak on http://localhost:$keycloak_port, purchasing system stub on http://localhost:$purchasing_port. Press Ctrl+C to stop."
 
 code=0
 while :; do
@@ -263,7 +276,7 @@ while :; do
   if [ -z "$worker" ] && [ -e "$state/server-listening" ]; then
     log "The server has migrated the tenant databases. Starting the worker."
     (cd src/Axis.Worker && DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true \
-      exec dotnet watch --non-interactive) \
+      exec env ${worker_env[@]+"${worker_env[@]}"} dotnet watch --non-interactive) \
       </dev/null > >(prefix worker) 2>&1 &
     worker=$!
     disown "$worker"

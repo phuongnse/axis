@@ -130,11 +130,14 @@ roles, `axis_schema` and `axis_runtime`, with the development password `axis`. T
 database with `axis_schema`, run servers and workers as `axis_runtime`, and run startup activation as
 `axis_schema`. Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the same. PostgreSQL loads
 `samples/postgres/init-roles.sql` on its first start, which creates the two roles and makes
-`axis_schema` own the tenant database. The server uses `axis_schema` for `SchemaConnectionString` and
+`axis_schema` own the tenant database. It also creates the preview tenant's database `axis_preview` and
+its two roles, `axis_preview_schema` and `axis_preview_runtime`, with the development password `axis`,
+which play the same parts for `default-preview`. The server uses `axis_schema` for `SchemaConnectionString` and
 `axis_runtime` for every other connection string. The worker uses only `axis_runtime` and gets no
 `SchemaConnectionString`. `axis` stays the bootstrap superuser, for setup and health checks only.
-PostgreSQL runs init scripts only on an empty volume, so an existing local Compose volume needs
-`docker compose down -v` once. That deletes its data. See
+PostgreSQL runs init scripts only on an empty volume, so an existing local Compose volume has no
+`axis_preview` database. It needs `docker compose down -v` once. That deletes its data. Until then
+the server stops at start, because it cannot reach `axis_preview`. See
 [database roles](docs/reference/storage.md#database-roles).
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
@@ -174,9 +177,19 @@ works on a fresh clone:
   its lines starting with `[publisher]`. It starts once the server has
   migrated the tenant databases. See
   [publisher](docs/reference/administration.md#publisher).
-- *(Planned for M10:)* Development, Compose and E2E configure one preview tenant, where an
-  author tries an application before publishing it. See
-  [D48](docs/decisions.md#d48-preview-tenants--agreed).
+- Development, Compose and E2E configure one preview tenant, `default-preview`, with
+  `PreviewOf: default`, where an author tries an application before publishing it. See
+  [D48](docs/decisions.md#d48-preview-tenants--agreed). It has its own database `axis_preview`
+  and its own roles, `axis_preview_schema` and `axis_preview_runtime`. It has no deployment
+  bindings, so the purchase request sample logs `AXC0100` warnings on it, and a connector call
+  there fails. It signs people in through the same Keycloak realm as `default`. The server
+  activates the purchase request and leave request samples on it at start. The worker runs it too,
+  with only its runtime connection string. Its host is `preview.localhost`: Compose and
+  `scripts/dev.sh` serve it at `http://preview.localhost:5206`, and `scripts/dev.sh` also serves it
+  through the SPA at `http://preview.localhost:5173`. The E2E server and worker serve it on
+  `localhost`, while `default` stays on `127.0.0.1`. The realm accepts sign-in and sign-out
+  redirects to those addresses. An existing local Compose volume needs `docker compose down -v`
+  once, because it has no `axis_preview` database.
 - `dotnet watch` applies C# changes, or restarts the server or the worker without
   a prompt when it cannot. Vite applies SPA changes.
 - A change to any `*.json` file under an activated application folder restarts the
