@@ -140,21 +140,22 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
 ## Platform database
 
-*(Partly built for M9.)* See
+See
 [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
 The `platform` schema, its migrations, the read-only grant, the secret cipher
 and the directory source of the server and the worker are built. `Axis.Admin
 tenant create` writes the tables and encrypts the stored passwords and the OIDC
-client secret. No other command is built, so nothing yet changes a tenant's
-status afterwards. Under `Tenancy:Source=configuration` the platform database holds no
-tables, and its connection string only serves the readiness check. Under
-`Tenancy:Source=directory` the server creates the tables at start, then reads
-the `active` tenants, their hosts and their bindings once over
-`ConnectionStrings:Platform`. It keeps each password, the client secret and
-each `secret` binding encrypted in memory, and decrypts one only when a
-connection opens, the sign-in client is set up or a binding is resolved. It
-reads no `schema_password`. The worker reads the same rows once, over the same
-role, and creates no tables. See
+client secret. `tenant suspend` and `tenant resume` change a tenant's status,
+and `tenant restore` adds a suspended tenant. Under `Tenancy:Source=configuration`
+the platform database holds no tables, and its connection string only serves the
+readiness check. Under `Tenancy:Source=directory` the server creates the tables at
+start, then reads the `active` tenants, their hosts and their bindings over
+`ConnectionStrings:Platform`. Both hosts read them again every
+`Tenancy:RefreshInterval`. The server and the worker keep each password, the client
+secret and each `secret` binding encrypted in memory, and decrypt one only when a
+connection opens, the sign-in client is set up or a binding is resolved. Neither
+reads any `schema_password`. The worker reads the same rows over the same role,
+and creates no tables. See
 [tenant directory](../architecture.md#tenant-directory).
 
 - **The `platform` schema.** Its EF Core migrations ship with Axis, with their
@@ -208,7 +209,7 @@ a tenant only when this value is the one the host was built for, see
 - **Decryption.** A value is decrypted only at the moment of use, as
   `SecretValue` does today. No API, log, problem details or backup manifest
   holds a decrypted value.
-- **No key rotation.** M9 has none. After a leaked key, every stored secret
+- **No key rotation.** Axis has none. After a leaked key, every stored secret
   must be set again by hand.
 
 ## Database roles
@@ -316,11 +317,11 @@ server holds no tenant schema connection, see
 
 ### Under the directory source
 
-*(Partly built for M9.)* See
+See
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
-`tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`, `tenant restore`, `migrate` and `activate` are built. Under `Tenancy:Source=directory`, `tenant create` creates
+Under `Tenancy:Source=directory`, `tenant create` creates
 the two database roles of a tenant, its database and the ownership, with no
-superuser. See [administration](administration.md). Each step below runs on one
+superuser. See [administration](administration.md) for the admin commands. Each step below runs on one
 host with one database role:
 
 | Step | Host | Database role |

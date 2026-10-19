@@ -127,7 +127,7 @@ The result is:
   per step and implemented once by the engine.
 - **Early events.** Events that arrive before a process waits for them are
   stored and matched later, not dropped.
-- **Restore** *(built for M9)*. A restore of a tenant backup returns
+- **Restore**. A restore of a tenant backup returns
   process instances, tasks, work items, connector and package calls, events,
   schedule state, sequence counters and audit records to backup time. The worker
   claims expired leases again once the tenant resumes. A call found `sending`

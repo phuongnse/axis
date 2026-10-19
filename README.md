@@ -12,8 +12,8 @@ amount, and an approved request is sent to a purchasing system.
 
 ## Status
 
-Milestone **M8, Studio and modules**, is complete. The current milestone is
-**M9, Tenancy and deployment**. The [roadmap](docs/roadmap.md) says what each
+Milestone **M9, Tenancy and deployment**, is complete. The current milestone is
+**M10, Hardening**. The [roadmap](docs/roadmap.md) says what each
 milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 

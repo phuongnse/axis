@@ -1073,11 +1073,11 @@ to show where a resource is used and what it uses.
 
 ## Tenancy settings
 
-*(Partly built for M9.)* See
+See
 [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed)
-and [tenant directory](../architecture.md#tenant-directory). The server's
-reading of `Tenancy:Source`, `ConnectionStrings:Platform`,
-`ConnectionStrings:PlatformSchema` and `Platform:SecretKey` exists. Under
+and [tenant directory](../architecture.md#tenant-directory). The server
+reads `Tenancy:Source`, `ConnectionStrings:Platform`,
+`ConnectionStrings:PlatformSchema` and `Platform:SecretKey`. Under
 `directory` the server applies the platform migrations at start, limits the
 role of `ConnectionStrings:Platform` to reading the `platform` schema, then
 reads the directory over that role, then again every `Tenancy:RefreshInterval`,
@@ -1131,7 +1131,7 @@ As environment variables they are `Tenancy__Source`,
 
 ## Admin settings
 
-*(Partly built for M9.)* See
+See
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
 and [administration](administration.md). `Axis.Admin` reads `Admin:ConnectionString`
 for `tenant create` and `tenant restore`. `migrate`, `tenant suspend`, `tenant resume`, `tenant list` and `tenant backup` do not read it.
@@ -1484,9 +1484,8 @@ reconciles is in [Connector calls](processes.md#connector-calls).
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
   A package operation names them in the `capabilities` of its manifest:
   `urls` need `url` bindings and `secrets` need `secret` bindings.
-- **Where values live.** Each tenant holds its values in
-  `Tenants:{id}:Bindings:{name}` of the host configuration, until the tenant
-  directory in M9. Each binding has a `Kind`, `url` or `secret`, and a
+- **Where values live.** Under `Tenancy:Source=configuration`, each tenant holds its values in
+  `Tenants:{id}:Bindings:{name}` of the host configuration. Each binding has a `Kind`, `url` or `secret`, and a
   `Value`. The server and the worker must both hold them. Under
   `Tenancy:Source=directory`, the server reads the values from the
   [tenant directory](../architecture.md#tenant-directory) instead, and `secret`

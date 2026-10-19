@@ -1,15 +1,14 @@
 # Administration
 
-*(Partly built for M9.)* Detailed reference for `Axis.Admin`, the command-line host
+Detailed reference for `Axis.Admin`, the command-line host
 that a platform operator runs to create tenants, migrate tenant databases,
 activate releases, and back up and restore tenants. It follows
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
 and
 [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
-Only `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`,
-`tenant restore`, `migrate`, `activate` and `version` are built. Every other command is still planned. Today a
-tenant can also come from the `Tenants` section, where the server migrates and
-activates at start, see
+The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`,
+`tenant restore`, `migrate`, `activate` and `version`. A tenant can also come from the `Tenants`
+section, where the server migrates and activates at start, see
 [startup activation](configuration.md#startup-activation).
 
 The conventions of [architecture.md](../architecture.md) apply, and Dn refers
@@ -21,7 +20,7 @@ the PostgreSQL role.
 holds an admin connection to the database server, and the only one that holds
 the schema database role of a tenant under `Tenancy:Source=directory`. See
 [database roles](storage.md#database-roles) for which host holds which
-connection. There is no HTTP API for provisioning in M9.
+connection. There is no HTTP API for provisioning.
 
 ## Settings
 
@@ -58,7 +57,7 @@ reads the OIDC authority and client id from the archive, so it takes no
 
 A new tenant's database goes on the same database server as
 `Admin:ConnectionString`. The directory records that server's host and port.
-M9 has a single database server.
+Axis supports a single database server.
 
 ## Output and exit codes
 
@@ -89,7 +88,7 @@ So a script can tell "some tenants failed" from "nothing ran".
 
 ## Tenant create
 
-*(Built for M9.)* `tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>`
+`tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>`
 creates one tenant.
 
 | Option | Meaning |
@@ -173,7 +172,7 @@ database.
 
 ## Tenant suspend
 
-*(Built for M9.)* `tenant suspend <id>` sets the status of an `active` tenant to `suspended`
+`tenant suspend <id>` sets the status of an `active` tenant to `suspended`
 and raises its `version`.
 
 | Option | Meaning |
@@ -192,7 +191,7 @@ write failed. `2` for an unknown tenant.
 
 ## Tenant resume
 
-*(Built for M9.)* `tenant resume <id>` sets the status of a `suspended` tenant to `active` and
+`tenant resume <id>` sets the status of a `suspended` tenant to `active` and
 raises its `version`.
 
 | Option | Meaning |
@@ -208,7 +207,7 @@ write failed. `2` for an unknown tenant.
 
 ## Tenant list
 
-*(Built for M9.)* `tenant list` prints a table with one row for each tenant, in ordinal order of
+`tenant list` prints a table with one row for each tenant, in ordinal order of
 the id:
 
 | Column | Meaning |
@@ -226,8 +225,8 @@ cannot read the directory.
 
 ## Tenant backup
 
-*(Built for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* `tenant backup <id> --out <file>` writes one
-archive of one tenant.
+`tenant backup <id> --out <file>` writes one
+archive of one tenant. See [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
 
 | Option | Meaning |
 | --- | --- |
@@ -301,8 +300,8 @@ exists, a missing option, a missing tool or a missing setting.
 
 ## Tenant restore
 
-*(Built for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* `tenant restore <file> --tenant <id> --host <host>...`
-restores an archive into a new tenant.
+`tenant restore <file> --tenant <id> --host <host>...`
+restores an archive into a new tenant. See [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
 
 | Option | Meaning |
 | --- | --- |
@@ -386,7 +385,7 @@ option or a missing setting.
    holds none of them.
 2. Run [`tenant resume <id>`](#tenant-resume).
 
-No command sets a binding yet, see [Not in M9](#not-in-m9).
+No command sets a binding yet, see [Not built yet](#not-built-yet).
 
 **Restoring over an existing tenant.** There is no in-place overwrite.
 
@@ -394,7 +393,7 @@ No command sets a binding yet, see [Not in M9](#not-in-m9).
 2. Restore the archive under a new id, with a temporary host.
 3. Set the secrets again and resume the new tenant.
 4. Move the hosts from the old tenant to the new one. No command does this yet,
-   see [Not in M9](#not-in-m9).
+   see [Not built yet](#not-built-yet).
 
 The old tenant stays in the directory, because there is no tenant delete.
 
@@ -419,7 +418,7 @@ The old tenant stays in the directory, because there is no tenant delete.
 
 ## Migrate
 
-*(Built for M9.)* `migrate [--tenant <id>] [--parallel <n>]` brings tenant databases to the schema
+`migrate [--tenant <id>] [--parallel <n>]` brings tenant databases to the schema
 that this build of `Axis.Admin` ships.
 
 | Option | Meaning |
@@ -484,7 +483,7 @@ that is `provisioning`, a `--parallel` below 1 or a missing setting.
 
 ## Activate
 
-*(Built for M9.)* `activate <folder> [--tenant <id>]` compiles an application folder and
+`activate <folder> [--tenant <id>]` compiles an application folder and
 activates its release. A running server serves the new release at its next request,
 with no restart.
 
@@ -537,8 +536,8 @@ or bad setting.
 
 ## What else to back up
 
-*(Built for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* A tenant archive is not a backup of the
-installation. The operator also keeps these safe:
+A tenant archive is not a backup of the
+installation. See [D45](../decisions.md#d45-tenant-backup-and-restore--agreed). The operator also keeps these safe:
 
 - **The platform database.** It holds the tenant directory. Back it up with
   standard PostgreSQL tools, such as `pg_dump` or continuous archiving. Axis does
@@ -553,7 +552,7 @@ installation. The operator also keeps these safe:
   needs the package versions that the archive marks `required`.
 
 Point-in-time recovery and restoring into another installation are out of scope,
-see [Not in M9](#not-in-m9).
+see [Not built yet](#not-built-yet).
 
 ## Version
 
@@ -562,7 +561,7 @@ option and needs no settings. It always exits `0`. The production image of the
 admin host carries the same version in its OCI label, see
 [installation](installation.md#images).
 
-## Not in M9
+## Not built yet
 
 - Deleting a tenant.
 - An HTTP API for provisioning.
