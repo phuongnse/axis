@@ -11,7 +11,7 @@ Business-specific models, queries, rules, processes, UI, policies and text are
 resources in an application's configuration. Platform code contains nothing
 specific to any application.
 
-*Why:* this is the product. It is also the only way many applications can
+_Why:_ this is the product. It is also the only way many applications can
 share upgrades, security fixes and engine guarantees.
 
 ## D2. Axis owns its engines — Agreed
@@ -22,7 +22,7 @@ are fine for infrastructure: HTTP, database access, serialization, UI
 components, standard security protocols and telemetry. No third-party workflow
 or rule engine.
 
-*Why:* versioning, durability, authorization and inspection have to work the
+_Why:_ versioning, durability, authorization and inspection have to work the
 same way across every engine. An external engine would set its own semantics
 for all four.
 
@@ -44,7 +44,7 @@ Axis is a single codebase with explicit module boundaries.
   executes background work.
 - **Never needed:** a message broker or microservices.
 
-*Why:* a small team gets the most speed from a monolith. Module boundaries
+_Why:_ a small team gets the most speed from a monolith. Module boundaries
 keep the option to split hosts later.
 
 ## D5. Configuration is authored as files first — Agreed
@@ -58,7 +58,7 @@ keep the option to split hosts later.
   updates.
 - **Studio:** a visual Studio writes the same resources.
 
-*Why:* files can be reviewed, diffed and tested in CI, and AI agents can author
+_Why:_ files can be reviewed, diffed and tested in CI, and AI agents can author
 them. Building a visual editor before the contracts settle would mean
 rewriting it.
 
@@ -73,7 +73,7 @@ typed, side-effect-free expression language that Axis interprets.
 - **No inline code:** no script, SQL or general-purpose code can be embedded
   in configuration.
 
-*Why:* see [knowledge](domain/knowledge.md#logic-in-configuration).
+_Why:_ see [knowledge](domain/knowledge.md#logic-in-configuration).
 
 ## D7. Custom code lives in extension packages — Agreed
 
@@ -93,7 +93,7 @@ for example file parsing, complex calculations or system integrations.
   `AssemblyLoadContext` and gives them only the platform APIs they declared.
   Out-of-process isolation comes with multi-tenant hosting.
 
-*Why:* real applications always need some custom code. Without an official
+_Why:_ real applications always need some custom code. Without an official
 place for it, code ends up as unsafe inline scripts or as
 application-specific platform code.
 
@@ -128,7 +128,7 @@ capability.
   confidential client, resource server). PAR, `private_key_jwt` and DPoP can be
   enabled later without restructuring. FAPI conformance is a later milestone.
 
-*Why:* the BFF pattern gives most of the protection. For a configuration
+_Why:_ the BFF pattern gives most of the protection. For a configuration
 platform the real risk is business authorization, which FAPI does not cover.
 Requiring full FAPI early would block every milestone.
 
@@ -146,7 +146,7 @@ Requiring full FAPI early would block every milestone.
   and migrations across tenant databases are in
   [D43](#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
 
-*Why:* adding tenant context afterwards touches every query and job, which is
+_Why:_ adding tenant context afterwards touches every query and job, which is
 expensive. Building full tenant management before there is a second customer
 delivers nothing.
 
@@ -160,7 +160,7 @@ delivers nothing.
   durable work with stable operation identities.
 - **Worker claims:** workers claim work with leases and fencing.
 
-*Why:* see [knowledge](domain/knowledge.md#execution).
+_Why:_ see [knowledge](domain/knowledge.md#execution).
 
 ## D12. Authorization is server-side and default-deny — Agreed
 
@@ -188,7 +188,7 @@ Policies grant access to resources, records, fields and actions.
 - **Bootstrap:** the solution skeleton, CI and the tool setup are done
   directly, not through NexKit, because NexKit needs working checks first.
 
-*Why:* a large up-front breakdown into layered issues delays anything
+_Why:_ a large up-front breakdown into layered issues delays anything
 runnable until the very end, and its issues are too big for one session.
 
 See [delivery.md](delivery.md) for the step-by-step workflow and who does each
@@ -216,7 +216,7 @@ but is not settled yet:
 - **Navigation:** `formPage` gives way to navigate actions with page
   parameters.
 
-*Why:* the page and widget split shapes data sources (M2), process task forms
+_Why:_ the page and widget split shapes data sources (M2), process task forms
 (M3) and authorization (M4). Keeping the page free of an entity or template
 lets more widgets and a layout be added without a format change.
 
@@ -234,7 +234,7 @@ fields and data source filters. See [the reference](reference/expressions.md).
 - **Two back ends:** one language, run by an interpreter and translated to SQL
   for data source filters.
 
-*Why:* see [knowledge](domain/knowledge.md#logic-in-configuration).
+_Why:_ see [knowledge](domain/knowledge.md#logic-in-configuration).
 
 ## D17. Entity logic and child collections — Agreed
 
@@ -259,7 +259,7 @@ Entities get logic and owned rows in M2. See
   written only through the owner record, in one request, under the owner's
   version.
 
-*Why:* see [knowledge](domain/knowledge.md#logic-in-configuration). Logic
+_Why:_ see [knowledge](domain/knowledge.md#logic-in-configuration). Logic
 stays in typed expressions with no side effects (D16). Line items are part of
 their owner, so they share its version and its transaction.
 
@@ -283,7 +283,7 @@ Data sources are read-only queries over entities, added in M2. See
 - **Widget binding:** a widget binds to a `dataSource`, and `entity` stays as
   shorthand for all records of an entity. In M2 only the `table` widget binds.
 
-*Why:* see [knowledge](domain/knowledge.md#authoring-and-packaging). Related
+_Why:_ see [knowledge](domain/knowledge.md#authoring-and-packaging). Related
 data is queried, not copied into each record, so it never goes stale. Filters
 use the one expression language (D16), so one check covers them.
 
@@ -329,7 +329,7 @@ Processes and the worker host arrive in M3. See
 - **History:** every step occurrence records its input, output, decision and
   error.
 
-*Why:* see [knowledge](domain/knowledge.md#execution) and
+_Why:_ see [knowledge](domain/knowledge.md#execution) and
 [D11](#d11-durable-process-engine--agreed). Steps run in a worker, never on the
 request thread, and each step is one transaction, so a crash leaves no partial
 work.
@@ -381,7 +381,7 @@ decision. Only the items under **Later** are not built.
   This replaces the sentence of D17 that put validation as the user types in
   M3.
 
-*Why:* see [knowledge](domain/knowledge.md#human-work) and
+_Why:_ see [knowledge](domain/knowledge.md#human-work) and
 [user interface](domain/knowledge.md#user-interface). A task is a first-class
 step, so exactly one decision is recorded and the instance resumes from it.
 One form resource serves a page and a task, so a layout is written once.
@@ -412,6 +412,7 @@ record history are built.
 
   See [storage](reference/storage.md#audit-records-and-sequence-counters)
   and [the record API](reference/record-api.md#audit-records-and-history).
+
 - **Record history:** an endpoint returns the audit records of one record,
   newest first. The form page shows them. See
   [the record API](reference/record-api.md#audit-records-and-history).
@@ -428,7 +429,7 @@ record history are built.
     creates of the same sequence wait on that row lock, which is accepted at
     the expected volumes.
 
-*Why:* see [knowledge](domain/knowledge.md#operations). Processes need an
+_Why:_ see [knowledge](domain/knowledge.md#operations). Processes need an
 actor to record and a trail that cannot be rewritten. Real authentication
 waits for M4, so a fixed list of test users stands in, and it must never
 reach Production. Business numbers come from the same transaction as the
@@ -464,7 +465,7 @@ rule has no milestone. These wait for it:
   `AXC0084` for now.
 - The local year in a sequence's `{yyyy}`, which is UTC today.
 
-*Why:* processes need the time of a step, for example to set `submittedAt`.
+_Why:_ processes need the time of a step, for example to set `submittedAt`.
 One value per transaction keeps every expression in a step consistent with
 the step's own record. An instant needs no time zone, so `now()` can come
 first, and everything that does need one waits for a single rule.
@@ -531,7 +532,7 @@ removed. Everything in this decision is in place. See
   name is stored with the audit record, because Axis has no user directory
   to look it up later.
 
-*Why:* see [knowledge](domain/knowledge.md#authorization). Policies and
+_Why:_ see [knowledge](domain/knowledge.md#authorization). Policies and
 processes need to know who acts, so test users must give way to real
 identities. Keeping tokens on the server and the session bound to one tenant
 means a stolen or reused cookie cannot act in another tenant. `sub` never
@@ -610,7 +611,7 @@ may not read. Everything below is in place. See
   evaluation. Every endpoint and engine command calls it with a resource and
   an action.
 
-*Why:* see [knowledge](domain/knowledge.md#authorization). A filter that is
+_Why:_ see [knowledge](domain/knowledge.md#authorization). A filter that is
 false, `null` or fails adds nothing, so a mistake in one policy can never
 widen access. Readable fields per entity keep queries simple: they do not
 depend on which grant matched a record.
@@ -744,7 +745,7 @@ retries and reconciliation.
   failed call also writes `process.failed`. The step history holds the
   operation identity and the outcome, and no field values.
 
-*Why:* see [knowledge](domain/knowledge.md#execution) and
+_Why:_ see [knowledge](domain/knowledge.md#execution) and
 [authoring and packaging](domain/knowledge.md#authoring-and-packaging), and
 [D7](#d7-custom-code-lives-in-extension-packages--agreed) and
 [D11](#d11-durable-process-engine--agreed). A call can succeed while its
@@ -848,7 +849,7 @@ step and how each trigger starts a process.
   `process.stepCompleted`, as other operations do. Its history output holds
   the event's id. The `axis.events` row records the occurrence.
 
-*Why:* see [what applications use most](domain/knowledge.md#what-applications-use-most)
+_Why:_ see [what applications use most](domain/knowledge.md#what-applications-use-most)
 and [execution](domain/knowledge.md#execution). Processes run per record
 ([D19](#d19-process-resource-and-worker-host--agreed)), so a trigger always
 names the record it starts for. The one-running-instance rule stops loops,
@@ -950,7 +951,7 @@ responses and its errors. The owner confirmed these points on issue #312 on
   claim, or from the token's client id (`azp`) when that claim is missing.
   Keycloak service-account tokens have no `name` claim.
 
-*Why:* see [what applications use most](domain/knowledge.md#what-applications-use-most)
+_Why:_ see [what applications use most](domain/knowledge.md#what-applications-use-most)
 and [authorization](domain/knowledge.md#authorization). Other systems need
 to hand work to Axis, and an endpoint does that through the same record
 command and process start as a user, so no rule is skipped. Bearer tokens
@@ -1055,7 +1056,7 @@ operation step. The owner confirmed these points on issue #313 on
   creditor reference. A test-only package
   under `tests/` covers the capability limits.
 
-*Why:* see [knowledge](domain/knowledge.md#logic-in-configuration) and
+_Why:_ see [knowledge](domain/knowledge.md#logic-in-configuration) and
 [D7](#d7-custom-code-lives-in-extension-packages--agreed). Some logic does not
 fit expressions, and a package gives it a tested, versioned home. Pinning the
 exact version in the release keeps a running process on the code it was
@@ -1110,7 +1111,7 @@ The owner confirmed these points on issue #412 on 2026-10-15.
   - This start check replaces D28's planned activation check. Its
     diagnostic code is `AXC0146`.
 
-*Why:* [D11](#d11-durable-process-engine--agreed) and
+_Why:_ [D11](#d11-durable-process-engine--agreed) and
 [execution](domain/knowledge.md#execution) keep running work on the version
 it started with. Pinning texts keeps removed keys readable on old tasks.
 [D24](#d24-roles-and-policies--agreed) keeps authorization current, so an old
@@ -1223,7 +1224,7 @@ The owner confirmed these points on issue #413 on 2026-10-15.
   calls in computed fields remain unbuilt (`AXC0050`), so that case describes
   future behaviour.
 
-*Why:* [D11](#d11-durable-process-engine--agreed) and
+_Why:_ [D11](#d11-durable-process-engine--agreed) and
 [D29](#d29-release-pinning-and-text-resources--agreed) keep running work on
 its release. Destructive changes must wait until that work stops reading
 the old columns. The start lock keeps that check true until activation
@@ -1297,7 +1298,7 @@ The owner confirmed these points for issue #414 on 2026-10-16.
     create two database roles, `axis_schema` and `axis_runtime`, with
     development passwords.
 
-*Why:* [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed) puts
+_Why:_ [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed) puts
 each tenant in its own database, so a tenant's database role is the last
 barrier between its data and its schema.
 [Execution](domain/knowledge.md#execution) and security rules need runtime code
@@ -1394,7 +1395,7 @@ The owner confirmed the points on advancing time for issue #481 on 2026-10-17.
   - **New project.** `Axis.Scenarios` is a new host next to the server and
     the worker.
 
-*Why:* [D5](#d5-configuration-is-authored-as-files-first--agreed) makes
+_Why:_ [D5](#d5-configuration-is-authored-as-files-first--agreed) makes
 configuration files the source of truth, so tests over them are files too and
 CI can run them. A scenario sets users and roles itself, so it checks
 [D24](#d24-roles-and-policies--agreed) denials without an identity provider.
@@ -1465,7 +1466,7 @@ The owner confirmed these points on issue #473 on 2026-10-17.
 - **Pending is accepted:** for a large table, a short, clearly marked period
   in which lists may not reflect the new expression is accepted.
 
-*Why:* [D17](#d17-entity-logic-and-child-collections--agreed) stores computed
+_Why:_ [D17](#d17-entity-logic-and-child-collections--agreed) stores computed
 values with their records, so a release that changes them must correct the
 stored values. [D29](#d29-release-pinning-and-text-resources--agreed) keeps
 running work on its release, so a row can be written under an older release
@@ -1547,7 +1548,7 @@ the step error bullet.
 - **Record history:** the record history links a process audit record to its
   instance when the user may inspect that process.
 
-*Why:* [Product goal 4](product-brief.md#product-goals) asks that people see
+_Why:_ [Product goal 4](product-brief.md#product-goals) asks that people see
 what a process did and why it failed. The engine stores that, but no API shows
 it. [D24](#d24-roles-and-policies--agreed) grants decide what a user may read,
 so inspection follows them and fails closed.
@@ -1639,7 +1640,7 @@ two changes to the proposal, which are marked below.
     `idempotent: true`. A failed connector call is safe to resend, because
     every unknown outcome was resent under the idempotency key or reconciled.
 
-*Why:* [D11](#d11-durable-process-engine--agreed) makes the engine durable,
+_Why:_ [D11](#d11-durable-process-engine--agreed) makes the engine durable,
 and a failed instance, a stuck call and old work that cannot be drained are
 the places where durability needs a human decision.
 [D24](#d24-roles-and-policies--agreed) makes every action a grant, so each
@@ -1715,7 +1716,7 @@ The owner confirmed these points on issue #479 on 2026-10-17.
   - Finding one user's failed request goes through the stored history, not
     the traces.
 
-*Why:* [Operations](domain/knowledge.md#operations) asks that every request,
+_Why:_ [Operations](domain/knowledge.md#operations) asks that every request,
 instance, step attempt and connector call carry correlation identifiers, so an
 operator can go from a user-visible error to the exact attempt and its logs.
 It also asks for log protection and for durable history instead of sampled
@@ -1763,7 +1764,7 @@ The owner confirmed these points on issue #480 on 2026-10-17.
   Degraded state on both hosts for a failed directory refresh. The
   worker is then no longer never Degraded. Both are built.
 
-*Why:* [Operations](domain/knowledge.md#operations) asks that failed and stuck
+_Why:_ [Operations](domain/knowledge.md#operations) asks that failed and stuck
 work is visible. Without a health endpoint, a stuck worker shows only when
 work piles up, and Compose cannot wait for it. The server's
 readiness ignores tenant databases and activation. Degraded, not unhealthy,
@@ -1834,7 +1835,7 @@ The owner confirmed these points on issue #569 on 2026-10-18.
     point of this decision.
   - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 
-*Why:* [D5](#d5-configuration-is-authored-as-files-first--agreed) says
+_Why:_ [D5](#d5-configuration-is-authored-as-files-first--agreed) says
 authoring APIs use the same contracts and that a Studio writes the same
 resources. [Authoring and packaging](domain/knowledge.md#authoring-and-packaging)
 forbids replace-all edits and asks for resource versions, so writes are
@@ -1895,7 +1896,7 @@ The owner confirmed these points on issue #570 on 2026-10-18.
     seconds. The [reference index](reference/configuration.md#reference-index)
     states both bounds.
 
-*Why:* [Typical application size](domain/knowledge.md#typical-application-size)
+_Why:_ [Typical application size](domain/knowledge.md#typical-application-size)
 says authoring at 30–90 entities and 150–250 data sources needs a dependency
 graph and "where is this used", because lists do not work at that size. The
 compiler already resolves every reference, but spreads them over the per-kind
@@ -1993,7 +1994,7 @@ confirmed these points on issue #571 on 2026-10-18.
   application uses it. The purchase request sample keeps its own `Department`
   entity.
 
-*Why:* [Authoring and packaging](domain/knowledge.md#authoring-and-packaging)
+_Why:_ [Authoring and packaging](domain/knowledge.md#authoring-and-packaging)
 warns against hidden dependencies, so a module is declared, pinned and copied
 into the release, and a missing name fails the compile. Reusing the ranges,
 pinning and installation folder of
@@ -2050,7 +2051,7 @@ owner confirmed these points on issue #572 on 2026-10-18.
   - The server activates the sample next to purchase requests under
     `scripts/dev.sh`, Compose and E2E.
 
-*Why:* The sample is small. It uses tasks and policies as purchase requests
+_Why:_ The sample is small. It uses tasks and policies as purchase requests
 do, and it uses the departments module of [D40](#d40-reusable-modules--agreed).
 It needs no package or connector. So it shows reuse without platform code. Any
 platform change it needs is a gap to raise, not to hide in the sample.
@@ -2158,7 +2159,7 @@ The owner confirmed these points on issue #639 on 2026-10-18.
     [D37](#d37-health-checks-for-the-server-and-the-worker--agreed) that the
     worker is never Degraded.
 
-*Why:* a new tenant, a suspended tenant or a changed secret must take effect
+_Why:_ a new tenant, a suspended tenant or a changed secret must take effect
 without editing the configuration of both hosts and restarting them.
 [D25](#d25-connectors-deployment-bindings-and-secrets--agreed) has no secret
 store, and provisioning creates database roles with generated passwords that
@@ -2201,7 +2202,7 @@ The owner confirmed these points on issue #640 on 2026-10-19.
     tenant.
 - **Creating a tenant:**
   - `tenant create <id> --host <host>... --oidc-authority <url>
-    --oidc-client-id <id>` takes the OIDC client secret from an environment
+--oidc-client-id <id>` takes the OIDC client secret from an environment
     variable.
   - It writes the directory entry as `provisioning` first. It creates the
     roles `axis_<id>_schema` and `axis_<id>_runtime` with generated
@@ -2265,7 +2266,7 @@ The owner confirmed these points on issue #640 on 2026-10-19.
 - **Not in M9:** deleting a tenant, an HTTP provisioning API, rotating the
   generated database passwords and moving a tenant to another database server.
 
-*Why:* a command-line tool keeps database admin rights out of every
+_Why:_ a command-line tool keeps database admin rights out of every
 long-running host, and a web console for operators can come later. Tenants
 migrate on their own, so one broken tenant database no longer stops the
 others. The cost is that tenants can sit on different schema versions, so a
@@ -2343,7 +2344,7 @@ The owner confirmed these points on issue #641 on 2026-10-19.
     replicas and restarts need a shared one. The guide lists it as an open
     point.
 
-*Why:* an image with development settings or sample credentials would weaken
+_Why:_ an image with development settings or sample credentials would weaken
 every installation, so the production images hold none. Compose suits one
 machine and Helm is the common package format for Kubernetes. The cost of Helm
 is a new tool in `scripts/setup.sh`, so the NexKit `cache` setting and the CI
@@ -2434,7 +2435,7 @@ The owner confirmed these points on issue #642 on 2026-10-19.
   recovery, restoring into another installation, and a command that moves a host
   between tenants or sets a binding.
 
-*Why:* a tenant is the unit of isolation, so it is the unit of backup. An
+_Why:_ a tenant is the unit of isolation, so it is the unit of backup. An
 archive without secrets can be stored like any data file, at the cost that a
 restored tenant stays suspended until its secrets are set again. Restoring only
 into a new tenant never overwrites live data, and moving the hosts is a
@@ -2503,7 +2504,7 @@ The owner confirmed these points on issue #702 on 2026-10-19.
   changes their scope. M10 plans publishing and activation from Studio, so its
   design decisions replace the "Studio never activates a release" point of D38.
 
-*Why:* the runtime is strong, but authors still need JSON, git and the admin
+_Why:_ the runtime is strong, but authors still need JSON, git and the admin
 CLI. The runtime is also narrow for many kinds of applications. A page holds
 one widget, `startProcess` is the only action, processes have no timer,
 sub-process or loop, and there are no notifications, files, indexes or
@@ -2517,3 +2518,59 @@ carry. The cost is that development and test databases are reset after a
 format change. M11 and M12 run in parallel because Studio editors can build on
 today's runtime while the page model grows. The cost is that some editors
 change again in M12.
+
+## D50. Sign-in audit records and security scanning in CI — Agreed
+
+M10 adds two security baselines _(planned for M10)_. Sign-in, sign-out and refused sign-ins leave
+audit records. CI scans the packages for known vulnerabilities and runs static
+analysis. See
+[audit records](reference/storage.md#audit-records-and-sequence-counters) and
+[sign-in and the session](architecture.md#sign-in-and-the-session) for the
+detail. The ASVS level and its verification stay in M16
+([D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)).
+The owner confirmed these points on issue #707 on 2026-10-19.
+
+- **Sign-in audit:**
+  - Three new audit actions are `session.signedIn`, `session.signedOut` and
+    `session.signInRefused`. They are written to `axis.audit_records` in the
+    tenant database, the same append-only table as the other actions.
+  - The names are in the past tense, like `record.created`, except
+    `session.signInRefused`.
+  - `session.signedIn` and `session.signedOut` record the user id and the
+    display name.
+  - `session.signInRefused` records the actor `anonymous` and a reason code. It
+    records no user. The reason is `otherTenant`, `invalidToken`,
+    `invalidState` or `providerError`. `providerError` covers a person who
+    cancels at the identity provider, and a provider error.
+  - Every record holds the client address, after the forwarded headers rules.
+    None holds a token, a cookie or the user agent.
+  - A session that expires writes nothing. A sign-out with no session writes
+    nothing.
+- **Dependency scanning:**
+  - A new script, `scripts/scan.sh`, needs network. It runs
+    `dotnet list package --vulnerable --include-transitive` on `Axis.slnx`,
+    and `npm audit --audit-level=high` in `web` and `tests/e2e`.
+  - It fails on a vulnerability of high or critical severity, and prints each
+    one with its package and advisory.
+  - CI runs it on its existing triggers and once a week. A finding on the
+    weekly run opens no issue. The red run is the signal.
+  - It is not a NexKit check until a hand-made change to `.nexkit/` adds it.
+- **Static analysis:**
+  - One CodeQL workflow scans `csharp` and `javascript-typescript` on a push
+    to `main` and on pull requests. Its alerts go to GitHub code scanning.
+  - A new alert of high or critical severity fails the check. The owner sets
+    this threshold in a repository code scanning rule, because CodeQL does not
+    fail a run on alerts by itself.
+- **Not in M10:** an audit of `403` refusals, an audit of session expiry, and
+  the ASVS level. The first two stay in logs and metrics. The ASVS level stays
+  in M16.
+
+_Why:_ signing in is the first step of every attack on a shared server, and
+today it leaves no trace. A refused sign-in is rare and worth a record, and an
+expired session is routine. A closed list of reason codes keeps free text, and
+possibly personal data, out of the table. The client address helps trace an
+attack, but it is personal data, and audit records are kept forever, so the
+cost is that it stays as long as they do. A `403` refusal is common, so
+auditing it would flood the table. A scan that stops at high and critical
+blocks the real risks without blocking a merge on every low finding. The cost
+is that lower severities pass.

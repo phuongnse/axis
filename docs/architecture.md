@@ -1,6 +1,6 @@
 # Axis architecture
 
-This is the target structure. Sections marked *(planned for Mx)* describe work
+This is the target structure. Sections marked _(planned for Mx)_ describe work
 that has not been built yet, as defined in
 [delivery.md](delivery.md#keeping-the-docs-current). Decisions referenced as
 Dn are in [decisions.md](decisions.md). Detailed behaviour is in
@@ -58,8 +58,8 @@ flowchart LR
   and [D45](decisions.md#d45-tenant-backup-and-restore--agreed).
 - **Platform database** stores installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform
-  settings *(both hosts read the tenant directory again every refresh
-  interval, and the worker also reads the schema versions every poll round)*.
+  settings _(both hosts read the tenant directory again every refresh
+  interval, and the worker also reads the schema versions every poll round)_.
 - **Tenant databases** hold everything else for one tenant: releases, system
   tables, process state, audit and the generated entity tables (D10).
 
@@ -290,14 +290,14 @@ the refresh in its polling loop, between work items.
 
 What a host answers for a tenant, once the directory is in use:
 
-| Case | Answer |
-| --- | --- |
-| An `active` tenant | The tenant is served after the next refresh, once the runtime database role check passes. Its OIDC client and its endpoint caller scheme are registered then. |
-| A `suspended` or `provisioning` tenant | `503` problem details (`application/problem+json`) titled "This tenant is not available.". It names no tenant and no host. The worker claims none of its new work, and work already claimed finishes. |
+| Case                                            | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| An `active` tenant                              | The tenant is served after the next refresh, once the runtime database role check passes. Its OIDC client and its endpoint caller scheme are registered then.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| A `suspended` or `provisioning` tenant          | `503` problem details (`application/problem+json`) titled "This tenant is not available.". It names no tenant and no host. The worker claims none of its new work, and work already claimed finishes.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | A tenant whose schema version is not the host's | `503`, like a suspended tenant, from the first directory refresh that reads the other version. The server logs one warning when a tenant joins this state. The worker re-reads the schema versions at each poll round and claims none of its work, new or old. It starts again once `Axis.Admin migrate` has brought the tenant to the worker's version, with no restart. The schema version is the newest EF Core migration that `Axis.Admin migrate` applied, see [administration](reference/administration.md#migrate). The server registers its sign-in client when the refresh serves it, so it can sign people in without a restart. |
-| A removed or unknown host | `404`, as today. |
-| A refresh that fails | The last good directory stays in use and one error is logged for each run of failed refreshes. Readiness is Degraded until a refresh works, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works. |
-| The first load fails | The server stops its start. The worker waits and retries, and is not ready until the first load works. |
+| A removed or unknown host                       | `404`, as today.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| A refresh that fails                            | The last good directory stays in use and one error is logged for each run of failed refreshes. Readiness is Degraded until a refresh works, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works.                                                                                                                                                                                                                                                                                                                                                                                 |
+| The first load fails                            | The server stops its start. The worker waits and retries, and is not ready until the first load works.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 - **New tenants.** A tenant that first appears at a refresh is served only
   after the runtime database role check passes, see
@@ -449,6 +449,19 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     redirect to the identity provider as a page. The shell header's
     [account button](reference/frontend.md) offers sign-in and
     sign-out.
+- **Audit.** _(planned for M10)_ Sign-in writes
+  [audit records](reference/storage.md#audit-records-and-sequence-counters)
+  in the database of the tenant that the host resolves to, see
+  [D50](decisions.md#d50-sign-in-audit-records-and-security-scanning-in-ci--agreed).
+  - The callback writes `session.signedIn` when it creates a session. It writes
+    `session.signInRefused`, with a reason code, when it refuses.
+  - `POST /api/auth/sign-out` writes `session.signedOut` only when a session
+    existed.
+  - An expired session writes nothing. A host that resolves to no tenant writes
+    nothing, because there is no tenant database.
+  - Each record holds the client address, and never a token, a cookie or the
+    user agent. The address follows the
+    [forwarded headers](reference/installation.md#open-points) rules.
 - **Session.** One HttpOnly, Secure, SameSite=Lax cookie, `Axis.Session`.
   - It holds the user id, the display name, the roles and the tenant id.
   - It holds no access, refresh or ID token, and no token reaches the
@@ -494,6 +507,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   `GET /api/auth/callback`, every path under `/health` and the SPA's static
   files. `POST /api/auth/sign-out` needs the CSRF header but no
   session.
+
 - **CSRF.** Every `POST`, `PUT`, `PATCH` and `DELETE` under `/api` must
   carry `X-Axis-Csrf: 1`, otherwise `403`. The server checks the header
   right after it resolves the tenant and before authentication, so a refused
@@ -568,6 +582,7 @@ systems.
   every endpoint call there is a `401`. The server's
   [startup checks](#sign-in-and-the-session) do not change. The worker
   ignores it, as it ignores the rest of `Oidc`.
+
 - **Token checks.** The server checks each token against the tenant
   [resolved from the host](#request-resolution). Any failure is a `401`
   with `WWW-Authenticate: Bearer`, which never says which check failed.
@@ -751,11 +766,11 @@ who holds both `employee` and `finance-reviewer`. The user's read filters on
 `PurchaseRequest` are `requester == currentUser()` and
 `status in ('submitted', 'approved', 'returned', 'rejected')`:
 
-| Request | `requester == currentUser()` | `status in ('submitted', 'approved', 'returned', 'rejected')` | Result |
-| --- | --- | --- | --- |
-| Their own draft | `true` | `false` | Readable |
-| Someone else's submitted request | `false` | `true` | Readable |
-| Someone else's draft | `false` | `false` | `404` |
+| Request                          | `requester == currentUser()` | `status in ('submitted', 'approved', 'returned', 'rejected')` | Result   |
+| -------------------------------- | ---------------------------- | ------------------------------------------------------------- | -------- |
+| Their own draft                  | `true`                       | `false`                                                       | Readable |
+| Someone else's submitted request | `false`                      | `true`                                                        | Readable |
+| Someone else's draft             | `false`                      | `false`                                                       | `404`    |
 
 The `false` filters add nothing. Someone else's draft matches neither
 filter, so it does not exist for them.
@@ -790,6 +805,7 @@ to the draft. Only another grant can make it readable.
   - event occurrences, their delivery work items and sync trigger starts
 
   A revision mismatch aborts the transaction.
+
 - **Workers.** Workers claim ready work with `FOR UPDATE SKIP LOCKED` and a
   lease. Commits check the claim token (fencing). Claims and fencing are
   built for work items.
@@ -860,14 +876,14 @@ is not part of this design.
 
 ### Axis spans
 
-| Span | Where | Attributes |
-| --- | --- | --- |
-| `axis.activation` | server | `axis.tenant`, `axis.application` |
-| `axis.work_item.run` | worker | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`. A link to the span that queued the item |
-| `axis.process.step` | server and worker | `axis.tenant`, `axis.application`, `axis.process`, `axis.step` |
-| `axis.connector.attempt` | worker | `axis.tenant`, `axis.application`, `axis.connector`, `axis.operation`, `axis.outcome` |
-| `axis.connector.lookup` | worker | `axis.tenant`, `axis.application`, `axis.connector`, `axis.operation`, `axis.outcome` |
-| `axis.package.call` | worker | `axis.tenant`, `axis.application`, `axis.package`, `axis.operation`, `axis.outcome` |
+| Span                     | Where             | Attributes                                                                                    |
+| ------------------------ | ----------------- | --------------------------------------------------------------------------------------------- |
+| `axis.activation`        | server            | `axis.tenant`, `axis.application`                                                             |
+| `axis.work_item.run`     | worker            | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`. A link to the span that queued the item |
+| `axis.process.step`      | server and worker | `axis.tenant`, `axis.application`, `axis.process`, `axis.step`                                |
+| `axis.connector.attempt` | worker            | `axis.tenant`, `axis.application`, `axis.connector`, `axis.operation`, `axis.outcome`         |
+| `axis.connector.lookup`  | worker            | `axis.tenant`, `axis.application`, `axis.connector`, `axis.operation`, `axis.outcome`         |
+| `axis.package.call`      | worker            | `axis.tenant`, `axis.application`, `axis.package`, `axis.operation`, `axis.outcome`           |
 
 - **Outcomes.** A call span's `axis.outcome` is a call outcome class:
   `succeeded`, `retryable`, `failed` or `unknown`, see
@@ -942,11 +958,11 @@ answers requests, with status `200`. It is never Degraded or Unhealthy.
 
 **Server `/health/ready`.**
 
-| Status | HTTP | When |
-| --- | --- | --- |
-| Healthy | `200` | The platform database answers, startup activation has finished for every tenant, and every tenant database answers. |
-| Degraded | `200` | The platform database answers and activation has finished, but at least one tenant database does not answer. |
-| Unhealthy | `503` | The platform database does not answer, or startup activation has not finished for every tenant. |
+| Status    | HTTP  | When                                                                                                                |
+| --------- | ----- | ------------------------------------------------------------------------------------------------------------------- |
+| Healthy   | `200` | The platform database answers, startup activation has finished for every tenant, and every tenant database answers. |
+| Degraded  | `200` | The platform database answers and activation has finished, but at least one tenant database does not answer.        |
+| Unhealthy | `503` | The platform database does not answer, or startup activation has not finished for every tenant.                     |
 
 Under `Tenancy:Source=directory`, the rows above hold
 until the first load of the [tenant directory](#tenant-directory) has worked.
@@ -1000,12 +1016,12 @@ The loop counts as stalled when it has not polled within twice
 `Worker:LeaseDuration`, one minute by default. A poll interval would be too
 short, because one work item can run for up to a lease.
 
-| Endpoint | Status | HTTP | When |
-| --- | --- | --- | --- |
-| `/health/live` | Healthy | `200` | The loop has polled within twice `Worker:LeaseDuration`. |
-| `/health/live` | Unhealthy | `503` | The loop has not polled within that time, so an orchestrator restarts the worker. |
-| `/health/ready` | Healthy | `200` | Every tenant database has its processes migrations, and the loop has polled within twice `Worker:LeaseDuration`. |
-| `/health/ready` | Degraded | `200` | A refresh of the tenant directory failed, and the last good read stays in use. |
+| Endpoint        | Status    | HTTP  | When                                                                                                                                                  |
+| --------------- | --------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/health/live`  | Healthy   | `200` | The loop has polled within twice `Worker:LeaseDuration`.                                                                                              |
+| `/health/live`  | Unhealthy | `503` | The loop has not polled within that time, so an orchestrator restarts the worker.                                                                     |
+| `/health/ready` | Healthy   | `200` | Every tenant database has its processes migrations, and the loop has polled within twice `Worker:LeaseDuration`.                                      |
+| `/health/ready` | Degraded  | `200` | A refresh of the tenant directory failed, and the last good read stays in use.                                                                        |
 | `/health/ready` | Unhealthy | `503` | A tenant database lacks its processes migrations, the first read of the tenant directory has not worked, or the loop has not polled within that time. |
 
 **Docker Compose.** The worker gets a health check on `/health/ready`. It runs
@@ -1035,13 +1051,13 @@ Moved to [reference/frontend.md](reference/frontend.md).
 
 ## Testing
 
-| Level | Tooling | Scope |
-| --- | --- | --- |
-| Unit | xUnit | Compiler, expression engine, policy evaluation, pure logic |
-| Integration | xUnit + Testcontainers PostgreSQL and Keycloak | Storage, transactions, concurrency, tenancy isolation, engine recovery, the development realm |
-| Frontend unit | Vitest + Testing Library | Shared components and metadata rendering |
-| End to end | Playwright | Real server + real database + SPA, user journeys and denied access |
-| Scenario | Axis.Scenarios + Testcontainers PostgreSQL | Configuration-level tests of an application. Record actions, process starts, task completions and the `expect` steps run, with `now` fixing the time. Stubs answer the calls to connectors and packages. Event deliveries run, so `async` event triggers start their processes. Schedule triggers run through `advanceTime`, which moves `now` and runs every due work item |
+| Level         | Tooling                                        | Scope                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit          | xUnit                                          | Compiler, expression engine, policy evaluation, pure logic                                                                                                                                                                                                                                                                                                                  |
+| Integration   | xUnit + Testcontainers PostgreSQL and Keycloak | Storage, transactions, concurrency, tenancy isolation, engine recovery, the development realm                                                                                                                                                                                                                                                                               |
+| Frontend unit | Vitest + Testing Library                       | Shared components and metadata rendering                                                                                                                                                                                                                                                                                                                                    |
+| End to end    | Playwright                                     | Real server + real database + SPA, user journeys and denied access                                                                                                                                                                                                                                                                                                          |
+| Scenario      | Axis.Scenarios + Testcontainers PostgreSQL     | Configuration-level tests of an application. Record actions, process starts, task completions and the `expect` steps run, with `now` fixing the time. Stubs answer the calls to connectors and packages. Event deliveries run, so `async` event triggers start their processes. Schedule triggers run through `advanceTime`, which moves `now` and runs every due work item |
 
 Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
