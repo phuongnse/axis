@@ -23,6 +23,18 @@ public sealed class TenantConnectionFactory(ITenantCatalog catalog, ITenantConte
         return await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Drops the tenant's connection pool, so the next connection opens a pool over the tenant's current settings.
+    /// A request that opens a connection at this moment may fail once.
+    /// </summary>
+    public async ValueTask RetireAsync(string tenantId)
+    {
+        if (_dataSources.TryRemove(tenantId, out var dataSource) && dataSource.IsValueCreated)
+        {
+            await dataSource.Value.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         _disposed = true;

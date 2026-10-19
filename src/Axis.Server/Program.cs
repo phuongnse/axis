@@ -36,6 +36,9 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
 ITenantCatalog tenants;
 if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
 {
+    // Read first, so a bad value stops the start even when the database is not there.
+    var refreshInterval = TenancySettings.RefreshInterval(builder.Configuration);
+
     var platformSchemaConnectionString = builder.Configuration.GetConnectionString("PlatformSchema");
     if (string.IsNullOrWhiteSpace(platformSchemaConnectionString))
     {
@@ -64,10 +67,18 @@ if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
 
     var cipher = TenantSecretCipher.Load(builder.Configuration);
     await PlatformMigration.ApplyAsync(new PlatformMigrationOptions(platformSchemaConnectionString, readerRole), CancellationToken.None);
-    tenants = await DirectoryTenantCatalog.LoadAsync(platformConnectionString, cipher, CancellationToken.None);
+    var loaded = await DirectoryTenantCatalog.LoadAsync(platformConnectionString, cipher, CancellationToken.None);
+
+    // The tenants served at start count as checked: the release check runs the role check on them before the server listens.
+    var directory = new TenantDirectoryCatalog(loaded);
+    tenants = directory;
 
     // Registered first, so it logs before the release check runs.
     builder.Services.AddSingleton(cipher);
+    builder.Services.AddSingleton(directory);
+    builder.Services.AddSingleton(new TenantDirectoryRefreshOptions(platformConnectionString, refreshInterval));
+    builder.Services.AddSingleton<TenantDirectoryRefresh>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<TenantDirectoryRefresh>());
     builder.Services.AddSingleton(new TenantDirectoryStart(
         readerRole,
         tenants.Tenants.Count,

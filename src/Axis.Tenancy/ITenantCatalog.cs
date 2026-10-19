@@ -15,6 +15,12 @@ public interface ITenantCatalog
 
     /// <summary>Finds the tenant for a host name without its port, ignoring letter case.</summary>
     TenantEntry? FindByHost(string host);
+
+    /// <summary>
+    /// Whether the host belongs to a tenant the source knows but does not serve, such as a suspended tenant. Such a
+    /// host resolves no tenant. A source that keeps no such tenants answers <c>false</c>.
+    /// </summary>
+    bool IsUnavailableHost(string host);
 }
 
 /// <summary>

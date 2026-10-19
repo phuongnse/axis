@@ -58,8 +58,9 @@ flowchart LR
   and [D45](decisions.md#d45-tenant-backup-and-restore--agreed).
 - **Platform database** stores installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform
-  settings *(the server and the worker read the tenant directory once at
-  start; the refresh is planned for M9)*.
+  settings *(the server reads the tenant directory again every refresh
+  interval, and the worker reads it once at start; the worker refresh is
+  planned for M9)*.
 - **Tenant databases** hold everything else for one tenant: releases, system
   tables, process state, audit and the generated entity tables (D10).
 
@@ -150,8 +151,9 @@ Moved to [reference/record-api.md](reference/record-api.md).
   include the tenant.
 - **Tenant source.** The setting `Tenancy:Source` chooses between server
   configuration, the default, and the [tenant directory](#tenant-directory).
-  The server and the worker read the directory once at start. Under `directory`
-  both ignore a `Tenants` section *(the refresh is planned for M9)*.
+  The server reads the directory at start and again at every refresh, and the
+  worker reads it once at start *(the worker refresh is planned for M9)*. Under
+  `directory` both ignore a `Tenants` section.
 
 ### Tenant configuration
 
@@ -238,15 +240,15 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
 [D42](decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
 The tenant catalog contract, the `platform` schema and the secret cipher are
 built. Under `Tenancy:Source=directory` the server creates the `platform`
-tables at start, then reads the `active` tenants, their hosts, database
-settings, OIDC settings and bindings once from the `platform` schema over
-`ConnectionStrings:Platform`. It uses them for host matching, tenant
-connections, deployment bindings and sign-in. A password, the client secret
+tables at start, then reads the tenants, their hosts, database settings, OIDC
+settings and bindings from the `platform` schema over
+`ConnectionStrings:Platform`. It uses the `active` tenants for host matching,
+tenant connections, deployment bindings and sign-in. A password, the client secret
 and a `secret` binding stay encrypted in memory and are decrypted only when a
 connection opens, the sign-in client is set up or a binding is resolved. If the
 first load fails, the start stops with an error that names
 `ConnectionStrings:Platform` and holds no password. An empty directory starts,
-and every host answers `404` until tenants are added and the server restarts.
+and every host answers `404` until a tenant is added and a refresh serves it.
 Under `directory`, a non-empty `ActivateOnStartup` stops the start. Under
 `directory` the worker reads the `active` tenants once over
 `ConnectionStrings:Platform` and runs their work on each tenant's own database,
@@ -254,10 +256,17 @@ with its decrypted runtime password. It never reads
 `ConnectionStrings:PlatformSchema`. It stops at start when
 `ConnectionStrings:Platform` is missing. If the first read fails, it logs the
 failure once, retries every `Worker:PollInterval` and is not ready until a read
-works. It ignores a `Tenants` section and logs a warning. The refresh, the
-`503` answers, the check of the schema version and the worker skipping tenants
-that are not `active` are not built. A change to the directory applies only
-after a restart of the server and the worker.
+works. It ignores a `Tenants` section and logs a warning.
+
+The server reads the directory again every `Tenancy:RefreshInterval`, without a
+restart. A tenant added as `active` is served after the next refresh, once its
+runtime database role check passes. A host of a `suspended` or `provisioning`
+tenant answers `503`, and a removed host answers `404`. A changed database
+setting gets a new connection pool. The worker refresh, Degraded readiness for
+a failed refresh, the check of the schema version and sign-in for a tenant
+added at a refresh are not built. A change to the directory applies to the
+worker only after a restart, and a changed OIDC setting applies to the server
+only after a restart.
 
 - **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
   default, or `directory`. Both answer through one tenant catalog contract, so
@@ -269,7 +278,8 @@ after a restart of the server and the worker.
 - **Refresh.** Both hosts read the directory again every
   `Tenancy:RefreshInterval`, 30 seconds by default, see
   [tenancy settings](reference/configuration.md#tenancy-settings). A changed
-  host, database or OIDC setting applies at the next refresh.
+  host or database setting applies at the next refresh. *(The worker refresh,
+  and the refresh of an OIDC setting, are planned for M9.)*
 - **Read only.** The hosts read the directory over a database role that may
   only read the `platform` schema. [`Axis.Admin`](reference/administration.md)
   writes it, see
@@ -279,18 +289,25 @@ What a host answers for a tenant, once the directory is in use:
 
 | Case | Answer |
 | --- | --- |
-| An `active` tenant | The tenant is served after the next refresh, and its OIDC client is registered then. |
+| An `active` tenant | The tenant is served after the next refresh, once the runtime database role check passes. Its OIDC client is registered then *(not built yet, planned for M9: a tenant added at a refresh has no sign-in until a restart)*. |
 | A `suspended` or `provisioning` tenant | `503` problem details (`application/problem+json`) titled "This tenant is not available.". It names no tenant and no host. The worker claims none of its new work, and work already claimed finishes. |
-| A tenant whose schema version is not the host's | `503`, like a suspended tenant. The worker claims none of its work. The schema version is the newest EF Core migration that `Axis.Admin migrate` applied, see [administration](reference/administration.md#migrate). |
+| A tenant whose schema version is not the host's *(not built yet, planned for M9)* | `503`, like a suspended tenant. The worker claims none of its work. The schema version is the newest EF Core migration that `Axis.Admin migrate` applied, see [administration](reference/administration.md#migrate). |
 | A removed or unknown host | `404`, as today. |
-| A refresh that fails | The last good directory stays in use and an error is logged. Readiness is Degraded, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works. |
+| A refresh that fails | The last good directory stays in use and an error is logged. Readiness is Degraded *(not built yet, planned for M9)*, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works. |
 | The first load fails | The server stops its start. The worker waits and retries, and is not ready until the first load works. |
 
 - **New tenants.** A tenant that first appears at a refresh is served only
   after the runtime database role check passes, see
   [database roles](reference/storage.md#database-roles). Until then it answers
-  `503`, like a suspended tenant. `Axis.Admin` creates, migrates, grants and
-  activates the database of a tenant, and the server does none of it, see
+  `503`, like a suspended tenant, and the check runs again at each refresh.
+  The same holds for a tenant that becomes `active` again, and for a served
+  tenant whose database host, port, name, runtime user or runtime password
+  changes. It answers `503` until the check passes on the new settings. Then
+  the server drops its old connection pool, and the next request opens one
+  with the new settings. The check runs only when the directory changes, so
+  privileges granted inside the database with no directory change are not
+  caught until a restart. `Axis.Admin` creates, migrates, grants and activates
+  the database of a tenant, and the server does none of it, see
   [administration](reference/administration.md).
 - **Health exemption.** Paths under `/health` stay exempt from resolution.
 
@@ -306,8 +323,7 @@ What a host answers for a tenant, once the directory is in use:
   host. This covers API and SPA paths alike.
 - **Health exemption.** Paths under `/health` are not resolved, so
   `/health/live` and `/health/ready` answer for any host.
-- **Tenant not available.** *(Not built yet, planned for M9.)* Under
-  `Tenancy:Source=directory`, a host of a tenant that is not `active` answers
+- **Tenant not available.** Under `Tenancy:Source=directory`, a host of a tenant that is not `active` answers
   `503` problem details titled "This tenant is not available.". It names
   neither the tenant nor the host. See [tenant directory](#tenant-directory).
 - **Log scope.** While a resolved request runs, the logging scope carries
