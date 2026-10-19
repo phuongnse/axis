@@ -6,7 +6,7 @@
   before any product or architecture work.
 - [docs/architecture.md](docs/architecture.md) is the target structure.
   [docs/reference/](docs/reference/) holds the detailed behaviour: configuration,
-  storage, record API, frontend, expressions, data sources, processes and
+  administration, storage, record API, frontend, expressions, data sources, processes and
   extension packages. The Studio authoring API is in
   [docs/reference/authoring.md](docs/reference/authoring.md).
 - [docs/domain/concepts.md](docs/domain/concepts.md) defines the vocabulary. Use those

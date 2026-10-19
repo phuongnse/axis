@@ -17,6 +17,8 @@ flowchart LR
     Server --> TenantDb[(Tenant databases)]
     Worker --> TenantDb
     Worker -->|connectors| External[External systems]
+    Admin[Axis.Admin] --> SysDb
+    Admin --> TenantDb
 ```
 
 - **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
@@ -45,6 +47,13 @@ flowchart LR
   It runs the package operations that process steps call, see
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
+- **Axis.Admin** *(planned for M9)* is the console host that the platform
+  operator runs. It creates tenants, migrates tenant databases and activates
+  releases. It is the only host that writes the [tenant directory](#tenant-directory),
+  holds an admin connection to the database server, and holds the schema
+  database role of a tenant under `Tenancy:Source=directory`. See
+  [administration](reference/administration.md) and
+  [D43](decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
 - **Platform database** stores installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform
   settings *(tenant directory planned for M9; tenants come from server
@@ -59,6 +68,7 @@ src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
   Axis.Scenarios/         console host that runs an application's test scenarios
+  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
@@ -160,7 +170,9 @@ setting change: every installation must add the setting, and there is no
 fallback to one connection string. `appsettings.Development.json`,
 Docker Compose, `scripts/dev.sh` and the E2E server pass `axis_schema` in
 `SchemaConnectionString` and `axis_runtime` in the other settings. See [database roles](reference/storage.md#database-roles) and
-[D31](decisions.md#d31-separate-database-roles--agreed).
+[D31](decisions.md#d31-separate-database-roles--agreed). *(Planned for M9.)*
+Under `Tenancy:Source=directory` there is no `SchemaConnectionString`: the
+server and the worker hold only runtime database roles for tenant databases.
 `appsettings.Development.json` maps `localhost` to tenant `default` on the
 compose database; the E2E server maps `127.0.0.1` to a tenant on the E2E
 database. The `Platform` connection string is separate and still serves the
@@ -231,8 +243,9 @@ None of it is built. Today the `Tenants` section above is the only source.
   [tenancy settings](reference/configuration.md#tenancy-settings). A changed
   host, database or OIDC setting applies at the next refresh.
 - **Read only.** The hosts read the directory over a database role that may
-  only read the `platform` schema. A later provisioning decision defines who
-  writes it.
+  only read the `platform` schema. [`Axis.Admin`](reference/administration.md)
+  writes it, see
+  [D43](decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
 
 What a host answers for a tenant, once the directory is in use:
 
@@ -240,6 +253,7 @@ What a host answers for a tenant, once the directory is in use:
 | --- | --- |
 | An `active` tenant | The tenant is served after the next refresh, and its OIDC client is registered then. |
 | A `suspended` or `provisioning` tenant | `503` problem details (`application/problem+json`) titled "This tenant is not available.". It names no tenant and no host. The worker claims none of its new work, and work already claimed finishes. |
+| A tenant whose schema version is not the host's | `503`, like a suspended tenant. The worker claims none of its work. The schema version is the newest EF Core migration that `Axis.Admin migrate` applied, see [administration](reference/administration.md#migrate). |
 | A removed or unknown host | `404`, as today. |
 | A refresh that fails | The last good directory stays in use and an error is logged. Readiness is Degraded, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works. |
 | The first load fails | The server stops its start. The worker waits and retries, and is not ready until the first load works. |
@@ -247,8 +261,9 @@ What a host answers for a tenant, once the directory is in use:
 - **New tenants.** A tenant that first appears at a refresh is served only
   after the runtime database role check passes, see
   [database roles](reference/storage.md#database-roles). Until then it answers
-  `503`, like a suspended tenant. Who migrates, grants and activates the
-  database of a tenant added after start is left to the provisioning decision.
+  `503`, like a suspended tenant. `Axis.Admin` creates, migrates, grants and
+  activates the database of a tenant, and the server does none of it, see
+  [administration](reference/administration.md).
 - **Health exemption.** Paths under `/health` stay exempt from resolution.
 
 ### Request resolution
@@ -882,7 +897,9 @@ until the first load of the [tenant directory](#tenant-directory) has worked.
 The server does not listen before that. After the first load, a platform
 database that does not answer is a failed refresh, and it makes the server
 Degraded (`200`), not Unhealthy. The server then keeps serving from the last
-good directory.
+good directory. Under `directory`, no startup activation runs, because
+`ActivateOnStartup` must be empty, so "startup activation has finished" holds
+from the start.
 
 - One tenant database that is down makes the server Degraded and not
   Unhealthy, so one tenant cannot take the others offline, see

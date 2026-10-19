@@ -2531,6 +2531,11 @@ applied to the tenant database. Until they are, it skips the tenant and logs
 once that it is waiting. Once they are, it logs that the tenant is ready for
 work and starts claiming. So the worker can start before the server.
 
+*(Planned for M9.)* That holds under `Tenancy:Source=configuration`. Under
+`directory`, [`Axis.Admin migrate`](administration.md#migrate) migrates the
+tenant databases, and the server does not. The worker skips a tenant whose
+schema version is not its own, and claims none of its work.
+
 ### Worker metrics
 
 The worker emits these metrics, next to the standard ASP.NET Core, HttpClient
