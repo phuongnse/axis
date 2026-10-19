@@ -143,8 +143,10 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
 *(Partly built for M9.)* See
 [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
 The `platform` schema, its migrations, the read-only grant, the secret cipher
-and the directory source of the server and the worker are built. `Axis.Admin`
-is not, so nothing writes the tables or encrypts a stored value yet. Under `Tenancy:Source=configuration` the platform database holds no
+and the directory source of the server and the worker are built. `Axis.Admin
+tenant create` writes the tables and encrypts the stored passwords and the OIDC
+client secret. No other command is built, so nothing yet changes a tenant's
+status afterwards. Under `Tenancy:Source=configuration` the platform database holds no
 tables, and its connection string only serves the readiness check. Under
 `Tenancy:Source=directory` the server creates the tables at start, then reads
 the `active` tenants, their hosts and their bindings once over
@@ -314,9 +316,9 @@ server holds no tenant schema connection, see
 
 ### Under the directory source
 
-*(Planned for M9.)* See
+*(Partly built for M9.)* See
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
-None of it is built. Under `Tenancy:Source=directory`, `tenant create` creates
+Only `tenant create` is built. Under `Tenancy:Source=directory`, `tenant create` creates
 the two database roles of a tenant, its database and the ownership, with no
 superuser. See [administration](administration.md). Each step below runs on one
 host with one database role:

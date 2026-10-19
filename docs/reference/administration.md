@@ -1,13 +1,14 @@
 # Administration
 
-*(Planned for M9.)* Detailed reference for `Axis.Admin`, the command-line host
+*(Partly built for M9.)* Detailed reference for `Axis.Admin`, the command-line host
 that a platform operator runs to create tenants, migrate tenant databases,
 activate releases, and back up and restore tenants. It follows
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
 and
 [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
-None of it is built. Today tenants come from the `Tenants` section, and the
-server migrates and activates at start, see
+Only `tenant create` is built. Every other command is still planned. Today a
+tenant can also come from the `Tenants` section, where the server migrates and
+activates at start, see
 [startup activation](configuration.md#startup-activation).
 
 The conventions of [architecture.md](../architecture.md) apply, and Dn refers
@@ -68,7 +69,7 @@ So a script can tell "some tenants failed" from "nothing ran".
 
 ## Tenant create
 
-`tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>`
+*(Built for M9.)* `tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>`
 creates one tenant.
 
 | Option | Meaning |
@@ -96,7 +97,32 @@ creates one tenant.
 8. `version`: record the schema version and set the entry `active`.
 
 Hosts serve the tenant after their next refresh, see
-[tenant directory](../architecture.md#tenant-directory).
+[tenant directory](../architecture.md#tenant-directory). The refresh is not
+built yet, so a server serves a new tenant only after it restarts. A new
+tenant also has no application until `activate` is built.
+
+**Settings and the platform tables.** The command checks its settings before any
+tenant work. It refuses an admin role that is a superuser, or a member of one,
+and an admin role without `CREATEDB` and `CREATEROLE`. It needs the `platform`
+tables to exist, because it does not create them. Start the server once under
+`Tenancy:Source=directory`, which creates them. Without the tables it exits
+with code 2.
+
+**What the steps do.**
+
+- `roles` saves each generated password, encrypted, before it creates the role.
+  It never alters a role that exists. A role that exists with no password
+  stored for this tenant fails the step.
+- `database` first gives the admin role `SET` membership, without `INHERIT`, in
+  the schema role. PostgreSQL 16 and later need this before a role that is not
+  a superuser can create a database owned by another role. The admin role
+  already holds `ADMIN OPTION` on the roles it creates, so this adds no power.
+  An existing database must already be owned by the schema role.
+- `grants` first revokes `CONNECT` and `TEMPORARY` on the database from
+  `PUBLIC`, and grants both only to the runtime role. Without this, any login
+  role of the database server could connect to the tenant database.
+- The command sets no claim names, endpoint audience or deployment binding.
+  They stay empty, so the hosts use their defaults.
 
 **Names.** The role and database names come from the id. PostgreSQL names hold
 at most 63 bytes, and `axis_<id>_runtime` adds 13 characters, hence the limit of
@@ -108,16 +134,25 @@ them in any SQL you run by hand.
 
 - On a `provisioning` entry, it skips every step already done and finishes the
   rest. The `roles` step does not generate new passwords for roles that exist.
+  The `entry` step replaces the entry's hosts and OIDC settings with the new
+  arguments, so an operator can fix a typo before the tenant goes live. A
+  `provisioning` tenant is never served, so this is safe. It never changes the
+  stored passwords.
+- A stop, such as Ctrl+C, writes a `failed` line for the current step and exits
+  with code 1. The entry stays `provisioning`, and a rerun finishes it.
 - On an `active` or `suspended` tenant, it fails with exit code 1 and changes
   nothing.
 
 **Exit codes.** `0` when the tenant is `active`. `1` when a step failed, and
 the entry stays `provisioning`. `2` for an invalid id, a missing option, a
-missing `AXIS_OIDC_CLIENT_SECRET` or a host that another tenant holds.
+missing `AXIS_OIDC_CLIENT_SECRET`, a superuser admin role, missing `platform`
+tables or a host that another tenant holds. A host conflict is written as an
+`entry failed` line that names no host, and it creates no entry, role or
+database.
 
 ## Tenant suspend
 
-`tenant suspend <id>` sets the status of an `active` tenant to `suspended`
+*(Planned for M9.)* `tenant suspend <id>` sets the status of an `active` tenant to `suspended`
 and raises its `version`.
 
 | Option | Meaning |
@@ -133,7 +168,7 @@ write failed. `2` for an unknown tenant.
 
 ## Tenant resume
 
-`tenant resume <id>` sets the status of a `suspended` tenant to `active` and
+*(Planned for M9.)* `tenant resume <id>` sets the status of a `suspended` tenant to `active` and
 raises its `version`.
 
 | Option | Meaning |
@@ -148,7 +183,7 @@ write failed. `2` for an unknown tenant.
 
 ## Tenant list
 
-`tenant list` prints a table with one row for each tenant, in ordinal order of
+*(Planned for M9.)* `tenant list` prints a table with one row for each tenant, in ordinal order of
 the id:
 
 | Column | Meaning |
@@ -319,7 +354,7 @@ The old tenant stays in the directory, because there is no tenant delete.
 
 ## Migrate
 
-`migrate [--tenant <id>] [--parallel <n>]` brings tenant databases to the schema
+*(Planned for M9.)* `migrate [--tenant <id>] [--parallel <n>]` brings tenant databases to the schema
 that this build of `Axis.Admin` ships.
 
 | Option | Meaning |
@@ -372,7 +407,7 @@ that is `provisioning`, a `--parallel` below 1 or a missing setting.
 
 ## Activate
 
-`activate <folder> [--tenant <id>]` compiles an application folder and
+*(Planned for M9.)* `activate <folder> [--tenant <id>]` compiles an application folder and
 activates its release.
 
 | Option | Meaning |
@@ -443,8 +478,8 @@ admin host carries the same version in its OCI label, see
 - Rotating the generated database passwords.
 - Moving a tenant to another database server.
 - Commands that set a tenant's deployment bindings, claim names or endpoint
-  audience. D43 does not say how they are written. The issue that builds
-  provisioning decides.
+  audience. D43 does not say how they are written. `tenant create` sets none
+  of them, so they stay empty until a later issue decides.
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation.
 - Overwriting a tenant in place with a restore.

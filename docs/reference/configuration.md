@@ -1130,9 +1130,10 @@ As environment variables they are `Tenancy__Source`,
 
 ## Admin settings
 
-*(Planned for M9.)* See
+*(Partly built for M9.)* See
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
-and [administration](administration.md). None of these settings exist yet.
+and [administration](administration.md). `Axis.Admin` reads `Admin:ConnectionString`
+for `tenant create`, the only command built so far.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
