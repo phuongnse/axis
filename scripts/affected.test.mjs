@@ -26,12 +26,12 @@ describe('decide', () => {
   })
 
   test('runs both suites when a path they cover changed', () => {
-    for (const matchers of Object.values(smokeSuites)) {
+    for (const matchers of [smokeSuites.compose, smokeSuites['dev-script']]) {
       assert.equal(decide({ base: 'abc', matchers, listChanged: () => ['compose.yaml'] }).run, true)
     }
   })
 
-  test('skips both suites when only unrelated paths changed', () => {
+  test('skips every suite when only unrelated paths changed', () => {
     const listChanged = () => ['docs/roadmap.md', 'src/Axis.Engine/Foo.cs']
     for (const matchers of Object.values(smokeSuites)) {
       assert.equal(decide({ base: 'abc', matchers, listChanged }).run, false)
@@ -53,27 +53,35 @@ describe('matches', () => {
   })
 
   test('covers the sample extension packages for both suites', () => {
-    for (const matchers of Object.values(smokeSuites)) {
+    for (const matchers of [smokeSuites.compose, smokeSuites['dev-script']]) {
       assert.equal(matches('samples/packages/PaymentReferences/axis-package.json', matchers), true)
     }
   })
 
   test('covers the sample modules for both suites', () => {
-    for (const matchers of Object.values(smokeSuites)) {
+    for (const matchers of [smokeSuites.compose, smokeSuites['dev-script']]) {
       assert.equal(matches('samples/modules/departments/module.json', matchers), true)
     }
   })
 
   test('covers the purchasing system stub for both suites', () => {
-    for (const matchers of Object.values(smokeSuites)) {
+    for (const matchers of [smokeSuites.compose, smokeSuites['dev-script']]) {
       assert.equal(matches('tests/Axis.PurchasingStub/PurchasingStubApp.cs', matchers), true)
     }
   })
 
   test('covers scripts/lib for both suites', () => {
-    for (const matchers of Object.values(smokeSuites)) {
+    for (const matchers of [smokeSuites.compose, smokeSuites['dev-script']]) {
       assert.equal(matches('scripts/lib/x.mjs', matchers), true)
     }
+  })
+})
+
+describe('images', () => {
+  test('covers the Dockerfile and the admin host, but not a sample application', () => {
+    assert.equal(matches('Dockerfile', smokeSuites.images), true)
+    assert.equal(matches('src/Axis.Admin/AdminCommands.cs', smokeSuites.images), true)
+    assert.equal(matches('samples/apps/leave-requests/application.json', smokeSuites.images), false)
   })
 })
 

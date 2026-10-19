@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,7 @@ internal static partial class AdminCommands
         """
         Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>
                tenant backup <id> --out <file>
+               version
         """;
 
     public static async Task<int> RunAsync(
@@ -36,6 +38,12 @@ internal static partial class AdminCommands
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+
+        if (args is ["version"])
+        {
+            output.WriteLine(typeof(AdminCommands).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
+            return 0;
+        }
 
         if (args.Length >= 2 && args[0] == "tenant" && args[1] == "backup")
         {

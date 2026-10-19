@@ -7,7 +7,11 @@ internal static class AdminProgram
 {
     private static async Task<int> Main(string[] args)
     {
-        var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+        // A file in /run/secrets, named as a setting in its environment variable form, wins over the variable.
+        var configuration = new ConfigurationBuilder()
+            .AddEnvironmentVariables()
+            .AddKeyPerFile("/run/secrets", optional: true)
+            .Build();
         using var cancellation = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) =>
         {

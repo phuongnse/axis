@@ -24,6 +24,9 @@ using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// A file in /run/secrets, named as a setting in its environment variable form, wins over the variable.
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
+
 var platformConnectionString = builder.Configuration.GetConnectionString("Platform");
 if (string.IsNullOrWhiteSpace(platformConnectionString))
 {

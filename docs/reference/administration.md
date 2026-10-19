@@ -6,8 +6,8 @@ activate releases, and back up and restore tenants. It follows
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
 and
 [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
-Only `tenant create` and `tenant backup` are built. Every other command is still
-planned. Today a
+Only `tenant create`, `tenant backup` and `version` are built. Every other command is
+still planned. Today a
 tenant can also come from the `Tenants` section, where the server migrates and
 activates at start, see
 [startup activation](configuration.md#startup-activation).
@@ -493,7 +493,7 @@ see [Not in M9](#not-in-m9).
 
 ## Version
 
-*(Planned for M9.)* `version` prints the Axis version on one line. It takes no
+`version` prints the Axis version on one line. It takes no
 option and needs no settings. It always exits `0`. The production image of the
 admin host carries the same version in its OCI label, see
 [installation](installation.md#images).
