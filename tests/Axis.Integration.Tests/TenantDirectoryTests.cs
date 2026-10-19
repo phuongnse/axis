@@ -7,6 +7,7 @@ using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Server.Tenancy;
 using Axis.Server.Tests;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -116,6 +117,22 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
 
         Assert.Contains("ConnectionStrings:Platform", exception.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(wrongPassword, exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_start_stops_naming_the_tenant_and_the_binding_but_not_the_value_when_a_url_binding_is_not_a_url()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(
+            [new TenantBindingRow { TenantId = "a", Name = "PurchasingUrl", Kind = DeploymentBindingKinds.Url, Url = "not-a-url/secretmarker" }],
+            a with { Host = "a.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector());
+
+        var exception = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains("Tenant 'a' binding 'PurchasingUrl' is not an absolute http or https URL.", exception.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("secretmarker", exception.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -255,6 +272,54 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
         Assert.DoesNotContain("Sales-a", list, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_failed_refresh_keeps_serving_the_last_good_directory_and_readiness_is_Degraded_until_a_refresh_works()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        var logs = new LogCollector();
+        await using var factory = CreateFactory(platform, logs);
+        using var client = factory.CreateClient().SignedInAs("anna");
+        await CreateDepartmentAsync(client, "a.example.test", "Sales-a");
+        var (before, beforeBody) = await ReadyAsync(client);
+        Assert.Equal(HttpStatusCode.OK, before);
+        Assert.Equal("""{"status":"Healthy"}""", beforeBody);
+
+        await StopPlatformAsync(platform);
+        try
+        {
+            await RefreshAsync(factory);
+            await RefreshAsync(factory);
+
+            Assert.Contains("Sales-a", await ListAsync(client, "a.example.test"), StringComparison.Ordinal);
+            var (status, body) = await ReadyAsync(client);
+            Assert.Equal(HttpStatusCode.OK, status);
+            Assert.Equal("""{"status":"Degraded"}""", body);
+            Assert.DoesNotContain("a.example.test", body, StringComparison.Ordinal);
+            Assert.DoesNotContain(new NpgsqlConnectionStringBuilder(platform).Database!, body, StringComparison.Ordinal);
+            Assert.DoesNotContain(a.DatabaseName, body, StringComparison.Ordinal);
+            Assert.Equal(
+                1,
+                logs.Entries.Count(entry => entry.StartsWith("Error:", StringComparison.Ordinal) && entry.Contains("tenant directory", StringComparison.Ordinal)));
+        }
+        finally
+        {
+            await AllowPlatformConnectionsAsync(platform);
+        }
+
+        // A pooled connection that died with the outage must not fail the first read after it.
+        NpgsqlConnection.ClearPool(new NpgsqlConnection(PostgreSqlServer.RuntimeConnectionString(platform)));
+        await RefreshAsync(factory);
+
+        var (recovered, recoveredBody) = await ReadyAsync(client);
+        Assert.Equal(HttpStatusCode.OK, recovered);
+        Assert.Equal("""{"status":"Healthy"}""", recoveredBody);
+        Assert.Contains(
+            logs.Entries,
+            entry => entry.StartsWith("Information:", StringComparison.Ordinal) && entry.Contains("read again after failed reads", StringComparison.Ordinal));
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(string platform, LogCollector logs, params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -324,7 +389,10 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
     }
 
     /// <summary>Creates a platform database with the directory tables and one active tenant row per tenant.</summary>
-    private async Task<string> PreparePlatformAsync(params DirectoryTenant[] tenants)
+    private Task<string> PreparePlatformAsync(params DirectoryTenant[] tenants) => PreparePlatformAsync([], tenants);
+
+    /// <summary>Creates a platform database with the directory tables, one active tenant row per tenant and the given bindings.</summary>
+    private async Task<string> PreparePlatformAsync(TenantBindingRow[] bindings, params DirectoryTenant[] tenants)
     {
         var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
         await using (var context = PlatformContext(platform))
@@ -332,11 +400,13 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
             await context.Database.MigrateAsync(CancellationToken);
         }
 
-        await AddTenantsAsync(platform, tenants);
+        await AddTenantsAsync(platform, tenants, bindings);
         return platform;
     }
 
-    private static async Task AddTenantsAsync(string platform, params DirectoryTenant[] tenants)
+    private static Task AddTenantsAsync(string platform, params DirectoryTenant[] tenants) => AddTenantsAsync(platform, tenants, []);
+
+    private static async Task AddTenantsAsync(string platform, DirectoryTenant[] tenants, TenantBindingRow[] bindings)
     {
         await using var context = PlatformContext(platform);
         foreach (var tenant in tenants)
@@ -359,6 +429,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
             context.TenantHosts.Add(new TenantHostRow { TenantId = tenant.Id, Host = tenant.Host });
         }
 
+        context.TenantBindings.AddRange(bindings);
         await context.SaveChangesAsync(CancellationToken);
     }
 
@@ -389,6 +460,30 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
         using var request = Request(HttpMethod.Post, Departments, host, $$"""{ "values": { "name": "{{name}}" } }""");
         using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    // The platform database cannot be stopped, since every test class shares one PostgreSQL container.
+    // Refusing connections and ending the open sessions looks the same to the server. The statements run on the
+    // fixture database, not on the platform database.
+    private async Task StopPlatformAsync(string platform)
+    {
+        var name = new NpgsqlConnectionStringBuilder(platform).Database!;
+        await PostgreSqlServer.AdminScalarAsync(database.ConnectionString, $"""ALTER DATABASE "{name}" ALLOW_CONNECTIONS false""", CancellationToken);
+        await PostgreSqlServer.AdminScalarAsync(
+            database.ConnectionString, $"SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname = '{name}'", CancellationToken);
+    }
+
+    private async Task AllowPlatformConnectionsAsync(string platform)
+    {
+        var name = new NpgsqlConnectionStringBuilder(platform).Database!;
+        await PostgreSqlServer.AdminScalarAsync(database.ConnectionString, $"""ALTER DATABASE "{name}" ALLOW_CONNECTIONS true""", CancellationToken.None);
+    }
+
+    // Health answers bypass tenant resolution, so any host works.
+    private static async Task<(HttpStatusCode Status, string Body)> ReadyAsync(HttpClient client)
+    {
+        using var response = await client.SendAsync(Request("/health/ready", "a.example.test"), CancellationToken);
+        return (response.StatusCode, await response.Content.ReadAsStringAsync(CancellationToken));
     }
 
     private static async Task<string> ListAsync(HttpClient client, string host)

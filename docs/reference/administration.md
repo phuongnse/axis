@@ -6,7 +6,8 @@ activate releases, and back up and restore tenants. It follows
 [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
 and
 [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
-Only `tenant create` and `version` are built. Every other command is still planned. Today a
+Only `tenant create`, `tenant backup` and `version` are built. Every other command is
+still planned. Today a
 tenant can also come from the `Tenants` section, where the server migrates and
 activates at start, see
 [startup activation](configuration.md#startup-activation).
@@ -39,6 +40,11 @@ connection. There is no HTTP API for provisioning in M9.
 A missing or invalid setting exits with code 2 before any tenant work. The
 message names the setting and never holds its value.
 
+`tenant backup` reads only `ConnectionStrings:PlatformSchema`,
+`Platform:SecretKey` and `PATH`. It creates no role or database, so it needs
+neither `Admin:ConnectionString` nor `AXIS_OIDC_CLIENT_SECRET`. The tool looks
+for `pg_dump` in the directories of the `PATH` setting.
+
 A new tenant's database goes on the same database server as
 `Admin:ConnectionString`. The directory records that server's host and port.
 M9 has a single database server.
@@ -56,7 +62,9 @@ The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
 `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
 `check` and `restore`. A line names the
 tenant and never a host, a password or a connection string. A `failed` message
-never holds one either. A command that does no tenant work, such as a usage
+never holds one either. A failed `dump` step says only `pg_dump exited with code <n>`
+and never repeats the text that `pg_dump` wrote, because that text can name the
+database host. To see the cause, run `pg_dump` by hand. A command that does no tenant work, such as a usage
 error, writes its message to standard error.
 
 | Exit code | Meaning |
@@ -201,13 +209,13 @@ cannot read the directory.
 
 ## Tenant backup
 
-*(Planned for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* `tenant backup <id> --out <file>` writes one
+*(Built for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* `tenant backup <id> --out <file>` writes one
 archive of one tenant.
 
 | Option | Meaning |
 | --- | --- |
 | `<id>` | The tenant id. |
-| `--out <file>` | The archive to write. The file must not exist. |
+| `--out <file>` | The archive to write. The file must not exist, and its folder must exist. Only its owner can read it, because it holds all of the tenant's business data. |
 
 The archive is one tar file with two entries: `manifest.json` and `tenant.dump`.
 It holds no secret. No database password, OIDC client secret or `secret` binding
@@ -217,7 +225,13 @@ value is ever in it, so it can be stored like any data file.
 
 1. `dump`: run `pg_dump --format=custom --no-owner --no-privileges` over the
    tenant database as its schema role. It reads one consistent snapshot, so the
-   tenant keeps running and its hosts keep answering.
+   tenant keeps running and its hosts keep answering. The tool reads the
+   manifest data inside the same snapshot, so a release that is activated during
+   the backup is in both the dump and the manifest or in neither. The schema
+   role's password goes to `pg_dump` in its environment, never in its
+   arguments. The tool holds one transaction open until the dump ends, so
+   vacuum on the tenant database waits, and so does an activation that changes
+   tables.
 2. `archive`: write the manifest and the dump into `--out`.
 
 A tenant in any status except `provisioning` can be backed up, also a
@@ -236,12 +250,24 @@ A tenant in any status except `provisioning` can be backed up, also a
 | `packages` | Every extension package version that a stored release pins. Each has `id`, `version` and `required`. |
 | `modules` | Every module version that a stored release pins. Each has `id` and `version`. |
 
-`directory` holds the status at backup, the hosts, the OIDC authority and client
-id, the claim names, the endpoint audience and the bindings. A binding holds its
-name, its kind and, for a kind other than `secret`, its `url` value. A `secret`
-binding holds only its name and kind. The database server, the database name,
-the role names and the `version` of the entry are not in the manifest, because a
-restore creates new ones.
+`directory` holds these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `status` | The status at backup, `active` or `suspended`. |
+| `hosts` | The tenant's hosts, in ordinal order. |
+| `oidcAuthority` | The OIDC authority. |
+| `oidcClientId` | The OIDC client id. |
+| `claimUserId` | The claim name of the user id, or `null` for the default. |
+| `claimDisplayName` | The claim name of the display name, or `null` for the default. |
+| `claimRoles` | The claim name of the roles, or `null` for the default. |
+| `endpointAudience` | The endpoint audience, or `null` for the default. |
+| `bindings` | The bindings, in ordinal order of the name. Each has `name`, `kind` and, for a `url` binding, `url`. |
+
+A `secret` binding holds only its name and kind. The database server, the
+database name, the role names and the `version` of the entry are not in the
+manifest, because a restore creates new ones. The tool builds the manifest from
+these named fields, so no other column of the directory reaches the archive.
 
 `required` is `true` for a package version that an active release, or a release
 with a running or waiting process instance, pins. These are the releases that the
@@ -249,7 +275,8 @@ start check `AXC0146` rebuilds, see
 [extension packages](extension-packages.md). Other stored releases are listed
 with `required` set to `false`.
 
-**Failures.** A failed dump or write exits `1` and leaves no partial file.
+**Failures.** A failed dump or write exits `1` and leaves no partial file. A
+`--out` that appears during the backup is never overwritten.
 
 **Exit codes.** `0` when the archive is written. `1` when the dump or the write
 failed. `2` for an unknown tenant, a `provisioning` tenant, an `--out` file that
@@ -446,7 +473,7 @@ unknown `--tenant`, a `--tenant` that is `provisioning` or a missing setting.
 
 ## What else to back up
 
-*(Planned for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* A tenant archive is not a backup of the
+*(Backup built for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* A tenant archive is not a backup of the
 installation. The operator also keeps these safe:
 
 - **The platform database.** It holds the tenant directory. Back it up with

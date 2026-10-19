@@ -47,7 +47,7 @@ flowchart LR
   It runs the package operations that process steps call, see
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
-- **Axis.Admin** *(partly built for M9: only `tenant create`)* is the console host that the platform
+- **Axis.Admin** *(partly built for M9: only `tenant create` and `tenant backup`)* is the console host that the platform
   operator runs. It creates tenants, migrates tenant databases, activates
   releases, and backs up and restores tenants. It is the only host that writes
   the [tenant directory](#tenant-directory), holds an admin connection to the
@@ -71,7 +71,7 @@ src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
   Axis.Scenarios/         console host that runs an application's test scenarios
-  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9; only `tenant create` is built)
+  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9; only `tenant create` and `tenant backup` are built)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
@@ -245,8 +245,9 @@ settings and bindings from the `platform` schema over
 `ConnectionStrings:Platform`. It uses the `active` tenants for host matching,
 tenant connections, deployment bindings and sign-in. A password, the client secret
 and a `secret` binding stay encrypted in memory and are decrypted only when a
-connection opens, the sign-in client is set up or a binding is resolved. If the
-first load fails, the start stops with an error that names
+connection opens, the sign-in client is set up or a binding is resolved. The
+binding check runs on each read. On failure it names the tenant and the binding,
+never the value. If the first load fails, the start stops with an error that names
 `ConnectionStrings:Platform` and holds no password. An empty directory starts,
 and every host answers `404` until a tenant is added and a refresh serves it.
 Under `directory`, a non-empty `ActivateOnStartup` stops the start. Under
@@ -262,9 +263,10 @@ The server reads the directory again every `Tenancy:RefreshInterval`, without a
 restart. A tenant added as `active` is served after the next refresh, once its
 runtime database role check passes. A host of a `suspended` or `provisioning`
 tenant answers `503`, and a removed host answers `404`. A changed database
-setting gets a new connection pool. The worker refresh, Degraded readiness for
-a failed refresh, the check of the schema version and sign-in for a tenant
-added at a refresh are not built. A change to the directory applies to the
+setting gets a new connection pool. A failed refresh keeps the last good
+directory and makes the server's readiness Degraded. The worker refresh, the
+check of the schema version and sign-in for a tenant added at a refresh are not
+built. A change to the directory applies to the
 worker only after a restart, and a changed OIDC setting applies to the server
 only after a restart.
 
@@ -293,7 +295,7 @@ What a host answers for a tenant, once the directory is in use:
 | A `suspended` or `provisioning` tenant | `503` problem details (`application/problem+json`) titled "This tenant is not available.". It names no tenant and no host. The worker claims none of its new work, and work already claimed finishes. |
 | A tenant whose schema version is not the host's *(not built yet, planned for M9)* | `503`, like a suspended tenant. The worker claims none of its work. The schema version is the newest EF Core migration that `Axis.Admin migrate` applied, see [administration](reference/administration.md#migrate). |
 | A removed or unknown host | `404`, as today. |
-| A refresh that fails | The last good directory stays in use and an error is logged. Readiness is Degraded *(not built yet, planned for M9)*, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works. |
+| A refresh that fails | The last good directory stays in use and one error is logged for each run of failed refreshes. Readiness is Degraded until a refresh works, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works. |
 | The first load fails | The server stops its start. The worker waits and retries, and is not ready until the first load works. |
 
 - **New tenants.** A tenant that first appears at a refresh is served only
@@ -936,14 +938,15 @@ answers requests, with status `200`. It is never Degraded or Unhealthy.
 | Degraded | `200` | The platform database answers and activation has finished, but at least one tenant database does not answer. |
 | Unhealthy | `503` | The platform database does not answer, or startup activation has not finished for every tenant. |
 
-*(Planned for M9.)* Under `Tenancy:Source=directory`, the rows above hold
+Under `Tenancy:Source=directory`, the rows above hold
 until the first load of the [tenant directory](#tenant-directory) has worked.
 The server does not listen before that. After the first load, a platform
 database that does not answer is a failed refresh, and it makes the server
-Degraded (`200`), not Unhealthy. The server then keeps serving from the last
-good directory. Under `directory`, no startup activation runs, because
-`ActivateOnStartup` must be empty, so "startup activation has finished" holds
-from the start.
+Degraded (`200`), not Unhealthy. So does a refresh that fails while the platform
+database still answers. The server then keeps serving from the last good
+directory. Readiness returns to Healthy at the next refresh that works. Under
+`directory`, no startup activation runs, because `ActivateOnStartup` must be
+empty, so "startup activation has finished" holds from the start.
 
 - One tenant database that is down makes the server Degraded and not
   Unhealthy, so one tenant cannot take the others offline, see

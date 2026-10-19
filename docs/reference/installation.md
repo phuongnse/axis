@@ -160,8 +160,8 @@ version, as [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-
 says. So migrate first and roll out the hosts second.
 
 1. Back up the platform database and every tenant database. For example, run
-   `pg_dump` from the admin image. A backup command comes with the separate M9
-   backup and restore issue.
+   `pg_dump` from the admin image. Back up each tenant with
+   [`tenant backup`](administration.md#tenant-backup).
 2. Run `migrate` with the new admin image.
 3. Roll out the new server and the new worker.
 

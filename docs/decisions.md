@@ -2062,8 +2062,9 @@ schema at start and reads the directory every `Tenancy:RefreshInterval`. It
 serves new tenants, answers `503` for tenants that are not `active` and `404`
 for removed hosts, and runs the role check of D31 on new tenants and on changed
 database settings. The worker reads its `active` tenants once, and retries the
-first read until it works. The worker refresh, Degraded readiness for a failed
-refresh and the worker skipping tenants that are not `active` are not built.
+first read until it works. The server's Degraded readiness for a failed refresh is
+built. The worker refresh, the worker's Degraded readiness and the worker
+skipping tenants that are not `active` are not built.
 Both hosts,
 under `configuration`, take tenants from the `Tenants` section, as in
 [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed).
@@ -2352,8 +2353,8 @@ rollback. Pushing images is a workflow change, which NexKit may not make.
 ## D45. Tenant backup and restore — Agreed
 
 A platform operator backs up one tenant into an archive that holds no secret,
-and restores it into a new, suspended tenant. This is planned for M9 and none of
-it is built. See [tenant backup](reference/administration.md#tenant-backup) and
+and restores it into a new, suspended tenant. The backup is built for M9. The
+restore is planned for M9 and is not built. See [tenant backup](reference/administration.md#tenant-backup) and
 [tenant restore](reference/administration.md#tenant-restore) for the commands,
 the manifest and every refusal.
 The owner confirmed these points on issue #642 on 2026-10-19.
