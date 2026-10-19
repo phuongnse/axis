@@ -1,5 +1,5 @@
-# Production Compose example: the server and the worker run from the production images, and the admin
-# tool runs only on demand. PostgreSQL 18 and the OIDC provider run elsewhere. Tenants come from the
+# Production Compose example: the server, the worker and the publisher run from the production images,
+# and the admin tool runs only on demand. PostgreSQL 18 and the OIDC provider run elsewhere. Tenants come from the
 # tenant directory. Every secret is a file under secrets:, mounted in /run/secrets. This file holds no
 # password, client secret or key. See docs/reference/installation.md#on-premises for the steps.
 #
@@ -53,6 +53,21 @@ services:
     # The worker never gets the schema connection string.
     secrets:
       - ConnectionStrings__Platform
+      - Platform__SecretKey
+
+  # Runs the publish requests that Studio stores. It listens on no port.
+  publisher:
+    <<: *host
+    image: ${AXIS_IMAGE_PREFIX:-}axis-admin:${AXIS_VERSION:?Set AXIS_VERSION}
+    command: ["publisher"]
+    restart: unless-stopped
+    # Longer than the five-minute lease, so a stop lets the running request finish.
+    stop_grace_period: 6m
+    volumes:
+      - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
+      - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
+    secrets:
+      - ConnectionStrings__PlatformSchema
       - Platform__SecretKey
 
   # Runs only through `docker compose run --rm admin <command>`, so `docker compose up` does not start it.

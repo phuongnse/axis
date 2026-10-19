@@ -569,9 +569,9 @@ runs until it is stopped.
 `publisher`
 
 It takes no option. It has no HTTP endpoint and listens on no port, so nothing
-can call it. The `axis-admin` image runs it. *(Planned for M10:)* `scripts/dev.sh`,
-Docker Compose, the E2E script and both production installs start one, see
-[installation](installation.md).
+can call it. The `axis-admin` image runs it. Both production installs start one,
+see [installation](installation.md). *(Planned for M10:)* `scripts/dev.sh`,
+Docker Compose and the E2E script start one too.
 
 **What is built.** The command runs `publish` requests for
 `Tenancy:Source=directory`. These stay *(planned for M10)*: `validate` and

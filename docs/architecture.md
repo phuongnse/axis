@@ -1109,7 +1109,7 @@ says. The images, the Compose example and the chart are built.
 - `axis-server` and `axis-worker` run the hosts. They hold no sample and no
   development setting.
 - `axis-admin` runs `Axis.Admin` and holds the PostgreSQL 18 client tools.
-  *(Planned for M10:)* It also runs the publisher, `axis-admin publisher`.
+  It also runs the publisher, `axis-admin publisher`.
 - `deploy/compose/` and `deploy/helm/axis/` install them on one machine and on
   Kubernetes.
 
