@@ -1,6 +1,6 @@
 # Axis
 
-Axis is an enterprise application platform. Organizations build complete
+Axis is a general-purpose low-code platform. Organizations build complete
 business applications on it by configuring them: data models, queries, rules,
 processes, sites, pages, widgets, security policies and text. Axis validates
 the configuration, publishes it as an immutable release, then runs it on
@@ -13,7 +13,7 @@ amount, and an approved request is sent to a purchasing system.
 ## Status
 
 Milestone **M9, Tenancy and deployment**, is complete. The current milestone is
-**M10, Hardening**. The [roadmap](docs/roadmap.md) says what each
+**M10, Publishing from Studio**. The [roadmap](docs/roadmap.md) says what each
 milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 
@@ -39,7 +39,7 @@ Node. It runs the server, the worker and the SPA with hot reload. See
 
 | Document | Purpose |
 | --- | --- |
-| [Product brief](docs/product-brief.md) | What Axis is, who uses it, the first application |
+| [Product brief](docs/product-brief.md) | What Axis is, who uses it, the proving samples |
 | [Decisions](docs/decisions.md) | Decisions that have been agreed, with reasons |
 | [Architecture](docs/architecture.md) | Modules, hosts, tenancy, security, execution and testing |
 | [Reference](docs/reference/) | Detailed behaviour: configuration, administration, installation, storage, record API, authoring API, frontend, expressions, data sources, processes and extension packages |
