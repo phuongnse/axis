@@ -7,7 +7,7 @@ activate releases, and back up and restore tenants. It follows
 and
 [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
 Only `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`,
-`migrate`, `activate` and `version` are built. Every other command is still planned. Today a
+`tenant restore`, `migrate`, `activate` and `version` are built. Every other command is still planned. Today a
 tenant can also come from the `Tenants` section, where the server migrates and
 activates at start, see
 [startup activation](configuration.md#startup-activation).
@@ -33,7 +33,7 @@ connection. There is no HTTP API for provisioning in M9.
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate` and `tenant restore` read it. |
-| `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `tenant restore` read it. |
+| `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` reads it. `tenant restore` never reads it, because a missing module refuses nothing. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. Only `tenant create` and `tenant restore` read it. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
@@ -49,6 +49,12 @@ nor `AXIS_OIDC_CLIENT_SECRET`.
 `Platform:SecretKey` and `PATH`. It creates no role or database, so it needs
 neither `Admin:ConnectionString` nor `AXIS_OIDC_CLIENT_SECRET`. The tool looks
 for `pg_dump` in the directories of the `PATH` setting.
+
+`tenant restore` reads the settings of `tenant create`, `PATH` to find
+`pg_restore`, and `Extensions:Path` to check the packages that the archive
+requires. It needs `Extensions:Path` only when the archive requires a package. It
+reads the OIDC authority and client id from the archive, so it takes no
+`--oidc-*` option.
 
 A new tenant's database goes on the same database server as
 `Admin:ConnectionString`. The directory records that server's host and port.
@@ -294,7 +300,7 @@ exists, a missing option, a missing tool or a missing setting.
 
 ## Tenant restore
 
-*(Planned for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* `tenant restore <file> --tenant <id> --host <host>...`
+*(Built for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* `tenant restore <file> --tenant <id> --host <host>...`
 restores an archive into a new tenant.
 
 | Option | Meaning |
@@ -319,6 +325,11 @@ what is missing:
   `Extensions:Path`. The message lists every missing version, not only the first.
 - `AXIS_OIDC_CLIENT_SECRET` is missing.
 
+A refusal of the archive, the tenant id, the hosts or the packages is written as
+a `<id> check failed: <message>` line on standard output. A missing or invalid
+setting, a missing `pg_restore` and a usage error go to standard error. Both exit
+`2`, and nothing has changed.
+
 A module version that is not installed under `Modules:Path` is listed in the
 manifest but never refuses a restore. A stored release holds its module files, so
 it keeps working without the module installed.
@@ -333,20 +344,26 @@ it keeps working without the module installed.
    passwords, as `tenant create` does.
 4. `database`: create `axis_<id>`, owned by the schema role.
 5. `restore`: run `pg_restore --single-transaction --no-owner --no-privileges`
-   as the schema role. It restores everything or nothing. It refuses a database
-   that already holds tables.
+   as the schema role. It restores everything or nothing. The tool streams
+   `tenant.dump` from the archive to the standard input of `pg_restore`, so no
+   unpacked copy of the data is left on disk. The schema role's password goes
+   in the environment of `pg_restore`, never in its arguments. A database that
+   already holds tables counts as restored, and the step runs no `pg_restore`.
 6. `grants`: run the grant step. This builds every privilege for the new roles,
    as [D31](../decisions.md#d31-separate-database-roles--agreed) describes.
 7. `migrations`: run the EF Core migrations. This step runs only when the
    archive's schema version is older than this build's.
 8. `grants`: run the grant step again.
 9. `role-check`: run the runtime role check of D31 over the runtime role.
-10. `version`: record the schema version and set the entry `suspended`.
+10. `version`: record the schema version and set the entry `suspended`. The step
+    fails unless the database is on the schema of this build, which catches an
+    archive whose manifest does not match its dump.
 
 **Running it again.** On a `provisioning` entry, the same command skips every
 step already done and finishes the rest, as `tenant create` does. A failed
-`restore` step restored nothing, so the rerun restores again. On an `active` or
-`suspended` tenant it is refused.
+`restore` step restored nothing, so the rerun restores again. A database that
+already holds tables counts as restored, so the rerun does not restore it a
+second time. On an `active` or `suspended` tenant it is refused.
 
 **Exit codes.** `0` when the tenant is `suspended` and restored. `1` when a step
 failed, and the entry stays `provisioning`. `2` for a refusal above, a missing
@@ -509,7 +526,7 @@ or bad setting.
 
 ## What else to back up
 
-*(Backup built for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* A tenant archive is not a backup of the
+*(Built for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* A tenant archive is not a backup of the
 installation. The operator also keeps these safe:
 
 - **The platform database.** It holds the tenant directory. Back it up with

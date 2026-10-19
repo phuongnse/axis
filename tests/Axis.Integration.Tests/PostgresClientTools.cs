@@ -22,6 +22,13 @@ internal sealed class PostgresClientTools : IDisposable
             #!/bin/sh
             exec docker exec -e PGHOST=127.0.0.1 -e PGPORT=5432 -e PGDATABASE -e PGUSER -e PGPASSWORD {containerId} pg_dump "$@"
             """);
+        // The dump arrives on standard input, so the container's exec needs -i.
+        WriteScript(
+            Path.Combine(_folder, "pg_restore"),
+            $"""
+            #!/bin/sh
+            exec docker exec -i -e PGHOST=127.0.0.1 -e PGPORT=5432 -e PGDATABASE -e PGUSER -e PGPASSWORD {containerId} pg_restore "$@"
+            """);
     }
 
     public string ContainerId { get; }
@@ -75,6 +82,31 @@ internal sealed class PostgresClientTools : IDisposable
         var text = await output;
         Assert.True(process.ExitCode == 0, $"pg_restore exited with code {process.ExitCode}: {await error}");
         return text;
+    }
+
+    /// <summary>Runs <c>pg_dump</c> in the container as the superuser over <paramref name="database"/> and writes the custom-format dump to <paramref name="file"/>.</summary>
+    public async Task DumpAsync(string database, string file, CancellationToken cancellationToken)
+    {
+        var info = new ProcessStartInfo("docker")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        foreach (var argument in new[] { "exec", ContainerId, "pg_dump", "-U", "postgres", "--format=custom", "--no-owner", "--no-privileges", "-d", database })
+        {
+            info.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(info)!;
+        var error = process.StandardError.ReadToEndAsync(cancellationToken);
+        await using (var output = File.Create(file))
+        {
+            await process.StandardOutput.BaseStream.CopyToAsync(output, cancellationToken);
+        }
+
+        await process.WaitForExitAsync(cancellationToken);
+        Assert.True(process.ExitCode == 0, $"pg_dump exited with code {process.ExitCode}: {await error}");
     }
 
     public void Dispose() => Directory.Delete(_folder, recursive: true);

@@ -12,8 +12,13 @@ namespace Axis.Processes.Storage;
 /// </summary>
 public static class TenantSchemaVersion
 {
+    // Declared first: the static initializers run in the order of the declarations.
+    private static readonly string[] _migrations = BuiltInMigrations();
+
+    private static readonly HashSet<string> _known = [.. _migrations];
+
     /// <summary>The newest migration this build holds. It needs no database.</summary>
-    public static string Current { get; } = BuiltIn();
+    public static string Current { get; } = Newest(_migrations);
 
     /// <summary>The newest migration applied to the database of <paramref name="connection"/>, or empty when none is.</summary>
     public static async Task<string> ReadAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
@@ -29,12 +34,15 @@ public static class TenantSchemaVersion
                 .Concat(await processes.Database.GetAppliedMigrationsAsync(cancellationToken)));
     }
 
-    private static string BuiltIn()
+    /// <summary>Whether <paramref name="version"/> is the id of a migration of the configuration, data or processes context of this build.</summary>
+    public static bool IsKnown(string version) => _known.Contains(version);
+
+    private static string[] BuiltInMigrations()
     {
         using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql().Options);
         using var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql().Options);
         using var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql().Options);
-        return Newest(configuration.Database.GetMigrations().Concat(data.Database.GetMigrations()).Concat(processes.Database.GetMigrations()));
+        return [.. configuration.Database.GetMigrations().Concat(data.Database.GetMigrations()).Concat(processes.Database.GetMigrations())];
     }
 
     private static string Newest(IEnumerable<string> migrations) => migrations.Max(StringComparer.Ordinal) ?? "";

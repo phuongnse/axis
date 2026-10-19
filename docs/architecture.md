@@ -47,7 +47,7 @@ flowchart LR
   It runs the package operations that process steps call, see
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
-- **Axis.Admin** *(partly built for M9: `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`, `migrate` and `activate`)* is the console host that the platform
+- **Axis.Admin** *(partly built for M9: `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`, `tenant restore`, `migrate` and `activate`)* is the console host that the platform
   operator runs. It creates tenants, migrates tenant databases, activates
   releases, and backs up and restores tenants. It is the only host that writes
   the [tenant directory](#tenant-directory), holds an admin connection to the

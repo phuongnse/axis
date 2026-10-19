@@ -37,6 +37,7 @@ internal static partial class AdminCommands
         """
         Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>
                tenant backup <id> --out <file>
+               tenant restore <file> --tenant <id> --host <host>...
                migrate [--tenant <id>] [--parallel <n>]
                activate <folder> [--tenant <id>]
                tenant suspend <id>
@@ -76,6 +77,11 @@ internal static partial class AdminCommands
         if (args.Length >= 2 && args[0] == "tenant" && args[1] == "backup")
         {
             return await BackupAsync(args, configuration, output, error, cancellationToken);
+        }
+
+        if (args.Length >= 2 && args[0] == "tenant" && args[1] == "restore")
+        {
+            return await RestoreAsync(args, configuration, output, error, cancellationToken);
         }
 
         if (args.Length >= 2 && args[0] == "tenant" && args[1] is "suspend" or "resume" or "list")
@@ -192,6 +198,88 @@ internal static partial class AdminCommands
         }
 
         return plan is null ? 2 : await new TenantBackup(settings, plan, output, cancellationToken).RunAsync();
+    }
+
+    private static async Task<int> RestoreAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var request = ParseTenantRestore(args);
+        if (request is null)
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        var settings = ReadRestoreSettings(configuration, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        var pgRestore = FindTool(settings.SearchPath, TenantRestore.PgRestore);
+        if (pgRestore is null)
+        {
+            error.WriteLine($"{TenantRestore.PgRestore} was not found in the directories of {PathSetting}.");
+            return 2;
+        }
+
+        RestorePlan? plan;
+        try
+        {
+            var refusal = await ValidateRestoreAsync(settings.Create, request, cancellationToken);
+            if (refusal is not null)
+            {
+                error.WriteLine(refusal);
+                return 2;
+            }
+
+            plan = await TenantRestore.PrepareAsync(settings, request, pgRestore, output, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+
+        return plan is null ? 2 : await new TenantRestore(settings.Create, plan, output, cancellationToken).RunAsync();
+    }
+
+    private static TenantRestoreRequest? ParseTenantRestore(string[] args)
+    {
+        if (args.Length < 3 || args[2].StartsWith("--", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var hosts = new List<string>();
+        string? id = null;
+        for (var i = 3; i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var value = args[i + 1];
+            switch (args[i])
+            {
+                case "--host":
+                    hosts.Add(value);
+                    break;
+                case "--tenant" when id is null:
+                    id = value;
+                    break;
+                default:
+                    return null;
+            }
+        }
+
+        return hosts.Count == 0 || id is null ? null : new TenantRestoreRequest(args[2], id, hosts);
     }
 
     private static TenantBackupRequest? ParseTenantBackup(string[] args)
@@ -569,6 +657,28 @@ internal static partial class AdminCommands
         return new BackupSettings(platform.PlatformConnectionString, platform.Cipher, path);
     }
 
+    /// <summary>
+    /// <c>tenant restore</c> reads the settings of <c>tenant create</c>, and <c>PATH</c> to find <c>pg_restore</c>. It reads
+    /// <c>Extensions:Path</c> when the archive requires a package. It never reads <c>Modules:Path</c>, because a missing module refuses nothing.
+    /// </summary>
+    private static RestoreSettings? ReadRestoreSettings(IConfiguration configuration, out string problem)
+    {
+        var create = ReadCreateSettings(configuration, out problem);
+        if (create is null)
+        {
+            return null;
+        }
+
+        var path = configuration[PathSetting];
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            problem = $"The environment variable {PathSetting} is required, to find {TenantRestore.PgRestore}.";
+            return null;
+        }
+
+        return new RestoreSettings(create, path, configuration[PackageCatalog.PathSetting]);
+    }
+
     /// <summary><c>tenant suspend</c>, <c>resume</c> and <c>list</c> need only the platform database. They decrypt nothing and create no role or database.</summary>
     private static string? ReadDirectorySettings(IConfiguration configuration, out string problem)
     {
@@ -684,6 +794,34 @@ internal static partial class AdminCommands
     /// <summary>Returns the reason to refuse the command, or null. It checks the admin role and the input before any tenant work.</summary>
     private static async Task<string?> ValidateAsync(CreateSettings settings, TenantCreateRequest request, CancellationToken cancellationToken)
     {
+        var problem = await AdminRoleProblemAsync(settings, cancellationToken) ?? IdAndHostsProblem(request.Id, request.Hosts);
+        if (problem is not null)
+        {
+            return problem;
+        }
+
+        if (!Uri.TryCreate(request.OidcAuthority, UriKind.Absolute, out var authority)
+            || (authority.Scheme != Uri.UriSchemeHttp && authority.Scheme != Uri.UriSchemeHttps))
+        {
+            return "--oidc-authority must be an absolute http or https URL.";
+        }
+
+        if (string.IsNullOrWhiteSpace(request.OidcClientId))
+        {
+            return "--oidc-client-id must not be blank.";
+        }
+
+        return await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+    }
+
+    /// <summary>The checks of <see cref="ValidateAsync"/> that do not depend on the OIDC options: the OIDC settings of a restore come from its archive.</summary>
+    private static async Task<string?> ValidateRestoreAsync(CreateSettings settings, TenantRestoreRequest request, CancellationToken cancellationToken) =>
+        await AdminRoleProblemAsync(settings, cancellationToken)
+        ?? IdAndHostsProblem(request.Id, request.Hosts)
+        ?? await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+
+    private static async Task<string?> AdminRoleProblemAsync(CreateSettings settings, CancellationToken cancellationToken)
+    {
         try
         {
             await using var admin = new NpgsqlConnection(settings.Admin.ConnectionString);
@@ -715,28 +853,33 @@ internal static partial class AdminCommands
             return $"The setting {AdminSetting} could not be used to connect to the database server.";
         }
 
-        if (!IdPattern().IsMatch(request.Id))
+        return null;
+    }
+
+    private static string? IdAndHostsProblem(string id, IReadOnlyList<string> hosts)
+    {
+        if (!IdPattern().IsMatch(id))
         {
             return "The tenant id must have 1 to 50 lowercase letters, digits and hyphens.";
         }
 
-        if (request.Hosts.Any(string.IsNullOrWhiteSpace))
+        return hosts.Any(string.IsNullOrWhiteSpace) ? "A host must not be blank." : null;
+    }
+
+    // The first existing file of that name in the directories of the setting, as a shell would find it.
+    internal static string? FindTool(string searchPath, string name)
+    {
+        var file = OperatingSystem.IsWindows() ? name + ".exe" : name;
+        foreach (var directory in searchPath.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            return "A host must not be blank.";
+            var candidate = Path.Combine(directory, file);
+            if (File.Exists(candidate))
+            {
+                return Path.GetFullPath(candidate);
+            }
         }
 
-        if (!Uri.TryCreate(request.OidcAuthority, UriKind.Absolute, out var authority)
-            || (authority.Scheme != Uri.UriSchemeHttp && authority.Scheme != Uri.UriSchemeHttps))
-        {
-            return "--oidc-authority must be an absolute http or https URL.";
-        }
-
-        if (string.IsNullOrWhiteSpace(request.OidcClientId))
-        {
-            return "--oidc-client-id must not be blank.";
-        }
-
-        return await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+        return null;
     }
 
     private static async Task<bool> PlatformTablesExistAsync(string platformConnectionString, CancellationToken cancellationToken)
@@ -781,6 +924,8 @@ internal sealed record ActivateRequest(string Folder, string? Tenant);
 
 internal sealed record TenantBackupRequest(string Id, string Out);
 
+internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyList<string> Hosts);
+
 /// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
 internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
 
@@ -795,3 +940,6 @@ internal sealed record CreateSettings(
     string PlatformConnectionString,
     TenantSecretCipher Cipher,
     string OidcClientSecret);
+
+/// <summary>The settings of <c>tenant restore</c>: those of <c>tenant create</c>, the <c>PATH</c> and the installed extension packages, which may be unset.</summary>
+internal sealed record RestoreSettings(CreateSettings Create, string SearchPath, string? ExtensionsPath);

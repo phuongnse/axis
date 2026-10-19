@@ -73,7 +73,7 @@ internal sealed class TenantBackup : IAsyncDisposable
         TextWriter error,
         CancellationToken cancellationToken)
     {
-        var pgDump = FindPgDump(settings.SearchPath);
+        var pgDump = AdminCommands.FindTool(settings.SearchPath, PgDump);
         if (pgDump is null)
         {
             error.WriteLine($"{PgDump} was not found in the directories of {AdminCommands.PathSetting}.");
@@ -160,22 +160,6 @@ internal sealed class TenantBackup : IAsyncDisposable
 
     private static PlatformDbContext NewPlatform(string connectionString) =>
         new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(connectionString).Options);
-
-    // The first existing file of that name in the directories of the setting, as a shell would find it.
-    private static string? FindPgDump(string searchPath)
-    {
-        var name = OperatingSystem.IsWindows() ? PgDump + ".exe" : PgDump;
-        foreach (var directory in searchPath.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            var candidate = Path.Combine(directory, name);
-            if (File.Exists(candidate))
-            {
-                return Path.GetFullPath(candidate);
-            }
-        }
-
-        return null;
-    }
 
     private static void Delete(string path)
     {
