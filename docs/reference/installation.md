@@ -66,8 +66,8 @@ file.
 | `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker | yes | The read-only platform database role. |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it only at start. The worker never gets it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | server, worker, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
-| `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | *(planned for M10)* Optional. The IP addresses of your reverse proxies. See [several server replicas](#several-server-replicas). |
-| `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | *(planned for M10)* Optional. The CIDR ranges of your reverse proxies. |
+| `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | Optional. The IP addresses of your reverse proxies. See [several server replicas](#several-server-replicas). |
+| `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | Optional. The CIDR ranges of your reverse proxies. |
 | `Admin:ConnectionString` | `Admin__ConnectionString` | admin | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of the new tenant. Only `tenant create` reads it. |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
@@ -303,7 +303,7 @@ against a live cluster.
 *(planned for M10)* The server can run as several replicas behind a reverse
 proxy that ends TLS. See
 [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
-Nothing here is built yet.
+The forwarded headers are built. The rest is planned.
 
 - **A shared key ring.** The server keeps its data protection keys in the
   platform database, encrypted with `Platform:SecretKey`. See

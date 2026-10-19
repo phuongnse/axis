@@ -2533,8 +2533,8 @@ change again in M12.
 ## D49. Several server replicas behind a TLS proxy — Agreed
 
 M10 runs the server as several replicas behind a reverse proxy that ends TLS.
-That is what a shared Studio server needs. Nothing in this decision is built
-yet. See the [installation guide](reference/installation.md#several-server-replicas),
+That is what a shared Studio server needs. Only the forwarded headers are
+built so far. See the [installation guide](reference/installation.md#several-server-replicas),
 the [forwarded headers settings](reference/configuration.md#forwarded-headers),
 the [platform database](reference/storage.md#platform-database) and the
 [authoring API](reference/authoring.md#versions).
