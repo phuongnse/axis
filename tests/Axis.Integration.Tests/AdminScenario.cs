@@ -108,7 +108,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         CancellationTokenSource? stop = null,
         string? adminConnectionString = null,
         bool withClientSecret = true,
-        string? path = null)
+        string? path = null,
+        string? extensionsPath = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -117,6 +118,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             ["Platform:SecretKey"] = TestSecretKey,
             ["AXIS_OIDC_CLIENT_SECRET"] = withClientSecret ? _clientSecret : null,
             ["PATH"] = path,
+            ["Extensions:Path"] = extensionsPath,
         };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         using var error = new StringWriter();

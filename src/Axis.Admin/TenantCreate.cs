@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using Axis.Data.Naming;
 using Axis.Processes.Storage;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
@@ -29,7 +27,7 @@ internal sealed class TenantCreate : IAsyncDisposable
     private readonly NpgsqlConnectionStringBuilder _admin;
 
     private TenantRow? _row;
-    private NpgsqlConnection? _adminConnection;
+    private TenantProvisioning? _provisioning;
     private TenantDatabaseSteps? _steps;
 
     public TenantCreate(CreateSettings settings, TenantCreateRequest request, TextWriter output, CancellationToken cancellationToken)
@@ -56,8 +54,8 @@ internal sealed class TenantCreate : IAsyncDisposable
                 return entry.Value;
             }
 
-            if (await Step("roles", EnsureRolesAsync)
-                && await Step("database", EnsureDatabaseAsync)
+            if (await Step("roles", () => Roles.EnsureRolesAsync())
+                && await Step("database", () => Roles.EnsureDatabaseAsync())
                 && await Step("grants", () => Steps.GrantAsync())
                 && await Step("migrations", () => Steps.MigrateAsync())
                 && await Step("grants", () => Steps.GrantAsync())
@@ -77,10 +75,10 @@ internal sealed class TenantCreate : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_adminConnection is not null)
+        if (_provisioning is not null)
         {
-            await _adminConnection.DisposeAsync();
-            _adminConnection = null;
+            await _provisioning.DisposeAsync();
+            _provisioning = null;
         }
 
         if (_steps is not null)
@@ -166,70 +164,11 @@ internal sealed class TenantCreate : IAsyncDisposable
         exception is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } };
 
     // The steps of the database run with the host and port of the admin connection, where the database was created.
+    private TenantProvisioning Roles =>
+        _provisioning ??= new TenantProvisioning(_admin, _settings.Cipher, _platform, _row!, _cancellationToken);
+
     private TenantDatabaseSteps Steps =>
         _steps ??= new TenantDatabaseSteps(_settings.Cipher, _row!, _admin.Host!, _admin.Port, _cancellationToken);
-
-    private async Task EnsureRolesAsync()
-    {
-        await EnsureRoleAsync(_schemaRole, TenantSecretFields.SchemaPassword, row => row.SchemaPassword, (row, value) => row.SchemaPassword = value);
-        await EnsureRoleAsync(_runtimeRole, TenantSecretFields.RuntimePassword, row => row.RuntimePassword, (row, value) => row.RuntimePassword = value);
-    }
-
-    private async Task EnsureRoleAsync(string role, string field, Func<TenantRow, byte[]> read, Action<TenantRow, byte[]> write)
-    {
-        var row = _row!;
-        var admin = await AdminConnectionAsync();
-        var exists = await ScalarAsync<bool>(admin, "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = @name)", ("name", role));
-        var stored = read(row);
-
-        string password;
-        if (stored.Length == 0)
-        {
-            if (exists)
-            {
-                throw new InvalidOperationException($"The database role '{role}' exists and is not recorded for this tenant.");
-            }
-
-            password = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
-            // Save the password before the role exists, so a stop between the two never loses it.
-            write(row, _settings.Cipher.Encrypt(_id, field, password));
-            row.Version++;
-            await _platform.SaveChangesAsync(_cancellationToken);
-        }
-        else if (!exists)
-        {
-            password = _settings.Cipher.Decrypt(_id, field, stored).Reveal();
-        }
-        else
-        {
-            return;
-        }
-
-        // The password is hex, so it needs no escaping. An existing role is never altered.
-        await ExecuteAsync(admin, $"CREATE ROLE {EntityNaming.Quote(role)} LOGIN PASSWORD '{password}'");
-    }
-
-    private async Task EnsureDatabaseAsync()
-    {
-        var admin = await AdminConnectionAsync();
-        var owner = await ScalarAsync<string?>(
-            admin,
-            "SELECT pg_get_userbyid(datdba)::text FROM pg_database WHERE datname = @name",
-            ("name", _database));
-        if (owner is not null)
-        {
-            if (owner != _schemaRole)
-            {
-                throw new InvalidOperationException($"The database '{_database}' exists and is not owned by the role '{_schemaRole}'.");
-            }
-
-            return;
-        }
-
-        // PostgreSQL 16 and later let a non-superuser create a database for a role only when it can SET ROLE to it.
-        await ExecuteAsync(admin, $"GRANT {EntityNaming.Quote(_schemaRole)} TO CURRENT_USER WITH INHERIT FALSE, SET TRUE");
-        await ExecuteAsync(admin, $"CREATE DATABASE {EntityNaming.Quote(_database)} OWNER {EntityNaming.Quote(_schemaRole)}");
-    }
 
     private async Task ActivateAsync()
     {
@@ -270,31 +209,5 @@ internal sealed class TenantCreate : IAsyncDisposable
     {
         var line = $"{_id} {step} failed: {message}";
         _output.WriteLine(line);
-    }
-
-    private async Task<NpgsqlConnection> AdminConnectionAsync()
-    {
-        if (_adminConnection is null)
-        {
-            var connection = new NpgsqlConnection(_admin.ConnectionString);
-            await connection.OpenAsync(_cancellationToken);
-            _adminConnection = connection;
-        }
-
-        return _adminConnection;
-    }
-
-    private async Task ExecuteAsync(NpgsqlConnection connection, string sql)
-    {
-        await using var command = new NpgsqlCommand(sql, connection);
-        await command.ExecuteNonQueryAsync(_cancellationToken);
-    }
-
-    private async Task<T> ScalarAsync<T>(NpgsqlConnection connection, string sql, (string Name, object Value) parameter)
-    {
-        await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue(parameter.Name, parameter.Value);
-        var value = await command.ExecuteScalarAsync(_cancellationToken);
-        return value is null or DBNull ? default! : (T)value;
     }
 }
