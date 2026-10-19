@@ -14,48 +14,76 @@ using NpgsqlTypes;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>publisher</c>: runs the <c>publish</c> requests that Studio stores in the tenant databases, until it is stopped. Each
-/// poll round it claims the oldest queued request of every active tenant that is on this build's schema version and runs it
-/// with the steps of <c>activate</c>, compiling from the stored snapshot and never from a folder. A request ends
-/// <c>succeeded</c> or <c>failed</c>, with its diagnostics, and the audit record is written in the same transaction. A
-/// request of another tenant, and one that is not a <c>publish</c>, stays queued. Every step runs as the tenant's schema role,
-/// and a stop finishes the request that is running, then ends the loop.
+/// <c>publisher</c>: runs the <c>publish</c> and <c>validate</c> requests that Studio stores in the tenant databases, until it
+/// is stopped. Each poll round it claims the oldest queued request of every active tenant that is on this build's schema
+/// version. A <c>publish</c> runs the steps of <c>activate</c>, compiling from the stored snapshot and never from a folder. A
+/// <c>validate</c> runs the compile and every activation check in a transaction that it rolls back. A request ends
+/// <c>succeeded</c> or <c>failed</c>, with its diagnostics. A <c>publish</c> writes its audit record in the same transaction,
+/// and a <c>validate</c> writes none. A request of another tenant, and a <c>rollback</c>, stays queued. While a request runs,
+/// the publisher renews its lease. A running request whose lease has run out is claimed again, and the third such claim to
+/// run out ends it <c>failed</c> with <c>AXC0215</c>. The <c>claims</c> count fences the final update, so a publisher that
+/// lost its claim changes nothing. Every step runs as the tenant's schema role, and a stop finishes the request that is
+/// running, then ends the loop.
 /// </summary>
 internal sealed class Publisher(
     ActivateSettings settings,
     TimeSpan refreshInterval,
+    TimeSpan leaseDuration,
     TextWriter output,
     TextWriter error,
     CancellationToken stopping)
 {
-    // The lease is not renewed yet, and a running request whose lease has run out is not claimed again.
-    internal static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(5);
+    internal static readonly TimeSpan DefaultLeaseDuration = TimeSpan.FromMinutes(5);
 
     internal static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
 
     private static readonly string _claimedBy = $"{Environment.MachineName}-{Environment.ProcessId}";
 
+    private const int MaxClaims = 3;
+
+    // Claims of one tenant database take this lock, so two publishers cannot both see no running request of an application.
+    private const long ClaimLockKey = 0x4158_4953_5055_424C; // "AXISPUBL"
+
+    private const string ExhaustedSql =
+        """
+        UPDATE axis.publish_requests
+        SET status = 'failed', finished_at = clock_timestamp(), diagnostics = @diagnostics
+        WHERE kind IN ('publish', 'validate') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
+        RETURNING id, application_id, requested_by, requested_by_name, kind
+        """;
+
+    // clock_timestamp() and not now(): now() is fixed when the transaction starts, before the wait for the lock.
     private const string ClaimSql =
         """
         WITH next AS (
           SELECT r.id FROM axis.publish_requests r
-          WHERE r.status = 'queued' AND r.kind = 'publish'
+          WHERE r.kind IN ('publish', 'validate')
+            AND (r.status = 'queued'
+                 OR (r.status = 'running' AND r.lease_until < clock_timestamp() AND r.claims < @max))
             AND NOT EXISTS (SELECT 1 FROM axis.publish_requests o
-                            WHERE o.application_id = r.application_id AND o.status = 'running')
+                            WHERE o.application_id = r.application_id AND o.status = 'running' AND o.id <> r.id)
           ORDER BY r.requested_at, r.id LIMIT 1
           FOR UPDATE SKIP LOCKED)
         UPDATE axis.publish_requests p
-        SET status = 'running', claimed_by = @me, lease_until = now() + @lease,
-            claims = p.claims + 1, started_at = coalesce(p.started_at, now())
+        SET status = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
+            claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.label, p.note
+        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims, p.label, p.note
         """;
 
+    private const string RenewSql =
+        """
+        UPDATE axis.publish_requests
+        SET lease_until = clock_timestamp() + @lease
+        WHERE id = @id AND status = 'running' AND claims = @claims
+        """;
+
+    // The claims count is the fencing token: it goes up on every claim, so a publisher that lost its claim changes no row.
     private const string FinishSql =
         """
         UPDATE axis.publish_requests
         SET status = @status, finished_at = now(), release_id = @release, diagnostics = @diagnostics
-        WHERE id = @id
+        WHERE id = @id AND status = 'running' AND claims = @claims
         """;
 
     private IReadOnlyList<TenantRow> _served = [];
@@ -153,7 +181,7 @@ internal sealed class Publisher(
         ClaimedRequest? request;
         try
         {
-            request = await ClaimAsync(steps);
+            request = await ClaimAsync(steps, id);
         }
         catch (Exception exception)
         {
@@ -179,32 +207,113 @@ internal sealed class Publisher(
         return true;
     }
 
-    private static async Task<ClaimedRequest?> ClaimAsync(TenantDatabaseSteps steps)
+    private async Task<ClaimedRequest?> ClaimAsync(TenantDatabaseSteps steps, string tenant)
     {
         var connection = await steps.SchemaConnectionAsync();
-        await using var command = new NpgsqlCommand(ClaimSql, connection);
-        command.Parameters.AddWithValue("me", _claimedBy);
-        command.Parameters.AddWithValue("lease", LeaseDuration);
-        await using var reader = await command.ExecuteReaderAsync();
-        if (!await reader.ReadAsync())
+        await using var transaction = await connection.BeginTransactionAsync();
+        await using (var lockCommand = new NpgsqlCommand("SELECT pg_advisory_xact_lock(@key)", connection, transaction))
         {
-            return null;
+            lockCommand.Parameters.AddWithValue("key", ClaimLockKey);
+            await lockCommand.ExecuteNonQueryAsync();
         }
 
-        return new ClaimedRequest(
-            reader.GetGuid(0),
-            reader.GetGuid(1),
-            await reader.IsDBNullAsync(2) ? null : reader.GetString(2),
-            reader.GetString(3),
-            await reader.IsDBNullAsync(4) ? null : reader.GetString(4),
-            await reader.IsDBNullAsync(5) ? null : reader.GetString(5),
-            await reader.IsDBNullAsync(6) ? null : reader.GetString(6));
+        await FailExhaustedAsync(connection, transaction, tenant);
+
+        ClaimedRequest? claimed = null;
+        await using (var command = new NpgsqlCommand(ClaimSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("me", _claimedBy);
+            command.Parameters.AddWithValue("lease", leaseDuration);
+            command.Parameters.AddWithValue("max", MaxClaims);
+            await using var reader = await command.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                claimed = new ClaimedRequest(
+                    reader.GetGuid(0),
+                    reader.GetGuid(1),
+                    await reader.IsDBNullAsync(2) ? null : reader.GetString(2),
+                    reader.GetString(3),
+                    await reader.IsDBNullAsync(4) ? null : reader.GetString(4),
+                    reader.GetString(5),
+                    reader.GetInt32(6),
+                    await reader.IsDBNullAsync(7) ? null : reader.GetString(7),
+                    await reader.IsDBNullAsync(8) ? null : reader.GetString(8));
+            }
+        }
+
+        await transaction.CommitAsync();
+        return claimed;
+    }
+
+    // A running request that was claimed three times and whose lease ran out again ends failed. A publish gets its audit record.
+    private async Task FailExhaustedAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string tenant)
+    {
+        const string message = "The publisher stopped three times while running the request.";
+        var exhausted = new List<(Guid Id, Guid ApplicationId, string RequestedBy, string? RequestedByName, string Kind)>();
+        await using (var command = new NpgsqlCommand(ExhaustedSql, connection, transaction))
+        {
+            command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb)
+            {
+                Value = DiagnosticsJson([new Diagnostic(DiagnosticCodes.PublishClaimsExhausted, message, "", "")]),
+            });
+            command.Parameters.AddWithValue("max", MaxClaims);
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                exhausted.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), await reader.IsDBNullAsync(3) ? null : reader.GetString(3), reader.GetString(4)));
+            }
+        }
+
+        foreach (var request in exhausted)
+        {
+            if (request.Kind == "publish")
+            {
+                await AppendAuditAsync(transaction, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, false, null);
+            }
+
+            output.WriteLine($"{tenant} claim failed: {DiagnosticCodes.PublishClaimsExhausted} {message}");
+        }
     }
 
     private async Task RunRequestAsync(TenantRow row, TenantDatabaseSteps steps, ClaimedRequest request)
     {
+        using var renewing = new CancellationTokenSource();
+        var renewal = RenewAsync(steps, request, renewing.Token);
+        try
+        {
+            await RunRequestCoreAsync(row, steps, request, renewing, renewal);
+        }
+        finally
+        {
+            await StopRenewalAsync(renewing, renewal);
+        }
+    }
+
+    private async Task RunRequestCoreAsync(
+        TenantRow row,
+        TenantDatabaseSteps steps,
+        ClaimedRequest request,
+        CancellationTokenSource renewing,
+        Task renewal)
+    {
         var diagnostics = new List<Diagnostic>();
         var files = ParseSnapshot(request.Snapshot);
+        var activation = new TenantReleaseActivation(settings.InlineRecomputeLimit, output, error, CancellationToken.None);
+        if (request.Kind == "validate")
+        {
+            var valid = await activation.ValidateAsync(
+                row,
+                steps,
+                _bindings[row.Id],
+                files is null
+                    ? null
+                    : configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
+                diagnostics);
+            await StopRenewalAsync(renewing, renewal);
+            await FinishAsync(row, steps, request, new ReleaseRun(valid, null), diagnostics, audit: false);
+            return;
+        }
+
         ReleaseRun run;
         if (files is null)
         {
@@ -213,7 +322,7 @@ internal sealed class Publisher(
         }
         else
         {
-            run = await new TenantReleaseActivation(settings.InlineRecomputeLimit, output, error, CancellationToken.None).RunAsync(
+            run = await activation.RunAsync(
                 row,
                 steps,
                 _bindings[row.Id],
@@ -222,7 +331,64 @@ internal sealed class Publisher(
                 ActivationActor.User(request.RequestedBy, request.RequestedByName, request.Label, request.Note, request.Id));
         }
 
-        await FinishAsync(steps, request, run, diagnostics);
+        // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
+        await StopRenewalAsync(renewing, renewal);
+        await FinishAsync(row, steps, request, run, diagnostics, audit: true);
+    }
+
+    private static async Task StopRenewalAsync(CancellationTokenSource renewing, Task renewal)
+    {
+        await renewing.CancelAsync();
+        try
+        {
+            await renewal;
+        }
+        catch (OperationCanceledException)
+        {
+            // The renewal ends with the request.
+        }
+    }
+
+    // Renews the lease every third of its length on a connection of its own, because activation uses the main one. It stops
+    // when no row changes: the request ended, or another publisher claimed it again.
+    private async Task RenewAsync(TenantDatabaseSteps steps, ClaimedRequest request, CancellationToken token)
+    {
+        NpgsqlConnection? connection = null;
+        try
+        {
+            using var timer = new PeriodicTimer(leaseDuration / 3);
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                try
+                {
+                    connection ??= await steps.OpenSchemaConnectionAsync();
+                    await using var command = new NpgsqlCommand(RenewSql, connection);
+                    command.Parameters.AddWithValue("lease", leaseDuration);
+                    command.Parameters.AddWithValue("id", request.Id);
+                    command.Parameters.AddWithValue("claims", request.Claims);
+                    if (await command.ExecuteNonQueryAsync(token) == 0)
+                    {
+                        return;
+                    }
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    // The next tick tries again, on a new connection when this one broke.
+                    if (connection is not null)
+                    {
+                        await connection.DisposeAsync();
+                        connection = null;
+                    }
+                }
+            }
+        }
+        finally
+        {
+            if (connection is not null)
+            {
+                await connection.DisposeAsync();
+            }
+        }
     }
 
     // The snapshot is an array of { file, version, content }, where content is the file's text as a JSON string. Null means
@@ -265,33 +431,72 @@ internal sealed class Publisher(
         }
     }
 
-    // The final status, the diagnostics and the audit record commit together, so a request never ends without its record.
-    private static async Task FinishAsync(TenantDatabaseSteps steps, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics)
+    // The final status, the diagnostics and the audit record commit together, so a request never ends without its record. A
+    // validate has no audit record. A publisher that lost its claim changes nothing and writes no record.
+    private async Task FinishAsync(TenantRow row, TenantDatabaseSteps steps, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit)
     {
         var connection = await steps.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
+        int changed;
         await using (var command = new NpgsqlCommand(FinishSql, connection, transaction))
         {
             command.Parameters.AddWithValue("status", run.Succeeded ? "succeeded" : "failed");
             command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = run.ReleaseId is { } release ? release : DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb) { Value = DiagnosticsJson(diagnostics) });
             command.Parameters.AddWithValue("id", request.Id);
-            await command.ExecuteNonQueryAsync();
+            command.Parameters.AddWithValue("claims", request.Claims);
+            changed = await command.ExecuteNonQueryAsync();
         }
 
-        // The release history assigns the number, and it is not built yet, so the number stays null.
+        if (changed == 0)
+        {
+            await transaction.RollbackAsync();
+            output.WriteLine($"{row.Id} claim failed: Another publisher claimed the request again.");
+            return;
+        }
+
+        if (audit)
+        {
+            await AppendAuditAsync(transaction, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, run.Succeeded, run.ReleaseId);
+        }
+
+        await transaction.CommitAsync();
+    }
+
+    // The number is the release's number in the release history. It is null when the request failed before a release was
+    // known, or when the release was never activated.
+    private static async Task AppendAuditAsync(
+        NpgsqlTransaction transaction,
+        Guid requestId,
+        Guid applicationId,
+        string requestedBy,
+        string? requestedByName,
+        bool succeeded,
+        Guid? releaseId)
+    {
+        int? number = null;
+        if (releaseId is { } id)
+        {
+            await using var command = new NpgsqlCommand(
+                "SELECT number FROM axis.release_activations WHERE application_id = @application AND release_id = @release LIMIT 1",
+                transaction.Connection,
+                transaction);
+            command.Parameters.AddWithValue("application", applicationId);
+            command.Parameters.AddWithValue("release", id);
+            number = await command.ExecuteScalarAsync() as int?;
+        }
+
         await AuditRecords.AppendAsync(
             transaction,
             new AuditEntry(
-                request.RequestedBy,
-                run.Succeeded ? "release.published" : "release.publishFailed",
-                request.ApplicationId,
+                requestedBy,
+                succeeded ? "release.published" : "release.publishFailed",
+                applicationId,
                 null,
                 null,
                 null,
-                new JsonObject { ["requestId"] = request.Id, ["releaseId"] = run.ReleaseId, ["number"] = null },
-                request.RequestedByName));
-        await transaction.CommitAsync();
+                new JsonObject { ["requestId"] = requestId, ["releaseId"] = releaseId, ["number"] = number },
+                requestedByName));
     }
 
     // Each entry has the shape of a Studio diagnostic.
@@ -306,5 +511,5 @@ internal sealed class Publisher(
             ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
         })]).ToJsonString();
 
-    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string? Label, string? Note);
+    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims, string? Label, string? Note);
 }

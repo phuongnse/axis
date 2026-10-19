@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -91,7 +92,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal(request.ToString("D"), details["requestId"]!.GetValue<string>());
         var release = ((Guid)(await ScalarAsync(scenario, ids[0], "SELECT release_id FROM axis.active_releases"))!).ToString("D");
         Assert.Equal(release, details["releaseId"]!.GetValue<string>());
-        Assert.Null(details["number"]);
+        Assert.Equal(1, details["number"]!.GetValue<int>());
         Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.release_activations"));
         Assert.Equal("hoa", await ScalarAsync(scenario, ids[0], "SELECT actor FROM axis.release_activations"));
         Assert.Equal("Hoa Author", await ScalarAsync(scenario, ids[0], "SELECT actor_name FROM axis.release_activations"));
@@ -121,25 +122,260 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
-    public async Task Only_publish_requests_are_claimed_and_the_oldest_of_an_application_runs_first()
+    public async Task Rollback_requests_are_not_claimed_and_the_oldest_of_an_application_runs_first()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var ids = await CreateTenantsAsync(scenario);
         var snapshot = await SnapshotAsync(null);
-        var validate = await QueueAsync(scenario, ids[0], snapshot, kind: "validate");
+        var rollback = await QueueAsync(scenario, ids[0], snapshot, kind: "rollback");
         var first = await QueueAsync(scenario, ids[0], snapshot);
         var second = await QueueAsync(scenario, ids[0], snapshot);
 
         var result = await RunPublisherAsync(scenario, ids[0], second);
 
         Assert.Equal(0, result.Exit);
-        Assert.Equal("queued", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{validate}'"));
+        Assert.Equal("queued", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{rollback}'"));
+        Assert.Equal(0, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{rollback}'"));
         Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{first}'"));
         Assert.True((bool)(await ScalarAsync(
             scenario,
             ids[0],
             $"SELECT (SELECT started_at FROM axis.publish_requests WHERE id = '{first}') <= (SELECT started_at FROM axis.publish_requests WHERE id = '{second}')"))!);
         Assert.Equal(2L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.published'"));
+    }
+
+    [Fact]
+    public async Task Two_publishers_run_one_request_once_while_the_lease_is_renewed()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null));
+        await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
+        var release = hold.ReleaseAfterAsync(TimeSpan.FromSeconds(7));
+        var first = StartPublisher(scenario, _testLease);
+        var second = StartPublisher(scenario, _testLease);
+        try
+        {
+            await WaitForStatusAsync(scenario, ids[0], request, "succeeded", "failed");
+        }
+        finally
+        {
+            await release;
+            await first.StopAsync();
+            await second.StopAsync();
+        }
+
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(1, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.active_releases"));
+        Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.published'"));
+        Assert.Equal(0L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.publishFailed'"));
+    }
+
+    [Fact]
+    public async Task A_request_whose_publisher_stopped_is_claimed_again_after_its_lease()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null));
+        await SetRunningAsync(scenario, ids[0], request, 1, "now() + interval '3 seconds'");
+        var waited = Stopwatch.StartNew();
+        var publisher = StartPublisher(scenario, _testLease);
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken);
+            Assert.True(waited.Elapsed < TimeSpan.FromSeconds(3));
+            Assert.Equal("running", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+            Assert.Equal(1, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+
+            await WaitForStatusAsync(scenario, ids[0], request, "succeeded", "failed");
+        }
+        finally
+        {
+            await publisher.StopAsync();
+        }
+
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(2, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.active_releases"));
+        Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.published'"));
+    }
+
+    [Fact]
+    public async Task A_request_claimed_three_times_with_an_expired_lease_fails_with_AXC0215()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null));
+        await SetRunningAsync(scenario, ids[0], request, 3, "now() - interval '1 minute'");
+        var publisher = StartPublisher(scenario, _testLease);
+        try
+        {
+            await WaitForStatusAsync(scenario, ids[0], request, "succeeded", "failed");
+        }
+        finally
+        {
+            await publisher.StopAsync();
+        }
+
+        Assert.Equal("failed", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(3, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+        var diagnostics = JsonNode.Parse((string)(await ScalarAsync(scenario, ids[0], $"SELECT diagnostics::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
+        var diagnostic = Assert.Single(diagnostics)!;
+        Assert.Equal("AXC0215", diagnostic["code"]!.GetValue<string>());
+        Assert.Equal("error", diagnostic["severity"]!.GetValue<string>());
+        Assert.Equal("", diagnostic["file"]!.GetValue<string>());
+        Assert.Equal("", diagnostic["path"]!.GetValue<string>());
+        Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.publishFailed'"));
+        Assert.Equal(0L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.published'"));
+        Assert.Equal(0L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.releases"));
+        Assert.Null(await ScalarAsync(scenario, ids[0], $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'"));
+    }
+
+    [Fact]
+    public async Task A_publisher_that_lost_its_claim_does_not_finish_the_request()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null));
+        await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
+        var text = new StringWriter();
+        var output = TextWriter.Synchronized(text);
+        var publisher = StartPublisher(scenario, _testLease, output);
+        try
+        {
+            await WaitForStatusAsync(scenario, ids[0], request, "running");
+
+            // Another publisher claimed the request again. The lease is long, so nothing claims it a third time.
+            await ScalarAsync(
+                scenario,
+                ids[0],
+                $"UPDATE axis.publish_requests SET claims = 2, lease_until = now() + interval '1 hour' WHERE id = '{request}'");
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await WaitForAsync(() => PublisherOutput(output, text).Contains("claim failed", StringComparison.Ordinal));
+        }
+        finally
+        {
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await publisher.StopAsync();
+        }
+
+        Assert.Contains($"{ids[0]} claim failed: Another publisher claimed the request again.", PublisherOutput(output, text), StringComparison.Ordinal);
+        Assert.Equal("running", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(2, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Null(await ScalarAsync(scenario, ids[0], $"SELECT finished_at FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(0L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action LIKE 'release.%'"));
+    }
+
+    [Fact]
+    public async Task Two_publishers_run_one_request_of_an_application_at_a_time()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var snapshot = await SnapshotAsync(null);
+        var older = await QueueAsync(scenario, ids[0], snapshot);
+        var newer = await QueueAsync(scenario, ids[0], snapshot);
+        await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
+        var first = StartPublisher(scenario, _testLease);
+        var second = StartPublisher(scenario, _testLease);
+        try
+        {
+            await WaitForStatusAsync(scenario, ids[0], older, "running");
+            for (var i = 0; i < 10; i++)
+            {
+                Assert.Equal("running", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{older}'"));
+                Assert.Equal("queued", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{newer}'"));
+                await Task.Delay(300, CancellationToken);
+            }
+
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await WaitForStatusAsync(scenario, ids[0], newer, "succeeded", "failed");
+        }
+        finally
+        {
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await first.StopAsync();
+            await second.StopAsync();
+        }
+
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{older}'"));
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{newer}'"));
+        Assert.Equal(1, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{older}'"));
+        Assert.Equal(1, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{newer}'"));
+        Assert.Equal(2L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.published'"));
+    }
+
+    [Fact]
+    public async Task A_validate_with_a_missing_binding_fails_with_the_binding_diagnostic_and_stores_no_release()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        await using (var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options))
+        {
+            await platform.TenantBindings.Where(binding => binding.TenantId == ids[0] && binding.Name == UrlBinding).ExecuteDeleteAsync(CancellationToken);
+        }
+
+        var releases = await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.releases");
+        var active = await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.active_releases");
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null), kind: "validate");
+
+        var result = await RunPublisherAsync(scenario, ids[0], request);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("failed", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var diagnostics = JsonNode.Parse((string)(await ScalarAsync(scenario, ids[0], $"SELECT diagnostics::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
+        Assert.Contains(diagnostics, item => item!["code"]!.GetValue<string>() == "AXC0100" && item["severity"]!.GetValue<string>() == "error");
+        Assert.Equal($"{ids[0]} claim ok", result.Output[0]);
+        Assert.Equal($"{ids[0]} version ok", result.Output[1]);
+        Assert.StartsWith($"{ids[0]} validate failed: AXC0100", result.Output[2], StringComparison.Ordinal);
+        Assert.DoesNotContain(result.Output, line => line.Contains(" compile ", StringComparison.Ordinal) || line.Contains(" activate ", StringComparison.Ordinal) || line.Contains(" seed ", StringComparison.Ordinal));
+        Assert.Equal(releases, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.releases"));
+        Assert.Equal(active, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.active_releases"));
+        Assert.Equal(0L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records"));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_valid_validate_succeeds_and_leaves_no_release_active_release_entity_table_or_audit_record()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null), kind: "validate");
+
+        var result = await RunPublisherAsync(scenario, ids[0], request);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Empty(result.Error);
+        Assert.Equal([$"{ids[0]} claim ok", $"{ids[0]} version ok", $"{ids[0]} validate ok"], result.Output);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Null(await ScalarAsync(scenario, ids[0], $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(1, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+        foreach (var table in new[] { "releases", "active_releases", "active_sites", "provisioned_entities", "applied_migrations", "audit_records" })
+        {
+            Assert.Equal(0L, await ScalarAsync(scenario, ids[0], $"SELECT count(*) FROM axis.{table}"));
+        }
+
+        Assert.Equal(0L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'entities'"));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_validate_does_not_change_the_active_release_and_a_validate_of_an_unreadable_snapshot_fails_at_validate()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        Assert.Equal(0, (await scenario.RunAsync(["activate", _sample, "--tenant", ids[0]])).Exit);
+        var before = await ScalarAsync(scenario, ids[0], "SELECT release_id FROM axis.active_releases");
+        var releases = await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.releases");
+        var unreadable = await QueueAsync(scenario, ids[0], "{}", kind: "validate");
+
+        var result = await RunPublisherAsync(scenario, ids[0], unreadable);
+
+        Assert.Equal("failed", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{unreadable}'"));
+        Assert.Equal([$"{ids[0]} claim ok", $"{ids[0]} version ok", $"{ids[0]} validate failed: The snapshot cannot be read."], result.Output);
+        Assert.Equal(before, await ScalarAsync(scenario, ids[0], "SELECT release_id FROM axis.active_releases"));
+        Assert.Equal(releases, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.releases"));
+        Assert.Equal(0L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records"));
     }
 
     [Fact]
@@ -174,6 +410,99 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         Assert.DoesNotContain("nowhere", invalid.Error[0], StringComparison.Ordinal);
         Assert.Contains("Tenancy:RefreshInterval", refresh.Error[0], StringComparison.Ordinal);
         await scenario.AssertNoSecretsAsync();
+    }
+
+    // A publisher whose lease is short, so that a test sees renewal and reclaim in seconds.
+    private static readonly TimeSpan _testLease = TimeSpan.FromSeconds(2);
+
+    private sealed record RunningPublisher(CancellationTokenSource Stop, Task<AdminResult> Run)
+    {
+        public async Task<AdminResult> StopAsync()
+        {
+            await Stop.CancelAsync();
+            var result = await Run;
+            Stop.Dispose();
+            return result;
+        }
+    }
+
+    // The synchronized writer takes its own lock for each write, so a read under that lock sees whole lines.
+    private static string PublisherOutput(TextWriter synchronized, StringWriter text)
+    {
+        lock (synchronized)
+        {
+            return text.ToString();
+        }
+    }
+
+    private static RunningPublisher StartPublisher(AdminScenario scenario, TimeSpan lease, TextWriter? output = null)
+    {
+        var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+        return new RunningPublisher(stop, scenario.RunAsync(["publisher"], output, stop, extra: _directory, publisherLease: lease));
+    }
+
+    // Holds a lock on the table of releases, so that a request stops at its activation for a time the test chooses.
+    private sealed class ReleasesHold : IAsyncDisposable
+    {
+        private readonly NpgsqlConnection _connection;
+        private bool _released;
+
+        private ReleasesHold(NpgsqlConnection connection) => _connection = connection;
+
+        public static async Task<ReleasesHold> StartAsync(AdminScenario scenario, string tenant)
+        {
+            var connection = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(await PostgreSqlServer.AdminConnectionStringAsync())
+            {
+                Database = $"axis_{tenant}",
+                Pooling = false,
+            }.ConnectionString);
+            await connection.OpenAsync(CancellationToken);
+            await using var command = new NpgsqlCommand("BEGIN; LOCK TABLE axis.releases IN ACCESS EXCLUSIVE MODE", connection);
+            await command.ExecuteNonQueryAsync(CancellationToken);
+            return new ReleasesHold(connection);
+        }
+
+        // Ends the transaction after the delay. Calling it again does nothing.
+        public async Task ReleaseAfterAsync(TimeSpan delay)
+        {
+            await Task.Delay(delay, CancellationToken);
+            if (_released)
+            {
+                return;
+            }
+
+            _released = true;
+            await using var command = new NpgsqlCommand("COMMIT", _connection);
+            await command.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        public async ValueTask DisposeAsync() => await _connection.DisposeAsync();
+    }
+
+    // Makes the row look as if a publisher claimed it and then died: running, with the given claims and lease.
+    private static async Task SetRunningAsync(AdminScenario scenario, string tenant, Guid request, int claims, string leaseSql) =>
+        await ScalarAsync(
+            scenario,
+            tenant,
+            $"UPDATE axis.publish_requests SET status = 'running', claimed_by = 'dead-publisher', claims = {claims}, started_at = now(), lease_until = {leaseSql} WHERE id = '{request}'");
+
+    private static async Task WaitForStatusAsync(AdminScenario scenario, string tenant, Guid request, params string[] statuses) =>
+        await WaitForAsync(async () =>
+        {
+            var status = (string?)await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
+            return Array.IndexOf(statuses, status) >= 0;
+        });
+
+    private static async Task WaitForAsync(Func<bool> condition) => await WaitForAsync(() => Task.FromResult(condition()));
+
+    private static async Task WaitForAsync(Func<Task<bool>> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        while (!await condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "The condition did not hold within 60 seconds.");
+            await Task.Delay(200, CancellationToken);
+        }
     }
 
     // Runs the publisher until the request is final, then stops it and returns its result.

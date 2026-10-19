@@ -2232,7 +2232,7 @@ The owner confirmed these points on issue #640 on 2026-10-19.
   - The new database goes on the same database server as
     `Admin:ConnectionString`. The directory records that server's host and
     port. Axis has one database server.
-  - *(planned for M10)* `--preview-of <main>` creates a preview tenant of the
+  - `--preview-of <main>` creates a preview tenant of the
     main tenant, and `--binding <name>=<value>` sets its `url` bindings. See
     [D48](#d48-preview-tenants--agreed).
   - Running it again for a `provisioning` tenant finishes what is missing. For
@@ -2548,8 +2548,9 @@ server never gets schema rights. It stores a **publish request**, and a
 separate **publisher** runs it. Every activation also gets a release number in
 a per-tenant history. This decision is planned for M10. The release history
 and its `GET .../releases` route are built, and so is the publish request
-table. The publish routes, the publisher, rollback, audit records and
-`studioPublisher` are not. See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+table. The publisher runs `publish` and `validate` requests, and a `publish`
+writes its audit record. The Studio publish routes, rollback and
+`studioPublisher` are not built. See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
 for M10, the [authoring API](reference/authoring.md#publishing) for the routes,
 the [publisher](reference/administration.md#publisher) and the
 [publish request and release history tables](reference/storage.md#publish-requests-and-release-history).

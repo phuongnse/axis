@@ -82,8 +82,9 @@ public static class ReleaseActivator
     /// and the release is active when it holds no error. When a changed computed definition, or a migration
     /// <c>fill</c> or <c>convert</c>, affects more than <paramref name="inlineRecomputeLimit"/> rows of an entity,
     /// activation marks the entity pending and queues a <c>computed.backfill</c> work item instead of recomputing
-    /// the rows. The release history records <paramref name="actor"/> for the activation. Call it outside an
-    /// explicit transaction.
+    /// the rows. The release history records <paramref name="actor"/> for the activation. It also runs in a
+    /// transaction that the caller enlisted <paramref name="data"/> and the store's context in. The
+    /// caller then commits or rolls back the activation.
     /// </summary>
     public static async Task<ActivationResult> ActivateAsync(
         ReleaseCompilationResult compiled,

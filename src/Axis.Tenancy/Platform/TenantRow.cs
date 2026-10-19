@@ -38,6 +38,12 @@ public sealed class TenantRow
 
     public string? EndpointAudience { get; set; }
 
+    /// <summary>
+    /// The id of the main tenant when this is a preview tenant, otherwise <c>null</c>. A tenant has at most one preview
+    /// tenant. A preview tenant has no sign-in settings of its own, and the catalog takes those of its main tenant.
+    /// </summary>
+    public string? PreviewOf { get; set; }
+
     /// <summary>The newest migration applied to the tenant database. Empty until the first migration.</summary>
     public string SchemaVersion { get; set; } = "";
 }

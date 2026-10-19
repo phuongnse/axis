@@ -72,7 +72,7 @@ Every command writes one line per tenant and step to standard output:
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
 `work`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
 `check`, `restore` and `status`. The [publisher](#publisher)
-adds `claim`, and *(planned for M10)* `validate` and `rollback`. A line names the
+adds `claim` and `validate`, and *(planned for M10)* `rollback`. A line names the
 tenant and never a database host, a password or a connection string. A `failed` message
 never holds one either. A restore refusal does name the tenant host the operator gave on the
 command line, as typed. A failed `dump` step says only `pg_dump exited with code <n>`
@@ -92,6 +92,8 @@ So a script can tell "some tenants failed" from "nothing ran".
 
 `tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>`
 creates one tenant.
+`tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...`
+creates a [preview tenant](../architecture.md#preview-tenants) of a main tenant.
 
 | Option | Meaning |
 | --- | --- |
@@ -99,10 +101,10 @@ creates one tenant.
 | `--host <host>` | A host of the tenant. Repeat it for more hosts. At least one is needed. |
 | `--oidc-authority <url>` | The authority of the tenant's identity provider. |
 | `--oidc-client-id <id>` | The OIDC client id. The client secret comes from `AXIS_OIDC_CLIENT_SECRET`. |
-| `--preview-of <main>` | *(Planned for M10.)* Makes the tenant the preview tenant of the main tenant `<main>`. |
-| `--binding <name>=<value>` | *(Planned for M10.)* A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`. |
+| `--preview-of <main>` | Makes the tenant the preview tenant of the main tenant `<main>`. |
+| `--binding <name>=<value>` | A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`. |
 
-**Preview tenant.** *(Planned for M10.)* With `--preview-of`, the command creates
+**Preview tenant.** With `--preview-of`, the command creates
 a [preview tenant](../architecture.md#preview-tenants) as
 [D48](../decisions.md#d48-preview-tenants--agreed) agrees. The steps below stay
 the same, and the entry also names its main tenant.
@@ -112,11 +114,22 @@ the same, and the entry also names its main tenant.
   option together with `--preview-of` is a usage error.
 - `--binding` without `--preview-of` is a usage error. A binding that is not
   `<name>=<value>`, or whose value is not an absolute `http` or `https` URL, is
-  a usage error. No binding value is printed.
+  a usage error. A binding name that repeats, ignoring letter case, is a usage
+  error too. No binding value is printed.
 - Without `--binding` the preview has no bindings. See
   [preview tenants](configuration.md#preview-tenants).
 - The command exits `2` when `<main>` is not in the directory, is itself a
-  preview tenant, or already has a preview tenant.
+  preview tenant, already has a preview tenant, or is the tenant itself. The
+  directory stays unchanged. Two operators who create a preview of one main
+  tenant at the same moment cannot both succeed: the second also exits `2`.
+- The entry stores no sign-in settings of its own. The server reads them from
+  the main tenant at every refresh, so a change to the main tenant's settings
+  reaches the preview, and the client secret is stored only once. The preview
+  never takes the main tenant's endpoint audience, so it accepts no
+  machine-caller token. The preview uses the main tenant's settings whatever the
+  main tenant's status.
+- A rerun on a `provisioning` preview replaces its main tenant and its bindings,
+  as it replaces its hosts.
 
 **Steps, in order.** Each step writes its own line.
 
@@ -161,8 +174,9 @@ with code 2.
 - `grants` first revokes `CONNECT` and `TEMPORARY` on the database from
   `PUBLIC`, and grants both only to the runtime role. Without this, any login
   role of the database server could connect to the tenant database.
-- The command sets no claim names, endpoint audience or deployment binding.
-  They stay empty, so the hosts use their defaults.
+- The command sets no claim names or endpoint audience. They stay empty, so the
+  hosts use their defaults. It sets no deployment binding either, except the
+  `url` bindings that `--binding` gives a preview tenant.
 
 **Names.** The role and database names come from the id. PostgreSQL names hold
 at most 63 bytes, and `axis_<id>_runtime` adds 13 characters, hence the limit of
@@ -186,7 +200,10 @@ them in any SQL you run by hand.
 **Exit codes.** `0` when the tenant is `active`. `1` when a step failed, and
 the entry stays `provisioning`. `2` for an invalid id, a missing option, a
 missing `AXIS_OIDC_CLIENT_SECRET`, a superuser admin role, missing `platform`
-tables or a host that another tenant holds. A host conflict is written as an
+tables or a host that another tenant holds. For a preview tenant, `2` also covers
+a usage error of `--preview-of` or `--binding`, and a main tenant that is
+unknown, is itself a preview tenant, already has a preview tenant or is the
+tenant itself. A host conflict is written as an
 `entry failed` line that names no host, and it creates no entry, role or
 database.
 
@@ -236,7 +253,7 @@ the id:
 | `status` | `provisioning`, `active` or `suspended`. |
 | `hosts` | The tenant's hosts, separated by commas. |
 | `schema version` | The recorded schema version, or `-` when it is empty. |
-| `preview of` | *(Planned for M10.)* The id of the main tenant, for a preview tenant, or `-` for a main tenant. |
+| `preview of` | The id of the main tenant, for a preview tenant, or `-` for a main tenant. |
 
 It takes no option. It never prints a password, an OIDC secret, a binding value
 or a connection string.
@@ -526,7 +543,9 @@ not a positive whole number is a settings error. An unset `Extensions:Path` or
 does not exist is a settings error that names the setting and not the path.
 A problem of an installed package or module is written to standard error.
 The tool always refuses an `http` URL binding, because `http` is allowed only in
-Development, which uses startup activation.
+Development, which uses startup activation. On a [preview tenant](../architecture.md#preview-tenants),
+a missing binding is an `AXC0100` warning and not an error, as
+[preview tenants](configuration.md#preview-tenants) describe.
 
 **Steps for each tenant.**
 
@@ -575,10 +594,9 @@ can call it. The `axis-admin` image runs it. Both production installs start one,
 see [installation](installation.md). *(Planned for M10:)* `scripts/dev.sh`,
 Docker Compose and the E2E script start one too.
 
-**What is built.** The command runs `publish` requests for
-`Tenancy:Source=directory`. These stay *(planned for M10)*: `validate` and
-`rollback` requests, the configuration source, preview requests, renewing a
-lease, claiming an expired one again and `AXC0215`. A
+**What is built.** The command runs `publish` and `validate` requests for
+`Tenancy:Source=directory`. These stay *(planned for M10)*: `rollback`
+requests, the configuration source and preview requests. A
 request of a kind that is not built is never claimed, so it stays `queued`.
 
 **Settings.** It reads these, with the meaning they have for the other commands:
@@ -607,22 +625,27 @@ schema itself. `activate` does none either. *(Planned for M10:)* Under
 the worker does.
 
 **Claiming.** Each poll round, for each served tenant, it claims the oldest
-`queued` `publish` request with `FOR UPDATE SKIP LOCKED`. It sets the request
-`running`, `claimed_by` to its own name, `lease_until` and adds 1 to `claims`.
+`queued` `publish` or `validate` request with `FOR UPDATE SKIP LOCKED`. It sets the request
+`running`, `claimed_by` to its own name, `lease_until` and adds 1 to `claims`. A
+`running` request whose lease has run out is claimed the same way.
 
 - **One at a time.** For one tenant and application it runs one request at a
   time, oldest first, so when two publishes are queued the newer one ends up
-  live. A claim skips an application that already has a `running` request.
-  Requests of other applications and tenants can run at the same time. Two
-  publishers can still claim two requests of one application at the same
-  moment, because that check does not lock the rows it reads.
-- **Lease.** The lease is five minutes, fixed. It is not renewed, and a
-  `running` request whose lease has run out is not claimed again, so a request
-  whose publisher died stays `running`. *(Planned for M10:)* The publisher
-  renews the lease while the request runs. A `running` request whose lease has
-  run out is claimed again, because its publisher died. A request that has been
-  claimed three times and whose lease runs out again ends `failed` with
-  `AXC0215`, see the [lifecycle](authoring.md#lifecycle).
+  live. A `validate` waits behind a running `publish` of the same application. A claim skips an application that already has a `running` request.
+  Requests of other applications and tenants can run at the same time. Each
+  claim takes a lock of the tenant database before it reads the queue, so two
+  publishers cannot claim two requests of one application at the same moment.
+- **Lease.** The lease is five minutes, fixed. The publisher renews it every
+  third of the lease while the request runs, so a long request is not claimed
+  twice. A `running` request whose lease has run out is claimed again by any
+  publisher, because its publisher died. A request that has been claimed three
+  times and whose lease runs out again ends `failed` with `AXC0215`, see the
+  [lifecycle](authoring.md#lifecycle). A `publish` gets a
+  `release.publishFailed` audit record with it, and a `validate` gets none.
+  The `claims` count is the fencing token. Renewal and the final update change
+  the request only while its status is `running` and `claims` is still the value
+  this publisher claimed. A publisher that lost its claim writes a
+  `claim failed` line and no audit record.
 - **Two publishers.** More than one publisher is safe, because the claim skips
   rows that another publisher holds. The production installs run one.
 
@@ -643,12 +666,15 @@ role unless it says otherwise.
    and stores no release. Activation adds a row to the
    [release history](storage.md#release-history) with the requesting user, the
    label, the note and the request id, unless the release is already active.
-4. *(Planned for M10.)* For `validate`: run the `compile` and every check of
+4. For `validate`: run the `compile` and every check of
    `activate` against the tenant inside one transaction, then roll the
    transaction back. It stores no release, adds no history row and seeds
-   nothing. It reports the diagnostics of activation, so a clean `validate`
-   means an activation with the same input would pass its checks. The step is
-   called `validate`.
+   nothing, and it starts no schedule trigger. It reports the diagnostics of
+   activation, so a clean `validate` means an activation with the same input
+   would pass its checks, apart from the seed. The step is called `validate`,
+   and it is the only step after `version`. A snapshot that cannot be read
+   fails at `validate`. The transaction holds the schema lock until it rolls
+   back, so other activations of the tenant wait for it.
 5. *(Planned for M10.)* For `rollback`: read the stored release the request
    names and activate it as it is, without compiling. It refuses the case where a
    migration applied after that release is missing from it, with `AXC0174`, and
@@ -657,6 +683,8 @@ role unless it says otherwise.
 6. Write the audit record of a `publish` *(planned for M10:)* or a `rollback`, with
    the request's final status, then set the request `succeeded` or `failed` and
    store its diagnostics and its release id. These happen in one transaction.
+   A `validate` gets its final status and diagnostics the same way, with no
+   audit record and no release id.
    The diagnostics are all of them, warnings included, as in the
    [authoring API](authoring.md#diagnostics). A request that fails with an
    exception rather than diagnostics, such as a lost connection, stores only the
@@ -685,8 +713,7 @@ stays active and the request ends `failed` with its `releaseId`, as with
 
 **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the
 request it is running, then exits. A stop that comes mid-request leaves a lease
-that runs out. *(Planned for M10:)* Another publisher then claims the request
-again. The platform's shutdown grace period must be longer than the longest
+that runs out. Another publisher then claims the request again. The platform's shutdown grace period must be longer than the longest
 request, or the request is claimed twice.
 
 **Exit codes.** `0` after a stop on `SIGTERM` or Ctrl+C. `1` when it cannot read
@@ -729,8 +756,8 @@ admin host carries the same version in its OCI label, see
 - Moving a tenant to another database server.
 - Commands that set a tenant's deployment bindings, claim names or endpoint
   audience. D43 does not say how they are written. `tenant create` sets none
-  of them, so they stay empty until a later issue decides. *(Planned for M10:)*
-  the one exception is `--binding` on a `tenant create --preview-of`.
+  of them, so they stay empty until a later issue decides. The one exception
+  is `--binding` on a `tenant create --preview-of`.
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation.
 - Overwriting a tenant in place with a restore.

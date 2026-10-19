@@ -193,7 +193,7 @@ The tables:
 
 | Table                                               | Columns                                                                                                                                                                                                                                                                                                                     |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience and the `schema_version` |
+| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants` |
 | `platform.tenant_hosts`                             | The tenant id and the host. The host is unique on `lower(host)` across all tenants                                                                                                                                                                                                                                          |
 | `platform.tenant_bindings`                          | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                         |
 | `platform.data_protection_keys` _(planned for M10)_ | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. Rows are only inserted, never updated or deleted. Every server replica reads them                                                                                                                                                                   |
@@ -240,7 +240,10 @@ database roles, `axis_schema` and `axis_runtime`, own each test database with
 `axis_schema`, run the server and worker as `axis_runtime`, and run activation
 as `axis_schema`. Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the
 same: `samples/postgres/init-roles.sql` creates the roles and grants them
-nothing. The server and the worker run the start checks for a superuser, a
+nothing. It also creates the development [preview tenant](configuration.md#preview-tenants)'s
+database `axis_preview`, owned by its own schema role `axis_preview_schema`, and its runtime role
+`axis_preview_runtime`, both with the development password `axis`. An existing Compose volume
+needs `docker compose down -v` once to get them. The server and the worker run the start checks for a superuser, a
 schema owner or a role that may create objects, also when the right comes
 through role membership.
 
@@ -1200,13 +1203,12 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
   SHA-256 of the file's bytes, as in [Versions](authoring.md#versions). A later
   edit never changes a stored snapshot. The publisher compiles the snapshot from
   these texts alone.
-- **Claim.** The publisher takes the oldest `queued` `publish` row of an application with
+- **Claim.** The publisher takes the oldest `queued` `publish` or `validate` row of an application with
   `FOR UPDATE SKIP LOCKED`, sets `running`, `claimed_by`, `lease_until` and
   adds 1 to `claims`. It skips an application that has a `running` row.
-  *(Planned for M10:)* A `running` row whose `lease_until` has passed is claimed
-  again the same way. A row with `claims` of 3 and an expired lease becomes
-  `failed` with `AXC0215`. Until then a row stays `running` when its publisher
-  dies, and the publisher claims no `validate` or `rollback` row.
+  A `running` row whose `lease_until` has passed is claimed again the same way.
+  A row with `claims` of 3 and an expired lease becomes `failed` with `AXC0215`.
+  The publisher claims no `rollback` row.
 - **Preview target.** *(Planned for M10.)* A row with `target` `preview` is
   stored in the session tenant's database and run against that tenant's preview
   tenant, see [preview](authoring.md#preview). Its history row lives in the
@@ -1293,6 +1295,6 @@ records who published it.
 | `release.rollbackFailed` | A `rollback` failed    |
 
 `details` is `{ requestId, releaseId, number }`. `releaseId` and `number` are
-null when the request failed before a release was known. Until the
-[release history](#release-history) exists, `number` is always null. A `validate` writes
-no audit record.
+null when the request failed before a release was known. `number` is the
+release's number in the [release history](#release-history), and it is also null
+when the release was never activated. A `validate` writes no audit record.
