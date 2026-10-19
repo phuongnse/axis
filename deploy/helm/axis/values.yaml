@@ -27,6 +27,13 @@ worker:
   replicas: 1
   resources: {}
 
+# The publisher runs "axis-admin publisher", which runs the publish requests that
+# Studio stores. It uses the image of migrate.repository and always runs one replica.
+publisher:
+  resources: {}
+  # Longer than the five-minute lease, so a stop lets the running request finish.
+  terminationGracePeriodSeconds: 360
+
 # The Job that runs "axis-admin migrate" before every upgrade.
 migrate:
   repository: axis-admin
@@ -62,11 +69,11 @@ secrets:
     name: ""
     key: ConnectionStrings__Platform
   # ConnectionStrings:PlatformSchema, the role that owns the platform schema.
-  # Used by the server and the migrate Job. The worker never gets it.
+  # Used by the server, the migrate Job and the publisher. The worker never gets it.
   platformSchemaConnection:
     name: ""
     key: ConnectionStrings__PlatformSchema
-  # Platform:SecretKey, the installation key. Used by every host.
+  # Platform:SecretKey, the installation key. Used by every host and the publisher.
   platformSecretKey:
     name: ""
     key: Platform__SecretKey

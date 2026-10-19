@@ -44,6 +44,7 @@ internal static partial class AdminCommands
                tenant suspend <id>
                tenant resume <id>
                tenant list
+               publisher
                version
         """;
 
@@ -67,6 +68,11 @@ internal static partial class AdminCommands
         if (args.Length > 0 && args[0] == "activate")
         {
             return await ActivateAsync(args, configuration, output, error, cancellationToken);
+        }
+
+        if (args.Length > 0 && args[0] == "publisher")
+        {
+            return await PublisherAsync(args, configuration, output, error, cancellationToken);
         }
 
         if (args is ["version"])
@@ -482,7 +488,7 @@ internal static partial class AdminCommands
         }
 
         IReadOnlyList<TenantRow> tenants;
-        var bindings = new Dictionary<string, ActivationBindings>(StringComparer.Ordinal);
+        Dictionary<string, ActivationBindings> bindings;
         try
         {
             var tablesProblem = await PlatformTablesProblemAsync(settings.Platform.PlatformConnectionString, cancellationToken);
@@ -516,25 +522,7 @@ internal static partial class AdminCommands
                 tenants = [.. rows.Where(row => row.Status == ActiveStatus).OrderBy(row => row.Id, StringComparer.Ordinal)];
             }
 
-            var ids = tenants.Select(row => row.Id).ToArray();
-            var bindingRows = await platform.TenantBindings.AsNoTracking().Where(binding => ids.Contains(binding.TenantId)).ToListAsync(cancellationToken);
-            foreach (var id in ids)
-            {
-                // A secret's value stays encrypted: activation checks only that the binding exists.
-                var named = bindingRows
-                    .Where(binding => binding.TenantId == id)
-                    .ToDictionary(
-                        binding => binding.Name,
-                        binding => new ActivationBinding(
-                            binding.Kind,
-                            binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Url!, UriKind.Absolute) : null),
-                        StringComparer.OrdinalIgnoreCase);
-                bindings[id] = new ActivationBindings(
-                    id,
-                    named,
-                    AllowHttp: false,
-                    IsPreview: rows.First(row => row.Id == id).PreviewOf is not null);
-            }
+            bindings = await ReadBindingsAsync(platform, [.. tenants.Select(row => row.Id)], cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -554,6 +542,86 @@ internal static partial class AdminCommands
 
         return await new TenantActivate(
             settings.Platform, tenants, bindings, folder, settings.Packages, settings.Modules, settings.InlineRecomputeLimit, output, error, cancellationToken).RunAsync();
+    }
+
+    private static async Task<int> PublisherAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        if (args.Length != 1)
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        // A setting's own message holds its value, so these say only which setting is wrong.
+        try
+        {
+            if (TenancySettings.Source(configuration) != TenancySource.Directory)
+            {
+                error.WriteLine($"The setting {TenancySettings.SourceSetting} must be 'directory'. The publisher serves no other tenant source yet.");
+                return 2;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            error.WriteLine($"The setting {TenancySettings.SourceSetting} must be 'configuration' or 'directory'.");
+            return 2;
+        }
+
+        TimeSpan refreshInterval;
+        try
+        {
+            refreshInterval = TenancySettings.RefreshInterval(configuration);
+        }
+        catch (InvalidOperationException)
+        {
+            error.WriteLine($"The setting {TenancySettings.RefreshIntervalSetting} must be a positive time span, such as 00:00:30.");
+            return 2;
+        }
+
+        var settings = ReadActivateSettings(configuration, error, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        return await new Publisher(settings, refreshInterval, output, error, cancellationToken).RunAsync();
+    }
+
+    /// <summary>
+    /// Reads the deployment bindings of <paramref name="ids"/> from the directory, as activation needs them. A secret's value
+    /// stays encrypted: activation checks only that the binding exists.
+    /// </summary>
+    internal static async Task<Dictionary<string, ActivationBindings>> ReadBindingsAsync(
+        PlatformDbContext platform,
+        IReadOnlyCollection<string> ids,
+        CancellationToken cancellationToken)
+    {
+        var bindingRows = await platform.TenantBindings.AsNoTracking().Where(binding => ids.Contains(binding.TenantId)).ToListAsync(cancellationToken);
+        var previewIds = await platform.Tenants.AsNoTracking()
+            .Where(tenant => ids.Contains(tenant.Id) && tenant.PreviewOf != null)
+            .Select(tenant => tenant.Id)
+            .ToListAsync(cancellationToken);
+        var bindings = new Dictionary<string, ActivationBindings>(StringComparer.Ordinal);
+        foreach (var id in ids)
+        {
+            var named = bindingRows
+                .Where(binding => binding.TenantId == id)
+                .ToDictionary(
+                    binding => binding.Name,
+                    binding => new ActivationBinding(
+                        binding.Kind,
+                        binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Url!, UriKind.Absolute) : null),
+                    StringComparer.OrdinalIgnoreCase);
+            bindings[id] = new ActivationBindings(id, named, AllowHttp: false, IsPreview: previewIds.Contains(id));
+        }
+
+        return bindings;
     }
 
     private static ActivateRequest? ParseActivate(string[] args)
