@@ -340,9 +340,9 @@ What a host answers for a tenant, once the directory is in use:
 A preview tenant is a tenant that belongs to one main
 tenant. An author tries an application there before publishing it to the main
 tenant. See [D48](decisions.md#d48-preview-tenants--agreed). Under
-`Tenancy:Source=configuration`, `PreviewOf`, sign-in and bindings work. The
-`directory` source, the status rules and publishing are planned for M10, and
-their bullets say so.
+`Tenancy:Source=configuration` and under `directory`, `PreviewOf`, sign-in and
+bindings work. The status rules and publishing are planned for M10, and their
+bullets say so.
 
 - **One main tenant, one preview.** A preview tenant belongs to one main tenant,
   and a main tenant has at most one preview tenant. A preview tenant has no
@@ -353,9 +353,12 @@ their bullets say so.
   signed in on, see [tenant binding](#sign-in-and-the-session).
 - **Where it is set.** Under `configuration`, the tenant setting `PreviewOf`
   names the main tenant, see
-  [preview tenants](reference/configuration.md#preview-tenants). *(Planned for
-  M10:)* under `directory`, the entry names it, and the operator creates it with
-  [`tenant create --preview-of`](reference/administration.md#tenant-create).
+  [preview tenants](reference/configuration.md#preview-tenants). Under
+  `directory`, the entry names it in `platform.tenants.preview_of`, and the
+  operator creates it with
+  [`tenant create --preview-of`](reference/administration.md#tenant-create). The
+  entry stores no sign-in settings. The catalog copies the main tenant's at each
+  refresh.
 - **Sign-in.** A preview tenant uses its main tenant's authority, client id,
   client secret and claim names. It does not use `Oidc:EndpointAudience`, so it
   accepts no machine-caller token. The operator registers the preview host's

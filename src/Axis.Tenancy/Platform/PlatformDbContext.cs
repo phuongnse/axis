@@ -49,6 +49,13 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.ClaimRoles).HasColumnName("claim_roles");
             tenant.Property(t => t.EndpointAudience).HasColumnName("endpoint_audience");
             tenant.Property(t => t.SchemaVersion).HasColumnName("schema_version").HasDefaultValue("");
+            tenant.Property(t => t.PreviewOf).HasColumnName("preview_of");
+            tenant.HasIndex(t => t.PreviewOf).IsUnique().HasDatabaseName("ix_tenants_preview_of");
+            tenant.HasOne<TenantRow>()
+                .WithMany()
+                .HasForeignKey(t => t.PreviewOf)
+                .HasConstraintName("fk_tenants_tenants_preview_of")
+                .OnDelete(DeleteBehavior.Restrict);
             tenant.HasMany<TenantHostRow>()
                 .WithOne()
                 .HasForeignKey(host => host.TenantId)

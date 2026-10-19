@@ -326,7 +326,7 @@ internal sealed class TenantRestore : IAsyncDisposable
             }
 
             await using var transaction = await _platform.Database.BeginTransactionAsync(_cancellationToken);
-            var secret = _settings.Cipher.Encrypt(_id, TenantSecretFields.OidcClientSecret, _settings.OidcClientSecret);
+            var secret = _settings.Cipher.Encrypt(_id, TenantSecretFields.OidcClientSecret, _settings.OidcClientSecret!);
             if (_row is null)
             {
                 _row = new TenantRow { Id = _id, Status = Provisioning };

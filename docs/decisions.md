@@ -2232,7 +2232,7 @@ The owner confirmed these points on issue #640 on 2026-10-19.
   - The new database goes on the same database server as
     `Admin:ConnectionString`. The directory records that server's host and
     port. Axis has one database server.
-  - *(planned for M10)* `--preview-of <main>` creates a preview tenant of the
+  - `--preview-of <main>` creates a preview tenant of the
     main tenant, and `--binding <name>=<value>` sets its `url` bindings. See
     [D48](#d48-preview-tenants--agreed).
   - Running it again for a `provisioning` tenant finishes what is missing. For

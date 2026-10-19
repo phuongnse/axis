@@ -92,6 +92,8 @@ So a script can tell "some tenants failed" from "nothing ran".
 
 `tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>`
 creates one tenant.
+`tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...`
+creates a [preview tenant](../architecture.md#preview-tenants) of a main tenant.
 
 | Option | Meaning |
 | --- | --- |
@@ -99,10 +101,10 @@ creates one tenant.
 | `--host <host>` | A host of the tenant. Repeat it for more hosts. At least one is needed. |
 | `--oidc-authority <url>` | The authority of the tenant's identity provider. |
 | `--oidc-client-id <id>` | The OIDC client id. The client secret comes from `AXIS_OIDC_CLIENT_SECRET`. |
-| `--preview-of <main>` | *(Planned for M10.)* Makes the tenant the preview tenant of the main tenant `<main>`. |
-| `--binding <name>=<value>` | *(Planned for M10.)* A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`. |
+| `--preview-of <main>` | Makes the tenant the preview tenant of the main tenant `<main>`. |
+| `--binding <name>=<value>` | A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`. |
 
-**Preview tenant.** *(Planned for M10.)* With `--preview-of`, the command creates
+**Preview tenant.** With `--preview-of`, the command creates
 a [preview tenant](../architecture.md#preview-tenants) as
 [D48](../decisions.md#d48-preview-tenants--agreed) agrees. The steps below stay
 the same, and the entry also names its main tenant.
@@ -112,11 +114,22 @@ the same, and the entry also names its main tenant.
   option together with `--preview-of` is a usage error.
 - `--binding` without `--preview-of` is a usage error. A binding that is not
   `<name>=<value>`, or whose value is not an absolute `http` or `https` URL, is
-  a usage error. No binding value is printed.
+  a usage error. A binding name that repeats, ignoring letter case, is a usage
+  error too. No binding value is printed.
 - Without `--binding` the preview has no bindings. See
   [preview tenants](configuration.md#preview-tenants).
 - The command exits `2` when `<main>` is not in the directory, is itself a
-  preview tenant, or already has a preview tenant.
+  preview tenant, already has a preview tenant, or is the tenant itself. The
+  directory stays unchanged. Two operators who create a preview of one main
+  tenant at the same moment cannot both succeed: the second also exits `2`.
+- The entry stores no sign-in settings of its own. The server reads them from
+  the main tenant at every refresh, so a change to the main tenant's settings
+  reaches the preview, and the client secret is stored only once. The preview
+  never takes the main tenant's endpoint audience, so it accepts no
+  machine-caller token. The preview uses the main tenant's settings whatever the
+  main tenant's status.
+- A rerun on a `provisioning` preview replaces its main tenant and its bindings,
+  as it replaces its hosts.
 
 **Steps, in order.** Each step writes its own line.
 
@@ -161,8 +174,9 @@ with code 2.
 - `grants` first revokes `CONNECT` and `TEMPORARY` on the database from
   `PUBLIC`, and grants both only to the runtime role. Without this, any login
   role of the database server could connect to the tenant database.
-- The command sets no claim names, endpoint audience or deployment binding.
-  They stay empty, so the hosts use their defaults.
+- The command sets no claim names or endpoint audience. They stay empty, so the
+  hosts use their defaults. It sets no deployment binding either, except the
+  `url` bindings that `--binding` gives a preview tenant.
 
 **Names.** The role and database names come from the id. PostgreSQL names hold
 at most 63 bytes, and `axis_<id>_runtime` adds 13 characters, hence the limit of
@@ -186,7 +200,10 @@ them in any SQL you run by hand.
 **Exit codes.** `0` when the tenant is `active`. `1` when a step failed, and
 the entry stays `provisioning`. `2` for an invalid id, a missing option, a
 missing `AXIS_OIDC_CLIENT_SECRET`, a superuser admin role, missing `platform`
-tables or a host that another tenant holds. A host conflict is written as an
+tables or a host that another tenant holds. For a preview tenant, `2` also covers
+a usage error of `--preview-of` or `--binding`, and a main tenant that is
+unknown, is itself a preview tenant, already has a preview tenant or is the
+tenant itself. A host conflict is written as an
 `entry failed` line that names no host, and it creates no entry, role or
 database.
 
@@ -236,7 +253,7 @@ the id:
 | `status` | `provisioning`, `active` or `suspended`. |
 | `hosts` | The tenant's hosts, separated by commas. |
 | `schema version` | The recorded schema version, or `-` when it is empty. |
-| `preview of` | *(Planned for M10.)* The id of the main tenant, for a preview tenant, or `-` for a main tenant. |
+| `preview of` | The id of the main tenant, for a preview tenant, or `-` for a main tenant. |
 
 It takes no option. It never prints a password, an OIDC secret, a binding value
 or a connection string.
@@ -526,7 +543,9 @@ not a positive whole number is a settings error. An unset `Extensions:Path` or
 does not exist is a settings error that names the setting and not the path.
 A problem of an installed package or module is written to standard error.
 The tool always refuses an `http` URL binding, because `http` is allowed only in
-Development, which uses startup activation.
+Development, which uses startup activation. On a [preview tenant](../architecture.md#preview-tenants),
+a missing binding is an `AXC0100` warning and not an error, as
+[preview tenants](configuration.md#preview-tenants) describe.
 
 **Steps for each tenant.**
 
@@ -700,8 +719,8 @@ admin host carries the same version in its OCI label, see
 - Moving a tenant to another database server.
 - Commands that set a tenant's deployment bindings, claim names or endpoint
   audience. D43 does not say how they are written. `tenant create` sets none
-  of them, so they stay empty until a later issue decides. *(Planned for M10:)*
-  the one exception is `--binding` on a `tenant create --preview-of`.
+  of them, so they stay empty until a later issue decides. The one exception
+  is `--binding` on a `tenant create --preview-of`.
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation.
 - Overwriting a tenant in place with a restore.

@@ -121,6 +121,10 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("oidc_client_secret");
 
+                    b.Property<string>("PreviewOf")
+                        .HasColumnType("text")
+                        .HasColumnName("preview_of");
+
                     b.Property<byte[]>("RuntimePassword")
                         .IsRequired()
                         .HasColumnType("bytea")
@@ -162,6 +166,10 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.HasKey("Id")
                         .HasName("pk_tenants");
 
+                    b.HasIndex("PreviewOf")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tenants_preview_of");
+
                     b.ToTable("tenants", "platform", t =>
                         {
                             t.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended')");
@@ -186,6 +194,15 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_hosts_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("PreviewOf")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenants_tenants_preview_of");
                 });
 #pragma warning restore 612, 618
         }
