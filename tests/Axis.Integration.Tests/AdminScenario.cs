@@ -125,7 +125,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         string? adminConnectionString = null,
         bool withClientSecret = true,
         string? path = null,
-        IReadOnlyDictionary<string, string?>? extra = null)
+        IReadOnlyDictionary<string, string?>? extra = null,
+        TimeSpan? publisherLease = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -145,7 +146,9 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         using var error = new StringWriter();
         output ??= new StringWriter();
-        var exit = await AdminCommands.RunAsync(args, configuration, output, error, stop?.Token ?? CancellationToken);
+        var exit = publisherLease is { } lease
+            ? await AdminCommands.RunAsync(args, configuration, output, error, lease, stop?.Token ?? CancellationToken)
+            : await AdminCommands.RunAsync(args, configuration, output, error, stop?.Token ?? CancellationToken);
         var text = output.ToString()!;
         _texts.Add(text);
         _texts.Add(error.ToString());

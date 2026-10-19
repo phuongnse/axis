@@ -48,11 +48,21 @@ internal static partial class AdminCommands
                version
         """;
 
-    public static async Task<int> RunAsync(
+    public static Task<int> RunAsync(
         string[] args,
         IConfiguration configuration,
         TextWriter output,
         TextWriter error,
+        CancellationToken cancellationToken) =>
+        RunAsync(args, configuration, output, error, Publisher.DefaultLeaseDuration, cancellationToken);
+
+    // The publisher lease is a parameter so that tests can use a short one. The product has no setting for it.
+    internal static async Task<int> RunAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        TimeSpan publisherLease,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(args);
@@ -72,7 +82,7 @@ internal static partial class AdminCommands
 
         if (args.Length > 0 && args[0] == "publisher")
         {
-            return await PublisherAsync(args, configuration, output, error, cancellationToken);
+            return await PublisherAsync(args, configuration, output, error, publisherLease, cancellationToken);
         }
 
         if (args is ["version"])
@@ -549,6 +559,7 @@ internal static partial class AdminCommands
         IConfiguration configuration,
         TextWriter output,
         TextWriter error,
+        TimeSpan lease,
         CancellationToken cancellationToken)
     {
         if (args.Length != 1)
@@ -590,7 +601,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        return await new Publisher(settings, refreshInterval, output, error, cancellationToken).RunAsync();
+        return await new Publisher(settings, refreshInterval, lease, output, error, cancellationToken).RunAsync();
     }
 
     /// <summary>
