@@ -14,12 +14,6 @@ namespace Axis.Integration.Tests;
 
 public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
-    private const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-    private const string Authority = "https://127.0.0.1:1/realms/axis";
-
-    private static readonly TenantSecretCipher _cipher = TenantSecretCipher.Load(
-        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [TenantSecretCipher.KeySetting] = TestSecretKey }).Build());
-
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -49,7 +43,7 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
             Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         }
 
-        var runtime = _cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
+        var runtime = AdminScenario.Cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
         await using var connection = new NpgsqlConnection(scenario.TenantConnectionString(id, row.RuntimeUser, runtime));
         await connection.OpenAsync(CancellationToken);
         await using var create = new NpgsqlCommand("CREATE TABLE entities.x(i int)", connection);
@@ -73,7 +67,7 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
         using var stop = new CancellationTokenSource();
         var output = new CancelOnLineWriter(stop);
 
-        var first = await scenario.RunAsync(Scenario.CreateArgs(id, "shop.example.test"), output, stop);
+        var first = await scenario.RunAsync(AdminScenario.CreateArgs(id, "shop.example.test"), output, stop);
 
         Assert.Equal(1, first.Exit);
         Assert.Contains($"{id} database ok", first.Output);
@@ -100,7 +94,7 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
         await using var scenario = await NewScenarioAsync();
         var id = scenario.NewTenantId();
         using var stop = new CancellationTokenSource();
-        await scenario.RunAsync(Scenario.CreateArgs(id, "shop.exampel.test"), new CancelOnLineWriter(stop), stop);
+        await scenario.RunAsync(AdminScenario.CreateArgs(id, "shop.exampel.test"), new CancelOnLineWriter(stop), stop);
         var stopped = await scenario.RowAsync(id);
 
         var rerun = await scenario.CreateAsync(id, "SHOP.example.test");
@@ -160,7 +154,7 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
         var id = scenario.NewTenantId();
         var superuser = await PostgreSqlServer.AdminConnectionStringAsync();
 
-        var result = await scenario.RunAsync(Scenario.CreateArgs(id, "shop.example.test"), adminConnectionString: superuser);
+        var result = await scenario.RunAsync(AdminScenario.CreateArgs(id, "shop.example.test"), adminConnectionString: superuser);
 
         Assert.Equal(2, result.Exit);
         Assert.Contains("superuser", result.Error[0], StringComparison.Ordinal);
@@ -179,7 +173,7 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
         var id = scenario.NewTenantId();
         var limited = await scenario.NewAdminRoleAsync("CREATEDB");
 
-        var result = await scenario.RunAsync(Scenario.CreateArgs(id, "shop.example.test"), adminConnectionString: limited);
+        var result = await scenario.RunAsync(AdminScenario.CreateArgs(id, "shop.example.test"), adminConnectionString: limited);
 
         Assert.Equal(2, result.Exit);
         Assert.Contains("CREATEDB and CREATEROLE", result.Error[0], StringComparison.Ordinal);
@@ -226,8 +220,8 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
         await using var scenario = await NewScenarioAsync();
         var id = scenario.NewTenantId();
 
-        var noSecret = await scenario.RunAsync(Scenario.CreateArgs(id, "shop.example.test"), withClientSecret: false);
-        var noHost = await scenario.RunAsync(["tenant", "create", id, "--oidc-authority", Authority, "--oidc-client-id", "axis"]);
+        var noSecret = await scenario.RunAsync(AdminScenario.CreateArgs(id, "shop.example.test"), withClientSecret: false);
+        var noHost = await scenario.RunAsync(["tenant", "create", id, "--oidc-authority", AdminScenario.Authority, "--oidc-client-id", "axis"]);
         var unknown = await scenario.RunAsync(["tenant", "delete", id]);
 
         Assert.Equal(2, noSecret.Exit);
@@ -247,195 +241,9 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
             builder.UseSetting("Tenancy:Source", "directory");
             builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(platform));
             builder.UseSetting("ConnectionStrings:PlatformSchema", platform);
-            builder.UseSetting("Platform:SecretKey", TestSecretKey);
+            builder.UseSetting("Platform:SecretKey", AdminScenario.TestSecretKey);
             builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
         });
 
-    private async Task<Scenario> NewScenarioAsync(bool migrate = true)
-    {
-        var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
-        if (migrate)
-        {
-            var options = new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options;
-            await using var context = new PlatformDbContext(options);
-            await context.Database.MigrateAsync(CancellationToken);
-        }
-
-        var scenario = new Scenario(platform, migrate);
-        await scenario.InitializeAsync();
-        return scenario;
-    }
-
-    /// <summary>A line ends a stop request: the token is canceled once the database step has reported.</summary>
-    private sealed class CancelOnLineWriter(CancellationTokenSource source) : StringWriter
-    {
-        public override void WriteLine(string? value)
-        {
-            base.WriteLine(value);
-            if (value is not null && value.EndsWith(" database ok", StringComparison.Ordinal))
-            {
-                source.Cancel();
-            }
-        }
-    }
-
-    private sealed record Result(int Exit, string[] Output, string[] Error);
-
-    /// <summary>One platform database and its admin roles. It drops the databases of the tenants it made.</summary>
-    private sealed class Scenario(string platform, bool migrated) : IAsyncDisposable
-    {
-        private readonly string _clientSecret = $"client-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12))}";
-        private readonly List<string> _adminPasswords = [];
-        private readonly List<string> _texts = [];
-        private readonly List<string> _tenants = [];
-
-        public string Platform { get; } = platform;
-
-        /// <summary>The connection string of the admin role that every command uses unless a test passes another.</summary>
-        public string AdminConnection { get; private set; } = "";
-
-        public static string[] CreateArgs(string id, params string[] hosts) =>
-        [
-            "tenant", "create", id,
-            .. hosts.SelectMany(host => new[] { "--host", host }),
-            "--oidc-authority", Authority,
-            "--oidc-client-id", "axis",
-        ];
-
-        public async Task InitializeAsync() => AdminConnection = await NewAdminRoleAsync("CREATEDB CREATEROLE");
-
-        public string NewTenantId()
-        {
-            var id = $"t-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}";
-            _tenants.Add(id);
-            return id;
-        }
-
-        /// <summary>Creates a login role with the given attributes and returns its connection string.</summary>
-        public async Task<string> NewAdminRoleAsync(string attributes)
-        {
-            var name = $"adm_{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}";
-            var password = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12));
-            await PostgreSqlServer.AdminScalarAsync(Platform, $"CREATE ROLE {name} LOGIN PASSWORD '{password}' {attributes}", CancellationToken);
-            _adminPasswords.Add(password);
-            return new NpgsqlConnectionStringBuilder(await PostgreSqlServer.AdminConnectionStringAsync())
-            {
-                Username = name,
-                Password = password,
-            }.ConnectionString;
-        }
-
-        public Task<Result> CreateAsync(string id, params string[] hosts) => RunAsync(CreateArgs(id, hosts));
-
-        /// <summary>Runs a command in process and keeps its output, so <see cref="AssertNoSecretsAsync"/> can check it.</summary>
-        public async Task<Result> RunAsync(
-            string[] args,
-            TextWriter? output = null,
-            CancellationTokenSource? stop = null,
-            string? adminConnectionString = null,
-            bool withClientSecret = true)
-        {
-            var settings = new Dictionary<string, string?>
-            {
-                ["Admin:ConnectionString"] = adminConnectionString ?? AdminConnection,
-                ["ConnectionStrings:PlatformSchema"] = Platform,
-                ["Platform:SecretKey"] = TestSecretKey,
-                ["AXIS_OIDC_CLIENT_SECRET"] = withClientSecret ? _clientSecret : null,
-            };
-            var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
-            using var error = new StringWriter();
-            output ??= new StringWriter();
-            var exit = await AdminCommands.RunAsync(args, configuration, output, error, stop?.Token ?? CancellationToken);
-            var text = output.ToString()!;
-            _texts.Add(text);
-            _texts.Add(error.ToString());
-            return new Result(exit, Lines(text), Lines(error.ToString()));
-        }
-
-        public string TenantConnectionString(string id, string user, string password) =>
-            new NpgsqlConnectionStringBuilder(Platform) { Database = $"axis_{id}", Username = user, Password = password }.ConnectionString;
-
-        public async Task<TenantRow> RowAsync(string id)
-        {
-            await using var context = NewContext();
-            return await context.Tenants.AsNoTracking().SingleAsync(tenant => tenant.Id == id, CancellationToken);
-        }
-
-        public async Task<string[]> HostsAsync(string id)
-        {
-            await using var context = NewContext();
-            return await context.TenantHosts.AsNoTracking().Where(host => host.TenantId == id).Select(host => host.Host).ToArrayAsync(CancellationToken);
-        }
-
-        public async Task<long> CountEntriesAsync()
-        {
-            await using var context = NewContext();
-            return await context.Tenants.LongCountAsync(CancellationToken);
-        }
-
-        public async Task<bool> DatabaseExistsAsync(string id) =>
-            (bool)(await PostgreSqlServer.AdminScalarAsync(Platform, $"SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'axis_{id}')", CancellationToken))!;
-
-        public async Task<long> CountRolesAsync(string id) =>
-            (long)(await PostgreSqlServer.AdminScalarAsync(Platform, $"SELECT count(*) FROM pg_roles WHERE starts_with(rolname, 'axis_{id}_')", CancellationToken))!;
-
-        /// <summary>Every column of every tenant and host row, in a stable order.</summary>
-        public async Task<string> SnapshotAsync()
-        {
-            await using var context = NewContext();
-            var tenants = await context.Tenants.AsNoTracking().OrderBy(tenant => tenant.Id).ToListAsync(CancellationToken);
-            var hosts = await context.TenantHosts.AsNoTracking().OrderBy(host => host.Host).ToListAsync(CancellationToken);
-            return string.Join(
-                '\n',
-                tenants.Select(t => string.Join(
-                    '|',
-                    t.Id, t.Status, t.Version, t.DatabaseHost, t.DatabasePort, t.DatabaseName, t.RuntimeUser, t.SchemaUser,
-                    Convert.ToHexString(t.RuntimePassword), Convert.ToHexString(t.SchemaPassword), t.OidcAuthority, t.OidcClientId,
-                    Convert.ToHexString(t.OidcClientSecret), t.SchemaVersion))
-                .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}")));
-        }
-
-        /// <summary>
-        /// Checks that no output of any command held the admin password, a generated password, the client secret or a
-        /// connection string with a password.
-        /// </summary>
-        public async Task AssertNoSecretsAsync()
-        {
-            var secrets = new List<string>([.. _adminPasswords, _clientSecret]);
-            await using (var context = NewContext())
-            {
-                // Without the platform tables there is no directory, so no generated password.
-                foreach (var tenant in migrated ? await context.Tenants.AsNoTracking().ToListAsync(CancellationToken) : [])
-                {
-                    if (tenant.SchemaPassword.Length > 0)
-                    {
-                        secrets.Add(_cipher.Decrypt(tenant.Id, TenantSecretFields.SchemaPassword, tenant.SchemaPassword).Reveal());
-                    }
-
-                    if (tenant.RuntimePassword.Length > 0)
-                    {
-                        secrets.Add(_cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
-                    }
-                }
-            }
-
-            Assert.All(_texts, text =>
-            {
-                Assert.All(secrets, secret => Assert.DoesNotContain(secret, text, StringComparison.Ordinal));
-                Assert.DoesNotContain("Password=", text, StringComparison.OrdinalIgnoreCase);
-            });
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            foreach (var id in _tenants)
-            {
-                await PostgreSqlServer.DropDatabaseAsync($"axis_{id}");
-            }
-        }
-
-        private PlatformDbContext NewContext() => new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(Platform).Options);
-
-        private static string[] Lines(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    }
+    private Task<AdminScenario> NewScenarioAsync(bool migrate = true) => AdminScenario.NewAsync(database, migrate, CancellationToken);
 }

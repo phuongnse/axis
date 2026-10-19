@@ -17,8 +17,13 @@ internal static partial class AdminCommands
 
     public const string ClientSecretSetting = "AXIS_OIDC_CLIENT_SECRET";
 
+    public const string PathSetting = "PATH";
+
     private const string Usage =
-        "Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>";
+        """
+        Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>
+               tenant backup <id> --out <file>
+        """;
 
     public static async Task<int> RunAsync(
         string[] args,
@@ -31,6 +36,11 @@ internal static partial class AdminCommands
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+
+        if (args.Length >= 2 && args[0] == "tenant" && args[1] == "backup")
+        {
+            return await BackupAsync(args, configuration, output, error, cancellationToken);
+        }
 
         var request = ParseTenantCreate(args);
         if (request is null)
@@ -62,6 +72,62 @@ internal static partial class AdminCommands
         }
 
         return await new TenantCreate(settings, request, output, cancellationToken).RunAsync();
+    }
+
+    private static async Task<int> BackupAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var request = ParseTenantBackup(args);
+        if (request is null)
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        var settings = ReadBackupSettings(configuration, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        BackupPlan? plan;
+        try
+        {
+            plan = await TenantBackup.PrepareAsync(settings, request, error, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+
+        return plan is null ? 2 : await new TenantBackup(settings, plan, output, cancellationToken).RunAsync();
+    }
+
+    private static TenantBackupRequest? ParseTenantBackup(string[] args)
+    {
+        if (args.Length < 3 || args[2].StartsWith("--", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        string? file = null;
+        for (var i = 3; i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || args[i] != "--out" || file is not null || string.IsNullOrWhiteSpace(args[i + 1]))
+            {
+                return null;
+            }
+
+            file = args[i + 1];
+        }
+
+        return file is null ? null : new TenantBackupRequest(args[2], file);
     }
 
     private static TenantCreateRequest? ParseTenantCreate(string[] args)
@@ -107,15 +173,69 @@ internal static partial class AdminCommands
     {
         problem = "";
         var admin = configuration[AdminSetting];
-        var platform = configuration[PlatformSetting];
-        var secret = configuration[ClientSecretSetting];
-        var key = configuration[TenantSecretCipher.KeySetting];
-
         if (string.IsNullOrWhiteSpace(admin))
         {
             problem = $"The setting {AdminSetting} is required.";
             return null;
         }
+
+        var platform = ReadPlatformSettings(configuration, out problem);
+        if (platform is null)
+        {
+            return null;
+        }
+
+        var secret = configuration[ClientSecretSetting];
+        if (string.IsNullOrEmpty(secret))
+        {
+            problem = $"The environment variable {ClientSecretSetting} is required.";
+            return null;
+        }
+
+        NpgsqlConnectionStringBuilder adminBuilder;
+        try
+        {
+            adminBuilder = new NpgsqlConnectionStringBuilder(admin) { Pooling = false };
+        }
+        catch (Exception exception) when (exception is ArgumentException or FormatException)
+        {
+            problem = $"The setting {AdminSetting} is not a valid connection string.";
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(adminBuilder.Host))
+        {
+            problem = $"The setting {AdminSetting} names no host.";
+            return null;
+        }
+
+        return new AdminSettings(adminBuilder, platform.PlatformConnectionString, platform.Cipher, secret);
+    }
+
+    /// <summary><c>tenant backup</c> needs the platform database and the installation key, and <c>PATH</c> to find <c>pg_dump</c>. It needs no admin role and no client secret.</summary>
+    private static BackupSettings? ReadBackupSettings(IConfiguration configuration, out string problem)
+    {
+        var platform = ReadPlatformSettings(configuration, out problem);
+        if (platform is null)
+        {
+            return null;
+        }
+
+        var path = configuration[PathSetting];
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            problem = $"The environment variable {PathSetting} is required, to find pg_dump.";
+            return null;
+        }
+
+        return new BackupSettings(platform.PlatformConnectionString, platform.Cipher, path);
+    }
+
+    private static PlatformSettings? ReadPlatformSettings(IConfiguration configuration, out string problem)
+    {
+        problem = "";
+        var platform = configuration[PlatformSetting];
+        var key = configuration[TenantSecretCipher.KeySetting];
 
         if (string.IsNullOrWhiteSpace(platform))
         {
@@ -129,28 +249,14 @@ internal static partial class AdminCommands
             return null;
         }
 
-        if (string.IsNullOrEmpty(secret))
-        {
-            problem = $"The environment variable {ClientSecretSetting} is required.";
-            return null;
-        }
-
-        NpgsqlConnectionStringBuilder adminBuilder;
         string platformConnection;
         try
         {
-            adminBuilder = new NpgsqlConnectionStringBuilder(admin) { Pooling = false };
             platformConnection = new NpgsqlConnectionStringBuilder(platform) { Pooling = false }.ConnectionString;
         }
         catch (Exception exception) when (exception is ArgumentException or FormatException)
         {
-            problem = $"The setting {AdminSetting} or {PlatformSetting} is not a valid connection string.";
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(adminBuilder.Host))
-        {
-            problem = $"The setting {AdminSetting} names no host.";
+            problem = $"The setting {PlatformSetting} is not a valid connection string.";
             return null;
         }
 
@@ -166,7 +272,7 @@ internal static partial class AdminCommands
             return null;
         }
 
-        return new AdminSettings(adminBuilder, platformConnection, cipher, secret);
+        return new PlatformSettings(platformConnection, cipher);
     }
 
     /// <summary>Returns the reason to refuse the command, or null. It checks the admin role and the input before any tenant work.</summary>
@@ -224,9 +330,15 @@ internal static partial class AdminCommands
             return "--oidc-client-id must not be blank.";
         }
 
+        return await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+    }
+
+    /// <summary>Returns the reason that the platform database cannot be used, or null when its tables exist. The admin tool does not create them.</summary>
+    public static async Task<string?> PlatformTablesProblemAsync(string platformConnectionString, CancellationToken cancellationToken)
+    {
         try
         {
-            await using var platform = new NpgsqlConnection(settings.PlatformConnectionString);
+            await using var platform = new NpgsqlConnection(platformConnectionString);
             await platform.OpenAsync(cancellationToken);
             await using var command = new NpgsqlCommand("SELECT to_regclass('platform.tenants') IS NOT NULL", platform);
             if (!(bool)(await command.ExecuteScalarAsync(cancellationToken))!)
@@ -251,6 +363,13 @@ internal static partial class AdminCommands
 }
 
 internal sealed record TenantCreateRequest(string Id, IReadOnlyList<string> Hosts, string OidcAuthority, string OidcClientId);
+
+internal sealed record TenantBackupRequest(string Id, string Out);
+
+/// <summary>The settings every command reads: the platform database and the installation key.</summary>
+internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
+
+internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath);
 
 internal sealed record AdminSettings(
     NpgsqlConnectionStringBuilder Admin,

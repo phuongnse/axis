@@ -47,7 +47,7 @@ flowchart LR
   It runs the package operations that process steps call, see
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
-- **Axis.Admin** *(partly built for M9: only `tenant create`)* is the console host that the platform
+- **Axis.Admin** *(partly built for M9: only `tenant create` and `tenant backup`)* is the console host that the platform
   operator runs. It creates tenants, migrates tenant databases, activates
   releases, and backs up and restores tenants. It is the only host that writes
   the [tenant directory](#tenant-directory), holds an admin connection to the
@@ -58,9 +58,8 @@ flowchart LR
   and [D45](decisions.md#d45-tenant-backup-and-restore--agreed).
 - **Platform database** stores installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform
-  settings *(the server reads the tenant directory again every refresh
-  interval, and the worker reads it once at start; the worker refresh is
-  planned for M9)*.
+  settings *(both hosts read the tenant directory again every refresh
+  interval)*.
 - **Tenant databases** hold everything else for one tenant: releases, system
   tables, process state, audit and the generated entity tables (D10).
 
@@ -71,7 +70,7 @@ src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
   Axis.Scenarios/         console host that runs an application's test scenarios
-  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9; only `tenant create` is built)
+  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9; only `tenant create` and `tenant backup` are built)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
@@ -151,8 +150,7 @@ Moved to [reference/record-api.md](reference/record-api.md).
   include the tenant.
 - **Tenant source.** The setting `Tenancy:Source` chooses between server
   configuration, the default, and the [tenant directory](#tenant-directory).
-  The server reads the directory at start and again at every refresh, and the
-  worker reads it once at start *(the worker refresh is planned for M9)*. Under
+  Both hosts read the directory at start and again at every refresh. Under
   `directory` both ignore a `Tenants` section.
 
 ### Tenant configuration
@@ -251,15 +249,16 @@ never the value. If the first load fails, the start stops with an error that nam
 `ConnectionStrings:Platform` and holds no password. An empty directory starts,
 and every host answers `404` until a tenant is added and a refresh serves it.
 Under `directory`, a non-empty `ActivateOnStartup` stops the start. Under
-`directory` the worker reads the `active` tenants once over
+`directory` the worker reads the `active` tenants over
 `ConnectionStrings:Platform` and runs their work on each tenant's own database,
 with its decrypted runtime password. It never reads
 `ConnectionStrings:PlatformSchema`. It stops at start when
-`ConnectionStrings:Platform` is missing. If the first read fails, it logs the
-failure once, retries every `Worker:PollInterval` and is not ready until a read
-works. It ignores a `Tenants` section and logs a warning.
+`ConnectionStrings:Platform` is missing or `Tenancy:RefreshInterval` is invalid.
+If the first read fails, it logs the failure once, retries every
+`Worker:PollInterval` and is not ready until a read works. It ignores a
+`Tenants` section and logs a warning.
 
-The server reads the directory again every `Tenancy:RefreshInterval`, without a
+Both hosts read the directory again every `Tenancy:RefreshInterval`, without a
 restart. A tenant added as `active` is served after the next refresh, once its
 runtime database role check passes. A host of a `suspended` or `provisioning`
 tenant answers `503`, and a removed host answers `404`. A changed database
@@ -267,9 +266,10 @@ setting gets a new connection pool. A refresh also updates sign-in. A tenant
 added at a refresh gets its OIDC client and its endpoint caller scheme, a
 changed OIDC setting applies at the next refresh, and a tenant that is no
 longer served loses both. A failed refresh keeps the last good directory and
-makes the server's readiness Degraded. The worker refresh and the check of the
-schema version are not built. A change to the directory applies to the worker
-only after a restart.
+makes readiness Degraded. The worker claims no new work item of a tenant that
+is no longer `active`, and a work item already claimed finishes. The worker runs
+the refresh in its polling loop, between work items. The check of the schema
+version is not built.
 
 - **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
   default, or `directory`. Both answer through one tenant catalog contract, so
@@ -281,8 +281,7 @@ only after a restart.
 - **Refresh.** Both hosts read the directory again every
   `Tenancy:RefreshInterval`, 30 seconds by default, see
   [tenancy settings](reference/configuration.md#tenancy-settings). A changed
-  host, database setting or OIDC setting applies at the next refresh. *(The
-  worker refresh is planned for M9.)*
+  host, database setting or OIDC setting applies at the next refresh.
 - **Read only.** The hosts read the directory over a database role that may
   only read the `platform` schema. [`Axis.Admin`](reference/administration.md)
   writes it, see
@@ -302,7 +301,9 @@ What a host answers for a tenant, once the directory is in use:
 - **New tenants.** A tenant that first appears at a refresh is served only
   after the runtime database role check passes, see
   [database roles](reference/storage.md#database-roles). Until then it answers
-  `503`, like a suspended tenant, and the check runs again at each refresh.
+  `503`, like a suspended tenant, and the check runs again at each refresh. The
+  worker skips such a tenant, logs an error and runs the check again at each
+  refresh. A failed check does not stop the worker.
   The same holds for a tenant that becomes `active` again, and for a served
   tenant whose database host, port, name, runtime user or runtime password
   changes. It answers `503` until the check passes on the new settings. Then
@@ -976,13 +977,14 @@ empty, so "startup activation has finished" holds from the start.
 **Worker.** The worker serves only `/health/live` and `/health/ready`, on the
 address `Health:Urls`. The default is `http://127.0.0.1:5208`, so nothing
 outside the host reaches it until someone changes the setting. See
-[worker settings](reference/processes.md#worker-settings). Today the worker is
-never Degraded. A tenant database that stops answering after the worker saw it
-migrated is only logged. Under `Tenancy:Source=directory`, the worker answers
-`503` on `/health/ready` until its first read of the
+[worker settings](reference/processes.md#worker-settings). A tenant database
+that stops answering after the worker saw it migrated is only logged, and does
+not make the worker Degraded. Under `Tenancy:Source=directory`, the worker
+answers `503` on `/health/ready` until its first read of the
 [tenant directory](#tenant-directory) has worked, while `/health/live` stays
-`200`. *(Planned for M9.)* A failed refresh of the directory makes the worker
-Degraded (`200`).
+`200`. A failed refresh of the directory makes the worker Degraded (`200`),
+and the worker keeps running the last good read. It is Healthy again after the
+next refresh that works.
 
 The loop counts as stalled when it has not polled within twice
 `Worker:LeaseDuration`, one minute by default. A poll interval would be too
@@ -993,7 +995,8 @@ short, because one work item can run for up to a lease.
 | `/health/live` | Healthy | `200` | The loop has polled within twice `Worker:LeaseDuration`. |
 | `/health/live` | Unhealthy | `503` | The loop has not polled within that time, so an orchestrator restarts the worker. |
 | `/health/ready` | Healthy | `200` | Every tenant database has its processes migrations, and the loop has polled within twice `Worker:LeaseDuration`. |
-| `/health/ready` | Unhealthy | `503` | A tenant database lacks its processes migrations, or the loop has not polled within that time. |
+| `/health/ready` | Degraded | `200` | A refresh of the tenant directory failed, and the last good read stays in use. |
+| `/health/ready` | Unhealthy | `503` | A tenant database lacks its processes migrations, the first read of the tenant directory has not worked, or the loop has not polled within that time. |
 
 **Docker Compose.** The worker gets a health check on `/health/ready`. It runs
 inside the container, and Compose does not publish the worker's health port.
