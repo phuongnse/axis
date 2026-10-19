@@ -2056,11 +2056,12 @@ platform change it needs is a gap to raise, not to hide in the sample.
 
 The server and the worker learn their tenants from a tenant directory in the
 platform database, and pick up changes without a restart. This is planned for
-M9. The tenant catalog contract, the `platform` schema and the server's
-directory source are built. Under `directory` the server creates the schema at
-start and reads its `active` tenants once. The refresh, the `503` answers and
-the worker's directory source are not built. The worker, and the server under
-`configuration`, take tenants from the `Tenants` section, as in
+M9. The tenant catalog contract, the `platform` schema and the directory source
+of the server and the worker are built. Under `directory` the server creates the
+schema at start and reads its `active` tenants once. The worker reads them once
+too, and retries the first read until it works. The refresh, the `503` answers
+and the worker skipping tenants that are not `active` are not built. Both hosts,
+under `configuration`, take tenants from the `Tenants` section, as in
 [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed).
 See [tenant directory](architecture.md#tenant-directory) for what each host
 answers, [tenancy settings](reference/configuration.md#tenancy-settings) for

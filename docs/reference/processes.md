@@ -2509,10 +2509,16 @@ further occurrence runs, but a running fan-out finishes.
 The worker polls every tenant database in the `Tenants` section of its
 configuration (see
 [Tenant configuration](../architecture.md#tenant-configuration)).
-*(Planned for M9.)* Under `Tenancy:Source=directory`, the worker reads its
-tenants from the [tenant directory](../architecture.md#tenant-directory)
-instead. It refreshes the directory, and it claims no new work for a tenant that
-is not `active`. Work it already claimed finishes.
+Under `Tenancy:Source=directory`, the worker reads its tenants from the
+[tenant directory](../architecture.md#tenant-directory) instead, over
+`ConnectionStrings:Platform`, and ignores a `Tenants` section. It needs
+`ConnectionStrings:Platform` and `Platform:SecretKey` and stops at start without
+them. It never uses `ConnectionStrings:PlatformSchema`. It reads the directory
+once at start. If that read fails, it logs the failure once, retries every
+`Worker:PollInterval` and is not ready until a read works. A change to the
+directory applies after a restart of the worker. *(Planned for M9.)* The worker
+refreshes the directory, and it claims no new work for a tenant that is not
+`active`. Work it already claimed finishes.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |

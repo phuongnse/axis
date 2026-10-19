@@ -20,15 +20,14 @@ public sealed partial class WorkerGauges(
     AxisGauges gauges,
     ILogger<WorkerGauges> logger)
 {
-    private readonly string[] _tenantIds = [.. tenants.Tenants.Select(tenant => tenant.Id)];
-
     // Tenants whose database was migrated. A new schema arrives with a new release, which restarts the worker.
     private readonly HashSet<string> _migrated = new(StringComparer.Ordinal);
 
     /// <summary>Reads every migrated tenant once. A tenant that fails is logged and does not stop the others.</summary>
     public async Task RefreshAsync(CancellationToken cancellationToken)
     {
-        foreach (var tenantId in _tenantIds)
+        // Read at each refresh, because under the directory source the tenants arrive after the first load.
+        foreach (var tenantId in tenants.Tenants.Select(tenant => tenant.Id).ToArray())
         {
             try
             {

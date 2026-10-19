@@ -9,16 +9,17 @@ using Axis.Tenancy;
 namespace Axis.Worker;
 
 /// <summary>
-/// Polls every configured tenant in ordinal order of its id and runs its due work items until none
-/// is left, then waits for the poll interval when no tenant had work. A tenant whose database the
-/// server has not migrated yet is skipped until it has. When a tenant's database counts as migrated,
+/// Under the directory source it first reads the tenant directory, and retries until a read works. Then it
+/// polls every tenant in ordinal order of its id and runs its due work items until none is left, then waits
+/// for the poll interval when no tenant had work. A tenant whose database the server has not migrated yet is
+/// skipped until it has. When a tenant's database counts as migrated,
 /// its runtime database role is checked, so that it can only read and write rows. Then the releases
 /// the tenant still uses are checked against the installed extension packages. A role that can change
 /// the schema, a pinned version that is not installed, or a release that no longer compiles records
 /// the failure in <see cref="StartupCheckState"/> and stops the host before any work of that tenant runs.
 /// </summary>
 internal sealed partial class WorkerService(
-    ITenantCatalog tenants,
+    WorkerTenantCatalog tenants,
     WorkerOptions options,
     WorkItemRunner runner,
     WorkerHealth health,
@@ -28,8 +29,6 @@ internal sealed partial class WorkerService(
     StartupCheckState checkState,
     ILogger<WorkerService> logger) : BackgroundService
 {
-    private readonly string[] _tenantIds = [.. tenants.Tenants.Select(tenant => tenant.Id)];
-
     // Tenants whose database was migrated. A new schema arrives with a new release, which restarts
     // the worker, so a ready tenant is not checked again.
     private readonly HashSet<string> _ready = new(StringComparer.Ordinal);
@@ -37,11 +36,18 @@ internal sealed partial class WorkerService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (tenants.TenantsSectionIgnored)
+        {
+            LogTenantsSectionIgnored();
+        }
+
+        await LoadTenantsAsync(stoppingToken);
+        var tenantIds = tenants.Tenants.Select(tenant => tenant.Id).ToArray();
         while (!stoppingToken.IsCancellationRequested)
         {
             health.Polled();
             var ranAny = false;
-            foreach (var tenantId in _tenantIds)
+            foreach (var tenantId in tenantIds)
             {
                 using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
                 {
@@ -53,6 +59,38 @@ internal sealed partial class WorkerService(
             {
                 await Task.Delay(options.PollInterval, stoppingToken);
             }
+        }
+    }
+
+    /// <summary>
+    /// Under the directory source, reads the tenants and retries every poll interval until a read works. Only the
+    /// first failure is logged, and readiness shows that the problem continues.
+    /// </summary>
+    private async Task LoadTenantsAsync(CancellationToken stoppingToken)
+    {
+        var failureLogged = false;
+        while (!tenants.IsLoaded)
+        {
+            health.Polled();
+            try
+            {
+                await tenants.LoadAsync(stoppingToken);
+            }
+            catch (InvalidOperationException exception)
+            {
+                if (!failureLogged)
+                {
+                    failureLogged = true;
+                    LogLoadFailed(exception, options.PollInterval);
+                }
+
+                await Task.Delay(options.PollInterval, stoppingToken);
+            }
+        }
+
+        if (tenants.FromDirectorySource)
+        {
+            LogLoaded(tenants.Tenants.Count);
         }
     }
 
@@ -156,6 +194,15 @@ internal sealed partial class WorkerService(
             throw new StartupCheckException(tenantId, diagnostics[0]);
         }
     }
+
+    [LoggerMessage(LogLevel.Warning, "The Tenants section is ignored because Tenancy:Source is 'directory'.")]
+    private partial void LogTenantsSectionIgnored();
+
+    [LoggerMessage(LogLevel.Error, "Loading the tenant directory failed. The worker retries every {PollInterval}.")]
+    private partial void LogLoadFailed(Exception exception, TimeSpan pollInterval);
+
+    [LoggerMessage(LogLevel.Information, "Loaded {TenantCount} active tenant(s) from the tenant directory.")]
+    private partial void LogLoaded(int tenantCount);
 
     [LoggerMessage(LogLevel.Information, "Waiting for the database of tenant {TenantId} to be migrated.")]
     private partial void LogWaitingForMigrations(string tenantId);

@@ -1082,10 +1082,12 @@ reading of `Tenancy:Source`, `ConnectionStrings:Platform`,
 role of `ConnectionStrings:Platform` to reading the `platform` schema, then
 reads its `active` tenants once over that role. It ignores a `Tenants` section
 and logs a warning at start. If the first read fails, the start stops with an
-error that names `ConnectionStrings:Platform`. The worker reads
-`Platform:SecretKey` and `Tenancy:Source` only to refuse a missing or invalid
-key, and still reads its tenants from the `Tenants` section. The refresh,
-`Tenancy:RefreshInterval` and the worker's directory source are not built.
+error that names `ConnectionStrings:Platform`. Under `directory` the worker needs
+`ConnectionStrings:Platform` and `Platform:SecretKey`, reads its `active` tenants
+once over that connection, and also ignores a `Tenants` section with a warning.
+It never reads `ConnectionStrings:PlatformSchema`. If its first read fails, it
+retries every `Worker:PollInterval` and is not ready until a read works. The
+refresh and `Tenancy:RefreshInterval` are not built.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |

@@ -58,8 +58,8 @@ flowchart LR
   and [D45](decisions.md#d45-tenant-backup-and-restore--agreed).
 - **Platform database** stores installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform
-  settings *(the server reads the tenant directory; the worker still reads
-  tenants from its configuration until M9 is done)*.
+  settings *(the server and the worker read the tenant directory once at
+  start; the refresh is planned for M9)*.
 - **Tenant databases** hold everything else for one tenant: releases, system
   tables, process state, audit and the generated entity tables (D10).
 
@@ -150,8 +150,8 @@ Moved to [reference/record-api.md](reference/record-api.md).
   include the tenant.
 - **Tenant source.** The setting `Tenancy:Source` chooses between server
   configuration, the default, and the [tenant directory](#tenant-directory).
-  The server reads the directory. The worker still reads its `Tenants`
-  section *(the worker reading the directory is planned for M9)*.
+  The server and the worker read the directory once at start. Under `directory`
+  both ignore a `Tenants` section *(the refresh is planned for M9)*.
 
 ### Tenant configuration
 
@@ -247,11 +247,17 @@ connection opens, the sign-in client is set up or a binding is resolved. If the
 first load fails, the start stops with an error that names
 `ConnectionStrings:Platform` and holds no password. An empty directory starts,
 and every host answers `404` until tenants are added and the server restarts.
-Under `directory`, a non-empty `ActivateOnStartup` stops the start. The refresh,
-the `503` answers, the check of the schema version and the worker reading the
-directory are not built. The worker still reads its `Tenants` section, so a
-directory installation must give it one. A change to the directory applies
-only after a server restart.
+Under `directory`, a non-empty `ActivateOnStartup` stops the start. Under
+`directory` the worker reads the `active` tenants once over
+`ConnectionStrings:Platform` and runs their work on each tenant's own database,
+with its decrypted runtime password. It never reads
+`ConnectionStrings:PlatformSchema`. It stops at start when
+`ConnectionStrings:Platform` is missing. If the first read fails, it logs the
+failure once, retries every `Worker:PollInterval` and is not ready until a read
+works. It ignores a `Tenants` section and logs a warning. The refresh, the
+`503` answers, the check of the schema version and the worker skipping tenants
+that are not `active` are not built. A change to the directory applies only
+after a restart of the server and the worker.
 
 - **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
   default, or `directory`. Both answer through one tenant catalog contract, so
@@ -945,10 +951,11 @@ address `Health:Urls`. The default is `http://127.0.0.1:5208`, so nothing
 outside the host reaches it until someone changes the setting. See
 [worker settings](reference/processes.md#worker-settings). Today the worker is
 never Degraded. A tenant database that stops answering after the worker saw it
-migrated is only logged. *(Planned for M9.)* Under
-`Tenancy:Source=directory`, a failed refresh of the
-[tenant directory](#tenant-directory) makes the worker Degraded (`200`), and
-the worker is not ready until the first load has worked.
+migrated is only logged. Under `Tenancy:Source=directory`, the worker answers
+`503` on `/health/ready` until its first read of the
+[tenant directory](#tenant-directory) has worked, while `/health/live` stays
+`200`. *(Planned for M9.)* A failed refresh of the directory makes the worker
+Degraded (`200`).
 
 The loop counts as stalled when it has not polled within twice
 `Worker:LeaseDuration`, one minute by default. A poll interval would be too
