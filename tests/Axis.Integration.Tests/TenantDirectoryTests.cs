@@ -255,6 +255,54 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
         Assert.DoesNotContain("Sales-a", list, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_failed_refresh_keeps_serving_the_last_good_directory_and_readiness_is_Degraded_until_a_refresh_works()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        var logs = new LogCollector();
+        await using var factory = CreateFactory(platform, logs);
+        using var client = factory.CreateClient().SignedInAs("anna");
+        await CreateDepartmentAsync(client, "a.example.test", "Sales-a");
+        var (before, beforeBody) = await ReadyAsync(client);
+        Assert.Equal(HttpStatusCode.OK, before);
+        Assert.Equal("""{"status":"Healthy"}""", beforeBody);
+
+        await StopPlatformAsync(platform);
+        try
+        {
+            await RefreshAsync(factory);
+            await RefreshAsync(factory);
+
+            Assert.Contains("Sales-a", await ListAsync(client, "a.example.test"), StringComparison.Ordinal);
+            var (status, body) = await ReadyAsync(client);
+            Assert.Equal(HttpStatusCode.OK, status);
+            Assert.Equal("""{"status":"Degraded"}""", body);
+            Assert.DoesNotContain("a.example.test", body, StringComparison.Ordinal);
+            Assert.DoesNotContain(new NpgsqlConnectionStringBuilder(platform).Database!, body, StringComparison.Ordinal);
+            Assert.DoesNotContain(a.DatabaseName, body, StringComparison.Ordinal);
+            Assert.Equal(
+                1,
+                logs.Entries.Count(entry => entry.StartsWith("Error:", StringComparison.Ordinal) && entry.Contains("tenant directory", StringComparison.Ordinal)));
+        }
+        finally
+        {
+            await AllowPlatformConnectionsAsync(platform);
+        }
+
+        // A pooled connection that died with the outage must not fail the first read after it.
+        NpgsqlConnection.ClearPool(new NpgsqlConnection(PostgreSqlServer.RuntimeConnectionString(platform)));
+        await RefreshAsync(factory);
+
+        var (recovered, recoveredBody) = await ReadyAsync(client);
+        Assert.Equal(HttpStatusCode.OK, recovered);
+        Assert.Equal("""{"status":"Healthy"}""", recoveredBody);
+        Assert.Contains(
+            logs.Entries,
+            entry => entry.StartsWith("Information:", StringComparison.Ordinal) && entry.Contains("read again after failed reads", StringComparison.Ordinal));
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(string platform, LogCollector logs, params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -389,6 +437,30 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
         using var request = Request(HttpMethod.Post, Departments, host, $$"""{ "values": { "name": "{{name}}" } }""");
         using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    // The platform database cannot be stopped, since every test class shares one PostgreSQL container.
+    // Refusing connections and ending the open sessions looks the same to the server. The statements run on the
+    // fixture database, not on the platform database.
+    private async Task StopPlatformAsync(string platform)
+    {
+        var name = new NpgsqlConnectionStringBuilder(platform).Database!;
+        await PostgreSqlServer.AdminScalarAsync(database.ConnectionString, $"""ALTER DATABASE "{name}" ALLOW_CONNECTIONS false""", CancellationToken);
+        await PostgreSqlServer.AdminScalarAsync(
+            database.ConnectionString, $"SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname = '{name}'", CancellationToken);
+    }
+
+    private async Task AllowPlatformConnectionsAsync(string platform)
+    {
+        var name = new NpgsqlConnectionStringBuilder(platform).Database!;
+        await PostgreSqlServer.AdminScalarAsync(database.ConnectionString, $"""ALTER DATABASE "{name}" ALLOW_CONNECTIONS true""", CancellationToken.None);
+    }
+
+    // Health answers bypass tenant resolution, so any host works.
+    private static async Task<(HttpStatusCode Status, string Body)> ReadyAsync(HttpClient client)
+    {
+        using var response = await client.SendAsync(Request("/health/ready", "a.example.test"), CancellationToken);
+        return (response.StatusCode, await response.Content.ReadAsStringAsync(CancellationToken));
     }
 
     private static async Task<string> ListAsync(HttpClient client, string host)

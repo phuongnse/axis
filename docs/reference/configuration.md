@@ -1084,13 +1084,14 @@ reads the directory over that role, then again every `Tenancy:RefreshInterval`,
 without a restart. It ignores a `Tenants` section and logs a warning at start. If
 the first read fails, the start stops with an error that names
 `ConnectionStrings:Platform`. If a later read fails, it keeps serving the last
-good read and logs an error. Under `directory` the worker needs
+good read, logs one error for each run of failed reads and reports Degraded
+readiness until a read works. Under `directory` the worker needs
 `ConnectionStrings:Platform` and `Platform:SecretKey`, reads its `active` tenants
 once over that connection, and also ignores a `Tenants` section with a warning.
 It never reads `ConnectionStrings:PlatformSchema`. If its first read fails, it
 retries every `Worker:PollInterval` and is not ready until a read works. The
-worker does not read the directory again, and Degraded readiness for a failed
-refresh is not built. Neither is sign-in for a tenant added at a refresh.
+worker does not read the directory again, and it has no Degraded readiness for a
+failed refresh. Sign-in for a tenant added at a refresh is not built either.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |

@@ -2062,8 +2062,9 @@ schema at start and reads the directory every `Tenancy:RefreshInterval`. It
 serves new tenants, answers `503` for tenants that are not `active` and `404`
 for removed hosts, and runs the role check of D31 on new tenants and on changed
 database settings. The worker reads its `active` tenants once, and retries the
-first read until it works. The worker refresh, Degraded readiness for a failed
-refresh and the worker skipping tenants that are not `active` are not built.
+first read until it works. The server's Degraded readiness for a failed refresh is
+built. The worker refresh, the worker's Degraded readiness and the worker
+skipping tenants that are not `active` are not built.
 Both hosts,
 under `configuration`, take tenants from the `Tenants` section, as in
 [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed).
