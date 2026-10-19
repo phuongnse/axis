@@ -30,7 +30,8 @@ public static class TenancyServiceCollectionExtensions
         services.AddSingleton(catalog);
         services.AddSingleton(new TenantResolver(catalog));
         services.AddSingleton<ITenantContextAccessor, TenantContextAccessor>();
-        services.AddSingleton<ITenantConnectionFactory, TenantConnectionFactory>();
+        services.AddSingleton<TenantConnectionFactory>();
+        services.AddSingleton<ITenantConnectionFactory>(sp => sp.GetRequiredService<TenantConnectionFactory>());
         services.AddSingleton<IDeploymentBindings, DeploymentBindings>();
         return services;
     }

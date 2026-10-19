@@ -22,6 +22,13 @@ internal sealed class TenantResolutionMiddleware(
         // Request.Host.Host has no port. The response names neither the requested host nor any tenant.
         if (!resolver.TryResolve(context.Request.Host.Host, out var tenant))
         {
+            if (resolver.IsUnavailable(context.Request.Host.Host))
+            {
+                await Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "This tenant is not available.")
+                    .ExecuteAsync(context);
+                return;
+            }
+
             await Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant is configured for this host.")
                 .ExecuteAsync(context);
             return;

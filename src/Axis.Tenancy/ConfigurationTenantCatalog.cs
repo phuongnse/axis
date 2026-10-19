@@ -30,6 +30,8 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
 
     public TenantEntry? FindByHost(string host) => _tenantsByHost.GetValueOrDefault(host);
 
+    public bool IsUnavailableHost(string host) => false;
+
     /// <summary>
     /// Reads and checks the <c>Tenants</c> section. Outside Development a secret binding may not take its value from
     /// a configuration file.

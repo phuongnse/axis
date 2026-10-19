@@ -2058,9 +2058,13 @@ The server and the worker learn their tenants from a tenant directory in the
 platform database, and pick up changes without a restart. This is planned for
 M9. The tenant catalog contract, the `platform` schema and the directory source
 of the server and the worker are built. Under `directory` the server creates the
-schema at start and reads its `active` tenants once. The worker reads them once
-too, and retries the first read until it works. The refresh, the `503` answers
-and the worker skipping tenants that are not `active` are not built. Both hosts,
+schema at start and reads the directory every `Tenancy:RefreshInterval`. It
+serves new tenants, answers `503` for tenants that are not `active` and `404`
+for removed hosts, and runs the role check of D31 on new tenants and on changed
+database settings. The worker reads its `active` tenants once, and retries the
+first read until it works. The worker refresh, Degraded readiness for a failed
+refresh and the worker skipping tenants that are not `active` are not built.
+Both hosts,
 under `configuration`, take tenants from the `Tenants` section, as in
 [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed).
 See [tenant directory](architecture.md#tenant-directory) for what each host
@@ -2122,6 +2126,9 @@ The owner confirmed these points on issue #639 on 2026-10-18.
     database role check of
     [D31](#d31-separate-database-roles--agreed) passes. Until then it answers
     `503`, like a suspended tenant.
+  - A served tenant whose database host, port, name, runtime user or runtime
+    password changes at a refresh answers `503` until the D31 check passes on
+    the new settings. Then it gets a new connection pool.
 - **Who writes the directory:** the server and the worker only read it. The
   admin host of
   [D43](#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
