@@ -70,7 +70,7 @@ Every command writes one line per tenant and step to standard output:
 ```
 
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
-`role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
+`work`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
 `check`, `restore` and `status`. A line names the
 tenant and never a host, a password or a connection string. A `failed` message
 never holds one either. A failed `dump` step says only `pg_dump exited with code <n>`
@@ -354,8 +354,11 @@ it keeps working without the module installed.
 7. `migrations`: run the EF Core migrations. This step runs only when the
    archive's schema version is older than this build's.
 8. `grants`: run the grant step again.
-9. `role-check`: run the runtime role check of D31 over the runtime role.
-10. `version`: record the schema version and set the entry `suspended`. The step
+9. `work`: give every work item the new tenant id. The worker claims only the
+   work items of its own tenant, so without this the work that was due at
+   backup would never run.
+10. `role-check`: run the runtime role check of D31 over the runtime role.
+11. `version`: record the schema version and set the entry `suspended`. The step
     fails unless the database is on the schema of this build, which catches an
     archive whose manifest does not match its dump.
 

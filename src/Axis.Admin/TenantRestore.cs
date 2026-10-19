@@ -13,8 +13,8 @@ namespace Axis.Admin;
 
 /// <summary>
 /// <c>tenant restore</c>: checks the archive, writes a directory entry as <c>provisioning</c>, creates the database roles and
-/// the database, restores the dump with <c>pg_restore</c> as the schema role, grants and migrates it, checks the runtime role
-/// and sets the entry <c>suspended</c>. A rerun on a <c>provisioning</c> entry skips what is done, and a database that already
+/// the database, restores the dump with <c>pg_restore</c> as the schema role, grants and migrates it, gives every work item
+/// the new tenant id, checks the runtime role and sets the entry <c>suspended</c>. A rerun on a <c>provisioning</c> entry skips what is done, and a database that already
 /// holds tables counts as restored. Each step writes one line that names the tenant and never a password, a host or a
 /// connection string. The dump goes to <c>pg_restore</c> on its standard input, so no copy of the business data is left on disk.
 /// </summary>
@@ -97,6 +97,7 @@ internal sealed class TenantRestore : IAsyncDisposable
                 && await Step("grants", () => Steps.GrantAsync())
                 && (!older || await Step("migrations", () => Steps.MigrateAsync()))
                 && await Step("grants", () => Steps.GrantAsync())
+                && await Step("work", RetagWorkAsync)
                 && await Step("role-check", () => Steps.CheckRuntimeRoleAsync())
                 && await Step("version", SuspendAsync))
             {
@@ -476,6 +477,15 @@ internal sealed class TenantRestore : IAsyncDisposable
         {
             return true;
         }
+    }
+
+    // Each work item names the tenant whose worker claims it. A restore under a new id takes over the work of the archive.
+    private async Task RetagWorkAsync()
+    {
+        var connection = await Steps.SchemaConnectionAsync();
+        await using var command = new NpgsqlCommand("UPDATE axis.process_work_items SET tenant_id = @tenant WHERE tenant_id <> @tenant", connection);
+        command.Parameters.AddWithValue("tenant", _id);
+        await command.ExecuteNonQueryAsync(_cancellationToken);
     }
 
     private async Task SuspendAsync()

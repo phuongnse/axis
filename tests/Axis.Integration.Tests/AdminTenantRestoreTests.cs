@@ -27,7 +27,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
     private static readonly string[] _steps =
     [
-        "check", "entry", "roles", "database", "restore", "grants", "grants", "role-check", "version",
+        "check", "entry", "roles", "database", "restore", "grants", "grants", "work", "role-check", "version",
     ];
 
     private static readonly JsonSerializerOptions _web = new(JsonSerializerDefaults.Web);
@@ -79,7 +79,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         }
 
         // The operator sets the secret binding, which the archive never held, and resumes the tenant.
-        await SetBindingSecretAsync(newId, "restored-token");
+        await scenario.SetBindingAsync(newId, SecretBinding, binding => binding.SecretValue = AdminScenario.Cipher.Encrypt(newId, TenantSecretFields.Binding(SecretBinding), "restored-token"));
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "resume", newId])).Exit);
         await RefreshAsync(server);
 
@@ -150,7 +150,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         var result = await RestoreAsync(file, id, host);
 
         Assert.Equal(0, result.Exit);
-        string[] steps = ["check", "entry", "roles", "database", "restore", "grants", "migrations", "grants", "role-check", "version"];
+        string[] steps = ["check", "entry", "roles", "database", "restore", "grants", "migrations", "grants", "work", "role-check", "version"];
         Assert.Equal(steps.Select(step => $"{id} {step} ok"), result.Output);
         var row = await scenario.RowAsync(id);
         Assert.Equal(TenantSchemaVersion.Current, row.SchemaVersion);
@@ -346,7 +346,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         await scenario.AssertNoSecretsAsync();
     }
 
-    private static string[] RestoreArgs(string file, string id, params string[] hosts) =>
+    internal static string[] RestoreArgs(string file, string id, params string[] hosts) =>
         ["tenant", "restore", file, "--tenant", id, .. hosts.SelectMany(host => new[] { "--host", host })];
 
     private Task<AdminResult> RestoreAsync(string file, string id, string host, bool withClientSecret = true) =>
@@ -363,7 +363,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
     }
 
     // A server on the directory of the scenario. Its refresh timer is an hour, so a test refreshes the directory itself.
-    private static WebApplicationFactory<Program> CreateDirectoryServer(string platform) =>
+    internal static WebApplicationFactory<Program> CreateDirectoryServer(string platform) =>
         AdminScenario.CreateServer(platform).WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
@@ -371,7 +371,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
             builder.UseSetting("Tenancy:RefreshInterval", "01:00:00");
         });
 
-    private static async Task RefreshAsync(WebApplicationFactory<Program> server) =>
+    internal static async Task RefreshAsync(WebApplicationFactory<Program> server) =>
         await server.Services.GetRequiredService<TenantDirectoryRefresh>().RefreshAsync(CancellationToken);
 
     private async Task<long> CountSecretBindingValuesAsync(string id) =>
@@ -384,14 +384,6 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
     {
         await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(fixture.Scenario.Platform).Options);
         return await context.TenantBindings.AsNoTracking().Where(binding => binding.TenantId == id).OrderBy(binding => binding.Name).Select(binding => binding.Name).ToArrayAsync(CancellationToken);
-    }
-
-    private async Task SetBindingSecretAsync(string id, string value)
-    {
-        await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(fixture.Scenario.Platform).Options);
-        var binding = await context.TenantBindings.SingleAsync(row => row.TenantId == id && row.Name == SecretBinding, CancellationToken);
-        binding.SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding(SecretBinding), value);
-        await context.SaveChangesAsync(CancellationToken);
     }
 
     // Makes a database whose newest migration is older than this build's: the context that holds the current version stops one migration short.
