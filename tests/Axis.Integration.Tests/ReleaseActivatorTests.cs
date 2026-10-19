@@ -161,6 +161,66 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
     }
 
     [Fact]
+    public async Task On_a_preview_tenant_every_missing_binding_is_a_warning_and_the_release_is_activated()
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField)
+            .With("connectors/purchasing-system.json", PurchasingConnector(_connectorId));
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled, ActivationBindings.None("acme") with { IsPreview = true });
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.MissingDeploymentBinding, "/auth/token/binding", DiagnosticSeverity.Warning),
+                (DiagnosticCodes.MissingDeploymentBinding, "/baseUrl/binding", DiagnosticSeverity.Warning),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path, diagnostic.Severity)).Order());
+        Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+    }
+
+    [Theory]
+    [InlineData("secret", "secret", "/baseUrl/binding")]
+    [InlineData("url", "url", "/auth/token/binding")]
+    public async Task On_a_preview_tenant_a_binding_of_the_wrong_kind_is_still_an_error_and_changes_nothing(
+        string urlKind, string tokenKind, string path)
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField)
+            .With("connectors/purchasing-system.json", PurchasingConnector(_connectorId));
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PurchasingSystemUrl"] = new(urlKind, urlKind == "url" ? new Uri("https://purchasing.example.test/api") : null),
+            ["PurchasingSystemToken"] = new(tokenKind, tokenKind == "url" ? new Uri("https://token.example.test") : null),
+        };
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false, IsPreview: true));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingDeploymentBinding, path, DiagnosticSeverity.Error),
+            (diagnostic.Code, diagnostic.Path, diagnostic.Severity));
+        Assert.Empty(await ReadTablesAsync(_orderId));
+        Assert.Null(await FindActiveAsync(_applicationId));
+    }
+
+    [Fact]
+    public async Task On_a_preview_tenant_an_http_base_url_is_still_an_error()
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField)
+            .With("connectors/purchasing-system.json", PurchasingConnector(_connectorId));
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PurchasingSystemUrl"] = new(ActivationBinding.UrlKind, new Uri("http://purchasing.example.test/api")),
+        };
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false, IsPreview: true));
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.InsecureBaseUrl && diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.Null(await FindActiveAsync(_applicationId));
+    }
+
+    [Fact]
     public async Task An_http_base_url_is_refused_unless_http_is_allowed()
     {
         using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField);

@@ -16,6 +16,11 @@ namespace Axis.Data;
 /// entity tables and then sets the active release with its site paths. Between the two it recomputes the stored
 /// computed values of each entity whose computed definitions differ from the previously active release's.
 /// <para>
+/// On a preview tenant (<see cref="ActivationBindings.IsPreview"/>) a missing binding is a warning, which the result
+/// carries while activation goes on. A binding of the wrong kind and an <c>http</c> URL outside Development are still
+/// errors.
+/// </para>
+/// <para>
 /// It also refuses a module upgrade that drops a module entity or field, or changes a field's type, with
 /// <see cref="DiagnosticCodes.NonAdditiveModuleUpgrade"/>, comparing the module copies with those of the active release.
 /// </para>
@@ -56,7 +61,8 @@ public static class ReleaseActivator
     /// Activates the release in <paramref name="compiled"/>, which must have a release and a model
     /// with the same application id, for the tenant whose deployment bindings are
     /// <paramref name="bindings"/>. <paramref name="openInstances"/> counts the process instances that are
-    /// still open on the other releases of the application. When a changed computed definition, or a migration
+    /// still open on the other releases of the application. The result holds the warnings of a successful activation,
+    /// and the release is active when it holds no error. When a changed computed definition, or a migration
     /// <c>fill</c> or <c>convert</c>, affects more than <paramref name="inlineRecomputeLimit"/> rows of an entity,
     /// activation marks the entity pending and queues a <c>computed.backfill</c> work item instead of recomputing
     /// the rows. Call it outside an explicit transaction.
@@ -109,10 +115,10 @@ public static class ReleaseActivator
         }
 
         // Checked before provisioning, so a refused release leaves no new tables behind.
-        var badBindings = CheckBindings(model, bindings);
-        if (badBindings.Count > 0)
+        var bindingDiagnostics = CheckBindings(model, bindings);
+        if (bindingDiagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         {
-            return new ActivationResult(badBindings);
+            return new ActivationResult(bindingDiagnostics);
         }
 
         var sitePaths = model.Sites.Select(site => site.Path).ToList();
@@ -130,7 +136,7 @@ public static class ReleaseActivator
             TenantId = bindings.TenantId,
         };
         var provisioned = await EntityProvisioner.ProvisionAsync(model, data, migrations, cancellationToken);
-        return new ActivationResult(provisioned.Diagnostics);
+        return new ActivationResult([.. bindingDiagnostics, .. provisioned.Diagnostics]);
     }
 
     // The module upgrade the release makes over the application's active release; none before the first activation.
@@ -221,16 +227,16 @@ public static class ReleaseActivator
     /// <summary>
     /// Reports every binding the tenant lacks or holds with another kind: those of the connectors,
     /// and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
-    /// reports every base URL that is not <c>https</c> when <c>http</c> is not allowed. A message
-    /// names the tenant and the binding, never its value.
+    /// reports every base URL that is not <c>https</c> when <c>http</c> is not allowed. A missing binding is a warning
+    /// on a preview tenant. A message names the tenant and the binding, never its value.
     /// </summary>
     private static List<Diagnostic> CheckBindings(ApplicationModel model, ActivationBindings bindings)
     {
         var diagnostics = new List<Diagnostic>();
         foreach (var connector in model.Connectors)
         {
-            void Report(string code, string message, string path) =>
-                diagnostics.Add(new Diagnostic(code, message, connector.File, path, connector.Id));
+            void Report(string code, string message, string path, DiagnosticSeverity severity = DiagnosticSeverity.Error) =>
+                diagnostics.Add(new Diagnostic(code, message, connector.File, path, connector.Id, severity));
 
             var baseUrl = CheckBinding(connector.BaseUrlBinding, ActivationBinding.UrlKind, "/baseUrl/binding", bindings, Report);
             if (baseUrl is not null && !bindings.AllowHttp && baseUrl.Url?.Scheme != Uri.UriSchemeHttps)
@@ -257,8 +263,8 @@ public static class ReleaseActivator
                 }
 
                 var path = $"/steps/{index}/operation";
-                void Report(string code, string message, string path) =>
-                    diagnostics.Add(new Diagnostic(code, message, process.File, path, process.Id));
+                void Report(string code, string message, string path, DiagnosticSeverity severity = DiagnosticSeverity.Error) =>
+                    diagnostics.Add(new Diagnostic(code, message, process.File, path, process.Id, severity));
 
                 foreach (var name in step.Capabilities.Urls)
                 {
@@ -284,7 +290,7 @@ public static class ReleaseActivator
 
     /// <summary>Gives the binding named <paramref name="name"/> when the tenant has it with <paramref name="kind"/>, otherwise reports it.</summary>
     private static ActivationBinding? CheckBinding(
-        string name, string kind, string path, ActivationBindings bindings, Action<string, string, string> report)
+        string name, string kind, string path, ActivationBindings bindings, Action<string, string, string, DiagnosticSeverity> report)
     {
         var binding = bindings.Bindings.TryGetValue(name, out var exact)
             ? exact
@@ -294,7 +300,8 @@ public static class ReleaseActivator
             report(
                 DiagnosticCodes.MissingDeploymentBinding,
                 $"Tenant '{bindings.TenantId}' has no binding '{name}'. Add a '{kind}' binding with that name to the tenant.",
-                path);
+                path,
+                bindings.IsPreview ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error);
             return null;
         }
 
@@ -303,7 +310,8 @@ public static class ReleaseActivator
             report(
                 DiagnosticCodes.MissingDeploymentBinding,
                 $"Tenant '{bindings.TenantId}' binding '{name}' is a '{binding.Kind}' binding. It is used here as a '{kind}' binding.",
-                path);
+                path,
+                DiagnosticSeverity.Error);
             return null;
         }
 

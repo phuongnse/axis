@@ -56,6 +56,26 @@ public sealed class ConfigurationTenantCatalogTests
             [.. Valid(), "Tenants:default:Bindings:Url:Kind=url", "Tenants:default:Bindings:Url:Value=purchasing.example.test"],
             "Tenant 'default' binding 'Url' is not an absolute http or https URL."
         },
+        {
+            "PreviewOf of an unknown tenant",
+            [.. Valid(), "Tenants:default:PreviewOf=missing"],
+            "Tenant 'default' names 'missing' in PreviewOf, which is not a configured tenant."
+        },
+        {
+            "PreviewOf of a preview tenant",
+            [.. PreviewPair(), "Tenants:third:Hosts:0=third.example.test", $"Tenants:third:ConnectionString={Connection}", "Tenants:third:PreviewOf=main-preview"],
+            "Tenant 'third' names 'main-preview' in PreviewOf, which is itself a preview tenant."
+        },
+        {
+            "two preview tenants of one main tenant",
+            [.. PreviewPair(), "Tenants:main-preview-2:Hosts:0=preview2.example.test", $"Tenants:main-preview-2:ConnectionString={Connection}", "Tenants:main-preview-2:PreviewOf=main"],
+            "Tenants 'main-preview' and 'main-preview-2' both name 'main' in PreviewOf. A tenant has at most one preview tenant."
+        },
+        {
+            "preview tenant with an Oidc block",
+            [.. PreviewPair(), "Tenants:main-preview:Oidc:Authority=https://idp.example.test/realm"],
+            "Tenant 'main-preview' is a preview tenant and has its own Oidc block. A preview tenant uses the Oidc settings of its main tenant 'main'."
+        },
     };
 
     [Theory]
@@ -154,6 +174,59 @@ public sealed class ConfigurationTenantCatalogTests
     }
 
     [Fact]
+    public void A_preview_tenant_signs_in_with_the_main_tenants_settings_without_its_audience_or_bindings()
+    {
+        var catalog = Load(
+            [
+                .. PreviewPair(),
+                "Tenants:main:Oidc:Authority=https://idp.example.test/realm",
+                "Tenants:main:Oidc:ClientId=client",
+                $"Tenants:main:Oidc:ClientSecret={ClientSecret}",
+                "Tenants:main:Oidc:EndpointAudience=axis-endpoints",
+                "Tenants:main:Oidc:Claims:UserId=preferred_username",
+                "Tenants:main:Oidc:Claims:DisplayName=name",
+                "Tenants:main:Oidc:Claims:Roles=groups",
+                "Tenants:main:Bindings:PurchasingSystemUrl:Kind=url",
+                "Tenants:main:Bindings:PurchasingSystemUrl:Value=https://purchasing.example.test",
+                "Tenants:main-preview:Bindings:Own:Kind=secret",
+                $"Tenants:main-preview:Bindings:Own:Value={BindingSecret}",
+            ]);
+
+        var main = catalog.Find("main")!;
+        var preview = catalog.Find("main-preview")!;
+
+        Assert.Null(main.PreviewOf);
+        Assert.Equal("axis-endpoints", main.Oidc?.EndpointAudience);
+        Assert.Equal("main", preview.PreviewOf);
+        var oidc = Assert.IsType<TenantOidc>(preview.Oidc);
+        Assert.Equal("https://idp.example.test/realm", oidc.Authority);
+        Assert.Equal("client", oidc.ClientId);
+        Assert.Equal(ClientSecret, oidc.ClientSecret?.Reveal());
+        Assert.Equal("preferred_username", oidc.UserIdClaim);
+        Assert.Equal("name", oidc.DisplayNameClaim);
+        Assert.Equal("groups", oidc.RolesClaim);
+        Assert.Null(oidc.EndpointAudience);
+        Assert.Equal(["Own"], preview.Bindings.Keys);
+        Assert.Single(main.Bindings);
+    }
+
+    [Fact]
+    public void A_preview_tenant_of_a_main_tenant_without_an_Oidc_block_has_none()
+    {
+        var catalog = Load(PreviewPair());
+
+        Assert.Null(catalog.Find("main-preview")!.Oidc);
+    }
+
+    [Fact]
+    public void A_blank_PreviewOf_makes_a_main_tenant()
+    {
+        var entry = Assert.Single(Load([.. Valid(), "Tenants:default:PreviewOf=  "]).Tenants);
+
+        Assert.Null(entry.PreviewOf);
+    }
+
+    [Fact]
     public void The_text_of_an_entry_shows_no_secret()
     {
         var entry = Assert.Single(Load(
@@ -179,6 +252,15 @@ public sealed class ConfigurationTenantCatalogTests
         Assert.Equal(ClientSecret, entry.Oidc?.ClientSecret?.Reveal());
         Assert.Equal(BindingSecret, entry.Bindings["Token"].Secret?.Reveal());
     }
+
+    private static string[] PreviewPair() =>
+    [
+        "Tenants:main:Hosts:0=main.example.test",
+        $"Tenants:main:ConnectionString={Connection}",
+        "Tenants:main-preview:Hosts:0=preview.example.test",
+        $"Tenants:main-preview:ConnectionString={Connection}",
+        "Tenants:main-preview:PreviewOf=main",
+    ];
 
     private static string[] Valid() => ["Tenants:default:Hosts:0=localhost", $"Tenants:default:ConnectionString={Connection}"];
 

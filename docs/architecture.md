@@ -220,7 +220,7 @@ Startup fails with an `InvalidOperationException` naming every problem when:
   variables, command-line arguments, mounted secret files and in-memory
   sources are allowed. The message names the tenant, the binding and the file,
   never the value;
-- *(planned for M10)* `PreviewOf` names a tenant that is not configured, or a
+- `PreviewOf` names a tenant that is not configured, or a
   tenant that is itself a preview tenant, or two tenants name the same main
   tenant, or a preview tenant has its own `Oidc` block. See
   [preview tenants](#preview-tenants).
@@ -337,10 +337,12 @@ What a host answers for a tenant, once the directory is in use:
 
 ### Preview tenants
 
-*(Planned for M10.)* A preview tenant is a tenant that belongs to one main
+A preview tenant is a tenant that belongs to one main
 tenant. An author tries an application there before publishing it to the main
-tenant. See [D48](decisions.md#d48-preview-tenants--agreed). Nothing in this
-section is built yet.
+tenant. See [D48](decisions.md#d48-preview-tenants--agreed). Under
+`Tenancy:Source=configuration`, `PreviewOf`, sign-in and bindings work. The
+`directory` source, the status rules and publishing are planned for M10, and
+their bullets say so.
 
 - **One main tenant, one preview.** A preview tenant belongs to one main tenant,
   and a main tenant has at most one preview tenant. A preview tenant has no
@@ -351,8 +353,8 @@ section is built yet.
   signed in on, see [tenant binding](#sign-in-and-the-session).
 - **Where it is set.** Under `configuration`, the tenant setting `PreviewOf`
   names the main tenant, see
-  [preview tenants](reference/configuration.md#preview-tenants). Under
-  `directory`, the entry names it, and the operator creates it with
+  [preview tenants](reference/configuration.md#preview-tenants). *(Planned for
+  M10:)* under `directory`, the entry names it, and the operator creates it with
   [`tenant create --preview-of`](reference/administration.md#tenant-create).
 - **Sign-in.** A preview tenant uses its main tenant's authority, client id,
   client secret and claim names. It does not use `Oidc:EndpointAudience`, so it
@@ -361,9 +363,9 @@ section is built yet.
 - **Bindings.** A preview tenant's bindings are its own and empty by default.
   A missing binding is a warning at activation there, not an error, see
   [deployment bindings](reference/configuration.md#deployment-bindings).
-- **Status.** Each tenant keeps its own status. Suspending a main tenant does
+- **Status.** *(Planned for M10.)* Each tenant keeps its own status. Suspending a main tenant does
   not suspend its preview tenant.
-- **Publishing.** Studio on the main tenant's host stores a preview request in
+- **Publishing.** *(Planned for M10.)* Studio on the main tenant's host stores a preview request in
   the main tenant's database. The publisher runs it against the preview tenant.
   The server never opens a connection to another tenant's database. See
   [preview](reference/authoring.md#preview).
@@ -470,7 +472,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 - **Startup checks.** The server's startup fails, naming every problem as
   for the tenant configuration, when a tenant has no `Oidc` block, or when
   its `Authority`, `ClientId` or `ClientSecret` is missing or blank.
-  *(Planned for M10:)* a preview tenant has no `Oidc` block, and takes its
+  A preview tenant has no `Oidc` block, and takes its
   main tenant's, see [preview tenants](#preview-tenants). Only the
   server reads and checks the block. The worker reads the same `Tenants`
   section but signs nobody in, so it ignores `Oidc`. Under

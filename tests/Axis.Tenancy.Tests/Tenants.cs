@@ -18,6 +18,13 @@ internal static class Tenants
         return options;
     }
 
+    /// <summary>Makes a tenant of <paramref name="options"/> a preview tenant of <paramref name="mainTenantId"/> and returns the options.</summary>
+    public static TenantOptions WithPreviewOf(this TenantOptions options, string tenantId, string? mainTenantId)
+    {
+        options.Tenants[tenantId].PreviewOf = mainTenantId;
+        return options;
+    }
+
     /// <summary>Adds a deployment binding to a tenant of <paramref name="options"/> and returns the options.</summary>
     public static TenantOptions WithBinding(this TenantOptions options, string tenantId, string name, string? kind, string? value)
     {

@@ -26,8 +26,9 @@ namespace Axis.Server.Applications;
 /// provisioning and the active release use a connection from the tenant's
 /// <c>SchemaConnectionString</c>, which closes when the tenant is done. The runtime database role is the
 /// user of the tenant's <c>ConnectionString</c>. The schedule trigger state
-/// and the seed records use the tenant's <c>ConnectionString</c>. Any diagnostic or error stops the start:
-/// tenants are processed in ordinal order of their id, and the first failure is thrown.
+/// and the seed records use the tenant's <c>ConnectionString</c>. Any exception or error diagnostic stops the start:
+/// tenants are processed in ordinal order of their id, and the first failure is thrown. The activation of a preview
+/// tenant may end with warnings, such as a missing deployment binding, which are logged and do not stop the start.
 /// Readiness reports Unhealthy until the last tenant is done, and stays so when a tenant fails.
 /// Restarting with unchanged folders, installed packages and installed modules stores no new release and only
 /// refreshes the activation time.
@@ -118,9 +119,9 @@ internal sealed partial class StartupActivation(
                 }
 
                 var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, options.InlineRecomputeLimit, cancellationToken);
-                if (activated.Diagnostics.Count > 0)
+                LogDiagnostics(activated.Diagnostics, folder, tenantId);
+                if (activated.Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
                 {
-                    LogDiagnostics(activated.Diagnostics, folder, tenantId);
                     throw Failure("could not be activated", activated.Diagnostics, folder, tenantId);
                 }
 
