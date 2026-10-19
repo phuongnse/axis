@@ -2108,6 +2108,8 @@ The owner confirmed these points on issue #639 on 2026-10-18.
     (`provisioning`, `active` or `suspended`), its hosts, its database, its
     OIDC settings and its deployment bindings.
   - Hosts are unique across all tenants, ignoring letter case.
+  - *(planned for M10)* An entry may name its main tenant, when it is a
+    preview tenant. See [D48](#d48-preview-tenants--agreed).
   - The database is the server host, the port, the database name, and the
     runtime and schema user names.
   - Every entry has a `version` that grows on each change.
@@ -2230,6 +2232,9 @@ The owner confirmed these points on issue #640 on 2026-10-19.
   - The new database goes on the same database server as
     `Admin:ConnectionString`. The directory records that server's host and
     port. Axis has one database server.
+  - *(planned for M10)* `--preview-of <main>` creates a preview tenant of the
+    main tenant, and `--binding <name>=<value>` sets its `url` bindings. See
+    [D48](#d48-preview-tenants--agreed).
   - Running it again for a `provisioning` tenant finishes what is missing. For
     an `active` or `suspended` tenant it fails and changes nothing.
 - **Suspend, resume and list:**
@@ -2563,7 +2568,9 @@ The owner confirmed these points on issue #704 on 2026-10-19.
   - The runtime role may insert and read requests. Only the publisher changes
     their status.
 - **Target tenant:** a request runs for the tenant of the author's session.
-  Studio on a tenant's host publishes to that tenant only.
+  Studio on a tenant's host publishes to that tenant only. A preview request
+  runs for the session tenant's preview tenant instead, see
+  [D48](#d48-preview-tenants--agreed).
 - **Who may publish:**
   - A new setting, `Studio:PublisherRole`, names a roles claim value.
   - `validate` needs the author role. `publish` and `rollback` need both the
@@ -2652,6 +2659,82 @@ The costs:
   differ until the author fixes the folder.
 - **Release numbers per tenant.** The same content can have different numbers in
   two tenants.
+
+## D48. Preview tenants — Agreed
+
+An author tries an application on a **preview tenant** before publishing it to
+the real tenant. A preview tenant belongs to one main tenant and keeps its own
+data, database roles, hosts and bindings. This decision is planned for M10 and
+nothing in it is built yet. See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+for M10, [preview tenants](architecture.md#preview-tenants) for how the hosts
+treat one, [preview](reference/authoring.md#preview) for the route,
+[tenant create](reference/administration.md#tenant-create) for the command and
+[preview tenant settings](reference/configuration.md#preview-tenants) for the
+`PreviewOf` setting.
+The owner confirmed these points on issue #705 on 2026-10-19.
+
+- **What a preview tenant is:**
+  - It is a tenant that belongs to one main tenant. A main tenant has at most
+    one preview tenant. A preview tenant has no preview of its own.
+  - It has its own database, database roles and hosts, like any tenant. Its
+    data never mixes with the main tenant's.
+  - Under `directory`, the operator creates it once with
+    `tenant create <id> --preview-of <main> --host <host>`.
+  - Under `configuration`, a tenant setting `PreviewOf` names the main tenant.
+    Development, Compose and E2E configure one preview tenant.
+- **Sign-in:**
+  - A preview tenant uses its main tenant's sign-in settings: the same
+    authority, client and claim names.
+  - The operator registers the preview host's redirect address at the identity
+    provider.
+  - A session is still bound to the tenant it signed in on.
+- **Bindings:**
+  - A preview tenant has its own bindings. They are empty by default, so a
+    preview never calls a real system by accident.
+  - Under `configuration` they are set like any tenant's. Under `directory`,
+    `tenant create --preview-of` takes `--binding <name>=<value>` options for
+    `url` bindings.
+  - On a preview tenant, a missing binding is a warning at activation, not an
+    error. A call that needs it fails at run time, where the inspector shows
+    it.
+- **Publishing to the preview:**
+  - `POST /api/studio/apps/{application}/preview` writes a publish request of
+    kind `publish` for the session tenant's preview tenant. It answers `202`,
+    as for publish.
+  - It needs the author role only, not the publisher role.
+  - Preview activations go in the preview tenant's own release history, not
+    the main tenant's.
+  - When the main tenant has no preview tenant, the route answers `409` with a
+    problem that says so.
+  - Publishing to the main tenant does not require a preview first.
+- **Data in a preview:**
+  - A preview starts with the application's seed data. Records created in it
+    stay until the operator recreates the preview tenant.
+  - Resetting a preview from Studio comes later.
+- **Effect on earlier decisions:**
+  - [D42](#d42-tenant-directory-in-the-platform-database--agreed): a directory
+    entry may name its main tenant.
+  - [D43](#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed):
+    `tenant create` gains `--preview-of` and `--binding`.
+  - [D47](#d47-publishing-from-studio--agreed): a request normally runs for
+    the session tenant. A preview request runs for its preview tenant.
+
+*Why:* [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+asks for a preview on a preview tenant in M10. Today the only way to try a
+change is `scripts/dev.sh`, where a saved file restarts the server and
+activates the folder for every tenant. A tenant has no notion of a preview, and
+its bindings point at real systems. A preview tenant gives the author a place
+to try a change with its own data and bindings. The costs:
+
+- **One preview per tenant, shared by every application of that tenant.** That
+  is simpler than one per application. Two authors who preview different
+  applications share one preview tenant.
+- **Empty bindings by default.** A preview with a connector shows failed calls
+  until the operator gives it bindings, for example to a test system.
+- **No reset from Studio in M10.** A preview tenant collects test records until
+  the operator recreates it.
+- **Preview needs no publisher role.** Any author can preview. Only publishing
+  to the main tenant needs the second role.
 
 ## D49. Several server replicas behind a TLS proxy — Agreed
 

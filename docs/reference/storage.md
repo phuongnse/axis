@@ -1162,6 +1162,7 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 | `id`                | `uuid`              | Primary key, a version 7 UUID                                                                                                          |
 | `application_id`    | `uuid`              | The application `id`                                                                                                                   |
 | `kind`              | `text`              | `validate`, `publish` or `rollback`                                                                                                    |
+| `target`            | `text`              | *(Planned for M10.)* `tenant` or `preview`. It defaults to `tenant`. See the preview note below |
 | `status`            | `text`              | `queued`, `running`, `succeeded` or `failed`                                                                                           |
 | `snapshot`          | `jsonb`, null       | For `validate` and `publish`, an array of `{ file, version, content }`, one for every resource file of the folder. Null for `rollback` |
 | `release_id`        | `uuid`, null        | For `rollback`, the release to activate. For `publish`, set when the release is stored                                                 |
@@ -1185,6 +1186,13 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
   adds 1 to `claims`. A `running` row whose `lease_until` has passed is claimed
   again the same way. A row with `claims` of 3 and an expired lease becomes
   `failed` with `AXC0215`.
+- **Preview target.** *(Planned for M10.)* A row with `target` `preview` is
+  stored in the session tenant's database and run against that tenant's preview
+  tenant, see [preview](authoring.md#preview). Its history row lives in the
+  preview tenant's `release_activations` and keeps this row's `id` as
+  `request_id`. That `request_id` points at a request in another database, so no
+  foreign key can hold it. The publisher sets the row `failed` with `AXC0216`
+  when the main tenant no longer has a preview tenant.
 - **Final.** A `succeeded` or `failed` row is never changed again.
 - **Size and age.** No limit on the size of a snapshot is set, and nothing
   deletes old requests. Large folders or many requests grow the table. A later
@@ -1250,7 +1258,9 @@ have at activation. See also [rollback](authoring.md#rollback).
 
 Each `publish` and `rollback` writes one record in `axis.audit_records`, in the
 transaction that sets the request's final status. The actor is the requesting
-user, and `application_id` is the application `id`.
+user, and `application_id` is the application `id`. *(Planned for M10.)* A
+preview request writes no audit record. The preview tenant's release history
+records who published it.
 
 | Action                   | When                   |
 | ------------------------ | ---------------------- |

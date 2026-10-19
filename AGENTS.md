@@ -174,6 +174,9 @@ works on a fresh clone:
   its lines starting with `[publisher]`. It starts once the server has
   migrated the tenant databases. See
   [publisher](docs/reference/administration.md#publisher).
+- *(Planned for M10:)* Development, Compose and E2E configure one preview tenant, where an
+  author tries an application before publishing it. See
+  [D48](docs/decisions.md#d48-preview-tenants--agreed).
 - `dotnet watch` applies C# changes, or restarts the server or the worker without
   a prompt when it cannot. Vite applies SPA changes.
 - A change to any `*.json` file under an activated application folder restarts the
