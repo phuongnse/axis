@@ -4,6 +4,7 @@ using Axis.Configuration.Storage;
 using Axis.Core.Tenancy;
 using Axis.Data;
 using Axis.Processes.Instances;
+using Axis.Processes.Storage;
 using Axis.Server.Applications;
 using Axis.Server.Tests;
 using Axis.Tenancy;
@@ -167,6 +168,7 @@ public sealed class DirectoryTenantBindingsTests(PostgreSqlFixture database) : I
             {
                 Id = tenant.Id,
                 Status = "active",
+                SchemaVersion = TenantSchemaVersion.Current,
                 DatabaseHost = builder.Host!,
                 DatabasePort = builder.Port,
                 DatabaseName = builder.Database!,

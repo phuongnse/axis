@@ -2530,6 +2530,10 @@ pool. If a refresh fails, the worker keeps the last good read and logs an error,
 and `/health/ready` answers `200` with status `Degraded` until a refresh works.
 A long run of work items for one tenant delays the refresh until the run ends.
 
+The worker also reads the schema version of every tenant again at each poll
+round, and claims no new work for a tenant whose version is not its own. It runs
+that tenant's work again once `migrate` has brought the tenant to its version.
+
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Worker:LeaseDuration` | `00:00:30` | How long a claim lasts before another worker can claim the item. |
@@ -2547,10 +2551,14 @@ applied to the tenant database. Until they are, it skips the tenant and logs
 once that it is waiting. Once they are, it logs that the tenant is ready for
 work and starts claiming. So the worker can start before the server.
 
-*(Planned for M9.)* That holds under `Tenancy:Source=configuration`. Under
+That holds under `Tenancy:Source=configuration`. Under
 `directory`, [`Axis.Admin migrate`](administration.md#migrate) migrates the
-tenant databases, and the server does not. The worker skips a tenant whose
-schema version is not its own, and claims none of its work.
+tenant databases, and the server does not. The worker reads the recorded schema
+version of every tenant at each poll round. It skips a tenant whose schema
+version is not its own and claims none of its work, until `migrate` has brought
+the tenant to its version. It then runs the work without a restart. A tenant
+that waits for its schema version logs once and does not make the worker not
+ready.
 
 ### Worker metrics
 

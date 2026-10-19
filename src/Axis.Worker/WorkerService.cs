@@ -3,6 +3,7 @@ using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
+using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Tenancy;
 using Npgsql;
@@ -15,7 +16,9 @@ namespace Axis.Worker;
 /// for the poll interval when no tenant had work. A tenant whose database the server has not migrated yet is
 /// skipped until it has. Under the directory source it reads the directory again every <c>Tenancy:RefreshInterval</c>,
 /// between work items. A tenant that is no longer active gets no new work item claimed, and a new tenant is polled
-/// once its runtime role passes the check. When a tenant's database counts as migrated,
+/// once its runtime role passes the check. It also reads the recorded schema version of every tenant at the
+/// start of each round, and claims no work of a tenant whose version is not the worker's, until the admin tool's
+/// <c>migrate</c> has brought it there. When a tenant's database counts as migrated,
 /// its runtime database role is checked, so that it can only read and write rows. Then the releases
 /// the tenant still uses are checked against the installed extension packages. A role that can change
 /// the schema, a pinned version that is not installed, or a release that no longer compiles records
@@ -39,6 +42,11 @@ internal sealed partial class WorkerService(
     // leaves the directory, is dropped from the set and checked again when it is served again.
     private readonly HashSet<string> _ready = new(StringComparer.Ordinal);
     private readonly HashSet<string> _waitingLogged = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _schemaWaiting = new(StringComparer.Ordinal);
+
+    // The recorded schema versions of the last good read. Null under the configuration source, and before a read worked.
+    private IReadOnlyDictionary<string, string>? _schemaVersions;
+    private bool _schemaReadFailureLogged;
     private DateTimeOffset _lastRefresh;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -53,6 +61,7 @@ internal sealed partial class WorkerService(
         while (!stoppingToken.IsCancellationRequested)
         {
             health.Polled();
+            await ReadSchemaVersionsAsync(stoppingToken);
             await RefreshIfDueAsync(stoppingToken);
             var ranAny = false;
             foreach (var tenantId in tenants.Tenants.Select(tenant => tenant.Id).ToArray())
@@ -103,6 +112,38 @@ internal sealed partial class WorkerService(
     }
 
     /// <summary>
+    /// Under the directory source, reads the schema versions again. When a read fails, the worker keeps the last good read,
+    /// and the log holds the failure once until a read works.
+    /// </summary>
+    private async Task ReadSchemaVersionsAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            var versions = await tenants.ReadSchemaVersionsAsync(stoppingToken);
+            if (versions is not null)
+            {
+                _schemaVersions = versions;
+            }
+
+            _schemaReadFailureLogged = false;
+        }
+        catch (InvalidOperationException exception)
+        {
+            if (!_schemaReadFailureLogged)
+            {
+                _schemaReadFailureLogged = true;
+                LogSchemaReadFailed(exception);
+            }
+        }
+    }
+
+    // A tenant that has no recorded version in the read is not held back: the read lists the active tenants only.
+    private bool IsOnOtherSchemaVersion(string tenantId) =>
+        _schemaVersions is not null
+        && _schemaVersions.TryGetValue(tenantId, out var version)
+        && !string.Equals(version, TenantSchemaVersion.Current, StringComparison.Ordinal);
+
+    /// <summary>
     /// Under the directory source, reads the directory again once the refresh interval has passed since the last read.
     /// A tenant that changed or left loses its old connection pool and its ready state. It runs between work items,
     /// so no pool is dropped while one of its items runs.
@@ -122,6 +163,7 @@ internal sealed partial class WorkerService(
                 await pools.RetireAsync(tenantId);
                 _ready.Remove(tenantId);
                 _waitingLogged.Remove(tenantId);
+                _schemaWaiting.Remove(tenantId);
                 health.TenantDropped(tenantId);
             }
 
@@ -163,6 +205,22 @@ internal sealed partial class WorkerService(
             if (tenants.Find(tenantId) is null)
             {
                 return false;
+            }
+
+            if (IsOnOtherSchemaVersion(tenantId))
+            {
+                if (_schemaWaiting.Add(tenantId))
+                {
+                    LogSchemaWaiting(tenantId);
+                }
+
+                health.SchemaWaiting(tenantId, true);
+                return false;
+            }
+
+            if (_schemaWaiting.Remove(tenantId))
+            {
+                health.SchemaWaiting(tenantId, false);
             }
 
             if (!_ready.Contains(tenantId))
@@ -283,6 +341,12 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Information, "Waiting for the database of tenant {TenantId} to be migrated.")]
     private partial void LogWaitingForMigrations(string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Tenant {TenantId} waits: its schema version is not this worker's. Run Axis.Admin migrate.")]
+    private partial void LogSchemaWaiting(string tenantId);
+
+    [LoggerMessage(LogLevel.Error, "Reading the schema versions from the tenant directory failed. The worker keeps the last good read.")]
+    private partial void LogSchemaReadFailed(Exception exception);
 
     [LoggerMessage(LogLevel.Information, "Tenant {TenantId} is ready for work.")]
     private partial void LogReady(string tenantId);

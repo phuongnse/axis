@@ -2171,7 +2171,7 @@ serving from the last good directory while it still shows the problem.
 A platform operator creates tenants, migrates every tenant database and
 activates releases with a command-line admin host, `Axis.Admin`. This is
 planned for M9. Only `tenant create`, `tenant backup`, `tenant suspend`,
-`tenant resume` and `tenant list` are built. Until the rest is, tenants can
+`tenant resume`, `tenant list` and `migrate` are built. Until the rest is, tenants can
 come from the `Tenants` section and the server migrates and activates at start, as in
 [D31](#d31-separate-database-roles--agreed). See
 [administration](reference/administration.md) for every command,

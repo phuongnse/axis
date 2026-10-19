@@ -1,4 +1,5 @@
 using Axis.Data.Storage;
+using Axis.Processes.Storage;
 using Axis.Server.Authentication;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
@@ -12,7 +13,7 @@ internal sealed record TenantDirectoryRefreshOptions(string PlatformConnectionSt
 
 /// <summary>
 /// Under <c>Tenancy:Source=directory</c>, reads the tenant directory again every <c>Tenancy:RefreshInterval</c>. A tenant
-/// is served only while it is active and has passed the runtime role check on its current database settings. When a
+/// is served only while it is active, is on this server's schema version and has passed the runtime role check on its current database settings. When a
 /// read fails, the server keeps serving the last good read, logs one error per run of failed reads and reports Degraded readiness
 /// until a read works. The log holds no host name and no connection value.
 /// </summary>
@@ -21,12 +22,17 @@ internal sealed partial class TenantDirectoryRefresh(
     TenantDirectoryRefreshOptions options,
     TenantSecretCipher cipher,
     TenantConnectionFactory connections,
+    TenantDirectoryStart start,
     TenantSignInSchemes signIn,
     TimeProvider timeProvider,
     TenantDirectoryRefreshStatus status,
     ILogger<TenantDirectoryRefresh> logger) : BackgroundService
 {
     private readonly SemaphoreSlim _gate = new(1);
+
+    // The tenants the last read held back for their schema version, so the warning comes once per tenant and not at every read.
+    // The start already logged the first ones.
+    private HashSet<string> _schemaWithheld = [.. start.SchemaWithheld];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -68,6 +74,16 @@ internal sealed partial class TenantDirectoryRefresh(
                 status.Set(true);
                 return;
             }
+
+            // A tenant on another schema version is not served. One that becomes current counts as new below and is checked.
+            var otherSchema = loaded.OnOtherSchemaVersion(TenantSchemaVersion.Current);
+            foreach (var id in otherSchema.Where(id => !_schemaWithheld.Contains(id)))
+            {
+                LogSchemaWithheld(id);
+            }
+
+            _schemaWithheld = [.. otherSchema];
+            loaded = loaded.Withhold(otherSchema);
 
             var pending = loaded.DatabaseChanges(directory.Current);
             var withheld = new List<string>();
@@ -148,6 +164,9 @@ internal sealed partial class TenantDirectoryRefresh(
 
     [LoggerMessage(LogLevel.Error, "Tenant {TenantId} is not served until its runtime database role passes the check. {Reason}")]
     private partial void LogRoleCheckFailed(string tenantId, string reason);
+
+    [LoggerMessage(LogLevel.Warning, "Tenant {TenantId} is not served: its schema version is not this server's. Run Axis.Admin migrate.")]
+    private partial void LogSchemaWithheld(string tenantId);
 
     [LoggerMessage(LogLevel.Error, "Tenant {TenantId} is not served until its sign-in settings are complete. {Reason}")]
     private partial void LogSignInIncomplete(string tenantId, string reason);

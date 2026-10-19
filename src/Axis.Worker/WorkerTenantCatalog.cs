@@ -134,6 +134,16 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
         _refreshFailed = false;
         return new TenantRefreshResult([.. changed.Concat(dropped).Distinct(StringComparer.Ordinal)], next.Tenants.Count, pending.Count, withheld.Count);
     }
+
+    /// <summary>
+    /// Reads the recorded schema version of every active tenant, keyed by tenant id. It returns null under the
+    /// <c>configuration</c> source, which has no directory and no recorded version.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The directory cannot be read. The message holds no connection value.</exception>
+    public async Task<IReadOnlyDictionary<string, string>?> ReadSchemaVersionsAsync(CancellationToken cancellationToken) =>
+        _platformConnectionString is null
+            ? null
+            : await DirectoryTenantCatalog.ReadSchemaVersionsAsync(_platformConnectionString, cancellationToken);
 }
 
 /// <param name="Retired">The tenants whose database settings changed or that are no longer active, whose old pool must go.</param>

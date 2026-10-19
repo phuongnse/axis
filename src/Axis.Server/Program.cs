@@ -3,6 +3,7 @@ using Axis.Configuration.Packages;
 using Axis.Data;
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
+using Axis.Processes.Storage;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
 using Axis.Server.DataSources;
@@ -73,8 +74,11 @@ if (directorySource)
     await PlatformMigration.ApplyAsync(new PlatformMigrationOptions(platformSchemaConnectionString, readerRole), CancellationToken.None);
     var loaded = await DirectoryTenantCatalog.LoadAsync(platformConnectionString, cipher, CancellationToken.None);
 
+    // The server serves a tenant only on its own schema version. Axis.Admin migrate brings a tenant there.
+    var otherSchema = loaded.OnOtherSchemaVersion(TenantSchemaVersion.Current);
+
     // The tenants served at start count as checked: the release check runs the role check on them before the server listens.
-    var directory = new TenantDirectoryCatalog(loaded);
+    var directory = new TenantDirectoryCatalog(loaded.Withhold(otherSchema));
     tenants = directory;
 
     // Registered first, so it logs before the release check runs.
@@ -87,7 +91,8 @@ if (directorySource)
     builder.Services.AddSingleton(new TenantDirectoryStart(
         readerRole,
         tenants.Tenants.Count,
-        builder.Configuration.GetSection(TenantOptions.SectionName).Exists()));
+        builder.Configuration.GetSection(TenantOptions.SectionName).Exists(),
+        otherSchema));
     builder.Services.AddHostedService<TenantDirectoryStartLog>();
 }
 else

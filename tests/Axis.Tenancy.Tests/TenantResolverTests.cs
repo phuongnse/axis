@@ -31,7 +31,7 @@ public sealed class TenantResolverTests
     [Fact]
     public void A_host_of_a_known_tenant_that_is_not_served_resolves_no_tenant_and_is_unavailable()
     {
-        var catalog = new DirectoryTenantCatalog([], ["off.example.test"], new Dictionary<string, string>());
+        var catalog = new DirectoryTenantCatalog([], ["off.example.test"], new Dictionary<string, string>(), new Dictionary<string, string>());
         var resolver = new TenantResolver(catalog);
 
         Assert.False(resolver.TryResolve("off.example.test", out _));

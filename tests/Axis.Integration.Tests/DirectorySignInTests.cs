@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Axis.Processes.Storage;
 using Axis.Server.Authentication;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
@@ -95,6 +96,7 @@ public sealed partial class DirectorySignInTests(PostgreSqlFixture database, Key
                 {
                     Id = id,
                     Status = "active",
+                    SchemaVersion = TenantSchemaVersion.Current,
                     DatabaseHost = UnreachableHost,
                     DatabasePort = 1,
                     DatabaseName = $"signin_{id}",

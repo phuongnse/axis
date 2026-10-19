@@ -171,6 +171,23 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}")));
     }
 
+    /// <summary>Sets the schema version recorded for a tenant, as if its database were on another schema.</summary>
+    public async Task SetSchemaVersionAsync(string id, string schemaVersion)
+    {
+        await using var context = NewContext();
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+        row.SchemaVersion = schemaVersion;
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
+    public async Task SetStatusAsync(string id, string status)
+    {
+        await using var context = NewContext();
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+        row.Status = status;
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
     /// <summary>
     /// Checks that no output of any command held the admin password, a generated password, the client secret or a
     /// connection string with a password.
