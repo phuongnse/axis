@@ -1759,7 +1759,7 @@ The owner confirmed these points on issue #480 on 2026-10-17.
 - **Tenant directory:**
   [D42](#d42-tenant-directory-in-the-platform-database--agreed) adds a
   Degraded state on both hosts for a failed directory refresh, from M9. The
-  worker is then no longer never Degraded.
+  worker is then no longer never Degraded. Both are built.
 
 *Why:* [Operations](domain/knowledge.md#operations) asks that failed and stuck
 work is visible. Without a health endpoint, a stuck worker shows only when
@@ -2061,10 +2061,12 @@ of the server and the worker are built. Under `directory` the server creates the
 schema at start and reads the directory every `Tenancy:RefreshInterval`. It
 serves new tenants, answers `503` for tenants that are not `active` and `404`
 for removed hosts, and runs the role check of D31 on new tenants and on changed
-database settings. The worker reads its `active` tenants once, and retries the
-first read until it works. The server's Degraded readiness for a failed refresh is
-built. The worker refresh, the worker's Degraded readiness and the worker
-skipping tenants that are not `active` are not built.
+database settings. The worker reads its `active` tenants, and retries the
+first read until it works. It then reads the directory every
+`Tenancy:RefreshInterval`, runs the role check of D31 on new tenants and on
+changed database settings, claims no new work of tenants that are not `active`,
+and is Degraded for a failed refresh. The server's Degraded readiness for a
+failed refresh is built.
 Both hosts,
 under `configuration`, take tenants from the `Tenants` section, as in
 [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed).

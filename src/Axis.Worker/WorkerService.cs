@@ -5,6 +5,7 @@ using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.Tenancy;
+using Npgsql;
 
 namespace Axis.Worker;
 
@@ -12,7 +13,9 @@ namespace Axis.Worker;
 /// Under the directory source it first reads the tenant directory, and retries until a read works. Then it
 /// polls every tenant in ordinal order of its id and runs its due work items until none is left, then waits
 /// for the poll interval when no tenant had work. A tenant whose database the server has not migrated yet is
-/// skipped until it has. When a tenant's database counts as migrated,
+/// skipped until it has. Under the directory source it reads the directory again every <c>Tenancy:RefreshInterval</c>,
+/// between work items. A tenant that is no longer active gets no new work item claimed, and a new tenant is polled
+/// once its runtime role passes the check. When a tenant's database counts as migrated,
 /// its runtime database role is checked, so that it can only read and write rows. Then the releases
 /// the tenant still uses are checked against the installed extension packages. A role that can change
 /// the schema, a pinned version that is not installed, or a release that no longer compiles records
@@ -24,15 +27,19 @@ internal sealed partial class WorkerService(
     WorkItemRunner runner,
     WorkerHealth health,
     ITenantConnectionFactory connections,
+    TenantConnectionFactory pools,
+    TimeProvider time,
     ITenantContextAccessor accessor,
     PackageCatalog packages,
     StartupCheckState checkState,
     ILogger<WorkerService> logger) : BackgroundService
 {
     // Tenants whose database was migrated. A new schema arrives with a new release, which restarts
-    // the worker, so a ready tenant is not checked again.
+    // the worker, so a ready tenant is not checked again. A tenant whose database settings change, or that
+    // leaves the directory, is dropped from the set and checked again when it is served again.
     private readonly HashSet<string> _ready = new(StringComparer.Ordinal);
     private readonly HashSet<string> _waitingLogged = new(StringComparer.Ordinal);
+    private DateTimeOffset _lastRefresh;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -42,12 +49,13 @@ internal sealed partial class WorkerService(
         }
 
         await LoadTenantsAsync(stoppingToken);
-        var tenantIds = tenants.Tenants.Select(tenant => tenant.Id).ToArray();
+        _lastRefresh = time.GetUtcNow();
         while (!stoppingToken.IsCancellationRequested)
         {
             health.Polled();
+            await RefreshIfDueAsync(stoppingToken);
             var ranAny = false;
-            foreach (var tenantId in tenantIds)
+            foreach (var tenantId in tenants.Tenants.Select(tenant => tenant.Id).ToArray())
             {
                 using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
                 {
@@ -94,11 +102,69 @@ internal sealed partial class WorkerService(
         }
     }
 
+    /// <summary>
+    /// Under the directory source, reads the directory again once the refresh interval has passed since the last read.
+    /// A tenant that changed or left loses its old connection pool and its ready state. It runs between work items,
+    /// so no pool is dropped while one of its items runs.
+    /// </summary>
+    private async Task RefreshIfDueAsync(CancellationToken stoppingToken)
+    {
+        if (!tenants.FromDirectorySource || time.GetUtcNow() - _lastRefresh < tenants.RefreshInterval)
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await tenants.RefreshAsync(PassesRoleCheckAsync, stoppingToken);
+            foreach (var tenantId in result.Retired)
+            {
+                await pools.RetireAsync(tenantId);
+                _ready.Remove(tenantId);
+                _waitingLogged.Remove(tenantId);
+                health.TenantDropped(tenantId);
+            }
+
+            LogRefreshed(result.TenantCount, result.CheckedCount, result.WithheldCount);
+        }
+        catch (InvalidOperationException exception)
+        {
+            LogRefreshFailed(exception.InnerException?.GetType().Name ?? exception.GetType().Name);
+        }
+        finally
+        {
+            _lastRefresh = time.GetUtcNow();
+        }
+    }
+
+    private async Task<bool> PassesRoleCheckAsync(TenantEntry entry, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var source = NpgsqlDataSource.Create(entry.ConnectionString.Reveal());
+            await using var connection = await source.OpenConnectionAsync(cancellationToken);
+            await RuntimeRoleCheck.CheckAsync(connection, entry.Id, cancellationToken);
+            return true;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or NpgsqlException)
+        {
+            // The role check names the tenant and the role. A connection failure may name the database host, so it is not logged.
+            LogTenantNotServed(entry.Id, exception is InvalidOperationException ? exception.Message : "The tenant database could not be reached.");
+            return false;
+        }
+    }
+
     private async Task<bool> RunTenantAsync(string tenantId, CancellationToken stoppingToken)
     {
         var ran = false;
         try
         {
+            // A tenant that left the directory at a refresh gets no more work.
+            if (tenants.Find(tenantId) is null)
+            {
+                return false;
+            }
+
             if (!_ready.Contains(tenantId))
             {
                 if (!await runner.IsMigratedAsync(tenantId, stoppingToken))
@@ -114,16 +180,18 @@ internal sealed partial class WorkerService(
                 await CheckRuntimeRoleAsync(tenantId, stoppingToken);
                 await CheckReleasesAsync(tenantId, stoppingToken);
                 _ready.Add(tenantId);
-                health.TenantMigrated();
+                health.TenantMigrated(tenantId);
                 LogReady(tenantId);
             }
 
-            while (await runner.RunNextAsync(tenantId, options.LeaseDuration, stoppingToken))
+            // A refresh between two items can end the service of the tenant. The item already claimed has finished.
+            while (tenants.Find(tenantId) is not null && await runner.RunNextAsync(tenantId, options.LeaseDuration, stoppingToken))
             {
                 ran = true;
 
-                // A worker with a steady stream of items still polls. One item that hangs does not.
+                // A worker with a steady stream of items still polls and refreshes. One item that hangs does not.
                 health.Polled();
+                await RefreshIfDueAsync(stoppingToken);
             }
         }
         catch (Exception exception) when (exception is not StartupCheckException
@@ -203,6 +271,15 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Information, "Loaded {TenantCount} active tenant(s) from the tenant directory.")]
     private partial void LogLoaded(int tenantCount);
+
+    [LoggerMessage(LogLevel.Error, "The tenant directory could not be read again over ConnectionStrings:Platform ({Cause}). The worker keeps running the last good read.")]
+    private partial void LogRefreshFailed(string cause);
+
+    [LoggerMessage(LogLevel.Error, "Tenant {TenantId} gets no work until its runtime database role passes the check. {Reason}")]
+    private partial void LogTenantNotServed(string tenantId, string reason);
+
+    [LoggerMessage(LogLevel.Information, "Read the tenant directory again. {TenantCount} tenant(s) active, {CheckedCount} checked, {WithheldCount} withheld.")]
+    private partial void LogRefreshed(int tenantCount, int checkedCount, int withheldCount);
 
     [LoggerMessage(LogLevel.Information, "Waiting for the database of tenant {TenantId} to be migrated.")]
     private partial void LogWaitingForMigrations(string tenantId);

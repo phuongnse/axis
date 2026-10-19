@@ -14,11 +14,12 @@ public static class WorkerServiceCollectionExtensions
     /// Registers the tenancy and processes services, the installed extension packages and the
     /// background service that runs the due work items of every tenant, and the health checks
     /// that <see cref="WorkerHealthEndpoints.MapWorkerHealth"/> serves. Under <c>Tenancy:Source=directory</c> the
-    /// tenants are read from the tenant directory over <c>ConnectionStrings:Platform</c> once the worker runs. Only a worker
+    /// tenants are read from the tenant directory over <c>ConnectionStrings:Platform</c> once the worker runs, and again every
+    /// <c>Tenancy:RefreshInterval</c>. Only a worker
     /// that runs in Development sends connector calls to an <c>http</c> base URL.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker or health configuration is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c> or <c>Platform:SecretKey</c> is missing or invalid under
+    /// The tenant, worker or health configuration is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -58,13 +59,18 @@ public static class WorkerServiceCollectionExtensions
                 throw new InvalidOperationException("ConnectionStrings:Platform is required when Tenancy:Source is 'directory'.");
             }
 
+            // Read first, so a bad value stops the start even when the database is not there.
+            var refreshInterval = TenancySettings.RefreshInterval(configuration);
+
             var cipher = TenantSecretCipher.Load(configuration);
             services.AddSingleton(cipher);
 
-            // The worker reads the directory when it runs, and retries until a read works. It ignores a Tenants section.
+            // The worker reads the directory when it runs, retries until a read works, and reads it again every
+            // refresh interval. It ignores a Tenants section.
             catalog = WorkerTenantCatalog.FromDirectory(
                 platformConnectionString,
                 cipher,
+                refreshInterval,
                 configuration.GetSection(TenantOptions.SectionName).Exists());
         }
         else
