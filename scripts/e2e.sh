@@ -24,8 +24,10 @@
 # PostgreSQL loads samples/postgres/init-roles.sql on its first start, which creates the database
 # roles axis_schema and axis_runtime. The server runs startup activation as axis_schema and serves
 # requests as axis_runtime. The worker runs only as axis_runtime and gets no schema connection string.
-# A Compose smoke test then builds the image and runs the stack on free ports. It is skipped
-# when $NEXKIT_BASE_SHA shows that nothing it covers changed.
+# A Compose smoke test then builds the image and runs the stack on free ports. An images smoke test
+# then builds the production images axis-server, axis-worker and axis-admin and runs them read-only
+# against a throwaway PostgreSQL. Each is skipped when $NEXKIT_BASE_SHA shows that nothing it covers
+# changed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
@@ -246,5 +248,8 @@ fi
 
 run_suite_if_affected compose . node --test --test-reporter=spec --test-reporter-destination=stdout \
   --test-reporter=junit --test-reporter-destination="$results_dir/compose.xml" scripts/compose.test.mjs
+
+run_suite_if_affected images . node --test --test-reporter=spec --test-reporter-destination=stdout \
+  --test-reporter=junit --test-reporter-destination="$results_dir/images.xml" scripts/images.test.mjs
 
 finish_report

@@ -52,7 +52,32 @@ public sealed class DirectoryTenantCatalogTests
         Assert.Empty(catalog.Withhold(["a", "b", "c"]).OnOtherSchemaVersion("9"));
     }
 
+    [Fact]
+    public void Oidc_changes_list_new_tenants_and_tenants_on_other_sign_in_settings_in_ordinal_order()
+    {
+        var previous = Catalog(OidcKeys("a", "oidc-a"), OidcKeys("b", "oidc-b"), OidcKeys("d", "oidc-d"));
+        var next = Catalog(OidcKeys("a", "oidc-a"), OidcKeys("b", "other"), OidcKeys("d", "oidc-d"), OidcKeys("c", "oidc-c"));
+
+        Assert.Equal(["b", "c"], next.OidcChanges(previous));
+        Assert.Empty(previous.OidcChanges(previous));
+    }
+
+    [Fact]
+    public void A_withheld_tenant_is_listed_in_oidc_changes_when_the_next_read_holds_it()
+    {
+        var read = Catalog(OidcKeys("a", "oidc-a"), OidcKeys("b", "oidc-b"));
+        var served = read.Withhold(["a"]);
+
+        Assert.Empty(served.OidcChanges(read.Withhold(["a"])));
+        Assert.Equal(["a"], read.OidcChanges(served));
+    }
+
+    private static (string Id, string Key, string OidcKey) OidcKeys(string id, string oidcKey) => (id, $"key-{id}", oidcKey);
+
     private static DirectoryTenantCatalog Catalog(params (string Id, string Key)[] tenants) =>
+        Catalog(tenants.Select(tenant => (tenant.Id, tenant.Key, OidcKey: tenant.Key)).ToArray());
+
+    private static DirectoryTenantCatalog Catalog(params (string Id, string Key, string OidcKey)[] tenants) =>
         new(
             tenants.Select(tenant => new TenantEntry(
                 tenant.Id,
@@ -63,5 +88,6 @@ public sealed class DirectoryTenantCatalogTests
                 new Dictionary<string, TenantBinding>())),
             [],
             tenants.ToDictionary(tenant => tenant.Id, tenant => tenant.Key),
-            new Dictionary<string, string>());
+            new Dictionary<string, string>(),
+            tenants.ToDictionary(tenant => tenant.Id, tenant => tenant.OidcKey));
 }

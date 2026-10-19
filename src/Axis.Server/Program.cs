@@ -25,6 +25,9 @@ using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// A file in /run/secrets, named as a setting in its environment variable form, wins over the variable.
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
+
 var platformConnectionString = builder.Configuration.GetConnectionString("Platform");
 if (string.IsNullOrWhiteSpace(platformConnectionString))
 {
@@ -35,10 +38,6 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
 // built, because sign-in registers one client per tenant. Under configuration, nothing about the platform
 // schema is read.
 ITenantCatalog tenants;
-
-// The tenants whose sign-in client is registered. Under directory this is every active tenant, also one that is not served yet
-// because its schema version is not this server's, so a tenant that migrate brings up later can sign people in without a restart.
-ITenantCatalog signInTenants;
 var directorySource = TenancySettings.Source(builder.Configuration) == TenancySource.Directory;
 if (directorySource)
 {
@@ -81,7 +80,6 @@ if (directorySource)
     // The tenants served at start count as checked: the release check runs the role check on them before the server listens.
     var directory = new TenantDirectoryCatalog(loaded.Withhold(otherSchema));
     tenants = directory;
-    signInTenants = loaded;
 
     // Registered first, so it logs before the release check runs.
     builder.Services.AddSingleton(cipher);
@@ -100,7 +98,6 @@ if (directorySource)
 else
 {
     tenants = ConfigurationTenantCatalog.Load(builder.Configuration, builder.Environment);
-    signInTenants = tenants;
 
     // Fails startup when a tenant has no schema connection string. Only startup activation uses it,
     // and the worker never uses it.
@@ -132,7 +129,7 @@ builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment
 builder.Services.AddModules(builder.Configuration, builder.Environment);
 
 // Fails startup when a tenant has no complete Oidc block. Only the server signs people in.
-var oidcTenants = TenantOidcSettings.Load(signInTenants);
+var oidcTenants = new TenantSignInSettings(TenantOidcSettings.Load(tenants));
 
 // The development, E2E and test servers run over http, where a Secure cookie never comes back.
 var plainHttpAllowed = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing");

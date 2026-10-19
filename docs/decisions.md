@@ -2170,7 +2170,8 @@ serving from the last good directory while it still shows the problem.
 
 A platform operator creates tenants, migrates every tenant database and
 activates releases with a command-line admin host, `Axis.Admin`. This is
-planned for M9. `tenant create` and `migrate` are built. Until the rest is, tenants can
+planned for M9. Only `tenant create`, `tenant backup`, `tenant suspend`,
+`tenant resume`, `tenant list` and `migrate` are built. Until the rest is, tenants can
 come from the `Tenants` section and the server migrates and activates at start, as in
 [D31](#d31-separate-database-roles--agreed). See
 [administration](reference/administration.md) for every command,
@@ -2278,9 +2279,10 @@ admin role limited to creating databases and roles.
 ## D44. Packaging for on-premises and cloud installation — Agreed
 
 Axis ships as three production images, a Compose example for one machine and a
-Helm chart for Kubernetes. This is planned for M9 and none of it is built.
-Today only the development `Dockerfile` and `compose.yaml` exist. They hold the
-samples and development credentials, and they are not for production. See the
+Helm chart for Kubernetes. The production images are built. The Compose
+example and the chart are planned for M9. The development `Dockerfile` default
+target and `compose.yaml` hold the samples and development credentials, and
+they are not for production. See the
 [installation guide](reference/installation.md) for the steps and every
 setting, and [administration](reference/administration.md) for the admin
 commands.

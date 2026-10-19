@@ -1,6 +1,9 @@
 using System.Security.Cryptography;
 using Axis.Admin;
+using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
@@ -44,6 +47,18 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         "--oidc-authority", Authority,
         "--oidc-client-id", "axis",
     ];
+
+    /// <summary>A server on the tenant directory of <paramref name="platform"/>, with <c>anna</c> signed in.</summary>
+    public static WebApplicationFactory<Program> CreateServer(string platform) =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Tenancy:Source", "directory");
+            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(platform));
+            builder.UseSetting("ConnectionStrings:PlatformSchema", platform);
+            builder.UseSetting("Platform:SecretKey", TestSecretKey);
+            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
+        });
 
     /// <summary>Creates a platform database, migrates it unless <paramref name="migrate"/> is false, and returns the scenario on it.</summary>
     public static async Task<AdminScenario> NewAsync(PostgreSqlFixture database, bool migrate, CancellationToken cancellationToken)

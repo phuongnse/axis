@@ -17,9 +17,10 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     private readonly HashSet<string> _unavailableHosts = new(StringComparer.OrdinalIgnoreCase);
     private readonly IReadOnlyDictionary<string, string> _databaseKeys;
     private readonly IReadOnlyDictionary<string, string> _schemaVersions;
+    private readonly IReadOnlyDictionary<string, string> _oidcKeys;
 
     public DirectoryTenantCatalog(IEnumerable<TenantEntry> tenants)
-        : this(tenants, [], new Dictionary<string, string>(), new Dictionary<string, string>())
+        : this(tenants, [], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<string, string>())
     {
     }
 
@@ -27,12 +28,14 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         IEnumerable<TenantEntry> tenants,
         IEnumerable<string> unavailableHosts,
         IReadOnlyDictionary<string, string> databaseKeys,
-        IReadOnlyDictionary<string, string> schemaVersions)
+        IReadOnlyDictionary<string, string> schemaVersions,
+        IReadOnlyDictionary<string, string>? oidcKeys = null)
     {
         ArgumentNullException.ThrowIfNull(tenants);
 
         _databaseKeys = databaseKeys;
         _schemaVersions = schemaVersions;
+        _oidcKeys = oidcKeys ?? new Dictionary<string, string>();
         _unavailableHosts.UnionWith(unavailableHosts);
 
         Tenants = [.. tenants.OrderBy(tenant => tenant.Id, StringComparer.Ordinal)];
@@ -68,7 +71,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             Tenants.Except(withheld),
             _unavailableHosts.Concat(withheld.SelectMany(tenant => tenant.Hosts)),
             _databaseKeys.Where(pair => !tenantIds.Contains(pair.Key, StringComparer.Ordinal)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
-            _schemaVersions.Where(pair => !tenantIds.Contains(pair.Key, StringComparer.Ordinal)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+            _schemaVersions.Where(pair => !tenantIds.Contains(pair.Key, StringComparer.Ordinal)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+            _oidcKeys.Where(pair => !tenantIds.Contains(pair.Key, StringComparer.Ordinal)).ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
     }
 
     /// <summary>
@@ -125,6 +129,22 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             .Select(tenant => tenant.Id)
             .Where(id => !previous._databaseKeys.TryGetValue(id, out var before)
                 || !_databaseKeys.TryGetValue(id, out var now)
+                || !string.Equals(before, now, StringComparison.Ordinal))];
+    }
+
+    /// <summary>
+    /// The ids of the tenants of this catalog that <paramref name="previous"/> does not hold, or holds on other
+    /// sign-in settings, in ordinal order. A tenant whose OIDC authority, client id, encrypted client secret,
+    /// endpoint audience or claim names differ counts, and nothing is decrypted to compare.
+    /// </summary>
+    public IReadOnlyList<string> OidcChanges(DirectoryTenantCatalog previous)
+    {
+        ArgumentNullException.ThrowIfNull(previous);
+
+        return [.. Tenants
+            .Select(tenant => tenant.Id)
+            .Where(id => !previous._oidcKeys.TryGetValue(id, out var before)
+                || !_oidcKeys.TryGetValue(id, out var now)
                 || !string.Equals(before, now, StringComparison.Ordinal))];
     }
 
@@ -197,7 +217,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 cipher)),
             hosts.Where(host => !activeIds.Contains(host.TenantId)).Select(host => host.Host),
             active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal),
-            active.ToDictionary(row => row.Id, row => row.SchemaVersion, StringComparer.Ordinal));
+            active.ToDictionary(row => row.Id, row => row.SchemaVersion, StringComparer.Ordinal),
+            active.ToDictionary(row => row.Id, OidcKey, StringComparer.Ordinal));
     }
 
     private static bool IsActive(TenantRow row) => row.Status == "active";
@@ -205,6 +226,10 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     // Compares the stored encrypted password, so nothing is decrypted to tell whether the database settings changed.
     private static string DatabaseKey(TenantRow row) =>
         $"{row.DatabaseHost}\n{row.DatabasePort}\n{row.DatabaseName}\n{row.RuntimeUser}\n{Convert.ToBase64String(row.RuntimePassword)}";
+
+    // Compares the stored encrypted client secret, so nothing is decrypted to tell whether the sign-in settings changed.
+    private static string OidcKey(TenantRow row) =>
+        string.Join('\n', row.OidcAuthority, row.OidcClientId, Convert.ToBase64String(row.OidcClientSecret), row.EndpointAudience, row.ClaimUserId, row.ClaimDisplayName, row.ClaimRoles);
 
     private static TenantEntry Entry(TenantRow row, IReadOnlyList<string> hosts, IEnumerable<TenantBindingRow> bindingRows, TenantSecretCipher cipher)
     {

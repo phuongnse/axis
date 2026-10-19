@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,10 @@ internal static partial class AdminCommands
         Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>
                tenant backup <id> --out <file>
                migrate [--tenant <id>] [--parallel <n>]
+               tenant suspend <id>
+               tenant resume <id>
+               tenant list
+               version
         """;
 
     public static async Task<int> RunAsync(
@@ -47,9 +52,20 @@ internal static partial class AdminCommands
             return await MigrateAsync(args, configuration, output, error, cancellationToken);
         }
 
+        if (args is ["version"])
+        {
+            output.WriteLine(typeof(AdminCommands).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
+            return 0;
+        }
+
         if (args.Length >= 2 && args[0] == "tenant" && args[1] == "backup")
         {
             return await BackupAsync(args, configuration, output, error, cancellationToken);
+        }
+
+        if (args.Length >= 2 && args[0] == "tenant" && args[1] is "suspend" or "resume" or "list")
+        {
+            return await StatusAsync(args, configuration, output, error, cancellationToken);
         }
 
         var request = ParseTenantCreate(args);
@@ -82,6 +98,50 @@ internal static partial class AdminCommands
         }
 
         return await new TenantCreate(settings, request, output, cancellationToken).RunAsync();
+    }
+
+    private static async Task<int> StatusAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var shapeIsValid = args[1] == "list" ? args.Length == 2 : args.Length == 3 && !args[2].StartsWith("--", StringComparison.Ordinal);
+        if (!shapeIsValid)
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        var connectionString = ReadDirectorySettings(configuration, out var problem);
+        if (connectionString is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        try
+        {
+            var tablesProblem = await PlatformTablesProblemAsync(connectionString, cancellationToken);
+            if (tablesProblem is not null)
+            {
+                error.WriteLine(tablesProblem);
+                return 2;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+
+        return args[1] switch
+        {
+            "suspend" => await TenantStatus.SuspendAsync(connectionString, args[2], output, error, cancellationToken),
+            "resume" => await TenantStatus.ResumeAsync(connectionString, args[2], output, error, cancellationToken),
+            _ => await TenantStatus.ListAsync(connectionString, output, error, cancellationToken),
+        };
     }
 
     private static async Task<int> BackupAsync(
@@ -307,7 +367,29 @@ internal static partial class AdminCommands
         return new BackupSettings(platform.PlatformConnectionString, platform.Cipher, path);
     }
 
-    /// <summary>Reads the settings that every command needs: the platform database and the key of the tenant secrets.</summary>
+    /// <summary><c>tenant suspend</c>, <c>resume</c> and <c>list</c> need only the platform database. They decrypt nothing and create no role or database.</summary>
+    private static string? ReadDirectorySettings(IConfiguration configuration, out string problem)
+    {
+        problem = "";
+        var platform = configuration[PlatformSetting];
+        if (string.IsNullOrWhiteSpace(platform))
+        {
+            problem = $"The setting {PlatformSetting} is required.";
+            return null;
+        }
+
+        try
+        {
+            return new NpgsqlConnectionStringBuilder(platform) { Pooling = false }.ConnectionString;
+        }
+        catch (Exception exception) when (exception is ArgumentException or FormatException)
+        {
+            problem = $"The setting {PlatformSetting} is not a valid connection string.";
+            return null;
+        }
+    }
+
+    /// <summary>Reads the settings that <c>tenant create</c>, <c>tenant backup</c> and <c>migrate</c> need: the platform database and the key of the tenant secrets.</summary>
     private static PlatformSettings? ReadPlatformSettings(IConfiguration configuration, out string problem)
     {
         problem = "";

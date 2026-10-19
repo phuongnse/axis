@@ -47,7 +47,7 @@ flowchart LR
   It runs the package operations that process steps call, see
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
-- **Axis.Admin** *(partly built for M9: `tenant create`, `tenant backup` and `migrate`)* is the console host that the platform
+- **Axis.Admin** *(partly built for M9: `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup` and `migrate`)* is the console host that the platform
   operator runs. It creates tenants, migrates tenant databases, activates
   releases, and backs up and restores tenants. It is the only host that writes
   the [tenant directory](#tenant-directory), holds an admin connection to the
@@ -70,7 +70,7 @@ src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
   Axis.Scenarios/         console host that runs an application's test scenarios
-  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9; `tenant create`, `tenant backup` and `migrate` are built)
+  Axis.Admin/             console host for tenant provisioning, migrations and activation (M9; `tenant create`, `suspend`, `resume`, `list`, `backup` and `migrate` are built)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
@@ -265,12 +265,13 @@ restart. A tenant added as `active` is served after the next refresh, once its
 runtime database role check passes. A host of a `suspended` or `provisioning`
 tenant answers `503`, and a removed host answers `404`. A changed database
 setting gets a new connection pool. A tenant whose schema version is not the
-server's is not served, see the table below. A failed refresh keeps the last good
-directory and makes readiness Degraded. The worker claims no new work item of a
-tenant that is no longer `active`, and a work item already claimed finishes.
-The worker runs the refresh in its polling loop, between work items. Sign-in for
-a tenant added at a refresh is not built. A changed OIDC setting applies to the
-server only after a restart.
+server's is not served, see the table below. A refresh also updates sign-in. A tenant
+added at a refresh gets its OIDC client and its endpoint caller scheme, a
+changed OIDC setting applies at the next refresh, and a tenant that is no
+longer served loses both. A failed refresh keeps the last good directory and
+makes readiness Degraded. The worker claims no new work item of a tenant that
+is no longer `active`, and a work item already claimed finishes. The worker runs
+the refresh in its polling loop, between work items.
 
 - **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
   default, or `directory`. Both answer through one tenant catalog contract, so
@@ -282,8 +283,7 @@ server only after a restart.
 - **Refresh.** Both hosts read the directory again every
   `Tenancy:RefreshInterval`, 30 seconds by default, see
   [tenancy settings](reference/configuration.md#tenancy-settings). A changed
-  host or database setting applies at the next refresh. *(The refresh of an
-  OIDC setting is planned for M9.)*
+  host, database setting or OIDC setting applies at the next refresh.
 - **Read only.** The hosts read the directory over a database role that may
   only read the `platform` schema. [`Axis.Admin`](reference/administration.md)
   writes it, see
@@ -293,9 +293,9 @@ What a host answers for a tenant, once the directory is in use:
 
 | Case | Answer |
 | --- | --- |
-| An `active` tenant | The tenant is served after the next refresh, once the runtime database role check passes. Its OIDC client is registered then *(not built yet, planned for M9: a tenant added at a refresh has no sign-in until a restart)*. |
+| An `active` tenant | The tenant is served after the next refresh, once the runtime database role check passes. Its OIDC client and its endpoint caller scheme are registered then. |
 | A `suspended` or `provisioning` tenant | `503` problem details (`application/problem+json`) titled "This tenant is not available.". It names no tenant and no host. The worker claims none of its new work, and work already claimed finishes. |
-| A tenant whose schema version is not the host's | `503`, like a suspended tenant, from the first directory refresh that reads the other version. The server logs one warning when a tenant joins this state. The worker re-reads the schema versions at each poll round and claims none of its work, new or old. It starts again once `Axis.Admin migrate` has brought the tenant to the worker's version, with no restart. The schema version is the newest EF Core migration that `Axis.Admin migrate` applied, see [administration](reference/administration.md#migrate). The server registers the sign-in client of such a tenant at start all the same, so a tenant that `migrate` brings up later can sign people in without a restart. |
+| A tenant whose schema version is not the host's | `503`, like a suspended tenant, from the first directory refresh that reads the other version. The server logs one warning when a tenant joins this state. The worker re-reads the schema versions at each poll round and claims none of its work, new or old. It starts again once `Axis.Admin migrate` has brought the tenant to the worker's version, with no restart. The schema version is the newest EF Core migration that `Axis.Admin migrate` applied, see [administration](reference/administration.md#migrate). The server registers its sign-in client when the refresh serves it, so it can sign people in without a restart. |
 | A removed or unknown host | `404`, as today. |
 | A refresh that fails | The last good directory stays in use and one error is logged for each run of failed refreshes. Readiness is Degraded until a refresh works, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works. |
 | The first load fails | The server stops its start. The worker waits and retries, and is not ready until the first load works. |
@@ -312,8 +312,11 @@ What a host answers for a tenant, once the directory is in use:
   the server drops its old connection pool, and the next request opens one
   with the new settings. The check runs only when the directory changes, so
   privileges granted inside the database with no directory change are not
-  caught until a restart. `Axis.Admin` creates, migrates, grants and activates
-  the database of a tenant, and the server does none of it, see
+  caught until a restart. A tenant whose `Oidc` authority, client id or client
+  secret is blank at a refresh is withheld in the same way. It answers `503`,
+  the server logs the missing setting, and the other tenants keep working.
+  `Axis.Admin` creates, migrates, grants and activates the database of a
+  tenant, and the server does none of it, see
   [administration](reference/administration.md).
 - **Health exemption.** Paths under `/health` stay exempt from resolution.
 
@@ -418,7 +421,11 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   server reads and checks the block. The worker reads the same `Tenants`
   section but signs nobody in, so it ignores `Oidc`. Under
   `Tenancy:Source=directory`, the `Oidc` settings of a tenant come from the
-  [tenant directory](#tenant-directory), not from `Tenants`.
+  [tenant directory](#tenant-directory), not from `Tenants`. Under `directory`,
+  each refresh registers the OIDC client and the endpoint caller scheme of a new
+  tenant, builds them again for a tenant whose `Oidc` settings changed, and
+  removes both for a tenant that is no longer served. The identity provider's
+  metadata is fetched again only for the tenants that changed.
 - **Secret.** The client secret comes from the environment, such as
   `Tenants__default__Oidc__ClientSecret`. It is never in a committed file,
   except the development fixtures, which are never valid outside
@@ -1009,9 +1016,10 @@ checks, because the production images hold no `curl`.
 
 ## Installation
 
-*(Planned for M9.)* Axis ships as three production images, as
+Axis ships as three production images, as
 [D44](decisions.md#d44-packaging-for-on-premises-and-cloud-installation--agreed)
-says. None of it is built.
+says. The images are built. *(Planned for M9.)* The Compose example and the
+chart are not.
 
 - `axis-server` and `axis-worker` run the hosts. They hold no sample and no
   development setting.

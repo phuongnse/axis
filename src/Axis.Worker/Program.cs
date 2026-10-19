@@ -2,6 +2,8 @@ using Axis.Worker;
 using Microsoft.AspNetCore.Builder;
 
 var builder = WebApplication.CreateSlimBuilder(args);
+// A file in /run/secrets, named as a setting in its environment variable form, wins over the variable.
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
 builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
 using var app = builder.Build();
 app.MapWorkerHealth();

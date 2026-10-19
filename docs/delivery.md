@@ -60,12 +60,12 @@ models, are not copied here. Look them up where they live.
   runs it once more if the failure looks flaky. Otherwise it tells the owner
   and opens a bug issue with the failure, which goes before other issues.
 - **NexKit's checks skip smoke tests that a change cannot affect.** The
-  `scripts/dev.sh` and Docker Compose smoke tests take about 4 of the 9 minutes
-  of checks. NexKit sets `NEXKIT_BASE_SHA`, the commit the pull request started
+  `scripts/dev.sh`, Docker Compose and production image smoke tests take about
+  4 of the 9 minutes of checks, before the image tests. NexKit sets `NEXKIT_BASE_SHA`, the commit the pull request started
   from. A smoke test is skipped only when that variable is set, git can list the
   changed and untracked files, and none of them is on the test's path list. The
   lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs). Any
-  doubt runs the test. CI sets no base, so CI on `main` always runs both. The
+  doubt runs the test. CI sets no base, so CI on `main` always runs all three. The
   test summary lists a skipped suite as skipped.
 - **NexKit restores the dependency caches that CI on `main` saves.** Before
   `scripts/setup.sh`, NexKit's implement, fix and check runs restore the
