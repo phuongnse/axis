@@ -13,7 +13,7 @@ namespace Axis.Server.Health;
 /// <see cref="TenantDatabaseGauge"/>.
 /// </summary>
 internal sealed partial class TenantDatabasesHealthCheck(
-    TenantOptions tenants,
+    ITenantCatalog tenants,
     ITenantContextAccessor accessor,
     ITenantConnectionFactory connections,
     TenantDatabaseGauge gauge,
@@ -25,7 +25,7 @@ internal sealed partial class TenantDatabasesHealthCheck(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var ids = tenants.Tenants.Keys.ToArray();
+        var ids = tenants.Tenants.Select(tenant => tenant.Id).ToArray();
         var answers = await Task.WhenAll(ids.Select(id => AnswersAsync(id, cancellationToken)));
         for (var i = 0; i < ids.Length; i++)
         {

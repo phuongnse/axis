@@ -2049,7 +2049,8 @@ platform change it needs is a gap to raise, not to hide in the sample.
 
 The server and the worker learn their tenants from a tenant directory in the
 platform database, and pick up changes without a restart. This is planned for
-M9 and none of it is built. Until then tenants come from the `Tenants`
+M9. Only the tenant catalog contract is built, and the `configuration` source
+answers it. Until the directory source exists, tenants come from the `Tenants`
 section, as in [D10](#d10-tenant-aware-from-day-one-full-tenancy-later--agreed).
 See [tenant directory](architecture.md#tenant-directory) for what each host
 answers, [tenancy settings](reference/configuration.md#tenancy-settings) for

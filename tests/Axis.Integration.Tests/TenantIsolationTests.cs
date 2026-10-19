@@ -17,6 +17,8 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
 {
     private WebApplication? _app;
     private HttpClient? _client;
+    private RecordingTenantCatalog? _catalog;
+    private string? _tenantBDatabase;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -38,6 +40,19 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
 
         Assert.Contains("written-for-b", await ListAsync("b.example.test"));
         Assert.DoesNotContain("written-for-b", await ListAsync("a.example.test"));
+    }
+
+    [Fact]
+    public async Task A_request_on_tenant_a_asks_the_catalog_only_for_tenant_a_and_never_opens_tenant_b()
+    {
+        await PostAsync("a.example.test", "written-for-a");
+        Assert.Contains("written-for-a", await ListAsync("a.example.test"));
+
+        Assert.NotEmpty(_catalog!.FoundIds);
+        Assert.All(_catalog.FoundIds, id => Assert.Equal("a", id));
+        await using var dataSource = NpgsqlDataSource.Create(_tenantBDatabase!);
+        await using var count = dataSource.CreateCommand("SELECT count(*) FROM rows");
+        Assert.Equal(0L, await count.ExecuteScalarAsync(CancellationToken));
     }
 
     [Fact]
@@ -71,6 +86,7 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
     {
         var tenantA = await database.CreateDatabaseAsync("tenant_a", CancellationToken);
         var tenantB = await database.CreateDatabaseAsync("tenant_b", CancellationToken);
+        _tenantBDatabase = tenantB;
 
         // The runtime role cannot create tables, so the schema role creates the table the handlers use
         // and grants the runtime role row access to it.
@@ -96,7 +112,10 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
             ["Tenants:b:Bindings:PurchasingSystemUrl:Kind"] = "url",
             ["Tenants:b:Bindings:PurchasingSystemUrl:Value"] = "https://b.example.test/api",
         });
-        builder.Services.AddTenancy(builder.Configuration, builder.Environment);
+
+        // The host reads tenants through the catalog contract only, and the catalog records which tenants it is asked for.
+        _catalog = new RecordingTenantCatalog(ConfigurationTenantCatalog.Load(builder.Configuration, builder.Environment));
+        builder.Services.AddTenancy(_catalog);
         _app = builder.Build();
         _app.UseTenantResolution();
         _app.MapPost("/rows", async (string value, ITenantConnectionFactory connections, CancellationToken cancellationToken) =>
@@ -166,5 +185,35 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
         var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
         request.Headers.Host = host;
         return request;
+    }
+
+    private sealed class RecordingTenantCatalog(ITenantCatalog inner) : ITenantCatalog
+    {
+        private readonly List<string> _foundIds = [];
+
+        public IReadOnlyList<TenantEntry> Tenants => inner.Tenants;
+
+        public IReadOnlyList<string> FoundIds
+        {
+            get
+            {
+                lock (_foundIds)
+                {
+                    return [.. _foundIds];
+                }
+            }
+        }
+
+        public TenantEntry? Find(string tenantId)
+        {
+            lock (_foundIds)
+            {
+                _foundIds.Add(tenantId);
+            }
+
+            return inner.Find(tenantId);
+        }
+
+        public TenantEntry? FindByHost(string host) => inner.FindByHost(host);
     }
 }

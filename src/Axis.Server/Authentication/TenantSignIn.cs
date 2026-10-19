@@ -31,7 +31,7 @@ internal static class TenantSignIn
             {
                 options.Authority = settings.Authority;
                 options.ClientId = settings.ClientId;
-                options.ClientSecret = settings.ClientSecret;
+                options.ClientSecret = settings.ClientSecret?.Reveal();
                 options.RequireHttpsMetadata = !allowHttp;
                 options.ResponseType = "code";
                 // The identity provider returns with a GET. A cross-site form post would not carry

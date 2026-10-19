@@ -299,7 +299,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         var options = new TenantOptions();
         options.Tenants["a"] = new TenantSettings { ConnectionString = PostgreSqlServer.RuntimeConnectionString(connectionString) };
         var accessor = new TenantContextAccessor();
-        return new Connections(new TenantConnectionFactory(options, accessor), accessor);
+        return new Connections(new TenantConnectionFactory(ConfigurationTenantCatalog.FromOptions(options), accessor), accessor);
     }
 
     private async Task<string> CreateTenantDatabaseAsync(string prefix, bool migrate = true)
