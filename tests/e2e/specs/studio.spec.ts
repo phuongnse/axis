@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { studioFolder } from '../server-settings'
+import { startServer } from '../activate'
+import { e2eApp, studioFolder } from '../server-settings'
 import { useSession } from '../sessions'
 
 test('an author follows the Studio link, searches for a resource and opens it', async ({ page }) => {
@@ -61,6 +62,44 @@ test('an author follows a Used by entry from a department to the entity that use
 
   await expect(page).toHaveURL(new RegExp(`resource=${entity.id}`))
   await expect(page.getByTestId('studio-resource-details')).toContainText('entities/purchase-request.json')
+})
+
+test('an author saves a resource while the server restarts, and sees the saved version after the reconnect', async ({
+  page,
+}) => {
+  test.setTimeout(240_000)
+  // A second server on a spare port, so the restart does not touch the server the other specs use.
+  let server = await startServer({ ActivateOnStartup__0: e2eApp })
+  try {
+    await useSession(page, 'hoa')
+    expect((await page.request.get(`${server.url}/api/me`)).status()).toBe(200)
+    const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
+    const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+    const supplier = items.find((item) => item.file === 'entities/supplier.json')!
+    const department = items.find((item) => item.file === 'entities/department.json')!
+    const file = path.join(studioFolder, 'entities/supplier.json')
+    const before = JSON.parse(await readFile(file, 'utf8')) as { fields: { maxLength: number }[] }
+    const next = before.fields[1].maxLength + 1
+
+    await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${supplier.id}`)
+    await page.getByTestId('studio-field-/fields/1/maxLength').getByRole('spinbutton').fill(String(next))
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+
+    const { port } = server
+    await server.stop()
+    await page.getByTestId(`studio-resource-${department.id}`).click()
+    await expect(page.getByTestId('studio-reconnecting')).toBeVisible()
+
+    server = await startServer({ ActivateOnStartup__0: e2eApp }, port)
+    await expect(page.getByTestId('studio-reconnecting')).toBeHidden({ timeout: 90_000 })
+    await page.getByTestId(`studio-resource-${supplier.id}`).click()
+    await expect(page.getByTestId('studio-field-/fields/1/maxLength').getByRole('spinbutton')).toHaveValue(
+      String(next),
+    )
+  } finally {
+    await server.stop()
+  }
 })
 
 test('an author selects a diagnostic and the editor shows the field at its path', async ({ page }) => {

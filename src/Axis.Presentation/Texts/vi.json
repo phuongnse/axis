@@ -166,5 +166,6 @@
   "shell.studio.cancel": "Hủy",
   "shell.studio.deleteConfirm": "Xóa tài nguyên này?",
   "shell.studio.deleteUsedBy": "Các tham chiếu trỏ đến tài nguyên này, sẽ bị lỗi:",
-  "shell.studio.deleteFailed": "Không thể xóa tài nguyên."
+  "shell.studio.deleteFailed": "Không thể xóa tài nguyên.",
+  "shell.studio.reconnecting": "Máy chủ đang khởi động lại. Đang kết nối lại…"
 }

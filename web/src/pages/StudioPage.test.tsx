@@ -3,9 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { assignLocation } from '../platform/navigation'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
 import { StudioPage } from './StudioPage'
+
+vi.mock('../platform/navigation', () => ({ assignLocation: vi.fn() }))
 
 const entityId = 'd9ccbf89-5004-4d52-8885-2ee377b7caa5'
 const formId = '5b6c7d8e-9f01-4a2b-8c3d-4e5f60718293'
@@ -136,14 +139,29 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
+/** While `down` is set, the entity routes and `/api/me` fail: with no answer when `status` is null, else with `status`. */
+interface Outage {
+  down: { status: number | null } | null
+}
+
 /** Stubs `fetch` with the Studio list routes, the read, patch and delete of the purchase request entity, and its references. `apps` is the status or list of `/api/studio/apps`. */
 function stubServer(
   apps: { name: string }[] | number = [{ name: 'PurchaseRequests' }],
   patch: PatchAnswer = { status: 200, body: { version: 'b2', diagnostics: [savedDiagnostic] } },
+  outage: Outage = { down: null },
 ) {
   const entityPath = `${folder}/resources/${entityId}`
   const manifestPath = `${folder}/resources/${manifestId}`
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if ((input === entityPath || input === '/api/me') && outage.down) {
+      if (outage.down.status === null) {
+        throw new TypeError('Failed to fetch')
+      }
+      return new Response(null, { status: outage.down.status })
+    }
+    if (input === '/api/me') {
+      return json({ id: 'hoa', studio: true })
+    }
     if (input === entityPath && init?.method === 'PATCH') {
       return json(patch.body, patch.status)
     }
@@ -644,5 +662,90 @@ describe('StudioPage', () => {
 
     await screen.findByRole('button', { name: 'Save' })
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['does not answer', { status: null }],
+    ['answers 503', { status: 503 }],
+  ])('shows the reconnect message, and no load error, when the server %s', async (_, down) => {
+    stubServer(undefined, undefined, { down })
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    expect(await screen.findByTestId('studio-reconnecting', {}, { timeout: 3000 })).toHaveTextContent(
+      'The server is restarting. Reconnecting…',
+    )
+    expect(screen.queryByTestId('studio-resource-load-error')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('studio-load-error')).not.toBeInTheDocument()
+  })
+
+  it('still shows the load error for a 500', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer(undefined, undefined, { down: { status: 500 } })
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    expect(await screen.findByTestId('studio-resource-load-error', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-reconnecting')).not.toBeInTheDocument()
+    warn.mockRestore()
+  })
+
+  it('loads the resource and the diagnostics again once the server answers', async () => {
+    const outage: Outage = { down: { status: 503 } }
+    const fetchMock = stubServer(undefined, undefined, outage)
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    await screen.findByTestId('studio-reconnecting', {}, { timeout: 3000 })
+
+    outage.down = null
+
+    expect(await screen.findByTestId('studio-field-/fields/0/name', {}, { timeout: 3000 })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByTestId('studio-reconnecting')).not.toBeInTheDocument())
+    const reads = (path: string) => fetchMock.mock.calls.filter(([input, init]) => input === path && !init?.method)
+    expect(reads(`/api/studio/apps/PurchaseRequests/resources/${entityId}`)).toHaveLength(2)
+    expect(reads('/api/studio/apps/PurchaseRequests/diagnostics')).toHaveLength(2)
+  })
+
+  it('keeps an unsaved draft through a reconnect, and saves it with the same patch', async () => {
+    const outage: Outage = { down: null }
+    const fetchMock = stubServer(undefined, undefined, outage)
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await userEvent.clear(maxLength)
+    await userEvent.type(maxLength, '250')
+
+    outage.down = { status: null }
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByTestId('studio-reconnecting', {}, { timeout: 3000 })
+    expect(maxLength).toHaveValue('250')
+
+    outage.down = null
+    await waitFor(() => expect(screen.queryByTestId('studio-reconnecting')).not.toBeInTheDocument(), { timeout: 3000 })
+    expect(maxLength).toHaveValue('250')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    const patches = fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')
+    expect(patches).toHaveLength(2)
+    const [, init] = patches[1]
+    expect(JSON.parse(init!.body as string)).toEqual([{ op: 'replace', path: '/fields/1/maxLength', value: 250 }])
+    expect(new Headers(init!.headers).get('If-Match')).toBe('"b"')
+  })
+
+  it('starts sign-in when the reload after a reconnect answers 401', async () => {
+    vi.mocked(assignLocation).mockClear()
+    const outage: Outage = { down: null }
+    stubServer(undefined, undefined, outage)
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await userEvent.clear(maxLength)
+    await userEvent.type(maxLength, '250')
+
+    outage.down = { status: null }
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByTestId('studio-reconnecting', {}, { timeout: 3000 })
+    outage.down = { status: 401 }
+
+    await waitFor(
+      () => expect(assignLocation).toHaveBeenCalledWith(expect.stringMatching(/^\/api\/auth\/sign-in\?returnUrl=/)),
+      { timeout: 3000 },
+    )
   })
 })

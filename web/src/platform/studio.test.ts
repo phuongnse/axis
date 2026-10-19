@@ -1,9 +1,69 @@
-import { describe, expect, it } from 'vitest'
-import { filterResources, groupByKind, type StudioResourceItem } from './studio'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  fetchStudioResource,
+  filterResources,
+  groupByKind,
+  ServerUnreachableError,
+  type StudioResourceItem,
+  waitForServer,
+} from './studio'
+
+afterEach(() => vi.unstubAllGlobals())
 
 function resource(id: string, kind: string, name: string | null, file: string): StudioResourceItem {
   return { id, kind, name, file, version: 'v', usedBy: 0 }
 }
+
+describe('fetchStudioResource', () => {
+  it('reports a request without an answer and a 504 as an unreachable server', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockResolvedValueOnce(new Response(null, { status: 504 })),
+    )
+
+    await expect(fetchStudioResource('PurchaseRequests', 'a')).rejects.toBeInstanceOf(ServerUnreachableError)
+    await expect(fetchStudioResource('PurchaseRequests', 'a')).rejects.toBeInstanceOf(ServerUnreachableError)
+  })
+
+  it('reports a 500 as an ordinary error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(null, { status: 500 })))
+
+    const error = await fetchStudioResource('PurchaseRequests', 'a').catch((reason: unknown) => reason)
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(ServerUnreachableError)
+  })
+})
+
+describe('waitForServer', () => {
+  it('resolves once /api/me answers, after a request without an answer and a 503', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await waitForServer(new AbortController().signal, [0])
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/me', expect.anything())
+  })
+
+  it('does not wait once the signal aborts', async () => {
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', vi.fn())
+    const waiting = waitForServer(controller.signal, [60_000])
+
+    controller.abort()
+
+    await expect(waiting).rejects.toThrow()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})
 
 const items = [
   resource('aaaa0001-0000-4000-8000-000000000000', 'entity', 'PurchaseRequest', 'entities/purchase-request.json'),
