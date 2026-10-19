@@ -2352,8 +2352,8 @@ rollback. Pushing images is a workflow change, which NexKit may not make.
 ## D45. Tenant backup and restore — Agreed
 
 A platform operator backs up one tenant into an archive that holds no secret,
-and restores it into a new, suspended tenant. This is planned for M9 and none of
-it is built. See [tenant backup](reference/administration.md#tenant-backup) and
+and restores it into a new, suspended tenant. The backup is built for M9. The
+restore is planned for M9 and is not built. See [tenant backup](reference/administration.md#tenant-backup) and
 [tenant restore](reference/administration.md#tenant-restore) for the commands,
 the manifest and every refusal.
 The owner confirmed these points on issue #642 on 2026-10-19.

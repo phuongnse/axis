@@ -110,6 +110,9 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
         }
     }
 
+    /// <summary>The id of the container, for tests that run the PostgreSQL client tools inside it with <c>docker exec</c>.</summary>
+    public static async Task<string> ContainerIdAsync() => (await _container.Value).Id;
+
     /// <summary>The connection string to the maintenance database, which creates and drops the others.</summary>
     public static async Task<string> AdminConnectionStringAsync() => (await _container.Value).GetConnectionString();
 
