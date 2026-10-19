@@ -28,8 +28,8 @@ The SPA signs people in through Keycloak at `/api/auth/sign-in`, but sign-in thr
 Compose is not wired yet. Every application page needs a session, so under Compose
 opening a sample page starts a sign-in that cannot complete yet. See
 [AGENTS.md](AGENTS.md#commands) for the port variables. This setup is for local
-use. Production installs follow the [installation guide](docs/reference/installation.md)
-(planned for M9).
+use. Production installs follow the [installation guide](docs/reference/installation.md),
+for Docker Compose on one machine and for Kubernetes.
 
 For development with hot reload, run `scripts/dev.sh`. It needs Docker, .NET and
 Node. It runs the server, the worker and the SPA with hot reload. See

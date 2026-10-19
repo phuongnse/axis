@@ -95,7 +95,7 @@ samples/
   postgres/               init-roles.sql, which creates the axis_schema and axis_runtime database roles
   packages/               the sample extension package payment-references and its unit tests
 deploy/
-  compose/                production Compose example (M9)
+  compose/                production Compose example
   helm/axis/              Helm chart for Kubernetes
 ```
 
@@ -1011,15 +1011,15 @@ short, because one work item can run for up to a lease.
 
 **Docker Compose.** The worker gets a health check on `/health/ready`. It runs
 inside the container, and Compose does not publish the worker's health port.
-*(Planned for M9.)* The production Compose example has no container health
-checks, because the production images hold no `curl`.
+The production Compose example has no container health checks, because the
+production images hold no `curl`. It publishes the worker's health port on
+`127.0.0.1` only, for probes from the host.
 
 ## Installation
 
 Axis ships as three production images, as
 [D44](decisions.md#d44-packaging-for-on-premises-and-cloud-installation--agreed)
-says. The images and the chart are built. *(Planned for M9.)* The Compose
-example is not.
+says. The images, the Compose example and the chart are built.
 
 - `axis-server` and `axis-worker` run the hosts. They hold no sample and no
   development setting.

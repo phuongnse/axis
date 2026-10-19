@@ -26,3 +26,5 @@ artifacts/
 
 # Built SPA served by the server
 src/Axis.Server/wwwroot/
+
+deploy/compose/secrets/
