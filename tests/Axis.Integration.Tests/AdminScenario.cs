@@ -49,7 +49,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         "--oidc-client-id", "axis",
     ];
 
-    /// <summary>A server on the tenant directory of <paramref name="platform"/>, with <c>anna</c> signed in.</summary>
+    /// <summary>A server on the tenant directory of <paramref name="platform"/>, with <c>anna</c> and <c>chau</c> able to sign in.</summary>
     public static WebApplicationFactory<Program> CreateServer(string platform) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -62,7 +62,9 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             // A release that pins an extension package or uses a module needs them to be rebuilt.
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("Modules:Path", SampleModules.Path);
-            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
+            builder.UseTestAuthentication(
+                new TestIdentity("anna", "Anna Employee", "employee"),
+                new TestIdentity("chau", "Chau Operations Manager", "department-manager"));
         });
 
     /// <summary>Creates a platform database, migrates it unless <paramref name="migrate"/> is false, and returns the scenario on it.</summary>
@@ -154,6 +156,15 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
     {
         await using var context = NewContext();
         return await context.TenantHosts.AsNoTracking().Where(host => host.TenantId == id).Select(host => host.Host).ToArrayAsync(CancellationToken);
+    }
+
+    /// <summary>Changes a binding of a tenant in the directory, as the operator does until a command sets bindings.</summary>
+    public async Task SetBindingAsync(string id, string name, Action<TenantBindingRow> change)
+    {
+        await using var context = NewContext();
+        var binding = await context.TenantBindings.SingleAsync(row => row.TenantId == id && row.Name == name, CancellationToken);
+        change(binding);
+        await context.SaveChangesAsync(CancellationToken);
     }
 
     public async Task<long> CountEntriesAsync()
