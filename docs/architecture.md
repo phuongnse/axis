@@ -104,7 +104,7 @@ tests/
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
   keycloak/               the development Keycloak realm with the sample's users
-  postgres/               init-roles.sql, which creates the axis_schema and axis_runtime database roles
+  postgres/               init-roles.sql, which creates the axis_schema and axis_runtime database roles, and the preview tenant's database and roles
   packages/               the sample extension package payment-references and its unit tests
 deploy/
   compose/                production Compose example
@@ -193,8 +193,10 @@ Under `Tenancy:Source=directory` there is no `SchemaConnectionString`: the
 server and the worker hold only runtime database roles for tenant databases.
 The server builds none from the directory.
 `appsettings.Development.json` maps `localhost` to tenant `default` on the
-compose database; the E2E server maps `127.0.0.1` to a tenant on the E2E
-database. The `Platform` connection string is separate and still serves the
+compose database, and `preview.localhost` to its preview tenant `default-preview`
+on the `axis_preview` database. The E2E server maps `127.0.0.1` to a tenant on the E2E
+database, and `localhost` to its preview tenant. See
+[preview tenants](reference/configuration.md#preview-tenants). The `Platform` connection string is separate and still serves the
 readiness check.
 
 Startup fails with an `InvalidOperationException` naming every problem when:

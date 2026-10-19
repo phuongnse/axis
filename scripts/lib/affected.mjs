@@ -52,6 +52,7 @@ export const smokeSuites = {
     'Axis.slnx',
     /\.csproj$/,
     /^src\/(.+\/)?appsettings\.json$/,
+    /^src\/(.+\/)?appsettings\.Development\.json$/,
     'tests/Axis.PurchasingStub/',
     'web/package.json',
     'web/package-lock.json',

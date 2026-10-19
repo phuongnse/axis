@@ -24,6 +24,10 @@
 # PostgreSQL loads samples/postgres/init-roles.sql on its first start, which creates the database
 # roles axis_schema and axis_runtime. The server runs startup activation as axis_schema and serves
 # requests as axis_runtime. The worker runs only as axis_runtime and gets no schema connection string.
+# The same file creates the preview tenant's database axis_preview and its roles axis_preview_schema and
+# axis_preview_runtime. The server and the worker serve the preview tenant default-preview on localhost,
+# while the main tenant stays on 127.0.0.1, so one server serves both. The preview tenant has no
+# deployment bindings, and the worker gets only its runtime connection string.
 # A Compose smoke test then builds the image and runs the stack on free ports. An images smoke test
 # then builds the production images axis-server, axis-worker and axis-admin and runs them read-only
 # against a throwaway PostgreSQL. An on-premises smoke test then installs deploy/compose/compose.yaml
@@ -182,6 +186,9 @@ export AXIS_E2E_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis_
 # Only Playwright, which starts the server, gets the schema role. It is not exported here, so the
 # worker below never inherits it.
 schema_database="Host=127.0.0.1;Port=$port;Database=axis;Username=axis_schema;Password=axis"
+# The preview tenant has its own database and roles. Only Playwright gets its schema role as well.
+export AXIS_E2E_PREVIEW_DATABASE="Host=127.0.0.1;Port=$port;Database=axis_preview;Username=axis_preview_runtime;Password=axis"
+preview_schema_database="Host=127.0.0.1;Port=$port;Database=axis_preview;Username=axis_preview_schema;Password=axis"
 export AXIS_E2E_KEYCLOAK_URL="http://127.0.0.1:$keycloak_port"
 
 # The worker waits until the server, which Playwright starts, has migrated the database. It runs
@@ -194,10 +201,13 @@ export AXIS_E2E_KEYCLOAK_URL="http://127.0.0.1:$keycloak_port"
 # The worker runs in Development, as the server does, because only Development lets a connector
 # call the stub over http. It gets the same purchasing system bindings as the server.
 # Its health endpoints listen on a free port, so a worker under scripts/dev.sh does not hold the address.
+# Bash cannot export a name with a hyphen, so the preview tenant's settings go through env.
 run_worker() {
   local child
   while true; do
-    DOTNET_ENVIRONMENT=Development Health__Urls=http://127.0.0.1:0 Tenants__default__Hosts__0=127.0.0.1 \
+    env 'Tenants__default-preview__PreviewOf=default' 'Tenants__default-preview__Hosts__0=localhost' \
+      "Tenants__default-preview__ConnectionString=$AXIS_E2E_PREVIEW_DATABASE" \
+      DOTNET_ENVIRONMENT=Development Health__Urls=http://127.0.0.1:0 Tenants__default__Hosts__0=127.0.0.1 \
       Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 \
       Extensions__Path="$root/artifacts/extensions" Modules__Path="$root/artifacts/modules" \
       Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
@@ -215,7 +225,8 @@ run_worker() {
 run_worker &
 worker_pid=$!
 
-AXIS_E2E_SCHEMA_DATABASE="$schema_database" run_suite playwright tests/e2e npm test --prefix tests/e2e
+AXIS_E2E_SCHEMA_DATABASE="$schema_database" AXIS_E2E_PREVIEW_SCHEMA_DATABASE="$preview_schema_database" \
+  run_suite playwright tests/e2e npm test --prefix tests/e2e
 playwright_status=$status
 
 worker_failed=0

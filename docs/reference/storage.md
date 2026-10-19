@@ -239,7 +239,10 @@ database roles, `axis_schema` and `axis_runtime`, own each test database with
 `axis_schema`, run the server and worker as `axis_runtime`, and run activation
 as `axis_schema`. Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the
 same: `samples/postgres/init-roles.sql` creates the roles and grants them
-nothing. The server and the worker run the start checks for a superuser, a
+nothing. It also creates the development [preview tenant](configuration.md#preview-tenants)'s
+database `axis_preview`, owned by its own schema role `axis_preview_schema`, and its runtime role
+`axis_preview_runtime`, both with the development password `axis`. An existing Compose volume
+needs `docker compose down -v` once to get them. The server and the worker run the start checks for a superuser, a
 schema owner or a role that may create objects, also when the right comes
 through role membership.
 
