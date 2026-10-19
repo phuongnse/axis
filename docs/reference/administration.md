@@ -422,6 +422,13 @@ installation. The operator also keeps these safe:
 Point-in-time recovery and restoring into another installation are out of scope,
 see [Not in M9](#not-in-m9).
 
+## Version
+
+*(Planned for M9.)* `version` prints the Axis version on one line. It takes no
+option and needs no settings. It always exits `0`. The production image of the
+admin host carries the same version in its OCI label, see
+[installation](installation.md#images).
+
 ## Not in M9
 
 - Deleting a tenant.
