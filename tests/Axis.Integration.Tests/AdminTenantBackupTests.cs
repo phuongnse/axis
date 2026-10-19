@@ -405,6 +405,9 @@ public sealed class AdminBackupFixture : IAsyncLifetime
     internal Task<AdminResult> BackupAsync(string file) =>
         Scenario.RunAsync(["tenant", "backup", TenantId, "--out", file], path: Tools.PathSetting);
 
+    /// <summary>Runs a statement in the tenant database as the schema role.</summary>
+    internal async Task ExecuteAsync(string sql) => await ScalarAsync(sql);
+
     /// <summary>Creates a draft Operations request through the record API and returns its id, after the response came back.</summary>
     public static async Task<Guid> CreateRequestAsync(HttpClient client)
     {
