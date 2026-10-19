@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { startServer } from '../activate'
 import { e2eApp, studioFolder } from '../server-settings'
@@ -99,6 +99,35 @@ test('an author saves a resource while the server restarts, and sees the saved v
     )
   } finally {
     await server.stop()
+  }
+})
+
+test('an author selects a diagnostic and the editor shows the field at its path', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const endpoint = items.find((item) => item.file === 'endpoints/submit-purchase-request.json')!
+  const file = path.join(studioFolder, 'endpoints/submit-purchase-request.json')
+  const original = await readFile(file, 'utf8')
+
+  try {
+    await page.goto(`/studio?app=PurchaseRequests&resource=${endpoint.id}`)
+    await page.getByTestId('studio-field-/input/2/target').getByRole('textbox').fill('NoSuchEntity')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+
+    await page.goto('/studio?app=PurchaseRequests')
+    const diagnostic = page
+      .getByTestId('studio-diagnostics')
+      .getByRole('button')
+      .filter({ hasText: 'Path: /input/2/target' })
+    await expect(diagnostic).toContainText('AXC0012')
+    await diagnostic.click()
+
+    await expect(page).toHaveURL(/path=%2Finput%2F2%2Ftarget/)
+    await expect(page.getByTestId('studio-field-/input/2/target')).toBeInViewport()
+  } finally {
+    await writeFile(file, original)
   }
 })
 

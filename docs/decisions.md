@@ -1757,8 +1757,8 @@ Studio edits an application's resource files through an authoring API
 on the server. The routes that list applications, list, read, patch, create and
 delete resources and give diagnostics are built, and so are the Studio page's
 list, search, editor, diagnostics panel, Uses and Used by lists, the delete
-button with its warning, and the reconnect message. The rest is *(planned for
-M9)*: opening a diagnostic at its path. See the
+button with its warning, and the reconnect message. A diagnostic also opens its
+resource at its path. See the
 [authoring API](reference/authoring.md) for the routes and answers, the
 [Studio settings](reference/configuration.md#studio) and the
 [Studio section of the frontend](reference/frontend.md#studio).
@@ -1896,10 +1896,10 @@ the release, and the compile of a module's entities, sequences, seeds, events,
 data sources and forms with ids derived from the application are built. So are the
 `target`, `sequence` and `dataSource` references, the module texts that join the
 application's texts by locale, a module's rules and the calls to them from
-application expressions, and the codes `AXC0207` to `AXC0214`. So are activating
+application expressions, module validations that call rules of their own
+module, and the codes `AXC0207` to `AXC0214`. So are activating
 module entities, seeding and the record API for module entities. So is the
-sample module `departments`. Module validations that call rules are
-*(planned for M9)*. See the
+sample module `departments`. See the
 [Modules section](reference/configuration.md#modules) of the configuration
 reference for the manifest, the diagnostic codes and the rules, and
 [storage](reference/storage.md) for the derived ids. The owner

@@ -340,9 +340,16 @@ public static class ApplicationCompiler
         // aggregate item expressions see no rules.
         var appRules = RuleChecker.Check(loaded.Rules, references, diagnostics, moduleRules, declaredModules);
         var rules = (IReadOnlyList<ExpressionRule>)[.. appRules.Values, .. moduleRules];
+
+        // A module entity sees only the rules of its own module, by plain name. It sees no
+        // application rule and no qualified call.
+        IReadOnlyList<ExpressionRule> RulesFor(EntityResource entity) =>
+            IsModuleResource(entity)
+                ? [.. moduleRules.Where(rule => rule.Module == entity.Name[..entity.Name.IndexOf('/')]).Select(rule => rule with { Module = null })]
+                : rules;
+
         foreach (var entity in allEntities)
         {
-            // A module entity sees no rules yet, so it cannot call an application rule or a module rule.
             CheckEntity(
                 entity,
                 FindEntity,
@@ -352,7 +359,7 @@ public static class ApplicationCompiler
                 loaded.UnloadedSequenceNames,
                 moduleReferences,
                 references,
-                IsModuleResource(entity) ? [] : rules,
+                RulesFor(entity),
                 IsModuleResource(entity) ? null : declaredModules,
                 diagnostics);
         }
@@ -480,7 +487,7 @@ public static class ApplicationCompiler
         }
 
         var entities = allEntities
-            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, IsModuleResource(entity) ? [] : rules, IsModuleResource(entity) ? null : declaredModules))
+            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, RulesFor(entity), IsModuleResource(entity) ? null : declaredModules))
             .ToList();
         var model = new ApplicationModel
         {
@@ -800,7 +807,8 @@ public static class ApplicationCompiler
             if (parsed.Succeeded)
             {
                 var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
-                if (check.Succeeded)
+                // Module rule calls add no edges, as for module rules.
+                if (check.Succeeded && !IsModuleResource(entity))
                 {
                     references.AddRuleCalls(entity, $"{path}/expression", check);
                 }

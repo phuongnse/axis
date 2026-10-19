@@ -299,13 +299,15 @@ Paths in validations and computed fields are not built. There a path is
   application declares is called as `departments:IsManager(x)`. It is allowed
   wherever a rule call is: a rule body, a validation, a data source filter, a
   process condition and a policy filter. The module id must match exactly. The
-  rule name ignores letter case. A bare name never reaches a module rule, and a
-  qualified name never reaches an application rule or a built-in function. The
+  rule name ignores letter case. A bare name in an application expression never
+  reaches a module rule. A module's rule bodies and entity validations call that
+  module's rules by bare name. A qualified name never reaches an application rule
+  or a built-in function. The
   interpreter runs the module rule's body, and a filter's SQL inlines it, with
   the module rules it calls in turn. A module that `modules` in
   `application.json` does not declare is `AXC0207`. A declared module without
   that rule is `AXC0050`, so is a qualified call where no rules are callable,
-  such as a computed field or a module's own rule.
+  such as a computed field, a module's own rule or a module entity validation.
 - **Scope in a computed field.** The expression sees the entity's own fields
   that are not computed and its child collections through aggregates, and no
   reference path. Another computed field, itself included, is an unknown

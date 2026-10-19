@@ -14,6 +14,7 @@ const entityId = 'd9ccbf89-5004-4d52-8885-2ee377b7caa5'
 const formId = '5b6c7d8e-9f01-4a2b-8c3d-4e5f60718293'
 const departmentId = '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b'
 const manifestId = 'f0e1d2c3-b4a5-4968-8776-655443322110'
+const folder = '/api/studio/apps/PurchaseRequests'
 
 const resources: StudioResourceItem[] = [
   { id: departmentId, kind: 'entity', name: 'Department', file: 'entities/department.json', version: 'a', usedBy: 1 },
@@ -149,7 +150,6 @@ function stubServer(
   patch: PatchAnswer = { status: 200, body: { version: 'b2', diagnostics: [savedDiagnostic] } },
   outage: Outage = { down: null },
 ) {
-  const folder = '/api/studio/apps/PurchaseRequests'
   const entityPath = `${folder}/resources/${entityId}`
   const manifestPath = `${folder}/resources/${manifestId}`
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
@@ -412,6 +412,57 @@ describe('StudioPage', () => {
     expect(screen.getByRole('button', { name: /AXC0101/ })).toBeInTheDocument()
   })
 
+  it('opens the resource of a clicked diagnostic at its path and scrolls to that field', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      stubServer()
+      renderPage()
+
+      await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+
+      const field = await screen.findByTestId('studio-field-/fields/0/type')
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+      expect(scrollIntoView.mock.contexts).toEqual([field])
+      expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}&path=%2Ffields%2F0%2Ftype`)
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
+  it('opens a diagnostic without a path at the top of its resource', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      const fetchMock = stubServer()
+      const base = fetchMock.getMockImplementation()!
+      const noPath: StudioDiagnostic = {
+        code: 'AXC0102',
+        severity: 'error',
+        message: 'The entity has no label.',
+        file: 'entities/purchase-request.json',
+        path: '',
+        resourceId: entityId,
+      }
+      fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+        if (input === `${folder}/diagnostics`) {
+          return json({ diagnostics: [noPath] })
+        }
+        return base(input, init)
+      })
+      renderPage()
+
+      await userEvent.click(await screen.findByRole('button', { name: /AXC0102/ }))
+
+      await screen.findByTestId('studio-field-/fields/0/name')
+      expect(screen.getByTestId('location')).toHaveTextContent(/resource=[^&]+$/)
+      expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true')
+      expect(scrollIntoView).not.toHaveBeenCalled()
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
   it('picks the only application by itself', async () => {
     const fetchMock = stubServer()
     renderPage('/studio')
@@ -504,6 +555,56 @@ describe('StudioPage', () => {
       const field = await screen.findByTestId('studio-field-/fields/1/maxLength')
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
       expect(scrollIntoView.mock.contexts).toEqual([field])
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
+  it('opens a path inside a map in the JSON view', async () => {
+    const fetchMock = stubServer()
+    const base = fetchMock.getMockImplementation()!
+    const textId = '3f9c2a10-7b5e-4d8c-9e1f-0a1b2c3d4e5f'
+    const textItem: StudioResourceItem = {
+      id: textId,
+      kind: 'text',
+      name: null,
+      file: 'texts/en.json',
+      version: 'e',
+      usedBy: 0,
+    }
+    const textContent = { id: textId, kind: 'text', name: null, formatVersion: 1, locale: 'en', texts: { 'a.b': 'x' } }
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === `${folder}/resources`) {
+        return json({ items: [...resources, textItem] })
+      }
+      if (input === `${folder}/resources/${textId}`) {
+        return json({ ...textItem, content: textContent })
+      }
+      if (input === `${folder}/resources/${textId}/references`) {
+        return json({ uses: [], usedBy: [] })
+      }
+      return base(input, init)
+    })
+    renderPage(`/studio?app=PurchaseRequests&resource=${textId}&path=%2Ftexts%2Fa.b`)
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true'))
+    expect(screen.getByRole('textbox', { name: 'JSON' })).toHaveValue(JSON.stringify(textContent, null, 2))
+  })
+
+  it('shows the form again for a path it can show after a path it cannot show', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      stubServer()
+      renderPage(`/studio?app=PurchaseRequests&resource=${entityId}&path=%2Funknown`)
+      await waitFor(() => expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true'))
+
+      await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+
+      const field = await screen.findByTestId('studio-field-/fields/0/type')
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+      expect(scrollIntoView.mock.contexts).toEqual([field])
+      expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true')
     } finally {
       delete (Element.prototype as Partial<Element>).scrollIntoView
     }
