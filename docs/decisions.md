@@ -1288,7 +1288,7 @@ The owner confirmed these points for issue #414 on 2026-10-16.
 - **Creating the database roles:**
   - Axis creates no database roles or databases. Whoever installs Axis does,
     while tenants come from the `Tenants` section.
-  - *(Planned for M9.)* Under `Tenancy:Source=directory`, `tenant create`
+  - *(Built for M9.)* Under `Tenancy:Source=directory`, `tenant create`
     creates them, see
     [D43](#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
   - Docker Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the test fixtures
@@ -2160,8 +2160,8 @@ serving from the last good directory while it still shows the problem.
 
 A platform operator creates tenants, migrates every tenant database and
 activates releases with a command-line admin host, `Axis.Admin`. This is
-planned for M9 and none of it is built. Until then tenants come from the
-`Tenants` section and the server migrates and activates at start, as in
+planned for M9. Only `tenant create` is built. Until the rest is, tenants can
+come from the `Tenants` section and the server migrates and activates at start, as in
 [D31](#d31-separate-database-roles--agreed). See
 [administration](reference/administration.md) for every command,
 [database roles](reference/storage.md#database-roles) for who holds which
