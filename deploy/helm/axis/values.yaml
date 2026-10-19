@@ -35,7 +35,8 @@ migrate:
   resources: {}
 
 tenancy:
-  # How often the hosts reload the tenant directory, such as "30s".
+  # How often the hosts reload the tenant directory, as a time span such as
+  # "00:00:30". A value like "30s" stops the hosts at start.
   # Empty keeps the host default.
   refreshInterval: ""
 
