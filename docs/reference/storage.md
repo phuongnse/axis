@@ -22,8 +22,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.release_computed_fingerprints`, the hash of the
     computed definitions of each entity in each release. It also owns
     `axis.publish_requests` (the requests that Studio stores and the publisher
-    runs) and `axis.release_activations` (the activation history with release
-    numbers), both _(planned for M10)_, see
+    runs). It will also own `axis.release_activations` (the activation history
+    with release numbers) _(planned for M10)_, see
     [Publish requests and release history](#publish-requests-and-release-history). The caller
     supplies the tenant database connection. Other modules read and set the
     active release and its site paths only through `IActiveReleaseStore`;
@@ -255,16 +255,16 @@ through role membership.
 
 What each database role may do:
 
-| Objects                                                                                                                                                                                                                                     | Schema database role                                             | Runtime database role                                             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `entities` tables                                                                                                                                                                                                                           | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields` | Owns them                                                        | Read and write rows                                               |
-| Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                     | Owns them                                                        | Read only                                                         |
-| Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                         | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
-| `publish_requests` _(planned for M10)_                                                                                                                                                                                                      | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |
-| `release_activations` _(planned for M10)_                                                                                                                                                                                                   | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
-| Sequences in `axis` and `entities`                                                                                                                                                                                                          | Owns them                                                        | `USAGE`, `SELECT`                                                 |
-| Create, alter, drop                                                                                                                                                                                                                         | Yes                                                              | No                                                                |
+| Objects                                                                                                                                                                                                                                     | Schema database role                                                        | Runtime database role                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `entities` tables                                                                                                                                                                                                                           | Owns them                                                                   | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields` | Owns them                                                                   | Read and write rows                                               |
+| Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                     | Owns them                                                                   | Read only                                                         |
+| Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                         | Insert and read. The trigger refuses update, delete and truncate            | Read only                                                         |
+| `publish_requests`                                                                                                                                                                                                                          | Owns it. The publisher changes the status and the lease _(planned for M10)_ | `SELECT` and `INSERT` only. It never updates or deletes a request |
+| `release_activations` _(planned for M10)_                                                                                                                                                                                                   | Insert and read. The trigger refuses update, delete and truncate            | Read only                                                         |
+| Sequences in `axis` and `entities`                                                                                                                                                                                                          | Owns them                                                                   | `USAGE`, `SELECT`                                                 |
+| Create, alter, drop                                                                                                                                                                                                                         | Yes                                                                         | No                                                                |
 
 - **Default privileges.** The schema database role sets default privileges. A
   new table in `entities` gives the runtime database role `SELECT`, `INSERT`,
@@ -275,7 +275,7 @@ What each database role may do:
   runtime writes. It grants row access on those and revokes `INSERT`, `UPDATE`,
   `DELETE` and `TRUNCATE` on every other `axis` table, so a database with
   older, wider grants is repaired. A new system table is read-only until
-  someone adds it to the list. _(Planned for M10:)_ the list has a second
+  someone adds it to the list. The list has a second
   category, tables where runtime may only insert. `publish_requests` is the
   only one. It grants `SELECT` and `INSERT` and revokes `UPDATE`, `DELETE` and
   `TRUNCATE`, so the server cannot change the status of a request.
@@ -1146,15 +1146,17 @@ schema of the tenant database.
 
 ## Publish requests and release history
 
-_(Planned for M10.)_ `Axis.Configuration` owns both tables, in the `axis`
-schema of each tenant database. See
+`Axis.Configuration` owns both tables, in the `axis`
+schema of each tenant database. `axis.publish_requests` is built. The release
+history, the routes and the publisher are planned for M10. See
 [D47](../decisions.md#d47-publishing-from-studio--agreed) and the
 [authoring API](authoring.md#publishing).
 
 ### Publish requests
 
 `axis.publish_requests` holds one row per request. The server inserts a row
-over the runtime role. Only the publisher changes a row, over the schema role.
+over the runtime role _(planned for M10)_. Only the publisher changes a row,
+over the schema role _(planned for M10)_.
 An index on `(application_id, status, requested_at, id)` serves the claim.
 
 | Column              | Type                | Meaning                                                                                                                                |
