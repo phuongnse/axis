@@ -26,6 +26,49 @@ internal sealed class TenantOidcSettings
     /// <summary>The names of the claims that give the user id, the display name and the roles.</summary>
     public TenantOidcClaims Claims { get; set; } = new();
 
+    /// <summary>Reads the Oidc settings of one tenant and checks them.</summary>
+    /// <param name="problems">Receives one message for each problem found. The messages hold no secret.</param>
+    /// <returns>The settings, or null when there are problems.</returns>
+    internal static TenantOidcSettings? TryCreate(TenantEntry tenant, List<string> problems)
+    {
+        if (tenant.Oidc is not { } source)
+        {
+            problems.Add($"Tenant '{tenant.Id}' has no Oidc block.");
+            return null;
+        }
+
+        var count = problems.Count;
+        var oidc = new TenantOidcSettings
+        {
+            Authority = source.Authority,
+            ClientId = source.ClientId,
+            ClientSecret = source.ClientSecret,
+            EndpointAudience = source.EndpointAudience,
+            Claims =
+            {
+                UserId = source.UserIdClaim ?? "",
+                DisplayName = source.DisplayNameClaim ?? "",
+                Roles = source.RolesClaim ?? "",
+            },
+        };
+        if (string.IsNullOrWhiteSpace(oidc.Authority))
+        {
+            problems.Add($"Tenant '{tenant.Id}' has no Oidc authority.");
+        }
+
+        if (string.IsNullOrWhiteSpace(oidc.ClientId))
+        {
+            problems.Add($"Tenant '{tenant.Id}' has no Oidc client id.");
+        }
+
+        if (oidc.ClientSecret is null)
+        {
+            problems.Add($"Tenant '{tenant.Id}' has no Oidc client secret.");
+        }
+
+        return problems.Count == count ? oidc : null;
+    }
+
     /// <summary>Reads the Oidc settings of every tenant and checks them.</summary>
     /// <returns>The settings keyed by tenant id.</returns>
     /// <exception cref="InvalidOperationException">
@@ -37,41 +80,10 @@ internal sealed class TenantOidcSettings
         var problems = new List<string>();
         foreach (var tenant in catalog.Tenants)
         {
-            if (tenant.Oidc is not { } source)
+            if (TryCreate(tenant, problems) is { } oidc)
             {
-                problems.Add($"Tenant '{tenant.Id}' has no Oidc block.");
-                continue;
+                settings[tenant.Id] = oidc;
             }
-
-            var oidc = new TenantOidcSettings
-            {
-                Authority = source.Authority,
-                ClientId = source.ClientId,
-                ClientSecret = source.ClientSecret,
-                EndpointAudience = source.EndpointAudience,
-                Claims =
-                {
-                    UserId = source.UserIdClaim ?? "",
-                    DisplayName = source.DisplayNameClaim ?? "",
-                    Roles = source.RolesClaim ?? "",
-                },
-            };
-            if (string.IsNullOrWhiteSpace(oidc.Authority))
-            {
-                problems.Add($"Tenant '{tenant.Id}' has no Oidc authority.");
-            }
-
-            if (string.IsNullOrWhiteSpace(oidc.ClientId))
-            {
-                problems.Add($"Tenant '{tenant.Id}' has no Oidc client id.");
-            }
-
-            if (oidc.ClientSecret is null)
-            {
-                problems.Add($"Tenant '{tenant.Id}' has no Oidc client secret.");
-            }
-
-            settings[tenant.Id] = oidc;
         }
 
         if (problems.Count > 0)

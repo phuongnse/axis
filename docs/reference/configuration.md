@@ -1090,7 +1090,7 @@ once over that connection, and also ignores a `Tenants` section with a warning.
 It never reads `ConnectionStrings:PlatformSchema`. If its first read fails, it
 retries every `Worker:PollInterval` and is not ready until a read works. The
 worker does not read the directory again, and Degraded readiness for a failed
-refresh is not built. Neither is sign-in for a tenant added at a refresh.
+refresh is not built.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |

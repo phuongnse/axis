@@ -1,4 +1,5 @@
 using Axis.Data.Storage;
+using Axis.Server.Authentication;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Npgsql;
@@ -19,6 +20,7 @@ internal sealed partial class TenantDirectoryRefresh(
     TenantDirectoryRefreshOptions options,
     TenantSecretCipher cipher,
     TenantConnectionFactory connections,
+    TenantSignInSchemes signIn,
     TimeProvider timeProvider,
     ILogger<TenantDirectoryRefresh> logger) : BackgroundService
 {
@@ -69,9 +71,27 @@ internal sealed partial class TenantDirectoryRefresh(
                 }
             }
 
+            // The start check stops the server on incomplete sign-in settings. Here the tenant is withheld, so one
+            // tenant cannot stop the refresh of the others.
+            var signInSettings = new Dictionary<string, TenantOidcSettings>(StringComparer.Ordinal);
+            foreach (var tenant in loaded.Tenants.Where(tenant => !withheld.Contains(tenant.Id, StringComparer.Ordinal)))
+            {
+                var problems = new List<string>();
+                if (TenantOidcSettings.TryCreate(tenant, problems) is { } settings)
+                {
+                    signInSettings[tenant.Id] = settings;
+                }
+                else
+                {
+                    withheld.Add(tenant.Id);
+                    LogSignInIncomplete(tenant.Id, string.Join(" ", problems));
+                }
+            }
+
             var next = loaded.Withhold(withheld);
             var changed = next.DatabaseChanges(directory.Current);
             var dropped = directory.Current.Tenants.Select(tenant => tenant.Id).Except(next.Tenants.Select(tenant => tenant.Id), StringComparer.Ordinal);
+            signIn.Apply(signInSettings, next.OidcChanges(directory.Current));
             directory.Replace(next);
 
             // A tenant that is no longer served, or serves on new settings, must not keep its old pool.
@@ -111,6 +131,9 @@ internal sealed partial class TenantDirectoryRefresh(
 
     [LoggerMessage(LogLevel.Error, "Tenant {TenantId} is not served until its runtime database role passes the check. {Reason}")]
     private partial void LogRoleCheckFailed(string tenantId, string reason);
+
+    [LoggerMessage(LogLevel.Error, "Tenant {TenantId} is not served until its sign-in settings are complete. {Reason}")]
+    private partial void LogSignInIncomplete(string tenantId, string reason);
 
     [LoggerMessage(LogLevel.Information, "Read the tenant directory again. {TenantCount} tenant(s) served, {CheckedCount} checked, {WithheldCount} withheld.")]
     private partial void LogRefreshed(int tenantCount, int checkedCount, int withheldCount);

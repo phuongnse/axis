@@ -5,9 +5,11 @@ using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
+using Axis.Server.Authentication;
 using Axis.Server.Tenancy;
 using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +21,7 @@ using static Axis.Integration.Tests.RecordApiFixture;
 
 namespace Axis.Integration.Tests;
 
-public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
+public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
 {
     private const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
     private const string Departments = "/api/apps/RecordsApp/entities/Department/records";
@@ -255,6 +257,108 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
         Assert.DoesNotContain("Sales-a", list, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_tenant_added_at_a_refresh_gets_its_sign_in_redirect_and_its_endpoint_caller_scheme()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var authority = await keycloak.StartAsync();
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector());
+        using var client = SignInClient(factory);
+        using var before = await client.SendAsync(Request("/api/auth/sign-in", "b.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, before.StatusCode);
+        Assert.Null(await SchemeAsync(factory, EndpointCaller.SchemeName("b")));
+
+        await AddTenantsAsync(platform, b with { Host = "b.example.test", OidcAuthority = authority.ToString() });
+        await RefreshAsync(factory);
+
+        Assert.StartsWith(AuthorizationEndpoint(authority), await SignInLocationAsync(client, "b.example.test"), StringComparison.Ordinal);
+        Assert.NotNull(await SchemeAsync(factory, TenantSignIn.SchemeName("b")));
+        Assert.NotNull(await SchemeAsync(factory, EndpointCaller.SchemeName("b")));
+    }
+
+    [Fact]
+    public async Task A_tenant_suspended_at_a_refresh_answers_503_to_sign_in_and_loses_both_schemes()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var authority = await keycloak.StartAsync();
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test", OidcAuthority = authority.ToString() });
+        await using var factory = CreateFactory(platform, new LogCollector());
+        using var client = SignInClient(factory);
+        Assert.StartsWith(AuthorizationEndpoint(authority), await SignInLocationAsync(client, "a.example.test"), StringComparison.Ordinal);
+        Assert.NotNull(await SchemeAsync(factory, EndpointCaller.SchemeName("a")));
+
+        await UpdateTenantAsync(platform, "a", row => row.Status = "suspended");
+        await RefreshAsync(factory);
+
+        using var response = await client.SendAsync(Request("/api/auth/sign-in", "a.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Null(await SchemeAsync(factory, TenantSignIn.SchemeName("a")));
+        Assert.Null(await SchemeAsync(factory, EndpointCaller.SchemeName("a")));
+    }
+
+    [Fact]
+    public async Task A_changed_oidc_authority_applies_to_sign_in_after_one_refresh()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var axis = await keycloak.StartAsync();
+        var master = new Uri(axis.ToString().Replace("realms/axis", "realms/master", StringComparison.Ordinal));
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test", OidcAuthority = axis.ToString() });
+        await using var factory = CreateFactory(platform, new LogCollector());
+        using var client = SignInClient(factory);
+        Assert.StartsWith(AuthorizationEndpoint(axis), await SignInLocationAsync(client, "a.example.test"), StringComparison.Ordinal);
+
+        await UpdateTenantAsync(platform, "a", row => row.OidcAuthority = master.ToString());
+        Assert.StartsWith(AuthorizationEndpoint(axis), await SignInLocationAsync(client, "a.example.test"), StringComparison.Ordinal);
+        await RefreshAsync(factory);
+
+        Assert.StartsWith(AuthorizationEndpoint(master), await SignInLocationAsync(client, "a.example.test"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_tenant_added_with_a_blank_oidc_authority_answers_503_and_the_other_tenants_keep_working()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        var logs = new LogCollector();
+        await using var factory = CreateFactory(platform, logs);
+        using var client = factory.CreateClient().SignedInAs("anna");
+
+        await AddTenantsAsync(platform, b with { Host = "b.example.test" });
+        await UpdateTenantAsync(platform, "b", row => row.OidcAuthority = "");
+        await RefreshAsync(factory);
+
+        using var refused = await client.SendAsync(Request(Departments, "b.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
+        await ListAsync(client, "a.example.test");
+        Assert.Contains(
+            logs.Entries,
+            entry => entry.StartsWith("Error:", StringComparison.Ordinal) && entry.Contains("sign-in settings are complete", StringComparison.Ordinal));
+        Assert.Null(await SchemeAsync(factory, TenantSignIn.SchemeName("b")));
+    }
+
+    private static HttpClient SignInClient(WebApplicationFactory<Program> factory) =>
+        factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+    private static string AuthorizationEndpoint(Uri authority) => $"{authority.ToString().TrimEnd('/')}/protocol/openid-connect/auth?";
+
+    /// <summary>Starts sign-in on <paramref name="host"/> and returns where the redirect points.</summary>
+    private static async Task<string> SignInLocationAsync(HttpClient client, string host)
+    {
+        using var response = await client.SendAsync(Request("/api/auth/sign-in", host), CancellationToken);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        return response.Headers.Location?.ToString() ?? "";
+    }
+
+    private static Task<AuthenticationScheme?> SchemeAsync(WebApplicationFactory<Program> factory, string name) =>
+        factory.Services.GetRequiredService<IAuthenticationSchemeProvider>().GetSchemeAsync(name);
+
     private static WebApplicationFactory<Program> CreateFactory(string platform, LogCollector logs, params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -352,7 +456,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
                 SchemaUser = PostgreSqlServer.SchemaRole,
                 RuntimePassword = _cipher.Encrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.Role.Password),
                 SchemaPassword = _cipher.Encrypt(tenant.Id, TenantSecretFields.SchemaPassword, PostgreSqlServer.RolePassword),
-                OidcAuthority = "https://127.0.0.1:1/realms/axis",
+                OidcAuthority = tenant.OidcAuthority,
                 OidcClientId = "axis",
                 OidcClientSecret = _cipher.Encrypt(tenant.Id, TenantSecretFields.OidcClientSecret, "test"),
             });
@@ -400,7 +504,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database) : IClassFix
 
     private sealed record Role(string Name, string Password);
 
-    private sealed record DirectoryTenant(string Id, string Host, string DatabaseHost, int DatabasePort, string DatabaseName, Role Role)
+    private sealed record DirectoryTenant(string Id, string Host, string DatabaseHost, int DatabasePort, string DatabaseName, Role Role, string OidcAuthority = "https://127.0.0.1:1/realms/axis")
     {
         public string RuntimeConnectionString() =>
             new NpgsqlConnectionStringBuilder

@@ -2,6 +2,8 @@ using System.Security.Claims;
 using Axis.Core.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Axis.Server.Authentication;
 
@@ -27,7 +29,9 @@ internal static class EndpointCaller
     private const string RoleClaim = "axis:caller_role";
     private const string TenantIdClaim = "axis:tenant_id";
 
-    public static string SchemeName(string tenantId) => $"endpoint-{tenantId}";
+    public const string SchemePrefix = "endpoint-";
+
+    public static string SchemeName(string tenantId) => $"{SchemePrefix}{tenantId}";
 
     /// <summary>Whether the path is under <c>/api/apps/{app}/endpoints</c>, in any case.</summary>
     public static bool IsEndpointPath(PathString path)
@@ -71,90 +75,119 @@ internal static class EndpointCaller
 
     /// <summary>
     /// Registers the default request scheme, the endpoint caller scheme and one JWT bearer scheme
-    /// per tenant. A tenant without <c>Oidc:EndpointAudience</c> accepts no bearer token.
+    /// for each tenant in <paramref name="settings"/>. A refresh of the tenant directory adds and removes bearer
+    /// schemes later through <see cref="TenantSignInSchemes"/>. A tenant without <c>Oidc:EndpointAudience</c> accepts
+    /// no bearer token.
     /// </summary>
     /// <param name="allowHttp">Whether the identity provider may be reached over http, in Development and Testing only.</param>
     public static AuthenticationBuilder AddEndpointCallers(
         this AuthenticationBuilder builder,
-        IReadOnlyDictionary<string, TenantOidcSettings> tenants,
+        TenantSignInSettings settings,
         bool allowHttp)
     {
+        builder.Services.TryAddSingleton(settings);
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<JwtBearerOptions>, EndpointCallerOptions>(
+            sp => new EndpointCallerOptions(settings, allowHttp, sp.GetRequiredService<TimeProvider>())));
+
+        // A tenant added at a refresh has no AddJwtBearer call, so the post-configuration is registered here.
+        builder.Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IPostConfigureOptions<JwtBearerOptions>, JwtBearerPostConfigureOptions>());
+
         builder.AddPolicyScheme(RequestScheme, displayName: null, options =>
             options.ForwardDefaultSelector = context => IsEndpointPath(context.Request.Path) ? Scheme : Session.Scheme);
 
-        // Tenant resolution answers a request without a tenant before authentication runs. Should one
-        // get here anyway, the first tenant's scheme gives it no result, as it does any other tenant.
+        // Tenant resolution answers a request without a tenant before authentication runs, so one should
+        // never get here without a tenant.
         builder.AddPolicyScheme(Scheme, displayName: null, options =>
             options.ForwardDefaultSelector = context =>
             {
-                var current = context.RequestServices.GetRequiredService<ITenantContextAccessor>().Current;
-                return SchemeName(current?.TenantId ?? tenants.Keys.First());
+                var current = context.RequestServices.GetRequiredService<ITenantContextAccessor>().Current
+                    ?? throw new InvalidOperationException("No tenant context is set.");
+                return SchemeName(current.TenantId);
             });
 
-        foreach (var (tenantId, settings) in tenants)
+        foreach (var tenantId in settings.Current.Keys)
         {
-            builder.AddJwtBearer(SchemeName(tenantId), options =>
-            {
-                options.Authority = settings.Authority;
-                options.Audience = settings.EndpointAudience;
-                options.RequireHttpsMetadata = !allowHttp;
-                options.MapInboundClaims = false;
-                options.IncludeErrorDetails = false;
-                options.SaveToken = false;
-                options.Events = new JwtBearerEvents
-                {
-                    OnMessageReceived = context =>
-                    {
-                        var current = context.HttpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current;
-                        if (current?.TenantId != tenantId || string.IsNullOrWhiteSpace(settings.EndpointAudience))
-                        {
-                            context.NoResult();
-                        }
-
-                        return Task.CompletedTask;
-                    },
-                    OnTokenValidated = context =>
-                    {
-                        var principal = context.Principal;
-                        var callerId = principal?.FindFirst(settings.Claims.UserId)?.Value;
-                        if (principal is null || string.IsNullOrWhiteSpace(callerId))
-                        {
-                            context.Fail("The access token has no user id claim.");
-                            return Task.CompletedTask;
-                        }
-
-                        // Service-account tokens often have no name, and a bare id is hard to read in a history.
-                        var displayName = principal.FindFirst(settings.Claims.DisplayName)?.Value;
-                        if (string.IsNullOrWhiteSpace(displayName))
-                        {
-                            displayName = principal.FindFirst("azp")?.Value;
-                        }
-
-                        var roles = principal.FindAll(settings.Claims.Roles).Select(claim => claim.Value);
-                        context.Principal = CreatePrincipal(
-                            tenantId,
-                            callerId,
-                            string.IsNullOrWhiteSpace(displayName) ? callerId : displayName,
-                            roles);
-                        return Task.CompletedTask;
-                    },
-                };
-            });
-
-            // The expiry is checked against the server's clock, so tests can replace it. The
-            // parameters keep their default clock skew of 5 minutes.
-            builder.Services.AddOptions<JwtBearerOptions>(SchemeName(tenantId))
-                .Configure<TimeProvider>((options, clock) =>
-                    options.TokenValidationParameters.LifetimeValidator = (notBefore, expires, _, parameters) =>
-                    {
-                        var now = clock.GetUtcNow().UtcDateTime;
-                        return expires is { } expiresAt
-                            && now < expiresAt.ToUniversalTime() + parameters.ClockSkew
-                            && (notBefore is not { } notBeforeAt || now >= notBeforeAt.ToUniversalTime() - parameters.ClockSkew);
-                    });
+            builder.AddScheme<JwtBearerOptions, JwtBearerHandler>(SchemeName(tenantId), displayName: null, configureOptions: null);
         }
 
         return builder;
+    }
+}
+
+/// <summary>Builds the options of a tenant's bearer scheme from its settings, each time the options are created.</summary>
+internal sealed class EndpointCallerOptions(TenantSignInSettings settings, bool allowHttp, TimeProvider clock)
+    : IConfigureNamedOptions<JwtBearerOptions>
+{
+    public void Configure(JwtBearerOptions options) => Configure(Options.DefaultName, options);
+
+    public void Configure(string? name, JwtBearerOptions options)
+    {
+        if (name is null || !name.StartsWith(EndpointCaller.SchemePrefix, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var tenantId = name[EndpointCaller.SchemePrefix.Length..];
+        if (settings.Find(tenantId) is not { } tenant)
+        {
+            return;
+        }
+
+        options.Authority = tenant.Authority;
+        options.Audience = tenant.EndpointAudience;
+        options.RequireHttpsMetadata = !allowHttp;
+        options.MapInboundClaims = false;
+        options.IncludeErrorDetails = false;
+        options.SaveToken = false;
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var current = context.HttpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current;
+                if (current?.TenantId != tenantId || string.IsNullOrWhiteSpace(tenant.EndpointAudience))
+                {
+                    context.NoResult();
+                }
+
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var principal = context.Principal;
+                var callerId = principal?.FindFirst(tenant.Claims.UserId)?.Value;
+                if (principal is null || string.IsNullOrWhiteSpace(callerId))
+                {
+                    context.Fail("The access token has no user id claim.");
+                    return Task.CompletedTask;
+                }
+
+                // Service-account tokens often have no name, and a bare id is hard to read in a history.
+                var displayName = principal.FindFirst(tenant.Claims.DisplayName)?.Value;
+                if (string.IsNullOrWhiteSpace(displayName))
+                {
+                    displayName = principal.FindFirst("azp")?.Value;
+                }
+
+                var roles = principal.FindAll(tenant.Claims.Roles).Select(claim => claim.Value);
+                context.Principal = EndpointCaller.CreatePrincipal(
+                    tenantId,
+                    callerId,
+                    string.IsNullOrWhiteSpace(displayName) ? callerId : displayName,
+                    roles);
+                return Task.CompletedTask;
+            },
+        };
+
+        // The expiry is checked against the server's clock, so tests can replace it. The
+        // parameters keep their default clock skew of 5 minutes.
+        options.TokenValidationParameters.LifetimeValidator = (notBefore, expires, _, parameters) =>
+        {
+            var now = clock.GetUtcNow().UtcDateTime;
+            return expires is { } expiresAt
+                && now < expiresAt.ToUniversalTime() + parameters.ClockSkew
+                && (notBefore is not { } notBeforeAt || now >= notBeforeAt.ToUniversalTime() - parameters.ClockSkew);
+        };
     }
 }
 

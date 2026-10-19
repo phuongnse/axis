@@ -108,7 +108,7 @@ builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment
 builder.Services.AddModules(builder.Configuration, builder.Environment);
 
 // Fails startup when a tenant has no complete Oidc block. Only the server signs people in.
-var oidcTenants = TenantOidcSettings.Load(tenants);
+var oidcTenants = new TenantSignInSettings(TenantOidcSettings.Load(tenants));
 
 // The development, E2E and test servers run over http, where a Secure cookie never comes back.
 var plainHttpAllowed = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing");

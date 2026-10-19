@@ -97,8 +97,9 @@ creates one tenant.
 8. `version`: record the schema version and set the entry `active`.
 
 Hosts serve the tenant after their next refresh, see
-[tenant directory](../architecture.md#tenant-directory). The refresh is not
-built yet, so a server serves a new tenant only after it restarts. A new
+[tenant directory](../architecture.md#tenant-directory). The server serves a
+new tenant, with its sign-in, after its next refresh. The worker does not read
+the directory again, so it runs the tenant's work only after a restart. A new
 tenant also has no application until `activate` is built.
 
 **Settings and the platform tables.** The command checks its settings before any
