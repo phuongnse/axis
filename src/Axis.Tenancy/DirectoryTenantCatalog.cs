@@ -209,16 +209,18 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         }
 
         var activeIds = active.Select(row => row.Id).ToHashSet(StringComparer.Ordinal);
+        var byId = tenants.ToDictionary(row => row.Id, StringComparer.Ordinal);
         return new DirectoryTenantCatalog(
             active.Select(row => Entry(
                 row,
                 [.. hosts.Where(host => host.TenantId == row.Id).Select(host => host.Host)],
                 bindings.Where(binding => binding.TenantId == row.Id),
-                cipher)),
+                cipher,
+                row.PreviewOf is null ? null : byId[row.PreviewOf])),
             hosts.Where(host => !activeIds.Contains(host.TenantId)).Select(host => host.Host),
             active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal),
             active.ToDictionary(row => row.Id, row => row.SchemaVersion, StringComparer.Ordinal),
-            active.ToDictionary(row => row.Id, OidcKey, StringComparer.Ordinal));
+            active.ToDictionary(row => row.Id, row => OidcKey(row.PreviewOf is null ? row : byId[row.PreviewOf], row.PreviewOf is not null), StringComparer.Ordinal));
     }
 
     private static bool IsActive(TenantRow row) => row.Status == "active";
@@ -228,10 +230,20 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         $"{row.DatabaseHost}\n{row.DatabasePort}\n{row.DatabaseName}\n{row.RuntimeUser}\n{Convert.ToBase64String(row.RuntimePassword)}";
 
     // Compares the stored encrypted client secret, so nothing is decrypted to tell whether the sign-in settings changed.
-    private static string OidcKey(TenantRow row) =>
-        string.Join('\n', row.OidcAuthority, row.OidcClientId, Convert.ToBase64String(row.OidcClientSecret), row.EndpointAudience, row.ClaimUserId, row.ClaimDisplayName, row.ClaimRoles);
+    // A preview tenant is keyed by the settings of its main tenant, without the endpoint audience it never takes, so a
+    // change to the main tenant's sign-in reaches the preview at the next refresh.
+    private static string OidcKey(TenantRow signIn, bool preview) =>
+        string.Join('\n', signIn.OidcAuthority, signIn.OidcClientId, Convert.ToBase64String(signIn.OidcClientSecret), preview ? null : signIn.EndpointAudience, signIn.ClaimUserId, signIn.ClaimDisplayName, signIn.ClaimRoles);
 
-    private static TenantEntry Entry(TenantRow row, IReadOnlyList<string> hosts, IEnumerable<TenantBindingRow> bindingRows, TenantSecretCipher cipher)
+    // A preview tenant signs people in with the sign-in settings of its main tenant, whatever the main tenant's status,
+    // and decrypts the client secret under the main tenant's id. It never takes the main tenant's EndpointAudience, so it
+    // accepts no machine-caller bearer token. Its bindings are only its own.
+    private static TenantEntry Entry(
+        TenantRow row,
+        IReadOnlyList<string> hosts,
+        IEnumerable<TenantBindingRow> bindingRows,
+        TenantSecretCipher cipher,
+        TenantRow? main)
     {
         var id = row.Id;
         var bindings = new Dictionary<string, TenantBinding>(StringComparer.OrdinalIgnoreCase);
@@ -254,18 +266,19 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             Password = cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal(),
         }.ConnectionString);
 
+        var signIn = main ?? row;
         var oidc = new TenantOidc(
-            Blank(row.OidcAuthority),
-            Blank(row.OidcClientId),
-            row.OidcClientSecret.Length == 0
+            Blank(signIn.OidcAuthority),
+            Blank(signIn.OidcClientId),
+            signIn.OidcClientSecret.Length == 0
                 ? null
-                : SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.OidcClientSecret, row.OidcClientSecret).Reveal()),
-            Blank(row.EndpointAudience),
-            Blank(row.ClaimUserId),
-            Blank(row.ClaimDisplayName),
-            Blank(row.ClaimRoles));
+                : SecretValue.Deferred(() => cipher.Decrypt(signIn.Id, TenantSecretFields.OidcClientSecret, signIn.OidcClientSecret).Reveal()),
+            main is null ? Blank(signIn.EndpointAudience) : null,
+            Blank(signIn.ClaimUserId),
+            Blank(signIn.ClaimDisplayName),
+            Blank(signIn.ClaimRoles));
 
-        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings);
+        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf);
     }
 
     // A blank value counts as missing.

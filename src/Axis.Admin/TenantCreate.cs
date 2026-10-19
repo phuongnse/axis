@@ -1,4 +1,5 @@
 using Axis.Processes.Storage;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -119,7 +120,10 @@ internal sealed class TenantCreate : IAsyncDisposable
             }
 
             await using var transaction = await _platform.Database.BeginTransactionAsync(_cancellationToken);
-            var secret = _settings.Cipher.Encrypt(_id, TenantSecretFields.OidcClientSecret, _settings.OidcClientSecret);
+            // A preview tenant has no sign-in settings of its own, so it stores no client secret.
+            var secret = _request.PreviewOf is null
+                ? _settings.Cipher.Encrypt(_id, TenantSecretFields.OidcClientSecret, _settings.OidcClientSecret!)
+                : [];
             if (_row is null)
             {
                 _row = new TenantRow { Id = _id, Status = Provisioning };
@@ -127,9 +131,10 @@ internal sealed class TenantCreate : IAsyncDisposable
             }
             else
             {
-                // A provisioning tenant is never served, so an operator can fix the hosts and the OIDC settings on a rerun.
+                // A provisioning tenant is never served, so an operator can fix the hosts, the OIDC settings, the main tenant and the bindings on a rerun.
                 _row.Version++;
                 _platform.TenantHosts.RemoveRange(_platform.TenantHosts.Where(host => host.TenantId == _id));
+                _platform.TenantBindings.RemoveRange(_platform.TenantBindings.Where(binding => binding.TenantId == _id));
                 await _platform.SaveChangesAsync(_cancellationToken);
             }
 
@@ -138,15 +143,28 @@ internal sealed class TenantCreate : IAsyncDisposable
             _row.DatabaseName = _database;
             _row.SchemaUser = _schemaRole;
             _row.RuntimeUser = _runtimeRole;
-            _row.OidcAuthority = _request.OidcAuthority;
-            _row.OidcClientId = _request.OidcClientId;
+            _row.OidcAuthority = _request.OidcAuthority ?? "";
+            _row.OidcClientId = _request.OidcClientId ?? "";
             _row.OidcClientSecret = secret;
+            _row.PreviewOf = _request.PreviewOf;
             _platform.TenantHosts.AddRange(hosts.Select(host => new TenantHostRow { TenantId = _id, Host = host }));
+            _platform.TenantBindings.AddRange(_request.Bindings.Select(binding => new TenantBindingRow
+            {
+                TenantId = _id,
+                Name = binding.Key,
+                Kind = DeploymentBindingKinds.Url,
+                Url = binding.Value,
+            }));
             await _platform.SaveChangesAsync(_cancellationToken);
             await transaction.CommitAsync(_cancellationToken);
 
             Ok("entry");
             return null;
+        }
+        catch (Exception exception) when (IsPreviewConflict(exception))
+        {
+            Failed("entry", "the main tenant already has a preview tenant");
+            return 2;
         }
         catch (Exception exception) when (IsHostConflict(exception))
         {
@@ -159,6 +177,9 @@ internal sealed class TenantCreate : IAsyncDisposable
             return 1;
         }
     }
+
+    private static bool IsPreviewConflict(Exception exception) =>
+        exception is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ix_tenants_preview_of" } };
 
     private static bool IsHostConflict(Exception exception) =>
         exception is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } };

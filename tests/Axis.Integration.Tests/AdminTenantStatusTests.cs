@@ -87,9 +87,9 @@ public sealed class AdminTenantStatusTests(PostgreSqlFixture database) : IClassF
 
         Assert.Equal(0, result.Exit);
         Assert.Equal(3, result.Output.Length);
-        Assert.Equal(["id", "status", "hosts", "schema version"], Cells(result.Output[0]));
-        Assert.Equal([ids[0], "active", "a.example.test,b.example.test", first.SchemaVersion], Cells(result.Output[1]));
-        Assert.Equal([ids[1], "suspended", "c.example.test", second.SchemaVersion], Cells(result.Output[2]));
+        Assert.Equal(["id", "status", "hosts", "schema version", "preview of"], Cells(result.Output[0]));
+        Assert.Equal([ids[0], "active", "a.example.test,b.example.test", first.SchemaVersion, "-"], Cells(result.Output[1]));
+        Assert.Equal([ids[1], "suspended", "c.example.test", second.SchemaVersion, "-"], Cells(result.Output[2]));
 
         await scenario.AssertNoSecretsAsync();
     }
@@ -102,7 +102,7 @@ public sealed class AdminTenantStatusTests(PostgreSqlFixture database) : IClassF
         var result = await scenario.RunAsync(["tenant", "list"]);
 
         Assert.Equal(0, result.Exit);
-        Assert.Equal(["id", "status", "hosts", "schema version"], Cells(Assert.Single(result.Output)));
+        Assert.Equal(["id", "status", "hosts", "schema version", "preview of"], Cells(Assert.Single(result.Output)));
     }
 
     [Fact]

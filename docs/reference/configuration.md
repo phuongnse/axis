@@ -1177,8 +1177,8 @@ A tenant can be the preview tenant of another tenant, as
 [preview tenants](../architecture.md#preview-tenants) for how the hosts treat
 it. Under `Tenancy:Source=configuration`, the tenant setting
 `Tenants:{id}:PreviewOf` names the main tenant. As an environment variable it is
-`Tenants__<id>__PreviewOf`. A blank value counts as unset. *(Planned for M10:)*
-under `directory`, the operator sets it with
+`Tenants__<id>__PreviewOf`. A blank value counts as unset. Under `directory`,
+the operator sets it with
 [`tenant create --preview-of`](administration.md#tenant-create).
 
 ```json

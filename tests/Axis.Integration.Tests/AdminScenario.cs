@@ -49,6 +49,15 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         "--oidc-client-id", "axis",
     ];
 
+    /// <summary>The arguments that create a preview tenant of <paramref name="main"/>. Each binding is <c>name=value</c>.</summary>
+    public static string[] PreviewArgs(string id, string main, string host, params string[] bindings) =>
+    [
+        "tenant", "create", id,
+        "--preview-of", main,
+        "--host", host,
+        .. bindings.SelectMany(binding => new[] { "--binding", binding }),
+    ];
+
     /// <summary>A server on the tenant directory of <paramref name="platform"/>, with <c>anna</c> and <c>chau</c> able to sign in.</summary>
     public static WebApplicationFactory<Program> CreateServer(string platform) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -167,6 +176,21 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         await context.SaveChangesAsync(CancellationToken);
     }
 
+    public async Task<int> CountBindingsAsync(string id)
+    {
+        await using var context = NewContext();
+        return await context.TenantBindings.AsNoTracking().CountAsync(binding => binding.TenantId == id, CancellationToken);
+    }
+
+    /// <summary>Sets the endpoint audience of a tenant in the directory, which no command sets.</summary>
+    public async Task SetEndpointAudienceAsync(string id, string audience)
+    {
+        await using var context = NewContext();
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+        row.EndpointAudience = audience;
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
     public async Task<long> CountEntriesAsync()
     {
         await using var context = NewContext();
@@ -179,20 +203,22 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
     public async Task<long> CountRolesAsync(string id) =>
         (long)(await PostgreSqlServer.AdminScalarAsync(Platform, $"SELECT count(*) FROM pg_roles WHERE starts_with(rolname, 'axis_{id}_')", CancellationToken))!;
 
-    /// <summary>Every column of every tenant and host row, in a stable order.</summary>
+    /// <summary>Every column of every tenant row and every host and binding row, in a stable order.</summary>
     public async Task<string> SnapshotAsync()
     {
         await using var context = NewContext();
         var tenants = await context.Tenants.AsNoTracking().OrderBy(tenant => tenant.Id).ToListAsync(CancellationToken);
         var hosts = await context.TenantHosts.AsNoTracking().OrderBy(host => host.Host).ToListAsync(CancellationToken);
+        var bindings = await context.TenantBindings.AsNoTracking().OrderBy(binding => binding.TenantId).ThenBy(binding => binding.Name).ToListAsync(CancellationToken);
         return string.Join(
             '\n',
             tenants.Select(t => string.Join(
                 '|',
                 t.Id, t.Status, t.Version, t.DatabaseHost, t.DatabasePort, t.DatabaseName, t.RuntimeUser, t.SchemaUser,
                 Convert.ToHexString(t.RuntimePassword), Convert.ToHexString(t.SchemaPassword), t.OidcAuthority, t.OidcClientId,
-                Convert.ToHexString(t.OidcClientSecret), t.SchemaVersion))
-            .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}")));
+                Convert.ToHexString(t.OidcClientSecret), t.SchemaVersion, t.PreviewOf))
+            .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}"))
+            .Concat(bindings.Select(binding => $"{binding.TenantId}|{binding.Name}|{binding.Kind}|{binding.Url}")));
     }
 
     /// <summary>Sets the schema version recorded for a tenant, as if its database were on another schema.</summary>

@@ -16,7 +16,7 @@ internal static class TenantStatus
 
     private const string Provisioning = "provisioning";
 
-    private static readonly string[] _header = ["id", "status", "hosts", "schema version"];
+    private static readonly string[] _header = ["id", "status", "hosts", "schema version", "preview of"];
 
     public static Task<int> SuspendAsync(string connectionString, string id, TextWriter output, TextWriter error, CancellationToken cancellationToken) =>
         SetAsync(connectionString, id, Active, Suspended, output, error, cancellationToken);
@@ -84,7 +84,7 @@ internal static class TenantStatus
 
     public static async Task<int> ListAsync(string connectionString, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
-        List<(string Id, string Status, string SchemaVersion)> tenants;
+        List<(string Id, string Status, string SchemaVersion, string? PreviewOf)> tenants;
         ILookup<string, string> hosts;
         try
         {
@@ -92,12 +92,12 @@ internal static class TenantStatus
 
             // Only these columns are read, so no secret ever reaches the tool.
             var rows = await platform.Tenants.AsNoTracking()
-                .Select(tenant => new { tenant.Id, tenant.Status, tenant.SchemaVersion })
+                .Select(tenant => new { tenant.Id, tenant.Status, tenant.SchemaVersion, tenant.PreviewOf })
                 .ToListAsync(cancellationToken);
             var hostRows = await platform.TenantHosts.AsNoTracking()
                 .Select(host => new { host.TenantId, host.Host })
                 .ToListAsync(cancellationToken);
-            tenants = [.. rows.Select(row => (row.Id, row.Status, row.SchemaVersion)).OrderBy(row => row.Id, StringComparer.Ordinal)];
+            tenants = [.. rows.Select(row => (row.Id, row.Status, row.SchemaVersion, row.PreviewOf)).OrderBy(row => row.Id, StringComparer.Ordinal)];
             hosts = hostRows.OrderBy(row => row.Host, StringComparer.Ordinal).ToLookup(row => row.TenantId, row => row.Host);
         }
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
@@ -116,9 +116,10 @@ internal static class TenantStatus
             tenant.Status,
             string.Join(',', hosts[tenant.Id]),
             tenant.SchemaVersion.Length == 0 ? "-" : tenant.SchemaVersion,
+            tenant.PreviewOf ?? "-",
         }));
 
-        var widths = Enumerable.Range(0, 4).Select(column => table.Max(row => row[column].Length)).ToArray();
+        var widths = Enumerable.Range(0, _header.Length).Select(column => table.Max(row => row[column].Length)).ToArray();
         foreach (var row in table)
         {
             output.WriteLine(string.Join("  ", row.Select((cell, column) => cell.PadRight(widths[column]))).TrimEnd());
