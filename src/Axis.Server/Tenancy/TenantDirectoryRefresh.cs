@@ -13,7 +13,8 @@ internal sealed record TenantDirectoryRefreshOptions(string PlatformConnectionSt
 /// <summary>
 /// Under <c>Tenancy:Source=directory</c>, reads the tenant directory again every <c>Tenancy:RefreshInterval</c>. A tenant
 /// is served only while it is active and has passed the runtime role check on its current database settings. When a
-/// read fails, the server keeps serving the last good read. The log holds no host name and no connection value.
+/// read fails, the server keeps serving the last good read, logs one error per run of failed reads and reports Degraded readiness
+/// until a read works. The log holds no host name and no connection value.
 /// </summary>
 internal sealed partial class TenantDirectoryRefresh(
     TenantDirectoryCatalog directory,
@@ -22,6 +23,7 @@ internal sealed partial class TenantDirectoryRefresh(
     TenantConnectionFactory connections,
     TenantSignInSchemes signIn,
     TimeProvider timeProvider,
+    TenantDirectoryRefreshStatus status,
     ILogger<TenantDirectoryRefresh> logger) : BackgroundService
 {
     private readonly SemaphoreSlim _gate = new(1);
@@ -57,7 +59,13 @@ internal sealed partial class TenantDirectoryRefresh(
             }
             catch (InvalidOperationException exception)
             {
-                LogRefreshFailed(exception.InnerException?.GetType().Name ?? exception.GetType().Name);
+                // One error per run of failed reads. The status tells the next read whether a run is open.
+                if (!status.Failing)
+                {
+                    LogRefreshFailed(exception.InnerException?.GetType().Name ?? exception.GetType().Name);
+                }
+
+                status.Set(true);
                 return;
             }
 
@@ -93,6 +101,12 @@ internal sealed partial class TenantDirectoryRefresh(
             var dropped = directory.Current.Tenants.Select(tenant => tenant.Id).Except(next.Tenants.Select(tenant => tenant.Id), StringComparer.Ordinal);
             signIn.Apply(signInSettings, next.OidcChanges(directory.Current));
             directory.Replace(next);
+            if (status.Failing)
+            {
+                LogRefreshRecovered();
+            }
+
+            status.Set(false);
 
             // A tenant that is no longer served, or serves on new settings, must not keep its old pool.
             foreach (var id in changed.Concat(dropped).Distinct(StringComparer.Ordinal))
@@ -128,6 +142,9 @@ internal sealed partial class TenantDirectoryRefresh(
 
     [LoggerMessage(LogLevel.Error, "The tenant directory could not be read again over ConnectionStrings:Platform ({Cause}). The server keeps serving the last good read.")]
     private partial void LogRefreshFailed(string cause);
+
+    [LoggerMessage(LogLevel.Information, "The tenant directory was read again after failed reads. The server serves the new read.")]
+    private partial void LogRefreshRecovered();
 
     [LoggerMessage(LogLevel.Error, "Tenant {TenantId} is not served until its runtime database role passes the check. {Reason}")]
     private partial void LogRoleCheckFailed(string tenantId, string reason);

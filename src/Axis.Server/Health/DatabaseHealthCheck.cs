@@ -3,7 +3,10 @@ using Npgsql;
 
 namespace Axis.Server.Health;
 
-/// <summary>Reports whether the platform database accepts queries.</summary>
+/// <summary>
+/// Reports whether the platform database accepts queries. A failure is reported with the registration's failure status,
+/// so the registration decides whether it is Unhealthy or Degraded.
+/// </summary>
 internal sealed class DatabaseHealthCheck(NpgsqlDataSource dataSource) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -18,7 +21,7 @@ internal sealed class DatabaseHealthCheck(NpgsqlDataSource dataSource) : IHealth
         }
         catch (Exception exception) when (exception is NpgsqlException or TimeoutException)
         {
-            return HealthCheckResult.Unhealthy("The platform database is unreachable.", exception);
+            return new HealthCheckResult(context.Registration.FailureStatus, "The platform database is unreachable.", exception);
         }
     }
 }

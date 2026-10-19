@@ -111,6 +111,10 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     /// <exception cref="InvalidOperationException">
     /// The directory cannot be read. The message names <c>ConnectionStrings:Platform</c> and holds no connection value.
     /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// A binding is invalid, with the checks of the <c>configuration</c> source. The message names the tenant and the
+    /// binding, never the value.
+    /// </exception>
     public static async Task<DirectoryTenantCatalog> LoadAsync(
         string platformConnectionString,
         TenantSecretCipher cipher,
@@ -141,6 +145,24 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         }
 
         var active = tenants.Where(IsActive).ToList();
+        var problems = new List<string>();
+        foreach (var tenant in active.OrderBy(tenant => tenant.Id, StringComparer.Ordinal))
+        {
+            foreach (var binding in bindings.Where(binding => binding.TenantId == tenant.Id).OrderBy(binding => binding.Name, StringComparer.Ordinal))
+            {
+                // A secret is never decrypted here: it stays encrypted until the moment of use.
+                var hasValue = binding.Kind == DeploymentBindingKinds.Secret
+                    ? binding.SecretValue is { Length: > 0 }
+                    : !string.IsNullOrWhiteSpace(binding.Url);
+                TenantOptionsValidator.AddBindingProblems(tenant.Id, binding.Name, binding.Kind, hasValue, binding.Url, problems);
+            }
+        }
+
+        if (problems.Count > 0)
+        {
+            throw new InvalidOperationException($"The tenant directory is invalid. {string.Join(" ", problems)}");
+        }
+
         var activeIds = active.Select(row => row.Id).ToHashSet(StringComparer.Ordinal);
         return new DirectoryTenantCatalog(
             active.Select(row => Entry(

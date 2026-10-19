@@ -1084,13 +1084,14 @@ reads the directory over that role, then again every `Tenancy:RefreshInterval`,
 without a restart. It ignores a `Tenants` section and logs a warning at start. If
 the first read fails, the start stops with an error that names
 `ConnectionStrings:Platform`. If a later read fails, it keeps serving the last
-good read and logs an error. Under `directory` the worker needs
+good read, logs one error for each run of failed reads and reports Degraded
+readiness until a read works. Under `directory` the worker needs
 `ConnectionStrings:Platform` and `Platform:SecretKey`, reads its `active` tenants
 once over that connection, and also ignores a `Tenants` section with a warning.
 It never reads `ConnectionStrings:PlatformSchema`. If its first read fails, it
 retries every `Worker:PollInterval` and is not ready until a read works. The
-worker does not read the directory again, and Degraded readiness for a failed
-refresh is not built.
+worker does not read the directory again, and it has no Degraded readiness for a
+failed refresh.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -1489,8 +1490,8 @@ reconciles is in [Connector calls](processes.md#connector-calls).
   `Value`. The server and the worker must both hold them. Under
   `Tenancy:Source=directory`, the server reads the values from the
   [tenant directory](../architecture.md#tenant-directory) instead, and `secret`
-  values are stored encrypted and decrypted when resolved. The worker reading
-  them from the directory is planned for M9.
+  values are stored encrypted and decrypted when resolved. Under `directory`
+  the worker reads them from the directory too.
 - **Secrets from the environment.** A secret's value is set with an
   environment variable, such as
   `Tenants__default__Bindings__PurchasingSystemToken__Value`. A command-line
@@ -1517,12 +1518,16 @@ reconciles is in [Connector calls](processes.md#connector-calls).
   Activation checks bindings before it provisions anything, and reports every
   bad binding at once. Startup activation passes in each tenant's bindings,
   so a bad binding stops the start. A tenant is checked only when a release
-  is activated for it.
+  is activated for it. Under `directory` the bindings come from the tenant's
+  directory entry.
 - **Startup check.** A binding whose `Kind` is missing or is not `url` or
   `secret`, whose `Value` is blank, or a `url` binding whose value is not an
   absolute `http` or `https` URL, fails startup like the other
   [tenant checks](../architecture.md#tenant-configuration). The message names
-  the tenant and the binding, never the value.
+  the tenant and the binding, never the value. Under `directory` the same
+  check runs when the directory is read, and a `secret` binding must hold a
+  stored value, which is not decrypted. If it fails, the server stops its
+  start and the worker stays not ready.
 - **Resolved at run time.** The worker reads a binding each time it makes a
   call, so changing a secret needs no new release.
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
