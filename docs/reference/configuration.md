@@ -870,6 +870,12 @@ development or E2E server serves a real application without a separate step.
   to the tenant database, then compiles each listed folder against that database and
   activates the release, in the listed order. The same folders apply to
   every tenant.
+- **Tenant source** *(planned for M9)*. `ActivateOnStartup` is for
+  `Tenancy:Source=configuration` only. Under `directory` a non-empty setting
+  stops the start, and releases are activated with
+  [`Axis.Admin activate`](administration.md#activate). The server runs no
+  tenant migrations under `directory` either, see
+  [tenancy settings](#tenancy-settings).
 - **Packages.** Each folder compiles against the extension packages
   installed under `Extensions:Path`, see
   [Extension packages](#extension-packages). When a newer version in a range
@@ -1078,7 +1084,7 @@ settings exist yet.
 | `Tenancy:RefreshInterval` | `00:00:30` | How often both hosts read the tenant directory again. It must be positive. |
 | `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed under `directory`. A missing or invalid key stops the start. |
 | `ConnectionStrings:Platform` | none | A role that may only read the `platform` schema. Both hosts need it under `directory`. |
-| `ConnectionStrings:PlatformSchema` | none | The role that applies the platform migrations. Only the server reads it, and only at start. |
+| `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. |
 
 As environment variables they are `Tenancy__Source`,
 `Tenancy__RefreshInterval`, `Platform__SecretKey`,
@@ -1091,6 +1097,34 @@ As environment variables they are `Tenancy__Source`,
 - **Where secrets live.** Under `directory`, the encrypted values are in the
   platform database, see
   [platform database](storage.md#platform-database).
+- **No tenant schema connection.** Under `directory`, a tenant has no
+  `SchemaConnectionString`. The server and the worker hold only the runtime
+  database role of each tenant. `Axis.Admin` migrates and activates tenant
+  databases, see [database roles](storage.md#database-roles).
+- **Platform schema.** The server still applies the platform migrations at
+  start over `ConnectionStrings:PlatformSchema`. So "no schema connection"
+  under `directory` means no tenant schema connection.
+- **`ActivateOnStartup`.** It must be empty under `directory`, see
+  [startup activation](#startup-activation).
+
+## Admin settings
+
+*(Planned for M9.)* See
+[D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
+and [administration](administration.md). None of these settings exist yet.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create`. |
+
+As an environment variable it is `Admin__ConnectionString`.
+
+- **Not a superuser.** `Axis.Admin` refuses a superuser role and exits with
+  code 2. The role only needs the right to create databases and roles.
+- **Only the admin host reads it.** The server and the worker never read
+  `Admin:ConnectionString`.
+- **Not the directory writer.** `Axis.Admin` writes the tenant directory over
+  `ConnectionStrings:PlatformSchema`, not over this setting.
 
 ## Telemetry export
 

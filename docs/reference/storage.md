@@ -153,19 +153,28 @@ connection string only serves the readiness check. Under
   nothing else.
 - **Read-only hosts.** Both hosts read the directory over
   `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
-  and `SELECT` on its tables, and nothing else. The writer is left to a later
-  provisioning decision.
+  and `SELECT` on its tables, and nothing else.
+- **The writer.** `Axis.Admin` writes the directory over
+  `ConnectionStrings:PlatformSchema`, see
+  [administration](administration.md) and
+  [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
 
 The tables:
 
 | Table | Columns |
 | --- | --- |
-| `platform.tenants` | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names and the endpoint audience |
+| `platform.tenants` | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience and the `schema_version` |
 | `platform.tenant_hosts` | The tenant id and the host. The host is unique on `lower(host)` across all tenants |
 | `platform.tenant_bindings` | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case |
 
 The tenant `version` grows on every change to the tenant, its hosts or its
 bindings.
+
+The `schema_version` is text. It is the id of the newest EF Core migration
+across the configuration, data and processes contexts that `Axis.Admin` applied
+to the tenant database, and it is empty until the first migration. A host serves
+a tenant only when this value is the one the host was built for, see
+[administration](administration.md#migrate).
 
 - **Where secrets are stored.** Each of these is stored encrypted, and nowhere
   else:
@@ -283,8 +292,38 @@ Which connection string each step uses. The server does this today:
 
 The server holds both connection strings for its whole life. It opens the
 schema connection only during startup activation, and closes it when each
-tenant is done. Moving activation out of the server comes with tenant
-provisioning in M9.
+tenant is done. *(Planned for M9.)* Under `Tenancy:Source=directory`, the
+server holds no tenant schema connection, see
+[under the directory source](#under-the-directory-source).
+
+### Under the directory source
+
+*(Planned for M9.)* See
+[D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
+None of it is built. Under `Tenancy:Source=directory`, `tenant create` creates
+the two database roles of a tenant, its database and the ownership, with no
+superuser. See [administration](administration.md). Each step below runs on one
+host with one database role:
+
+| Step | Host | Database role |
+| --- | --- | --- |
+| Create the database and the two roles | `Axis.Admin` | `Admin:ConnectionString` |
+| Directory writes | `Axis.Admin` | `ConnectionStrings:PlatformSchema` |
+| Platform migrations, at start | Server | `ConnectionStrings:PlatformSchema` |
+| Grants, EF Core migrations, compile, store and activate | `Axis.Admin` | The tenant's schema role |
+| Seeding and schedule trigger state | `Axis.Admin` | The tenant's runtime role |
+| Runtime role check | `Axis.Admin`, server and worker | The tenant's runtime role |
+| Requests and work items | Server and worker | The tenant's runtime role |
+
+- **No tenant schema connection.** The server holds no tenant schema
+  connection. It runs no tenant migration and no grant step. The worker never
+  held one.
+- **Platform schema.** The server still holds `ConnectionStrings:PlatformSchema`
+  at start, for the platform migrations. So "no schema connection" means no
+  tenant schema connection.
+- **Tenant schema version.** Each tenant database migrates on its own. A host
+  serves a tenant only when the tenant's schema version is the host's own, see
+  [tenant directory](../architecture.md#tenant-directory).
 
 ## Schema planning
 
