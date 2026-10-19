@@ -69,7 +69,7 @@ internal sealed class Publisher(
         SET status = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims
+        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims, p.label, p.note
         """;
 
     private const string RenewSql =
@@ -222,7 +222,9 @@ internal sealed class Publisher(
                     reader.GetString(3),
                     await reader.IsDBNullAsync(4) ? null : reader.GetString(4),
                     reader.GetString(5),
-                    reader.GetInt32(6));
+                    reader.GetInt32(6),
+                    await reader.IsDBNullAsync(7) ? null : reader.GetString(7),
+                    await reader.IsDBNullAsync(8) ? null : reader.GetString(8));
             }
         }
 
@@ -314,7 +316,8 @@ internal sealed class Publisher(
                 connections,
                 tenant.Bindings,
                 configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
-                diagnostics);
+                diagnostics,
+                ActivationActor.User(request.RequestedBy, request.RequestedByName, request.Label, request.Note, request.Id));
         }
 
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
@@ -449,16 +452,30 @@ internal sealed class Publisher(
         await transaction.CommitAsync();
     }
 
-    // The release history assigns the number, and it is not built yet, so the number stays null.
-    private static Task AppendAuditAsync(
+    // The number is the release's number in the release history. It is null when the request failed before a release was
+    // known, or when the release was never activated.
+    private static async Task AppendAuditAsync(
         NpgsqlTransaction transaction,
         Guid requestId,
         Guid applicationId,
         string requestedBy,
         string? requestedByName,
         bool succeeded,
-        Guid? releaseId) =>
-        AuditRecords.AppendAsync(
+        Guid? releaseId)
+    {
+        int? number = null;
+        if (releaseId is { } id)
+        {
+            await using var command = new NpgsqlCommand(
+                "SELECT number FROM axis.release_activations WHERE application_id = @application AND release_id = @release LIMIT 1",
+                transaction.Connection,
+                transaction);
+            command.Parameters.AddWithValue("application", applicationId);
+            command.Parameters.AddWithValue("release", id);
+            number = await command.ExecuteScalarAsync() as int?;
+        }
+
+        await AuditRecords.AppendAsync(
             transaction,
             new AuditEntry(
                 requestedBy,
@@ -467,8 +484,9 @@ internal sealed class Publisher(
                 null,
                 null,
                 null,
-                new JsonObject { ["requestId"] = requestId, ["releaseId"] = releaseId, ["number"] = null },
+                new JsonObject { ["requestId"] = requestId, ["releaseId"] = releaseId, ["number"] = number },
                 requestedByName));
+    }
 
     // Each entry has the shape of a Studio diagnostic.
     private static string DiagnosticsJson(List<Diagnostic> diagnostics) =>
@@ -482,5 +500,5 @@ internal sealed class Publisher(
             ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
         })]).ToJsonString();
 
-    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims);
+    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims, string? Label, string? Note);
 }

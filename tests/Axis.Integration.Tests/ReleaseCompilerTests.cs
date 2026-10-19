@@ -51,6 +51,7 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
             migration => Assert.EndsWith("_CreateReleasePackages", migration, StringComparison.Ordinal),
             migration => Assert.EndsWith("_ProtectStoredReleases", migration, StringComparison.Ordinal),
             migration => Assert.EndsWith("_CreateReleaseComputedFingerprints", migration, StringComparison.Ordinal),
+            migration => Assert.EndsWith("_CreateReleaseActivations", migration, StringComparison.Ordinal),
             migration => Assert.EndsWith("_CreatePublishRequests", migration, StringComparison.Ordinal));
     }
 

@@ -34,8 +34,9 @@ internal sealed class ConflictHidingStore(IActiveReleaseStore inner) : IActiveRe
         Guid releaseId,
         IReadOnlyList<string> sitePaths,
         DateTimeOffset activatedAt,
+        ActivationActor actor,
         CancellationToken cancellationToken = default) =>
-        inner.TrySetAsync(applicationId, name, releaseId, sitePaths, activatedAt, cancellationToken);
+        inner.TrySetAsync(applicationId, name, releaseId, sitePaths, activatedAt, actor, cancellationToken);
 
     public Task<SetActiveReleaseResult> TrySetInTransactionAsync(
         DbTransaction transaction,
@@ -44,6 +45,10 @@ internal sealed class ConflictHidingStore(IActiveReleaseStore inner) : IActiveRe
         Guid releaseId,
         IReadOnlyList<string> sitePaths,
         DateTimeOffset activatedAt,
+        ActivationActor actor,
         CancellationToken cancellationToken = default) =>
-        inner.TrySetInTransactionAsync(transaction, applicationId, name, releaseId, sitePaths, activatedAt, cancellationToken);
+        inner.TrySetInTransactionAsync(transaction, applicationId, name, releaseId, sitePaths, activatedAt, actor, cancellationToken);
+
+    public Task<IReadOnlyList<ReleaseActivation>> ListActivationsAsync(Guid applicationId, CancellationToken cancellationToken = default) =>
+        inner.ListActivationsAsync(applicationId, cancellationToken);
 }

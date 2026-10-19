@@ -34,10 +34,11 @@ internal sealed class PausingStore(IActiveReleaseStore inner, TaskCompletionSour
         Guid releaseId,
         IReadOnlyList<string> sitePaths,
         DateTimeOffset activatedAt,
+        ActivationActor actor,
         CancellationToken cancellationToken = default)
     {
         await PauseAsync(cancellationToken);
-        return await inner.TrySetAsync(applicationId, name, releaseId, sitePaths, activatedAt, cancellationToken);
+        return await inner.TrySetAsync(applicationId, name, releaseId, sitePaths, activatedAt, actor, cancellationToken);
     }
 
     public async Task<SetActiveReleaseResult> TrySetInTransactionAsync(
@@ -47,11 +48,15 @@ internal sealed class PausingStore(IActiveReleaseStore inner, TaskCompletionSour
         Guid releaseId,
         IReadOnlyList<string> sitePaths,
         DateTimeOffset activatedAt,
+        ActivationActor actor,
         CancellationToken cancellationToken = default)
     {
         await PauseAsync(cancellationToken);
-        return await inner.TrySetInTransactionAsync(transaction, applicationId, name, releaseId, sitePaths, activatedAt, cancellationToken);
+        return await inner.TrySetInTransactionAsync(transaction, applicationId, name, releaseId, sitePaths, activatedAt, actor, cancellationToken);
     }
+
+    public Task<IReadOnlyList<ReleaseActivation>> ListActivationsAsync(Guid applicationId, CancellationToken cancellationToken = default) =>
+        inner.ListActivationsAsync(applicationId, cancellationToken);
 
     private async Task PauseAsync(CancellationToken cancellationToken)
     {

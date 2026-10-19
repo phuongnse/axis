@@ -3,7 +3,9 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Releases;
 using Axis.Server.Http;
+using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Json.Patch;
 using Microsoft.Net.Http.Headers;
@@ -40,6 +42,10 @@ namespace Axis.Server.Studio;
 /// file when <c>If-Match</c> holds its current version and answers <c>{ diagnostics }</c>. It answers 428
 /// without <c>If-Match</c>, 409 for a stale version and 400 for the manifest.
 /// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>.
+/// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
+/// newest first, as <c>{ active, folderContentHash, items }</c>. <c>active</c> is the active release or null, and
+/// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. It reads the
+/// tenant database and changes nothing.
 /// </summary>
 internal static class StudioEndpoints
 {
@@ -50,6 +56,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/releases", ReleasesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}/references", ResourceReferencesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
@@ -176,6 +183,46 @@ internal static class StudioEndpoints
         // The compile step of activation, before it touches a database. The folder is read from disk as
         // activation reads it, not through the filtered list of the other routes.
         return Results.Ok(new StudioDiagnosticsResponse(StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
+    private static async Task<IResult> ReleasesAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        TenantDatabase database)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        // A folder without a readable manifest id has never been activated, so its history is empty.
+        var applicationId = StudioFolder.List(folder).FirstOrDefault(file => file.File == "application.json")?.Id;
+        var folderContentHash = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).ContentHash;
+        if (applicationId is not { } id)
+        {
+            return Results.Ok(new StudioReleaseHistoryResponse(null, folderContentHash, []));
+        }
+
+        var cancellationToken = httpContext.RequestAborted;
+        var store = new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken));
+        var active = await store.FindByApplicationIdAsync(id, cancellationToken);
+        var activations = await store.ListActivationsAsync(id, cancellationToken);
+
+        // A release can be in the history more than once, always with one number, so the first row of it has it.
+        var activeRelease = active is null
+            ? null
+            : activations.FirstOrDefault(row => row.ReleaseId == active.ReleaseId) is { } current
+                ? new StudioActiveRelease(current.ReleaseId, current.Number, current.ContentHash)
+                : null;
+        var items = activations
+            .Select(row => new StudioReleaseItem(
+                row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, row.ActorName, row.Label, row.Note, row.RequestId))
+            .ToList();
+        return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, folderContentHash, items));
     }
 
     private static async Task<IResult> PatchAsync(
@@ -414,3 +461,25 @@ internal sealed record StudioCreateResponse(
 
 /// <summary>The answer to a delete: the folder's compile diagnostics, which show the references it broke.</summary>
 internal sealed record StudioDeleteResponse(IReadOnlyList<StudioDiagnostic> Diagnostics);
+
+/// <summary>
+/// The release history of an application, newest first. <c>Active</c> is the active release, or null when there
+/// is none, and <c>FolderContentHash</c> is the hash the folder compiles to now, or null when it has errors.
+/// </summary>
+internal sealed record StudioReleaseHistoryResponse(
+    StudioActiveRelease? Active, string? FolderContentHash, IReadOnlyList<StudioReleaseItem> Items);
+
+/// <summary>The active release: its id, its number and its content hash.</summary>
+internal sealed record StudioActiveRelease(Guid ReleaseId, int Number, string ContentHash);
+
+/// <summary>One activation in the history. <c>Actor</c> is a user id, <c>startup</c>, <c>operator</c> or <c>unknown</c>.</summary>
+internal sealed record StudioReleaseItem(
+    Guid ReleaseId,
+    int Number,
+    string ContentHash,
+    DateTimeOffset ActivatedAt,
+    string Actor,
+    string? ActorName,
+    string? Label,
+    string? Note,
+    Guid? RequestId);

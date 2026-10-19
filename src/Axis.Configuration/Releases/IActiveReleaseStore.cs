@@ -42,7 +42,8 @@ public interface IActiveReleaseStore
     /// previous one; the last call wins. The release and its site paths are written in one
     /// transaction, so call it outside an explicit transaction. Returns a conflict and changes
     /// nothing when another application id holds the name, ignoring letter case, or one of the
-    /// site paths.
+    /// site paths. When <paramref name="releaseId"/> is not the release that was active, the same
+    /// transaction adds a row to the release history for <paramref name="actor"/>. A conflict adds none.
     /// </summary>
     Task<SetActiveReleaseResult> TrySetAsync(
         Guid applicationId,
@@ -50,6 +51,7 @@ public interface IActiveReleaseStore
         Guid releaseId,
         IReadOnlyList<string> sitePaths,
         DateTimeOffset activatedAt,
+        ActivationActor actor,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -66,5 +68,12 @@ public interface IActiveReleaseStore
         Guid releaseId,
         IReadOnlyList<string> sitePaths,
         DateTimeOffset activatedAt,
+        ActivationActor actor,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists the release history of <paramref name="applicationId"/>, newest first: every activation
+    /// that added a row, by activation time and then by id.
+    /// </summary>
+    Task<IReadOnlyList<ReleaseActivation>> ListActivationsAsync(Guid applicationId, CancellationToken cancellationToken = default);
 }

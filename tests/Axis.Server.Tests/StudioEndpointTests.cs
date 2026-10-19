@@ -149,6 +149,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/resources")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001")]
     [InlineData("/api/studio/apps/PurchaseRequests/diagnostics")]
+    [InlineData("/api/studio/apps/PurchaseRequests/releases")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
     [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
     public async Task User_without_the_author_role_gets_403_and_no_session_gets_401(string url)
@@ -171,6 +172,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/resources")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001")]
     [InlineData("/api/studio/apps/PurchaseRequests/diagnostics")]
+    [InlineData("/api/studio/apps/PurchaseRequests/releases")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
     [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
     public async Task Studio_is_off_without_an_author_role_or_without_folders(string url)
@@ -190,6 +192,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [Theory]
     [InlineData("/api/studio/apps/Unknown/resources", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/Unknown/diagnostics", HttpStatusCode.NotFound)]
+    [InlineData("/api/studio/apps/Unknown/releases", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/PURCHASEREQUESTS/resources", HttpStatusCode.OK)]
     [InlineData("/api/studio/apps/Unknown/resources/00000000-0000-0000-0000-000000000001", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001", HttpStatusCode.NotFound)]

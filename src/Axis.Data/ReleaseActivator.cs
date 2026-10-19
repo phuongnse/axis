@@ -33,6 +33,10 @@ namespace Axis.Data;
 /// anything commits.
 /// </para>
 /// <para>
+/// The same write adds a row to the release history, unless the release is already the active one. The row
+/// names the actor, which is <see cref="ActivationActor.Startup"/> unless the caller passes another.
+/// </para>
+/// <para>
 /// When a migration is pending, the same transaction holds the application's <see cref="StartLock"/>
 /// exclusively until it commits, so a process start either commits first or waits and pins the new release.
 /// Under both locks, a destructive migration is refused with <see cref="DiagnosticCodes.OldReleaseWorkOpen"/>
@@ -58,6 +62,19 @@ public static class ReleaseActivator
         ActivateAsync(compiled, store, data, bindings, openInstances, DefaultInlineRecomputeLimit, cancellationToken);
 
     /// <summary>
+    /// Activates the release in <paramref name="compiled"/> as the startup activation does. See the overload with an actor.
+    /// </summary>
+    public static Task<ActivationResult> ActivateAsync(
+        ReleaseCompilationResult compiled,
+        IActiveReleaseStore store,
+        DataDbContext data,
+        ActivationBindings bindings,
+        IOpenInstanceCounter openInstances,
+        int inlineRecomputeLimit,
+        CancellationToken cancellationToken = default) =>
+        ActivateAsync(compiled, store, data, bindings, openInstances, inlineRecomputeLimit, ActivationActor.Startup, cancellationToken);
+
+    /// <summary>
     /// Activates the release in <paramref name="compiled"/>, which must have a release and a model
     /// with the same application id, for the tenant whose deployment bindings are
     /// <paramref name="bindings"/>. <paramref name="openInstances"/> counts the process instances that are
@@ -65,7 +82,8 @@ public static class ReleaseActivator
     /// and the release is active when it holds no error. When a changed computed definition, or a migration
     /// <c>fill</c> or <c>convert</c>, affects more than <paramref name="inlineRecomputeLimit"/> rows of an entity,
     /// activation marks the entity pending and queues a <c>computed.backfill</c> work item instead of recomputing
-    /// the rows. It also runs in a transaction that the caller enlisted <paramref name="data"/> and the store's context in. The
+    /// the rows. The release history records <paramref name="actor"/> for the activation. It also runs in a
+    /// transaction that the caller enlisted <paramref name="data"/> and the store's context in. The
     /// caller then commits or rolls back the activation.
     /// </summary>
     public static async Task<ActivationResult> ActivateAsync(
@@ -75,6 +93,7 @@ public static class ReleaseActivator
         ActivationBindings bindings,
         IOpenInstanceCounter openInstances,
         int inlineRecomputeLimit,
+        ActivationActor actor,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(compiled);
@@ -82,6 +101,7 @@ public static class ReleaseActivator
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(bindings);
         ArgumentNullException.ThrowIfNull(openInstances);
+        ArgumentNullException.ThrowIfNull(actor);
         if (compiled.Release is not { } release || compiled.Model is not { } model)
         {
             throw new ArgumentException("Only a compilation result with a release and a model can be activated.", nameof(compiled));
@@ -129,7 +149,7 @@ public static class ReleaseActivator
             (transaction, token) => ReadOldReleaseWorkAsync(store, openInstances, transaction, manifest.Id, release.Id, token),
             async (transaction, token) => ToDiagnostics(
                 model,
-                await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, token)))
+                await store.TrySetInTransactionAsync(transaction, manifest.Id, manifest.Name, release.Id, sitePaths, DateTimeOffset.UtcNow, actor, token)))
         {
             ReadActiveComputedFingerprintsAsync = token => ReadActiveComputedFingerprintsAsync(store, manifest.Id, token),
             CheckModuleUpgradeAsync = token => CheckModuleUpgradeAsync(store, manifest.Id, release, token),

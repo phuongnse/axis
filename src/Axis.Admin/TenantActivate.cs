@@ -54,7 +54,8 @@ internal sealed class TenantActivate(
             steps,
             bindings[row.Id],
             configuration => ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, modules.Modules, cancellationToken),
-            []);
+            [],
+            ActivationActor.Operator);
         return run.Succeeded;
     }
 }

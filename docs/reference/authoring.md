@@ -143,8 +143,8 @@ requests or releases exist.
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
 from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics,
-Resource references, Text key references, Validate, Publish and Request status are built. The rows for Preview,
-Release history and Rollback are *(planned for M10)*.
+Resource references, Text key references, Release history, Validate, Publish and Request status are built. The rows for
+Preview and Rollback are *(planned for M10)*.
 
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
@@ -160,7 +160,7 @@ Release history and Rollback are *(planned for M10)*.
 | Validate | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Publish | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Request status | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
-| Release history *(planned for M10)* | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
+| Release history | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Preview *(planned for M10)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | This tenant has no preview tenant |
 | Rollback *(planned for M10)* | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application, or a release not in the tenant's history | Not used |
 
@@ -424,6 +424,9 @@ stateDiagram-v2
 
 ### Release history
 
+This route is built. The rows of a publish and a rollback *(planned for M10)*
+come with the publisher.
+
 `GET .../releases` answers
 `{ active: { releaseId, number, contentHash }, folderContentHash, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId }] }`,
 newest first.
@@ -445,7 +448,7 @@ newest first.
 - Activating the release that is already active adds no row and keeps the
   number. Otherwise every restart under `scripts/dev.sh` would fill the history
   with copies.
-- `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
+- *(Planned for M10.)* `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
   both the author role and the publisher role and `Studio:Folders` is not
   empty. It is built. Studio will use it to hide the publish and rollback buttons.
 

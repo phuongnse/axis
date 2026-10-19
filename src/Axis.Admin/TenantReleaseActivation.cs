@@ -30,7 +30,7 @@ internal sealed class TenantReleaseActivation(
 {
     /// <summary>
     /// Runs the steps for the tenant <paramref name="id"/>, whose directory entry or build records <paramref name="schemaVersion"/>. Every diagnostic of compile, activate and seed, warnings included, is added
-    /// to <paramref name="diagnostics"/>.
+    /// to <paramref name="diagnostics"/>. The release history records <paramref name="actor"/> for the activation.
     /// </summary>
     public async Task<ReleaseRun> RunAsync(
         string id,
@@ -38,7 +38,8 @@ internal sealed class TenantReleaseActivation(
         ITenantConnections connections,
         ActivationBindings bindings,
         Func<ConfigurationDbContext, Task<ReleaseCompilationResult>> compile,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        ActivationActor actor)
     {
         ConfigurationDbContext? configuration = null;
         DataDbContext? data = null;
@@ -62,7 +63,7 @@ internal sealed class TenantReleaseActivation(
                 && await Step(id, "activate", async () =>
                 {
                     var activated = await ReleaseActivator.ActivateAsync(
-                        compiled!, new ActiveReleaseStore(configuration!), data!, bindings, OpenInstanceCounter.Instance, inlineRecomputeLimit, cancellationToken);
+                        compiled!, new ActiveReleaseStore(configuration!), data!, bindings, OpenInstanceCounter.Instance, inlineRecomputeLimit, actor, cancellationToken);
                     diagnostics.AddRange(activated.Diagnostics);
                     WriteWarnings(id, activated.Diagnostics);
                     if (activated.Diagnostics.Any(IsError))
