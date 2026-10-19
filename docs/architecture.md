@@ -325,6 +325,10 @@ What a host answers for a tenant, once the directory is in use:
   endpoints. It matches `Request.Host.Host` against the configured hosts,
   ignoring letter case. The port is ignored, so `A.Example.TEST:8443` matches
   `a.example.test`.
+- **Behind a proxy.** From a proxy named in the
+  [forwarded headers settings](reference/configuration.md#forwarded-headers),
+  the host matched is the forwarded host. From any other address it is the
+  request's own `Host`.
 - **Unknown host.** The response is `404` problem details
   (`application/problem+json`) titled "No tenant is configured for this
   host." It names neither the requested host nor any configured tenant or
@@ -472,12 +476,13 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     so the hour counts from the last request.
   - In `Development` and `Testing`, which run over plain http, the session
     cookie and the OIDC helper cookies are Secure only on https requests.
+  - Behind a named proxy, the callback and sign-out addresses and the cookie's
+    Secure flag use the forwarded scheme and host. See
+    [D49](decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed) and the
+    [forwarded headers settings](reference/configuration.md#forwarded-headers).
   - *(planned for M10)* The cookie is protected with a key ring that every
     server replica shares. The keys are in the platform database, so a session
-    survives a restart and works on every replica. Behind a named proxy, the
-    callback and sign-out addresses and the cookie's Secure flag use the
-    forwarded scheme and host. See [D49](decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed) and the
-    [forwarded headers settings](reference/configuration.md#forwarded-headers).
+    survives a restart and works on every replica.
 - **Tenant binding.** A session whose tenant id differs from the tenant
   [resolved from the host](#request-resolution) counts as no session. So a
   cookie taken to another tenant's host signs nobody in there.
