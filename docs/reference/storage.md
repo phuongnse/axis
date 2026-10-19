@@ -20,7 +20,11 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     site paths of each active release, as application `id` and path, unique
     on path), with history in `axis.__configuration_migrations`. It also owns
     `axis.release_computed_fingerprints`, the hash of the
-    computed definitions of each entity in each release. The caller
+    computed definitions of each entity in each release. It also owns
+    `axis.publish_requests` (the requests that Studio stores and the publisher
+    runs) and `axis.release_activations` (the activation history with release
+    numbers), both _(planned for M10)_, see
+    [Publish requests and release history](#publish-requests-and-release-history). The caller
     supplies the tenant database connection. Other modules read and set the
     active release and its site paths only through `IActiveReleaseStore`;
     they never use `axis.active_releases`, `axis.active_sites` or the
@@ -150,7 +154,7 @@ tenant create` writes the tables and encrypts the stored passwords and the OIDC
 client secret. `tenant suspend` and `tenant resume` change a tenant's status,
 and `tenant restore` adds a suspended tenant. Today, under `Tenancy:Source=configuration`
 the platform database holds no tables, and its connection string only serves the
-readiness check. *(planned for M10)* That changes: the platform tables exist
+readiness check. _(planned for M10)_ That changes: the platform tables exist
 under both tenant sources, because the server also keeps its data protection
 keys there, see [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 Under `Tenancy:Source=directory` the server creates the tables at
@@ -174,7 +178,7 @@ and creates no tables. See
   there. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
   It does not yet check whether the role is a superuser, owns the schema or
   inherits rights through membership.
-- **One write grant.** *(planned for M10)* The same role also gets `INSERT` on
+- **One write grant.** _(planned for M10)_ The same role also gets `INSERT` on
   `platform.data_protection_keys`, and on no other table. Key rotation happens
   while the server runs, so the server must add keys. It never updates or
   deletes one. The Studio write lock is a PostgreSQL advisory lock. It needs
@@ -186,12 +190,12 @@ and creates no tables. See
 
 The tables:
 
-| Table | Columns |
-| --- | --- |
-| `platform.tenants` | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience and the `schema_version` |
-| `platform.tenant_hosts` | The tenant id and the host. The host is unique on `lower(host)` across all tenants |
-| `platform.tenant_bindings` | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case |
-| `platform.data_protection_keys` *(planned for M10)* | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. Rows are only inserted, never updated or deleted. Every server replica reads them |
+| Table                                               | Columns                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience and the `schema_version` |
+| `platform.tenant_hosts`                             | The tenant id and the host. The host is unique on `lower(host)` across all tenants                                                                                                                                                                                                                                          |
+| `platform.tenant_bindings`                          | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                         |
+| `platform.data_protection_keys` _(planned for M10)_ | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. Rows are only inserted, never updated or deleted. Every server replica reads them                                                                                                                                                                   |
 
 The tenant `version` grows on every change to the tenant, its hosts or its
 bindings.
@@ -216,7 +220,7 @@ a tenant only when this value is the one the host was built for, see
   id, one zero byte, and the UTF-8 bytes of the field name. The field names are
   `runtime_password`, `schema_password`, `oidc_client_secret`, and `binding:`
   followed by the binding name in lower case. Every writer must use these
-  exact bytes and names. *(planned for M10)* A data protection key uses an
+  exact bytes and names. _(planned for M10)_ A data protection key uses an
   empty tenant id, so the associated data is one zero byte and the field name
   `data_protection_key:` followed by the key's `id`. A tenant id is never
   empty, so a key and a tenant field cannot be swapped.
@@ -251,14 +255,16 @@ through role membership.
 
 What each database role may do:
 
-| Objects                                                                                                                                                                                                                                     | Schema database role                                             | Runtime database role |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------- |
-| `entities` tables                                                                                                                                                                                                                           | Owns them                                                        | Read and write rows   |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields` | Owns them                                                        | Read and write rows   |
-| Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                     | Owns them                                                        | Read only             |
-| Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                         | Insert and read. The trigger refuses update, delete and truncate | Read only             |
-| Sequences in `axis` and `entities`                                                                                                                                                                                                          | Owns them                                                        | `USAGE`, `SELECT`     |
-| Create, alter, drop                                                                                                                                                                                                                         | Yes                                                              | No                    |
+| Objects                                                                                                                                                                                                                                     | Schema database role                                             | Runtime database role                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `entities` tables                                                                                                                                                                                                                           | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields` | Owns them                                                        | Read and write rows                                               |
+| Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                     | Owns them                                                        | Read only                                                         |
+| Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                         | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
+| `publish_requests` _(planned for M10)_                                                                                                                                                                                                      | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |
+| `release_activations` _(planned for M10)_                                                                                                                                                                                                   | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
+| Sequences in `axis` and `entities`                                                                                                                                                                                                          | Owns them                                                        | `USAGE`, `SELECT`                                                 |
+| Create, alter, drop                                                                                                                                                                                                                         | Yes                                                              | No                                                                |
 
 - **Default privileges.** The schema database role sets default privileges. A
   new table in `entities` gives the runtime database role `SELECT`, `INSERT`,
@@ -269,7 +275,10 @@ What each database role may do:
   runtime writes. It grants row access on those and revokes `INSERT`, `UPDATE`,
   `DELETE` and `TRUNCATE` on every other `axis` table, so a database with
   older, wider grants is repaired. A new system table is read-only until
-  someone adds it to the list.
+  someone adds it to the list. _(Planned for M10:)_ the list has a second
+  category, tables where runtime may only insert. `publish_requests` is the
+  only one. It grants `SELECT` and `INSERT` and revokes `UPDATE`, `DELETE` and
+  `TRUNCATE`, so the server cannot change the status of a request.
 - **Role name.** The runtime database role is the user of `ConnectionString`.
   The name comes from configuration, so a migration cannot hold it. A grant
   step runs over the schema connection at every server start, both before and
@@ -311,23 +320,32 @@ What each database role may do:
 
 Which connection string each step uses. The server does this today:
 
-| Step                                                                                              | Connection string        |
-| ------------------------------------------------------------------------------------------------- | ------------------------ |
-| EF Core migrations of configuration, data and processes                                           | `SchemaConnectionString` |
-| Compiling a folder and storing its release                                                        | `SchemaConnectionString` |
-| Activation: migrations, provisioning, active release, site paths                                  | `SchemaConnectionString` |
-| Grants for the runtime database role, before and after the migrations                             | `SchemaConnectionString` |
-| Schedule trigger state                                                                            | `ConnectionString`       |
-| Seed records                                                                                      | `ConnectionString`       |
-| Start release check (`AXC0146`) and the runtime database role check, in the server and the worker | `ConnectionString`       |
-| Server requests: record API, data sources, process starts, endpoints, tasks, sites                | `ConnectionString`       |
-| Worker                                                                                            | `ConnectionString` only  |
+| Step                                                                                                                               | Connection string        |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| EF Core migrations of configuration, data and processes                                                                            | `SchemaConnectionString` |
+| Compiling a folder and storing its release                                                                                         | `SchemaConnectionString` |
+| Activation: migrations, provisioning, active release, site paths                                                                   | `SchemaConnectionString` |
+| Grants for the runtime database role, before and after the migrations                                                              | `SchemaConnectionString` |
+| Schedule trigger state                                                                                                             | `ConnectionString`       |
+| Seed records                                                                                                                       | `ConnectionString`       |
+| Publish routes of the server _(planned for M10)_: insert a request, read requests and the release history                          | `ConnectionString`       |
+| Publisher _(planned for M10)_: claim, renew and finish a request, compile, store, activate, write the history and the audit record | `SchemaConnectionString` |
+| Publisher _(planned for M10)_: seed records                                                                                        | `ConnectionString`       |
+| Start release check (`AXC0146`) and the runtime database role check, in the server and the worker                                  | `ConnectionString`       |
+| Server requests: record API, data sources, process starts, endpoints, tasks, sites                                                 | `ConnectionString`       |
+| Worker                                                                                                                             | `ConnectionString` only  |
 
 The server holds both connection strings for its whole life. It opens the
 schema connection only during startup activation, and closes it when each
 tenant is done. Under `Tenancy:Source=directory`, the
 server holds no tenant schema connection, see
 [under the directory source](#under-the-directory-source).
+
+_(Planned for M10:)_ the publisher, `axis-admin publisher`, runs every
+publish request. Under `Tenancy:Source=configuration` it uses each tenant's
+`SchemaConnectionString`, so it holds the schema role. The server still opens
+that connection only during startup activation, and runs no publish request
+itself.
 
 ### Under the directory source
 
@@ -338,19 +356,29 @@ the two database roles of a tenant, its database and the ownership, with no
 superuser. See [administration](administration.md) for the admin commands. Each step below runs on one
 host with one database role:
 
-| Step                                                    | Host                            | Database role                      |
-| ------------------------------------------------------- | ------------------------------- | ---------------------------------- |
-| Create the database and the two roles                   | `Axis.Admin`                    | `Admin:ConnectionString`           |
-| Directory writes                                        | `Axis.Admin`                    | `ConnectionStrings:PlatformSchema` |
-| Platform migrations, at start                           | Server                          | `ConnectionStrings:PlatformSchema` |
-| Grants, EF Core migrations, compile, store and activate | `Axis.Admin`                    | The tenant's schema role           |
-| Seeding and schedule trigger state                      | `Axis.Admin`                    | The tenant's runtime role          |
-| Runtime role check                                      | `Axis.Admin`, server and worker | The tenant's runtime role          |
-| Requests and work items                                 | Server and worker               | The tenant's runtime role          |
+| Step                                                                                                                    | Host                            | Database role                      |
+| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------- |
+| Create the database and the two roles                                                                                   | `Axis.Admin`                    | `Admin:ConnectionString`           |
+| Directory writes                                                                                                        | `Axis.Admin`                    | `ConnectionStrings:PlatformSchema` |
+| Platform migrations, at start                                                                                           | Server                          | `ConnectionStrings:PlatformSchema` |
+| Grants, EF Core migrations, compile, store and activate                                                                 | `Axis.Admin`                    | The tenant's schema role           |
+| Seeding and schedule trigger state                                                                                      | `Axis.Admin`                    | The tenant's runtime role          |
+| Claim, run and finish a publish request: compile, store, activate, release history and audit record _(planned for M10)_ | `axis-admin publisher`          | The tenant's schema role           |
+| Seeding of a publish request _(planned for M10)_                                                                        | `axis-admin publisher`          | The tenant's runtime role          |
+| Insert and read publish requests, read the release history _(planned for M10)_                                          | Server                          | The tenant's runtime role          |
+| Runtime role check                                                                                                      | `Axis.Admin`, server and worker | The tenant's runtime role          |
+| Requests and work items                                                                                                 | Server and worker               | The tenant's runtime role          |
 
 - **No tenant schema connection.** The server holds no tenant schema
   connection. It runs no tenant migration and no grant step. The worker never
-  held one.
+  held one. This stays true when Studio publishes _(planned for M10)_: the
+  server only inserts a request over the runtime role, and `axis-admin
+publisher` runs it with the tenant's schema role.
+- **The publisher.** _(Planned for M10.)_ It reads the tenants from the
+  directory as the server does and holds the schema role of every active
+  tenant. It becomes the most valuable host to attack, so run it apart from the
+  server and give it no inbound network. It has no HTTP endpoint, see
+  [publisher](administration.md#publisher).
 - **Platform schema.** The server still holds `ConnectionStrings:PlatformSchema`
   at start, for the platform migrations. So "no schema connection" means no
   tenant schema connection.
@@ -1064,6 +1092,9 @@ schema of the tenant database.
   | `details`             | `jsonb`                                              | An object that depends on the action                                                                                                                                                                                                                                 |
   - Application and entity are stored by their stable resource ids, never by
     name, so a rename keeps the history.
+  - _(Planned for M10.)_ A `publish` and a `rollback` write an audit record
+    when they succeed and when they fail, see
+    [publish requests and release history](#publish-requests-and-release-history).
   - **Session actions** _(planned for M10)_. The
     BFF session writes three actions, see
     [D50](../decisions.md#d50-sign-in-audit-records-and-security-scanning-in-ci--agreed)
@@ -1112,3 +1143,122 @@ schema of the tenant database.
     in the caller's transaction.
   - Its row lock makes concurrent creates of the same sequence wait for each
     other. A create that rolls back uses no number, so there are no gaps.
+
+## Publish requests and release history
+
+_(Planned for M10.)_ `Axis.Configuration` owns both tables, in the `axis`
+schema of each tenant database. See
+[D47](../decisions.md#d47-publishing-from-studio--agreed) and the
+[authoring API](authoring.md#publishing).
+
+### Publish requests
+
+`axis.publish_requests` holds one row per request. The server inserts a row
+over the runtime role. Only the publisher changes a row, over the schema role.
+An index on `(application_id, status, requested_at, id)` serves the claim.
+
+| Column              | Type                | Meaning                                                                                                                                |
+| ------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                | `uuid`              | Primary key, a version 7 UUID                                                                                                          |
+| `application_id`    | `uuid`              | The application `id`                                                                                                                   |
+| `kind`              | `text`              | `validate`, `publish` or `rollback`                                                                                                    |
+| `status`            | `text`              | `queued`, `running`, `succeeded` or `failed`                                                                                           |
+| `snapshot`          | `jsonb`, null       | For `validate` and `publish`, an array of `{ file, version, content }`, one for every resource file of the folder. Null for `rollback` |
+| `release_id`        | `uuid`, null        | For `rollback`, the release to activate. For `publish`, set when the release is stored                                                 |
+| `label`             | `text`, null        | The optional label, up to 100 characters                                                                                               |
+| `note`              | `text`, null        | The optional note, up to 2000 characters                                                                                               |
+| `requested_by`      | `text`              | The requesting user's id                                                                                                               |
+| `requested_by_name` | `text`, null        | The user's display name at the time                                                                                                    |
+| `requested_at`      | `timestamptz`       | When the request was stored                                                                                                            |
+| `claimed_by`        | `text`, null        | The publisher that holds the claim                                                                                                     |
+| `lease_until`       | `timestamptz`, null | When the claim runs out unless the publisher renews it                                                                                 |
+| `claims`            | `integer`           | How many times a publisher claimed the request, from 0                                                                                 |
+| `started_at`        | `timestamptz`, null | When it was first claimed                                                                                                              |
+| `finished_at`       | `timestamptz`, null | When it reached `succeeded` or `failed`                                                                                                |
+| `diagnostics`       | `jsonb`, null       | The diagnostics, as an array                                                                                                           |
+
+- **A snapshot.** `content` is the file's JSON as the author saw it, and
+  `version` is its SHA-256, as in [Versions](authoring.md#versions). A later
+  edit never changes a stored snapshot.
+- **Claim.** The publisher takes the oldest `queued` row of an application with
+  `FOR UPDATE SKIP LOCKED`, sets `running`, `claimed_by`, `lease_until` and
+  adds 1 to `claims`. A `running` row whose `lease_until` has passed is claimed
+  again the same way. A row with `claims` of 3 and an expired lease becomes
+  `failed` with `AXC0215`.
+- **Final.** A `succeeded` or `failed` row is never changed again.
+- **Size and age.** No limit on the size of a snapshot is set, and nothing
+  deletes old requests. Large folders or many requests grow the table. A later
+  decision sets both.
+
+### Release history
+
+`axis.release_activations` holds one row per activation, and is append-only.
+
+| Column           | Type          | Meaning                                                              |
+| ---------------- | ------------- | -------------------------------------------------------------------- |
+| `id`             | `uuid`        | Primary key, a version 7 UUID                                        |
+| `release_id`     | `uuid`        | The activated release                                                |
+| `application_id` | `uuid`        | The application `id`                                                 |
+| `number`         | `integer`     | The release number: 1, 2, 3… per application                         |
+| `content_hash`   | `varchar(64)` | The release's content hash                                           |
+| `activated_at`   | `timestamptz` | When the activation committed                                        |
+| `actor`          | `text`        | A user id, `startup`, `operator`, or `unknown` for a backfilled row  |
+| `actor_name`     | `text`, null  | The user's display name, or null                                     |
+| `label`          | `text`, null  | The label of the publish, or null                                    |
+| `note`           | `text`, null  | The note of the publish, or null                                     |
+| `request_id`     | `uuid`, null  | The publish request, or null for a startup and `axis-admin activate` |
+
+- **Append only.** A `BEFORE UPDATE OR DELETE` row trigger and a `BEFORE
+TRUNCATE` statement trigger raise SQLSTATE `23001`, as for `audit_records`.
+  The runtime role has `SELECT` only.
+- **Numbers.** A release gets its number the first time it is activated in the
+  tenant. Every later row of that release holds the same number, and no two
+  releases of one application share one. The activation takes the number in
+  the transaction that holds the schema lock, so two activations cannot give
+  one number to two releases.
+- **No copies.** Activating the release that is already active adds no row and
+  keeps the number. A restart under `scripts/dev.sh` and a request that runs
+  again therefore add nothing.
+- **Every path.** Startup activation, `axis-admin activate`, a publish and a
+  rollback each add a row. The actor is the user for a publish and a rollback,
+  `startup` for a startup and `operator` for `axis-admin activate`.
+- **Backfill.** The migration that creates the table adds one row for each
+  application's current active release, with number 1, the actor `unknown`, the
+  activation time of `axis.active_releases` and no request. Without it the
+  release that is live today would have no number and no row to roll back to.
+  Older releases that are not active are not in the history, so no rollback can
+  name them.
+- **Per tenant.** Numbers belong to one tenant. The same content can have
+  different numbers in two tenants.
+
+### Rollback refusals
+
+A `rollback` activates the stored release as it is and never compiles it
+again. The publisher refuses it, and the request ends `failed` with one of these
+diagnostics. Nothing is changed.
+
+| Case                                                                                                                  | Code      |
+| --------------------------------------------------------------------------------------------------------------------- | --------- |
+| A migration in [`axis.applied_migrations`](#applied-migrations) was applied after that release and is missing from it | `AXC0174` |
+| An extension package version that the release pins is not installed under `Extensions:Path`                           | `AXC0146` |
+
+The second check is the start check of
+[extension packages](extension-packages.md). Both codes have the meaning they
+have at activation. See also [rollback](authoring.md#rollback).
+
+### Audit records of publishing
+
+Each `publish` and `rollback` writes one record in `axis.audit_records`, in the
+transaction that sets the request's final status. The actor is the requesting
+user, and `application_id` is the application `id`.
+
+| Action                   | When                   |
+| ------------------------ | ---------------------- |
+| `release.published`      | A `publish` succeeded  |
+| `release.publishFailed`  | A `publish` failed     |
+| `release.rolledBack`     | A `rollback` succeeded |
+| `release.rollbackFailed` | A `rollback` failed    |
+
+`details` is `{ requestId, releaseId, number }`. `releaseId` and `number` are
+null when the request failed before a release was known. A `validate` writes
+no audit record.

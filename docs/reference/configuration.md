@@ -804,7 +804,7 @@ sorted by file and then path.
 | `AXC0143` | A data change trigger's `entity` names no loaded entity. Reported in the trigger at `/entity`. |
 | `AXC0144` | A data change trigger's `entity` is not the process's subject entity. Reported in the trigger at `/entity`. |
 | `AXC0145` | A name in a data change trigger's `fields` names no field of the entity, or names a computed field. Reported in the trigger at `/fields/{i}`. |
-| `AXC0146` | A release that is active, or has a running or waiting process instance, pins an extension package version that is not installed. Reported at the start of the server and the worker, in that release's stored `application.json` at `/packages/{i}/version`. It names the tenant, application, release, package id and version, and stops the start. |
+| `AXC0146` | A release that is active, or has a running or waiting process instance, pins an extension package version that is not installed. Reported at the start of the server and the worker, in that release's stored `application.json` at `/packages/{i}/version`. It names the tenant, application, release, package id and version, and stops the start. A [rollback](authoring.md#rollback) *(planned for M10)* of a release that pins a version that is not installed gets the same code and is refused. |
 | `AXC0150` | A process package operation step's `operation` names a package that the application does not list in `packages`, matched exactly. Not reported for a listed package that failed pinning (`AXC0139` to `AXC0142`), or when `application.json` was not loaded. Reported at `/steps/{i}/operation`. |
 | `AXC0151` | A process package operation step's `operation` names no operation in the manifest of the pinned version, matched ignoring letter case. Reported at `/steps/{i}/operation`. Its `input` and `output` are then not checked. |
 | `AXC0160` | A schedule trigger's `schedule` is not a valid 5-field cron. Reported at `/schedule`. |
@@ -819,7 +819,7 @@ sorted by file and then path.
 | `AXC0171` | A `renameField`'s `from`, or a `dropField`'s or `convert`'s `field`, names no field of the entity as it is at that change. Reported at `/changes/{i}/from` or `/changes/{i}/field`. |
 | `AXC0172` | A `renameField`'s `to` is already a field of the entity at that change. Reported at `/changes/{i}/to`. |
 | `AXC0173` | A `fill`'s or `convert`'s `field` is not a field of the entity in the release. A child-collection field does not count. Reported at `/changes/{i}/field`. |
-| `AXC0174` | An applied migration's file has changed since it was applied, or it is missing from the release. A changed file is reported at that file, and a missing one at `application.json`. Both have an empty path and the migration `id` as `resourceId`. Nothing is applied. |
+| `AXC0174` | An applied migration's file has changed since it was applied, or it is missing from the release. A changed file is reported at that file, and a missing one at `application.json`. Both have an empty path and the migration `id` as `resourceId`. Nothing is applied. A [rollback](authoring.md#rollback) *(planned for M10)* to a release that lacks a migration applied after it gets the same code and is refused. |
 | `AXC0176` | A pending `fill` leaves a `null` in some row, because its value is `null` for that row. Reported at `/changes/{i}/value` of the migration file, with the number of rows in the message. Nothing is applied. |
 | `AXC0177` | A pending `convert` fails for a stored row, such as text that does not parse as the new type, a value that is too long, a required field left empty or a duplicate in a unique field. Also reported when an enum `convert` leaves a value that the field does not list. Reported at `/changes/{i}/value` of the migration file, with a fixed message and, for a database error, its PostgreSQL error code. Nothing is applied. |
 | `AXC0178` | A pending `renameField`, `dropField`, `dropEntity` or `convert` changes a column that another release of the application uses, and `running` or `waiting` process instances are pinned to that release. One per migration and release, with the release id and the number of open instances in the message. Reported at the migration file with an empty path and the migration `id` as `resourceId`. Nothing is applied. Activate the release again once those instances end. |
@@ -853,6 +853,12 @@ sorted by file and then path.
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 | `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
 | `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
+
+*(Planned for M10.)* `AXC0215` is not in the table above, because the table lists
+the codes that are built. It means that the publisher stopped three times while
+running a publish request. It is reported on the request, with an empty file and
+path, see [lifecycle](authoring.md#lifecycle). It joins the table when the
+publisher is built.
 
 ## Startup activation
 
@@ -952,7 +958,9 @@ Studio edits application folders through the
 [authoring API](authoring.md), as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. Two server settings control it. They are built, and the authoring
-API reads them. The Studio page lists the resources with a search, edits them in a form
+API reads them. A third, `Studio:PublisherRole`, controls publishing
+*(planned for M10)*, see
+[D47](../decisions.md#d47-publishing-from-studio--agreed). The Studio page lists the resources with a search, edits them in a form
 and a JSON view, and shows the diagnostics.
 
 - **`Studio:Folders`.** An array of application folders that Studio may edit,
@@ -966,20 +974,35 @@ and a JSON view, and shows the diagnostics.
   roles claim holds the value may use Studio. It has no default, and with no
   value nobody may author. The Development settings set it to `author`.
   Application policies play no part, because an author edits them.
-- **Where Studio reads and writes.** Studio reads and writes only `*.json` files inside the listed
-  folders. Today it touches no database. *(planned for M10)* A write takes an
-  advisory lock in the platform database, over `ConnectionStrings:Platform`,
-  keyed by the folder. It holds across server replicas, so every replica must
-  mount the folder at the same path. A write that cannot take the lock
-  answers `503` and writes nothing. A read and the diagnostics touch no
-  database. See [authoring API](authoring.md#versions) and
+- **`Studio:PublisherRole`** *(planned for M10)*. A roles claim value, such as
+  `publisher`. The environment variable is `Studio__PublisherRole`. `publish`
+  and `rollback` need it on top of the author role, and `validate` needs the
+  author role only. It has no default, and with no value nobody may publish or
+  roll back. The Development settings set it to `publisher`, and the
+  development realm gives `hoa` that role. It plays no part in application
+  policies, as `Studio:AuthorRole` does not.
+- **Where Studio reads and writes.** Studio's edit routes read and write only
+  `*.json` files inside the listed folders. Today they touch no database.
+  *(planned for M10)* A write takes an advisory lock in the platform database,
+  over `ConnectionStrings:Platform`, keyed by the folder. It holds across server
+  replicas, so every replica must mount the folder at the same path. A write
+  that cannot take the lock answers `503` and writes nothing. A read and the
+  diagnostics touch no database. See [authoring API](authoring.md#versions) and
   [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
-- **No activation.** Studio never activates a release. Under `scripts/dev.sh`,
-  a saved file restarts the server, which activates the folder, see
-  [Startup activation](#startup-activation). Elsewhere a folder is committed
-  and deployed as today.
+  The publish routes *(planned for M10)* store a request in the tenant database
+  over the runtime role, see
+  [publish requests](storage.md#publish-requests-and-release-history).
+- **Activation.** Studio's edit routes never activate a release. Under
+  `scripts/dev.sh`, a saved file restarts the server, which activates the
+  folder, see [Startup activation](#startup-activation). Elsewhere a folder is
+  committed and deployed as today. *(Planned for M10:)* Studio asks for an
+  activation through a publish request, and the
+  [publisher](administration.md#publisher) runs it. The server never activates
+  in its own process.
 - **Current user.** `GET /api/me` answers `studio: true` when `Studio:Folders`
-  is not empty and the user holds the author role.
+  is not empty and the user holds the author role. It also answers
+  `studioPublisher: true` *(planned for M10)* when `Studio:Folders` is not
+  empty and the user holds both the author role and the publisher role.
 
 ## Reference index
 

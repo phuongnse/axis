@@ -117,6 +117,8 @@ with the purchase request and leave request samples at http://localhost:5206, th
 system stub at http://localhost:5207. The stub, in `tests/Axis.PurchasingStub`, stands in for
 the purchasing system that the sample calls when a request is approved. It needs only
 Docker. The images hold the `departments` sample module in `/modules`.
+*(Planned for M10:)* Compose also starts one publisher, `axis-admin publisher`, which runs the
+publish requests of Studio. See [D47](docs/decisions.md#d47-publishing-from-studio--agreed).
 `docker compose logs server` shows the activation diagnostics,
 and `docker compose logs worker` shows the worker output. `docker compose ps` shows the worker
 healthy once its `/health/ready` passes, and `docker compose up --wait` waits for that. The worker's
@@ -137,7 +139,7 @@ PostgreSQL runs init scripts only on an empty volume, so an existing local Compo
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
 realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `lan`,
-`binh`, `chau`, `dung`, `giang` and `hoa`, and the development password is `axis` for each. `giang` holds the `operator` role, which opens the purchase request sample's Approvals inspector page. The leave request sample, `samples/apps/leave-requests`, reuses `anna`, `lan`, `binh` and `chau` with the same `employee` and `department-manager` roles, in a site at `/leave`. `hoa` holds the `author` role, which lets the authoring API list and read the purchase request sample's resources under `scripts/dev.sh`. The Studio page at http://localhost:5173/studio opens for `hoa`. Under `scripts/dev.sh`,
+`binh`, `chau`, `dung`, `giang` and `hoa`, and the development password is `axis` for each. `giang` holds the `operator` role, which opens the purchase request sample's Approvals inspector page. The leave request sample, `samples/apps/leave-requests`, reuses `anna`, `lan`, `binh` and `chau` with the same `employee` and `department-manager` roles, in a site at `/leave`. `hoa` holds the `author` role, which lets the authoring API list and read the purchase request sample's resources under `scripts/dev.sh`. *(Planned for M10:)* `hoa` also holds the `publisher` role, which lets Studio publish and roll back. The Studio page at http://localhost:5173/studio opens for `hoa`. Under `scripts/dev.sh`,
 the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
 answers `GET /api/me`. The SPA header offers sign-in and sign-out there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the
@@ -168,6 +170,10 @@ works on a fresh clone:
   databases. Each line starts with `[server]`, `[worker]` or `[web]`, and the
   script's own messages start with `[dev]`. The SPA proxies `/api` and `/health`
   to the server.
+- *(Planned for M10:)* It also runs one publisher, `axis-admin publisher`, with
+  its lines starting with `[publisher]`. It starts once the server has
+  migrated the tenant databases. See
+  [publisher](docs/reference/administration.md#publisher).
 - `dotnet watch` applies C# changes, or restarts the server or the worker without
   a prompt when it cannot. Vite applies SPA changes.
 - A change to any `*.json` file under an activated application folder restarts the

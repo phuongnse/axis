@@ -7,7 +7,7 @@ activate releases, and back up and restore tenants. It follows
 and
 [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`,
-`tenant restore`, `migrate`, `activate` and `version`. A tenant can also come from the `Tenants`
+`tenant restore`, `migrate`, `activate`, `publisher` *(planned for M10)* and `version`. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
 [startup activation](configuration.md#startup-activation).
 
@@ -18,9 +18,10 @@ the PostgreSQL role.
 `Axis.Admin` is the only host that writes the
 [tenant directory](../architecture.md#tenant-directory), the only one that
 holds an admin connection to the database server, and the only one that holds
-the schema database role of a tenant under `Tenancy:Source=directory`. See
-[database roles](storage.md#database-roles) for which host holds which
-connection. There is no HTTP API for provisioning.
+the schema database role of a tenant under `Tenancy:Source=directory`. The
+[publisher](#publisher) *(planned for M10)* is a command of this host, so it
+holds that role as well. See [database roles](storage.md#database-roles) for
+which host holds which connection. There is no HTTP API for provisioning.
 
 ## Settings
 
@@ -31,8 +32,8 @@ connection. There is no HTTP API for provisioning.
 | `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create` and `tenant restore` read it, so `migrate` needs no admin role. See [admin settings](configuration.md#admin-settings). |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
-| `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate` and `tenant restore` read it. |
-| `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` reads it. `tenant restore` never reads it, because a missing module refuses nothing. |
+| `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate`, `publisher` and `tenant restore` read it. |
+| `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. Only `tenant create` and `tenant restore` read it. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
@@ -70,7 +71,8 @@ Every command writes one line per tenant and step to standard output:
 
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
 `work`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
-`check`, `restore` and `status`. A line names the
+`check`, `restore` and `status`. The [publisher](#publisher) *(planned for M10)*
+adds `claim`, `validate` and `rollback`. A line names the
 tenant and never a database host, a password or a connection string. A `failed` message
 never holds one either. A restore refusal does name the tenant host the operator gave on the
 command line, as typed. A failed `dump` step says only `pg_dump exited with code <n>`
@@ -533,6 +535,103 @@ Only a `compile` or `activate` failure keeps the previous release.
 when at least one tenant failed. `2` for a folder that does not exist, an
 unknown `--tenant`, a `--tenant` that is `provisioning`, a bad option or a missing
 or bad setting.
+
+## Publisher
+
+*(Planned for M10.)* `publisher` runs the [publish requests](authoring.md#publishing)
+that Studio stores, as [D47](../decisions.md#d47-publishing-from-studio--agreed)
+agrees. It is the only host that activates a release on the author's behalf, so
+the server never needs a tenant schema connection. Unlike the other commands, it
+runs until it is stopped.
+
+`publisher`
+
+It takes no option. It has no HTTP endpoint and listens on no port, so nothing
+can call it. The `axis-admin` image runs it, and `scripts/dev.sh`, Docker
+Compose, the E2E script and both production installs start one, see
+[installation](installation.md).
+
+**Settings.** It reads these, with the meaning they have for the other commands:
+
+- `Tenancy:Source`, which is `configuration` or `directory`, and the tenants of
+  that source. Under `configuration` it reads the `Tenants` section and each
+  tenant's `SchemaConnectionString`. Under `directory` it reads
+  `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, and decrypts the
+  schema role of each tenant. See [database roles](storage.md#database-roles).
+- `Extensions:Path` and `Modules:Path`, as `activate` reads them. An unset path
+  gives an empty catalog, and a set path whose folder does not exist is a
+  settings error.
+- `Activation:InlineRecomputeLimit`, as for `activate`.
+
+A missing or invalid setting exits with code 2 before any request runs.
+
+**Which tenants.** Under `directory` it serves only `active` tenants whose
+schema version is the one of this build, and it reads the directory again every
+`Tenancy:RefreshInterval`. A `suspended`, `provisioning` or out of date tenant
+is skipped, and its requests stay `queued`. Under `configuration` it waits until
+the server has migrated each tenant database, as the worker does. It runs no
+migration of the tenant schema itself. `activate` does none either.
+
+**Claiming.** Each poll round, for each served tenant, it claims the oldest
+`queued` request with `FOR UPDATE SKIP LOCKED` and sets a lease.
+
+- **One at a time.** For one tenant and application it runs one request at a
+  time, oldest first, so when two publishes are queued the newer one ends up
+  live. Requests of other applications and tenants can run at the same time.
+- **Lease.** The lease says how long the claim holds. The publisher renews it
+  while the request runs. A `running` request whose lease has run out is claimed
+  again, because its publisher died. A request that has been claimed three
+  times and whose lease runs out again ends `failed` with `AXC0215`, see the
+  [lifecycle](authoring.md#lifecycle).
+- **Two publishers.** More than one publisher is safe, because the claim skips
+  rows that another publisher holds. The production installs run one.
+
+**Steps for each request.** Each step writes its own line, as in
+[Output and exit codes](#output-and-exit-codes), and runs as the tenant's schema
+role unless it says otherwise.
+
+1. `claim`: claim the request, as above.
+2. `version`: check that the tenant's schema version is the one of this build.
+3. For `publish`: `compile` the snapshot against the tenant database and store
+   its release, `activate` the release, then `seed`. These are the steps of
+   [activate](#activate) and report the same diagnostics. `seed` runs as the
+   runtime role. The compile reads the snapshot's files, never the application
+   folder on any disk. Activation adds a row to the
+   [release history](storage.md#publish-requests-and-release-history).
+4. For `validate`: run the `compile` and every check of `activate` against the
+   tenant inside one transaction, then roll the transaction back. It stores no
+   release, adds no history row and seeds nothing. It reports the diagnostics
+   of activation, so a clean `validate` means an activation with the same input
+   would pass its checks. The step is called `validate`.
+5. For `rollback`: read the stored release the request names and activate it
+   as it is, without compiling. It refuses the case where a migration applied
+   after that release is missing from it, with `AXC0174`, and the case where a
+   pinned package version is not installed, with `AXC0146`. The step is called
+   `rollback`. See [rollback](authoring.md#rollback).
+6. Write the audit record of a `publish` or a `rollback`, with the request's
+   final status, then set the request `succeeded` or `failed` and store its
+   diagnostics.
+
+Activating the same content hash twice changes nothing, so a request that runs
+again does no harm. An activation of the release that is already active adds no
+history row.
+
+**Failures.** A request fails on its own and does not stop the others. The
+previously active release stays active after a failed `compile` or `activate`.
+A `seed` failure happens after activation has committed, so the new release
+stays active and the request ends `failed` with its `releaseId`, as with
+`activate`.
+
+**Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the
+request it is running, then exits. A stop that comes mid-request leaves a lease
+that runs out, and another publisher claims the request again. The platform's
+shutdown grace period must be longer than the longest request, or the request
+is claimed twice.
+
+**Exit codes.** `0` after a stop on `SIGTERM` or Ctrl+C. `1` when it cannot read
+its tenants at start or stops on an error that it cannot recover from. `2` for a
+usage error or a missing or bad setting. A request that fails is not an exit
+code, because it is stored on the request.
 
 ## What else to back up
 

@@ -12,21 +12,30 @@ in git. The application list, resource list, read, patch, create, delete, diagno
 and references routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
-It never activates a release and touches no database. Under `scripts/dev.sh`,
-a saved file restarts the server, which activates the folder, as a hand edit
-does today. *(planned for M10)* A write will take a lock in the platform
-database. Reads and diagnostics still touch no database.
+Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
+restarts the server, which activates the folder, as a hand edit does today.
+*(planned for M10)* A write will take a lock in the platform database. Reads
+and diagnostics touch no database. Going live from Studio is
+[Publishing](#publishing) *(planned for M10)*. It asks for an activation: the
+server stores a publish request in the tenant database, and a separate
+[publisher](administration.md#publisher) runs it. The server never activates in
+its own process, and
+[D47](../decisions.md#d47-publishing-from-studio--agreed) agrees this.
 
 ## Settings
 
 Two server settings decide who may use the API and which
-folders it may edit. See [Studio](configuration.md#studio) for their defaults.
+folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. See [Studio](configuration.md#studio) for their defaults.
 
 - `Studio:Folders` lists the application folders. With no folder, the API
   has nothing to edit, and every route answers `403`. `studio: false` on
   `GET /api/me` says the same.
 - `Studio:AuthorRole` names the roles claim value that may use the API. With
   no value, nobody may. Application policies play no part.
+- `Studio:PublisherRole` *(planned for M10)* names the roles claim value that
+  may publish and roll back, on top of the author role. With no value, nobody
+  may publish or roll back. `validate`, the request status and the release
+  history need the author role only.
 
 ## Routes
 
@@ -85,37 +94,47 @@ bytes, in lower-case hex.
 ## Order of checks
 
 Like the [record API](record-api.md#errors), a request is
-checked in this order, and the first failure is the response. Checks 1 to 5
-are built. Checks 6 to 9 are built for a patch, a create and a delete:
+checked in this order, and the first failure is the response. Checks 1 to 3,
+5 and 6 are built. Checks 7 to 10 are built for a patch, a create and a
+delete. Checks 4, 6 for a request or a release, and 8 for a publish body are
+*(planned for M10)*:
 
 1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PATCH` or `DELETE`, `403`.
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs `Studio:AuthorRole` to be set and held in
    the session's roles, and `Studio:Folders` to be non-empty. This holds for
    every route.
-4. An unknown application, `404`. It is an application that is not in
+4. The publisher role, `403`, on `publish` and `rollback` only. It needs
+   `Studio:PublisherRole` to be set and held in the session's roles. It comes
+   right after the author role and before the application is looked up.
+5. An unknown application, `404`. It is an application that is not in
    `Studio:Folders`.
-5. An unknown resource or text key, `404`.
-6. A patch or a delete without `If-Match`, `428`.
-7. A bad body, `400`. That is a body that is not JSON, a patch that is not
+6. An unknown resource or text key, `404`. An unknown request id is `404`, and
+   so is a release that is not in this tenant's history for the application.
+   A request or a release of another application or tenant counts as unknown.
+7. A patch or a delete without `If-Match`, `428`.
+8. A bad body, `400`. That is a body that is not JSON, a patch that is not
    valid RFC 6902, a patch that does not apply, a patch that changes `id` or
    `kind`, a create without a valid `id`, with an unknown `kind` or with a
    `name` or `locale` that does not form a safe file name, or a create or a
    delete of the `application.json` manifest. The kind `application` counts as
-   unknown here.
-8. A stale version, `409`.
-9. A create whose `id` or whose target file already exists, `409`.
+   unknown here. For `publish`, it is also a body that is not a JSON object, a
+   key other than `label` and `note`, a value that is not a string, a `label`
+   of more than 100 characters or a `note` of more than 2000.
+9. A stale version, `409`.
+10. A create whose `id` or whose target file already exists, `409`.
 
-The session comes before the role, and the role before the application. So a
-caller without the role cannot find out which applications or resources
-exist.
+The session comes before the role, and the roles before the application. So a
+caller without the roles cannot find out which applications, resources,
+requests or releases exist.
 
 ## Responses
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
 from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics,
-Resource references and Text key references are built.
+Resource references and Text key references are built. The rows for Validate, Publish, Request status,
+Release history and Rollback are *(planned for M10)*.
 
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
@@ -128,9 +147,16 @@ Resource references and Text key references are built.
 | Resource references | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
 | Text key references | No session | No author role, or no `Studio:Folders` | Unknown application, or a key that no text resource defines and no label uses | Not used |
 | Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
+| Validate *(planned for M10)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
+| Publish *(planned for M10)* | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
+| Request status *(planned for M10)* | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
+| Release history *(planned for M10)* | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
+| Rollback *(planned for M10)* | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application, or a release not in the tenant's history | Not used |
 
 `400` is a bad body, and `428` a missing `If-Match`, as
-[Order of checks](#order-of-checks) says. `415` answers a body of the wrong
+[Order of checks](#order-of-checks) says. `400` also answers a bad `publish`
+body *(planned for M10)*. A successful `validate`, `publish` or `rollback`
+answers `202`, see [Publishing](#publishing). `415` answers a body of the wrong
 content type, just before the body is read. A create needs `application/json`
 and a patch needs `application/json-patch+json`.
 
@@ -221,7 +247,9 @@ Writes are built for patches, creates and deletes.
   allowed, including one that breaks the resource. The new content is written
   and the diagnostics report the breakage.
 - **Never an activation.** A write never compiles against a database, never
-  stores a release and never activates one.
+  stores a release and never activates one. Only a [publish request](#publishing)
+  *(planned for M10)* leads to an activation, and the
+  [publisher](administration.md#publisher) runs it, never the server.
 
 ## Diagnostics
 
@@ -247,3 +275,153 @@ saved, and the diagnostics list the broken references.
 - A folder with an error is not activated. Under `scripts/dev.sh`, the
   restart after a saved file then stops the server, as a broken hand edit
   does today.
+
+## Publishing
+
+*(Planned for M10.)* An author validates, publishes and rolls back an
+application from Studio. The server never activates in its own process and
+holds no tenant schema connection. It stores a **publish request** in the
+tenant database, and a separate [publisher](administration.md#publisher) runs
+it with the tenant's schema role. See
+[D47](../decisions.md#d47-publishing-from-studio--agreed), and
+[publish requests and release history](storage.md#publish-requests-and-release-history)
+for the tables.
+
+A request runs for the tenant of the author's session. Studio on a tenant's
+host publishes to that tenant only.
+
+| Method and path | Response |
+| --- | --- |
+| `POST /api/studio/apps/{application}/validate` | `202` with the request and a `Location` header for `.../requests/{id}`. It needs the author role |
+| `POST /api/studio/apps/{application}/publish` | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role |
+| `GET /api/studio/apps/{application}/requests/{id}` | `200` with the request, its status and its diagnostics |
+| `GET /api/studio/apps/{application}/releases` | `200` with the activation history, newest first, and which release is active |
+| `POST /api/studio/apps/{application}/releases/{id}/rollback` | `202` with the request and a `Location` header. It takes no body. It needs the author role and the publisher role |
+
+`validate` and `rollback` take no body, and a body that is sent is ignored.
+`{id}` of a request is its UUID. `{id}` of a release is the release id from
+the history. The answers for `401`, `403`, `404` and the CSRF header are those
+of the rest of the API, see [Order of checks](#order-of-checks) and
+[Responses](#responses).
+
+### The request
+
+A request is shown as `{ id, application, kind, status, label, note, requestedBy, requestedAt, startedAt, finishedAt, releaseId, diagnostics }`.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The request id, a UUID |
+| `application` | The application `name` |
+| `kind` | `validate`, `publish` or `rollback` |
+| `status` | `queued`, `running`, `succeeded` or `failed` |
+| `label` | The optional label of a `publish`, up to 100 characters, or null |
+| `note` | The optional note of a `publish`, up to 2000 characters, or null |
+| `requestedBy` | The requesting user's id |
+| `requestedAt` | When the request was stored |
+| `startedAt` | When a publisher first started it, or null while `queued` |
+| `finishedAt` | When it reached `succeeded` or `failed`, or null before |
+| `releaseId` | The release a `publish` activated or a `rollback` named, or null. A `validate` has none |
+| `diagnostics` | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings |
+
+- **A snapshot.** `validate` and `publish` store the folder as it is when the
+  request is made: every resource file with its `version`, as for
+  [Versions](#versions). A later edit in Studio does not change a queued
+  request, so the release is exactly what the author sent.
+- **A folder with errors.** A `publish` of a folder with compile errors is
+  still accepted with `202`. The request then ends `failed` with those
+  diagnostics. There is one path for diagnostics, and the snapshot shows what
+  the author sent.
+- **`validate`.** The publisher runs every activation check against the
+  tenant inside a transaction that it rolls back. It returns the codes of
+  [startup activation](configuration.md#startup-activation), including the
+  checks that the in-memory diagnostics skip: bindings, name and site path
+  conflicts, and storage changes. It stores no release and changes nothing.
+  It ends `succeeded` when there is no error.
+- **`publish`.** The publisher compiles the snapshot against the tenant,
+  stores the release and activates it, then seeds, with the same steps as
+  [`axis-admin activate`](administration.md#activate). A `seed` failure
+  happens after activation has committed, so the request ends `failed` with
+  `releaseId` set, and the release stays active and stays in the history.
+- **Order.** For one tenant and application the publisher runs requests one at
+  a time, oldest first. When two publishes are queued, the newer one ends up
+  live.
+
+### Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued: request stored
+    queued --> running: publisher claims it
+    running --> running: lease expired, claimed again
+    running --> succeeded: all steps passed
+    running --> failed: a step failed, or third expired claim (AXC0215)
+    succeeded --> [*]
+    failed --> [*]
+```
+
+- Only the publisher changes `status`. The server only inserts requests and
+  reads them.
+- The publisher claims a request with a lease, and renews the lease while the
+  request runs, so a long recompute is not claimed twice. A request whose
+  publisher died is claimed again after its lease ran out. It stays `running`.
+- A request that has been claimed three times, and whose lease runs out again,
+  ends `failed` with `AXC0215` in place of a fourth claim. A request that
+  crashes the publisher cannot block the queue for good.
+- `succeeded` and `failed` are final. Studio polls
+  `GET .../requests/{id}` until the status is one of them.
+- A request that runs again does no harm. Activating the same content hash
+  twice changes nothing, see [Release history](#release-history).
+
+### Release history
+
+`GET .../releases` answers
+`{ active: { releaseId, number, contentHash }, folderContentHash, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId }] }`,
+newest first.
+
+- `active` is the application's active release in this tenant, or null when
+  there is none.
+- `folderContentHash` is the content hash that the folder would compile to now,
+  so Studio can show that the live release and the folder differ. It is null
+  when the folder has errors.
+- Each item is one activation: a startup, an `axis-admin activate`, a publish or
+  a rollback. `actor` is a user id, `startup` or `operator`. A row that a
+  migration added for a release that was live before the history existed has
+  the actor `unknown`. `actorName` is the
+  user's display name, or null. `requestId` is null for a startup and for an
+  `axis-admin activate`.
+- A release gets its `number` the first time it is activated in the tenant:
+  1, 2, 3… per application. Activating it again keeps the number, so the same
+  content can have different numbers in two tenants.
+- Activating the release that is already active adds no row and keeps the
+  number. Otherwise every restart under `scripts/dev.sh` would fill the history
+  with copies.
+- `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
+  both the author role and the publisher role and `Studio:Folders` is not
+  empty. Studio uses it to hide the publish and rollback buttons.
+
+### Rollback
+
+A `rollback` request names a release from the history. The publisher activates
+the stored release as it is, **without compiling it again**. It records an
+activation with the rollback's actor.
+
+It is refused, and the request ends `failed`, in these cases:
+
+| Case | Code |
+| --- | --- |
+| A migration that was applied after that release is missing from it, see [applied migrations](storage.md#applied-migrations) | `AXC0174` |
+| An extension package version that the release pins is no longer installed | `AXC0146` |
+
+These are the codes that activation already gives for the same causes. A refused
+rollback changes nothing: the active release and the history stay as they were.
+Rolling back to the release that is already active succeeds and adds no row.
+
+A rollback does not change the folder. Studio shows when the active release
+does not match the folder, with `folderContentHash`.
+
+### Audit
+
+Each `publish` and `rollback` writes an
+[audit record](storage.md#audit-records-and-sequence-counters) with the actor,
+the application, the release and the request, when it succeeds and when it
+fails. A `validate` writes none.

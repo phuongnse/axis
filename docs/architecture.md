@@ -19,6 +19,8 @@ flowchart LR
     Worker -->|connectors| External[External systems]
     Admin[Axis.Admin] --> SysDb
     Admin --> TenantDb
+    Publisher[axis-admin publisher] --> SysDb
+    Publisher --> TenantDb
 ```
 
 - **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
@@ -30,6 +32,10 @@ flowchart LR
   folders that `Studio:Folders` lists and needs a session and the author role.
   Its routes that list applications, list, read, patch, create and delete resources, give
   diagnostics and answer where a resource or text key is used are built.
+  *(Planned for M10:)* Its routes that validate, publish and roll back store a
+  publish request in the tenant database over the runtime role. The server
+  never activates a release in its own process, see
+  [D47](decisions.md#d47-publishing-from-studio--agreed).
 - **Axis.Worker** executes durable work. It serves health endpoints on its own
   address, see [health checks](#health-checks).
   It runs work items, and through them
@@ -56,6 +62,12 @@ flowchart LR
   [administration](reference/administration.md) and
   [D43](decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
   and [D45](decisions.md#d45-tenant-backup-and-restore--agreed).
+  *(Planned for M10:)* Its `publisher` command is a long-running part of the
+  same host. It reads the tenants as the server does, connects to each tenant
+  database with that tenant's schema role, and runs the publish requests that
+  Studio stores. It has no HTTP endpoint, and the server holds no tenant schema
+  connection. See [publisher](reference/administration.md#publisher) and
+  [D47](decisions.md#d47-publishing-from-studio--agreed).
 - **Platform database** stores installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform
   settings _(both hosts read the tenant directory again every refresh
@@ -493,6 +505,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean
   `studio`, true when `Studio:Folders` is not empty and the user holds
   `Studio:AuthorRole`. See [D38](decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
+  *(Planned for M10:)* It adds a boolean `studioPublisher`, true when
+  `Studio:Folders` is not empty and the user holds both `Studio:AuthorRole` and
+  `Studio:PublisherRole`. See [D47](decisions.md#d47-publishing-from-studio--agreed).
   Without a session it is a `401`, as today. Record writes, process starts and the
   task API read the current user the same way, and their audit records store
   the user's id and display name.
@@ -557,6 +572,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - It holds the purchase request users with fixed ids: `anna` and `lan`
     the employees, `binh` and `chau` the department managers, `dung` the
     finance reviewer, `giang` the operator, and `hoa` the author. Seed data and E2E journeys already name these ids.
+    *(Planned for M10:)* `hoa` also holds the `publisher` role.
   - Every user has the same development-only password.
   - The roles are client roles of the confidential client `axis`. A
     client-role mapper writes them to the `roles` claim, so the claim holds
@@ -1051,6 +1067,7 @@ says. The images, the Compose example and the chart are built.
 - `axis-server` and `axis-worker` run the hosts. They hold no sample and no
   development setting.
 - `axis-admin` runs `Axis.Admin` and holds the PostgreSQL 18 client tools.
+  *(Planned for M10:)* It also runs the publisher, `axis-admin publisher`.
 - `deploy/compose/` and `deploy/helm/axis/` install them on one machine and on
   Kubernetes.
 
