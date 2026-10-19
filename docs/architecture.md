@@ -48,12 +48,14 @@ flowchart LR
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
 - **Axis.Admin** *(planned for M9)* is the console host that the platform
-  operator runs. It creates tenants, migrates tenant databases and activates
-  releases. It is the only host that writes the [tenant directory](#tenant-directory),
-  holds an admin connection to the database server, and holds the schema
-  database role of a tenant under `Tenancy:Source=directory`. See
+  operator runs. It creates tenants, migrates tenant databases, activates
+  releases, and backs up and restores tenants. It is the only host that writes
+  the [tenant directory](#tenant-directory), holds an admin connection to the
+  database server, and holds the schema database role of a tenant under
+  `Tenancy:Source=directory`. See
   [administration](reference/administration.md) and
-  [D43](decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
+  [D43](decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
+  and [D45](decisions.md#d45-tenant-backup-and-restore--agreed).
 - **Platform database** stores installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform
   settings *(tenant directory planned for M9; tenants come from server

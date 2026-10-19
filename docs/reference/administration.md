@@ -1,9 +1,11 @@
 # Administration
 
 *(Planned for M9.)* Detailed reference for `Axis.Admin`, the command-line host
-that a platform operator runs to create tenants, migrate tenant databases and
-activate releases. It follows
-[D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
+that a platform operator runs to create tenants, migrate tenant databases,
+activate releases, and back up and restore tenants. It follows
+[D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
+and
+[D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
 None of it is built. Today tenants come from the `Tenants` section, and the
 server migrates and activates at start, see
 [startup activation](configuration.md#startup-activation).
@@ -28,9 +30,10 @@ connection. There is no HTTP API for provisioning in M9.
 | `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. See [admin settings](configuration.md#admin-settings). |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
-| `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate` reads it. |
-| `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` reads it. |
-| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. Only `tenant create` reads it. It is never a command-line option, so it does not appear in a process list. |
+| `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate` and `tenant restore` read it. |
+| `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `tenant restore` read it. |
+| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. Only `tenant create` and `tenant restore` read it. It is never a command-line option, so it does not appear in a process list. |
+| none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
 A missing or invalid setting exits with code 2 before any tenant work. The
 message names the setting and never holds its value.
@@ -49,7 +52,8 @@ Every command writes one line per tenant and step to standard output:
 ```
 
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
-`role-check`, `version`, `compile`, `activate` and `seed`. A line names the
+`role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
+`check` and `restore`. A line names the
 tenant and never a host, a password or a connection string. A `failed` message
 never holds one either. A command that does no tenant work, such as a usage
 error, writes its message to standard error.
@@ -160,6 +164,159 @@ or a connection string.
 **Exit codes.** `0` on success, also when there is no tenant. `1` when it
 cannot read the directory.
 
+## Tenant backup
+
+*(Planned for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* `tenant backup <id> --out <file>` writes one
+archive of one tenant.
+
+| Option | Meaning |
+| --- | --- |
+| `<id>` | The tenant id. |
+| `--out <file>` | The archive to write. The file must not exist. |
+
+The archive is one tar file with two entries: `manifest.json` and `tenant.dump`.
+It holds no secret. No database password, OIDC client secret or `secret` binding
+value is ever in it, so it can be stored like any data file.
+
+**Steps, in order.**
+
+1. `dump`: run `pg_dump --format=custom --no-owner --no-privileges` over the
+   tenant database as its schema role. It reads one consistent snapshot, so the
+   tenant keeps running and its hosts keep answering.
+2. `archive`: write the manifest and the dump into `--out`.
+
+A tenant in any status except `provisioning` can be backed up, also a
+`suspended` one. A `provisioning` tenant has no complete database.
+
+**Manifest.** `manifest.json` holds these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `format` | The archive format version. It is `1`. |
+| `tenantId` | The id of the backed-up tenant. |
+| `axisVersion` | The version of the `Axis.Admin` build that wrote the archive. |
+| `schemaVersion` | The tenant's schema version at backup, see [Migrate](#migrate). |
+| `createdAt` | The time of the backup, in UTC. |
+| `directory` | The directory entry without any secret, see below. |
+| `packages` | Every extension package version that a stored release pins. Each has `id`, `version` and `required`. |
+| `modules` | Every module version that a stored release pins. Each has `id` and `version`. |
+
+`directory` holds the status at backup, the hosts, the OIDC authority and client
+id, the claim names, the endpoint audience and the bindings. A binding holds its
+name, its kind and, for a kind other than `secret`, its `url` value. A `secret`
+binding holds only its name and kind. The database server, the database name,
+the role names and the `version` of the entry are not in the manifest, because a
+restore creates new ones.
+
+`required` is `true` for a package version that an active release, or a release
+with a running or waiting process instance, pins. These are the releases that the
+start check `AXC0146` rebuilds, see
+[extension packages](extension-packages.md). Other stored releases are listed
+with `required` set to `false`.
+
+**Failures.** A failed dump or write exits `1` and leaves no partial file.
+
+**Exit codes.** `0` when the archive is written. `1` when the dump or the write
+failed. `2` for an unknown tenant, a `provisioning` tenant, an `--out` file that
+exists, a missing option, a missing tool or a missing setting.
+
+## Tenant restore
+
+*(Planned for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* `tenant restore <file> --tenant <id> --host <host>...`
+restores an archive into a new tenant.
+
+| Option | Meaning |
+| --- | --- |
+| `<file>` | The archive that `tenant backup` wrote. |
+| `--tenant <id>` | The id of the new tenant. It follows the rule of `tenant create`. |
+| `--host <host>` | A host of the new tenant. Repeat it for more hosts. At least one is needed. |
+
+The OIDC client secret comes from `AXIS_OIDC_CLIENT_SECRET`, as for
+`tenant create`. The authority and client id come from the manifest.
+
+**Refusals.** Each refusal happens before anything changes, exits `2` and names
+what is missing:
+
+- The archive is unreadable, has no `manifest.json` or `tenant.dump`, or has a
+  `format` this build does not know.
+- The archive's `schemaVersion` is newer than this build's, or is not the id of
+  one of its migrations.
+- The tenant id exists in the directory as `active` or `suspended`.
+- A host belongs to another tenant, ignoring letter case.
+- A package version with `required` set to `true` is not installed under
+  `Extensions:Path`. The message lists every missing version, not only the first.
+- `AXIS_OIDC_CLIENT_SECRET` is missing.
+
+A module version that is not installed under `Modules:Path` is listed in the
+manifest but never refuses a restore. A stored release holds its module files, so
+it keeps working without the module installed.
+
+**Steps, in order.** Each step writes its own line.
+
+1. `check`: read the archive and make every check above.
+2. `entry`: write the directory entry with status `provisioning`. It takes the
+   new id and hosts, and everything else from `directory` in the manifest. A
+   `secret` binding is restored by name and kind, without a value.
+3. `roles`: create `axis_<id>_schema` and `axis_<id>_runtime` with new random
+   passwords, as `tenant create` does.
+4. `database`: create `axis_<id>`, owned by the schema role.
+5. `restore`: run `pg_restore --single-transaction --no-owner --no-privileges`
+   as the schema role. It restores everything or nothing. It refuses a database
+   that already holds tables.
+6. `grants`: run the grant step. This builds every privilege for the new roles,
+   as [D31](../decisions.md#d31-separate-database-roles--agreed) describes.
+7. `migrations`: run the EF Core migrations. This step runs only when the
+   archive's schema version is older than this build's.
+8. `grants`: run the grant step again.
+9. `role-check`: run the runtime role check of D31 over the runtime role.
+10. `version`: record the schema version and set the entry `suspended`.
+
+**Running it again.** On a `provisioning` entry, the same command skips every
+step already done and finishes the rest, as `tenant create` does. A failed
+`restore` step restored nothing, so the rerun restores again. On an `active` or
+`suspended` tenant it is refused.
+
+**Exit codes.** `0` when the tenant is `suspended` and restored. `1` when a step
+failed, and the entry stays `provisioning`. `2` for a refusal above, a missing
+option or a missing setting.
+
+**After a restore.** The tenant is `suspended`, and its hosts answer `503`.
+
+1. Set the OIDC client secret and every `secret` binding again. The archive
+   holds none of them.
+2. Run [`tenant resume <id>`](#tenant-resume).
+
+No command sets a binding yet, see [Not in M9](#not-in-m9).
+
+**Restoring over an existing tenant.** There is no in-place overwrite.
+
+1. Run [`tenant suspend`](#tenant-suspend) on the tenant.
+2. Restore the archive under a new id, with a temporary host.
+3. Set the secrets again and resume the new tenant.
+4. Move the hosts from the old tenant to the new one. No command does this yet,
+   see [Not in M9](#not-in-m9).
+
+The old tenant stays in the directory, because there is no tenant delete.
+
+**What a restore does to running work.** Work goes back to backup time, see
+[execution](../domain/knowledge.md#execution):
+
+- Process instances, tasks, work items and connector calls are as they were at
+  backup. The worker runs them again once the tenant resumes.
+- A call that was staged before the backup and sent after it is sent again,
+  with the same idempotency key, so a system that honours the key does not act
+  twice.
+- A call that was staged after the backup is not in the archive. Its step runs
+  again and stages a new call, with a new operation identity and so a new
+  idempotency key. The system may already have acted on the first call, so
+  even a system that honours the key can act twice. See
+  [staging and the call](processes.md#staging-and-the-call).
+- A connector without `idempotency` sends no key, so the system may act twice
+  in either case.
+- Sequence counters, inbound endpoint receipts and schedule state go back too.
+  A number issued after the backup can be issued again, and an inbound request
+  accepted after it is lost.
+
 ## Migrate
 
 `migrate [--tenant <id>] [--parallel <n>]` brings tenant databases to the schema
@@ -252,6 +409,26 @@ command exits `1` at the end.
 when at least one tenant failed. `2` for a folder that does not exist, an
 unknown `--tenant`, a `--tenant` that is `provisioning` or a missing setting.
 
+## What else to back up
+
+*(Planned for M9, see [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).)* A tenant archive is not a backup of the
+installation. The operator also keeps these safe:
+
+- **The platform database.** It holds the tenant directory. Back it up with
+  standard PostgreSQL tools, such as `pg_dump` or continuous archiving. Axis does
+  not back it up.
+- **The installation key.** `Platform:SecretKey` decrypts every stored secret.
+  Without it, no database password, OIDC client secret or `secret` binding
+  value can be read, and every one must be set again by hand. Keep it apart from
+  the backups, so a stolen backup does not hold its own key. See
+  [platform database](storage.md#platform-database).
+- **Installed packages and modules.** The folders `Extensions:Path` and
+  `Modules:Path` hold the installed extension packages and modules. A restore
+  needs the package versions that the archive marks `required`.
+
+Point-in-time recovery and restoring into another installation are out of scope,
+see [Not in M9](#not-in-m9).
+
 ## Version
 
 *(Planned for M9.)* `version` prints the Axis version on one line. It takes no
@@ -268,3 +445,8 @@ admin host carries the same version in its OCI label, see
 - Commands that set a tenant's deployment bindings, claim names or endpoint
   audience. D43 does not say how they are written. The issue that builds
   provisioning decides.
+- Point-in-time recovery of a tenant, and restoring a tenant into another
+  installation.
+- Overwriting a tenant in place with a restore.
+- A command that moves a host from one tenant to another. Restoring over an
+  existing tenant ends with this step.
