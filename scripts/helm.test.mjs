@@ -60,6 +60,30 @@ describe('the Axis Helm chart', () => {
     assert.match(job, /backoffLimit: 0\n/)
   })
 
+  test('the publisher is one Recreate pod with no port, probe or Service and only its two secrets', () => {
+    const output = renderOk()
+    const publisher = find(output, 'Deployment', 'axis-publisher')
+    assert.match(publisher, /replicas: 1\n/)
+    assert.match(publisher, /type: Recreate\n/)
+    assert.match(publisher, /terminationGracePeriodSeconds: 360\n/)
+    assert.match(publisher, /image: "axis-admin:[^"]+"/)
+    assert.match(publisher, /args:\n\s+- publisher\n/)
+    assert.match(publisher, /path: ConnectionStrings__PlatformSchema\n/)
+    assert.match(publisher, /path: Platform__SecretKey\n/)
+    assert.doesNotMatch(publisher, /ports:|containerPort/)
+    assert.doesNotMatch(publisher, /Probe:/)
+    assert.doesNotMatch(publisher, /path: ConnectionStrings__Platform\n/)
+    assert.doesNotMatch(publisher, /Admin__ConnectionString/)
+    for (const service of documents(output).filter((d) => /^kind: Service$/m.test(d))) {
+      assert.doesNotMatch(service, /component: publisher/)
+    }
+  })
+
+  test('the publisher grace period is a value', () => {
+    const publisher = find(renderOk('--set', 'publisher.terminationGracePeriodSeconds=420'), 'Deployment', 'axis-publisher')
+    assert.match(publisher, /terminationGracePeriodSeconds: 420\n/)
+  })
+
   test('the image tag and registry apply to every host', () => {
     const output = renderOk('--set', 'image.registry=registry.example.com/axis', '--set', 'image.tag=1.2.3')
     for (const image of ['axis-server', 'axis-worker', 'axis-admin']) {

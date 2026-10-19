@@ -14,13 +14,14 @@ using NpgsqlTypes;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>publisher</c>: runs the <c>publish</c> requests that Studio stores in the tenant databases, until it is stopped. Each
-/// poll round it claims the oldest queued request of every active tenant that is on this build's schema version and runs it
-/// with the steps of <c>activate</c>, compiling from the stored snapshot and never from a folder. A request ends
-/// <c>succeeded</c> or <c>failed</c>, with its diagnostics, and the audit record is written in the same transaction. A
-/// request of another tenant, and one that is not a <c>publish</c>, stays queued. Every step runs as the tenant's schema role,
-/// and a stop finishes the request that is running, then ends the loop. The tenants come from the tenant directory or from
-/// the <c>Tenants</c> configuration section, see <see cref="IPublisherTenants"/>.
+/// <c>publisher</c>: runs the <c>publish</c> and <c>validate</c> requests that Studio stores in the tenant databases, until it
+/// is stopped. Each poll round it claims the oldest queued request of every active tenant that is on this build's schema
+/// version. A <c>publish</c> runs the steps of <c>activate</c>, compiling from the stored snapshot and never from a folder. A
+/// <c>validate</c> runs the compile and every activation check in a transaction that it rolls back. A request ends
+/// <c>succeeded</c> or <c>failed</c>, with its diagnostics. A <c>publish</c> writes its audit record in the same transaction,
+/// and a <c>validate</c> writes none. A request of another tenant, and a <c>rollback</c>, stays queued. Every step runs as
+/// the tenant's schema role, and a stop finishes the request that is running, then ends the loop. The tenants come from the
+/// tenant directory or from the <c>Tenants</c> configuration section, see <see cref="IPublisherTenants"/>.
 /// </summary>
 internal sealed class Publisher(
     ReleaseSettings settings,
@@ -40,7 +41,7 @@ internal sealed class Publisher(
         """
         WITH next AS (
           SELECT r.id FROM axis.publish_requests r
-          WHERE r.status = 'queued' AND r.kind = 'publish'
+          WHERE r.status = 'queued' AND r.kind IN ('publish', 'validate')
             AND NOT EXISTS (SELECT 1 FROM axis.publish_requests o
                             WHERE o.application_id = r.application_id AND o.status = 'running')
           ORDER BY r.requested_at, r.id LIMIT 1
@@ -49,7 +50,7 @@ internal sealed class Publisher(
         SET status = 'running', claimed_by = @me, lease_until = now() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, now())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name
+        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind
         """;
 
     private const string FinishSql =
@@ -183,13 +184,30 @@ internal sealed class Publisher(
             reader.GetGuid(1),
             await reader.IsDBNullAsync(2) ? null : reader.GetString(2),
             reader.GetString(3),
-            await reader.IsDBNullAsync(4) ? null : reader.GetString(4));
+            await reader.IsDBNullAsync(4) ? null : reader.GetString(4),
+            reader.GetString(5));
     }
 
     private async Task RunRequestAsync(PublisherTenant tenant, ITenantConnections connections, ClaimedRequest request)
     {
         var diagnostics = new List<Diagnostic>();
         var files = ParseSnapshot(request.Snapshot);
+        var activation = new TenantReleaseActivation(settings.InlineRecomputeLimit, output, error, CancellationToken.None);
+        if (request.Kind == "validate")
+        {
+            var valid = await activation.ValidateAsync(
+                tenant.Id,
+                tenant.SchemaVersion,
+                connections,
+                tenant.Bindings,
+                files is null
+                    ? null
+                    : configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
+                diagnostics);
+            await FinishAsync(connections, request, new ReleaseRun(valid, null), diagnostics, audit: false);
+            return;
+        }
+
         ReleaseRun run;
         if (files is null)
         {
@@ -198,7 +216,7 @@ internal sealed class Publisher(
         }
         else
         {
-            run = await new TenantReleaseActivation(settings.InlineRecomputeLimit, output, error, CancellationToken.None).RunAsync(
+            run = await activation.RunAsync(
                 tenant.Id,
                 tenant.SchemaVersion,
                 connections,
@@ -207,7 +225,7 @@ internal sealed class Publisher(
                 diagnostics);
         }
 
-        await FinishAsync(connections, request, run, diagnostics);
+        await FinishAsync(connections, request, run, diagnostics, audit: true);
     }
 
     // The snapshot is an array of { file, version, content }, where content is the file's text as a JSON string. Null means
@@ -250,8 +268,9 @@ internal sealed class Publisher(
         }
     }
 
-    // The final status, the diagnostics and the audit record commit together, so a request never ends without its record.
-    private static async Task FinishAsync(ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics)
+    // The final status, the diagnostics and the audit record commit together, so a request never ends without its record. A
+    // validate has no audit record.
+    private static async Task FinishAsync(ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit)
     {
         var connection = await connections.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
@@ -264,18 +283,22 @@ internal sealed class Publisher(
             await command.ExecuteNonQueryAsync();
         }
 
-        // The release history assigns the number, and it is not built yet, so the number stays null.
-        await AuditRecords.AppendAsync(
-            transaction,
-            new AuditEntry(
-                request.RequestedBy,
-                run.Succeeded ? "release.published" : "release.publishFailed",
-                request.ApplicationId,
-                null,
-                null,
-                null,
-                new JsonObject { ["requestId"] = request.Id, ["releaseId"] = run.ReleaseId, ["number"] = null },
-                request.RequestedByName));
+        if (audit)
+        {
+            // The release history assigns the number, and it is not built yet, so the number stays null.
+            await AuditRecords.AppendAsync(
+                transaction,
+                new AuditEntry(
+                    request.RequestedBy,
+                    run.Succeeded ? "release.published" : "release.publishFailed",
+                    request.ApplicationId,
+                    null,
+                    null,
+                    null,
+                    new JsonObject { ["requestId"] = request.Id, ["releaseId"] = run.ReleaseId, ["number"] = null },
+                    request.RequestedByName));
+        }
+
         await transaction.CommitAsync();
     }
 
@@ -291,5 +314,5 @@ internal sealed class Publisher(
             ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
         })]).ToJsonString();
 
-    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName);
+    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind);
 }
