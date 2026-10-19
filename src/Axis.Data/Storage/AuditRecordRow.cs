@@ -27,8 +27,8 @@ public sealed class AuditRecordRow
     /// <summary>The action, such as <c>record.created</c>.</summary>
     public required string Action { get; init; }
 
-    /// <summary>The <c>id</c> of the application manifest.</summary>
-    public required Guid ApplicationId { get; init; }
+    /// <summary>The <c>id</c> of the application manifest, or null for a session action.</summary>
+    public Guid? ApplicationId { get; init; }
 
     /// <summary>The <c>id</c> of the entity, when the action concerns a record.</summary>
     public Guid? EntityId { get; init; }

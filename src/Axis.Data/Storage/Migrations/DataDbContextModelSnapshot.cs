@@ -80,7 +80,7 @@ namespace Axis.Data.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("actor_name");
 
-                    b.Property<Guid>("ApplicationId")
+                    b.Property<Guid?>("ApplicationId")
                         .HasColumnType("uuid")
                         .HasColumnName("application_id");
 

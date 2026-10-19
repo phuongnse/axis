@@ -4,8 +4,8 @@ namespace Axis.Data.Audit;
 public static class AuditActors
 {
     /// <summary>
-    /// Nobody was signed in. Only process starts from before they needed a session wrote it, so
-    /// it appears only in older audit records.
+    /// Nobody was signed in. A <c>session.signInRefused</c> record has it, and so do older
+    /// process starts from before they needed a session.
     /// </summary>
     public const string Anonymous = "anonymous";
 

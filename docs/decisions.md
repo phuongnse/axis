@@ -2739,9 +2739,9 @@ needs a `ReadWriteMany` storage class.
 
 ## D50. Sign-in audit records and security scanning in CI — Agreed
 
-M10 adds two security baselines _(planned for M10)_. Sign-in, sign-out and refused sign-ins leave
-audit records. CI scans the packages for known vulnerabilities and runs static
-analysis. See
+M10 adds two security baselines. Sign-in, sign-out and refused sign-ins leave
+audit records, and that part is built. CI scans the packages for known
+vulnerabilities and runs static analysis, which is _(planned for M10)_. See
 [audit records](reference/storage.md#audit-records-and-sequence-counters) and
 [sign-in and the session](architecture.md#sign-in-and-the-session) for the
 detail. The ASVS level and its verification stay in M16
