@@ -10,6 +10,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
 {
     private const string PermissionDenied = "42501";
     private const string UniqueViolation = "23505";
+    private const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
     [Fact]
     public async Task The_directory_source_creates_the_platform_tables_at_start()
@@ -73,6 +74,17 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
         Assert.Null(await ScalarAsync(platform, "SELECT to_regnamespace('platform')::text"));
     }
 
+    [Fact]
+    public async Task Under_directory_without_a_secret_key_the_server_start_fails_naming_the_setting()
+    {
+        var platform = await database.CreateDatabaseAsync("platform", TestContext.Current.CancellationToken);
+        await using var factory = CreateFactory(platform, directory: true, secretKey: null);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("Platform:SecretKey", exception.Message, StringComparison.Ordinal);
+    }
+
     private async Task<string> StartDirectoryServerAsync()
     {
         var platform = await database.CreateDatabaseAsync("platform", TestContext.Current.CancellationToken);
@@ -86,7 +98,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
     }
 
     // The tenant stays on the class database. Only the platform database is a separate one.
-    private WebApplicationFactory<Program> CreateFactory(string platformSchemaConnectionString, bool directory) =>
+    private WebApplicationFactory<Program> CreateFactory(string platformSchemaConnectionString, bool directory, string? secretKey = TestSecretKey) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -95,6 +107,10 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             {
                 builder.UseSetting("Tenancy:Source", "directory");
                 builder.UseSetting("ConnectionStrings:PlatformSchema", platformSchemaConnectionString);
+                if (secretKey is not null)
+                {
+                    builder.UseSetting("Platform:SecretKey", secretKey);
+                }
             }
 
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");

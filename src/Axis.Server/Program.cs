@@ -17,6 +17,7 @@ using Axis.Server.Telemetry;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Tenancy;
+using Axis.Tenancy.Platform;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
@@ -51,6 +52,7 @@ if (TenancySettings.Source(builder.Configuration) == TenancySource.Directory)
             "Connection strings 'Platform' and 'PlatformSchema' name the same user. They must be different roles.");
     }
 
+    builder.Services.AddSingleton(TenantSecretCipher.Load(builder.Configuration));
     builder.Services.AddSingleton(new PlatformMigrationOptions(platformSchemaConnectionString, readerRole));
     builder.Services.AddHostedService<PlatformMigration>();
 }
