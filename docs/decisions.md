@@ -2278,8 +2278,8 @@ admin role limited to creating databases and roles.
 ## D44. Packaging for on-premises and cloud installation — Agreed
 
 Axis ships as three production images, a Compose example for one machine and a
-Helm chart for Kubernetes. The production images are built. The Compose
-example and the chart are planned for M9. The development `Dockerfile` default
+Helm chart for Kubernetes. The production images and the chart are built.
+The Compose example is planned for M9. The development `Dockerfile` default
 target and `compose.yaml` hold the samples and development credentials, and
 they are not for production. See the
 [installation guide](reference/installation.md) for the steps and every

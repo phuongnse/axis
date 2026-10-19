@@ -7,3 +7,12 @@ dotnet format Axis.slnx --verify-no-changes
 npm run lint --prefix web
 npx --prefix tests/e2e tsc -p tests/e2e/tsconfig.json
 node scripts/check-links.mjs
+
+# The Helm chart: lint, then validate the rendered manifests against the Kubernetes schemas that
+# scripts/setup.sh downloads. No schema is missing-ignored, so a new kind needs its schema file.
+source scripts/lib/tools.sh
+chart=deploy/helm/axis
+"$helm" lint "$chart" --strict -f "$chart/ci/test-values.yaml"
+"$helm" template axis "$chart" -f "$chart/ci/test-values.yaml" |
+  "$kubeconform" -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
+    -schema-location "$kubernetes_schemas/{{ .ResourceKind }}{{ .KindSuffix }}.json"

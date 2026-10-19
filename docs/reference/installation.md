@@ -2,8 +2,8 @@
 
 How to install and upgrade Axis on premises and in the cloud. It follows
 [D44](../decisions.md#d44-packaging-for-on-premises-and-cloud-installation--agreed).
-The three production images are built. *(Planned for M9.)* The production
-Compose example and the Helm chart are not built. The default target of the
+The three production images and the Helm chart are built. *(Planned for M9.)*
+The production Compose example is not built. The default target of the
 `Dockerfile` and `compose.yaml` build the development images instead. Those
 hold the samples and development credentials, and they are not for
 production. See [AGENTS.md](../../AGENTS.md#commands) for them.
@@ -135,23 +135,90 @@ module.
 
 ## In the cloud
 
-This installs Axis on Kubernetes with a Helm chart. PostgreSQL, the OIDC
-provider and the source of secrets are external.
+This installs Axis on Kubernetes with the Helm chart in `deploy/helm/axis/`.
+PostgreSQL, the OIDC provider and the source of secrets are external.
 
-- **The chart.** It lives in `deploy/helm/axis/`.
-- **Deployments.** One for the server and one for the worker. Each has
-  `httpGet` probes on `/health/live` and `/health/ready`, see
-  [health checks](../architecture.md#health-checks). The chart sets
-  `Health__Urls` for the worker so the kubelet can reach it.
-- **The migrate Job.** A pre-upgrade hook Job runs `migrate` with the new admin
-  image before the Deployments roll out.
-- **Secrets.** Mount them at `/run/secrets` from a Kubernetes Secret, or from
-  your secret store through it. The names are those of the
-  [settings table](#settings-and-secrets).
-- **Tenants and releases.** Run `tenant create` and `activate` from a Job or a
-  pod that uses the admin image, with the application folder mounted.
-- **Checks.** `helm lint` and `helm template`, validated against the Kubernetes
-  schemas. M9 has no test against a live cluster.
+The chart has one Deployment for the server and one for the worker, and a
+Service for the server. It has no Ingress. Each Deployment has a startup,
+liveness and readiness probe, see
+[health checks](../architecture.md#health-checks). The chart sets
+`Health__Urls` to `http://0.0.0.0:5208` for the worker, so the kubelet can
+reach it. The pods run as a non-root user with a read-only root file system.
+
+**Before the first install.** Create the database roles of
+[On premises](#on-premises). Then create the Kubernetes Secrets. The chart
+creates none and never takes a secret value. Each reference in the values names
+a Secret and a key. Several references may name the same Secret.
+
+```sh
+kubectl create secret generic axis-platform \
+  --from-literal=ConnectionStrings__Platform='<connection string>' \
+  --from-literal=ConnectionStrings__PlatformSchema='<connection string>' \
+  --from-literal=Platform__SecretKey='<32 bytes in base64>'
+```
+
+A secret store works too, if it syncs into a Kubernetes Secret.
+
+**Install.** Write a values file that names the Secrets, then run:
+
+```sh
+helm upgrade --install axis deploy/helm/axis -f my-values.yaml
+```
+
+```yaml
+secrets:
+  platformConnection:
+    name: axis-platform
+  platformSchemaConnection:
+    name: axis-platform
+  platformSecretKey:
+    name: axis-platform
+```
+
+Each pod mounts only the secrets it needs as files in `/run/secrets`. The
+server gets all three, the worker gets the first and the last, and the migrate
+Job gets the last two. The Job has no `Admin:ConnectionString`.
+Rendering fails with a message that names the value when a `name` is missing.
+The values schema rejects any field in a reference other than `name` and `key`.
+
+| Value | Default | Meaning |
+| --- | --- | --- |
+| `image.registry` | empty | Registry prefix of the three images. |
+| `image.tag` | the chart's `appVersion` | Tag of all three images. |
+| `image.pullPolicy` | `IfNotPresent` | Pull policy. |
+| `image.pullSecrets` | none | Names of image pull Secrets. |
+| `server.repository`, `worker.repository`, `migrate.repository` | `axis-server`, `axis-worker`, `axis-admin` | Repository of each image. |
+| `server.replicas` | 1 | Keep 1 until the [key ring](#open-points) is decided. |
+| `worker.replicas` | 1 | Worker replicas. |
+| `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
+| `server.service.type`, `server.service.port` | `ClusterIP`, 80 | The Service of the server. Put your own Ingress in front of it. |
+| `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
+| `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. |
+| `extensions.volume`, `modules.volume` | empty | Any Kubernetes volume source, mounted read-only at `/extensions` and `/modules`. Empty uses the empty folders of the image. |
+| `secrets.platformConnection` | key `ConnectionStrings__Platform` | Secret `name` and `key` of `ConnectionStrings:Platform`. |
+| `secrets.platformSchemaConnection` | key `ConnectionStrings__PlatformSchema` | Secret `name` and `key` of `ConnectionStrings:PlatformSchema`. |
+| `secrets.platformSecretKey` | key `Platform__SecretKey` | Secret `name` and `key` of the installation key. |
+
+**The migrate Job.** A `pre-upgrade` hook Job runs `axis-admin migrate` with the
+new admin image before the Deployments roll out. A failed migration fails the
+upgrade and the Deployments stay as they are. The Job never retries. Helm keeps
+a failed Job for its logs and deletes a successful one. The Job does not run on
+the first install, because a first install has no tenants, see
+[the first install](#open-points). Helm waits 5 minutes for a hook. An
+installation with many tenants needs a longer wait, such as
+`helm upgrade --install --timeout 30m`.
+
+**Tenants and releases.** Run `tenant create` and `activate` from a Job or a pod
+that uses the admin image, with the settings of the
+[settings table](#settings-and-secrets) and the application folder mounted.
+The chart has no Job for them.
+
+**Checks.** `scripts/lint.sh` runs `helm lint --strict` and validates the
+rendered manifests against the Kubernetes schemas with kubeconform.
+`scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
+Job and the secret references. `scripts/setup.sh` installs the pinned Helm,
+kubeconform and Kubernetes schemas into `~/.cache/axis-tools`. M9 has no test
+against a live cluster.
 
 ## Upgrade
 

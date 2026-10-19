@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # before-hook-creation removes a failed Job kept by an earlier upgrade.
+  name: {{ .Release.Name }}-migrate
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    # Runs before an upgrade rolls out the hosts. A failed Job fails the upgrade.
+    # Helm keeps a failed Job for its logs and deletes a successful one.
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  # The admin tool exits 1 when any tenant fails. Stop there, so the operator can look.
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "axis.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        {{- include "axis.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ include "axis.image" (dict "root" . "repository" .Values.migrate.repository) | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - migrate
+            - --parallel
+            - {{ .Values.migrate.parallel | quote }}
+          securityContext:
+            {{- include "axis.containerSecurityContext" . | nindent 12 }}
+          {{- with .Values.migrate.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - {{ include "axis.secretsVolumeMount" . | nindent 14 | trim }}
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - {{ include "axis.secretsVolume" (dict "root" . "entries" (list "platformSchemaConnection" "platformSecretKey")) | nindent 10 | trim }}
+        - name: tmp
+          emptyDir: {}

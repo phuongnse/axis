@@ -1,0 +1,71 @@
+# Values of the Axis chart. See docs/reference/installation.md.
+# PostgreSQL, the OIDC provider and the source of secrets are external.
+
+image:
+  # Registry prefix of the three images, such as "registry.example.com/axis".
+  # Empty uses the repository names as they are.
+  registry: ""
+  # The tag of all three images. Empty uses the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+  # Names of image pull Secrets, as a list of strings.
+  pullSecrets: []
+
+server:
+  repository: axis-server
+  # More than one replica needs a shared data protection key ring, which
+  # D44 has not decided. Keep 1 until then.
+  replicas: 1
+  # A Kubernetes resources block: requests and limits.
+  resources: {}
+  service:
+    type: ClusterIP
+    port: 80
+
+worker:
+  repository: axis-worker
+  replicas: 1
+  resources: {}
+
+# The Job that runs "axis-admin migrate" before every upgrade.
+migrate:
+  repository: axis-admin
+  # The number of tenant databases migrated at once.
+  parallel: 1
+  resources: {}
+
+tenancy:
+  # How often the hosts reload the tenant directory, such as "30s".
+  # Empty keeps the host default.
+  refreshInterval: ""
+
+# Extension packages, mounted read-only at /extensions. Empty uses the empty
+# folder of the image. Give any Kubernetes volume source, for example:
+#   volume:
+#     persistentVolumeClaim:
+#       claimName: axis-extensions
+extensions:
+  volume: {}
+
+# Modules, mounted read-only at /modules. Same form as extensions.volume.
+modules:
+  volume: {}
+
+# References to existing Kubernetes Secrets. The chart creates no Secret and
+# never takes a secret value. Each reference holds the Secret's name and the
+# key inside it. The schema rejects any other field.
+secrets:
+  # ConnectionStrings:Platform, the read-only platform database role.
+  # Used by the server and the worker.
+  platformConnection:
+    name: ""
+    key: ConnectionStrings__Platform
+  # ConnectionStrings:PlatformSchema, the role that owns the platform schema.
+  # Used by the server and the migrate Job. The worker never gets it.
+  platformSchemaConnection:
+    name: ""
+    key: ConnectionStrings__PlatformSchema
+  # Platform:SecretKey, the installation key. Used by every host.
+  platformSecretKey:
+    name: ""
+    key: Platform__SecretKey
