@@ -131,12 +131,16 @@ The result is:
   process instances, tasks, work items, connector and package calls, events,
   schedule state, sequence counters and audit records to backup time. The worker
   claims expired leases again once the tenant resumes. A call found `sending`
-  becomes `unknown` and is reconciled. A call that was sent after the backup is
-  sent again with the same operation identity as its idempotency key, so only a
-  system that honours the key acts once. A connector without `idempotency`
-  sends no key. Inbound requests accepted after the backup are lost, and numbers
-  issued after it can be issued again. Schedules that were missed run once, as
-  after a worker outage. See
+  becomes `unknown` and is reconciled. A call that was staged before the backup
+  and sent after it is sent again with the same operation identity as its
+  idempotency key, so only a system that honours the key acts once. A call that
+  was staged after the backup is not in the archive. Its step runs again, and
+  stages a new call with a new operation identity, so a new idempotency key.
+  The system may already have acted on the first call, and even a system that
+  honours the key can act twice. A connector without `idempotency` sends no
+  key. Inbound requests accepted after the backup are lost, and numbers issued
+  after it can be issued again. Schedules that were missed run once, as after a
+  worker outage. See
   [D45](../decisions.md#d45-tenant-backup-and-restore--agreed) and
   [call outcomes](../reference/processes.md#call-outcomes).
 

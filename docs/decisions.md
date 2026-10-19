@@ -2394,10 +2394,15 @@ The owner confirmed these points on issue #642 on 2026-10-19.
 - **Work after a restore:**
   - Process instances, tasks, work items and connector calls are as they were at
     backup time. The worker runs them again once the tenant resumes.
-  - A connector call that was sent after the backup is sent again, with the
-    same idempotency key, so a system that honours the key does not act twice.
-    A connector without `idempotency` sends no key, so the system may act
-    twice.
+  - A call that was staged before the backup and sent after it is sent again,
+    with the same idempotency key, so a system that honours the key does not
+    act twice.
+  - A call that was staged after the backup is not in the archive. Its step
+    runs again and stages a new call with a new operation identity, so a new
+    idempotency key. The system may already have acted on the first call, so
+    even a system that honours the key can act twice.
+  - A connector without `idempotency` sends no key, so the system may act twice
+    in either case.
   - Sequence counters, inbound endpoint receipts and schedule state also go
     back to backup time. Numbers issued after the backup can be issued again,
     and inbound requests accepted after it are lost.
@@ -2419,7 +2424,8 @@ archive without secrets can be stored like any data file, at the cost that a
 restored tenant stays suspended until its secrets are set again. Restoring only
 into a new tenant never overwrites live data, and moving the hosts is a
 separate step. Work goes back to an earlier state, so a call sent after the
-backup is sent again, and only the idempotency key protects the external system
-from a second effect. A stored release holds its module files, so a missing
+backup is sent again. Only the idempotency key protects the external system
+from a second effect, and only for a call staged before the backup. A call
+staged after it gets a new key. A stored release holds its module files, so a missing
 module would not stop a restored tenant. Refusing on it would block restores for
 no reason.

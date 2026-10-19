@@ -303,9 +303,16 @@ The old tenant stays in the directory, because there is no tenant delete.
 
 - Process instances, tasks, work items and connector calls are as they were at
   backup. The worker runs them again once the tenant resumes.
-- A connector call that was sent after the backup is sent again, with the same
-  idempotency key, so a system that honours the key does not act twice. A
-  connector without `idempotency` sends no key, so the system may act twice.
+- A call that was staged before the backup and sent after it is sent again,
+  with the same idempotency key, so a system that honours the key does not act
+  twice.
+- A call that was staged after the backup is not in the archive. Its step runs
+  again and stages a new call, with a new operation identity and so a new
+  idempotency key. The system may already have acted on the first call, so
+  even a system that honours the key can act twice. See
+  [staging and the call](processes.md#staging-and-the-call).
+- A connector without `idempotency` sends no key, so the system may act twice
+  in either case.
 - Sequence counters, inbound endpoint receipts and schedule state go back too.
   A number issued after the backup can be issued again, and an inbound request
   accepted after it is lost.
