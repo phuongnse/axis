@@ -13,14 +13,14 @@ namespace Axis.Worker;
 /// reports no data until a later read succeeds, so old values never pass for healthy queues.
 /// </summary>
 public sealed partial class WorkerGauges(
-    TenantOptions tenants,
+    ITenantCatalog tenants,
     WorkItemRunner runner,
     ITenantConnectionFactory connections,
     ITenantContextAccessor accessor,
     AxisGauges gauges,
     ILogger<WorkerGauges> logger)
 {
-    private readonly string[] _tenantIds = [.. tenants.Tenants.Keys.Order(StringComparer.Ordinal)];
+    private readonly string[] _tenantIds = [.. tenants.Tenants.Select(tenant => tenant.Id)];
 
     // Tenants whose database was migrated. A new schema arrives with a new release, which restarts the worker.
     private readonly HashSet<string> _migrated = new(StringComparer.Ordinal);

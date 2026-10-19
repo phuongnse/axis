@@ -38,16 +38,17 @@ builder.Services.AddHealthChecks()
 // Every problem details answer carries the request's trace id.
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemTraceId.Apply);
 builder.Services.AddServerTelemetry(builder.Configuration);
-builder.Services.AddTenancy(builder.Configuration, builder.Environment);
+var tenants = ConfigurationTenantCatalog.Load(builder.Configuration, builder.Environment);
+builder.Services.AddTenancy(tenants);
 
 // Fails startup when a tenant has no schema connection string. Only startup activation uses it,
-// and the worker never reads it.
-builder.Services.AddSingleton(TenantSchemaConnections.Load(builder.Configuration));
+// and the worker never uses it.
+builder.Services.AddSingleton(TenantSchemaConnections.Load(tenants));
 builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment);
 builder.Services.AddModules(builder.Configuration, builder.Environment);
 
 // Fails startup when a tenant has no complete Oidc block. Only the server signs people in.
-var oidcTenants = TenantOidcSettings.Load(builder.Configuration);
+var oidcTenants = TenantOidcSettings.Load(tenants);
 
 // The development, E2E and test servers run over http, where a Secure cookie never comes back.
 var plainHttpAllowed = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing");

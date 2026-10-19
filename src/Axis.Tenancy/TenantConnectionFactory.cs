@@ -7,7 +7,7 @@ namespace Axis.Tenancy;
 /// <summary>
 /// Keeps one <see cref="NpgsqlDataSource"/> per tenant, created on first use and disposed with the factory.
 /// </summary>
-public sealed class TenantConnectionFactory(TenantOptions options, ITenantContextAccessor accessor)
+public sealed class TenantConnectionFactory(ITenantCatalog catalog, ITenantContextAccessor accessor)
     : ITenantConnectionFactory, IAsyncDisposable, IDisposable
 {
     private readonly ConcurrentDictionary<string, Lazy<NpgsqlDataSource>> _dataSources = new(StringComparer.Ordinal);
@@ -46,7 +46,7 @@ public sealed class TenantConnectionFactory(TenantOptions options, ITenantContex
     }
 
     private Lazy<NpgsqlDataSource> CreateDataSource(string tenantId) =>
-        new(() => options.Tenants.TryGetValue(tenantId, out var settings)
-            ? NpgsqlDataSource.Create(settings.ConnectionString!)
+        new(() => catalog.Find(tenantId) is { } tenant
+            ? NpgsqlDataSource.Create(tenant.ConnectionString.Reveal())
             : throw new InvalidOperationException($"Tenant '{tenantId}' is not configured."));
 }

@@ -4,12 +4,13 @@ namespace Axis.Tenancy.Tests;
 
 public sealed class TenantConnectionFactoryTests
 {
-    private readonly TenantOptions _options = Tenants.Options(("default", ["localhost"], Tenants.ConnectionString));
+    private readonly ITenantCatalog _catalog =
+        ConfigurationTenantCatalog.FromOptions(Tenants.Options(("default", ["localhost"], Tenants.ConnectionString)));
 
     [Fact]
     public async Task Opening_a_connection_without_a_tenant_context_throws()
     {
-        await using var factory = new TenantConnectionFactory(_options, new TenantContextAccessor());
+        await using var factory = new TenantConnectionFactory(_catalog, new TenantContextAccessor());
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await factory.OpenConnectionAsync(TestContext.Current.CancellationToken));
@@ -21,7 +22,7 @@ public sealed class TenantConnectionFactoryTests
     public async Task Opening_a_connection_for_an_unconfigured_tenant_throws()
     {
         var accessor = new TenantContextAccessor { Current = new TenantContext("other") };
-        await using var factory = new TenantConnectionFactory(_options, accessor);
+        await using var factory = new TenantConnectionFactory(_catalog, accessor);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await factory.OpenConnectionAsync(TestContext.Current.CancellationToken));

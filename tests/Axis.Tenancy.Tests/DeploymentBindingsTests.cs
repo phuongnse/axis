@@ -4,14 +4,14 @@ namespace Axis.Tenancy.Tests;
 
 public sealed class DeploymentBindingsTests
 {
-    private readonly TenantOptions _options = Tenants.Options(
+    private readonly ITenantCatalog _catalog = ConfigurationTenantCatalog.FromOptions(Tenants.Options(
             ("tenant-a", ["a.example.test"], Tenants.ConnectionString),
             ("tenant-b", ["b.example.test"], Tenants.ConnectionString))
         .WithBinding("tenant-a", "PurchasingSystemToken", "secret", "a-s3cr3t-value")
         .WithBinding("tenant-b", "PurchasingSystemToken", "secret", "b-s3cr3t-value")
         .WithBinding("tenant-b", "ReportingToken", "secret", "b-reporting-s3cr3t")
         .WithBinding("tenant-a", "PurchasingSystemUrl", "url", "https://a.example.test/api")
-        .WithBinding("tenant-b", "PurchasingSystemUrl", "url", "https://b.example.test/api");
+        .WithBinding("tenant-b", "PurchasingSystemUrl", "url", "https://b.example.test/api"));
 
     [Fact]
     public void Resolves_the_binding_of_the_current_tenant()
@@ -63,7 +63,7 @@ public sealed class DeploymentBindingsTests
     [Fact]
     public void Resolving_without_a_tenant_context_names_the_binding_and_no_value()
     {
-        var bindings = new DeploymentBindings(_options, new TenantContextAccessor());
+        var bindings = new DeploymentBindings(_catalog, new TenantContextAccessor());
 
         var exception = Assert.Throws<InvalidOperationException>(() => bindings.ResolveSecret("PurchasingSystemToken"));
 
@@ -102,5 +102,5 @@ public sealed class DeploymentBindingsTests
     }
 
     private DeploymentBindings Bindings(string tenantId) =>
-        new(_options, new TenantContextAccessor { Current = new TenantContext(tenantId) });
+        new(_catalog, new TenantContextAccessor { Current = new TenantContext(tenantId) });
 }

@@ -34,7 +34,7 @@ namespace Axis.Server.Applications;
 /// </summary>
 internal sealed partial class StartupActivation(
     StartupActivationOptions options,
-    TenantOptions tenants,
+    ITenantCatalog tenants,
     TenantSchemaConnections schemaConnections,
     PackageCatalog packages,
     ModuleCatalog modules,
@@ -46,7 +46,7 @@ internal sealed partial class StartupActivation(
 {
     public async Task StartingAsync(CancellationToken cancellationToken)
     {
-        foreach (var tenantId in tenants.Tenants.Keys.Order(StringComparer.Ordinal))
+        foreach (var tenantId in tenants.Tenants.Select(tenant => tenant.Id))
         {
             accessor.Current = new TenantContext(tenantId);
             try
@@ -84,7 +84,7 @@ internal sealed partial class StartupActivation(
         var configuration = await schema.GetConfigurationAsync(cancellationToken);
         var data = await schema.GetDataAsync(cancellationToken);
         var processes = await schema.GetProcessesAsync(cancellationToken);
-        var runtimeRole = new NpgsqlConnectionStringBuilder(tenants.Tenants[tenantId].ConnectionString!).Username;
+        var runtimeRole = new NpgsqlConnectionStringBuilder(tenants.Find(tenantId)!.ConnectionString.Reveal()).Username;
         if (string.IsNullOrWhiteSpace(runtimeRole))
         {
             throw new InvalidOperationException(
@@ -169,12 +169,12 @@ internal sealed partial class StartupActivation(
     private ActivationBindings Bindings(string tenantId)
     {
         var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (name, binding) in tenants.Tenants[tenantId].Bindings)
+        foreach (var (name, binding) in tenants.Find(tenantId)!.Bindings)
         {
             // The tenant check at startup already refused a binding without a kind, or a url binding that is not an absolute URL.
             bindings[name] = new ActivationBinding(
-                binding.Kind!,
-                binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Value!, UriKind.Absolute) : null);
+                binding.Kind,
+                binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Url!, UriKind.Absolute) : null);
         }
 
         return new ActivationBindings(tenantId, bindings, AllowHttp: environment.IsDevelopment());

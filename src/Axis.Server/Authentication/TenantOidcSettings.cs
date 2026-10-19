@@ -3,8 +3,8 @@ using Axis.Tenancy;
 namespace Axis.Server.Authentication;
 
 /// <summary>
-/// How one tenant signs people in, from the <c>Oidc</c> block of the tenant in the <c>Tenants</c>
-/// section. Only the server reads it. The worker reads the same section and ignores the block.
+/// How one tenant signs people in, from the Oidc settings of the tenant in the tenant catalog. Only the
+/// server reads them. The worker's tenants have none.
 /// </summary>
 internal sealed class TenantOidcSettings
 {
@@ -15,7 +15,7 @@ internal sealed class TenantOidcSettings
 
     public string? ClientId { get; set; }
 
-    public string? ClientSecret { get; set; }
+    public SecretValue? ClientSecret { get; set; }
 
     /// <summary>
     /// The audience that a machine caller's bearer token must contain. A blank value means the
@@ -26,43 +26,52 @@ internal sealed class TenantOidcSettings
     /// <summary>The names of the claims that give the user id, the display name and the roles.</summary>
     public TenantOidcClaims Claims { get; set; } = new();
 
-    /// <summary>Reads the <c>Oidc</c> block of every tenant and checks it.</summary>
+    /// <summary>Reads the Oidc settings of every tenant and checks them.</summary>
     /// <returns>The settings keyed by tenant id.</returns>
     /// <exception cref="InvalidOperationException">
     /// A tenant has no <c>Oidc</c> block, or its authority, client id or client secret is blank.
     /// </exception>
-    public static IReadOnlyDictionary<string, TenantOidcSettings> Load(IConfiguration configuration)
+    public static IReadOnlyDictionary<string, TenantOidcSettings> Load(ITenantCatalog catalog)
     {
         var settings = new Dictionary<string, TenantOidcSettings>(StringComparer.Ordinal);
         var problems = new List<string>();
-        var tenants = configuration.GetSection(TenantOptions.SectionName).GetChildren()
-            .OrderBy(tenant => tenant.Key, StringComparer.Ordinal);
-        foreach (var tenant in tenants)
+        foreach (var tenant in catalog.Tenants)
         {
-            var section = tenant.GetSection(SectionName);
-            if (!section.Exists())
+            if (tenant.Oidc is not { } source)
             {
-                problems.Add($"Tenant '{tenant.Key}' has no Oidc block.");
+                problems.Add($"Tenant '{tenant.Id}' has no Oidc block.");
                 continue;
             }
 
-            var oidc = section.Get<TenantOidcSettings>() ?? new TenantOidcSettings();
+            var oidc = new TenantOidcSettings
+            {
+                Authority = source.Authority,
+                ClientId = source.ClientId,
+                ClientSecret = source.ClientSecret,
+                EndpointAudience = source.EndpointAudience,
+                Claims =
+                {
+                    UserId = source.UserIdClaim ?? "",
+                    DisplayName = source.DisplayNameClaim ?? "",
+                    Roles = source.RolesClaim ?? "",
+                },
+            };
             if (string.IsNullOrWhiteSpace(oidc.Authority))
             {
-                problems.Add($"Tenant '{tenant.Key}' has no Oidc authority.");
+                problems.Add($"Tenant '{tenant.Id}' has no Oidc authority.");
             }
 
             if (string.IsNullOrWhiteSpace(oidc.ClientId))
             {
-                problems.Add($"Tenant '{tenant.Key}' has no Oidc client id.");
+                problems.Add($"Tenant '{tenant.Id}' has no Oidc client id.");
             }
 
-            if (string.IsNullOrWhiteSpace(oidc.ClientSecret))
+            if (oidc.ClientSecret is null)
             {
-                problems.Add($"Tenant '{tenant.Key}' has no Oidc client secret.");
+                problems.Add($"Tenant '{tenant.Id}' has no Oidc client secret.");
             }
 
-            settings[tenant.Key] = oidc;
+            settings[tenant.Id] = oidc;
         }
 
         if (problems.Count > 0)

@@ -2,9 +2,9 @@ namespace Axis.Tenancy.Tests;
 
 public sealed class TenantResolverTests
 {
-    private readonly TenantResolver _resolver = new(Tenants.Options(
+    private readonly TenantResolver _resolver = new(ConfigurationTenantCatalog.FromOptions(Tenants.Options(
         ("tenant-a", ["a.example.test"], Tenants.ConnectionString),
-        ("tenant-b", ["b.example.test", "localhost"], Tenants.ConnectionString)));
+        ("tenant-b", ["b.example.test", "localhost"], Tenants.ConnectionString))));
 
     [Theory]
     [InlineData("a.example.test", "tenant-a")]

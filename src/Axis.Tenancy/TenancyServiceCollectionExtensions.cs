@@ -9,33 +9,26 @@ public static class TenancyServiceCollectionExtensions
 {
     /// <summary>
     /// Registers tenant resolution, the tenant connection factory and the deployment binding resolver from the
-    /// <c>Tenants</c> section.
+    /// <c>Tenants</c> section, the <c>configuration</c> source of the tenant catalog.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant configuration is invalid, or outside Development a secret binding takes its value from a
     /// configuration file.
     /// </exception>
-    public static IServiceCollection AddTenancy(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    public static IServiceCollection AddTenancy(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment) =>
+        services.AddTenancy(ConfigurationTenantCatalog.Load(configuration, environment));
+
+    /// <summary>
+    /// Registers tenant resolution, the tenant connection factory and the deployment binding resolver over
+    /// <paramref name="catalog"/>.
+    /// </summary>
+    public static IServiceCollection AddTenancy(this IServiceCollection services, ITenantCatalog catalog)
     {
-        ArgumentNullException.ThrowIfNull(configuration);
-        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(catalog);
 
-        var options = new TenantOptions();
-        configuration.GetSection(TenantOptions.SectionName).Bind(options.Tenants);
-
-        var problems = TenantOptionsValidator.Validate(options).ToList();
-        if (!environment.IsDevelopment())
-        {
-            problems.AddRange(SecretBindingSources.Validate(configuration, options));
-        }
-
-        if (problems.Count > 0)
-        {
-            throw new InvalidOperationException($"The tenant configuration is invalid. {string.Join(" ", problems)}");
-        }
-
-        services.AddSingleton(options);
-        services.AddSingleton(new TenantResolver(options));
+        services.AddSingleton(catalog);
+        services.AddSingleton(new TenantResolver(catalog));
         services.AddSingleton<ITenantContextAccessor, TenantContextAccessor>();
         services.AddSingleton<ITenantConnectionFactory, TenantConnectionFactory>();
         services.AddSingleton<IDeploymentBindings, DeploymentBindings>();

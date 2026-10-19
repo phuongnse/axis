@@ -18,7 +18,7 @@ namespace Axis.Worker;
 /// the failure in <see cref="StartupCheckState"/> and stops the host before any work of that tenant runs.
 /// </summary>
 internal sealed partial class WorkerService(
-    TenantOptions tenants,
+    ITenantCatalog tenants,
     WorkerOptions options,
     WorkItemRunner runner,
     WorkerHealth health,
@@ -28,7 +28,7 @@ internal sealed partial class WorkerService(
     StartupCheckState checkState,
     ILogger<WorkerService> logger) : BackgroundService
 {
-    private readonly string[] _tenantIds = [.. tenants.Tenants.Keys.Order(StringComparer.Ordinal)];
+    private readonly string[] _tenantIds = [.. tenants.Tenants.Select(tenant => tenant.Id)];
 
     // Tenants whose database was migrated. A new schema arrives with a new release, which restarts
     // the worker, so a ready tenant is not checked again.

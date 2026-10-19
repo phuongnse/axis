@@ -165,7 +165,7 @@ Each tenant also gets `SchemaConnectionString`, or
 `ConnectionString` is for the runtime database role, and
 `SchemaConnectionString` is for the schema database role. The server reads
 both, and only startup activation uses `SchemaConnectionString`. The worker
-never reads it and starts with only `ConnectionString`. This is a breaking
+never uses it and starts with only `ConnectionString`. This is a breaking
 setting change: every installation must add the setting, and there is no
 fallback to one connection string. `appsettings.Development.json`,
 Docker Compose, `scripts/dev.sh` and the E2E server pass `axis_schema` in
@@ -229,7 +229,10 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
 
 *(Planned for M9.)* It follows
 [D42](decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
-None of it is built. Today the `Tenants` section above is the only source.
+Only the tenant catalog contract is built. The server and the worker read
+tenants through it, and only the `configuration` source answers it, from the
+`Tenants` section above. The `Tenancy:Source` setting, the directory source and
+the refresh are not built.
 
 - **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
   default, or `directory`. Both answer through one tenant catalog contract, so

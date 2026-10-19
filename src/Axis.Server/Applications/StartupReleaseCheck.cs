@@ -20,7 +20,7 @@ namespace Axis.Server.Applications;
 /// cannot be reached, is skipped, as the server starts with a database that is down.
 /// </summary>
 internal sealed partial class StartupReleaseCheck(
-    TenantOptions tenants,
+    ITenantCatalog tenants,
     PackageCatalog packages,
     ITenantContextAccessor accessor,
     IServiceScopeFactory scopes,
@@ -28,7 +28,7 @@ internal sealed partial class StartupReleaseCheck(
 {
     public async Task StartingAsync(CancellationToken cancellationToken)
     {
-        foreach (var tenantId in tenants.Tenants.Keys.Order(StringComparer.Ordinal))
+        foreach (var tenantId in tenants.Tenants.Select(tenant => tenant.Id))
         {
             accessor.Current = new TenantContext(tenantId);
             try

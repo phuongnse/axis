@@ -7,7 +7,7 @@ namespace Axis.Worker;
 /// database counted as migrated. The loop is stalled when it has not polled within twice the lease,
 /// because one work item can run for up to a lease. Before the first poll the time counts from the start.
 /// </summary>
-internal sealed class WorkerHealth(TimeProvider time, WorkerOptions options, TenantOptions tenants)
+internal sealed class WorkerHealth(TimeProvider time, WorkerOptions options, ITenantCatalog tenants)
 {
     private long _lastPolledTicks = time.GetUtcNow().UtcTicks;
     private int _migratedTenants;
