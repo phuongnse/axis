@@ -458,6 +458,12 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     so the hour counts from the last request.
   - In `Development` and `Testing`, which run over plain http, the session
     cookie and the OIDC helper cookies are Secure only on https requests.
+  - *(planned for M10)* The cookie is protected with a key ring that every
+    server replica shares. The keys are in the platform database, so a session
+    survives a restart and works on every replica. Behind a named proxy, the
+    callback and sign-out addresses and the cookie's Secure flag use the
+    forwarded scheme and host. See [D49](decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed) and the
+    [forwarded headers settings](reference/configuration.md#forwarded-headers).
 - **Tenant binding.** A session whose tenant id differs from the tenant
   [resolved from the host](#request-resolution) counts as no session. So a
   cookie taken to another tenant's host signs nobody in there.

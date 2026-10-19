@@ -967,7 +967,13 @@ and a JSON view, and shows the diagnostics.
   value nobody may author. The Development settings set it to `author`.
   Application policies play no part, because an author edits them.
 - **Where Studio reads and writes.** Studio reads and writes only `*.json` files inside the listed
-  folders. It touches no database.
+  folders. Today it touches no database. *(planned for M10)* A write takes an
+  advisory lock in the platform database, over `ConnectionStrings:Platform`,
+  keyed by the folder. It holds across server replicas, so every replica must
+  mount the folder at the same path. A write that cannot take the lock
+  answers `503` and writes nothing. A read and the diagnostics touch no
+  database. See [authoring API](authoring.md#versions) and
+  [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **No activation.** Studio never activates a release. Under `scripts/dev.sh`,
   a saved file restarts the server, which activates the folder, see
   [Startup activation](#startup-activation). Elsewhere a folder is committed
@@ -1097,9 +1103,9 @@ read when a refresh fails, and `/health/ready` is Degraded until a refresh works
 | --- | --- | --- |
 | `Tenancy:Source` | `configuration` | `configuration` reads the `Tenants` section. `directory` reads the tenants from the platform database and ignores a `Tenants` section, with a warning at start. |
 | `Tenancy:RefreshInterval` | `00:00:30` | How often the server and the worker read the tenant directory again. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, naming the setting. |
-| `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed under `directory`. A missing or invalid key stops the start. |
+| `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed under `directory`. A missing or invalid key stops the start. *(planned for M10)* The server needs it under `configuration` too, for the data protection keys. |
 | `ConnectionStrings:Platform` | none | A role that may only read the `platform` schema. Both hosts need it under `directory`. |
-| `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. |
+| `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations. *(planned for M10)* The server reads it under `configuration` too. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. |
 
 As environment variables they are `Tenancy__Source`,
 `Tenancy__RefreshInterval`, `Platform__SecretKey`,
@@ -1124,10 +1130,47 @@ As environment variables they are `Tenancy__Source`,
   under `directory` means no tenant schema connection. Under `directory` the
   server refuses a missing or blank `ConnectionStrings:PlatformSchema`, and a
   `ConnectionStrings:Platform` that names no user or the same user as
-  `ConnectionStrings:PlatformSchema`. Under `configuration` it reads neither
-  `ConnectionStrings:PlatformSchema` nor any platform table.
+  `ConnectionStrings:PlatformSchema`. Today, under `configuration` it reads
+  neither `ConnectionStrings:PlatformSchema` nor any platform table.
+  *(planned for M10)* That changes. Under `configuration` the server also
+  applies the platform migrations, so it needs `ConnectionStrings:PlatformSchema`
+  and `Platform:SecretKey` there too. It needs them to create the platform
+  tables and to encrypt the data protection keys. Development settings carry
+  a committed development key. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **`ActivateOnStartup`.** It must be empty under `directory`, see
   [startup activation](#startup-activation).
+
+## Forwarded headers
+
+*(planned for M10)* Behind a reverse proxy that ends TLS, the server sees plain
+HTTP. These two server settings name the proxies whose forwarded headers it
+trusts. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed). Today the server ignores forwarded headers.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `ForwardedHeaders:KnownProxies` | empty | An array of IP addresses of the proxies. |
+| `ForwardedHeaders:KnownNetworks` | empty | An array of CIDR ranges of the proxies, such as `10.0.0.0/8`. |
+
+As environment variables they are `ForwardedHeaders__KnownProxies__0` and
+`ForwardedHeaders__KnownNetworks__0`. Use `__1`, `__2` and so on for more
+entries.
+
+- **The headers read.** `X-Forwarded-For`, `X-Forwarded-Proto` and
+  `X-Forwarded-Host`, and only on a request that comes from a listed address or
+  network.
+- **No setting, no header.** With both settings empty, the default, the server
+  reads no forwarded header. Loopback is not trusted either. A proxy on the
+  same machine must be named.
+- **One hop.** The server reads one proxy, the nearest one. A client cannot
+  set the scheme or the host through a chain of proxies.
+- **No prefix.** The server never reads `X-Forwarded-Prefix`.
+- **What uses the result.** Tenant resolution by host, the `Secure` flag of the
+  session cookie and the OIDC callback and sign-out addresses use the scheme
+  and host that result. See
+  [sign-in and the session](../architecture.md#sign-in-and-the-session).
+- **An unreadable entry stops the start.** An entry that is not an IP address
+  or a CIDR range stops the server at start and names the setting.
+- **The worker reads neither setting.** It serves no forwarded request.
 
 ## Admin settings
 
