@@ -19,6 +19,11 @@ An installation has three hosts:
 - The admin host, `Axis.Admin`, is a command-line tool. A platform operator
   runs it to create tenants, migrate tenant databases and activate releases.
   See [administration](administration.md).
+- *(Planned for M10.)* The publisher, `axis-admin publisher`, is a
+  long-running command of the same host. It runs the publish requests that
+  Studio stores, see [publisher](administration.md#publisher). It holds the
+  schema role of every active tenant, so run it apart from the server. It has
+  no HTTP endpoint.
 
 An installation also needs a PostgreSQL 18 server and an OIDC provider. Axis
 does not ship either one for production.
@@ -96,7 +101,11 @@ provider run elsewhere. The example lives in `deploy/compose/`. Its
 the worker run the production images with a read-only root file system. The
 admin host runs only when asked, through `docker compose run --rm admin`, so
 `docker compose up` does not start it. The file holds no password, client
-secret or key.
+secret or key. *(Planned for M10:)* `compose.yaml` also has a `publisher`
+service. It runs the `axis-admin` image with the command `publisher`, and
+`docker compose up` starts it. It gets the `ConnectionStrings__PlatformSchema`
+and `Platform__SecretKey` files and not `Admin__ConnectionString`. It
+publishes no port.
 
 Set `AXIS_VERSION` to the tag of the three images. `AXIS_IMAGE_PREFIX` adds a
 registry prefix. The comment at the top of `compose.yaml` lists every variable.
@@ -129,8 +138,8 @@ file is named after its setting, and its content is the value.
 | File | Mounted in |
 | --- | --- |
 | `ConnectionStrings__Platform` | server, worker |
-| `ConnectionStrings__PlatformSchema` | server, admin |
-| `Platform__SecretKey` | server, worker, admin |
+| `ConnectionStrings__PlatformSchema` | server, admin, publisher *(planned for M10)* |
+| `Platform__SecretKey` | server, worker, admin, publisher *(planned for M10)* |
 | `Admin__ConnectionString` | admin |
 
 Write each file with `printf '%s'`, so it has no trailing newline. Make the
@@ -211,7 +220,11 @@ This installs Axis on Kubernetes with the Helm chart in `deploy/helm/axis/`.
 PostgreSQL, the OIDC provider and the source of secrets are external.
 
 The chart has one Deployment for the server and one for the worker, and a
-Service for the server. It has no Ingress. Each Deployment has a startup,
+Service for the server. *(Planned for M10:)* It also has a Deployment for the
+publisher, with one replica, that runs the `axis-admin` image with the command
+`publisher`. It has no Service and no probe, because the publisher has no HTTP
+endpoint. Its termination grace period is longer than the longest publish
+request. It mounts the same secrets as the migrate Job. It has no Ingress. Each Deployment has a startup,
 liveness and readiness probe, see
 [health checks](../architecture.md#health-checks). The chart sets
 `Health__Urls` to `http://0.0.0.0:5208` for the worker, so the kubelet can
