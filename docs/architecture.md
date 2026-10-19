@@ -92,6 +92,9 @@ samples/
   keycloak/               the development Keycloak realm with the sample's users
   postgres/               init-roles.sql, which creates the axis_schema and axis_runtime database roles
   packages/               the sample extension package payment-references and its unit tests
+deploy/
+  compose/                production Compose example (M9)
+  helm/axis/              Helm chart for Kubernetes (M9)
 ```
 
 Projects are created when the first issue needs them. The solution holds
@@ -941,6 +944,23 @@ short, because one work item can run for up to a lease.
 
 **Docker Compose.** The worker gets a health check on `/health/ready`. It runs
 inside the container, and Compose does not publish the worker's health port.
+*(Planned for M9.)* The production Compose example has no container health
+checks, because the production images hold no `curl`.
+
+## Installation
+
+*(Planned for M9.)* Axis ships as three production images, as
+[D44](decisions.md#d44-packaging-for-on-premises-and-cloud-installation--agreed)
+says. None of it is built.
+
+- `axis-server` and `axis-worker` run the hosts. They hold no sample and no
+  development setting.
+- `axis-admin` runs `Axis.Admin` and holds the PostgreSQL 18 client tools.
+- `deploy/compose/` and `deploy/helm/axis/` install them on one machine and on
+  Kubernetes.
+
+See the [installation guide](reference/installation.md) for the steps, every
+setting and the upgrade order.
 
 ## Frontend
 

@@ -27,7 +27,9 @@ external purchasing system.
 The SPA signs people in through Keycloak at `/api/auth/sign-in`, but sign-in through
 Compose is not wired yet. Every application page needs a session, so under Compose
 opening a sample page starts a sign-in that cannot complete yet. See
-[AGENTS.md](AGENTS.md#commands) for the port variables.
+[AGENTS.md](AGENTS.md#commands) for the port variables. This setup is for local
+use. Production installs follow the [installation guide](docs/reference/installation.md)
+(planned for M9).
 
 For development with hot reload, run `scripts/dev.sh`. It needs Docker, .NET and
 Node. It runs the server, the worker and the SPA with hot reload. See
@@ -40,7 +42,7 @@ Node. It runs the server, the worker and the SPA with hot reload. See
 | [Product brief](docs/product-brief.md) | What Axis is, who uses it, the first application |
 | [Decisions](docs/decisions.md) | Decisions that have been agreed, with reasons |
 | [Architecture](docs/architecture.md) | Modules, hosts, tenancy, security, execution and testing |
-| [Reference](docs/reference/) | Detailed behaviour: configuration, administration, storage, record API, authoring API, frontend, expressions, data sources, processes and extension packages |
+| [Reference](docs/reference/) | Detailed behaviour: configuration, administration, installation, storage, record API, authoring API, frontend, expressions, data sources, processes and extension packages |
 | [Concepts](docs/domain/concepts.md) | The Axis vocabulary and what each resource does |
 | [Design knowledge](docs/domain/knowledge.md) | What business applications need and the pitfalls to avoid |
 | [Roadmap](docs/roadmap.md) | Milestones, what each delivers and its status |
