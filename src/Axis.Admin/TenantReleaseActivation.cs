@@ -17,7 +17,8 @@ internal readonly record struct ReleaseRun(bool Succeeded, Guid? ReleaseId);
 /// <summary>
 /// The version, compile, activate and seed steps for one tenant, which <c>activate</c> and the publisher share. The caller
 /// says how to compile: from a folder, or from a snapshot. A tenant stops at its first failed step and keeps its previous
-/// active release. Each step writes one <c>ok</c> line, or one <c>failed</c> line for each error diagnostic. A line names the
+/// active release. A validate runs the version step and one validate step instead: the compile and every activation check
+/// run in one transaction that is always rolled back, and no seed or schedule trigger step runs. Each step writes one <c>ok</c> line, or one <c>failed</c> line for each error diagnostic. A line names the
 /// tenant and never a password, a host or a connection string. Compile and activate run as the tenant's schema role. The
 /// schedule trigger state and the seed records run as its runtime role. Warnings go to the error writer.
 /// </summary>
@@ -84,6 +85,61 @@ internal sealed class TenantReleaseActivation(
                 await data.DisposeAsync();
             }
         }
+    }
+
+    /// <summary>
+    /// Runs the <c>version</c> step and then the <c>validate</c> step for <paramref name="row"/>. The validate step compiles
+    /// and runs every activation check inside one transaction on the schema connection, then rolls it back, so the tenant
+    /// database is unchanged. A null <paramref name="compile"/> means that the snapshot cannot be read, and fails the step.
+    /// Every diagnostic, warnings included, is added to <paramref name="diagnostics"/>. Returns whether both steps passed.
+    /// </summary>
+    public async Task<bool> ValidateAsync(
+        TenantRow row,
+        TenantDatabaseSteps steps,
+        ActivationBindings bindings,
+        Func<ConfigurationDbContext, Task<ReleaseCompilationResult>>? compile,
+        List<Diagnostic> diagnostics)
+    {
+        var id = row.Id;
+        return await Step(id, "version", () => CheckVersionAsync(row))
+            && await Step(id, "validate", async () =>
+            {
+                if (compile is null)
+                {
+                    throw new InvalidOperationException("The snapshot cannot be read.");
+                }
+
+                var connection = await steps.SchemaConnectionAsync();
+                await using var transaction = await connection.BeginTransactionAsync();
+                try
+                {
+                    await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connection).Options);
+                    await using var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connection).Options);
+                    await configuration.Database.UseTransactionAsync(transaction);
+                    await data.Database.UseTransactionAsync(transaction);
+                    var compiled = await compile(configuration);
+                    diagnostics.AddRange(compiled.Diagnostics);
+                    WriteWarnings(id, compiled.Diagnostics);
+                    if (compiled.Release is null || compiled.Model is null)
+                    {
+                        throw new DiagnosticsFailure(compiled.Diagnostics);
+                    }
+
+                    var activated = await ReleaseActivator.ActivateAsync(
+                        compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, inlineRecomputeLimit, cancellationToken);
+                    diagnostics.AddRange(activated.Diagnostics);
+                    WriteWarnings(id, activated.Diagnostics);
+                    if (activated.Diagnostics.Any(IsError))
+                    {
+                        throw new DiagnosticsFailure(activated.Diagnostics);
+                    }
+                }
+                finally
+                {
+                    // Nothing is kept. This also frees the connection for the final status.
+                    await transaction.RollbackAsync(CancellationToken.None);
+                }
+            });
     }
 
     public static bool IsError(Diagnostic diagnostic) => diagnostic.Severity != DiagnosticSeverity.Warning;

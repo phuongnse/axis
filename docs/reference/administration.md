@@ -72,7 +72,7 @@ Every command writes one line per tenant and step to standard output:
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
 `work`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
 `check`, `restore` and `status`. The [publisher](#publisher)
-adds `claim`, and *(planned for M10)* `validate` and `rollback`. A line names the
+adds `claim` and `validate`, and *(planned for M10)* `rollback`. A line names the
 tenant and never a database host, a password or a connection string. A `failed` message
 never holds one either. A restore refusal does name the tenant host the operator gave on the
 command line, as typed. A failed `dump` step says only `pg_dump exited with code <n>`
@@ -573,9 +573,9 @@ can call it. The `axis-admin` image runs it. *(Planned for M10:)* `scripts/dev.s
 Docker Compose, the E2E script and both production installs start one, see
 [installation](installation.md).
 
-**What is built.** The command runs `publish` requests for
-`Tenancy:Source=directory`. These stay *(planned for M10)*: `validate` and
-`rollback` requests, the configuration source, preview requests, renewing a
+**What is built.** The command runs `publish` and `validate` requests for
+`Tenancy:Source=directory`. These stay *(planned for M10)*: `rollback`
+requests, the configuration source, preview requests, renewing a
 lease, claiming an expired one again, `AXC0215` and the release history. A
 request of a kind that is not built is never claimed, so it stays `queued`.
 
@@ -605,12 +605,12 @@ schema itself. `activate` does none either. *(Planned for M10:)* Under
 the worker does.
 
 **Claiming.** Each poll round, for each served tenant, it claims the oldest
-`queued` `publish` request with `FOR UPDATE SKIP LOCKED`. It sets the request
+`queued` `publish` or `validate` request with `FOR UPDATE SKIP LOCKED`. It sets the request
 `running`, `claimed_by` to its own name, `lease_until` and adds 1 to `claims`.
 
 - **One at a time.** For one tenant and application it runs one request at a
   time, oldest first, so when two publishes are queued the newer one ends up
-  live. A claim skips an application that already has a `running` request.
+  live. A `validate` waits behind a running `publish` of the same application. A claim skips an application that already has a `running` request.
   Requests of other applications and tenants can run at the same time. Two
   publishers can still claim two requests of one application at the same
   moment, because that check does not lock the rows it reads.
@@ -640,12 +640,15 @@ role unless it says otherwise.
    `{ file, version, content }` or names a file twice, fails at `compile`
    and stores no release. *(Planned for M10:)* Activation adds a row to the
    [release history](storage.md#publish-requests-and-release-history).
-4. *(Planned for M10.)* For `validate`: run the `compile` and every check of
+4. For `validate`: run the `compile` and every check of
    `activate` against the tenant inside one transaction, then roll the
    transaction back. It stores no release, adds no history row and seeds
-   nothing. It reports the diagnostics of activation, so a clean `validate`
-   means an activation with the same input would pass its checks. The step is
-   called `validate`.
+   nothing, and it starts no schedule trigger. It reports the diagnostics of
+   activation, so a clean `validate` means an activation with the same input
+   would pass its checks, apart from the seed. The step is called `validate`,
+   and it is the only step after `version`. A snapshot that cannot be read
+   fails at `validate`. The transaction holds the schema lock until it rolls
+   back, so other activations of the tenant wait for it.
 5. *(Planned for M10.)* For `rollback`: read the stored release the request
    names and activate it as it is, without compiling. It refuses the case where a
    migration applied after that release is missing from it, with `AXC0174`, and
@@ -654,6 +657,8 @@ role unless it says otherwise.
 6. Write the audit record of a `publish` *(planned for M10:)* or a `rollback`, with
    the request's final status, then set the request `succeeded` or `failed` and
    store its diagnostics and its release id. These happen in one transaction.
+   A `validate` gets its final status and diagnostics the same way, with no
+   audit record and no release id.
    The diagnostics are all of them, warnings included, as in the
    [authoring API](authoring.md#diagnostics). A request that fails with an
    exception rather than diagnostics, such as a lost connection, stores only the
