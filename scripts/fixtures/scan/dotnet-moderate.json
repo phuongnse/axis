@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "parameters": "--vulnerable --include-transitive",
+  "sources": ["https://api.nuget.org/v3/index.json"],
+  "projects": [
+    {
+      "path": "/work/src/Axis.Server/Axis.Server.csproj",
+      "frameworks": [
+        {
+          "framework": "net10.0",
+          "transitivePackages": [
+            {
+              "id": "System.Text.Encodings.Web",
+              "resolvedVersion": "4.5.0",
+              "vulnerabilities": [
+                {
+                  "severity": "Moderate",
+                  "advisoryurl": "https://github.com/advisories/GHSA-ghhp-997w-qr28"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
