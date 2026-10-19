@@ -42,6 +42,23 @@ internal static class StudioWrites
     };
 
     /// <summary>
+    /// The files of <paramref name="folder"/> as a publish request stores them. It holds the write lock, so the
+    /// snapshot never sees a write half done and includes every write that finished before the call.
+    /// </summary>
+    public static async Task<IReadOnlyList<StudioSnapshotFile>> SnapshotAsync(string folder, CancellationToken cancellationToken)
+    {
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            return StudioFolder.Snapshot(folder);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <summary>
     /// Applies <paramref name="patch"/> to the resource <paramref name="id"/> of <paramref name="folder"/> when
     /// <paramref name="ifMatch"/> is its current version, and replaces the file atomically. The checks run in
     /// this order: the resource, whether the patch applies, whether it changes <c>id</c> or <c>kind</c>, then

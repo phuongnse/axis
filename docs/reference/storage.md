@@ -1163,7 +1163,8 @@ schema of the tenant database.
 `Axis.Configuration` owns both tables, in the `axis`
 schema of each tenant database. `axis.publish_requests` is built, and so is the
 [publisher](administration.md#publisher) for `publish` requests under
-`Tenancy:Source=directory`. The release history and the routes are planned for
+`Tenancy:Source=directory`. The server inserts `validate` and `publish` requests through the
+[authoring API](authoring.md#publishing). The release history and the routes for rollback and preview are planned for
 M10. See
 [D47](../decisions.md#d47-publishing-from-studio--agreed) and the
 [authoring API](authoring.md#publishing).
@@ -1171,7 +1172,7 @@ M10. See
 ### Publish requests
 
 `axis.publish_requests` holds one row per request. The server inserts a row
-over the runtime role _(planned for M10)_. Only the publisher changes a row,
+over the runtime role, for `validate` and `publish`. A `rollback` row is _(planned for M10)_. Only the publisher changes a row,
 over the schema role.
 An index on `(application_id, status, requested_at, id)` serves the claim.
 
@@ -1182,7 +1183,7 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 | `kind`              | `text`              | `validate`, `publish` or `rollback`                                                                                                    |
 | `target`            | `text`              | *(Planned for M10.)* `tenant` or `preview`. It defaults to `tenant`. See the preview note below |
 | `status`            | `text`              | `queued`, `running`, `succeeded` or `failed`                                                                                           |
-| `snapshot`          | `jsonb`, null       | For `validate` and `publish`, an array of `{ file, version, content }`, one for every resource file of the folder. Null for `rollback` |
+| `snapshot`          | `jsonb`, null       | For `validate` and `publish`, an array of `{ file, version, content }`, one for every `*.json` file of the folder. Null for `rollback` |
 | `release_id`        | `uuid`, null        | For `rollback`, the release to activate. For `publish`, set when the release is stored                                                 |
 | `label`             | `text`, null        | The optional label, up to 100 characters                                                                                               |
 | `note`              | `text`, null        | The optional note, up to 2000 characters                                                                                               |

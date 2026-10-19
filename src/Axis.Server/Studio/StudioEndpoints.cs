@@ -39,6 +39,7 @@ namespace Axis.Server.Studio;
 /// <c>id</c> or the file exists. <c>DELETE /api/studio/apps/{application}/resources/{id}</c> removes one
 /// file when <c>If-Match</c> holds its current version and answers <c>{ diagnostics }</c>. It answers 428
 /// without <c>If-Match</c>, 409 for a stale version and 400 for the manifest.
+/// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>.
 /// </summary>
 internal static class StudioEndpoints
 {
@@ -53,6 +54,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
+        endpoints.MapStudioPublishEndpoints();
     }
 
     private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)
@@ -341,26 +343,33 @@ internal static class StudioEndpoints
             ? StudioFolder.List(folder).FirstOrDefault(file => file.Id == guid)
             : null;
 
-    // The session and role checks every route shares: the problem that refuses the request, or null.
-    private static async Task<IResult?> RefuseAsync(HttpContext httpContext, StudioOptions options)
+    // The session and role checks every route shares: the problem that refuses the request, or null. A route that
+    // publishes also needs the publisher role, which is checked right after the author role.
+    internal static async Task<IResult?> RefuseAsync(HttpContext httpContext, StudioOptions options, bool publisher = false)
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
             return Grants.SignInRequired();
         }
 
-        return options.Allows(user.Roles)
-            ? null
-            : Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not hold the author role.");
+        if (!options.Allows(user.Roles))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not hold the author role.");
+        }
+
+        return publisher && !options.AllowsPublish(user.Roles)
+            ? Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not hold the publisher role.")
+            : null;
     }
 
     // The checks the application routes share: the folder, or the problem that refused the request.
-    private static async Task<(string? Folder, IResult? Refusal)> FindFolderAsync(
+    internal static async Task<(string? Folder, IResult? Refusal)> FindFolderAsync(
         string application,
         HttpContext httpContext,
-        StudioOptions options)
+        StudioOptions options,
+        bool publisher = false)
     {
-        if (await RefuseAsync(httpContext, options) is { } refusal)
+        if (await RefuseAsync(httpContext, options, publisher) is { } refusal)
         {
             return (null, refusal);
         }
@@ -370,9 +379,9 @@ internal static class StudioEndpoints
             : (null, NotFound("No Studio folder holds an application with this name."));
     }
 
-    private static IResult NotFound(string title) => Problem(StatusCodes.Status404NotFound, title);
+    internal static IResult NotFound(string title) => Problem(StatusCodes.Status404NotFound, title);
 
-    private static IResult Problem(int statusCode, string title) => Results.Problem(statusCode: statusCode, title: title);
+    internal static IResult Problem(int statusCode, string title) => Results.Problem(statusCode: statusCode, title: title);
 }
 
 /// <summary>The applications of the Studio folders, in folder order.</summary>

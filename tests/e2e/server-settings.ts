@@ -92,5 +92,6 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // lists the sample itself.
     Studio__Folders__0: studioFolder,
     Studio__AuthorRole: 'author',
+    Studio__PublisherRole: 'publisher',
   }
 }

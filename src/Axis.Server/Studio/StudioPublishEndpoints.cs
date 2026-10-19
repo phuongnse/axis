@@ -1,0 +1,244 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Axis.Server.Tenancy;
+using Axis.Server.Users;
+using Microsoft.Net.Http.Headers;
+using Npgsql;
+using NpgsqlTypes;
+
+namespace Axis.Server.Studio;
+
+/// <summary>
+/// The routes that ask for an activation. <c>POST /api/studio/apps/{application}/validate</c> and <c>.../publish</c> store
+/// a snapshot of the folder as a publish request in the database of the tenant of the host, and answer 202 with the
+/// request and a <c>Location</c> for <c>GET /api/studio/apps/{application}/requests/{id}</c>. They never compile or
+/// activate: the publisher runs the request. The checks run in the order of the rest of the authoring API: session (401),
+/// author role (403), for <c>publish</c> the publisher role (403), then the application (404). A folder whose manifest
+/// has no UUID <c>id</c> answers 409. A <c>publish</c> without a body stores no label and no note. A body must be
+/// <c>application/json</c> (415) and a JSON object with only a string <c>label</c> of up to 100 characters and a string
+/// <c>note</c> of up to 2000 (400). A <c>validate</c> ignores its body. The status route answers 404 for a request
+/// of another application or tenant, because it reads this tenant's database for this application only.
+/// </summary>
+internal static class StudioPublishEndpoints
+{
+    private const int MaxLabel = 100;
+
+    private const int MaxNote = 2000;
+
+    public static void MapStudioPublishEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapPost("/api/studio/apps/{application}/validate", ValidateAsync);
+        endpoints.MapPost("/api/studio/apps/{application}/publish", PublishAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/requests/{id}", GetRequestAsync);
+    }
+
+    private static async Task<IResult> ValidateAsync(
+        string application, HttpContext httpContext, StudioOptions options, TenantDatabase database)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        return folder is null
+            ? refusal!
+            : await StoreAsync("validate", application, folder, label: null, note: null, httpContext, database);
+    }
+
+    private static async Task<IResult> PublishAsync(
+        string application, HttpContext httpContext, StudioOptions options, TenantDatabase database)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options, publisher: true);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        if (StudioFolder.ReadManifest(folder) is not { Id: not null })
+        {
+            return NoManifestId();
+        }
+
+        var request = httpContext.Request;
+        string? label = null;
+        string? note = null;
+        if (request.ContentLength != 0 && !(request.ContentLength is null && string.IsNullOrEmpty(request.ContentType)))
+        {
+            if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+                || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+            {
+                return StudioEndpoints.Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+            }
+
+            try
+            {
+                var body = await JsonNode.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted) as JsonObject
+                    ?? throw new JsonException();
+                if (!TryReadBody(body, out label, out note))
+                {
+                    return BadBody();
+                }
+            }
+            catch (Exception exception) when (exception is JsonException or ArgumentException)
+            {
+                return BadBody();
+            }
+        }
+
+        return await StoreAsync("publish", application, folder, label, note, httpContext, database);
+    }
+
+    // Only label and note, each a string within its limit.
+    private static bool TryReadBody(JsonObject body, out string? label, out string? note)
+    {
+        label = null;
+        note = null;
+        foreach (var (key, value) in body)
+        {
+            if (value is not JsonValue json || !json.TryGetValue<string>(out var text))
+            {
+                return false;
+            }
+
+            switch (key)
+            {
+                case "label" when text.Length <= MaxLabel:
+                    label = text;
+                    break;
+                case "note" when text.Length <= MaxNote:
+                    note = text;
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static IResult BadBody() =>
+        StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid publish request.");
+
+    private static IResult NoManifestId() =>
+        StudioEndpoints.Problem(StatusCodes.Status409Conflict, "The application manifest has no valid id.");
+
+    // The folder is read under the write lock, so the snapshot is what the author saw after their last finished write.
+    private static async Task<IResult> StoreAsync(
+        string kind,
+        string application,
+        string folder,
+        string? label,
+        string? note,
+        HttpContext httpContext,
+        TenantDatabase database)
+    {
+        if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest)
+        {
+            return NoManifestId();
+        }
+
+        var user = (await CurrentUsers.FindAsync(httpContext))!;
+        var cancellationToken = httpContext.RequestAborted;
+        var snapshot = new JsonArray([.. (await StudioWrites.SnapshotAsync(folder, cancellationToken)).Select(file => (JsonNode)new JsonObject
+        {
+            ["file"] = file.File,
+            ["version"] = file.Version,
+            ["content"] = file.Content,
+        })]);
+
+        var id = Guid.CreateVersion7();
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO axis.publish_requests
+                (id, application_id, kind, status, snapshot, label, note, requested_by, requested_by_name, requested_at)
+            VALUES (@id, @application, @kind, 'queued', @snapshot, @label, @note, @user, @name, clock_timestamp())
+            RETURNING requested_at
+            """,
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("kind", kind);
+        command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlDbType.Jsonb) { Value = snapshot.ToJsonString() });
+        command.Parameters.Add(new NpgsqlParameter("label", NpgsqlDbType.Text) { Value = (object?)label ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("note", NpgsqlDbType.Text) { Value = (object?)note ?? DBNull.Value });
+        command.Parameters.AddWithValue("user", user.Id);
+        command.Parameters.Add(new NpgsqlParameter("name", NpgsqlDbType.Text) { Value = (object?)user.DisplayName ?? DBNull.Value });
+        await using var inserted = await command.ExecuteReaderAsync(cancellationToken);
+        await inserted.ReadAsync(cancellationToken);
+        var requestedAt = inserted.GetFieldValue<DateTimeOffset>(0);
+
+        var response = new StudioPublishRequestResponse(
+            id.ToString("D"), manifest.Name ?? application, kind, "tenant", "queued", label, note, user.Id, requestedAt,
+            null, null, null, JsonDocument.Parse("[]").RootElement.Clone());
+        return Results.Accepted($"/api/studio/apps/{Uri.EscapeDataString(application)}/requests/{id:D}", response);
+    }
+
+    private static async Task<IResult> GetRequestAsync(
+        string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        // An id that is not a UUID, a request of another application and a manifest without an id all count as unknown.
+        if (!Guid.TryParseExact(id, "D", out var requestId)
+            || StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest)
+        {
+            return NoRequest();
+        }
+
+        var cancellationToken = httpContext.RequestAborted;
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text
+            FROM axis.publish_requests
+            WHERE id = @id AND application_id = @application
+            """,
+            connection);
+        command.Parameters.AddWithValue("id", requestId);
+        command.Parameters.AddWithValue("application", applicationId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return NoRequest();
+        }
+
+        using var diagnostics = JsonDocument.Parse(reader.IsDBNull(9) ? "[]" : reader.GetString(9));
+        return Results.Ok(new StudioPublishRequestResponse(
+            requestId.ToString("D"),
+            manifest.Name ?? application,
+            reader.GetString(0),
+            "tenant",
+            reader.GetString(1),
+            reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.IsDBNull(3) ? null : reader.GetString(3),
+            reader.GetString(4),
+            reader.GetFieldValue<DateTimeOffset>(5),
+            reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6),
+            reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
+            reader.IsDBNull(8) ? null : reader.GetGuid(8).ToString("D"),
+            diagnostics.RootElement.Clone()));
+    }
+
+    private static IResult NoRequest() =>
+        StudioEndpoints.NotFound("The application has no publish request with this id.");
+}
+
+/// <summary>
+/// A publish request as the authoring API shows it. <c>Application</c> is the manifest name, <c>Target</c> is always
+/// <c>tenant</c> and <c>Diagnostics</c> is empty until the request ends.
+/// </summary>
+internal sealed record StudioPublishRequestResponse(
+    string Id,
+    string Application,
+    string Kind,
+    string Target,
+    string Status,
+    string? Label,
+    string? Note,
+    string RequestedBy,
+    DateTimeOffset RequestedAt,
+    DateTimeOffset? StartedAt,
+    DateTimeOffset? FinishedAt,
+    string? ReleaseId,
+    JsonElement Diagnostics);

@@ -16,7 +16,8 @@ Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
 restarts the server, which activates the folder, as a hand edit does today.
 *(planned for M10)* A write will take a lock in the platform database. Reads
 and diagnostics touch no database. Going live from Studio is
-[Publishing](#publishing) *(planned for M10)*. It asks for an activation: the
+[Publishing](#publishing). `validate` and `publish` are built, `preview`, the release history and `rollback`
+are *(planned for M10)*. It asks for an activation: the
 server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
 its own process, and
@@ -32,7 +33,7 @@ folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. S
   `GET /api/me` says the same.
 - `Studio:AuthorRole` names the roles claim value that may use the API. With
   no value, nobody may. Application policies play no part.
-- `Studio:PublisherRole` *(planned for M10)* names the roles claim value that
+- `Studio:PublisherRole` names the roles claim value that
   may publish and roll back, on top of the author role. With no value, nobody
   may publish or roll back. `validate`, the request status and the release
   history need the author role only. A `preview` needs the author role only
@@ -95,10 +96,9 @@ bytes, in lower-case hex.
 ## Order of checks
 
 Like the [record API](record-api.md#errors), a request is
-checked in this order, and the first failure is the response. Checks 1 to 3,
-5 and 6 are built. Checks 7 to 10 are built for a patch, a create and a
-delete. Checks 4, 6 for a request or a release, and 8 for a publish body are
-*(planned for M10)*:
+checked in this order, and the first failure is the response. Checks 1 to 6
+and 8 to 10 are built for every route that is built, and so is check 5a. Check 7 is built for a patch and a delete.
+Check 6 is built for a request. For a release it is *(planned for M10)*, with the release routes:
 
 1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PATCH` or `DELETE`, `403`.
 2. The session, `401`. A session from another tenant counts as no session.
@@ -125,6 +125,10 @@ delete. Checks 4, 6 for a request or a release, and 8 for a publish body are
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
+A check 5a sits between checks 5 and 6, on `validate` and `publish` only. A folder whose manifest has no UUID `id` answers `409`,
+because the request needs the application id for the publisher's queue. It comes after the unknown application `404` and, for a
+`publish`, before the body is read.
+
 *(Planned for M10.)* A check 5b sits between checks 5 and 6, on `preview` only.
 When the session's tenant has no preview tenant, the answer is `409`. It comes
 after the unknown application `404`, so a caller cannot learn from it which
@@ -139,7 +143,7 @@ requests or releases exist.
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
 from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics,
-Resource references and Text key references are built. The rows for Validate, Publish, Preview, Request status,
+Resource references, Text key references, Validate, Publish and Request status are built. The rows for Preview,
 Release history and Rollback are *(planned for M10)*.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -153,17 +157,19 @@ Release history and Rollback are *(planned for M10)*.
 | Resource references | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
 | Text key references | No session | No author role, or no `Studio:Folders` | Unknown application, or a key that no text resource defines and no label uses | Not used |
 | Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
-| Validate *(planned for M10)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
-| Publish *(planned for M10)* | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
-| Request status *(planned for M10)* | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
+| Validate | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
+| Publish | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
+| Request status | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
 | Release history *(planned for M10)* | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Preview *(planned for M10)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | This tenant has no preview tenant |
 | Rollback *(planned for M10)* | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application, or a release not in the tenant's history | Not used |
 
+The `409` of Validate and Publish is problem details titled "The application
+manifest has no valid id." The `403` for a missing publisher role is titled "You do not hold the publisher role."
 The `409` of Preview is problem details titled "This tenant has no preview
 tenant." *(planned for M10)*. It names no tenant. `400` is a bad body, and `428`
 a missing `If-Match`, as [Order of checks](#order-of-checks) says. `400` also answers a bad `publish`
-body *(planned for M10)*. A successful `validate`, `publish` or `rollback`
+body, titled "The body is not a valid publish request." A successful `validate`, `publish` or `rollback`
 answers `202`, see [Publishing](#publishing). `415` answers a body of the wrong
 content type, just before the body is read. A create needs `application/json`
 and a patch needs `application/json-patch+json`.
@@ -256,7 +262,7 @@ Writes are built for patches, creates and deletes.
   and the diagnostics report the breakage.
 - **Never an activation.** A write never compiles against a database, never
   stores a release and never activates one. Only a [publish request](#publishing)
-  *(planned for M10)* leads to an activation, and the
+  leads to an activation, and the
   [publisher](administration.md#publisher) runs it, never the server.
 
 ## Diagnostics
@@ -286,8 +292,9 @@ saved, and the diagnostics list the broken references.
 
 ## Publishing
 
-*(Planned for M10.)* An author validates, publishes and rolls back an
-application from Studio. The server never activates in its own process and
+An author validates, publishes and rolls back an
+application from Studio. `validate`, `publish` and the request status are built.
+`preview`, the release history and `rollback` are *(planned for M10)*. The server never activates in its own process and
 holds no tenant schema connection. It stores a **publish request** in the
 tenant database, and a separate [publisher](administration.md#publisher) runs
 it with the tenant's schema role. See
@@ -308,7 +315,8 @@ host publishes to that tenant only.
 | `POST /api/studio/apps/{application}/releases/{id}/rollback` | `202` with the request and a `Location` header. It takes no body. It needs the author role and the publisher role |
 
 `validate`, `preview` and `rollback` take no body, and a body that is sent is
-ignored.
+ignored. A `publish` without a body stores no label and no note. A body that is sent
+must be `application/json` (`415` otherwise).
 `{id}` of a request is its UUID. `{id}` of a release is the release id from
 the history. The answers for `401`, `403`, `404` and the CSRF header are those
 of the rest of the API, see [Order of checks](#order-of-checks) and
@@ -335,8 +343,10 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | `diagnostics` | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings |
 
 - **A snapshot.** `validate` and `publish` store the folder as it is when the
-  request is made: every resource file with its `version`, as for
-  [Versions](#versions). A later edit in Studio does not change a queued
+  request is made: every `*.json` file that Studio can reach, with its `version`, as for
+  [Versions](#versions). A file that is not a valid resource is kept, so the request fails with the
+  diagnostic that the diagnostics route shows. The snapshot is read under the write lock, so it never
+  holds a write half done. A later edit in Studio does not change a queued
   request, so the release is exactly what the author sent.
 - **A folder with errors.** A `publish` of a folder with compile errors is
   still accepted with `202`. The request then ends `failed` with those
@@ -437,7 +447,7 @@ newest first.
   with copies.
 - `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
   both the author role and the publisher role and `Studio:Folders` is not
-  empty. Studio uses it to hide the publish and rollback buttons.
+  empty. It is built. Studio will use it to hide the publish and rollback buttons.
 
 ### Rollback
 

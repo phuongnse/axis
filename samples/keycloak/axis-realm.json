@@ -25,6 +25,10 @@
           "clientRole": true
         },
         {
+          "name": "publisher",
+          "clientRole": true
+        },
+        {
           "name": "purchasing-system",
           "clientRole": true
         }
@@ -266,7 +270,8 @@
       "requiredActions": [],
       "clientRoles": {
         "axis": [
-          "author"
+          "author",
+          "publisher"
         ]
       }
     },

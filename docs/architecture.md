@@ -554,7 +554,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean
   `studio`, true when `Studio:Folders` is not empty and the user holds
   `Studio:AuthorRole`. See [D38](decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
-  *(Planned for M10:)* It adds a boolean `studioPublisher`, true when
+  It adds a boolean `studioPublisher`, true when
   `Studio:Folders` is not empty and the user holds both `Studio:AuthorRole` and
   `Studio:PublisherRole`. See [D47](decisions.md#d47-publishing-from-studio--agreed).
   Without a session it is a `401`, as today. Record writes, process starts and the

@@ -959,9 +959,8 @@ development or E2E server serves a real application without a separate step.
 Studio edits application folders through the
 [authoring API](authoring.md), as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
-agrees. Two server settings control it. They are built, and the authoring
-API reads them. A third, `Studio:PublisherRole`, controls publishing
-*(planned for M10)*, see
+agrees. Three server settings control it. They are built, and the authoring
+API reads them. The third, `Studio:PublisherRole`, controls publishing, see
 [D47](../decisions.md#d47-publishing-from-studio--agreed). The Studio page lists the resources with a search, edits them in a form
 and a JSON view, and shows the diagnostics.
 
@@ -976,11 +975,12 @@ and a JSON view, and shows the diagnostics.
   roles claim holds the value may use Studio. It has no default, and with no
   value nobody may author. The Development settings set it to `author`.
   Application policies play no part, because an author edits them.
-- **`Studio:PublisherRole`** *(planned for M10)*. A roles claim value, such as
+- **`Studio:PublisherRole`**. A roles claim value, such as
   `publisher`. The environment variable is `Studio__PublisherRole`. `publish`
-  and `rollback` need it on top of the author role, and `validate` needs the
-  author role only. It has no default, and with no value nobody may publish or
-  roll back. The Development settings set it to `publisher`, and the
+  needs it on top of the author role, and `validate` needs the author role
+  only. `rollback` *(planned for M10)* needs it too. It has no default, and
+  with no value nobody may publish or roll back. A blank value counts as no
+  value. The Development settings set it to `publisher`, and the
   development realm gives `hoa` that role. It plays no part in application
   policies, as `Studio:AuthorRole` does not.
 - **Where Studio reads and writes.** Studio's edit routes read and write only
@@ -991,19 +991,19 @@ and a JSON view, and shows the diagnostics.
   that cannot take the lock answers `503` and writes nothing. A read and the
   diagnostics touch no database. See [authoring API](authoring.md#versions) and
   [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
-  The publish routes *(planned for M10)* store a request in the tenant database
-  over the runtime role, see
+  The `validate` and `publish` routes store a request in the database of the
+  tenant that owns the host, over the runtime role, see
   [publish requests](storage.md#publish-requests-and-release-history).
 - **Activation.** Studio's edit routes never activate a release. Under
   `scripts/dev.sh`, a saved file restarts the server, which activates the
   folder, see [Startup activation](#startup-activation). Elsewhere a folder is
-  committed and deployed as today. *(Planned for M10:)* Studio asks for an
+  committed and deployed as today. Studio asks for an
   activation through a publish request, and the
   [publisher](administration.md#publisher) runs it. The server never activates
   in its own process.
 - **Current user.** `GET /api/me` answers `studio: true` when `Studio:Folders`
   is not empty and the user holds the author role. It also answers
-  `studioPublisher: true` *(planned for M10)* when `Studio:Folders` is not
+  `studioPublisher: true` when `Studio:Folders` is not
   empty and the user holds both the author role and the publisher role.
 
 ## Reference index

@@ -97,7 +97,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         CopyDirectory(Folder, second);
         File.WriteAllText(Path.Combine(second, "application.json"), """{ "name": "Second" }""");
 
-        var names = StudioFolder.Applications(new StudioOptions([Outside, Folder, upper, copy, second], "author"));
+        var names = StudioFolder.Applications(new StudioOptions([Outside, Folder, upper, copy, second], "author", null));
 
         Assert.Equal(["PurchaseRequests", "Second"], names);
     }

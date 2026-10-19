@@ -1,7 +1,14 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace Axis.Server.Studio;
+
+/// <summary>The <c>id</c> and <c>name</c> of a folder's manifest. Each is null when the manifest has no usable value.</summary>
+internal sealed record StudioManifest(Guid? Id, string? Name);
+
+/// <summary>One file of a Studio snapshot: its path, the SHA-256 of its bytes and its text.</summary>
+internal sealed record StudioSnapshotFile(string File, string Version, string Content);
 
 /// <summary>One resource file of a Studio folder, with the bytes its version was computed from.</summary>
 internal sealed record StudioFile(Guid Id, string Kind, string? Name, string File, string Version, byte[] Bytes);
@@ -40,22 +47,71 @@ internal static class StudioFolder
         return [.. options.Folders.Select(ReadName).OfType<string>().Where(seen.Add)];
     }
 
-    private static string? ReadName(string folder)
+    private static string? ReadName(string folder) => ReadManifest(folder)?.Name;
+
+    /// <summary>
+    /// The manifest <c>id</c> and <c>name</c> of <paramref name="folder"/>, or null when the manifest cannot be
+    /// read or is not a JSON object.
+    /// </summary>
+    public static StudioManifest? ReadManifest(string folder)
     {
         try
         {
             using var document = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(folder, ManifestFile)));
-            return document.RootElement is { ValueKind: JsonValueKind.Object } root
-                && root.TryGetProperty("name", out var name)
-                && name.ValueKind == JsonValueKind.String
-                    ? name.GetString()
+            if (document.RootElement is not { ValueKind: JsonValueKind.Object } root)
+            {
+                return null;
+            }
+
+            var name = root.TryGetProperty("name", out var nameValue) && nameValue.ValueKind == JsonValueKind.String
+                ? nameValue.GetString()
+                : null;
+            Guid? id = root.TryGetProperty("id", out var idValue)
+                && idValue.ValueKind == JsonValueKind.String
+                && Guid.TryParse(idValue.GetString(), out var guid)
+                    ? guid
                     : null;
+            return new StudioManifest(id, name);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
             // A folder without a readable manifest has no application name.
             return null;
         }
+    }
+
+    /// <summary>
+    /// Every <c>*.json</c> file under <paramref name="folder"/>, sorted by file, as a publish request stores it. A file
+    /// that is not a valid resource is kept, so the publisher reports it. The same files as <see cref="List"/> are
+    /// reachable: no link, no hidden file and nothing that leaves the folder.
+    /// </summary>
+    public static IReadOnlyList<StudioSnapshotFile> Snapshot(string folder)
+    {
+        var root = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
+        var files = new List<StudioSnapshotFile>();
+        foreach (var path in Directory.EnumerateFiles(folder, "*.json", _enumeration))
+        {
+            if (!Path.GetFullPath(path).StartsWith(root, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            try
+            {
+                var bytes = File.ReadAllBytes(path);
+                files.Add(new StudioSnapshotFile(
+                    Path.GetRelativePath(folder, path).Replace(Path.DirectorySeparatorChar, '/'),
+                    Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                    Encoding.UTF8.GetString(bytes)));
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // A file that cannot be read is left out, as List leaves it out.
+            }
+        }
+
+        files.Sort((left, right) => string.CompareOrdinal(left.File, right.File));
+        return files;
     }
 
     /// <summary>
