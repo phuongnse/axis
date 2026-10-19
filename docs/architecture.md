@@ -58,8 +58,8 @@ flowchart LR
   and [D45](decisions.md#d45-tenant-backup-and-restore--agreed).
 - **Platform database** stores installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform
-  settings *(tenant directory planned for M9; tenants come from server
-  configuration until then)*.
+  settings *(the server reads the tenant directory; the worker still reads
+  tenants from its configuration until M9 is done)*.
 - **Tenant databases** hold everything else for one tenant: releases, system
   tables, process state, audit and the generated entity tables (D10).
 
@@ -148,9 +148,10 @@ Moved to [reference/record-api.md](reference/record-api.md).
   current tenant. Without a tenant context, data access fails.
 - **Scoping.** Cache keys, file storage paths, job records and log scopes all
   include the tenant.
-- **Tenant source.** Today tenants come from server configuration. From M9
-  the setting `Tenancy:Source` chooses between that source and the
-  [tenant directory](#tenant-directory) *(planned for M9)*.
+- **Tenant source.** The setting `Tenancy:Source` chooses between server
+  configuration, the default, and the [tenant directory](#tenant-directory).
+  The server reads the directory. The worker still reads its `Tenants`
+  section *(the worker reading the directory is planned for M9)*.
 
 ### Tenant configuration
 
@@ -175,9 +176,10 @@ setting change: every installation must add the setting, and there is no
 fallback to one connection string. `appsettings.Development.json`,
 Docker Compose, `scripts/dev.sh` and the E2E server pass `axis_schema` in
 `SchemaConnectionString` and `axis_runtime` in the other settings. See [database roles](reference/storage.md#database-roles) and
-[D31](decisions.md#d31-separate-database-roles--agreed). *(Planned for M9.)*
+[D31](decisions.md#d31-separate-database-roles--agreed).
 Under `Tenancy:Source=directory` there is no `SchemaConnectionString`: the
 server and the worker hold only runtime database roles for tenant databases.
+The server builds none from the directory.
 `appsettings.Development.json` maps `localhost` to tenant `default` on the
 compose database; the E2E server maps `127.0.0.1` to a tenant on the E2E
 database. The `Platform` connection string is separate and still serves the
@@ -232,15 +234,24 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
 
 ### Tenant directory
 
-*(Planned for M9.)* It follows
+*(Partly built, planned for M9.)* It follows
 [D42](decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
-The tenant catalog contract and the `platform` schema are built. The server and
-the worker read tenants through the contract, and only the `configuration`
-source answers it, from the `Tenants` section above. Under
-`Tenancy:Source=directory` the server creates the `platform` tables at start,
-but still reads its tenants from the `Tenants` section. The secret cipher and
-the check of `Platform:SecretKey` at start are built, but nothing encrypts a
-stored value yet. The directory source and the refresh are not built.
+The tenant catalog contract, the `platform` schema and the secret cipher are
+built. Under `Tenancy:Source=directory` the server creates the `platform`
+tables at start, then reads the `active` tenants, their hosts, database
+settings, OIDC settings and bindings once from the `platform` schema over
+`ConnectionStrings:Platform`. It uses them for host matching, tenant
+connections, deployment bindings and sign-in. A password, the client secret
+and a `secret` binding stay encrypted in memory and are decrypted only when a
+connection opens, the sign-in client is set up or a binding is resolved. If the
+first load fails, the start stops with an error that names
+`ConnectionStrings:Platform` and holds no password. An empty directory starts,
+and every host answers `404` until tenants are added and the server restarts.
+Under `directory`, a non-empty `ActivateOnStartup` stops the start. The refresh,
+the `503` answers, the check of the schema version and the worker reading the
+directory are not built. The worker still reads its `Tenants` section, so a
+directory installation must give it one. A change to the directory applies
+only after a server restart.
 
 - **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
   default, or `directory`. Both answer through one tenant catalog contract, so
@@ -289,7 +300,7 @@ What a host answers for a tenant, once the directory is in use:
   host. This covers API and SPA paths alike.
 - **Health exemption.** Paths under `/health` are not resolved, so
   `/health/live` and `/health/ready` answer for any host.
-- **Tenant not available.** *(Planned for M9.)* Under
+- **Tenant not available.** *(Not built yet, planned for M9.)* Under
   `Tenancy:Source=directory`, a host of a tenant that is not `active` answers
   `503` problem details titled "This tenant is not available.". It names
   neither the tenant nor the host. See [tenant directory](#tenant-directory).
@@ -377,16 +388,16 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   for the tenant configuration, when a tenant has no `Oidc` block, or when
   its `Authority`, `ClientId` or `ClientSecret` is missing or blank. Only the
   server reads and checks the block. The worker reads the same `Tenants`
-  section but signs nobody in, so it ignores `Oidc`. *(Planned for M9.)* Under
+  section but signs nobody in, so it ignores `Oidc`. Under
   `Tenancy:Source=directory`, the `Oidc` settings of a tenant come from the
   [tenant directory](#tenant-directory), not from `Tenants`.
 - **Secret.** The client secret comes from the environment, such as
   `Tenants__default__Oidc__ClientSecret`. It is never in a committed file,
   except the development fixtures, which are never valid outside
   `Development` and tests. `appsettings.Development.json` and the E2E server
-  use the development realm's secret. *(Planned for M9.)* Under
+  use the development realm's secret. Under
   `Tenancy:Source=directory`, the client secret is stored encrypted in the
-  tenant directory, see
+  tenant directory and decrypted only when the sign-in client is set up, see
   [platform database](reference/storage.md#platform-database).
 - **Endpoints.**
   - `GET /api/auth/sign-in?returnUrl=` redirects to the tenant's identity

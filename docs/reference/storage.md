@@ -142,19 +142,24 @@ apply: sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
 *(Partly built for M9.)* See
 [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
-The `platform` schema, its migrations, the read-only grant and the secret
-cipher are built. The directory source and `Axis.Admin` are not, so nothing
-reads or writes the tables, or encrypts a stored value, yet. Under `Tenancy:Source=configuration` the platform database holds no
+The `platform` schema, its migrations, the read-only grant, the secret cipher
+and the server's directory source are built. `Axis.Admin` and the worker's
+directory source are not, so nothing writes the tables or encrypts a stored
+value yet. Under `Tenancy:Source=configuration` the platform database holds no
 tables, and its connection string only serves the readiness check. Under
-`Tenancy:Source=directory` the server creates the tables at start, and they are
-meant to hold the tenant directory, see
+`Tenancy:Source=directory` the server creates the tables at start, then reads
+the `active` tenants, their hosts and their bindings once over
+`ConnectionStrings:Platform`. It keeps each password, the client secret and
+each `secret` binding encrypted in memory, and decrypts one only when a
+connection opens, the sign-in client is set up or a binding is resolved. It
+reads no `schema_password`. See
 [tenant directory](../architecture.md#tenant-directory).
 
 - **The `platform` schema.** Its EF Core migrations ship with Axis, with their
   history in `platform.__platform_migrations`. The server applies them at
   start over `ConnectionStrings:PlatformSchema`, and uses that setting for
   nothing else.
-- **Read-only hosts.** Both hosts read the directory over
+- **Read-only hosts.** The server reads the directory over
   `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
   and `SELECT` on its tables, and nothing else. The server sets this in one
   transaction after the migrations, and revokes any wider right the role had

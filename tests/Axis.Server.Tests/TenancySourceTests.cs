@@ -40,6 +40,20 @@ public sealed class TenancySourceTests
         Assert.Contains("same user", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task The_directory_source_with_an_ActivateOnStartup_folder_stops_the_start_naming_it()
+    {
+        await using var factory = CreateFactory(
+            ("Tenancy:Source", "directory"),
+            ("ConnectionStrings:PlatformSchema", UnreachableDatabase.Replace("Username=axis", "Username=axis_schema", StringComparison.Ordinal)),
+            ("Platform:SecretKey", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+            ("ActivateOnStartup:0", "/x"));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ActivateOnStartup", exception.Message, StringComparison.Ordinal);
+    }
+
     // No ActivateOnStartup folder is set, so the check does not depend on startup activation.
     private static WebApplicationFactory<Program> CreateFactory(params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

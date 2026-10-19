@@ -870,9 +870,9 @@ development or E2E server serves a real application without a separate step.
   to the tenant database, then compiles each listed folder against that database and
   activates the release, in the listed order. The same folders apply to
   every tenant.
-- **Tenant source** *(planned for M9)*. `ActivateOnStartup` is for
+- **Tenant source.** `ActivateOnStartup` is for
   `Tenancy:Source=configuration` only. Under `directory` a non-empty setting
-  stops the start, and releases are activated with
+  stops the start with a message that names `ActivateOnStartup`, and releases are activated with
   [`Axis.Admin activate`](administration.md#activate). The server runs no
   tenant migrations under `directory` either, see
   [tenancy settings](#tenancy-settings).
@@ -1075,15 +1075,17 @@ to show where a resource is used and what it uses.
 
 *(Partly built for M9.)* See
 [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed)
-and [tenant directory](../architecture.md#tenant-directory). Only the server's
-reading of `Tenancy:Source` and `ConnectionStrings:PlatformSchema`, and both
-hosts' reading of `Platform:SecretKey`, exist. Under `directory` the server
-applies the platform migrations at start and limits the role of
-`ConnectionStrings:Platform` to reading the `platform` schema. Both hosts
-refuse a missing or invalid `Platform:SecretKey` at start. The worker reads
-`Tenancy:Source` only for that. Both hosts still read their tenants from the
-`Tenants` section, and do not warn about that section, until the directory
-source is built. The other settings do not exist yet.
+and [tenant directory](../architecture.md#tenant-directory). The server's
+reading of `Tenancy:Source`, `ConnectionStrings:Platform`,
+`ConnectionStrings:PlatformSchema` and `Platform:SecretKey` exists. Under
+`directory` the server applies the platform migrations at start, limits the
+role of `ConnectionStrings:Platform` to reading the `platform` schema, then
+reads its `active` tenants once over that role. It ignores a `Tenants` section
+and logs a warning at start. If the first read fails, the start stops with an
+error that names `ConnectionStrings:Platform`. The worker reads
+`Platform:SecretKey` and `Tenancy:Source` only to refuse a missing or invalid
+key, and still reads its tenants from the `Tenants` section. The refresh,
+`Tenancy:RefreshInterval` and the worker's directory source are not built.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -1111,7 +1113,7 @@ As environment variables they are `Tenancy__Source`,
 - **Values.** `Tenancy:Source` matches exactly, in lower case. A blank value
   counts as unset. Any other value stops the start of the server and of the worker,
   naming the setting.
-- **Platform schema.** The server still applies the platform migrations at
+- **Platform schema.** The server applies the platform migrations at
   start over `ConnectionStrings:PlatformSchema`. So "no schema connection"
   under `directory` means no tenant schema connection. Under `directory` the
   server refuses a missing or blank `ConnectionStrings:PlatformSchema`, and a
@@ -1478,10 +1480,11 @@ reconciles is in [Connector calls](processes.md#connector-calls).
 - **Where values live.** Each tenant holds its values in
   `Tenants:{id}:Bindings:{name}` of the host configuration, until the tenant
   directory in M9. Each binding has a `Kind`, `url` or `secret`, and a
-  `Value`. The server and the worker must both hold them. *(Planned for M9.)*
-  Under `Tenancy:Source=directory`, the values live in the
+  `Value`. The server and the worker must both hold them. Under
+  `Tenancy:Source=directory`, the server reads the values from the
   [tenant directory](../architecture.md#tenant-directory) instead, and `secret`
-  values are stored encrypted.
+  values are stored encrypted and decrypted when resolved. The worker reading
+  them from the directory is planned for M9.
 - **Secrets from the environment.** A secret's value is set with an
   environment variable, such as
   `Tenants__default__Bindings__PurchasingSystemToken__Value`. A command-line
