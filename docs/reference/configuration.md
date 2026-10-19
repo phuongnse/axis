@@ -1165,9 +1165,9 @@ As environment variables they are `Tenancy__Source`,
 
 ## Forwarded headers
 
-*(planned for M10)* Behind a reverse proxy that ends TLS, the server sees plain
+Behind a reverse proxy that ends TLS, the server sees plain
 HTTP. These two server settings name the proxies whose forwarded headers it
-trusts. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed). Today the server ignores forwarded headers.
+trusts. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -1183,7 +1183,12 @@ entries.
   network.
 - **No setting, no header.** With both settings empty, the default, the server
   reads no forwarded header. Loopback is not trusted either. A proxy on the
-  same machine must be named.
+  same machine must be named. The settings also govern ASP.NET's
+  `ASPNETCORE_FORWARDEDHEADERS_ENABLED` switch. With both empty, no forwarded
+  header is read even when that switch is on.
+- **No client address, no header.** A request that has no client address, such
+  as one on a Unix socket, reads no forwarded header, because the address
+  cannot be checked against the list.
 - **One hop.** The server reads one proxy, the nearest one. A client cannot
   set the scheme or the host through a chain of proxies.
 - **No prefix.** The server never reads `X-Forwarded-Prefix`.

@@ -34,6 +34,10 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
     throw new InvalidOperationException("Connection string 'Platform' is not configured.");
 }
 
+// Read before any database work, so a bad value stops the start.
+var forwardedHeaders = ForwardedHeadersSettings.Load(builder.Configuration);
+builder.Services.PostConfigure<ForwardedHeadersOptions>(forwardedHeaders.Apply);
+
 // Under directory, the platform migrations and the first directory load run now, before the services are
 // built, because sign-in registers one client per tenant. Under configuration, nothing about the platform
 // schema is read.
@@ -171,6 +175,13 @@ var app = builder.Build();
 
 // Outermost, so an unexpected error on any path is a 500 problem without exception text.
 app.UseExceptionHandler();
+
+// Before tenant resolution, so the forwarded host picks the tenant. The built-in middleware skips the proxy check
+// when a request has no client address, so such a request is kept out of it. Off when no proxy is named.
+if (!forwardedHeaders.IsEmpty)
+{
+    app.UseWhen(context => context.Connection.RemoteIpAddress is not null, branch => branch.UseForwardedHeaders());
+}
 
 // Then tenant resolution, so API and SPA paths alike need a known tenant host, and a session is
 // checked against the resolved tenant.
