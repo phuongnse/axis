@@ -72,8 +72,9 @@ Every command writes one line per tenant and step to standard output:
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
 `work`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
 `check`, `restore` and `status`. A line names the
-tenant and never a host, a password or a connection string. A `failed` message
-never holds one either. A failed `dump` step says only `pg_dump exited with code <n>`
+tenant and never a database host, a password or a connection string. A `failed` message
+never holds one either. A restore refusal does name the tenant host the operator gave on the
+command line, as typed. A failed `dump` step says only `pg_dump exited with code <n>`
 and never repeats the text that `pg_dump` wrote, because that text can name the
 database host. To see the cause, run `pg_dump` by hand. A command that does no tenant work, such as a usage
 error, writes its message to standard error.
@@ -325,8 +326,15 @@ what is missing:
   `Extensions:Path`. The message lists every missing version, not only the first.
 - `AXIS_OIDC_CLIENT_SECRET` is missing.
 
-A refusal of the archive, the tenant id, the hosts or the packages is written as
-a `<id> check failed: <message>` line on standard output. A missing or invalid
+Every failed check is reported, not only the first. Each one is a
+`<id> check failed: <message>` line on standard output, in the order of the list
+above. A refusal of the archive, the tenant id, the hosts or the packages is
+written this way. The message names the cause: the tenant id, the host as the
+operator typed it (it does not say which tenant holds it), the schema version
+and whether it is newer than this build's or unknown to it, or the package id
+and version. When the archive is unreadable or its format is unknown, the schema
+version and package checks are skipped, because the manifest cannot be trusted.
+The tenant id and host checks still run. A missing or invalid
 setting, a missing `pg_restore` and a usage error go to standard error. Both exit
 `2`, and nothing has changed.
 

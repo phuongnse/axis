@@ -15,7 +15,7 @@ namespace Axis.Admin;
 /// <c>tenant restore</c>: checks the archive, writes a directory entry as <c>provisioning</c>, creates the database roles and
 /// the database, restores the dump with <c>pg_restore</c> as the schema role, grants and migrates it, gives every work item
 /// the new tenant id, checks the runtime role and sets the entry <c>suspended</c>. A rerun on a <c>provisioning</c> entry skips what is done, and a database that already
-/// holds tables counts as restored. Each step writes one line that names the tenant and never a password, a host or a
+/// holds tables counts as restored. Each step writes one line that names the tenant and never a password, a database host or a
 /// connection string. The dump goes to <c>pg_restore</c> on its standard input, so no copy of the business data is left on disk.
 /// </summary>
 internal sealed class TenantRestore : IAsyncDisposable
@@ -69,9 +69,13 @@ internal sealed class TenantRestore : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         var refusal = await CheckAsync(settings, request, cancellationToken);
-        if (refusal.Problem is not null)
+        if (refusal.Problems.Count > 0)
         {
-            output.WriteLine($"{request.Id} check failed: {refusal.Problem}");
+            foreach (var problem in refusal.Problems)
+            {
+                output.WriteLine($"{request.Id} check failed: {problem}");
+            }
+
             return null;
         }
 
@@ -134,37 +138,49 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     private static async Task<CheckResult> CheckAsync(RestoreSettings settings, TenantRestoreRequest request, CancellationToken cancellationToken)
     {
+        var problems = new List<string>();
         var manifest = ReadManifest(request.File);
+        var trusted = false;
         if (manifest is null)
         {
-            return CheckResult.Refused("the archive cannot be read");
+            problems.Add("the archive cannot be read");
         }
-
-        if (manifest.Format != SupportedFormat)
+        else if (manifest.Format != SupportedFormat)
         {
-            return CheckResult.Refused($"the archive format {manifest.Format.ToString(CultureInfo.InvariantCulture)} is not known");
+            problems.Add($"the archive format {manifest.Format.ToString(CultureInfo.InvariantCulture)} is not known");
         }
-
-        if (string.IsNullOrEmpty(manifest.SchemaVersion)
-            || !TenantSchemaVersion.IsKnown(manifest.SchemaVersion)
-            || string.CompareOrdinal(manifest.SchemaVersion, TenantSchemaVersion.Current) > 0)
+        else
         {
-            return CheckResult.Refused("the schema version of the archive is not one of this build");
+            trusted = true;
+            var version = manifest.SchemaVersion;
+            if (string.IsNullOrEmpty(version))
+            {
+                problems.Add("the archive has no schema version");
+            }
+            else if (string.CompareOrdinal(version, TenantSchemaVersion.Current) > 0)
+            {
+                problems.Add($"the schema version {Printable(version)} of the archive is newer than this build's");
+            }
+            else if (!TenantSchemaVersion.IsKnown(version))
+            {
+                problems.Add($"the schema version {Printable(version)} of the archive is not one of this build");
+            }
+
+            var directory = manifest.Directory;
+            if (!Uri.TryCreate(directory.OidcAuthority, UriKind.Absolute, out var authority)
+                || (authority.Scheme != Uri.UriSchemeHttp && authority.Scheme != Uri.UriSchemeHttps))
+            {
+                problems.Add("the OIDC authority of the archive is not an absolute http or https URL");
+            }
+
+            if (string.IsNullOrWhiteSpace(directory.OidcClientId))
+            {
+                problems.Add("the OIDC client id of the archive is blank");
+            }
         }
 
-        var directory = manifest.Directory;
-        if (!Uri.TryCreate(directory.OidcAuthority, UriKind.Absolute, out var authority)
-            || (authority.Scheme != Uri.UriSchemeHttp && authority.Scheme != Uri.UriSchemeHttps))
-        {
-            return CheckResult.Refused("the OIDC authority of the archive is not an absolute http or https URL");
-        }
-
-        if (string.IsNullOrWhiteSpace(directory.OidcClientId))
-        {
-            return CheckResult.Refused("the OIDC client id of the archive is blank");
-        }
-
-        var hosts = request.Hosts.Select(host => host.Trim().ToLowerInvariant()).ToArray();
+        var typed = request.Hosts.Select(host => host.Trim()).ToArray();
+        var hosts = typed.Select(host => host.ToLowerInvariant()).ToArray();
         try
         {
             await using var platform = NewPlatform(settings.Create.PlatformConnectionString);
@@ -174,45 +190,67 @@ internal sealed class TenantRestore : IAsyncDisposable
                 .FirstOrDefaultAsync(cancellationToken);
             if (status is not null && status != Provisioning)
             {
-                return CheckResult.Refused("the tenant already exists");
+                problems.Add($"the tenant {request.Id} already exists");
             }
 
-            var taken = await platform.TenantHosts.AnyAsync(
-                host => host.TenantId != request.Id && hosts.Contains(host.Host.ToLower()),
-                cancellationToken);
-            if (taken)
+            var held = await platform.TenantHosts.AsNoTracking()
+                .Where(host => host.TenantId != request.Id && hosts.Contains(host.Host.ToLower()))
+                .Select(host => host.Host.ToLower())
+                .ToListAsync(cancellationToken);
+            if (held.Count > 0)
             {
-                return CheckResult.Refused("a host belongs to another tenant");
+                var names = typed
+                    .Where(host => held.Contains(host.ToLowerInvariant()))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Order(StringComparer.Ordinal);
+                problems.Add("a host belongs to another tenant: " + string.Join(", ", names));
             }
         }
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
         {
-            return CheckResult.Refused($"the setting {AdminCommands.PlatformSetting} could not be used to read the tenant directory");
+            problems.Add($"the setting {AdminCommands.PlatformSetting} could not be used to read the tenant directory");
         }
 
-        var required = manifest.Packages.Where(package => package.Required).ToList();
-        if (required.Count > 0)
+        if (trusted)
         {
-            PackageCatalog catalog;
-            try
+            var required = manifest!.Packages.Where(package => package.Required).ToList();
+            if (required.Count > 0)
             {
-                catalog = PackageCatalog.Load(settings.ExtensionsPath);
-            }
-            catch (InvalidOperationException)
-            {
-                return CheckResult.Refused($"the setting {PackageCatalog.PathSetting} could not be used to find the required extension packages");
-            }
+                PackageCatalog? catalog = null;
+                try
+                {
+                    catalog = PackageCatalog.Load(settings.ExtensionsPath);
+                }
+                catch (InvalidOperationException)
+                {
+                    problems.Add($"the setting {PackageCatalog.PathSetting} could not be used to find the required extension packages");
+                }
 
-            var missing = required.Where(package => catalog.Find(package.Id, package.Version) is null).ToList();
-            if (missing.Count > 0)
-            {
-                return CheckResult.Refused(
-                    "missing required extension packages: " + string.Join(", ", missing.Select(package => $"{package.Id} {package.Version}")));
+                if (catalog is not null)
+                {
+                    var missing = required.Where(package => catalog.Find(package.Id, package.Version) is null).ToList();
+                    if (missing.Count > 0)
+                    {
+                        problems.Add(
+                            "missing required extension packages: "
+                            + string.Join(", ", missing.Select(package => $"{Printable(package.Id)} {Printable(package.Version)}")));
+                    }
+                }
             }
         }
 
-        return new CheckResult(manifest, null);
+        return new CheckResult(manifest, problems);
     }
+
+    // Text from the archive goes into a message, so a control character cannot start a fake output line.
+    private static string Printable(string text) =>
+        string.Create(text.Length, text, (span, source) =>
+        {
+            for (var i = 0; i < source.Length; i++)
+            {
+                span[i] = char.IsControl(source[i]) ? '?' : source[i];
+            }
+        });
 
     // Returns the manifest, or null when the file is not a readable archive with a complete manifest and a dump.
     private static BackupManifest? ReadManifest(string file)
@@ -527,10 +565,7 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     private void Failed(string step, string message) => _output.WriteLine($"{_id} {step} failed: {message}");
 
-    private sealed record CheckResult(BackupManifest? Manifest, string? Problem)
-    {
-        public static CheckResult Refused(string problem) => new(null, problem);
-    }
+    private sealed record CheckResult(BackupManifest? Manifest, IReadOnlyList<string> Problems);
 }
 
 /// <summary>What the <c>check</c> step found: the request with the archive's full path, the manifest and the path of <c>pg_restore</c>.</summary>
