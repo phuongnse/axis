@@ -7,7 +7,7 @@ activate releases, and back up and restore tenants. It follows
 and
 [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`,
-`tenant restore`, `migrate`, `activate`, `publisher` *(planned for M10)* and `version`. A tenant can also come from the `Tenants`
+`tenant restore`, `migrate`, `activate`, `publisher` and `version`. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
 [startup activation](configuration.md#startup-activation).
 
@@ -19,7 +19,7 @@ the PostgreSQL role.
 [tenant directory](../architecture.md#tenant-directory), the only one that
 holds an admin connection to the database server, and the only one that holds
 the schema database role of a tenant under `Tenancy:Source=directory`. The
-[publisher](#publisher) *(planned for M10)* is a command of this host, so it
+[publisher](#publisher) is a command of this host, so it
 holds that role as well. See [database roles](storage.md#database-roles) for
 which host holds which connection. There is no HTTP API for provisioning.
 
@@ -71,8 +71,8 @@ Every command writes one line per tenant and step to standard output:
 
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
 `work`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
-`check`, `restore` and `status`. The [publisher](#publisher) *(planned for M10)*
-adds `claim`, `validate` and `rollback`. A line names the
+`check`, `restore` and `status`. The [publisher](#publisher)
+adds `claim`, and *(planned for M10)* `validate` and `rollback`. A line names the
 tenant and never a database host, a password or a connection string. A `failed` message
 never holds one either. A restore refusal does name the tenant host the operator gave on the
 command line, as typed. A failed `dump` step says only `pg_dump exited with code <n>`
@@ -560,7 +560,7 @@ or bad setting.
 
 ## Publisher
 
-*(Planned for M10.)* `publisher` runs the [publish requests](authoring.md#publishing)
+`publisher` runs the [publish requests](authoring.md#publishing)
 that Studio stores, as [D47](../decisions.md#d47-publishing-from-studio--agreed)
 agrees. It is the only host that activates a release on the author's behalf, so
 the server never needs a tenant schema connection. Unlike the other commands, it
@@ -569,42 +569,58 @@ runs until it is stopped.
 `publisher`
 
 It takes no option. It has no HTTP endpoint and listens on no port, so nothing
-can call it. The `axis-admin` image runs it, and `scripts/dev.sh`, Docker
-Compose, the E2E script and both production installs start one, see
+can call it. The `axis-admin` image runs it. *(Planned for M10:)* `scripts/dev.sh`,
+Docker Compose, the E2E script and both production installs start one, see
 [installation](installation.md).
+
+**What is built.** The command runs `publish` requests for
+`Tenancy:Source=directory`. These stay *(planned for M10)*: `validate` and
+`rollback` requests, the configuration source, preview requests, renewing a
+lease, claiming an expired one again, `AXC0215` and the release history. A
+request of a kind that is not built is never claimed, so it stays `queued`.
 
 **Settings.** It reads these, with the meaning they have for the other commands:
 
-- `Tenancy:Source`, which is `configuration` or `directory`, and the tenants of
-  that source. Under `configuration` it reads the `Tenants` section and each
-  tenant's `SchemaConnectionString`. Under `directory` it reads
+- `Tenancy:Source`, which must be `directory`. It reads
   `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, and decrypts the
   schema role of each tenant. See [database roles](storage.md#database-roles).
+  Any other value, and an unset one, exits with code 2 with a message that
+  names the setting. *(Planned for M10:)* Under `configuration` it reads the
+  `Tenants` section and each tenant's `SchemaConnectionString`.
+- `Tenancy:RefreshInterval`, how often it reads the tenant directory again.
 - `Extensions:Path` and `Modules:Path`, as `activate` reads them. An unset path
   gives an empty catalog, and a set path whose folder does not exist is a
   settings error.
 - `Activation:InlineRecomputeLimit`, as for `activate`.
 
-A missing or invalid setting exits with code 2 before any request runs.
+A missing or invalid setting exits with code 2 before any request runs. It
+polls once a second. That interval is fixed and has no setting.
 
-**Which tenants.** Under `directory` it serves only `active` tenants whose
-schema version is the one of this build, and it reads the directory again every
+**Which tenants.** It serves only `active` tenants whose schema version is the
+one of this build, and it reads the directory again every
 `Tenancy:RefreshInterval`. A `suspended`, `provisioning` or out of date tenant
-is skipped, and its requests stay `queued`. Under `configuration` it waits until
-the server has migrated each tenant database, as the worker does. It runs no
-migration of the tenant schema itself. `activate` does none either.
+is skipped, and its requests stay `queued`. It runs no migration of the tenant
+schema itself. `activate` does none either. *(Planned for M10:)* Under
+`configuration` it waits until the server has migrated each tenant database, as
+the worker does.
 
 **Claiming.** Each poll round, for each served tenant, it claims the oldest
-`queued` request with `FOR UPDATE SKIP LOCKED` and sets a lease.
+`queued` `publish` request with `FOR UPDATE SKIP LOCKED`. It sets the request
+`running`, `claimed_by` to its own name, `lease_until` and adds 1 to `claims`.
 
 - **One at a time.** For one tenant and application it runs one request at a
   time, oldest first, so when two publishes are queued the newer one ends up
-  live. Requests of other applications and tenants can run at the same time.
-- **Lease.** The lease says how long the claim holds. The publisher renews it
-  while the request runs. A `running` request whose lease has run out is claimed
-  again, because its publisher died. A request that has been claimed three
-  times and whose lease runs out again ends `failed` with `AXC0215`, see the
-  [lifecycle](authoring.md#lifecycle).
+  live. A claim skips an application that already has a `running` request.
+  Requests of other applications and tenants can run at the same time. Two
+  publishers can still claim two requests of one application at the same
+  moment, because that check does not lock the rows it reads.
+- **Lease.** The lease is five minutes, fixed. It is not renewed, and a
+  `running` request whose lease has run out is not claimed again, so a request
+  whose publisher died stays `running`. *(Planned for M10:)* The publisher
+  renews the lease while the request runs. A `running` request whose lease has
+  run out is claimed again, because its publisher died. A request that has been
+  claimed three times and whose lease runs out again ends `failed` with
+  `AXC0215`, see the [lifecycle](authoring.md#lifecycle).
 - **Two publishers.** More than one publisher is safe, because the claim skips
   rows that another publisher holds. The production installs run one.
 
@@ -612,41 +628,51 @@ migration of the tenant schema itself. `activate` does none either.
 [Output and exit codes](#output-and-exit-codes), and runs as the tenant's schema
 role unless it says otherwise.
 
-1. `claim`: claim the request, as above.
+1. `claim`: claim the request, as above. A tenant with nothing to claim writes
+   no line. A claim that fails writes `<tenant> claim failed: <message>`, and the
+   publisher goes on with the next tenant.
 2. `version`: check that the tenant's schema version is the one of this build.
 3. For `publish`: `compile` the snapshot against the tenant database and store
    its release, `activate` the release, then `seed`. These are the steps of
    [activate](#activate) and report the same diagnostics. `seed` runs as the
    runtime role. The compile reads the snapshot's files, never the application
-   folder on any disk. Activation adds a row to the
+   folder on any disk. A snapshot that cannot be read, because it is not an array of
+   `{ file, version, content }` or names a file twice, fails at `compile`
+   and stores no release. *(Planned for M10:)* Activation adds a row to the
    [release history](storage.md#publish-requests-and-release-history).
-4. For `validate`: run the `compile` and every check of `activate` against the
-   tenant inside one transaction, then roll the transaction back. It stores no
-   release, adds no history row and seeds nothing. It reports the diagnostics
-   of activation, so a clean `validate` means an activation with the same input
-   would pass its checks. The step is called `validate`.
-5. For `rollback`: read the stored release the request names and activate it
-   as it is, without compiling. It refuses the case where a migration applied
-   after that release is missing from it, with `AXC0174`, and the case where a
-   pinned package version is not installed, with `AXC0146`. The step is called
-   `rollback`. See [rollback](authoring.md#rollback).
-6. Write the audit record of a `publish` or a `rollback`, with the request's
-   final status, then set the request `succeeded` or `failed` and store its
-   diagnostics.
+4. *(Planned for M10.)* For `validate`: run the `compile` and every check of
+   `activate` against the tenant inside one transaction, then roll the
+   transaction back. It stores no release, adds no history row and seeds
+   nothing. It reports the diagnostics of activation, so a clean `validate`
+   means an activation with the same input would pass its checks. The step is
+   called `validate`.
+5. *(Planned for M10.)* For `rollback`: read the stored release the request
+   names and activate it as it is, without compiling. It refuses the case where a
+   migration applied after that release is missing from it, with `AXC0174`, and
+   the case where a pinned package version is not installed, with `AXC0146`. The
+   step is called `rollback`. See [rollback](authoring.md#rollback).
+6. Write the audit record of a `publish` *(planned for M10:)* or a `rollback`, with
+   the request's final status, then set the request `succeeded` or `failed` and
+   store its diagnostics and its release id. These happen in one transaction.
+   The diagnostics are all of them, warnings included, as in the
+   [authoring API](authoring.md#diagnostics). A request that fails with an
+   exception rather than diagnostics, such as a lost connection, stores only the
+   diagnostics gathered so far, which can be none.
 
-**Preview requests.** A request with target `preview` is stored in the main
-tenant's database, see [preview](authoring.md#preview). The publisher runs its
-steps against the main tenant's preview tenant, with that tenant's database and
-schema role. It compiles, activates and seeds there, and adds the history row to
-the preview tenant's release history. It writes no audit record. It sets the
-request `succeeded` or `failed` in the main tenant's database. It fails the
-request with `AXC0216` when the main tenant no longer has a preview tenant. Under
-`directory` it runs the request only while the preview tenant is `active` and at
-this build's schema version. Otherwise the request stays `queued`.
+**Preview requests.** *(Planned for M10.)* A request with target `preview` is
+stored in the main tenant's database, see [preview](authoring.md#preview). The
+publisher runs its steps against the main tenant's preview tenant, with that
+tenant's database and schema role. It compiles, activates and seeds there, and
+adds the history row to the preview tenant's release history. It writes no audit
+record. It sets the request `succeeded` or `failed` in the main tenant's
+database. It fails the request with `AXC0216` when the main tenant no longer has
+a preview tenant. Under `directory` it runs the request only while the preview
+tenant is `active` and at this build's schema version. Otherwise the request
+stays `queued`.
 
 Activating the same content hash twice changes nothing, so a request that runs
-again does no harm. An activation of the release that is already active adds no
-history row.
+again does no harm. *(Planned for M10:)* An activation of the release that is
+already active adds no history row.
 
 **Failures.** A request fails on its own and does not stop the others. The
 previously active release stays active after a failed `compile` or `activate`.
@@ -656,9 +682,9 @@ stays active and the request ends `failed` with its `releaseId`, as with
 
 **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the
 request it is running, then exits. A stop that comes mid-request leaves a lease
-that runs out, and another publisher claims the request again. The platform's
-shutdown grace period must be longer than the longest request, or the request
-is claimed twice.
+that runs out. *(Planned for M10:)* Another publisher then claims the request
+again. The platform's shutdown grace period must be longer than the longest
+request, or the request is claimed twice.
 
 **Exit codes.** `0` after a stop on `SIGTERM` or Ctrl+C. `1` when it cannot read
 its tenants at start or stops on an error that it cannot recover from. `2` for a
