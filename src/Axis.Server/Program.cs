@@ -128,6 +128,7 @@ builder.Services.AddOptions<KeyManagementOptions>().Configure<PlatformKeyRing>((
 builder.Services.AddHostedService<PlatformKeyRingStart>();
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
+builder.Services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>();
 builder.Services.AddSingleton<TenantDatabaseGauge>();
 
 // Under directory, the server serves its tenants from the last good read while the platform database is down.

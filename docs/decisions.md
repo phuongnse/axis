@@ -1828,7 +1828,7 @@ The owner confirmed these points on issue #569 on 2026-10-18.
   - Every write answers with the folder's diagnostics. `GET .../diagnostics`
     compiles the folder in memory against the installed packages, with the
     same codes as activation. It touches no database.
-  - *(planned for M10)* A write takes a lock in the platform database, so the
+  - A write takes a lock in the platform database, so the
     version check holds across server replicas. See
     [D49](#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **Studio in the SPA:**
@@ -2742,7 +2742,8 @@ to try a change with its own data and bindings. The costs:
 
 M10 runs the server as several replicas behind a reverse proxy that ends TLS.
 That is what a shared Studio server needs. The forwarded headers, the shared
-key ring and the platform tables under both tenant sources are built so far. See the [installation guide](reference/installation.md#several-server-replicas),
+key ring, the platform tables under both tenant sources and the Studio write
+lock are built so far. See the [installation guide](reference/installation.md#several-server-replicas),
 the [forwarded headers settings](reference/configuration.md#forwarded-headers),
 the [platform database](reference/storage.md#platform-database) and the
 [authoring API](reference/authoring.md#versions).
@@ -2791,7 +2792,9 @@ The owner confirmed these points on issue #706 on 2026-10-19.
   - The lock is keyed by the folder alone. A create checks that its `id` is
     unused anywhere in the folder. A lock per file would let two creates with
     the same `id` both succeed.
-  - A write that cannot take the lock answers `503` and writes nothing.
+  - A write that cannot take the lock answers `503` and writes nothing. It
+    waits up to 10 seconds first. The snapshot of `validate` and `publish`
+    takes the same lock.
 - **Installs:**
   - The Helm chart drops the one-replica limit of the server.
     `studio.persistence` mounts a shared folder volume when Studio is on. In
