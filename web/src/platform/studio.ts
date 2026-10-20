@@ -107,6 +107,18 @@ export interface StudioApplication {
   name: string
 }
 
+/** An application template in the list of `GET /api/studio/templates`. `title` and `description` hold `en` and `vi`. */
+export interface StudioTemplate {
+  id: string
+  version: string
+  title: Record<string, string>
+  description: Record<string, string>
+}
+
+/** The answer of a create: the new application's name and diagnostics, or why it was refused. */
+export type CreateApplicationResult =
+  { status: 'created'; name: string; diagnostics: StudioDiagnostic[] } | { status: 'conflict' } | { status: 'invalid' }
+
 /**
  * A resource in the list of `GET /api/studio/apps/{application}/resources`. `name` is `null` when the file has none.
  * `usedBy` counts the references that point at the resource, so one resource that refers twice counts twice.
@@ -249,6 +261,38 @@ export async function fetchStudioApps(signal?: AbortSignal): Promise<StudioAppli
     throw new Error(`Loading the Studio applications failed with status ${response.status}.`)
   }
   return ((await response.json()) as { items: StudioApplication[] }).items
+}
+
+/** Loads the newest installed version of each application template. A 401 starts sign-in and throws, as any other failure does. */
+export async function fetchStudioTemplates(signal?: AbortSignal): Promise<StudioTemplate[]> {
+  const response = await studioFetch('/api/studio/templates', { signal })
+  if (!response.ok) {
+    throw new Error(`Loading the Studio templates failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: StudioTemplate[] }).items
+}
+
+/**
+ * Creates an application, blank without a `template`, and returns its name and diagnostics. A `409` is a name that is
+ * taken and a `400` a refused name. Any other failure throws.
+ */
+export async function createStudioApp(name: string, template?: string): Promise<CreateApplicationResult> {
+  const response = await studioFetch('/api/studio/apps', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(template === undefined ? { name } : { name, template }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (response.status === 400) {
+    return { status: 'invalid' }
+  }
+  if (!response.ok) {
+    throw new Error(`Posting '/api/studio/apps' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as { name: string; diagnostics: StudioDiagnostic[] }
+  return { status: 'created', name: body.name, diagnostics: body.diagnostics }
 }
 
 /** Loads the resources of an application's folder, sorted by file. A 401 starts sign-in and throws, as any other failure does. */

@@ -1095,6 +1095,38 @@ describe('StudioPage publishing', () => {
     await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
   })
 
+  describe('New application', () => {
+    function stubCreateAccess(studioCreate: boolean, apps: { name: string }[] = [{ name: 'PurchaseRequests' }]) {
+      const fetchMock = stubServer(apps)
+      const base = fetchMock.getMockImplementation()!
+      fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+        input === '/api/me' ? json({ id: 'hoa', studio: true, studioCreate }) : base(input, init),
+      )
+      return fetchMock
+    }
+
+    it.each([
+      ['studioCreate is true', true, true],
+      ['studioCreate is false', false, false],
+    ])('shows New application only when it may create: %s', async (_name, studioCreate, shown) => {
+      stubCreateAccess(studioCreate)
+      renderPage()
+
+      expect(await screen.findByTestId(`studio-resource-${entityId}`)).toBeInTheDocument()
+      await waitFor(() =>
+        expect(screen.queryAllByRole('button', { name: 'New application' })).toHaveLength(shown ? 1 : 0),
+      )
+    })
+
+    it('shows New application when Studio lists no application', async () => {
+      stubCreateAccess(true, [])
+      renderPage()
+
+      expect(await screen.findByTestId('studio-no-applications')).toBeInTheDocument()
+      expect(await screen.findByRole('button', { name: 'New application' })).toBeInTheDocument()
+    })
+  })
+
   describe('New resource', () => {
     const siteId = '11111111-2222-4333-8444-555555555555'
     const enId = '66666666-7777-4888-8999-aaaaaaaaaaaa'
