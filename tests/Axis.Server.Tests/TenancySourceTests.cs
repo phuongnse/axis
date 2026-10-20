@@ -18,21 +18,25 @@ public sealed class TenancySourceTests
         Assert.Contains("Tenancy:Source", exception.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task The_directory_source_without_a_platform_schema_connection_string_stops_the_start_naming_it()
+    [Theory]
+    [InlineData("directory")]
+    [InlineData("configuration")]
+    public async Task Without_a_platform_schema_connection_string_the_start_stops_naming_it(string source)
     {
-        await using var factory = CreateFactory(("Tenancy:Source", "directory"), ("ConnectionStrings:PlatformSchema", ""));
+        await using var factory = CreateFactory(("Tenancy:Source", source), ("ConnectionStrings:PlatformSchema", ""));
 
         var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
 
         Assert.Contains("PlatformSchema", exception.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task The_directory_source_with_one_user_for_both_platform_connection_strings_stops_the_start()
+    [Theory]
+    [InlineData("directory")]
+    [InlineData("configuration")]
+    public async Task With_one_user_for_both_platform_connection_strings_the_start_stops(string source)
     {
         await using var factory = CreateFactory(
-            ("Tenancy:Source", "directory"),
+            ("Tenancy:Source", source),
             ("ConnectionStrings:PlatformSchema", UnreachableDatabase));
 
         var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());

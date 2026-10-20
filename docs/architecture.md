@@ -193,6 +193,8 @@ Docker Compose, `scripts/dev.sh` and the E2E server pass `axis_schema` in
 [D31](decisions.md#d31-separate-database-roles--agreed).
 Under `Tenancy:Source=directory` there is no `SchemaConnectionString`: the
 server and the worker hold only runtime database roles for tenant databases.
+In those environments the server's `ConnectionStrings:PlatformSchema` also
+uses `axis_schema`, for the platform migrations.
 The server builds none from the directory.
 `appsettings.Development.json` maps `localhost` to tenant `default` on the
 compose database, and `preview.localhost` to its preview tenant `default-preview`
@@ -256,8 +258,9 @@ and [D25](decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed).
 
 It follows
 [D42](decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
-Under `Tenancy:Source=directory` the server creates the `platform`
-tables at start, then reads the tenants, their hosts, database settings, OIDC
+The server creates the `platform`
+tables at start under both tenant sources. Under `Tenancy:Source=directory` it
+then reads the tenants, their hosts, database settings, OIDC
 settings and bindings from the `platform` schema over
 `ConnectionStrings:Platform`. It uses the `active` tenants for host matching,
 tenant connections, deployment bindings and sign-in. A password, the client secret

@@ -1111,10 +1111,10 @@ See
 [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed)
 and [tenant directory](../architecture.md#tenant-directory). The server
 reads `Tenancy:Source`, `ConnectionStrings:Platform`,
-`ConnectionStrings:PlatformSchema` and `Platform:SecretKey`. Under
-`directory` the server applies the platform migrations at start, limits the
-role of `ConnectionStrings:Platform` to reading the `platform` schema, then
-reads the directory over that role, then again every `Tenancy:RefreshInterval`,
+`ConnectionStrings:PlatformSchema` and `Platform:SecretKey`. Under both
+sources the server applies the platform migrations at start and limits the
+role of `ConnectionStrings:Platform` to reading the `platform` schema. Under
+`directory` it then reads the directory over that role, then again every `Tenancy:RefreshInterval`,
 without a restart. It ignores a `Tenants` section and logs a warning at start. If
 the first read fails, the start stops with an error that names
 `ConnectionStrings:Platform`. If a later read fails, it keeps serving the last
@@ -1131,9 +1131,9 @@ read when a refresh fails, and `/health/ready` is Degraded until a refresh works
 | --- | --- | --- |
 | `Tenancy:Source` | `configuration` | `configuration` reads the `Tenants` section. `directory` reads the tenants from the platform database and ignores a `Tenants` section, with a warning at start. |
 | `Tenancy:RefreshInterval` | `00:00:30` | How often the server and the worker read the tenant directory again. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, naming the setting. |
-| `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed under `directory`. A missing or invalid key stops the start. *(planned for M10)* The server needs it under `configuration` too, for the data protection keys. |
+| `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, and by the worker and `Axis.Admin` under `directory`. A missing or invalid key stops the start. *(planned for M10)* The server will also use it under `configuration`, to encrypt the data protection keys. |
 | `ConnectionStrings:Platform` | none | A role that may only read the `platform` schema. Both hosts need it under `directory`. |
-| `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations. *(planned for M10)* The server reads it under `configuration` too. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. |
+| `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations, under both sources. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. |
 
 As environment variables they are `Tenancy__Source`,
 `Tenancy__RefreshInterval`, `Platform__SecretKey`,
@@ -1155,19 +1155,18 @@ As environment variables they are `Tenancy__Source`,
   naming the setting.
 - **Platform schema.** The server applies the platform migrations at
   start over `ConnectionStrings:PlatformSchema`. So "no schema connection"
-  under `directory` means no tenant schema connection. Under `directory` the
-  server refuses a missing or blank `ConnectionStrings:PlatformSchema`, and a
-  `ConnectionStrings:Platform` that names no user or the same user as
-  `ConnectionStrings:PlatformSchema`. Today, under `configuration` it reads
-  neither `ConnectionStrings:PlatformSchema` nor any platform table. The
+  under `directory` means no tenant schema connection. Under both sources the
+  server refuses a missing or blank `ConnectionStrings:PlatformSchema`, a
+  missing or invalid `Platform:SecretKey`, and a `ConnectionStrings:Platform`
+  that names no user or the same user as `ConnectionStrings:PlatformSchema`.
+  Under `configuration` the platform migrations run as the first hosted
+  service, before startup activation, and nothing reads a platform table yet.
+  A platform database that cannot be reached at start stops the server. The
   development settings, Docker Compose, `scripts/dev.sh` and the E2E server
-  already give the server `ConnectionStrings:PlatformSchema` on the
-  `axis_schema` role and a committed development `Platform:SecretKey`. The
-  server does not read them under `configuration` yet. The worker gets neither.
-  *(planned for M10)* That changes. Under `configuration` the server also
-  applies the platform migrations, so it needs `ConnectionStrings:PlatformSchema`
-  and `Platform:SecretKey` there too. It needs them to create the platform
-  tables and to encrypt the data protection keys. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+  give the server `ConnectionStrings:PlatformSchema` on the `axis_schema` role
+  and a committed development `Platform:SecretKey`. The worker gets neither.
+  The data protection keys that will use the platform tables and the key are
+  *(planned for M10)*. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **`ActivateOnStartup`.** It must be empty under `directory`, see
   [startup activation](#startup-activation).
 

@@ -328,7 +328,8 @@ against a live cluster.
 *(planned for M10)* The server can run as several replicas behind a reverse
 proxy that ends TLS. See
 [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
-The forwarded headers are built. The rest is planned.
+The forwarded headers and the platform settings under both tenant sources are
+built. The rest is planned.
 
 - **A shared key ring.** The server keeps its data protection keys in the
   platform database, encrypted with `Platform:SecretKey`. See
@@ -358,7 +359,7 @@ The forwarded headers are built. The rest is planned.
 - **Platform settings under both tenant sources.** The server needs
   `ConnectionStrings:PlatformSchema` and `Platform:SecretKey` also under
   `Tenancy:Source=configuration`, because it creates the platform tables there
-  too. See [tenancy settings](configuration.md#tenancy-settings).
+  too. A missing one stops the start. See [tenancy settings](configuration.md#tenancy-settings).
 
 ## Upgrade
 

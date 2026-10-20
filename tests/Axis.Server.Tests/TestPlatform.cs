@@ -5,8 +5,8 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// Gives test hosts the platform settings every environment supplies: the platform connection string, the
-/// platform schema connection string and the secret key. The server does not use the schema connection string
-/// or the key yet under <c>Tenancy:Source=configuration</c>.
+/// platform schema connection string and the secret key. It also removes the platform migration step, so a host
+/// starts without a database.
 /// </summary>
 internal static class TestPlatform
 {
@@ -32,6 +32,6 @@ internal static class TestPlatform
 
         builder.UseSetting("ConnectionStrings:PlatformSchema", UnreachableSchemaDatabase);
         builder.UseSetting(TenantSecretCipher.KeySetting, SecretKey);
-        return builder;
+        return builder.WithoutPlatformMigration();
     }
 }

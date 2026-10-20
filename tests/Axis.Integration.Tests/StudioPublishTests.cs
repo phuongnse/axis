@@ -217,7 +217,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(tenants[0].ConnectionString));
+            builder.UseTestPlatform(tenants[0].ConnectionString);
             foreach (var (tenant, host, connectionString) in tenants)
             {
                 builder.UseSetting($"Tenants:{tenant}:Hosts:0", host);

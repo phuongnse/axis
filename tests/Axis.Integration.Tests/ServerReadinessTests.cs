@@ -167,7 +167,7 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
         {
             // Port 1 on loopback refuses connections at once.
             ["ConnectionStrings:Platform"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2",
-        });
+        }, unreachablePlatform: true);
         using var client = factory.CreateClient();
 
         var (status, body) = await ReadyAsync(client);
@@ -238,11 +238,17 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
         string? folder,
         LogCollector logs,
         Action<IServiceCollection>? configureServices = null,
-        IReadOnlyDictionary<string, string>? settings = null) =>
+        IReadOnlyDictionary<string, string>? settings = null,
+        bool unreachablePlatform = false) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseTestPlatform(a);
+            if (unreachablePlatform)
+            {
+                builder.WithoutPlatformMigration();
+            }
+
             builder.UseSetting("Tenants:a:Hosts:0", HostA);
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(a));
             builder.UseSetting("Tenants:a:SchemaConnectionString", a);
