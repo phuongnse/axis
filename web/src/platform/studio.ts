@@ -138,6 +138,12 @@ export interface StudioDiagnostic {
   resourceId: string | null
 }
 
+/** The names an application defines, as completion needs them. A module rule's name is `<module>:<name>`. */
+export interface StudioNames {
+  entities: { name: string; module: string | null; fields: { name: string; type: string }[] }[]
+  rules: { name: string; module: string | null; parameters: { name: string; type: string }[]; resultType: string }[]
+}
+
 /** The other end of a reference. Each type writes only its own fields. */
 export type StudioReferenceNode =
   | { type: 'resource'; id: string; kind: string; name: string | null; file: string }
@@ -217,6 +223,16 @@ export async function fetchStudioDiagnostics(application: string, signal?: Abort
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
   return ((await response.json()) as { diagnostics: StudioDiagnostic[] }).diagnostics
+}
+
+/** Loads the names an application defines. A 401 starts sign-in and throws, as any other failure does. */
+export async function fetchStudioNames(application: string, signal?: AbortSignal): Promise<StudioNames> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/names`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioNames
 }
 
 /** Loads one resource with its content. A 401 starts sign-in and throws, as any other failure does. */

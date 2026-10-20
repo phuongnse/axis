@@ -137,6 +137,11 @@ interface PatchAnswer {
   body: unknown
 }
 
+const applicationNames = {
+  entities: [{ id: entityId, name: 'PurchaseRequest', module: null, fields: [{ name: 'title', type: 'text' }] }],
+  rules: [],
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
@@ -195,6 +200,9 @@ function stubServer(
     }
     if (input === `${folder}/diagnostics`) {
       return json({ diagnostics })
+    }
+    if (input === `${folder}/names`) {
+      return json(applicationNames)
     }
     if (input === `${folder}/expressions/check` && expressions.check) {
       checkCalls++
@@ -489,6 +497,29 @@ describe('StudioPage', () => {
     expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests')
     expect(fetchMock).toHaveBeenCalledWith('/api/studio/apps/PurchaseRequests/resources', expect.anything())
+  })
+
+  it('loads the names of the picked application', async () => {
+    const fetchMock = stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/studio/apps/PurchaseRequests/names', expect.anything())
+  })
+
+  it('keeps the folder usable when the names cannot be loaded', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fetchMock = stubServer()
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+      input === `${folder}/names` ? json({ title: 'No.' }, 500) : base(input, init),
+    )
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-group-entity')).toBeInTheDocument()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   it('waits for the person to pick when there are several applications', async () => {

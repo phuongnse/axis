@@ -288,7 +288,8 @@ agrees.
 ## Names
 
 `GET .../names` answers every name the application
-defines, so Studio's [reference pickers](frontend.md#studio) load them once.
+defines, so Studio loads them once for its [expression completion](frontend.md#studio)
+and its [reference pickers](frontend.md#studio).
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
 agrees it. The answer is:
 

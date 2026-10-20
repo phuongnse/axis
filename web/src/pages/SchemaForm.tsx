@@ -3,6 +3,7 @@ import { lazy, Suspense, useContext } from 'react'
 import { resolveSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
+import { expressionScope } from './expressionScope'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -122,6 +123,7 @@ function SchemaNode({
           name={name}
           value={text}
           required={required}
+          options={expressionScope(check.kind, check.draft, pointer, check.names)}
           onChange={onChange}
         />
       </Suspense>
