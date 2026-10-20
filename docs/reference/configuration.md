@@ -986,7 +986,8 @@ and a JSON view, and shows the diagnostics.
   `*.json` files inside the listed folders. A write takes an advisory lock in
   the platform database, over `ConnectionStrings:Platform`, keyed by the
   folder. It holds across server replicas, so every replica must mount the
-  folder at the same path. A write waits up to 10 seconds for the lock. A write
+  folder at the same path. The [installation guide](installation.md) shows the
+  Compose and Helm mounts. A write waits up to 10 seconds for the lock. A write
   that cannot take it answers `503` and writes nothing. A read and the
   diagnostics touch no database. See [authoring API](authoring.md#versions) and
   [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).

@@ -8,6 +8,8 @@
 # AXIS_SECRETS_DIR      The folder with the secret files. Default ./secrets.
 # AXIS_EXTENSIONS_DIR   The extension packages, mounted at /extensions. Default ./extensions.
 # AXIS_MODULES_DIR      The modules, mounted at /modules. Default ./modules.
+# AXIS_STUDIO_DIR       The Studio folders, mounted read-write at /studio on both servers. Default ./studio. It must
+#                       be writable by UID 1654.
 # AXIS_APPS_DIR         The application folders for `activate`, mounted at /apps. Default ./apps.
 # AXIS_SERVER_PORT      The host port of the server, on 127.0.0.1 only. Default 8080. Without TLS, put a
 #                       reverse proxy on the same machine in front of it.
@@ -25,6 +27,8 @@
 # Profiles. `proxy` starts the TLS proxy. `replicas` starts the second server, server-2. `admin` is for
 # `docker compose run --rm admin`.
 # AXIS_OIDC_CLIENT_SECRET  Passes through from the shell to `tenant create`. It is never stored here.
+# Studio__Folders__0, Studio__AuthorRole, Studio__PublisherRole  Pass through from the shell to both servers.
+#                       Studio stays off without them.
 x-host: &host
   read_only: true
   tmpfs:
@@ -43,6 +47,10 @@ x-server: &server
   environment:
     <<: *host-environment
     ForwardedHeaders__KnownProxies__0: ${AXIS_PROXY_ADDRESS:-172.31.250.10}
+    # No value: these pass through from the shell. Studio stays off without them.
+    Studio__Folders__0:
+    Studio__AuthorRole:
+    Studio__PublisherRole:
   networks:
     default:
       aliases:
@@ -50,6 +58,8 @@ x-server: &server
   volumes:
     - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
     - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
+    # Read-write, and the same folder on every replica, because the write lock is keyed by the folder path.
+    - ${AXIS_STUDIO_DIR:-./studio}:/studio
   secrets:
     - ConnectionStrings__Platform
     - ConnectionStrings__PlatformSchema

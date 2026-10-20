@@ -2746,7 +2746,8 @@ M10 runs the server as several replicas behind a reverse proxy that ends TLS.
 That is what a shared Studio server needs. The forwarded headers, the shared
 key ring, the platform tables under both tenant sources, the Studio write
 lock, the Helm chart's `studio.persistence` and the Compose example with two
-replicas behind a TLS proxy, with its smoke test, are built. See the [installation guide](reference/installation.md#several-server-replicas),
+replicas behind a TLS proxy and a shared Studio folder, with its smoke test,
+are built. See the [installation guide](reference/installation.md#several-server-replicas),
 the [forwarded headers settings](reference/configuration.md#forwarded-headers),
 the [platform database](reference/storage.md#platform-database) and the
 [authoring API](reference/authoring.md#versions).
@@ -2806,6 +2807,9 @@ The owner confirmed these points on issue #706 on 2026-10-19.
     proxy.
   - The on-premises smoke test does so. It checks that a session survives
     restarting one replica.
+  - The Compose install mounts one shared Studio folder, `AXIS_STUDIO_DIR`, on
+    both replicas. The smoke test saves through one replica and reads through
+    the other.
 - **Effect on earlier decisions:**
   - D23 keeps its session rules. The key ring and the forwarded headers change
     where the cookie key lives and which scheme and host the server sees.
