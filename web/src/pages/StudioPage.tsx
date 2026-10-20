@@ -324,7 +324,6 @@ function StudioWorkspace() {
                       application={application!}
                       item={selected}
                       resources={loaded.resources}
-                      names={names}
                       path={path}
                       onSaved={(diagnostics) => {
                         setFolder({ ...loaded, diagnostics })

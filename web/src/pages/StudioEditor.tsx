@@ -8,7 +8,6 @@ import {
   patchStudioResource,
   ServerUnreachableError,
   type StudioDiagnostic,
-  type StudioNames,
   type StudioResource,
   type StudioResourceItem,
 } from '../platform/studio'
@@ -90,7 +89,6 @@ export function StudioEditor({
   application,
   item,
   resources,
-  names,
   path,
   onSaved,
   onDeleted,
@@ -98,13 +96,12 @@ export function StudioEditor({
   application: string
   item: StudioResourceItem
   resources: StudioResourceItem[]
-  names: StudioNames | null
   path: string | null
   onSaved: (diagnostics: StudioDiagnostic[]) => void
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
-  const names = useContext(StudioNamesContext)
+  const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
   const dirtyRef = useRef(false)
