@@ -1,0 +1,131 @@
+{
+  "connector": {
+    "content": {
+      "baseUrl": { "binding": "" },
+      "operations": [{ "name": "Operation", "method": "GET", "path": "/" }]
+    },
+    "emptyReferences": ["/baseUrl/binding"]
+  },
+  "dataSource": {
+    "content": {
+      "entity": "",
+      "fields": [{ "name": "id", "path": "id" }]
+    },
+    "emptyReferences": ["/entity"]
+  },
+  "endpoint": {
+    "content": {
+      "entity": "",
+      "process": "",
+      "input": [],
+      "values": {}
+    },
+    "emptyReferences": ["/entity", "/process"]
+  },
+  "entity": {
+    "content": {
+      "fields": [{ "name": "name", "type": "text" }]
+    },
+    "emptyReferences": []
+  },
+  "event": {
+    "content": {
+      "entity": "",
+      "fields": []
+    },
+    "emptyReferences": ["/entity"]
+  },
+  "form": {
+    "content": {
+      "entity": "",
+      "sections": [{ "title": { "textKey": "" }, "fields": [{ "field": "" }] }]
+    },
+    "emptyReferences": ["/entity", "/sections/0/title/textKey", "/sections/0/fields/0/field"]
+  },
+  "migration": {
+    "content": {
+      "entity": "",
+      "changes": [{ "type": "renameField", "from": "", "to": "" }]
+    },
+    "emptyReferences": ["/entity", "/changes/0/from", "/changes/0/to"]
+  },
+  "page": {
+    "content": {
+      "title": { "textKey": "" },
+      "widgets": [{ "type": "taskInbox" }]
+    },
+    "emptyReferences": ["/title/textKey"]
+  },
+  "policy": {
+    "content": {
+      "roles": [""],
+      "grants": [{ "entity": "", "actions": ["read"] }]
+    },
+    "emptyReferences": ["/roles/0", "/grants/0/entity"]
+  },
+  "process": {
+    "content": {
+      "entity": "",
+      "start": "End",
+      "steps": [{ "name": "End", "type": "end" }]
+    },
+    "emptyReferences": ["/entity"]
+  },
+  "role": {
+    "content": {
+      "label": { "textKey": "" }
+    },
+    "emptyReferences": ["/label/textKey"]
+  },
+  "rule": {
+    "content": {
+      "parameters": [],
+      "resultType": "decimal",
+      "expression": "0"
+    },
+    "emptyReferences": []
+  },
+  "scenario": {
+    "content": {
+      "now": "2026-01-01T00:00:00Z",
+      "users": { "author": [] },
+      "steps": [{ "type": "advanceTime", "by": "PT1H" }]
+    },
+    "emptyReferences": []
+  },
+  "seed": {
+    "content": {
+      "entity": "",
+      "records": []
+    },
+    "emptyReferences": ["/entity"]
+  },
+  "sequence": {
+    "content": {
+      "format": "{n}"
+    },
+    "emptyReferences": []
+  },
+  "site": {
+    "content": {
+      "title": { "textKey": "" },
+      "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+      "navigation": [{ "page": "", "label": { "textKey": "" } }]
+    },
+    "emptyReferences": ["/title/textKey", "/navigation/0/page", "/navigation/0/label/textKey"]
+  },
+  "text": {
+    "content": {
+      "texts": {}
+    },
+    "emptyReferences": []
+  },
+  "trigger": {
+    "content": {
+      "type": "event",
+      "event": "",
+      "process": ""
+    },
+    "emptyReferences": ["/event", "/process"]
+  }
+}
