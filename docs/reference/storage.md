@@ -259,6 +259,19 @@ through role membership.
   `SchemaConnectionString` is for the schema database role. See
   [tenant configuration](../architecture.md#tenant-configuration). There is no
   fallback to one connection string.
+- **A scenario role.** *(planned for M11)* A third kind of database role runs
+  [test scenarios](configuration.md#test-scenarios) for Studio, as
+  [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed)
+  agrees. The scenario role has `CREATEDB`, is not a superuser and owns no
+  tenant database. Its development name is `axis_scenario`, with the password
+  `axis`, created by `samples/postgres/init-roles.sql`. Only the publisher holds
+  it, through the setting `Scenarios:ServerConnectionString`. It creates one
+  database `axis_scenario_<uuid>` for each scenario, owns it and drops it after
+  the scenario. The server holds no right to create databases, and neither does
+  the worker. They hold no role that may. On a shared PostgreSQL server every
+  role may connect to a database by default, so the scenario role can connect to
+  a tenant database, though it can read nothing there. See
+  [installation](installation.md#on-premises) for how to limit that.
 
 What each database role may do:
 
@@ -339,6 +352,8 @@ Which connection string each step uses. The server does this today:
 | Release history route of the server: read the release history                                                                      | `ConnectionString`       |
 | Publisher: claim and finish a request, compile, store, activate, write the history and the audit record                            | `SchemaConnectionString` |
 | Publisher: seed records                                                                                                            | `ConnectionString`       |
+| Publisher, `test` request *(planned for M11)*: create, migrate, run and drop the scenario databases                                 | `Scenarios:ServerConnectionString` |
+| Publisher, `test` request *(planned for M11)*: store the status and the outcomes                                                   | `SchemaConnectionString` |
 | Start release check (`AXC0146`) and the runtime database role check, in the server and the worker                                  | `ConnectionString`       |
 | Server requests: record API, data sources, process starts, endpoints, tasks, sites                                                 | `ConnectionString`       |
 | Worker                                                                                                                             | `ConnectionString` only  |
@@ -374,6 +389,8 @@ host with one database role:
 | Seeding and schedule trigger state                                                                                      | `Axis.Admin`                    | The tenant's runtime role          |
 | Claim, run and finish a publish request: compile, store, activate, release history and audit record | `axis-admin publisher`          | The tenant's schema role           |
 | Seeding of a publish request                                                                        | `axis-admin publisher`          | The tenant's runtime role          |
+| Create, migrate, run and drop the scenario databases of a `test` request *(planned for M11)*        | `axis-admin publisher`          | `Scenarios:ServerConnectionString` |
+| Store the status and the outcomes of a `test` request *(planned for M11)*                           | `axis-admin publisher`          | The tenant's schema role           |
 | Insert and read publish requests                                                                                        | Server                          | The tenant's runtime role          |
 | Read the release history                                                                                                | Server                          | The tenant's runtime role          |
 | Runtime role check                                                                                                      | `Axis.Admin`, server and worker | The tenant's runtime role          |
@@ -1179,7 +1196,7 @@ the target `preview`. See
 ### Publish requests
 
 `axis.publish_requests` holds one row per request. The server inserts a row
-over the runtime role, for `validate`, `publish` and `rollback`. Only the publisher changes a row,
+over the runtime role, for `validate`, `publish`, `rollback` and, from M11, `test`. Only the publisher changes a row,
 over the schema role.
 An index on `(application_id, status, requested_at, id)` serves the claim.
 
@@ -1187,10 +1204,10 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 | ------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`                | `uuid`              | Primary key, a version 7 UUID                                                                                                          |
 | `application_id`    | `uuid`              | The application `id`                                                                                                                   |
-| `kind`              | `text`              | `validate`, `publish` or `rollback`                                                                                                    |
+| `kind`              | `text`              | `validate`, `publish`, `rollback` or `test` *(planned for M11)*                                                                    |
 | `target`            | `text`              | `tenant` or `preview`. It defaults to `tenant`. See the preview note below |
 | `status`            | `text`              | `queued`, `running`, `succeeded` or `failed`                                                                                           |
-| `snapshot`          | `jsonb`, null       | For `validate` and `publish`, an array of `{ file, version, content }`, one for every `*.json` file of the folder. Null for `rollback` |
+| `snapshot`          | `jsonb`, null       | For `validate`, `publish` and `test`, an array of `{ file, version, content }`, one for every `*.json` file of the folder. Null for `rollback` |
 | `release_id`        | `uuid`, null        | For `rollback`, the release to activate. For `publish`, set when the release is stored                                                 |
 | `label`             | `text`, null        | The optional label, up to 100 characters                                                                                               |
 | `note`              | `text`, null        | The optional note, up to 2000 characters                                                                                               |
@@ -1203,6 +1220,7 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 | `started_at`        | `timestamptz`, null | When it was first claimed                                                                                                              |
 | `finished_at`       | `timestamptz`, null | When it reached `succeeded` or `failed`                                                                                                |
 | `diagnostics`       | `jsonb`, null       | The diagnostics, as an array                                                                                                           |
+| `scenario_results`  | `jsonb`, null       | *(planned for M11)* For `test`, an array of `{ name, resourceId, file, outcome, durationMs, step, path, message }`, one for each scenario that ran. Null for every other kind. See [the request](authoring.md#the-request) |
 
 - **A snapshot.** `content` is the file's text as a JSON string, not an embedded
   object, so the file reads back exactly as the author saw it. `version` is the
@@ -1214,6 +1232,12 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
   adds 1 to `claims`. It skips an application that has a `running` row.
   A `running` row whose `lease_until` has passed is claimed again the same way.
   A row with `claims` of 3 and an expired lease becomes `failed` with `AXC0215`.
+- **Test requests.** *(planned for M11)* A `test` row has its own queue for each
+  application: at most one runs at a time, oldest first, and it does not wait
+  behind a `publish`, `validate` or `rollback` row. When this is built, the
+  claim must stop skipping an application that has a `running` row of another
+  kind. The row has the target `tenant`, no `release_id` and no audit record.
+  See [test](authoring.md#test).
 - **Preview target.** A row with `target` `preview` is
   stored in the session tenant's database and run against that tenant's preview
   tenant, see [preview](authoring.md#preview). Its history row lives in the

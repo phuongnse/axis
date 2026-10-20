@@ -957,6 +957,26 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   - The buttons are off while a request runs and while the reconnect message
     shows. If the server does not answer during a request, Studio checks it again
     after the reconnect.
+- **Running tests.** *(planned for M11)* Studio runs the application's
+  [test scenarios](configuration.md#test-scenarios) through the
+  [test route](authoring.md#test), as
+  [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees.
+  - **Run tests** sits next to **Validate**. It sends `POST .../test` with no
+    body, so every scenario runs.
+  - A **Run** action in the editor of a selected `scenario` resource sends
+    `{ "scenarios": ["<name>"] }`, so only that scenario runs.
+  - Both show only when `GET /api/me` answers `studioTest: true`. When that
+    answer is `false` or fails, they do not show.
+  - The status line works as for Validate. It shows **queued**, **running** and
+    the outcome, and Studio checks `GET .../requests/{id}` every second until the
+    status is `succeeded` or `failed`.
+  - A **Test results** list shows each scenario of the request's `scenarios`
+    field, with **passed** or **failed**, its time and, for a failure, the failing
+    step and its message. Selecting a failure opens the scenario resource at the
+    item's `path`, as a diagnostic does.
+  - The request's diagnostics go in the diagnostics panel, as before.
+  - The buttons are off while a request runs and while the reconnect message
+    shows.
 - **Releases.** A list under the publishing buttons shows the open application's
   release history from `GET .../releases`.
   - Each row is one activation: its release number, label, note, who activated it

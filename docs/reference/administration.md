@@ -34,6 +34,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
 | `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads it. An unset value is `Production`. |
+| `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | *(planned for M11)* A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with a diagnostic that names this setting. See [database roles](storage.md#database-roles). |
 | `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate`, `publisher` and `tenant restore` read it. |
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. Only `tenant create` and `tenant restore` read it. It is never a command-line option, so it does not appear in a process list. |
@@ -601,6 +602,11 @@ file in the repository root and the E2E script each start one too.
 `publish` requests with target `preview`, see [preview requests](#publisher). A request of a
 kind that is not built is never claimed, so it stays `queued`.
 
+**Test requests.** *(planned for M11)* The command also runs `test` requests,
+which run an application's [test scenarios](configuration.md#test-scenarios) from
+Studio, as [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed)
+agrees. See [test](authoring.md#test) for the route.
+
 **Settings.** It reads these, with the meaning they have for the other commands:
 
 - `Tenancy:Source`, `configuration` or `directory`. An unset value is
@@ -621,6 +627,10 @@ kind that is not built is never claimed, so it stays `queued`.
   gives an empty catalog, and a set path whose folder does not exist is a
   settings error.
 - `Activation:InlineRecomputeLimit`, as for `activate`.
+- `Scenarios:ServerConnectionString` *(planned for M11)*, the role that creates
+  the scenario databases of `test` requests. It is optional. The publisher
+  starts without it, and a `test` request then fails with a diagnostic that
+  names the setting.
 
 A missing or invalid setting exits with code 2 before any request runs. It
 polls once a second. That interval is fixed and has no setting.
@@ -645,6 +655,12 @@ needs a restart of the publisher. The `directory` source writes neither line.
 `running`, `claimed_by` to its own name, `lease_until` and adds 1 to `claims`. A
 `running` request whose lease has run out is claimed the same way.
 
+- **Test requests.** *(planned for M11)* `test` requests form their own queue
+  for each tenant and application. At most one runs at a time, oldest first,
+  independent of the other kinds. A `test` does not wait behind a running
+  `publish`, `validate` or `rollback`, and none of them waits behind a `test`.
+  The claim that skips an application with a `running` request therefore counts
+  only the requests of the same queue.
 - **Target.** A request with target `tenant` is claimed as above. A request with
   target `preview` is claimed only when it is a `publish`, and only when the
   tenant has no preview tenant, or when the publisher serves that preview
@@ -713,7 +729,27 @@ role unless it says otherwise.
    with the requesting user and the request id, no label and no note, unless
    the release is already active. `seed` then sets the schedule triggers and
    the seed records of that release. See [rollback](authoring.md#rollback).
-6. Write the audit record of a `publish` or a `rollback`, with
+6. For `test` *(planned for M11)*: `version`, then, for each scenario of the
+   snapshot, one after another:
+   1. create the database `axis_scenario_<uuid>` over
+      `Scenarios:ServerConnectionString`;
+   2. migrate it, compile and activate the snapshot there, and apply its seed
+      data;
+   3. run the steps with the stubs, as `Axis.Scenarios` does;
+   4. drop the database, pass or fail.
+
+   Every step of a scenario runs as the scenario role. The publisher drops only
+   databases it created. The work item limit of D32 applies to each scenario,
+   see [test scenarios](configuration.md#test-scenarios). When the snapshot
+   cannot be read or compiled, no scenario runs and the request fails with the
+   diagnostics. The same happens for a name in the request that no scenario
+   has, and when the setting is empty. The step then stores the outcomes of the
+   scenarios and the request's status over the tenant's schema role. That is the
+   only use of the tenant database by a `test`. A request has a limit of 10
+   minutes. Past it, the scenario that runs fails, its database is dropped, and
+   the request ends `failed` with a diagnostic. A `test` gets no audit record
+   and no release id.
+7. Write the audit record of a `publish` or a `rollback`, with
    the request's final status, then set the request `succeeded` or `failed` and
    store its diagnostics and its release id. These happen in one transaction.
    A `validate` gets its final status and diagnostics the same way, with no
@@ -752,9 +788,19 @@ stays active and the request ends `failed` with its `releaseId`, as with
 `activate`.
 
 **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the
-request it is running, then exits. A stop that comes mid-request leaves a lease
+request it is running, then exits. A running `test` request is the exception
+*(planned for M11)*: a test may run for 10 minutes, which is longer than the
+stop grace period of both installs. The publisher stops it at once, drops its
+scenario database and sets the request `failed`. A stop that comes mid-request leaves a lease
 that runs out. Another publisher then claims the request again. The platform's shutdown grace period must be longer than the longest
 request, or the request is claimed twice.
+
+**Leftover databases.** *(planned for M11)* A publisher that crashes in the
+middle of a scenario leaves its `axis_scenario_<uuid>` database behind. The
+publisher does not clean it up, because with several publishers none can tell
+which leftover database is still in use. The operator drops the
+`axis_scenario_*` databases that the scenario role owns, once no publisher runs
+a `test`.
 
 **Exit codes.** `0` after a stop on `SIGTERM` or Ctrl+C. `1` when it cannot read
 its tenants at start or stops on an error that it cannot recover from. `2` for a

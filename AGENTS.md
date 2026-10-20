@@ -135,7 +135,7 @@ database with `axis_schema`, run servers and workers as `axis_runtime`, and run 
 `samples/postgres/init-roles.sql` on its first start, which creates the two roles and makes
 `axis_schema` own the tenant database. It also creates the preview tenant's database `axis_preview` and
 its two roles, `axis_preview_schema` and `axis_preview_runtime`, with the development password `axis`,
-which play the same parts for `default-preview`. The server uses `axis_schema` for `SchemaConnectionString` and
+which play the same parts for `default-preview`. _(planned for M11)_ `init-roles.sql` is also to create `axis_scenario`, a role with `CREATEDB` and the development password `axis`. Compose, `scripts/dev.sh` and `scripts/e2e.sh` are to give it to the publisher as `Scenarios__ServerConnectionString` and set `Studio__Tests=true` on the server, so Studio can run test scenarios, see [D55](docs/decisions.md#d55-running-test-scenarios-from-studio--agreed). The server uses `axis_schema` for `SchemaConnectionString` and
 `ConnectionStrings:PlatformSchema`, and `axis_runtime` for every other connection string. The worker uses only `axis_runtime` and gets no
 `SchemaConnectionString`. `axis` stays the bootstrap superuser, for setup and health checks only.
 PostgreSQL runs init scripts only on an empty volume, so an existing local Compose volume has no

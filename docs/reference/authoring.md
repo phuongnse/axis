@@ -37,6 +37,9 @@ folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. S
   may publish or roll back. `validate`, the request status and the release
   history need the author role only. A `preview` needs the author role only
   too, see [Preview](#preview).
+- `Studio:Tests` turns on `studioTest` on `GET /api/me`, which shows the test
+  controls in Studio. It is off by default. A `test` request needs the author
+  role only, see [Test](#test). *(planned for M11)*
 
 ## Routes
 
@@ -321,13 +324,15 @@ host publishes to that tenant only.
 | `POST /api/studio/apps/{application}/validate` | `202` with the request and a `Location` header for `.../requests/{id}`. It needs the author role |
 | `POST /api/studio/apps/{application}/publish` | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role |
 | `POST /api/studio/apps/{application}/preview` | `202` with the request and a `Location` header. It takes no body. It needs the author role only. `409` when the tenant has no preview tenant, see [Preview](#preview) |
-| `GET /api/studio/apps/{application}/requests/{id}` | `200` with the request, its status and its diagnostics |
+| `POST /api/studio/apps/{application}/test` | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`. None or an empty list means every scenario. It needs the author role only, see [Test](#test) *(planned for M11)* |
+| `GET /api/studio/apps/{application}/requests/{id}` | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes |
 | `GET /api/studio/apps/{application}/releases` | `200` with the activation history, newest first, and which release is active |
 | `POST /api/studio/apps/{application}/releases/{id}/rollback` | `202` with the request and a `Location` header. It takes no body. It needs the author role and the publisher role |
 
 `validate`, `preview` and `rollback` take no body, and a body that is sent is
 ignored. A `publish` without a body stores no label and no note. A body that is sent
-must be `application/json` (`415` otherwise).
+must be `application/json` (`415` otherwise). A `test` without a body runs every
+scenario, and a body that is sent must be `application/json` (`415` otherwise).
 `{id}` of a request is its UUID. `{id}` of a release is the release id from
 the history. The answers for `401`, `403`, `404` and the CSRF header are those
 of the rest of the API, see [Order of checks](#order-of-checks) and
@@ -335,13 +340,13 @@ of the rest of the API, see [Order of checks](#order-of-checks) and
 
 ### The request
 
-A request is shown as `{ id, application, kind, target, status, label, note, requestedBy, requestedAt, startedAt, finishedAt, releaseId, diagnostics }`.
+A request is shown as `{ id, application, kind, target, status, label, note, requestedBy, requestedAt, startedAt, finishedAt, releaseId, diagnostics, scenarios }`.
 
 | Field | Meaning |
 | --- | --- |
 | `id` | The request id, a UUID |
 | `application` | The application `name` |
-| `kind` | `validate`, `publish` or `rollback` |
+| `kind` | `validate`, `publish`, `rollback` or `test` *(planned for M11)* |
 | `target` | `tenant` or `preview`. `preview` marks a request that runs on the session tenant's preview tenant, see [Preview](#preview). Only the preview route writes `preview`. The request status route reports the stored value |
 | `status` | `queued`, `running`, `succeeded` or `failed` |
 | `label` | The optional label of a `publish`, up to 100 characters, or null |
@@ -350,8 +355,9 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | `requestedAt` | When the request was stored |
 | `startedAt` | When a publisher first started it, or null while `queued` |
 | `finishedAt` | When it reached `succeeded` or `failed`, or null before |
-| `releaseId` | The release a `publish` activated or a `rollback` named, or null. A `validate` has none |
+| `releaseId` | The release a `publish` activated or a `rollback` named, or null. A `validate` and a `test` have none |
 | `diagnostics` | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings |
+| `scenarios` | *(planned for M11)* Null for every kind but `test`. For `test`, an array with one item for each scenario that ran, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends |
 
 - **A snapshot.** `validate` and `publish` store the folder as it is when the
   request is made: every `*.json` file that Studio can reach, with its `version`, as for
@@ -374,9 +380,17 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   [`axis-admin activate`](administration.md#activate). A `seed` failure
   happens after activation has committed, so the request ends `failed` with
   `releaseId` set, and the release stays active and stays in the history.
+- **`test`.** *(planned for M11)* The snapshot is taken as for `validate`.
+  The publisher runs the scenarios as the [publisher](administration.md#publisher)
+  describes, and stores their outcomes in `scenarios`. The request ends
+  `failed` when any scenario fails. Scenario failures go only in `scenarios`.
+  Compile errors, the missing `Scenarios:ServerConnectionString` setting, an
+  unknown scenario name and the 10-minute limit go in `diagnostics`. See
+  [Test](#test).
 - **Order.** For one tenant and application the publisher runs requests one at
   a time, oldest first. When two publishes are queued, the newer one ends up
-  live.
+  live. A `test` request has its own queue and does not wait behind them, see
+  [Test](#test).
 
 ### Preview
 
@@ -406,6 +420,39 @@ request has the kind `publish` and the target `preview`.
 - **Bindings.** A preview has its own bindings, empty by default. A missing
   binding is a warning at activation, and the call fails at run time. See
   [preview tenants](configuration.md#preview-tenants).
+
+### Test
+
+*(planned for M11)* `POST .../test` runs the application's
+[test scenarios](configuration.md#test-scenarios) from Studio.
+[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees
+the route. The request has the kind `test` and the target `tenant`.
+
+- **Who may.** The author role is enough. It needs no publisher role, because
+  a test changes no tenant. It costs database time, so the limits below apply.
+- **The body.** The optional `scenarios` list names the scenarios to run, by
+  their `name`. With no body, no list or an empty list, every scenario runs.
+  An unknown name is accepted with `202`, and the request then ends `failed`
+  with a diagnostic, as for a folder with errors.
+- **Where it runs.** The publisher runs it with `Scenarios:ServerConnectionString`,
+  in a new database for each scenario, see
+  [publisher](administration.md#publisher). It touches the tenant database
+  only to store the request's status and outcomes. Without the setting, the
+  request ends `failed` with a diagnostic that names it.
+- **The outcome.** `scenarios` holds one item for each scenario that ran. A
+  scenario that fails has the failing `step`, its `path` and its `message`.
+  Selecting it in Studio opens the scenario at that step, as a diagnostic opens
+  a resource.
+- **Limits.** The scenarios of a request run one after another. A request stops
+  after 10 minutes: the scenario that runs fails, its database is dropped and
+  the request ends `failed` with a diagnostic. The work item limit of
+  [D32](../decisions.md#d32-test-scenarios--agreed) applies to each scenario.
+- **Order.** At most one `test` request per application runs at a time,
+  oldest first. The queue is separate from the one of `validate`, `publish` and
+  `rollback`, so a `test` does not wait behind a `publish`.
+- **Audit.** A `test` writes no audit record.
+- **A request that runs again.** A request that is claimed again after a lost
+  lease runs every scenario again.
 
 ### Lifecycle
 
@@ -461,6 +508,9 @@ newest first.
 - `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
   both the author role and the publisher role and `Studio:Folders` is not
   empty. It is built. Studio uses it to hide Publish and the rollback button.
+- `GET /api/me` gains a boolean `studioTest` *(planned for M11)*, true when
+  `studio` is true and `Studio:Tests` is true. Studio uses it to hide **Run
+  tests** and the **Run** action of a scenario.
 - `GET /api/me` also gains `studioPreviewHost`, the first host of the served tenant
   whose `PreviewOf` is the session's tenant. It is `null` when the user may not
   use Studio, or when the tenant has no served preview tenant. It is built. Studio

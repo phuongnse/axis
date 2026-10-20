@@ -75,6 +75,8 @@ file.
 | `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | Optional. The CIDR ranges of your reverse proxies. |
 | `Admin:ConnectionString` | `Admin__ConnectionString` | admin | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of the new tenant. Only `tenant create` reads it. |
+| `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | publisher | yes | *(planned for M11)* Optional. A database role with `CREATEDB`, not a superuser, that owns no tenant database. It lets the publisher run `test` requests. Empty by default, and a `test` request then fails with a diagnostic that names the setting. See [On premises](#on-premises). |
+| `Studio:Tests` | `Studio__Tests` | server | no | *(planned for M11)* Optional. `true` turns on `studioTest`, which shows the test controls in Studio. Off by default. Turn it on together with the publisher's `Scenarios:ServerConnectionString`. |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
 | `Modules:Path` | `Modules__Path` | server, worker, admin | no | Set to `/modules`. |
 | `Health:Urls` | `Health__Urls` | worker | no | The image keeps `http://127.0.0.1:5208`. The Helm chart sets it to all interfaces so the kubelet can probe it. |
@@ -132,6 +134,25 @@ CREATE DATABASE axis_platform OWNER axis_platform_schema;
 | `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema and nothing else. |
 | `axis_admin` | `Admin:ConnectionString`. It has `CREATEDB` and `CREATEROLE` and is not a superuser. |
 
+**The scenario role *(planned for M11)*.** To let Studio run test scenarios,
+create one more role. It has `CREATEDB`, is not a superuser and owns no tenant
+database. Put its connection string in the secret file
+`Scenarios__ServerConnectionString`, mounted in the publisher only, and set
+`Studio__Tests=true` on the server. See
+[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed).
+
+```sql
+CREATE ROLE axis_scenario LOGIN PASSWORD '<password>' CREATEDB;
+```
+
+Point it at a PostgreSQL server that holds no tenant data. If it shares the
+server with tenant databases, run
+`REVOKE CONNECT ON DATABASE <tenant database> FROM PUBLIC` for each one, because
+PostgreSQL lets every role connect by default. The scenario role can then
+connect to a tenant database but read nothing in it. The publisher drops each
+scenario database after use. After a crash, drop the `axis_scenario_*`
+databases that the role owns, see [publisher](administration.md#publisher).
+
 The names are examples. Create the tenant database roles through
 `tenant create`, not by hand. Also create the OIDC client for each tenant in
 your identity provider.
@@ -146,6 +167,7 @@ file is named after its setting, and its content is the value.
 | `ConnectionStrings__PlatformSchema` | server, admin, publisher |
 | `Platform__SecretKey` | server, worker, admin, publisher |
 | `Admin__ConnectionString` | admin |
+| `Scenarios__ServerConnectionString` *(planned for M11, optional)* | publisher |
 
 Write each file with `printf '%s'`, so it has no trailing newline. Make the
 folder and the files readable by UID 1654, the user the images run as. The
@@ -365,6 +387,8 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 80 | The Service of the server. Put your own Ingress in front of it. |
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
+| `secrets.scenarioServerConnection` | empty | *(planned for M11)* Publisher only. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. Create the role as in [On premises](#on-premises). |
+| `studio.tests` | `false` | *(planned for M11)* Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |
