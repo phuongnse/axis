@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Axis.Configuration.Tests;
 using Axis.Scenarios;
+using Axis.Scenarios.Runner;
 
 namespace Axis.Integration.Tests;
 

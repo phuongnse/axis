@@ -2,7 +2,7 @@ using Axis.Configuration.Model;
 using Axis.Data;
 using Axis.Tenancy;
 
-namespace Axis.Scenarios;
+namespace Axis.Scenarios.Runner;
 
 /// <summary>
 /// The deployment bindings of the scenario tenant. Every <c>url</c> binding is a placeholder host

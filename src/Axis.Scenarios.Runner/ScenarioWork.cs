@@ -6,7 +6,7 @@ using Axis.Tenancy;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
-namespace Axis.Scenarios;
+namespace Axis.Scenarios.Runner;
 
 /// <summary>
 /// Runs the due process step, connector call, package call and event delivery work items of the

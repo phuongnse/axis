@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 
-namespace Axis.Scenarios;
+namespace Axis.Scenarios.Runner;
 
 /// <summary>
 /// Compares the values an <c>expectRecord</c> step names with a saved record. Numbers compare by
