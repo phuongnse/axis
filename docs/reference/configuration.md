@@ -959,7 +959,7 @@ Studio edits application folders through the
 [authoring API](authoring.md), as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. Three server settings control it. They are built, and the authoring
-API reads them. The third, `Studio:PublisherRole`, controls publishing, see
+API reads them. `Studio:ApplicationsPath` names the folder for new applications, see below. The third, `Studio:PublisherRole`, controls publishing, see
 [D47](../decisions.md#d47-publishing-from-studio--agreed). A fourth,
 `Studio:Tests`, controls the test controls, see
 [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed).
@@ -972,7 +972,7 @@ and a JSON view, and shows the diagnostics.
   paths are resolved against the server content root. It is empty by default,
   so Production has no Studio. The Development settings list the purchase
   request sample. A folder entry that is empty is ignored.
-- **`Studio:ApplicationsPath`** _(planned for M11)_. The folder where Studio
+- **`Studio:ApplicationsPath`**. The folder where Studio
   creates new applications, such as `artifacts/studio-apps`. The environment
   variable is `Studio__ApplicationsPath`. It has no default, and relative paths
   are resolved against the server content root. With no value, Studio cannot
@@ -980,7 +980,7 @@ and a JSON view, and shows the diagnostics.
   the server stops if it cannot create it. Under several replicas it sits on
   the shared Studio volume, such as `/studio/apps`, see
   [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
-  Development, Compose and E2E use `artifacts/studio-apps`. Studio is on when
+  _(Planned for M11.)_ Development, Compose and E2E use `artifacts/studio-apps`. Studio is on when
   `Studio:Folders` is not empty or this setting is set. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
@@ -1024,12 +1024,12 @@ and a JSON view, and shows the diagnostics.
   [publisher](administration.md#publisher) runs it. The server never activates
   in its own process.
 - **Current user.** `GET /api/me` answers `studio: true` when `Studio:Folders`
-  is not empty and the user holds the author role. From M11 it also answers
+  is not empty and the user holds the author role. It also answers
   `studio: true` when `Studio:ApplicationsPath` is set, and answers
-  `studioCreate: true` when the user may use Studio and the setting is set
-  _(planned for M11)_. It also answers
-  `studioPublisher: true` when `Studio:Folders` is not
-  empty and the user holds both the author role and the publisher role. It
+  `studioCreate: true` when the user may use Studio and the setting is set.
+  It also answers
+  `studioPublisher: true` when Studio is on
+  and the user holds both the author role and the publisher role. It
   also answers `studioPreviewHost`, the first host of the tenant's served
   preview tenant, or null when the user cannot use Studio or the tenant has none.
   It also answers `studioTest`, true when `studio` is true and
@@ -2420,8 +2420,8 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 
 This section follows
 [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
-The manifest, the one-site rule, installation and listing are built. The copy and
-the sample are _(planned for M11)_.
+The manifest, the one-site rule, installation, listing and the copy are built. The sample is
+_(planned for M11)_.
 An application template is an application folder with a `template.json`
 manifest. Studio creates a new application by copying an installed template, see
 [creating an application](authoring.md#creating-an-application).
@@ -2459,7 +2459,7 @@ The manifest is `template.json` at the root of the folder:
 - **Listing.** `GET /api/studio/templates` lists the newest version of each
   template, with the diagnostics of compiling it in memory. A template that does
   not compile is still listed.
-- **Copy** _(planned for M11)_. A copy takes every `*.json` file of the template except
+- **Copy**. A copy takes every `*.json` file of the template except
   `template.json`, in the same folders.
   - The top-level `id` of each resource becomes a new UUID. Seed record ids stay,
     because they are row ids in the new application's own tables and cannot

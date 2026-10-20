@@ -138,6 +138,54 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Me_answers_studioCreate_only_for_an_author_while_Studio_ApplicationsPath_is_set()
+    {
+        foreach (var (user, applicationsPath, expected) in new[]
+        {
+            ("hoa", Path.Combine(_root, "created"), true),
+            ("hoa", null, false),
+            ("anna", Path.Combine(_root, "created"), false),
+        })
+        {
+            await using var factory = CreateFactory(applicationsPath: applicationsPath);
+            using var client = factory.CreateClient().SignedInAs(user);
+
+            var response = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+            Assert.Equal(expected, body.RootElement.GetProperty("studioCreate").GetBoolean());
+        }
+    }
+
+    [Fact]
+    public async Task Setting_only_Studio_ApplicationsPath_turns_Studio_on_and_creates_the_folder()
+    {
+        var applicationsPath = Path.Combine(_root, "created");
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseTestPlatform();
+            builder.UseSetting("Tenants:default:Hosts:0", "localhost");
+            builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
+            builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
+            builder.UseSetting("Extensions:Path", SamplePackages.Path);
+            builder.UseSetting("Studio:AuthorRole", "author");
+            builder.UseSetting("Studio:ApplicationsPath", applicationsPath);
+            builder.UseTestOidc("default");
+            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+        });
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+
+        Assert.True(Directory.Exists(applicationsPath));
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.True(body.RootElement.GetProperty("studio").GetBoolean());
+        Assert.True(body.RootElement.GetProperty("studioCreate").GetBoolean());
+    }
+
+    [Fact]
     public async Task Author_reads_a_resource_by_id_in_either_letter_case()
     {
         await using var factory = CreateFactory();
@@ -1075,7 +1123,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             .Order(StringComparer.Ordinal)
             .ToList();
 
-    private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author", string? modulesPath = null, bool tests = false) =>
+    private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author", string? modulesPath = null, bool tests = false, string? applicationsPath = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -1094,6 +1142,11 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             if (tests)
             {
                 builder.UseSetting("Studio:Tests", "true");
+            }
+
+            if (applicationsPath is not null)
+            {
+                builder.UseSetting("Studio:ApplicationsPath", applicationsPath);
             }
 
             builder.UseTestOidc("default");

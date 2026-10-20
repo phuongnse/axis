@@ -8,7 +8,7 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The application list, resource list, read, patch, create, delete, diagnostics,
+in git. The application list, application create, resource list, read, patch, create, delete, diagnostics,
 references, names and expression check routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
@@ -39,7 +39,7 @@ folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. S
   has nothing to edit, and every route answers `403`. `studio: false` on
   `GET /api/me` says the same.
 - `Studio:ApplicationsPath` names the folder where Studio creates new
-  applications _(planned for M11)_. With no value, Studio cannot create an
+  applications. With no value, Studio cannot create an
   application. See [Creating an application](#creating-an-application).
 - `Studio:AuthorRole` names the roles claim value that may use the API. With
   no value, nobody may. Application policies play no part.
@@ -62,8 +62,8 @@ in the application. File names and names can change.
 
 | Method and path | Response |
 | --- | --- |
-| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.` is skipped _(planned for M11)_ |
-| `POST /api/studio/apps` | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application) _(planned for M11)_ |
+| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.`, and a link, is skipped |
+| `POST /api/studio/apps` | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application) |
 | `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template, sorted by `id`. See [application templates](configuration.md#application-templates) |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
@@ -131,9 +131,9 @@ Check 6 is built for a request and for a release:
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs `Studio:AuthorRole` to be set and held in
    the session's roles, and `Studio:Folders` to be non-empty. This holds for
-   every route. From M11, a set `Studio:ApplicationsPath` also turns the API
+   every route. A set `Studio:ApplicationsPath` also turns the API
    on, so the check needs a non-empty `Studio:Folders` or a set
-   `Studio:ApplicationsPath` _(planned for M11)_.
+   `Studio:ApplicationsPath`.
 4. The publisher role, `403`, on `publish` and `rollback` only. It needs
    `Studio:PublisherRole` to be set and held in the session's roles. It comes
    right after the author role and before the application is looked up.
@@ -236,7 +236,7 @@ Resource references, Text key references, Release history, Validate, Publish, Pr
 | Release history | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Preview | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | This tenant has no served preview tenant, or the manifest has no UUID `id` |
 | Rollback | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application, or a release not in the tenant's history | Not used |
-| Create application _(planned for M11)_ | No session | No author role, no CSRF header, or no `Studio:ApplicationsPath` | Unknown template | The name or the folder already exists |
+| Create application | No session | No author role, no CSRF header, or no `Studio:ApplicationsPath` | Unknown template | The name or the folder already exists |
 | List templates | No session | No author role, or Studio is off | Not used | Not used |
 
 The `409` of Validate and Publish is problem details titled "The application
@@ -466,7 +466,7 @@ Writes are built for patches, creates and deletes.
 
 ## Creating an application
 
-_(planned for M11)_ `POST /api/studio/apps` creates a new application folder in
+`POST /api/studio/apps` creates a new application folder in
 `Studio:ApplicationsPath`, blank or from an installed
 [application template](configuration.md#application-templates). It follows
 [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
@@ -781,11 +781,13 @@ newest first.
   number. Otherwise every restart under `scripts/dev.sh` would fill the history
   with copies.
 - `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
-  both the author role and the publisher role and `Studio:Folders` is not
-  empty. It is built. Studio uses it to hide Publish and the rollback button.
+  both the author role and the publisher role and Studio is on. It is built. Studio uses it to hide Publish and the rollback button.
 - `GET /api/me` gains a boolean `studioTest`, true when
   `studio` is true and `Studio:Tests` is true. Studio uses it to hide **Run
   tests** and the **Run** action of a scenario.
+- `GET /api/me` gains a boolean `studioCreate`, true when `studio` is true and
+  `Studio:ApplicationsPath` is set. It is built. Studio uses it to show **New
+  application**.
 - `GET /api/me` also gains `studioPreviewHost`, the first host of the served tenant
   whose `PreviewOf` is the session's tenant. It is `null` when the user may not
   use Studio, or when the tenant has no served preview tenant. It is built. Studio

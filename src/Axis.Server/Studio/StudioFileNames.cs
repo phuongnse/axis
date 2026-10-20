@@ -95,6 +95,9 @@ internal static partial class StudioFileNames
         return $"{folder}/{(isRole ? name : Kebab(name))}.json";
     }
 
+    /// <summary>Whether <paramref name="name"/> is an application name: a letter, then letters and digits, at most 60 characters.</summary>
+    internal static bool IsName(string name) => Name().IsMatch(name);
+
     // A hyphen goes before a capital that follows a lower-case letter or a digit, or before the last capital
     // of an acronym that a lower-case letter follows. Everything is then lower-cased.
     internal static string Kebab(string name)
