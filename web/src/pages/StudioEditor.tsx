@@ -19,6 +19,7 @@ import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointValues } from './EndpointValues'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
+import { PageEditor } from './PageEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
 
@@ -82,7 +83,8 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * show opens the JSON view instead. A seed whose entity is a resource of the folder shows its records as a grid with
  * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
  * the entity is not in the folder, the seed uses the generic form. A connector opens in the connector editor, which
- * shows a binding as a name only. An endpoint keeps the generic form and shows its `values` as rows of a field of its
+ * shows a binding as a name only. A page opens in the page editor, which lists its widgets and shows a panel for the
+ * selected widget's type, and keeps a key it does not show. An endpoint keeps the generic form and shows its `values` as rows of a field of its
  * entity and an expression. When the server does not answer, the draft stays, and the resource loads again
  * after the reconnect unless the draft has changes.
  */
@@ -390,6 +392,8 @@ export function StudioEditor({
                   </Flex>
                 ) : item.kind === 'connector' && schema ? (
                   <ConnectorEditor value={draft} onChange={change} />
+                ) : item.kind === 'page' && schema ? (
+                  <PageEditor value={draft} onChange={change} />
                 ) : endpointSchema ? (
                   <Flex vertical gap="middle">
                     <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
