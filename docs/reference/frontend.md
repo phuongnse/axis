@@ -1169,7 +1169,7 @@ reconnect message are built.
     before a publish.
   - See [migrations](storage.md#migrations) and the
     [resource file shape](configuration.md#resource-file-shape).
-- **Policy matrix** *(planned for M11)*. One view per application shows who
+- **Policy matrix** *(read-only view built, editing planned for M11)*. One view per application shows who
   may do what.
   - Roles are the rows. The columns are the entities without child entities,
     the data sources, the processes and the endpoints.
@@ -1189,8 +1189,20 @@ reconnect message are built.
     takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
     takes `invoke`. Filter and fields are only on entity grants.
   - A save writes one file, with the single-file routes.
-  - The view reads the [policy matrix route](authoring.md#policy-matrix). The
-    route is built, and the view is not.
+  - The view reads the [policy matrix route](authoring.md#policy-matrix).
+  - A Resources / Policy matrix switch sits under the application picker. The
+    matrix view is kept in the address as `&view=policies`, so a reload or a
+    shared link reopens it. The diagnostics panel shows in both views.
+  - The read-only view is built. A cell lists the role's combined actions, and
+    selecting it opens its grants under the table with each grant's policy,
+    actions, filter and fields. A shared grant is tagged Shared, and its Open
+    policy link opens that policy in the Resources view. A data source cell
+    that lacks the `read` of its root entity warns and names that entity. A
+    read-only row shows its reason.
+  - Editing a cell, creating `<Role>Access` and showing the filter in the
+    expression editor and the fields in the field picker are *(planned for
+    M11)*. The grant panel shows the filter as plain text and the fields as
+    tags until then.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
