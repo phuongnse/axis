@@ -77,8 +77,8 @@ public static class ApplicationCompiler
     }
 
     /// <summary>
-    /// Compiles the files as the overload without a probe does, and tells <paramref name="probe"/> what the compile
-    /// saw at its expression place.
+    /// Compiles the files and tells <paramref name="probe"/> what the compile saw at its expression place. It returns
+    /// only the diagnostics: no model, reference index, names, policy matrix or content hash.
     /// </summary>
     /// <exception cref="ArgumentException">A path appears more than once.</exception>
     public static CompilationResult CompileFiles(
@@ -90,7 +90,7 @@ public static class ApplicationCompiler
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(probe);
 
-        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: true, probe);
+        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: false, probe);
     }
 
     /// <summary>
@@ -487,6 +487,11 @@ public static class ApplicationCompiler
             declaredPackageIds,
             references,
             diagnostics);
+
+        if (probe is not null)
+        {
+            return new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
+        }
 
         var index = references.Build();
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics))

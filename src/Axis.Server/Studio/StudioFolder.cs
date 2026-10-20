@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Axis.Configuration.Releases;
 
 namespace Axis.Server.Studio;
 
@@ -189,11 +190,60 @@ internal static class StudioFolder
         return [.. files.Where(file => seen.Add(file.Id))];
     }
 
+    /// <summary>
+    /// The resources of <paramref name="folder"/>, as <see cref="List"/> lists them, and every <c>*.json</c> file as
+    /// <see cref="Snapshot"/> reads it, from one walk of the folder. Both lists are sorted by file.
+    /// </summary>
+    public static (IReadOnlyList<StudioFile> Resources, IReadOnlyList<ResourceContent> Files) ListWithContent(string folder)
+    {
+        var root = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
+        var resources = new List<StudioFile>();
+        var files = new List<ResourceContent>();
+        foreach (var path in Directory.EnumerateFiles(folder, "*.json", _enumeration))
+        {
+            if (!Path.GetFullPath(path).StartsWith(root, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var relative = Path.GetRelativePath(folder, path).Replace(Path.DirectorySeparatorChar, '/');
+            try
+            {
+                var bytes = File.ReadAllBytes(path);
+                files.Add(new ResourceContent(relative, Encoding.UTF8.GetString(bytes)));
+                if (Read(bytes, relative) is { } file)
+                {
+                    resources.Add(file);
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // A file that cannot be read is left out, as List and Snapshot leave it out.
+            }
+        }
+
+        files.Sort((left, right) => string.CompareOrdinal(left.Path, right.Path));
+        resources.Sort((left, right) => string.CompareOrdinal(left.File, right.File));
+        var seen = new HashSet<Guid>();
+        return ([.. resources.Where(file => seen.Add(file.Id))], files);
+    }
+
     private static StudioFile? Read(string path, string relative)
     {
         try
         {
-            var bytes = File.ReadAllBytes(path);
+            return Read(File.ReadAllBytes(path), relative);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static StudioFile? Read(byte[] bytes, string relative)
+    {
+        try
+        {
             using var document = JsonDocument.Parse(bytes);
             if (document.RootElement is not { ValueKind: JsonValueKind.Object } content
                 || !content.TryGetProperty("id", out var id)
@@ -210,7 +260,7 @@ internal static class StudioFolder
                 : null;
             return new StudioFile(guid, kind.GetString()!, name, relative, Convert.ToHexStringLower(SHA256.HashData(bytes)), bytes);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        catch (JsonException)
         {
             return null;
         }
