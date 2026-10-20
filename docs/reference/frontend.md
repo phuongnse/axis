@@ -898,6 +898,8 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     `formatVersion` are read-only. Labels are the property names as written in
     the schema, without translation. A part the form cannot show, such as
     `oneOf` or a map like a text resource's `texts`, points to the JSON view.
+    *(Planned for M11.)* A text resource's `texts` map stays in the JSON view.
+    Label texts have their own editor, see Label texts below.
   - A JSON view shows the draft as text. A valid edit there updates the form.
     Invalid JSON shows an error and turns Save off.
   - Save sends only the changes, as a JSON Patch with the version the editor
@@ -983,6 +985,26 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   - The buttons are off while a request runs and while the reconnect message
     shows. If the server does not answer during a request, Studio checks it again
     after the reconnect.
+- **Running tests.** *(planned for M11)* Studio runs the application's
+  [test scenarios](configuration.md#test-scenarios) through the
+  [test route](authoring.md#test), as
+  [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees.
+  - **Run tests** sits next to **Validate**. It sends `POST .../test` with no
+    body, so every scenario runs.
+  - A **Run** action in the editor of a selected `scenario` resource sends
+    `{ "scenarios": ["<name>"] }`, so only that scenario runs.
+  - Both show only when `GET /api/me` answers `studioTest: true`. When that
+    answer is `false` or fails, they do not show.
+  - The status line works as for Validate. It shows **queued**, **running** and
+    the outcome, and Studio checks `GET .../requests/{id}` every second until the
+    status is `succeeded` or `failed`.
+  - A **Test results** list shows each scenario of the request's `scenarios`
+    field, with **passed** or **failed**, its time and, for a failure, the failing
+    step and its message. Selecting a failure opens the scenario resource at the
+    item's `path`, as a diagnostic does.
+  - The request's diagnostics go in the diagnostics panel, as before.
+  - The buttons are off while a request runs and while the reconnect message
+    shows.
 - **Releases.** A list under the publishing buttons shows the open application's
   release history from `GET .../releases`.
   - Each row is one activation: its release number, label, note, who activated it
@@ -1010,12 +1032,45 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   - Studio then calls `GET /api/me` with a back-off of 0.5, 1, 2 and then 4
     seconds, with no limit, until the server answers with any other status.
   - Then the resource list, the diagnostics, the open resource and its Uses
-    and Used by lists load again, and the message goes away.
+    and Used by lists load again, and the message goes away. *(Planned for
+    M11.)* The names load again too.
   - An unsaved draft stays on screen, with the version it was based on. If the
     file changed in the meantime, the next save gets a `409`. Studio does not
     resend a save that got no answer, so the author clicks Save again.
   - Save and Delete are off while the message shows.
   - A `401` from a reload starts sign-in, as elsewhere.
+- **Reference pickers.** *(Planned for M11.)* A property that the schema marks
+  with [`x-axis-reference`](configuration.md#schema-keywords) shows as a select
+  over the [names route](authoring.md#names), in place of a text box.
+  - A value that does not resolve stays in the select, tagged as unknown, so
+    nothing is lost.
+  - The names load with the application. They load again after a save, a
+    delete, a text write and a reconnect.
+- **Label texts.** *(Planned for M11.)* A label property, a `textKey`, shows one
+  text box for each locale in place of the key. Saving writes every locale
+  through the [text write route](authoring.md#text-writes).
+  - A new label gets the key
+    `<kind folder in camelCase>.<name in camelCase>.<path segments without the final textKey, joined with '.'>`,
+    such as `pages.myTasks.title`. It adds `2`, `3` and so on when the key is
+    taken. The author can change it.
+  - The text is written at once. The new key goes into the draft and is saved
+    with the next Save. An unused key does no harm.
+  - A key that other labels use shows how many, from `usedBy` in the names
+    answer, so the author knows the edit changes them too.
+- **Expression editor.** *(Planned for M11.)* A string property that the schema
+  marks with `x-axis-expression` shows a code editor in place of a text box.
+  - It is CodeMirror 6, about 120 KB gzipped, in a chunk that loads only when
+    Studio first shows an expression. It highlights the
+    [expression grammar](expressions.md#grammar).
+  - It checks the text 300 ms after the last keystroke, through the
+    [expression check route](authoring.md#expression-check). Only the latest
+    answer is shown. It underlines the range from `start` to `end` and shows the
+    result `type`.
+  - Completion offers the fields of the entity that the resource names, the
+    parameters of the data source in a filter, the rules and the functions.
+  - The check uses the saved resource, so a draft path that is not saved yet may
+    have no answer. When there is no answer, the last result stays on screen.
+    The editor never blocks Save.
 - **Editors by kind** *(planned for M11)*. Studio uses a typed editor for six
   kinds, and the generic form for the rest. The last column lists what still
   needs the JSON view, because the form cannot show it.

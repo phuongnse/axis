@@ -1387,6 +1387,8 @@ The owner confirmed the points on advancing time for issue #481 on 2026-10-17.
     when a scenario fails.
   - `scripts/integration.sh` runs the scenarios of every application under
     `samples/apps/` against its Testcontainers PostgreSQL, so CI runs them.
+  - Studio runs them through the publisher, see
+    [D55](#d55-running-test-scenarios-from-studio--agreed).
 - **Limits:**
   - **Outside the release.** Scenarios do not travel with a release, so a
     scenario always tests the folder, not a stored release.
@@ -2984,6 +2986,106 @@ resource id, so they never clash in one tenant. Starters in the SPA keep the
 server's create route simple. The cost is that a starter broken by a schema
 change shows up in the Vitest tests, not in a server check.
 
+## D52. Reference pickers, label texts and the expression editor — Agreed
+
+Studio lets an author pick references, edit label texts in every locale and
+write expressions with live type checks, in place of typing names, keys and
+expression strings by hand. This is _(planned for M11)_. See
+[D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+for M11, the [authoring API](reference/authoring.md#names) for the routes, the
+[schema keywords](reference/configuration.md#schema-keywords) and
+[Studio](reference/frontend.md#studio). The owner confirmed these points on
+issue #779 on 2026-10-20.
+
+- **Names:**
+  - `GET /api/studio/apps/{application}/names` answers every name the
+    application defines, from the in-memory compile of the folder: entities
+    with their fields, data sources with their parameters and columns,
+    processes with their steps and outcomes, rules with their parameters and
+    result type, connectors with their operations, events with their fields,
+    roles, sequences, forms, pages and text keys.
+  - It also answers the application's locales, and for each text key its text
+    in every locale and how many labels use it.
+  - Module entities and rules are included and marked with their module. A
+    folder with errors still answers with what resolved.
+  - It touches no database. The answers for `401`, `403` and `404` are those
+    of the rest of the authoring API.
+- **Reference pickers:**
+  - The form shows a property marked as a reference as a picker over the
+    names.
+  - A name that does not resolve stays visible, marked as unknown, so nothing
+    is lost.
+  - The names load with the application, and again after a save, a delete, a
+    text write and a reconnect.
+- **Schema keywords:**
+  - `"x-axis-reference"` marks a reference property. It names a kind, such as
+    `entity`, or a part, such as the fields of the entity at another path.
+  - `"x-axis-expression": true` marks a string property that holds an
+    expression, so the form shows the expression editor there.
+  - Both are annotations. The schemas stay the single source of what the form
+    shows, and no resource file changes.
+- **Label texts:**
+  - A label property shows its text in each locale of the application, not
+    its key.
+  - `PUT /api/studio/apps/{application}/texts/{key}` with
+    `{ texts: { <locale>: <text> } }` writes the key in every text resource.
+    It needs every locale and answers `400` when one is missing.
+  - It writes all text files under the folder write lock. It takes no
+    `If-Match`, so the last write to a key wins. Other keys are untouched.
+  - A new label gets a key made from the resource and the path, such as
+    `pages.myTasks.title`. The author can change it. The text is written
+    right away, and the key goes into the resource draft and is saved with
+    the next Save.
+  - A key that other labels use shows how many, so the author knows the edit
+    changes them too.
+- **Expression check:**
+  - `POST /api/studio/apps/{application}/expressions/check` with
+    `{ resourceId, path, expression }` checks one expression in the place it
+    would stand: the same names in scope, the same expected type and the same
+    limits as the compile.
+  - It uses the saved resource to find that place and takes no draft content.
+    A path with no expression place is `400`.
+  - It answers `{ type, diagnostics }`. A diagnostic has its code, message and
+    a range `{ start, end }` in UTF-16 code units of the expression text, with
+    an exclusive end. There is at most one, because the compile stops at the
+    first problem.
+  - It compiles in memory and writes nothing. It is not a save.
+- **Expression editor:**
+  - An expression property shows a code editor with the expression language's
+    highlighting.
+  - It checks the text 300 ms after the author stops typing, underlines the
+    diagnostic at its range and shows the result type.
+  - It completes the names in scope from the names route.
+  - A check that gets no answer shows nothing new. It never blocks a save.
+- **Editor library:** the editor is CodeMirror 6, at about 120 KB gzipped, in a
+  chunk that loads only when Studio first shows an expression.
+
+_Why:_ [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+plans reference pickers and an expression editor with type errors as you type
+in M11. Names, keys and expressions are typed by hand today, and a mistake
+shows only after a save, as a folder diagnostic. One names route lets Studio
+load everything once, in place of a call per picker. One shared keyword per
+purpose keeps the schemas the single source of what is a reference or an
+expression. CodeMirror 6 is several times smaller than Monaco and needs no web
+workers, and a lazy chunk keeps site pages free of a Studio-only editor. The
+costs:
+
+- **A larger answer.** The names route holds every name and every text. At the
+  typical application size that is a few hundred kilobytes, once per save.
+- **Last write wins on one key.** A text write takes no `If-Match`, so two
+  authors who edit the same key lose one edit. Other keys are safe.
+- **Not atomic across files.** A crash between two renames can leave a key in
+  some locales only. The next compile reports `AXC0027`.
+- **A compile per check.** Each pause in typing compiles the folder in memory.
+  This may be slow for a large application. The build issue sets the budget.
+- **A range the compiler lacks.** The compile reports only a character
+  position today. The build issue adds the range.
+- **Simple completion.** Completion offers names by a simple scope rule, so it
+  can offer a name that is not in scope at that exact place. The check then
+  flags it.
+- **Unused keys.** A new key is written before the Save, so an abandoned draft
+  leaves an unused key. That does no harm, because an unused key is allowed.
+
 ## D53. Typed editors and the process graph in Studio — Agreed
 
 M11 gives Studio typed editors for pages, process steps and connectors, and
@@ -3068,6 +3170,111 @@ support and custom nodes, which M14 needs. Dagre lays out directed step graphs
 of the size Axis processes have. ELK lays out better but weighs over 400 KB.
 The cost is two new libraries in the SPA bundle. The page editor changes again
 in M12, which D46 accepts.
+
+## D55. Running test scenarios from Studio — Agreed
+
+An author runs an application's test scenarios from Studio. Studio stores a
+new kind of publish request, `test`, and the publisher runs it with a separate
+database role that may create databases. The server still gets no such right.
+It is _(planned for M11)_. See
+[D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+for M11, the [authoring API](reference/authoring.md#test) for the route, the
+[publisher](reference/administration.md#publisher) for how it runs, and
+[database roles](reference/storage.md#database-roles) for the new role.
+The owner confirmed these points on issue #782 on 2026-10-20.
+
+- **A test request:**
+  - A new publish request kind, `test`. It holds a snapshot of the folder, as
+    `validate` does, and optionally the names of the scenarios to run. With no
+    names, it runs them all.
+  - `POST /api/studio/apps/{application}/test` answers `202` with the request
+    and a `Location`, as `validate` does. It needs the author role only,
+    because it changes no tenant.
+  - The request status route answers its outcome. For each scenario it gives
+    passed or failed, the failing step and its message, and the time it took.
+  - The outcome goes in a new `scenarios` field of the request, stored in a new
+    `scenario_results` column. Each item is
+    `{ name, resourceId, file, outcome, durationMs, step, path, message }`.
+    With `resourceId` and `path`, Studio opens a failing scenario at its step,
+    as it opens a resource from a diagnostic.
+  - A request ends `failed` when any scenario fails. Scenario failures go only
+    in `scenarios`. Compile errors, the missing setting, an unknown scenario
+    name and the time limit go in `diagnostics`.
+  - An unknown scenario name is accepted with `202`. The request then fails
+    with a diagnostic. The route does not answer `400`, so diagnostics keep one
+    path, as for a folder with errors.
+  - A `test` request always has the target `tenant`. It writes no audit record
+    and has no release id. It uses the existing lease and three-claim rules. A
+    claim after a lost lease runs every scenario again.
+- **Who runs it:**
+  - The publisher runs `test` requests. The server never does.
+  - A new publisher setting, `Scenarios:ServerConnectionString`, names a
+    PostgreSQL role that may create databases and owns no tenant database.
+  - The publisher runs each scenario as `Axis.Scenarios` does. It creates a new
+    `axis_scenario_<uuid>` database, migrates it, activates the snapshot,
+    applies the seed data, runs the steps with stubs and drops the database at
+    the end, pass or fail. It drops only databases it created.
+  - Without the setting, a `test` request fails with a diagnostic that names it.
+  - A `test` request never touches the tenant database except to store its own
+    status and results. It does not wait behind a `publish` of the same
+    application.
+  - On `SIGTERM`, the publisher stops a running `test` request at once, drops
+    its database and sets the request `failed`. A test may run for 10 minutes,
+    which is longer than the stop grace period of both installs.
+  - A database left behind by a publisher that crashed is not cleaned up
+    automatically. The operator drops the `axis_scenario_*` databases that the
+    scenario role owns. With several publishers, none can tell which leftover
+    database is still in use. Automatic cleanup needs its own decision.
+- **Limits:**
+  - The scenarios of one request run one after another.
+  - A request has a time limit of 10 minutes. Past it, the scenario that runs
+    fails, its database is dropped and the request fails.
+  - The work item limit of [D32](#d32-test-scenarios--agreed) applies per
+    scenario, as today.
+  - At most one `test` request per application runs at a time, oldest first.
+- **Studio:**
+  - A **Run tests** button next to **Validate**, and a **Run** action on each
+    scenario.
+  - A results list: each scenario with passed or failed, its time, and the
+    failing step. Selecting a failure opens the scenario at that step.
+  - They show only when `GET /api/me` answers `studioTest: true`.
+- **Settings in each place:**
+  - Development, Compose and E2E set `Scenarios:ServerConnectionString` to a
+    development role with `CREATEDB`, created by
+    `samples/postgres/init-roles.sql`.
+  - The production installs leave it empty by default. The installation docs
+    say how to set it, and that it should point at a PostgreSQL server that
+    holds no tenant data.
+  - `studioTest` comes from a new server setting, `Studio:Tests`, which is off
+    by default. The installs turn it on together with the publisher's
+    `Scenarios:ServerConnectionString`. The server cannot see the publisher's
+    settings, and under `Tenancy:Source=configuration` the publisher writes
+    nothing the server could read. The owner confirmed this on issue #782.
+  - The docs name no new diagnostic codes. The issues that build the feature
+    choose the next free `AXC02xx` codes.
+- **Effect on earlier decisions:**
+  - [D31](#d31-separate-database-roles--agreed): a third kind of role, which
+    may create databases, on a host other than the server.
+  - [D32](#d32-test-scenarios--agreed): Studio is a second place where
+    scenarios run, next to `Axis.Scenarios`.
+  - [D47](#d47-publishing-from-studio--agreed): a fourth request kind, with its
+    own queue per application.
+
+*Why:* [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+plans that Studio runs test scenarios in M11. Scenarios ran only through
+`Axis.Scenarios`, a console tool, so an author without a shell could not run
+them. The server may not create databases
+([D31](#d31-separate-database-roles--agreed)), and the publisher holds no such
+right, so a request and a publisher with a new role keep that rule. The costs:
+
+- **The publisher gets a third right.** It already holds every tenant's schema
+  role. Now it can also create databases. It still has no HTTP endpoint.
+- **A separate PostgreSQL server is advised, not required.** On one server, a
+  scenario database sits next to tenant databases, but the scenario role owns
+  none of them.
+- **Authors may run tests without the publisher role.** A test changes no
+  tenant. It costs database time, so the limits above apply.
+- **Scenarios test the folder, not a release,** as D32 says.
 
 ## D56. A service desk as the third sample application — Agreed
 

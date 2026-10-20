@@ -960,7 +960,10 @@ Studio edits application folders through the
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. Three server settings control it. They are built, and the authoring
 API reads them. The third, `Studio:PublisherRole`, controls publishing, see
-[D47](../decisions.md#d47-publishing-from-studio--agreed). The Studio page lists the resources with a search, edits them in a form
+[D47](../decisions.md#d47-publishing-from-studio--agreed). A fourth,
+`Studio:Tests`, controls the test controls, see
+[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed)
+_(planned for M11)_. The Studio page lists the resources with a search, edits them in a form
 and a JSON view, and shows the diagnostics.
 
 - **`Studio:Folders`.** An array of application folders that Studio may edit,
@@ -994,6 +997,13 @@ and a JSON view, and shows the diagnostics.
   value. The Development settings set it to `publisher`, and the
   development realm gives `hoa` that role. It plays no part in application
   policies, as `Studio:AuthorRole` does not.
+- **`Studio:Tests`** _(planned for M11)_. A boolean. The environment variable
+  is `Studio__Tests`. `true` makes `GET /api/me` answer `studioTest: true` for an
+  author, which shows **Run tests** in Studio. It is `false` by default. Turn it
+  on together with the publisher's `Scenarios:ServerConnectionString`, because
+  the server cannot see the publisher's settings. It grants no right. A `test`
+  request needs the author role only, and the publisher runs it, see
+  [test](authoring.md#test).
 - **Where Studio reads and writes.** Studio's edit routes read and write only
   `*.json` files inside the listed folders. A write takes an advisory lock in
   the platform database, over `ConnectionStrings:Platform`, keyed by the
@@ -1022,6 +1032,8 @@ and a JSON view, and shows the diagnostics.
   empty and the user holds both the author role and the publisher role. It
   also answers `studioPreviewHost`, the first host of the tenant's served
   preview tenant, or null when the user cannot use Studio or the tenant has none.
+  It also answers `studioTest` _(planned for M11)_, true when `studio` is true and
+  `Studio:Tests` is true.
 
 ## Reference index
 
@@ -1118,6 +1130,36 @@ to show where a resource is used and what it uses.
   `/modules/{i}`. See [Modules](#modules). How a reference to a module
   resource, written `<module id>/<name>`, appears in the index is left to the
   issue that builds modules.
+
+## Schema keywords
+
+*(Planned for M11.)* Two custom keywords in the resource schemas tell
+[Studio](frontend.md#studio) where to show a picker and where to show the
+expression editor, as
+[D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
+agrees. The schemas stay the single source of what the form shows.
+
+- *(Planned for M11.)* **Kind form.** `"x-axis-reference": "<kind>"` marks a
+  property that holds the name of a resource. The kind is one of `entity`,
+  `dataSource`, `process`, `role`, `rule`, `connector`, `event`, `sequence`,
+  `form`, `page` or `text`. The kind `text` marks a `textKey`.
+- *(Planned for M11.)* **Part form.**
+  `"x-axis-reference": { "part": "<part>", "of": "<pointer>" }` marks a
+  property that holds a part of another resource.
+  - `part` is `field`, `parameter`, `column`, `step`, `outcome` or `operation`.
+  - `of` is a JSON Pointer from the resource root, or a Relative JSON Pointer,
+    to the property that names the resource the part belongs to.
+- *(Planned for M11.)* **Examples.** A form section's `field` is
+  `{ "part": "field", "of": "/entity" }`, because the form's `entity` names
+  the entity whose fields it lists. The keys of a process `updateRecord`
+  step's `set` map are fields of the process's `/entity` in the same way.
+- *(Planned for M11.)* **Expressions.** `"x-axis-expression": true` marks a
+  string property that holds an [expression](expressions.md). The form then
+  shows the expression editor there.
+- *(Planned for M11.)* **Annotations only.** JsonSchema.Net ignores unknown
+  keywords when it validates, so neither keyword changes what a resource may
+  hold, and no resource file changes. The [reference index](#reference-index)
+  stays the list of reference paths.
 
 ## Tenancy settings
 
@@ -2967,7 +3009,9 @@ is `scenario`, wherever it is in the folder. The resource kind and its compile
 checks exist. The runner runs record actions, process starts and task
 completions, with or without `expect`, and the `expectRecord`, `expectInstance`
 and `expectTask` steps. It sets `now`. It answers connector and package calls
-from `stubs`.
+from `stubs`. Studio runs scenarios through the publisher, see
+[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed)
+_(planned for M11)_.
 
 This scenario submits a purchase request above the finance threshold. The
 manager approves it, the finance reviewer takes the finance decision and the
