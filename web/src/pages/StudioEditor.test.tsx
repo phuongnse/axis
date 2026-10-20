@@ -307,6 +307,7 @@ function renderResource(item: StudioResourceItem, names?: StudioNames) {
             application="Shop"
             item={item}
             resources={[item]}
+            names={names ?? null}
             path={null}
             onSaved={vi.fn()}
             onDeleted={vi.fn()}

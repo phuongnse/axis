@@ -1,5 +1,5 @@
 import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
-import { useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
 import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
 import {
@@ -13,7 +13,6 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
-import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { ConnectorEditor } from './ConnectorEditor'
@@ -104,7 +103,6 @@ export function StudioEditor({
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
-  const names = useContext(StudioNamesContext)
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
   const dirtyRef = useRef(false)
