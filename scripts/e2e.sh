@@ -19,6 +19,8 @@
 # One publisher, `axis-admin publisher`, runs against the same database and writes
 # artifacts/logs/e2e-publisher.log. It waits until the server has migrated the database, then runs the
 # publish requests of Studio. The run fails if it exits during the run or never finds the database migrated.
+# The purchase request release spec also holds the Studio journey: edit, validate, preview on localhost, publish and
+# rollback, all through the publisher and with no admin command.
 # The purchasing system stub from tests/Axis.PurchasingStub runs from the build output on
 # $AXIS_E2E_PURCHASING_PORT (default 5281). Specs find it at $AXIS_E2E_PURCHASING_URL. The run
 # fails if it never answers. The server and the worker run in Development, because only
