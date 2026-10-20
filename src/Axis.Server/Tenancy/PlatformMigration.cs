@@ -14,7 +14,7 @@ internal sealed record PlatformMigrationOptions(string SchemaConnectionString, s
 /// Applies the <c>platform</c> schema migrations over the <c>ConnectionStrings:PlatformSchema</c> role, then limits
 /// the reader role to reading that schema. Under <c>Tenancy:Source=directory</c> it runs while the server builds its
 /// services, before the first directory load, so a fresh install has its tables. Under <c>configuration</c> it runs
-/// as the first hosted service. A failure stops the start.
+/// as the first hosted service, in its starting step, which runs before the starting step of startup activation. A failure stops the start.
 /// </summary>
 internal static class PlatformMigration
 {

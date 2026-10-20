@@ -1,8 +1,12 @@
 using System.Net;
+using Axis.Server.Tenancy;
 using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
@@ -89,6 +93,26 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
         Assert.Contains("PlatformSchema", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Under_configuration_the_platform_tables_exist_before_the_next_service_starts()
+    {
+        var platform = await database.CreateDatabaseAsync("platform", TestContext.Current.CancellationToken);
+        var probe = new TablesProbe(platform);
+        await using var factory = CreateFactory(platform, directory: false).WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                // Lifecycle services run StartingAsync in registration order, and startup activation is one of them.
+                // The probe sits right behind the migration, so it sees the tables only when the migration ran in
+                // StartingAsync, before startup activation.
+                var index = services.ToList().FindIndex(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(PlatformMigrationStart));
+                Assert.True(index >= 0);
+                services.Insert(index + 1, ServiceDescriptor.Singleton<IHostedService>(probe));
+            }));
+        using var client = factory.CreateClient();
+
+        Assert.Equal(["__platform_migrations", "tenant_bindings", "tenant_hosts", "tenants"], probe.Tables);
+    }
+
     private async Task<string> StartServerAsync(bool directory)
     {
         var platform = await database.CreateDatabaseAsync("platform", TestContext.Current.CancellationToken);
@@ -125,6 +149,26 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             builder.UseSetting("Tenants:default:SchemaConnectionString", database.ConnectionString);
             builder.UseTestOidc("default");
         });
+
+    private sealed class TablesProbe(string platformConnectionString) : IHostedLifecycleService
+    {
+        public List<string> Tables { get; private set; } = [];
+
+        public async Task StartingAsync(CancellationToken cancellationToken) =>
+            Tables = await ScalarListAsync(
+                platformConnectionString,
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'platform' ORDER BY table_name");
+
+        public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task StartedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task StoppingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
 
     private static string InsertTenant(string id) =>
         $"""

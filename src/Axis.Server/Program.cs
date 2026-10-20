@@ -105,7 +105,8 @@ if (directorySource)
 }
 else
 {
-    // The first hosted service, so it runs before StartupActivation. Nothing above registers one.
+    // The first hosted service. It migrates in StartingAsync, as StartupActivation does, and the host runs those in
+    // registration order, so it runs before StartupActivation. Nothing above registers a hosted service.
     builder.Services.AddSingleton(platformMigration);
     builder.Services.AddHostedService<PlatformMigrationStart>();
 
