@@ -231,8 +231,17 @@ proxy that ends TLS. The `replicas` profile starts `server-2`, configured like
   `docker compose down` once before the first start with this file. If the
   default subnet overlaps a network of the machine, `docker compose up` fails.
   Set `AXIS_NETWORK_SUBNET`, `AXIS_NETWORK_IP_RANGE` and `AXIS_PROXY_ADDRESS`.
-- **Studio.** The example has no shared Studio volume, because production
-  Compose does not turn Studio on.
+- **Studio.** Studio is off until you turn it on. Both servers mount
+  `AXIS_STUDIO_DIR`, `./studio` by default, read-write at `/studio`. No other
+  service mounts it. To turn Studio on, set `Studio__Folders__0=/studio/<folder>`
+  in the shell, where `<folder>` is an application folder inside
+  `AXIS_STUDIO_DIR`. Set `Studio__AuthorRole` and `Studio__PublisherRole` too.
+  Without them nobody may author or publish. All three pass through from the
+  shell to both servers. More folders need an override file that adds
+  `Studio__Folders__1` and so on. Create the folder before the first start,
+  because Docker creates a missing one owned by root. It must be writable by
+  UID 1654, the user of the image, and it must be the same folder for every
+  replica. See [Studio](configuration.md#studio).
 
 **The smoke test.** `scripts/onprem.test.mjs` installs the example as the five
 steps say, and `scripts/e2e.sh` runs it. It builds the three production images
@@ -269,12 +278,20 @@ operator uses it. The test then:
    answers `200`. Then restarts `server` and checks that `GET /api/me` with the
    same cookie answers `200` through the proxy and on the ports of `server` and
    `server-2`.
+9. Turns Studio on for `hoa` over a copy of the leave request sample in a
+   temporary folder that every user may write. Signs `hoa` in through the proxy
+   and saves a text through `server`. Checks that the read of the same
+   resource through `server-2` answers `200` with the new text and the same
+   `ETag`. Then checks that a second save through `server-2` with the old
+   version answers `409`.
 
 Other tests check that nothing under `deploy/compose/` holds a secret, that the
 rendered configuration takes every connection string and the installation key
 only from `secrets:` files, that every published port of both servers is on
-`127.0.0.1`, that the proxy mounts its certificate folder read-only, and that
-both servers trust the proxy's fixed address only.
+`127.0.0.1`, that the proxy mounts its certificate folder read-only, that
+both servers trust the proxy's fixed address only, and that both servers mount
+the same Studio folder read-write at `/studio` while the worker, the
+publisher, the admin host and the proxy do not.
 
 ## In the cloud
 
@@ -382,9 +399,9 @@ against a live cluster.
 The server can run as several replicas behind a reverse proxy that ends TLS.
 See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 The shared key ring, the forwarded headers and the platform settings under both
-tenant sources, the Studio write lock and the Helm chart's `studio.persistence`
-and the Compose example with two replicas behind a TLS proxy, with its smoke
-test, are built.
+tenant sources, the Studio write lock, the Helm chart's `studio.persistence`
+and the Compose example with two replicas behind a TLS proxy and a shared
+Studio folder, with its smoke test, are built.
 
 - **A shared key ring.** The server keeps its data protection keys in the
   platform database, encrypted with `Platform:SecretKey`. See
@@ -414,8 +431,9 @@ test, are built.
   every replica, because the write lock is keyed by the folder path. The lock
   is built. It lives in the platform database. In
   Kubernetes that needs a `ReadWriteMany` storage class, set with
-  `studio.persistence`. The volume must be writable by the non-root user of the
-  image, and the chart sets no `fsGroup`. See [Studio](configuration.md#studio).
+  `studio.persistence`. In Compose, set `AXIS_STUDIO_DIR`. Both servers mount
+  it. The volume must be writable by the non-root user of the image, UID 1654,
+  and the chart sets no `fsGroup`. See [Studio](configuration.md#studio).
 - **On premises.** The Compose example runs two server replicas behind a TLS
   proxy. See "TLS proxy and a second replica" in [on premises](#on-premises).
 - **Platform settings under both tenant sources.** The server needs

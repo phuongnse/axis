@@ -3,7 +3,8 @@
 // and Keycloak, creates two tenants, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
 // publisher runs in each tenant. It then starts a second server replica and a TLS proxy, signs anna in
-// through the proxy, and restarts the first replica. Requires Docker and openssl, and the
+// through the proxy, and restarts the first replica. With Studio on, it saves a resource through one replica,
+// reads it back through the other, and checks that a stale save answers 409. Requires Docker and openssl, and the
 // sample modules in artifacts/modules (scripts/build.sh). Run from scripts/e2e.sh.
 //
 // Everything the test adds lives in an override file in a temporary folder: PostgreSQL, Keycloak over
@@ -14,7 +15,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
 import net from 'node:net'
@@ -59,10 +60,21 @@ const files = (dir) =>
     entry.isDirectory() ? files(join(dir, entry.name)) : [join(dir, entry.name)],
   )
 
+// openToAll: makes every folder under dir, and dir itself, 0777 and every file 0666, so UID 1654 can write them.
+const openToAll = (dir) => {
+  chmodSync(dir, 0o777)
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) openToAll(path)
+    else chmodSync(path, 0o666)
+  }
+}
+
 // render: the config of the example with every profile on and no variable set but the version.
 const render = () => {
   const env = { ...process.env, AXIS_VERSION: 'x', AXIS_OIDC_CLIENT_SECRET: '' }
   for (const name of Object.keys(env)) if (name.startsWith('AXIS_') && !['AXIS_VERSION', 'AXIS_OIDC_CLIENT_SECRET'].includes(name)) delete env[name]
+  for (const name of Object.keys(env)) if (name.startsWith('Studio__')) delete env[name]
   const rendered = spawnSync(
     'docker',
     ['compose', '-f', composeFile, '--profile', 'admin', '--profile', 'proxy', '--profile', 'replicas', 'config', '--format', 'json'],
@@ -143,6 +155,33 @@ describe('the example holds no secret', () => {
   })
 })
 
+describe('the Studio folder', () => {
+  test('only the servers mount the Studio folder, read-write, and Studio is off without shell values', () => {
+    const { services } = render()
+    const sources = []
+    for (const name of ['server', 'server-2']) {
+      const mounts = services[name].volumes.filter((volume) => volume.target === '/studio')
+      assert.equal(mounts.length, 1, `${name} mounts /studio ${mounts.length} times`)
+      assert.equal(mounts[0].type, 'bind')
+      assert.notEqual(mounts[0].read_only, true, `${name} mounts /studio read-only`)
+      sources.push(mounts[0].source)
+      for (const key of ['Studio__Folders__0', 'Studio__AuthorRole', 'Studio__PublisherRole']) {
+        const value = services[name].environment[key]
+        assert.ok(value === null || value === undefined || value === '', `${name} sets ${key}`)
+      }
+    }
+    assert.equal(sources[0], sources[1])
+    assert.equal(sources[0], join(root, 'deploy/compose/studio'))
+    for (const name of ['worker', 'publisher', 'admin', 'proxy']) {
+      assert.equal(
+        (services[name].volumes ?? []).some((volume) => volume.target === '/studio'),
+        false,
+        `${name} mounts /studio`,
+      )
+    }
+  })
+})
+
 describe('the on-premises installation', () => {
   const project = `axis-onprem-${process.pid}`
   const version = `0.0.0-onprem.${process.pid}`
@@ -191,9 +230,10 @@ describe('the on-premises installation', () => {
   }
 
   // request: sends a request to the server or the worker with a Host header, which fetch cannot set.
-  const request = (port, host, path, headers = {}) =>
+  const request = (port, host, path, headers = {}, { method = 'GET', body } = {}) =>
     new Promise((resolve) => {
-      const req = http.request({ host: '127.0.0.1', port, path, method: 'GET', headers: { host, ...headers } }, (response) => {
+      const sent = body === undefined ? headers : { ...headers, 'content-length': String(Buffer.byteLength(body)) }
+      const req = http.request({ host: '127.0.0.1', port, path, method, headers: { host, ...sent } }, (response) => {
         const chunks = []
         response.on('data', (chunk) => chunks.push(chunk))
         response.on('end', () =>
@@ -202,7 +242,7 @@ describe('the on-premises installation', () => {
       })
       req.setTimeout(10000, () => req.destroy())
       req.on('error', () => resolve({ status: 0, headers: {}, body: '' }))
-      req.end()
+      req.end(body)
     })
 
   const server = (host, path) => request(serverPort, host, path)
@@ -259,6 +299,41 @@ describe('the on-premises installation', () => {
       headers['content-length'] = String(Buffer.byteLength(body))
     }
     return tlsRequest(keycloakPort, target.host, `${target.pathname}${target.search}`, { method, headers, body })
+  }
+
+  // signInViaProxy: signs a Keycloak development user in through the proxy over HTTPS and returns the cookie jar
+  // with the sign-in and callback responses. Every assertion about the redirect and the cookies stays here.
+  const signInViaProxy = async (username, extraHeaders = {}) => {
+    const jar = new Map()
+    let signIn
+    for (let i = 0; i < 15; i++) {
+      if (i > 0) await sleep(1000)
+      signIn = await viaProxy('/api/auth/sign-in?returnUrl=%2Fleave', jar, extraHeaders)
+      if (signIn.status === 302) break
+    }
+    assert.equal(signIn.status, 302, `sign-in through the proxy: ${signIn.body}`)
+    remember(jar, signIn)
+    const authorize = new URL(signIn.headers.location)
+    assert.equal(authorize.searchParams.get('redirect_uri'), `https://${hosts.one}/api/auth/callback`)
+
+    // Sign the user in at Keycloak: the login page, then its form.
+    const keycloakJar = new Map()
+    const loginPage = await keycloak(authorize.href, keycloakJar)
+    assert.equal(loginPage.status, 200, `the Keycloak login page: ${loginPage.body}`)
+    remember(keycloakJar, loginPage)
+    const form = loginPage.body.match(/<form[^>]*id="kc-form-login"[^>]*>/)
+    assert.ok(form, 'the Keycloak login page has no kc-form-login form')
+    const action = form[0].match(/action="([^"]+)"/)[1].replaceAll('&amp;', '&')
+    const login = await keycloak(action, keycloakJar, { method: 'POST', form: { username, password: 'axis' } })
+    assert.equal(login.status, 302, `the Keycloak login: ${login.body}`)
+    const callback = new URL(login.headers.location)
+    assert.equal(`${callback.origin}${callback.pathname}`, `https://${hosts.one}/api/auth/callback`)
+
+    // The callback creates the session.
+    const done = await viaProxy(`${callback.pathname}${callback.search}`, jar)
+    assert.equal(done.status, 302, `the callback: ${done.body}`)
+    remember(jar, done)
+    return { jar, signIn, done }
   }
 
   // waitFor: polls until the status is the expected one and returns the last response.
@@ -350,6 +425,12 @@ describe('the on-premises installation', () => {
       client.attributes['post.logout.redirect.uris'] += `##${origins.join('##')}`
       writeFile(join(realm, 'axis-realm.json'), JSON.stringify(realmJson))
 
+      // A copy of the leave request sample that the servers may write: UID 1654 is not the owner, so the
+      // folders are 0777 and the files 0666.
+      const studio = join(folder, 'studio')
+      cpSync(join(root, 'samples/apps/leave-requests'), join(studio, 'leave-requests'), { recursive: true })
+      openToAll(studio)
+
       serverPort = await freePort()
       workerPort = await freePort()
       httpsPort = await freePort()
@@ -402,6 +483,9 @@ describe('the on-premises installation', () => {
         AXIS_HTTPS_PORT: String(httpsPort),
         AXIS_TLS_DIR: tls,
         AXIS_WORKER_HEALTH_PORT: String(workerPort),
+        AXIS_STUDIO_DIR: studio,
+        Studio__Folders__0: '/studio/leave-requests',
+        Studio__AuthorRole: 'author',
       }
       delete env.AXIS_OIDC_CLIENT_SECRET
       assert.ok(statSync(env.AXIS_MODULES_DIR).isDirectory(), 'run scripts/build.sh first: artifacts/modules is missing')
@@ -586,39 +670,13 @@ RETURNING id;`,
 
       // The sign-in redirect names the tenant host over https, even when the client sends its own
       // forwarded headers, which the proxy replaces.
-      const proxyJar = new Map()
-      let signIn
-      for (let i = 0; i < 15; i++) {
-        if (i > 0) await sleep(1000)
-        signIn = await viaProxy('/api/auth/sign-in?returnUrl=%2Fleave', proxyJar, {
-          'x-forwarded-proto': 'http',
-          'x-forwarded-host': hosts.two,
-          'x-forwarded-for': '203.0.113.9',
-        })
-        if (signIn.status === 302) break
-      }
-      assert.equal(signIn.status, 302, `sign-in through the proxy: ${signIn.body}`)
-      remember(proxyJar, signIn)
-      const authorize = new URL(signIn.headers.location)
-      assert.equal(authorize.searchParams.get('redirect_uri'), `https://${hosts.one}/api/auth/callback`)
+      const { jar: proxyJar, done } = await signInViaProxy('anna', {
+        'x-forwarded-proto': 'http',
+        'x-forwarded-host': hosts.two,
+        'x-forwarded-for': '203.0.113.9',
+      })
 
-      // Sign anna in at Keycloak: the login page, then its form.
-      const keycloakJar = new Map()
-      const loginPage = await keycloak(authorize.href, keycloakJar)
-      assert.equal(loginPage.status, 200, `the Keycloak login page: ${loginPage.body}`)
-      remember(keycloakJar, loginPage)
-      const form = loginPage.body.match(/<form[^>]*id="kc-form-login"[^>]*>/)
-      assert.ok(form, 'the Keycloak login page has no kc-form-login form')
-      const action = form[0].match(/action="([^"]+)"/)[1].replaceAll('&amp;', '&')
-      const login = await keycloak(action, keycloakJar, { method: 'POST', form: { username: 'anna', password: 'axis' } })
-      assert.equal(login.status, 302, `the Keycloak login: ${login.body}`)
-      const callback = new URL(login.headers.location)
-      assert.equal(`${callback.origin}${callback.pathname}`, `https://${hosts.one}/api/auth/callback`)
-
-      // The callback creates the session. Every session cookie it sets is Secure.
-      const done = await viaProxy(`${callback.pathname}${callback.search}`, proxyJar)
-      assert.equal(done.status, 302, `the callback: ${done.body}`)
-      remember(proxyJar, done)
+      // Every session cookie the callback sets is Secure.
       const sessionCookies = done.setCookie.filter((line) => line.startsWith('Axis.Session'))
       assert.ok(sessionCookies.length > 0, 'the callback set no Axis.Session cookie')
       for (const line of sessionCookies) assert.match(line, /;\s*secure/i, `not Secure: ${line}`)
@@ -637,6 +695,41 @@ RETURNING id;`,
         const direct = await request(port, hosts.one, '/api/me', cookieHeader(proxyJar))
         assert.equal(direct.status, 200, `GET /api/me on port ${port} after the restart: ${direct.body}`)
       }
+
+      // Step 9, Studio on a shared folder. hoa saves through server, reads through server-2 and a stale save
+      // through server-2 answers 409.
+      const { jar: hoaJar } = await signInViaProxy('hoa')
+      const resource = '/api/studio/apps/LeaveRequests/resources/bb5c622e-a7f8-41d4-8a6f-15fe463455b8'
+      const patch = (port, version, value) =>
+        request(
+          port,
+          hosts.one,
+          resource,
+          {
+            ...cookieHeader(hoaJar),
+            'x-axis-csrf': '1',
+            'if-match': version,
+            'content-type': 'application/json-patch+json',
+          },
+          { method: 'PATCH', body: JSON.stringify([{ op: 'replace', path: '/texts/site.title', value }]) },
+        )
+      const original = await request(serverPort, hosts.one, resource, cookieHeader(hoaJar))
+      assert.equal(original.status, 200, `GET the resource through server: ${original.body}`)
+      const etag0 = original.headers.etag
+      assert.ok(etag0, 'the resource has no ETag')
+
+      const saved = await patch(serverPort, etag0, 'Leave (on premises)')
+      assert.equal(saved.status, 200, `PATCH through server: ${saved.body}`)
+      const etag1 = saved.headers.etag
+      assert.ok(etag1 && etag1 !== etag0, 'the save did not change the ETag')
+
+      const read = await request(server2Port, hosts.one, resource, cookieHeader(hoaJar))
+      assert.equal(read.status, 200, `GET through server-2: ${read.body}`)
+      assert.equal(read.headers.etag, etag1)
+      assert.equal(JSON.parse(read.body).content.texts['site.title'], 'Leave (on premises)')
+
+      const stale = await patch(server2Port, etag0, 'Leave (stale)')
+      assert.equal(stale.status, 409, `a stale PATCH through server-2: ${stale.body}`)
     } catch (error) {
       dumpLogs()
       throw error
