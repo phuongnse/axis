@@ -141,6 +141,8 @@
   "shell.studio.path": "Đường dẫn",
   "shell.studio.diagnostics": "Chẩn đoán",
   "shell.studio.noDiagnostics": "Không có chẩn đoán nào.",
+  "shell.studio.processGraph": "Sơ đồ quy trình",
+  "shell.studio.graphStepHasDiagnostics": "có chẩn đoán",
   "shell.studio.loadFailed": "Không thể tải Studio.",
   "shell.studio.forbidden.title": "Studio không khả dụng",
   "shell.studio.forbidden.message": "Bạn cần vai trò tác giả để dùng Studio.",

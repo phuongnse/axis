@@ -940,7 +940,7 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     the same lists.
   - A package or a module entry is plain text. It cannot be opened or expanded.
   - Uses and Used by stay lists. The **Process graph** below is the only
-    drawn graph *(planned for M11)*.
+    drawn graph.
 - **Text keys.** A text resource's **Uses** list holds its keys, each as an
   entry. Expanding a key lists the labels that use it and the locales that
   define it, as its **Used by** list.
@@ -1226,25 +1226,33 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     built, see
     [D46](../decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
     The page editor changes again then.
-- **Process graph** *(planned for M11)*. A process shows a drawn graph of its
-  steps and transitions above its editor, see
+- **Process graph.** A process shows a drawn graph of its steps and transitions
+  above its editor, see
   [D53](../decisions.md#d53-typed-editors-and-the-process-graph-in-studio--agreed).
-  It is read-only. The author edits steps in the list.
+  It is read-only. The author edits steps in the JSON view or the form until the
+  step list is built.
   - Dagre, `@dagrejs/dagre`, lays out the graph, and React Flow,
     `@xyflow/react`, draws it. Their sizes are about 30 KB and 50 KB min+gzip.
-    Neither is in the SPA yet. M14's process designer builds on both.
-  - The graph and the step editor stay in step. Both read the same unsaved
-    draft, so an edit in the list redraws the graph at once.
-  - Selecting a node selects that step in the list. Selecting an edge opens its
-    transition: the outcome, the branch, `otherwise` or `next`. Selecting a step
-    in the list highlights its node.
+    Both load in a chunk of their own when a process opens.
+  - The graph is drawn from the editor's unsaved draft, so a step added in the
+    JSON view shows as a node at once.
+  - Until the process step editor is built, selecting a node opens the editor at
+    `/steps/{i}`, and selecting an edge opens its transition's path, such as
+    `/steps/1/outcomes/0`. Both go through the `&path=` address, as a diagnostic
+    does. Selecting a step in the list and highlighting its node come with the
+    step editor *(planned for M11)*.
+  - The node of the open path has `aria-current="true"`. The open path is
+    `/steps/{i}` or a path under it.
   - A transition to a step that does not exist draws no edge. The graph never
     invents a node.
   - A step that a diagnostic in the diagnostics panel names, by a path such as
-    `/steps/{i}`, is marked. The marks come from the panel's last loaded list,
+    `/steps/{i}`, is marked. A marked node has `data-marked` and says "has
+    diagnostics" in its name. The marks come from the panel's last loaded list,
     so they change on a save or a request, not on every edit.
-  - Nodes are reached with Tab and opened with Enter. Each node has a text label
-    with the step's name and type.
+  - Only nodes take keyboard focus, in step order, and Enter opens the node.
+    Edges can be clicked but not tabbed to. A keyboard user reaches a transition
+    through its step's path in the editor. Each node has a text label with the
+    step's name and type.
 - **Designers.** Visual page, form and process designers are not built yet.
   They are planned for M13 and M14, see
   [D46](../decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).

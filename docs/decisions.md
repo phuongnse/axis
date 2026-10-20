@@ -3090,7 +3090,7 @@ costs:
 
 M11 gives Studio typed editors for pages, process steps and connectors, and
 for the kinds that need JSON today. It also adds a read-only process graph. The
-seed grid is built. The rest is _(planned for M11)_. See the
+seed grid and the process graph are built. The rest is _(planned for M11)_. See the
 [Studio section](reference/frontend.md#studio) for the detail. The owner
 confirmed these points on issue #780 on 2026-10-20.
 
@@ -3154,7 +3154,7 @@ confirmed these points on issue #780 on 2026-10-20.
   - It uses React Flow (`@xyflow/react`, MIT, about 50 KB min+gzip with its
     dependencies) to draw, and dagre (`@dagrejs/dagre`, MIT, about 30 KB
     min+gzip) to lay out. M14's process designer builds on both.
-  - Neither package is added until the M11 issue that builds the graph.
+  - Both packages were added with the graph.
 - **Effect on earlier decisions:** D39 says there is no graph drawing library.
   [D39](#d39-reference-index-and-where-a-resource-is-used--agreed) links here
   where M11 changes that.

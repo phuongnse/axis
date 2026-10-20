@@ -141,6 +141,8 @@
   "shell.studio.path": "Path",
   "shell.studio.diagnostics": "Diagnostics",
   "shell.studio.noDiagnostics": "No diagnostics.",
+  "shell.studio.processGraph": "Process graph",
+  "shell.studio.graphStepHasDiagnostics": "has diagnostics",
   "shell.studio.loadFailed": "Studio could not be loaded.",
   "shell.studio.forbidden.title": "Studio is not available",
   "shell.studio.forbidden.message": "You need the author role to use Studio.",

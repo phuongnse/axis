@@ -62,6 +62,8 @@ function renderEditor() {
         item={resources[0]}
         resources={resources}
         path={null}
+        diagnosticPaths={[]}
+        onOpenPath={vi.fn()}
         onSaved={vi.fn()}
         onDeleted={vi.fn()}
       />

@@ -1,5 +1,5 @@
 import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
 import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
 import {
@@ -16,6 +16,11 @@ import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
+import { buildProcessGraph } from './processGraph'
+
+const StudioProcessGraph = lazy(() =>
+  import('./StudioProcessGraph').then((module) => ({ default: module.StudioProcessGraph })),
+)
 
 type Content = Record<string, unknown>
 
@@ -77,13 +82,16 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * show opens the JSON view instead. A seed whose entity is a resource of the folder shows its records as a grid with
  * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
  * the entity is not in the folder, the seed uses the generic form. When the server does not answer, the draft stays, and the resource loads again
- * after the reconnect unless the draft has changes.
+ * after the reconnect unless the draft has changes. A process shows its step graph above the tabs, drawn from the draft.
+ * Its diagnostic paths mark steps, and selecting a node or an edge opens its path, as a diagnostic does.
  */
 export function StudioEditor({
   application,
   item,
   resources,
   path,
+  diagnosticPaths,
+  onOpenPath,
   onSaved,
   onDeleted,
 }: {
@@ -91,6 +99,8 @@ export function StudioEditor({
   item: StudioResourceItem
   resources: StudioResourceItem[]
   path: string | null
+  diagnosticPaths: readonly string[]
+  onOpenPath: (path: string) => void
   onSaved: (diagnostics: StudioDiagnostic[]) => void
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
@@ -198,6 +208,10 @@ export function StudioEditor({
 
   const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
   const isLoaded = loaded !== undefined
+  const graph = useMemo(
+    () => (item.kind === 'process' ? buildProcessGraph(draft, diagnosticPaths) : null),
+    [item.kind, draft, diagnosticPaths],
+  )
 
   useEffect(() => {
     dirtyRef.current = patch.length > 0 || jsonInvalid
@@ -338,6 +352,11 @@ export function StudioEditor({
 
   return (
     <Flex vertical gap="small" data-testid="studio-editor" ref={rootRef}>
+      {graph && (
+        <Suspense fallback={null}>
+          <StudioProcessGraph graph={graph} openPath={path} onOpen={onOpenPath} />
+        </Suspense>
+      )}
       <Tabs
         activeKey={tab}
         onChange={(key) => setTab(key as 'form' | 'json')}

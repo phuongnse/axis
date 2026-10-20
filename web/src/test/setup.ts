@@ -16,6 +16,40 @@ afterAll(() => {
   return new Promise((resolve) => setTimeout(resolve, 500))
 })
 
+// React Flow observes its nodes and container, and jsdom has no layout to report.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+// React Flow reads the zoom from a transform matrix, which jsdom does not parse.
+globalThis.DOMMatrixReadOnly ??= class {
+  m22: number
+  constructor(transform = '') {
+    const match = /scale\((.+?)\)/.exec(transform)
+    this.m22 = match ? Number(match[1]) : 1
+  }
+} as unknown as typeof DOMMatrixReadOnly
+
+// jsdom reports every element as 0 wide and tall, so React Flow would measure nothing.
+Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+  configurable: true,
+  get() {
+    return parseFloat(this.style.width) || 1
+  },
+})
+Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+  configurable: true,
+  get() {
+    return parseFloat(this.style.height) || 1
+  },
+})
+
+// Edge labels measure their text, which jsdom does not lay out.
+const svg = SVGElement.prototype as SVGElement & { getBBox?: () => DOMRect }
+svg.getBBox ??= () => ({ x: 0, y: 0, width: 0, height: 0 }) as DOMRect
+
 // jsdom does not implement matchMedia, which Ant Design and the theme provider use.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

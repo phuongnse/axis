@@ -1122,3 +1122,72 @@ describe('StudioPage publishing', () => {
     })
   })
 })
+
+describe('StudioPage process graph', () => {
+  const processId = 'a7e2c9d4-1f3b-4c5e-8d6a-9b0c1d2e3f4a'
+  const processItem: StudioResourceItem = {
+    id: processId,
+    kind: 'process',
+    name: 'Approve',
+    file: 'processes/approve.json',
+    version: 'p1',
+    usedBy: 0,
+  }
+  const processContent = {
+    id: processId,
+    kind: 'process',
+    name: 'Approve',
+    formatVersion: 1,
+    start: 'Start',
+    steps: [
+      { name: 'Start', type: 'operation', next: 'Review' },
+      { name: 'Review', type: 'operation', next: 'End' },
+      { name: 'End', type: 'end' },
+    ],
+  }
+  const processDiagnostic: StudioDiagnostic = {
+    code: 'AXC0300',
+    severity: 'error',
+    message: 'The next step does not exist.',
+    file: 'processes/approve.json',
+    path: '/steps/1/next',
+    resourceId: processId,
+  }
+
+  it('marks the steps that a diagnostic of the open process names', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/me') {
+          return json({ id: 'hoa', studio: true })
+        }
+        if (input === '/api/studio/apps') {
+          return json({ items: [{ name: 'PurchaseRequests' }] })
+        }
+        if (input === `${folder}/resources`) {
+          return json({ items: [processItem] })
+        }
+        if (input === `${folder}/resources/${processId}`) {
+          return json({ ...processItem, content: processContent })
+        }
+        if (input === `${folder}/resources/${processId}/references`) {
+          return json({ uses: [], usedBy: [] })
+        }
+        if (input === `${folder}/releases`) {
+          return json({ active: null, folderContentHash: null, items: [] })
+        }
+        if (input === `${folder}/diagnostics`) {
+          return json({ diagnostics: [processDiagnostic] })
+        }
+        return new Response(null, { status: 404 })
+      }),
+    )
+    renderPage(`/studio?app=PurchaseRequests&resource=${processId}`)
+
+    const marked = await screen.findByTestId('studio-graph-node-1', undefined, { timeout: 5000 })
+    expect(marked).toHaveAttribute('data-marked', 'true')
+    expect(marked).toHaveAccessibleName(/has diagnostics/)
+    expect(screen.getByTestId('studio-graph-node-0')).not.toHaveAttribute('data-marked')
+    expect(screen.getByTestId('studio-graph-node-0')).not.toHaveAccessibleName(/has diagnostics/)
+  })
+})

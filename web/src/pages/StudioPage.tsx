@@ -48,6 +48,8 @@ type FolderState =
  * active release. The diagnostics panel shows the diagnostics of a request that ended. When the server does not
  * answer, a reconnect message shows at the top. Studio checks the server with a
  * back-off, then loads its data again, and an unsaved draft stays on screen.
+ * A process opens with its step graph above the editor. The diagnostics of the open resource mark its steps, and
+ * selecting a node or an edge opens that path in the editor.
  */
 export function StudioPage() {
   const t = useText()
@@ -162,6 +164,13 @@ function StudioWorkspace() {
   const resources = useMemo(() => (loaded && 'resources' in loaded ? loaded.resources : []), [loaded])
   const groups = useMemo(() => groupByKind(filterResources(resources, search)), [resources, search])
   const selected = resourceId === null ? undefined : resources.find((item) => item.id === resourceId.toLowerCase())
+  const diagnosticPaths = useMemo(
+    () =>
+      loaded && 'diagnostics' in loaded && selected
+        ? loaded.diagnostics.filter((d) => d.resourceId?.toLowerCase() === selected.id).map((d) => d.path)
+        : [],
+    [loaded, selected],
+  )
 
   function pickApplication(name: string) {
     setSearch('')
@@ -293,6 +302,8 @@ function StudioWorkspace() {
                     item={selected}
                     resources={loaded.resources}
                     path={path}
+                    diagnosticPaths={diagnosticPaths}
+                    onOpenPath={(graphPath) => openReference(selected.id, graphPath)}
                     onSaved={(diagnostics) => {
                       setFolder({ ...loaded, diagnostics })
                       setFolderRevision((value) => value + 1)
