@@ -755,6 +755,7 @@ describe('StudioPage', () => {
 
 describe('StudioPage publishing', () => {
   const requestId = '7a8b9c0d-1e2f-4a3b-9c4d-5e6f70819203'
+  const siteId = '3c4d5e6f-7081-4920-a3b4-c5d6e7f80910'
   const releaseId = '0192f4a7-3b1c-7e2d-9a4f-aaaaaaaaaaaa'
   const published: StudioDiagnostic = {
     code: 'AXC0900',
@@ -795,6 +796,31 @@ describe('StudioPage publishing', () => {
       if (input === `${folder}/validate` && init?.method === 'POST') {
         return json(request('queued', { kind: 'validate', label: null }), 202)
       }
+      if (input === `${folder}/preview` && init?.method === 'POST') {
+        return json(request('queued', { target: 'preview', label: null }), 202)
+      }
+      if (input === `${folder}/resources`) {
+        const site = {
+          id: siteId,
+          kind: 'site',
+          name: 'Purchasing',
+          file: 'sites/purchasing.json',
+          version: 'e',
+          usedBy: 0,
+        }
+        return json({ items: [...resources, site] })
+      }
+      if (input === `${folder}/resources/${siteId}`) {
+        return json({
+          id: siteId,
+          kind: 'site',
+          name: 'Purchasing',
+          file: 'sites/purchasing.json',
+          version: 'e',
+          usedBy: 0,
+          content: { id: siteId, kind: 'site', name: 'Purchasing', path: 'purchasing' },
+        })
+      }
       if (input === `${folder}/requests/${requestId}`) {
         return json(answers.length > 1 ? answers.shift() : answers[0])
       }
@@ -821,7 +847,11 @@ describe('StudioPage publishing', () => {
     return fetchMock
   }
 
-  const publisher = () => json({ id: 'hoa', studio: true, studioPublisher: true })
+  const publisher = () => json({ id: 'hoa', studio: true, studioPublisher: true, studioPreviewHost: null })
+  const previewer =
+    (studioPublisher = true) =>
+    () =>
+      json({ id: 'hoa', studio: true, studioPublisher, studioPreviewHost: 'preview.example.test' })
 
   afterEach(() => vi.useRealTimers())
 
@@ -868,6 +898,62 @@ describe('StudioPage publishing', () => {
     expect(within(panel).getByText('AXC0900')).toBeInTheDocument()
     expect(within(panel).queryByText('AXC0101')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Validate' })).toBeEnabled()
+  })
+
+  it.each([
+    ['studioPreviewHost is null', publisher, false],
+    ['studioPreviewHost is set', previewer(), true],
+    ['studioPreviewHost is set and studioPublisher is false', previewer(false), true],
+    ['GET /api/me fails', () => new Response(null, { status: 500 }), false],
+  ])('shows Preview only when there is a preview host: %s', async (_name, me, shown) => {
+    stubPublishing(me)
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Validate' })).toBeEnabled()
+    await waitFor(() => expect(screen.queryAllByTestId('studio-preview')).toHaveLength(shown ? 1 : 0))
+  })
+
+  it('links a succeeded preview to each site on the preview host and shows no release number', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const fetchMock = stubPublishing(previewer(false), [
+      request('running', { target: 'preview' }),
+      request('succeeded', { target: 'preview', releaseId }),
+    ])
+    renderPage()
+    await userEvent.click(await screen.findByTestId('studio-preview'))
+
+    expect(await screen.findByTestId('studio-request-status')).toHaveAttribute('data-status', 'queued')
+    expect(screen.getByTestId('studio-preview')).toBeDisabled()
+    expect(screen.queryByTestId('studio-preview-link')).not.toBeInTheDocument()
+    await vi.advanceTimersByTimeAsync(1000)
+    await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'running'))
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
+    const link = await screen.findByTestId('studio-preview-link')
+    expect(link.getAttribute('href')).toContain('//preview.example.test')
+    expect(link.getAttribute('href')).toMatch(/\/purchasing$/)
+    expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()
+    expect(screen.getByTestId('studio-preview')).toBeEnabled()
+    const posts = fetchMock.mock.calls.filter(
+      ([input, init]) => input === `${folder}/preview` && init?.method === 'POST',
+    )
+    expect(posts).toHaveLength(1)
+  })
+
+  it('shows no preview link when the preview fails, and puts its diagnostics in the panel', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    stubPublishing(previewer(), [request('failed', { target: 'preview', diagnostics: [savedDiagnostic] })])
+    renderPage()
+    await userEvent.click(await screen.findByTestId('studio-preview'))
+    await screen.findByTestId('studio-request-status')
+
+    await vi.advanceTimersByTimeAsync(1000)
+
+    await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed'))
+    expect(screen.getByTestId('studio-request-status')).toHaveTextContent('Preview failed.')
+    expect(screen.queryByTestId('studio-preview-link')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-diagnostics')).getByText('AXC0777')).toBeInTheDocument()
   })
 
   it('puts the diagnostics of a failed validate in the panel and shows no release number', async () => {

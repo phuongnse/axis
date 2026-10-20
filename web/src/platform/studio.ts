@@ -262,7 +262,7 @@ export interface StudioRequest {
   id: string
   application: string
   kind: 'validate' | 'publish' | 'rollback'
-  target: string
+  target: 'tenant' | 'preview'
   status: StudioRequestStatus
   label: string | null
   note: string | null
@@ -310,6 +310,28 @@ export async function validateStudioApp(application: string): Promise<StudioRequ
     throw new Error(`Posting '${path}' failed with status ${response.status}.`)
   }
   return (await response.json()) as StudioRequest
+}
+
+/** Sends a preview request, which publishes the folder to the preview tenant. It answers at once with the queued request. A 401 starts sign-in and throws, as any other failure does. */
+export async function previewStudioApp(application: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/preview`
+  const response = await studioFetch(path, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
+/**
+ * The address of a site on the preview host. It takes the protocol and the port of the page, because the preview host
+ * is served on the same ones as the main host.
+ */
+export function previewSiteUrl(
+  host: string,
+  sitePath: string,
+  location: Pick<Location, 'protocol' | 'port'> = window.location,
+): string {
+  return `${location.protocol}//${host}${location.port ? `:${location.port}` : ''}/${sitePath}`
 }
 
 /** Sends a rollback request to an earlier release. It answers at once with the queued request. A 401 starts sign-in and throws, as any other failure does. */

@@ -852,7 +852,7 @@ Studio is where authors edit an application's resources. It uses the
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. The route, the link, the application picker, the resource list with its
 search, the editor, the Uses and Used by lists, the delete button and its warning,
-the diagnostics panel, Validate and Publish with the request status, the Releases list with Roll back, and the reconnect message are built.
+the diagnostics panel, Validate, Preview and Publish with the request status and the preview links, the Releases list with Roll back, and the reconnect message are built.
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
@@ -922,13 +922,26 @@ the diagnostics panel, Validate and Publish with the request status, the Release
   opens the resource at the diagnostic's `path`, as a Used by entry does. A
   diagnostic with an empty path opens the resource at its top. A diagnostic that
   names no resource cannot be selected. A diagnostic never blocks a save.
-- **Publishing.** Two buttons sit under the application picker. They use the
-  [publishing routes](authoring.md#publishing). Preview is *(planned for M10)*.
+- **Publishing.** Up to three buttons sit under the application picker. They use the
+  [publishing routes](authoring.md#publishing).
   - **Validate** sends a validate request. **Publish** opens a dialog with an
     optional label, up to 100 characters, and an optional note, up to 2000.
     Confirming sends the publish request. Empty values are left out of the body.
   - **Publish** shows only when `GET /api/me` answers `studioPublisher: true`.
-    When that answer is `false` or fails, only **Validate** shows.
+    When that answer is `false` or fails, **Publish** does not show.
+  - **Preview** sits next to **Validate** and shows only when `GET /api/me`
+    answers a `studioPreviewHost` that is not null. It does not need
+    `studioPublisher`. It sends `POST .../preview` at once, with no dialog, and
+    the status line shows **queued**, **running** and the outcome, as for Publish.
+    A succeeded preview shows **Previewed** and a link to each of the
+    application's sites on the preview host. Studio builds a link from the page's
+    protocol and port, the `studioPreviewHost` and the site's `path`, and it reads the
+    paths from the folder's `site` resources when the preview succeeds. A site
+    renamed after the request was sent can give a wrong link. The preview host
+    must be served on the same port and protocol as the page. A failed preview
+    shows **Preview failed** and puts its diagnostics in the diagnostics panel.
+    A preview shows no release number and does not change the Releases list,
+    because its release belongs to the preview tenant's own history.
   - Studio then checks `GET .../requests/{id}` every second until the status is
     `succeeded` or `failed`, with no time limit. A status line shows **queued** or
     **running** meanwhile. It shows the outcome only once the publisher has finished
@@ -941,7 +954,7 @@ the diagnostics panel, Validate and Publish with the request status, the Release
   - When a request ends, the diagnostics panel shows the request's diagnostics in
     place of the loaded ones, for a failed request and for a succeeded one that holds
     warnings. They open at their paths as before.
-  - Both buttons are off while a request runs and while the reconnect message
+  - The buttons are off while a request runs and while the reconnect message
     shows. If the server does not answer during a request, Studio checks it again
     after the reconnect.
 - **Releases.** A list under the publishing buttons shows the open application's

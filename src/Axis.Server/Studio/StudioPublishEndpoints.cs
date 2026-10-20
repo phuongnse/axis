@@ -1,8 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Releases;
+using Axis.Core.Tenancy;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Axis.Tenancy;
 using Microsoft.Net.Http.Headers;
 using Npgsql;
 using NpgsqlTypes;
@@ -10,12 +12,13 @@ using NpgsqlTypes;
 namespace Axis.Server.Studio;
 
 /// <summary>
-/// The routes that ask for an activation. <c>POST /api/studio/apps/{application}/validate</c> and <c>.../publish</c> store
-/// a snapshot of the folder as a publish request in the database of the tenant of the host, and answer 202 with the
+/// The routes that ask for an activation. <c>POST /api/studio/apps/{application}/validate</c>, <c>.../publish</c> and
+/// <c>.../preview</c> store a snapshot of the folder as a publish request in the database of the tenant of the host, and answer 202 with the
 /// request and a <c>Location</c> for <c>GET /api/studio/apps/{application}/requests/{id}</c>. They never compile or
 /// activate: the publisher runs the request. The checks run in the order of the rest of the authoring API: session (401),
 /// author role (403), for <c>publish</c> the publisher role (403), then the application (404). A folder whose manifest
-/// has no UUID <c>id</c> answers 409. A <c>publish</c> without a body stores no label and no note. A body must be
+/// has no UUID <c>id</c> answers 409. A <c>preview</c> needs the author role only. It stores a <c>publish</c> request with
+/// target <c>preview</c>, and answers 409 when the tenant has no served preview tenant, before the manifest check. A <c>publish</c> without a body stores no label and no note. A body must be
 /// <c>application/json</c> (415) and a JSON object with only a string <c>label</c> of up to 100 characters and a string
 /// <c>note</c> of up to 2000 (400). A <c>validate</c> ignores its body. The status route answers 404 for a request
 /// of another application or tenant, because it reads this tenant's database for this application only.
@@ -33,6 +36,7 @@ internal static class StudioPublishEndpoints
     {
         endpoints.MapPost("/api/studio/apps/{application}/validate", ValidateAsync);
         endpoints.MapPost("/api/studio/apps/{application}/publish", PublishAsync);
+        endpoints.MapPost("/api/studio/apps/{application}/preview", PreviewAsync);
         endpoints.MapPost("/api/studio/apps/{application}/releases/{id}/rollback", RollbackAsync);
         endpoints.MapGet("/api/studio/apps/{application}/requests/{id}", GetRequestAsync);
     }
@@ -67,6 +71,25 @@ internal static class StudioPublishEndpoints
         return folder is null
             ? refusal!
             : await StoreAsync("validate", application, folder, label: null, note: null, httpContext, database);
+    }
+
+    private static async Task<IResult> PreviewAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        TenantDatabase database,
+        ITenantCatalog catalog,
+        ITenantContextAccessor tenants)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        return StudioPreview.Find(catalog, tenants.Current!.TenantId) is null
+            ? StudioEndpoints.Problem(StatusCodes.Status409Conflict, "This tenant has no preview tenant.")
+            : await StoreAsync("publish", application, folder, label: null, note: null, httpContext, database, target: "preview");
     }
 
     private static async Task<IResult> PublishAsync(
@@ -154,7 +177,8 @@ internal static class StudioPublishEndpoints
         string? label,
         string? note,
         HttpContext httpContext,
-        TenantDatabase database)
+        TenantDatabase database,
+        string target = "tenant")
     {
         if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest)
         {
@@ -170,7 +194,7 @@ internal static class StudioPublishEndpoints
             ["content"] = file.Content,
         })]);
 
-        return await InsertAsync(kind, application, manifest.Name, applicationId, snapshot.ToJsonString(), releaseId: null, label, note, user, database, cancellationToken);
+        return await InsertAsync(kind, application, manifest.Name, applicationId, snapshot.ToJsonString(), releaseId: null, label, note, user, database, cancellationToken, target);
     }
 
     // Stores the request as queued and answers 202 with it and its Location.
@@ -185,21 +209,23 @@ internal static class StudioPublishEndpoints
         string? note,
         CurrentUserResponse user,
         TenantDatabase database,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string target = "tenant")
     {
         var id = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests
-                (id, application_id, kind, status, snapshot, release_id, label, note, requested_by, requested_by_name, requested_at)
-            VALUES (@id, @application, @kind, 'queued', @snapshot, @release, @label, @note, @user, @name, clock_timestamp())
+                (id, application_id, kind, target, status, snapshot, release_id, label, note, requested_by, requested_by_name, requested_at)
+            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, @release, @label, @note, @user, @name, clock_timestamp())
             RETURNING requested_at
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("application", applicationId);
         command.Parameters.AddWithValue("kind", kind);
+        command.Parameters.AddWithValue("target", target);
         command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlDbType.Jsonb) { Value = (object?)snapshot ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = (object?)releaseId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("label", NpgsqlDbType.Text) { Value = (object?)label ?? DBNull.Value });
@@ -211,7 +237,7 @@ internal static class StudioPublishEndpoints
         var requestedAt = inserted.GetFieldValue<DateTimeOffset>(0);
 
         var response = new StudioPublishRequestResponse(
-            id.ToString("D"), name ?? application, kind, "tenant", "queued", label, note, user.Id, requestedAt,
+            id.ToString("D"), name ?? application, kind, target, "queued", label, note, user.Id, requestedAt,
             null, null, releaseId?.ToString("D"), JsonDocument.Parse("[]").RootElement.Clone());
         return Results.Accepted($"/api/studio/apps/{Uri.EscapeDataString(application)}/requests/{id:D}", response);
     }
@@ -236,7 +262,7 @@ internal static class StudioPublishEndpoints
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
             """
-            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text
+            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text, target
             FROM axis.publish_requests
             WHERE id = @id AND application_id = @application
             """,
@@ -254,7 +280,7 @@ internal static class StudioPublishEndpoints
             requestId.ToString("D"),
             manifest.Name ?? application,
             reader.GetString(0),
-            "tenant",
+            reader.GetString(10),
             reader.GetString(1),
             reader.IsDBNull(2) ? null : reader.GetString(2),
             reader.IsDBNull(3) ? null : reader.GetString(3),
@@ -271,8 +297,8 @@ internal static class StudioPublishEndpoints
 }
 
 /// <summary>
-/// A publish request as the authoring API shows it. <c>Application</c> is the manifest name, <c>Target</c> is always
-/// <c>tenant</c> and <c>Diagnostics</c> is empty until the request ends.
+/// A publish request as the authoring API shows it. <c>Application</c> is the manifest name, <c>Target</c> is
+/// <c>tenant</c> or <c>preview</c> and <c>Diagnostics</c> is empty until the request ends.
 /// </summary>
 internal sealed record StudioPublishRequestResponse(
     string Id,

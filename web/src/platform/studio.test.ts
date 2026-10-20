@@ -4,6 +4,7 @@ import {
   filterResources,
   folderDiffers,
   groupByKind,
+  previewSiteUrl,
   releaseRows,
   ServerUnreachableError,
   type StudioReleaseItem,
@@ -183,5 +184,16 @@ describe('folderDiffers', () => {
   it('is false when no release is active, or the folder has errors', () => {
     expect(folderDiffers(history({ active: null, folderContentHash: 'other' }))).toBe(false)
     expect(folderDiffers(history({ folderContentHash: null }))).toBe(false)
+  })
+})
+
+describe('previewSiteUrl', () => {
+  it('keeps the protocol and the port of the page and puts the site path after the preview host', () => {
+    expect(previewSiteUrl('preview.localhost', 'purchasing', { protocol: 'http:', port: '5173' })).toBe(
+      'http://preview.localhost:5173/purchasing',
+    )
+    expect(previewSiteUrl('preview.example.test', 'leave', { protocol: 'https:', port: '' })).toBe(
+      'https://preview.example.test/leave',
+    )
   })
 })

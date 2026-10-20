@@ -17,6 +17,8 @@ public sealed class StudioPublishTests : IAsyncLifetime
 {
     internal const string HostA = "a.example.test";
 
+    internal const string PreviewHost = "preview.example.test";
+
     private const string HostB = "b.example.test";
 
     private const string ValidateUrl = "/api/studio/apps/PurchaseRequests/validate";
@@ -213,7 +215,9 @@ public sealed class StudioPublishTests : IAsyncLifetime
     }
 
     // A server for the tenants, which activates the folder on each of them at start.
-    internal static WebApplicationFactory<Program> NewFactory(string folder, (string Tenant, string Host, string ConnectionString)[] tenants) =>
+    // With a previewConnectionString, the first tenant also has a preview tenant, with no deployment bindings.
+    internal static WebApplicationFactory<Program> NewFactory(
+        string folder, (string Tenant, string Host, string ConnectionString)[] tenants, string? previewConnectionString = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -230,6 +234,15 @@ public sealed class StudioPublishTests : IAsyncLifetime
                 builder.UseTestOidc(tenant);
             }
 
+            if (previewConnectionString is not null)
+            {
+                var preview = $"{tenants[0].Tenant}-preview";
+                builder.UseSetting($"Tenants:{preview}:Hosts:0", PreviewHost);
+                builder.UseSetting($"Tenants:{preview}:ConnectionString", PostgreSqlServer.RuntimeConnectionString(previewConnectionString));
+                builder.UseSetting($"Tenants:{preview}:SchemaConnectionString", previewConnectionString);
+                builder.UseSetting($"Tenants:{preview}:PreviewOf", tenants[0].Tenant);
+            }
+
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("ActivateOnStartup:0", folder);
@@ -243,9 +256,10 @@ public sealed class StudioPublishTests : IAsyncLifetime
         });
 
     // Runs the publisher of one tenant in this process until it is disposed. The server has migrated the database by now.
-    internal static RunningPublisher RunPublisher(string tenant, string host, string connectionString)
+    // With a previewConnectionString, it serves the tenant's preview tenant too.
+    internal static RunningPublisher RunPublisher(string tenant, string host, string connectionString, string? previewConnectionString = null)
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        var settings = new Dictionary<string, string?>
         {
             ["Tenancy:Source"] = "configuration",
             [$"Tenants:{tenant}:Hosts:0"] = host,
@@ -257,7 +271,17 @@ public sealed class StudioPublishTests : IAsyncLifetime
             [$"Tenants:{tenant}:Bindings:PurchasingSystemToken:Value"] = "studio-test-token",
             ["Extensions:Path"] = SamplePackages.Path,
             ["Modules:Path"] = SampleModules.Path,
-        }).Build();
+        };
+        if (previewConnectionString is not null)
+        {
+            var preview = $"{tenant}-preview";
+            settings[$"Tenants:{preview}:Hosts:0"] = PreviewHost;
+            settings[$"Tenants:{preview}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(previewConnectionString);
+            settings[$"Tenants:{preview}:SchemaConnectionString"] = previewConnectionString;
+            settings[$"Tenants:{preview}:PreviewOf"] = tenant;
+        }
+
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var output = TextWriter.Synchronized(new StringWriter());
         var error = new StringWriter();

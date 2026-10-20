@@ -376,7 +376,7 @@ bullets say so.
   [deployment bindings](reference/configuration.md#deployment-bindings).
 - **Status.** *(Planned for M10.)* Each tenant keeps its own status. Suspending a main tenant does
   not suspend its preview tenant.
-- **Publishing.** *(Planned for M10.)* Studio on the main tenant's host stores a preview request in
+- **Publishing.** Studio on the main tenant's host stores a preview request in
   the main tenant's database. The publisher runs it against the preview tenant.
   The server never opens a connection to another tenant's database. See
   [preview](reference/authoring.md#preview).
@@ -564,6 +564,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   It adds a boolean `studioPublisher`, true when
   `Studio:Folders` is not empty and the user holds both `Studio:AuthorRole` and
   `Studio:PublisherRole`. See [D47](decisions.md#d47-publishing-from-studio--agreed).
+  It adds `studioPreviewHost`, the host of the tenant's served preview tenant. It
+  is null for a user who may not use Studio and for a tenant without a preview
+  tenant. See [D48](decisions.md#d48-preview-tenants--agreed).
   Without a session it is a `401`, as today. Record writes, process starts and the
   task API read the current user the same way, and their audit records store
   the user's id and display name.

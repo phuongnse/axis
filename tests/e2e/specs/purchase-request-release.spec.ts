@@ -4,7 +4,7 @@ import path from 'node:path'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 import { activateFolder, startServer } from '../activate'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
-import { purchaseRequests } from '../server-settings'
+import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 
 // Each activation starts a second server, which takes a few seconds.
@@ -164,6 +164,59 @@ test.describe('the active release of the purchase request sample changes', () =>
       await useSession(page, 'anna')
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('an author previews from Studio and the preview host shows the new label while the main host does not', async (
+    { baseURL, browser, page },
+    testInfo,
+  ) => {
+    test.setTimeout(240_000)
+    const { server, folder } = await studioServer(testInfo)
+    const heading = `Name ${Date.now().toString(36)}`
+    try {
+      await useSession(page, 'hoa')
+      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
+        expect(content.texts['supplier.name']).toBe('Name')
+        content.texts['supplier.name'] = heading
+      })
+
+      await page.getByTestId('studio-preview').click()
+
+      await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
+        timeout: 60_000,
+      })
+      await expect(page.getByTestId('studio-release-number')).toHaveCount(0)
+      await expect(page.getByTestId('studio-preview-link')).toHaveAttribute(
+        'href',
+        `${previewURL(server.url)}/purchasing`,
+      )
+
+      // The preview tenant shares its database with the main E2E server, which is the one with a Keycloak redirect
+      // address, so anna signs in to the preview host of that server, as in the preview tenant journey.
+      const context = await browser.newContext({
+        baseURL: previewURL(baseURL!),
+        storageState: { cookies: [], origins: [] },
+      })
+      try {
+        const preview = await context.newPage()
+        await preview.goto('/api/auth/sign-in?returnUrl=/')
+        await preview.locator('#username').fill('anna')
+        await preview.locator('#password').fill('axis')
+        await preview.locator('#kc-login').click()
+        await preview.waitForURL(`${previewURL(baseURL!)}/`)
+        await preview.goto('/purchasing/suppliers')
+        await expect(preview.getByRole('columnheader', { name: heading })).toBeVisible()
+      } finally {
+        await context.close()
+      }
+
+      await useSession(page, 'anna')
+      await page.goto('/purchasing/suppliers')
+      await expect(page.getByRole('columnheader', { name: 'Name', exact: true })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: heading })).toHaveCount(0)
     } finally {
       await server.stop()
     }

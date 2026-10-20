@@ -9,6 +9,8 @@ export interface CurrentUser {
   studio: boolean
   /** Whether the user may publish from Studio: the author and publisher roles, and Studio has folders. */
   studioPublisher: boolean
+  /** The host of the tenant's preview tenant, or `null` when the user may not use Studio or the tenant has none. */
+  studioPreviewHost: string | null
 }
 
 /**
