@@ -210,5 +210,14 @@
   "shell.studio.seed.tooLong": "Giá trị quá dài.",
   "shell.studio.seed.outOfBounds": "Giá trị nằm ngoài giới hạn.",
   "shell.studio.seed.notInValues": "Giá trị không nằm trong các giá trị của trường.",
-  "shell.studio.seed.invalidDate": "Ngày hoặc giờ không hợp lệ."
+  "shell.studio.seed.invalidDate": "Ngày hoặc giờ không hợp lệ.",
+  "shell.studio.newResource.button": "Tài nguyên mới",
+  "shell.studio.newResource.title": "Tài nguyên mới",
+  "shell.studio.newResource.kind": "Loại",
+  "shell.studio.newResource.name": "Tên",
+  "shell.studio.newResource.locale": "Ngôn ngữ",
+  "shell.studio.newResource.create": "Tạo",
+  "shell.studio.newResource.exists": "Đã có tài nguyên với tên hoặc ngôn ngữ này.",
+  "shell.studio.newResource.invalid": "Tên hoặc ngôn ngữ này không được phép. Tên dùng chữ cái và chữ số và bắt đầu bằng chữ cái. Tên vai trò dùng chữ cái thường, chữ số và dấu gạch nối. Ngôn ngữ có dạng en hoặc pt-BR.",
+  "shell.studio.newResource.failed": "Không thể tạo tài nguyên."
 }

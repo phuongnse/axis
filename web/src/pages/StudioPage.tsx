@@ -22,6 +22,7 @@ import { StudioConnectionContext, useStudioConnection } from '../platform/studio
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
+import { StudioNewResource } from './StudioNewResource'
 import { StudioPublishing } from './StudioPublishing'
 import { StudioReferences } from './StudioReferences'
 
@@ -42,10 +43,14 @@ type FolderState =
  * as a Used by entry does. A selected resource opens in an editor below its details, with its Uses and Used by
  * lists under the editor. A Used by entry opens its resource at the path of the reference, as `&path=`. After a
  * save, the diagnostics panel shows the diagnostics that the save answered. After a delete, the resource leaves the
- * list. Validate and Publish sit under the application picker, and Publish shows only when `GET /api/me` answers
+ * list. A New resource button above the search box creates a resource of any kind from its starter. The new resource
+ * joins the list, the diagnostics panel shows the diagnostics of the create, and the editor opens the resource.
+ * Validate and Publish sit under the application picker, and Publish shows only when `GET /api/me` answers
  * `studioPublisher: true`. Under them, the release list shows the application's releases, with a Roll back button
  * for a publisher. A save or a delete loads the release list again, because the folder may now differ from the
- * active release. The names that the reference pickers offer load again after a save, a delete and a reconnect. The diagnostics panel shows the diagnostics of a request that ended. When the server does not answer, a reconnect message shows at the top. Studio checks the server with a
+ * active release. The names that the reference pickers offer load again after a save, a delete and a reconnect.
+ * The diagnostics panel shows the diagnostics of a request that ended. When the server does not answer, a reconnect
+ * message shows at the top. Studio checks the server with a
  * back-off, then loads its data again, and an unsaved draft stays on screen.
  */
 export function StudioPage() {
@@ -195,6 +200,17 @@ function StudioWorkspace() {
     setParams({ app: application!, resource: id })
   }
 
+  function onCreated(item: StudioResourceItem, diagnostics: StudioDiagnostic[]) {
+    setFolder((current) =>
+      current && current.application === application && 'resources' in current
+        ? { ...current, resources: [...current.resources, item], diagnostics }
+        : current,
+    )
+    setFolderRevision((value) => value + 1)
+    setSearch('')
+    setParams({ app: application!, resource: item.id })
+  }
+
   function openReference(id: string, referencePath: string | null) {
     setParams({ app: application!, resource: id, ...(referencePath ? { path: referencePath } : {}) })
   }
@@ -256,6 +272,7 @@ function StudioWorkspace() {
         <>
           <Flex gap="large" align="flex-start">
             <Flex vertical gap="small" style={{ width: 320, flex: 'none' }}>
+              <StudioNewResource application={application!} resources={resources} onCreated={onCreated} />
               <Input.Search
                 aria-label={t('shell.studio.search')}
                 placeholder={t('shell.studio.search')}

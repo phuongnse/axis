@@ -177,6 +177,15 @@ export interface StudioNames {
   texts: StudioNameText[]
 }
 
+/**
+ * The answer to a create: the new resource as the list shows it and the folder's diagnostics after the write, `conflict`
+ * when the id or the target file exists, or `invalid` when the name or the locale is refused.
+ */
+export type CreateResult =
+  | { status: 'created'; item: StudioResourceItem; diagnostics: StudioDiagnostic[] }
+  | { status: 'conflict' }
+  | { status: 'invalid' }
+
 /** The answer to a delete: the folder's diagnostics after it, or `conflict` when the file changed since it was read. */
 export type DeleteResult = { status: 'deleted'; diagnostics: StudioDiagnostic[] } | { status: 'conflict' }
 
@@ -269,6 +278,46 @@ export async function patchStudioResource(
   }
   const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
   return { status: 'saved', version: body.version, diagnostics: body.diagnostics }
+}
+
+/**
+ * Creates a resource from `content`, which holds its `id`, `kind` and `name`. A 409 means the id or the file exists, and
+ * a 400 means the name or the locale is refused. Nothing is written for either. A 401 starts sign-in and throws, as any
+ * other failure does.
+ */
+export async function createStudioResource(
+  application: string,
+  content: Record<string, unknown>,
+): Promise<CreateResult> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/resources`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(content),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (response.status === 400) {
+    return { status: 'invalid' }
+  }
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as StudioResourceItem & { diagnostics: StudioDiagnostic[] }
+  const { diagnostics, ...item } = body
+  return {
+    status: 'created',
+    item: {
+      id: item.id,
+      kind: item.kind,
+      name: item.name,
+      file: item.file,
+      version: item.version,
+      usedBy: 0,
+    },
+    diagnostics,
+  }
 }
 
 /** Loads what a resource uses and what uses it. A 401 starts sign-in and throws, as any other failure does. */

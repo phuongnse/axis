@@ -1049,4 +1049,129 @@ describe('StudioPage publishing', () => {
 
     await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
   })
+
+  describe('New resource', () => {
+    const siteId = '11111111-2222-4333-8444-555555555555'
+    const enId = '66666666-7777-4888-8999-aaaaaaaaaaaa'
+    const viId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'
+    const newId = '01234567-89ab-4cde-8f01-23456789abcd'
+    const withTexts: StudioResourceItem[] = [
+      ...resources,
+      { id: siteId, kind: 'site', name: 'Purchasing', file: 'sites/purchasing.json', version: 'e', usedBy: 0 },
+      { id: enId, kind: 'text', name: 'TextsEn', file: 'texts/en.json', version: 'f', usedBy: 0 },
+      { id: viId, kind: 'text', name: 'TextsVi', file: 'texts/vi.json', version: 'g', usedBy: 0 },
+    ]
+
+    /** The base stub, with a site that defaults to `vi`, two text resources, and a create that answers `status`. */
+    function stubCreate(status: number) {
+      const fetchMock = stubServer()
+      const base = fetchMock.getMockImplementation()!
+      fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+        if (input === `${folder}/resources` && init?.method === 'POST') {
+          return status === 201
+            ? json(
+                {
+                  id: newId,
+                  kind: 'text',
+                  name: 'TextsDe',
+                  file: 'texts/de.json',
+                  version: 'h',
+                  diagnostics: [savedDiagnostic],
+                },
+                201,
+              )
+            : json({ title: 'No.' }, status)
+        }
+        if (input === `${folder}/resources`) {
+          return json({ items: withTexts })
+        }
+        if (input === `${folder}/resources/${siteId}`) {
+          return json({
+            ...withTexts[4],
+            content: { locales: { default: 'vi', fallback: 'en', available: ['en', 'vi'] } },
+          })
+        }
+        if (input === `${folder}/resources/${enId}`) {
+          return json({
+            ...withTexts[5],
+            content: { locale: 'en', texts: { 'app.title': 'Title', 'app.save': 'Save' } },
+          })
+        }
+        if (input === `${folder}/resources/${viId}`) {
+          return json({ ...withTexts[6], content: { locale: 'vi', texts: { 'app.title': 'Tiêu đề' } } })
+        }
+        return base(input, init)
+      })
+      return fetchMock
+    }
+
+    async function fillDialog(kind: string, value: string, valueLabel: string) {
+      await userEvent.click(await screen.findByRole('button', { name: 'New resource' }))
+      await userEvent.click(screen.getByRole('combobox', { name: 'Kind' }))
+      await userEvent.click(await screen.findByTitle(kind))
+      await userEvent.type(screen.getByRole('textbox', { name: valueLabel }), value)
+      await userEvent.click(screen.getByRole('button', { name: 'Create' }))
+    }
+
+    it('creates a text resource that copies the texts of the default locale of the first site', async () => {
+      const fetchMock = stubCreate(201)
+      renderPage()
+
+      await fillDialog('text', 'de', 'Locale')
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`resource=${newId}`))
+      const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
+      const body = JSON.parse(init!.body as string) as Record<string, unknown>
+      expect(body).toMatchObject({
+        kind: 'text',
+        name: 'TextsDe',
+        formatVersion: 1,
+        locale: 'de',
+        texts: { 'app.title': 'Tiêu đề' },
+      })
+      expect(body.id).toMatch(/^[0-9a-f-]{36}$/)
+      expect(screen.getByTestId(`studio-resource-${newId}`)).toBeInTheDocument()
+      expect(within(screen.getByTestId('studio-diagnostics')).getByText('AXC0777')).toBeInTheDocument()
+    })
+
+    it('copies the en texts when the application has no site', async () => {
+      const fetchMock = stubCreate(201)
+      const base = fetchMock.getMockImplementation()!
+      fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+        input === `${folder}/resources` && init?.method !== 'POST'
+          ? json({ items: withTexts.filter((item) => item.kind !== 'site') })
+          : base(input, init),
+      )
+      renderPage()
+
+      await fillDialog('text', 'vi', 'Locale')
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`resource=${newId}`))
+      const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
+      expect((JSON.parse(init!.body as string) as { texts: unknown }).texts).toEqual({
+        'app.title': 'Title',
+        'app.save': 'Save',
+      })
+    })
+
+    it('shows a conflict under the field and keeps the dialog open', async () => {
+      stubCreate(409)
+      renderPage()
+
+      await fillDialog('entity', 'CostCentre', 'Name')
+
+      expect(await screen.findByText('A resource with this name or locale already exists.')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+      expect(screen.getByTestId('location')).not.toHaveTextContent('resource=')
+    })
+
+    it('shows a refused name under the field', async () => {
+      stubCreate(400)
+      renderPage()
+
+      await fillDialog('entity', 'Cost Centre', 'Name')
+
+      expect(await screen.findByText(/This name or locale is not allowed/)).toBeInTheDocument()
+    })
+  })
 })

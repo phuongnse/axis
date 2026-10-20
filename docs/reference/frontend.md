@@ -850,7 +850,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 Studio is where authors edit an application's resources. It uses the
 [authoring API](authoring.md) and writes the same JSON files that git keeps, as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
-agrees. The route, the link, the application picker, the resource list with its
+agrees. The route, the link, the application picker, New resource, the resource list with its
 search, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
 the request status and the preview links, the Releases list with Roll back, and the
@@ -872,17 +872,29 @@ reconnect message are built.
   diagnostics. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
-- **New resource** _(planned for M11)_. A **New resource** button asks for the
-  kind and the name, or the locale for a `text` resource.
+- **New resource.** A **New resource** button above the search box opens a
+  dialog that asks for the kind and the name, or the locale for a `text`
+  resource. The kind picker lists the 18 kinds that the create route accepts,
+  which is every kind except the manifest.
   - It sends the kind's starter with an id from `crypto.randomUUID()`. A starter
     is the smallest content that passes the kind's schema. A reference the
     author must still choose is an empty string, so it shows up as a diagnostic.
-  - The starters live in the SPA, next to the bundled schemas. A Vitest test
-    checks each one against its schema, except for the reference paths left
-    empty.
+    A new `site` gets the kebab-case name as its `path`, by the same rule as
+    file names, because a path is a value and not a reference.
+  - The starters live in the SPA, in `web/src/platform/studioStarters.json`.
+    Each lists the pointers of its empty references. A Vitest test checks each
+    one against its bundled schema, so a schema file without a starter fails,
+    and every error must be at a listed pointer. A server test reads the same
+    file, sends each starter through the create route, and checks that its
+    diagnostics are at the listed pointers only.
   - A new text resource copies every key and text of the default locale of the
     first site in file order, or `en` when there is no site, so every label still
-    resolves. The author then translates.
+    resolves. The author then translates. Its name is `Texts` and the locale,
+    such as `TextsVi` for `vi` and `TextsPtBr` for `pt-BR`.
+  - A `409`, when the id or the file exists, and a `400`, when the name or the
+    locale is refused, show under the field and keep the dialog open.
+  - After a create, the new resource joins the list, the diagnostics panel shows
+    the diagnostics that the create answered, and the editor opens the resource.
   - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 - **Application picker.** The first step picks one of the applications that
   `GET /api/studio/apps` lists. With only one application, it is picked at

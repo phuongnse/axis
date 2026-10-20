@@ -2429,8 +2429,10 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 
 ## Application templates
 
-_(planned for M11)_ This section follows
+This section follows
 [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
+The manifest, the one-site rule, installation and listing are built. The copy and
+the sample are _(planned for M11)_.
 An application template is an application folder with a `template.json`
 manifest. Studio creates a new application by copying an installed template, see
 [creating an application](authoring.md#creating-an-application).
@@ -2463,11 +2465,12 @@ The manifest is `template.json` at the root of the folder:
   template is installed. A setting that names a missing folder stops the
   server. A template version with a bad manifest, with folder names that differ
   from its manifest, or without exactly one site is left out and logged as a
-  warning at start, and the other versions still load.
+  warning at start, and the other versions still load. The warning names the
+  version's folder, as `request-approval/1.0.0`, and has no `AXC` code.
 - **Listing.** `GET /api/studio/templates` lists the newest version of each
   template, with the diagnostics of compiling it in memory. A template that does
   not compile is still listed.
-- **Copy.** A copy takes every `*.json` file of the template except
+- **Copy** _(planned for M11)_. A copy takes every `*.json` file of the template except
   `template.json`, in the same folders.
   - The top-level `id` of each resource becomes a new UUID. Seed record ids stay,
     because they are row ids in the new application's own tables and cannot
@@ -2477,7 +2480,7 @@ The manifest is `template.json` at the root of the folder:
   - References are by name, so they still resolve.
   - The copy has the template's diagnostics. `template.json` is not copied,
     because template metadata does not belong in an application.
-- **Sample.** `samples/templates/request-approval` is the sample template. It
+- **Sample** _(planned for M11)_. `samples/templates/request-approval` is the sample template. It
   holds one entity with a sequence number, a form page, a table page, a two-step
   approval process, two roles and their policies, texts in `en` and `vi`, and one
   test scenario. `scripts/build.sh` installs it into `artifacts/templates`. The
