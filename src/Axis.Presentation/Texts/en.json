@@ -156,6 +156,7 @@
   "shell.studio.editInJson": "Edit this value in the JSON view.",
   "shell.studio.addItem": "Add",
   "shell.studio.removeItem": "Remove",
+  "shell.studio.unknownName": "unknown",
   "shell.studio.loadResourceFailed": "The resource could not be loaded.",
   "shell.studio.uses": "Uses",
   "shell.studio.usedBy": "Used by",

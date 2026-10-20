@@ -38,7 +38,7 @@
         "additionalProperties": false,
         "required": ["page", "label"],
         "properties": {
-          "page": { "$ref": "#/$defs/name" },
+          "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
           "label": { "$ref": "#/$defs/textReference" }
         }
       }
@@ -60,7 +60,7 @@
       "additionalProperties": false,
       "required": ["textKey"],
       "properties": {
-        "textKey": { "type": "string", "minLength": 1 }
+        "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" }
       }
     },
     "locale": {
