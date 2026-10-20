@@ -130,6 +130,7 @@ builder.Services.AddHostedService<PlatformKeyRingStart>();
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
 builder.Services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>();
+builder.Services.AddSingleton<IStudioFileWriter, StudioFileWriter>();
 builder.Services.AddSingleton<TenantDatabaseGauge>();
 
 // Under directory, the server serves its tenants from the last good read while the platform database is down.
@@ -184,7 +185,7 @@ if (startupFolders.Length > 0)
 // Registered after StartupActivation, so a release activated at this start is the one checked.
 builder.Services.AddHostedService<StartupReleaseCheck>();
 
-// Studio is off unless folders and an author role are set, which is the Production default.
+// Studio is off unless folders or an applications path, and an author role, are set, which is the Production default.
 builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath));
 
 builder.Services.AddScoped<TenantDatabase>();
