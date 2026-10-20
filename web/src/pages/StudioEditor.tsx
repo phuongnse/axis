@@ -8,7 +8,6 @@ import {
   patchStudioResource,
   ServerUnreachableError,
   type StudioDiagnostic,
-  type StudioNames,
   type StudioResource,
   type StudioResourceItem,
 } from '../platform/studio'
@@ -19,6 +18,7 @@ import { useText } from '../platform/texts'
 import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointValues } from './EndpointValues'
 import { ExpressionCheckContext } from './expressionCheckContext'
+import { ProcessEditor } from './ProcessEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
 
@@ -82,15 +82,15 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * show opens the JSON view instead. A seed whose entity is a resource of the folder shows its records as a grid with
  * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
  * the entity is not in the folder, the seed uses the generic form. A connector opens in the connector editor, which
- * shows a binding as a name only. An endpoint keeps the generic form and shows its `values` as rows of a field of its
- * entity and an expression. When the server does not answer, the draft stays, and the resource loads again
- * after the reconnect unless the draft has changes.
+ * shows a binding as a name only. A process opens in the process editor, which shows its steps as cards, with the
+ * decision and end panels and a picker of the draft's step names for every transition. An endpoint keeps the generic
+ * form and shows its `values` as rows of a field of its entity and an expression. When the server does not answer, the
+ * draft stays, and the resource loads again after the reconnect unless the draft has changes.
  */
 export function StudioEditor({
   application,
   item,
   resources,
-  names,
   path,
   onSaved,
   onDeleted,
@@ -98,7 +98,6 @@ export function StudioEditor({
   application: string
   item: StudioResourceItem
   resources: StudioResourceItem[]
-  names: StudioNames | null
   path: string | null
   onSaved: (diagnostics: StudioDiagnostic[]) => void
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
@@ -193,7 +192,7 @@ export function StudioEditor({
 
   const seedFields = entityId !== undefined && seedEntity?.id === entityId ? seedEntity.fields : null
   const checkContext = useMemo(
-    () => ({ application, resourceId: item.id, kind: item.kind, draft, names }),
+    () => ({ application, resourceId: item.id, kind: item.kind, draft, names: names ?? null }),
     [application, item.id, item.kind, draft, names],
   )
   // The form is final once the seed's entity has loaded, so a path into a record finds its cell.
@@ -209,6 +208,14 @@ export function StudioEditor({
     const { records: _records, ...properties } = schema.properties ?? {}
     return { ...schema, properties, required: schema.required?.filter((name) => name !== 'records') }
   }, [schema, seedFields])
+
+  const processSchema = useMemo(() => {
+    if (item.kind !== 'process' || !schema) {
+      return undefined
+    }
+    const { start: _start, steps: _steps, ...properties } = schema.properties ?? {}
+    return { ...schema, properties, required: schema.required?.filter((name) => name !== 'start' && name !== 'steps') }
+  }, [item.kind, schema])
 
   const endpointSchema = useMemo(() => {
     if (item.kind !== 'endpoint' || !schema) {
@@ -379,6 +386,8 @@ export function StudioEditor({
                 </Flex>
               ) : item.kind === 'connector' && schema ? (
                 <ConnectorEditor value={draft} onChange={change} />
+              ) : processSchema ? (
+                <ProcessEditor schema={processSchema} value={draft} onChange={change} />
               ) : endpointSchema ? (
                 <Flex vertical gap="middle">
                   <SchemaForm schema={endpointSchema} value={draft} onChange={change} />

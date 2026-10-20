@@ -932,8 +932,9 @@ reconnect message are built.
     JSON view as the second view of the same draft. The typed editor saves
     through the same JSON Patch, with the same `If-Match` rules. It never drops
     a value it does not show, so unknown keys stay as they are. See
-    **Editors by kind** below. The seed editor, the connector editor and the
-    endpoint mapping rows are built.
+    **Editors by kind** below. The seed editor, the connector editor, the endpoint
+    mapping rows and the process editor's step list, with its decision and end
+    panels, are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1176,7 +1177,8 @@ reconnect message are built.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
-  the connector editor and the endpoint mapping rows are built. The other typed
+  the connector editor, the endpoint mapping rows and the process editor's step
+  list, with its decision and end panels, are built. The other typed
   editors and the entity designer are *(planned for M11)*, and until they are built those kinds use the generic form. The last
   column lists what still needs the JSON view, because the form cannot show it.
 
@@ -1187,7 +1189,7 @@ reconnect message are built.
   | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives it a panel          |
   | `form`        | Generic form                          | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
-  | `process`     | Typed editor with the process graph   | Nothing                                                               |
+  | `process`     | Typed editor with the process graph   | The properties of `task` and `operation` steps other than their transitions, until their panels are built |
   | `rule`        | Generic form                          | Nothing                                                               |
   | `sequence`    | Generic form                          | Nothing                                                               |
   | `role`        | Generic form                          | Nothing                                                               |
@@ -1211,12 +1213,29 @@ reconnect message are built.
     summary. A panel per widget type, `table`, `form`, `taskInbox` and
     `processInspector`, shows the properties the widget has today. The `form`
     panel also shows its `startProcess` actions.
-  - **Process step editor.** The steps show as a list in graph order, with add,
-    remove and reorder. A panel per step type, `operation`, `decision`, `task`
-    and `end`, shows that type's properties. `set`, `input`, `output` and
-    `fields` show as rows of target and expression. A transition, `next`, a
-    branch's `next`, `otherwise` or an outcome's `next`, picks its target from
-    the process's steps.
+  - **Process step editor.** The Form tab opens the process with its name,
+    entity and optional start condition, and its start step. The JSON view
+    stays as a second view of the same draft.
+    - **Step list** *(built)*. The steps show as cards in file order. Each card
+      shows the step's name and type, with move up, move down and remove. Add
+      step appends a step of the chosen type, with an empty name.
+    - **Type change** *(built)*. Changing a step's type removes the keys the
+      new type forbids and adds the keys it requires, empty. The other keys,
+      including unknown keys, stay.
+    - **Decision and end panels** *(built)*. A decision shows its branches,
+      each with a `when` expression and a target, and its `otherwise`. A branch
+      can be added and removed. An end step shows only its name and type.
+    - **Transitions** *(built)*. The start step, `next`, a branch's `next`,
+      `otherwise` and an outcome's `next` pick their target from the step names
+      of the unsaved draft. A target that is not a step stays visible and is
+      tagged unknown. Removing a step does not rewrite the transitions that
+      name it, so the compiler reports them.
+    - **Task and operation panels** *(planned for M11)*. A panel per step type,
+      `operation` and `task`, shows that type's properties. `set`, `input`,
+      `output` and `fields` show as rows of target and expression. Until they
+      are built, a task or an operation card shows its transitions and says to
+      edit its other properties in the JSON view. A diagnostic path inside them
+      opens the JSON view.
   - **Connector editor** *(built)*. The Form tab shows the base URL binding,
     the auth type with its secret binding, `timeout`, `idempotency`, and the
     operations as a list. The JSON view stays as a second view of the same

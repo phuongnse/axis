@@ -3090,8 +3090,9 @@ costs:
 
 M11 gives Studio typed editors for pages, process steps and connectors, and
 for the kinds that need JSON today. It also adds a read-only process graph. The
-seed grid, the connector editor and the endpoint mapping rows are built. The
-rest is _(planned for M11)_. See the
+seed grid, the connector editor, the endpoint mapping rows and the process
+step list with its decision and end panels are built. The rest is
+_(planned for M11)_. See the
 [Studio section](reference/frontend.md#studio) for the detail. The owner
 confirmed these points on issue #780 on 2026-10-20.
 
@@ -3114,7 +3115,7 @@ confirmed these points on issue #780 on 2026-10-20.
     A widget or layout that M12 adds gets its panel in M12. Until then it
     shows in the JSON view.
 - **Process step editor:**
-  - The steps as a list in graph order, with add, remove and reorder.
+  - The steps as a list in file order, with add, remove and reorder.
   - A panel per step type: `operation`, `decision`, `task` and `end`. An
     operation shows its `set`, `input`, `output` and `retry`. A decision shows
     its `branches` and `otherwise`. A task shows its assignee, form, outcomes

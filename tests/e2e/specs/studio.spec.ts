@@ -69,7 +69,6 @@ test('an author sees an expression error as they type, and its type once fixed, 
   expect(await readFile(file, 'utf8')).toBe(before)
 })
 
-
 test('an author completes the names of a policy filter without saving', async ({ page }) => {
   await useSession(page, 'hoa')
   const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
