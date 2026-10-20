@@ -22,6 +22,8 @@ RUN npm ci
 COPY web/ ./
 # The type check also reads the platform texts that web tests import.
 COPY src/Axis.Presentation/Texts/ /src/src/Axis.Presentation/Texts/
+# It also reads the sample process that processGraph.test.ts imports. Only the SPA output leaves this stage.
+COPY samples/apps/purchase-requests/processes/ /src/samples/apps/purchase-requests/processes/
 RUN npm run build
 
 # The server, published with the SPA in its web root, the worker, the admin tool and the sample extension package.
