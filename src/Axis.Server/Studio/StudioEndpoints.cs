@@ -43,6 +43,8 @@ namespace Axis.Server.Studio;
 /// <c>id</c> or the file exists. <c>DELETE /api/studio/apps/{application}/resources/{id}</c> removes one
 /// file when <c>If-Match</c> holds its current version and answers <c>{ diagnostics }</c>. It answers 428
 /// without <c>If-Match</c>, 409 for a stale version and 400 for the manifest.
+/// <c>POST /api/studio/apps/{application}/changes</c> applies 1 to 20 creates and patches in one call under one write
+/// lock, checks every change before it writes any, and answers <c>{ items: [{ id, version }], diagnostics }</c>.
 /// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, and the expression check is in
 /// <see cref="StudioExpressionEndpoints"/>, and the template list is in <see cref="StudioTemplateEndpoints"/>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
@@ -58,6 +60,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/resources", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
+        endpoints.MapPost("/api/studio/apps/{application}/changes", ChangesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
         endpoints.MapGet("/api/studio/apps/{application}/names", NamesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/releases", ReleasesAsync);
@@ -369,6 +372,145 @@ internal static class StudioEndpoints
             StudioDiagnostics.Compile(folder, packages, modules)));
     }
 
+    private static async Task<IResult> ChangesAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var request = httpContext.Request;
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+            || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+        }
+
+        // The shape of the list: an object with only `changes`, holding 1 to 20 changes, each of them exactly
+        // { create } or { patch, id, version? }.
+        JsonArray list;
+        try
+        {
+            var body = await JsonNode.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted) as JsonObject
+                ?? throw new JsonException();
+            list = body.Count == 1 && body["changes"] is JsonArray array ? array : throw new JsonException();
+        }
+        catch (JsonException)
+        {
+            return Problem(StatusCodes.Status400BadRequest, BadChanges);
+        }
+
+        if (list.Count is < 1 or > MaxChanges || list.Any(item => !IsChangeShape(item)))
+        {
+            return Problem(StatusCodes.Status400BadRequest, BadChanges);
+        }
+
+        var items = list.Select(item => (JsonObject)item!).ToList();
+        foreach (var item in items.Where(item => item.ContainsKey("patch")))
+        {
+            if (!Guid.TryParseExact((string)item["id"]!, "D", out var patchId)
+                || StudioFolder.List(folder).All(file => file.Id != patchId))
+            {
+                return NotFound(NoResource);
+            }
+        }
+
+        if (items.Any(item => item.ContainsKey("patch") && !item.ContainsKey("version")))
+        {
+            return Problem(StatusCodes.Status428PreconditionRequired, "A patch change needs the version it was made from.");
+        }
+
+        var changes = new List<StudioChange>(items.Count);
+        foreach (var item in items)
+        {
+            if (item["create"] is JsonObject content)
+            {
+                if (StudioFileNames.NewFile(content, out var id, out var problem) is not { } file)
+                {
+                    return Problem(StatusCodes.Status400BadRequest, problem!);
+                }
+
+                changes.Add(new StudioCreateChange(id, file, content));
+                continue;
+            }
+
+            JsonPatch patch;
+            try
+            {
+                patch = item["patch"].Deserialize<JsonPatch>() ?? throw new JsonException();
+            }
+            catch (Exception exception) when (exception is JsonException or ArgumentException or NotSupportedException or InvalidOperationException)
+            {
+                return Problem(StatusCodes.Status400BadRequest, "The body is not a valid JSON Patch.");
+            }
+
+            if (item["version"] is not JsonValue version || !version.TryGetValue<string>(out var text))
+            {
+                return Problem(StatusCodes.Status400BadRequest, BadChanges);
+            }
+
+            changes.Add(new StudioPatchChange(Guid.ParseExact((string)item["id"]!, "D"), patch, text));
+        }
+
+        if (changes.Select(change => change.Id).Distinct().Count() != changes.Count
+            || changes.OfType<StudioCreateChange>().Select(change => change.File).Distinct(StringComparer.Ordinal).Count()
+                != changes.OfType<StudioCreateChange>().Count())
+        {
+            return Problem(StatusCodes.Status400BadRequest, "Each change must name a different resource and file.");
+        }
+
+        var outcome = await StudioWrites.ChangesAsync(writeLock, folder, changes, httpContext.RequestAborted);
+        switch (outcome.Refusal)
+        {
+            case StudioWriteRefusal.Unavailable:
+                return Problem(StatusCodes.Status503ServiceUnavailable, WriteLockUnavailable);
+            case StudioWriteRefusal.DoesNotApply:
+                return Problem(StatusCodes.Status400BadRequest, "The patch does not apply to the resource.");
+            case StudioWriteRefusal.ChangesIdOrKind:
+                return Problem(StatusCodes.Status400BadRequest, "A patch may not change id or kind.");
+            case StudioWriteRefusal.UnsafePath:
+                return Problem(StatusCodes.Status400BadRequest, "The file name leads outside the application folder.");
+            case StudioWriteRefusal.Exists:
+                return Problem(StatusCodes.Status409Conflict, "A resource with this id or file already exists.");
+            case not null:
+                // Stale, or a patched resource that is gone under the lock.
+                return Problem(StatusCodes.Status409Conflict, "The resource has changed since this version. Read it again.");
+        }
+
+        return Results.Ok(new StudioChangesResponse(
+            [.. changes.Select((change, index) => new StudioChangeItem(change.Id.ToString("D"), outcome.Versions![index]))],
+            StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
+    // A change is exactly { create: object } or { patch, id: string, version? }, with no other key.
+    private static bool IsChangeShape(JsonNode? node)
+    {
+        if (node is not JsonObject change)
+        {
+            return false;
+        }
+
+        if (change.ContainsKey("create"))
+        {
+            return change.Count == 1 && change["create"] is JsonObject;
+        }
+
+        return change.ContainsKey("patch")
+            && change["id"] is JsonValue id && id.TryGetValue<string>(out _)
+            && change.All(pair => pair.Key is "patch" or "id" or "version");
+    }
+
+    private const int MaxChanges = 20;
+
+    private const string BadChanges = "The body is not a valid list of changes.";
+
     private static async Task<IResult> DeleteAsync(
         string application,
         string id,
@@ -491,6 +633,12 @@ internal sealed record StudioPatchResponse(string Version, IReadOnlyList<StudioD
 /// <summary>The answer to a create: the new resource's identity and version, and the folder's compile diagnostics.</summary>
 internal sealed record StudioCreateResponse(
     string Id, string Kind, string Name, string File, string Version, IReadOnlyList<StudioDiagnostic> Diagnostics);
+
+/// <summary>The answer to a batch of changes: the new version of each file in request order, and the folder's compile diagnostics.</summary>
+internal sealed record StudioChangesResponse(IReadOnlyList<StudioChangeItem> Items, IReadOnlyList<StudioDiagnostic> Diagnostics);
+
+/// <summary>One change of the answer: the resource's <c>id</c> and the new <c>version</c> of its file.</summary>
+internal sealed record StudioChangeItem(string Id, string Version);
 
 /// <summary>The answer to a delete: the folder's compile diagnostics, which show the references it broke.</summary>
 internal sealed record StudioDeleteResponse(IReadOnlyList<StudioDiagnostic> Diagnostics);
