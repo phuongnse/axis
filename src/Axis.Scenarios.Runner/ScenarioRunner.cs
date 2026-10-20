@@ -46,7 +46,7 @@ public static class ScenarioRunner
     /// <summary>
     /// Runs <paramref name="scenario"/> of the application in <paramref name="folder"/> on the
     /// server of <paramref name="serverConnectionString"/>, whose login may create databases.
-    /// A cancelled run still drops the database, then throws <see cref="OperationCanceledException"/>.
+    /// A cancelled run still drops the database, also when the cancel came while it was being created, then throws <see cref="OperationCanceledException"/>.
     /// An action that makes more than <paramref name="workItemLimit"/> work items run fails the scenario.
     /// <paramref name="packages"/> are the installed extension packages whose manifests the application
     /// is compiled against, or null for none. <paramref name="modules"/> are the installed modules it is
@@ -119,7 +119,21 @@ public static class ScenarioRunner
         {
             await ExecuteAsync(serverConnectionString, $"""CREATE DATABASE "{database}" """, cancellationToken);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (OperationCanceledException)
+        {
+            // The cancel may have come after the server committed the database.
+            try
+            {
+                await DropAsync(serverConnectionString, database);
+            }
+            catch (Exception)
+            {
+                // The cancel is what the caller must see.
+            }
+
+            throw;
+        }
+        catch (Exception exception)
         {
             return Result(new(null, null, $"The temporary database could not be created: {exception.Message}"));
         }

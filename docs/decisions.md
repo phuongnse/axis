@@ -3269,7 +3269,7 @@ a server that dies in the middle can leave one file written.
 An author runs an application's test scenarios from Studio. Studio stores a
 new kind of publish request, `test`, and the publisher runs it with a separate
 database role that may create databases. The server still gets no such right.
-The route, the stored request and the publisher's run are built. The rest is _(planned for M11)_: the 10-minute limit, the immediate stop on `SIGTERM`, and the wiring of the scenario role in Compose, `scripts/dev.sh`, E2E, `init-roles.sql` and the chart. See
+The route, the stored request and the publisher's run are built. The limit and the stop are built too, with `AXC0219` and `AXC0220`. The rest is _(planned for M11)_: the wiring of the scenario role in Compose, `scripts/dev.sh`, E2E, `init-roles.sql` and the chart. See
 [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
 for M11, the [authoring API](reference/authoring.md#test) for the route, the
 [publisher](reference/administration.md#publisher) for how it runs, and

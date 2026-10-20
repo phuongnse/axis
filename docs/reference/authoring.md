@@ -581,7 +581,7 @@ saved, and the diagnostics list the broken references.
 ## Publishing
 
 An author validates, publishes and rolls back an
-application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. `test` is built too, except its 10-minute limit, which is _(planned for M11)_. The server never activates in its own process and
+application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. `test` is built too, with its 10-minute limit and its stop on `SIGTERM`. The server never activates in its own process and
 holds no tenant schema connection. It stores a **publish request** in the
 tenant database, and a separate [publisher](administration.md#publisher) runs
 it with the tenant's schema role. See
@@ -658,8 +658,8 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   describes, and stores their outcomes in `scenarios`. The request ends
   `failed` when any scenario fails. Scenario failures go only in `scenarios`.
   Compile diagnostics, the missing `Scenarios:ServerConnectionString` setting
-  (`AXC0217`), an unknown scenario name (`AXC0218`) and the 10-minute limit
-  *(planned for M11)* go in `diagnostics`. See [Test](#test).
+  (`AXC0217`), an unknown scenario name (`AXC0218`), the 10-minute limit
+  (`AXC0219`) and a stop of the publisher (`AXC0220`) go in `diagnostics`. See [Test](#test).
 - **Order.** For one tenant and application the publisher runs requests one at
   a time, oldest first. When two publishes are queued, the newer one ends up
   live. A `test` request has its own queue and does not wait behind them, see
@@ -698,8 +698,8 @@ request has the kind `publish` and the target `preview`.
 
 `POST .../test` stores a request to run the application's
 [test scenarios](configuration.md#test-scenarios) from Studio. The route and the
-stored request are built, and so is the publisher's run. Its 10-minute limit and
-the immediate stop on `SIGTERM` are *(planned for M11)*.
+stored request are built, and so is the publisher's run, with its 10-minute limit
+and its immediate stop on `SIGTERM`.
 [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees
 the route. The request has the kind `test` and the target `tenant`.
 
@@ -722,8 +722,11 @@ the route. The request has the kind `test` and the target `tenant`.
   Selecting it in Studio opens the scenario at that step, as a diagnostic opens
   a resource.
 - **Limits.** The scenarios of a request run one after another. A request stops
-  after 10 minutes *(planned for M11)*: the scenario that runs fails, its database is dropped and
-  the request ends `failed` with a diagnostic. The work item limit of
+  after 10 minutes: the scenario that runs fails, its database is dropped and
+  the request ends `failed` with `AXC0219`. A stop of the publisher does the same
+  at once, with `AXC0220`. The scenarios that finished keep their outcomes in
+  `scenarios`, and the one that was cut is stored as `failed` with no `step` and no
+  `path`. The work item limit of
   [D32](../decisions.md#d32-test-scenarios--agreed) applies to each scenario.
 - **Order.** At most one `test` request per application runs at a time,
   oldest first. The queue is separate from the one of `validate`, `publish` and
@@ -753,6 +756,8 @@ stateDiagram-v2
 - A request that has been claimed three times, and whose lease runs out again,
   ends `failed` with `AXC0215` in place of a fourth claim. A request that
   crashes the publisher cannot block the queue for good.
+- A `test` that runs past 10 minutes ends `failed` with `AXC0219`, and one that a
+  stop of the publisher ends fails with `AXC0220`, see [Test](#test).
 - `succeeded` and `failed` are final. Studio polls
   `GET .../requests/{id}` until the status is one of them.
 - A request that runs again does no harm. Activating the same content hash

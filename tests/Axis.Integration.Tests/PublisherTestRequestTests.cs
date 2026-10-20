@@ -233,6 +233,71 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         Assert.Equal("running|other-publisher|1", await ScalarAsync(scenario, tenant, $"SELECT status || '|' || claimed_by || '|' || claims FROM axis.publish_requests WHERE id = '{test}'"));
     }
 
+    [Fact]
+    public async Task A_test_request_past_its_time_limit_fails_with_AXC0219_and_drops_its_database()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, await SnapshotAsync(failing: false), "test");
+
+        var result = await RunPublisherAsync(scenario, tenant, request, withScenarioServer: true, testLimit: TimeSpan.FromSeconds(3));
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var error = Assert.Single(await DiagnosticsAsync(scenario, tenant, request), diagnostic => diagnostic["severity"]!.GetValue<string>() == "error");
+        Assert.Equal("AXC0219", error["code"]!.GetValue<string>());
+        Assert.Equal("", error["file"]!.GetValue<string>());
+        Assert.Equal("", error["path"]!.GetValue<string>());
+
+        // The scenarios that finished keep their outcomes. The one that was cut is the last, failed and with no step.
+        var results = await ResultsAsync(scenario, tenant, request);
+        Assert.True(results.Count < Directory.EnumerateFiles(Path.Combine(_sample, "scenarios"), "*.json").Count());
+        var cut = results[^1]!;
+        Assert.Equal("failed", cut["outcome"]!.GetValue<string>());
+        Assert.Null(cut["step"]);
+        Assert.Null(cut["path"]);
+        Assert.Contains("time limit", cut["message"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} test failed: AXC0219 ", StringComparison.Ordinal));
+        Assert.Equal(0L, await ScenarioDatabasesAsync());
+    }
+
+    [Fact]
+    public async Task Stopping_the_publisher_during_a_test_request_fails_it_with_AXC0220_exits_0_and_drops_its_database()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, await SnapshotAsync(failing: false), "test");
+        var settings = new Dictionary<string, string?>
+        {
+            ["Tenancy:Source"] = "directory",
+            ["Scenarios:ServerConnectionString"] = await PostgreSqlServer.ScenarioConnectionStringAsync(),
+        };
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+        var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings);
+        try
+        {
+            var deadline = DateTime.UtcNow + _limit;
+            while (!run.IsCompleted && await ScenarioDatabasesAsync() == 0 && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(20, CancellationToken);
+            }
+        }
+        finally
+        {
+            await stop.CancelAsync();
+        }
+
+        var result = await run;
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var error = Assert.Single(await DiagnosticsAsync(scenario, tenant, request), diagnostic => diagnostic["severity"]!.GetValue<string>() == "error");
+        Assert.Equal("AXC0220", error["code"]!.GetValue<string>());
+        Assert.Equal("failed", (await ResultsAsync(scenario, tenant, request))[^1]!["outcome"]!.GetValue<string>());
+        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} test failed: AXC0220 ", StringComparison.Ordinal));
+        Assert.Equal(0L, await ScenarioDatabasesAsync());
+    }
+
     private static async Task<string> CreateTenantAsync(AdminScenario scenario)
     {
         var tenant = scenario.NewTenantId();
@@ -252,7 +317,8 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
     }
 
     // Runs the publisher until the request is final, then stops it and returns its result.
-    private static async Task<AdminResult> RunPublisherAsync(AdminScenario scenario, string tenant, Guid request, bool withScenarioServer)
+    private static async Task<AdminResult> RunPublisherAsync(
+        AdminScenario scenario, string tenant, Guid request, bool withScenarioServer, TimeSpan? testLimit = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -260,7 +326,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
             ["Scenarios:ServerConnectionString"] = withScenarioServer ? await PostgreSqlServer.ScenarioConnectionStringAsync() : null,
         };
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
-        var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings);
+        var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings, publisherTestLimit: testLimit);
         try
         {
             var deadline = DateTime.UtcNow + _limit;
