@@ -4,6 +4,8 @@ import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
+import { OperationPanel } from './OperationPanel'
+import { operationJsonOnlyKeys } from './operationKeys'
 import { ReferencePicker } from './ReferencePicker'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
 
@@ -73,9 +75,8 @@ const requiredStepKeys: Record<string, Content> = {
   end: {},
 }
 
-/** The keys of an operation or a task step that the editor does not edit yet. */
+/** The keys of a task step that the editor does not edit yet. */
 const jsonOnlyKeys: Record<string, string[]> = {
-  operation: ['operation', 'set', 'connector', 'input', 'output', 'retry', 'event', 'fields'],
   task: ['label', 'assignee', 'form', 'dueIn'],
 }
 
@@ -108,8 +109,9 @@ function withType(step: Content, type: string): Content {
 /**
  * The editor of a process. It shows the process's name, entity and start condition with the generic form, the start
  * step, and the steps as cards in file order. A decision shows its branches and its `otherwise`, an end shows only
- * its name and type, and every transition is a picker over the step names of the draft. A task or an operation shows
- * its transitions and points to the JSON view for its other properties. The editor edits the draft through
+ * its name and type, and every transition is a picker over the step names of the draft. An operation shows its
+ * operation panel and its `next`. A task shows its transitions and points to the JSON view for its other properties.
+ * The editor edits the draft through
  * `onChange`, so a key it does not show stays as it is, and removing a step leaves the transitions that name it for
  * the compiler to report.
  */
@@ -158,6 +160,7 @@ export function ProcessEditor({
               key={index}
               index={index}
               step={isContent(step) ? step : {}}
+              entity={text(value.entity)}
               names={names}
               last={index === steps.length - 1}
               onMove={(offset) => move(index, offset)}
@@ -192,6 +195,7 @@ export function ProcessEditor({
 function Step({
   index,
   step,
+  entity,
   names,
   last,
   onMove,
@@ -200,6 +204,7 @@ function Step({
 }: {
   index: number
   step: Content
+  entity: string
   names: string[]
   last: boolean
   onMove: (offset: number) => void
@@ -253,6 +258,7 @@ function Step({
         {type === 'decision' && <Decision pointer={pointer} step={step} names={names} onChange={onChange} />}
         {type === 'operation' && (
           <>
+            <OperationPanel pointer={pointer} step={step} entity={entity} onChange={onChange} />
             <Transition
               pointer={`${pointer}/next`}
               label={t('shell.studio.process.next')}
@@ -260,7 +266,7 @@ function Step({
               names={names}
               onChange={onChange}
             />
-            <JsonOnlyKeys pointer={pointer} keys={present(jsonOnlyKeys.operation)} />
+            <JsonOnlyKeys pointer={pointer} keys={operationJsonOnlyKeys(step)} />
           </>
         )}
         {type === 'task' && (

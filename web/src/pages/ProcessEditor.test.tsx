@@ -113,11 +113,14 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect(within(outcome).getByTestId('studio-reference-unknown')).toHaveTextContent('gone')
   })
 
-  it('points to the JSON view for the other properties of an operation and a task', () => {
+  it('shows the operation panel and points to the JSON view for the other properties of a task', () => {
     renderEditor()
 
     const set = screen.getByTestId('studio-field-/steps/0/set')
-    expect(within(set).getByTestId('studio-json-only')).toBeVisible()
+    expect(within(set).queryByTestId('studio-json-only')).toBeNull()
+    expect(
+      within(screen.getByTestId('studio-field-/steps/0/set/status')).getByRole('textbox', { name: 'Expression' }),
+    ).toHaveValue("'submitted'")
     expect(screen.getByTestId('studio-field-/steps/0/next')).toBeVisible()
     expect(within(screen.getByTestId('studio-field-/steps/1/dueIn')).getByTestId('studio-json-only')).toBeVisible()
     expect(within(screen.getByTestId('studio-field-/steps/1/outcomes')).getByTestId('studio-json-only')).toBeVisible()
