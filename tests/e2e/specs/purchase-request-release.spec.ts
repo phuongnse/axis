@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import { expect, test, type Browser, type Page, type TestInfo } from '@playwright/test'
 import { activateFolder, startServer } from '../activate'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
@@ -69,6 +69,24 @@ async function editInStudio(
   await page.getByRole('textbox', { name: 'JSON' }).fill(JSON.stringify(content, null, 2))
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByTestId('studio-saved')).toBeVisible()
+}
+
+/**
+ * Opens a new browser context on the preview host of the main E2E server, signs `user` in through Keycloak and
+ * returns the context and its page. The caller closes the context.
+ */
+async function signInToPreview(browser: Browser, baseURL: string, user: string) {
+  const context = await browser.newContext({
+    baseURL: previewURL(baseURL),
+    storageState: { cookies: [], origins: [] },
+  })
+  const page = await context.newPage()
+  await page.goto('/api/auth/sign-in?returnUrl=/')
+  await page.locator('#username').fill(user)
+  await page.locator('#password').fill('axis')
+  await page.locator('#kc-login').click()
+  await page.waitForURL(`${previewURL(baseURL)}/`)
+  return { context, page }
 }
 
 /** Clicks Publish, fills the dialog's label and confirms. */
@@ -196,17 +214,8 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       // The preview tenant shares its database with the main E2E server, which is the one with a Keycloak redirect
       // address, so anna signs in to the preview host of that server, as in the preview tenant journey.
-      const context = await browser.newContext({
-        baseURL: previewURL(baseURL!),
-        storageState: { cookies: [], origins: [] },
-      })
+      const { context, page: preview } = await signInToPreview(browser, baseURL!, 'anna')
       try {
-        const preview = await context.newPage()
-        await preview.goto('/api/auth/sign-in?returnUrl=/')
-        await preview.locator('#username').fill('anna')
-        await preview.locator('#password').fill('axis')
-        await preview.locator('#kc-login').click()
-        await preview.waitForURL(`${previewURL(baseURL!)}/`)
         await preview.goto('/purchasing/suppliers')
         await expect(preview.getByRole('columnheader', { name: heading })).toBeVisible()
       } finally {
@@ -391,6 +400,107 @@ test.describe('the active release of the purchase request sample changes', () =>
         'data-active',
         'true',
       )
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('an author takes a change from edit to preview, publish and rollback without the admin CLI, and a waiting request finishes on its release', async (
+    { baseURL, browser, page },
+    testInfo,
+  ) => {
+    test.setTimeout(420_000)
+    const { server, folder } = await studioServer(testInfo)
+    const title = `Suppliers ${Date.now().toString(36)}`
+    const label = `Journey ${title}`
+    const status = page.getByTestId('studio-request-status')
+    const suppliers = '/purchasing/suppliers'
+    try {
+      // A request that waits for its manager before the publish. The total stays under the finance threshold,
+      // so the manager's approval ends the process.
+      await useSession(page, 'anna')
+      const request = await createRequest(page, 'Journey', 500)
+      await submit(page, request.id, request.title)
+      await useSession(page, 'chau')
+      await waitForTask(page, request.title)
+
+      // The release that is active now, which the request is pinned to, and the newest number so far.
+      await useSession(page, 'hoa')
+      const history = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/releases`)
+      expect(history.status()).toBe(200)
+      const body = (await history.json()) as {
+        active: { releaseId: string; number: number }
+        items: { number: number }[]
+      }
+      const before = body.active
+      const maxNumber = Math.max(...body.items.map((item) => item.number))
+
+      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
+        expect(content.texts['pages.suppliers.title']).toBe('Suppliers')
+        content.texts['pages.suppliers.title'] = title
+      })
+
+      await page.getByRole('button', { name: 'Validate' }).click()
+      await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
+      const diagnostics = page.getByTestId('studio-diagnostics')
+      await expect(diagnostics.locator('li')).toHaveCount(0)
+      await expect(diagnostics).toContainText('No diagnostics.')
+
+      await page.getByTestId('studio-preview').click()
+      await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
+      const preview = await signInToPreview(browser, baseURL!, 'anna')
+      try {
+        await preview.page.goto(suppliers)
+        await expect(preview.page.getByText(title, { exact: true }).first()).toBeVisible()
+      } finally {
+        await preview.context.close()
+      }
+      await useSession(page, 'anna')
+      await page.goto(suppliers)
+      await expect(page.getByText('Suppliers', { exact: true }).first()).toBeVisible()
+      await expect(page.getByText(title, { exact: true })).toHaveCount(0)
+
+      await useSession(page, 'hoa')
+      await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+      await publishWithLabel(page, label)
+      await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
+      const published = page.getByTestId('studio-release-row').filter({ hasText: label })
+      await expect(published).toHaveAttribute('data-number', String(maxNumber + 1))
+      await expect(published).toHaveAttribute('data-active', 'true')
+      await useSession(page, 'anna')
+      await page.goto(suppliers)
+      await expect(page.getByText(title, { exact: true }).first()).toBeVisible()
+
+      // The request approved after the publish finishes on the release it started on.
+      await useSession(page, 'chau')
+      await decide(page, request.title, 'Manager approval', 'Approve')
+      // The manager sees the status read-only, which the helper can read as a value.
+      await expectStatus(page, request.id, 'approved')
+      await useSession(page, 'giang')
+      await expect(async () => {
+        const response = await page.request.get(`${appPath}/processes/PurchaseRequestApproval/instances?pageSize=100`)
+        expect(response.status()).toBe(200)
+        const { items } = (await response.json()) as {
+          items: { subjectId: string; state: string; releaseId: string }[]
+        }
+        const instance = items.find((item) => item.subjectId === request.id)
+        expect(instance).toMatchObject({ state: 'completed', releaseId: before.releaseId })
+      }).toPass({ timeout: 30_000 })
+
+      await useSession(page, 'hoa')
+      await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+      await page
+        .locator(`[data-testid="studio-release-row"][data-number="${before.number}"]`)
+        .first()
+        .getByRole('button', { name: 'Roll back' })
+        .click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Roll back' }).click()
+      await expect(status).toContainText('Rolled back', { timeout: 60_000 })
+      await expect(status).toHaveAttribute('data-status', 'succeeded')
+      await useSession(page, 'anna')
+      await page.goto(suppliers)
+      await expect(page.getByText('Suppliers', { exact: true }).first()).toBeVisible()
+      await expect(page.getByText(title, { exact: true })).toHaveCount(0)
     } finally {
       await server.stop()
     }
