@@ -60,15 +60,16 @@ internal static partial class AdminCommands
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken) =>
-        RunAsync(args, configuration, output, error, Publisher.DefaultLeaseDuration, cancellationToken);
+        RunAsync(args, configuration, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, cancellationToken);
 
-    // The publisher lease is a parameter so that tests can use a short one. The product has no setting for it.
+    // The publisher lease and the test limit are parameters so that tests can use short ones. The product has no setting for them.
     internal static async Task<int> RunAsync(
         string[] args,
         IConfiguration configuration,
         TextWriter output,
         TextWriter error,
         TimeSpan publisherLease,
+        TimeSpan publisherTestLimit,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(args);
@@ -88,7 +89,7 @@ internal static partial class AdminCommands
 
         if (args.Length > 0 && args[0] == "publisher")
         {
-            return await PublisherAsync(args, configuration, output, error, publisherLease, cancellationToken);
+            return await PublisherAsync(args, configuration, output, error, publisherLease, publisherTestLimit, cancellationToken);
         }
 
         if (args is ["version"])
@@ -566,6 +567,7 @@ internal static partial class AdminCommands
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
+        TimeSpan testLimit,
         CancellationToken cancellationToken)
     {
         if (args.Length != 1)
@@ -587,8 +589,8 @@ internal static partial class AdminCommands
         }
 
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, output, error, lease, cancellationToken)
-            : await ConfigurationPublisherAsync(configuration, output, error, lease, cancellationToken);
+            ? await DirectoryPublisherAsync(configuration, output, error, lease, testLimit, cancellationToken)
+            : await ConfigurationPublisherAsync(configuration, output, error, lease, testLimit, cancellationToken);
     }
 
     private static async Task<int> DirectoryPublisherAsync(
@@ -596,6 +598,7 @@ internal static partial class AdminCommands
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
+        TimeSpan testLimit,
         CancellationToken cancellationToken)
     {
         TimeSpan refreshInterval;
@@ -626,6 +629,7 @@ internal static partial class AdminCommands
             scenarioServer,
             new DirectoryPublisherTenants(settings.Platform, refreshInterval),
             lease,
+            testLimit,
             output,
             error,
             cancellationToken).RunAsync();
@@ -636,6 +640,7 @@ internal static partial class AdminCommands
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
+        TimeSpan testLimit,
         CancellationToken cancellationToken)
     {
         ConfigurationTenantCatalog catalog;
@@ -674,6 +679,7 @@ internal static partial class AdminCommands
             scenarioServer,
             new ConfigurationPublisherTenants(catalog.Tenants, allowHttp, output),
             lease,
+            testLimit,
             output,
             error,
             cancellationToken).RunAsync();

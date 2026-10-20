@@ -1,5 +1,5 @@
 import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
 import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
 import {
@@ -12,8 +12,11 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
+import { ConnectorEditor } from './ConnectorEditor'
+import { EndpointValues } from './EndpointValues'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
@@ -79,8 +82,10 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * show opens the JSON view instead. A seed whose entity is a resource of the folder shows its records as a grid with
  * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
  * the entity is not in the folder, the seed uses the generic form. A scenario shows a typed editor of its name, users,
- * stubs and steps, and the JSON view edits the same draft. When the server does not answer, the draft stays, and the
- * resource loads again after the reconnect unless the draft has changes.
+ * stubs and steps, and the JSON view edits the same draft. A connector opens in the connector editor, which shows a
+ * binding as a name only. An endpoint keeps the generic form and shows its `values` as rows of a field of its entity
+ * and an expression. When the server does not answer, the draft stays, and the resource loads again after the
+ * reconnect unless the draft has changes.
  */
 export function StudioEditor({
   application,
@@ -98,6 +103,7 @@ export function StudioEditor({
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
+  const names = useContext(StudioNamesContext)
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
   const dirtyRef = useRef(false)
@@ -199,6 +205,18 @@ export function StudioEditor({
     const { records: _records, ...properties } = schema.properties ?? {}
     return { ...schema, properties, required: schema.required?.filter((name) => name !== 'records') }
   }, [schema, seedFields])
+
+  const endpointSchema = useMemo(() => {
+    if (item.kind !== 'endpoint' || !schema) {
+      return undefined
+    }
+    const { values: _values, ...properties } = schema.properties ?? {}
+    return { ...schema, properties, required: schema.required?.filter((name) => name !== 'values') }
+  }, [item.kind, schema])
+  const endpointEntity = item.kind === 'endpoint' ? String(draft.entity).toLowerCase() : undefined
+  const endpointFields = names?.entities
+    .find((entity) => entity.name.toLowerCase() === endpointEntity)
+    ?.fields.map((field) => field.name)
 
   const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
   const isLoaded = loaded !== undefined
@@ -357,6 +375,13 @@ export function StudioEditor({
                 </Flex>
               ) : item.kind === 'scenario' ? (
                 <ScenarioEditor value={draft} onChange={update} />
+              ) : item.kind === 'connector' && schema ? (
+                <ConnectorEditor value={draft} onChange={change} />
+              ) : endpointSchema ? (
+                <Flex vertical gap="middle">
+                  <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
+                  <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
+                </Flex>
               ) : schema ? (
                 <SchemaForm schema={schema} value={draft} onChange={change} />
               ) : (

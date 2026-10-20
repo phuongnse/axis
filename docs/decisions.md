@@ -3090,7 +3090,8 @@ costs:
 
 M11 gives Studio typed editors for pages, process steps and connectors, and
 for the kinds that need JSON today. It also adds a read-only process graph. The
-seed grid and the scenario editor are built. The rest is _(planned for M11)_. See the
+seed grid, the scenario editor, the connector editor and the endpoint mapping rows
+are built. The rest is _(planned for M11)_. See the
 [Studio section](reference/frontend.md#studio) for the detail. The owner
 confirmed these points on issue #780 on 2026-10-20.
 
@@ -3122,7 +3123,7 @@ confirmed these points on issue #780 on 2026-10-20.
   - Each transition, `next`, a branch, `otherwise` or an outcome, picks its
     target from the process's steps.
 - **Connector editor:**
-  - The base URL binding and the auth secret binding are picked by name. No
+  - The base URL binding and the auth secret binding are set by name, in a name box. No
     value of a binding is shown or stored, as today.
   - The timeout and the idempotency header.
   - The operations as a list, each with its method, path, input and output
@@ -3269,7 +3270,7 @@ a server that dies in the middle can leave one file written.
 An author runs an application's test scenarios from Studio. Studio stores a
 new kind of publish request, `test`, and the publisher runs it with a separate
 database role that may create databases. The server still gets no such right.
-The route, the stored request and the publisher's run are built. The rest is _(planned for M11)_: the 10-minute limit, the immediate stop on `SIGTERM`, and the wiring of the scenario role in Compose, `scripts/dev.sh`, E2E, `init-roles.sql` and the chart. See
+The route, the stored request and the publisher's run are built. The limit and the stop are built too, with `AXC0219` and `AXC0220`. The rest is _(planned for M11)_: the wiring of the scenario role in Compose, `scripts/dev.sh`, E2E, `init-roles.sql` and the chart. See
 [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
 for M11, the [authoring API](reference/authoring.md#test) for the route, the
 [publisher](reference/administration.md#publisher) for how it runs, and

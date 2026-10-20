@@ -857,6 +857,8 @@ sorted by file and then path.
 | `AXC0216` | The main tenant has no preview tenant when a preview request runs, see [preview](authoring.md#preview). Reported on the request, with an empty file and path. |
 | `AXC0217` | A `test` request runs and the publisher has no `Scenarios:ServerConnectionString`, see [test](authoring.md#test). The message names the setting. Reported on the request, with an empty file and path. |
 | `AXC0218` | A `test` request names a scenario that the application does not have. The message names the scenario. Reported on the request, with an empty file and path, once for each unknown name. |
+| `AXC0219` | A `test` request ran for more than 10 minutes, see [test](authoring.md#test). The message names the limit. Reported on the request, with an empty file and path. |
+| `AXC0220` | The publisher stopped while a `test` request ran, see [test](authoring.md#test). Reported on the request, with an empty file and path. |
 
 ## Startup activation
 

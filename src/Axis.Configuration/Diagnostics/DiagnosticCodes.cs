@@ -206,4 +206,6 @@ public static class DiagnosticCodes
     public const string PreviewTenantMissing = "AXC0216";
     public const string ScenarioServerMissing = "AXC0217";
     public const string UnknownScenario = "AXC0218";
+    public const string ScenarioTimeLimit = "AXC0219";
+    public const string ScenarioStopped = "AXC0220";
 }
