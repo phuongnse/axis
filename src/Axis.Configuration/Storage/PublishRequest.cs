@@ -1,7 +1,7 @@
 namespace Axis.Configuration.Storage;
 
 /// <summary>
-/// A request to validate, publish or roll back an application, stored by the server and run by the
+/// A request to validate, publish, roll back or test an application, stored by the server and run by the
 /// publisher. The server only inserts a row. The publisher changes its status and lease.
 /// </summary>
 public sealed class PublishRequest
@@ -11,7 +11,7 @@ public sealed class PublishRequest
     /// <summary>The <c>id</c> of the application manifest.</summary>
     public required Guid ApplicationId { get; init; }
 
-    /// <summary><c>validate</c>, <c>publish</c> or <c>rollback</c>.</summary>
+    /// <summary><c>validate</c>, <c>publish</c>, <c>rollback</c> or <c>test</c>.</summary>
     public required string Kind { get; init; }
 
     /// <summary><c>queued</c>, <c>running</c>, <c>succeeded</c> or <c>failed</c>.</summary>
@@ -47,4 +47,10 @@ public sealed class PublishRequest
 
     /// <summary>The diagnostics as a JSON array.</summary>
     public string? Diagnostics { get; init; }
+
+    /// <summary>For a <c>test</c>, the scenario names to run as a JSON array. Null runs every scenario.</summary>
+    public string? ScenarioNames { get; init; }
+
+    /// <summary>For a <c>test</c>, the result of each scenario as a JSON array. Null until the request ends.</summary>
+    public string? ScenarioResults { get; init; }
 }

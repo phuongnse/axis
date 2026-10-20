@@ -137,6 +137,14 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("requested_by_name");
 
+                    b.Property<string>("ScenarioNames")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("scenario_names");
+
+                    b.Property<string>("ScenarioResults")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("scenario_results");
+
                     b.Property<string>("Snapshot")
                         .HasColumnType("jsonb")
                         .HasColumnName("snapshot");

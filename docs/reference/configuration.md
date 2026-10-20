@@ -962,8 +962,8 @@ agrees. Three server settings control it. They are built, and the authoring
 API reads them. The third, `Studio:PublisherRole`, controls publishing, see
 [D47](../decisions.md#d47-publishing-from-studio--agreed). A fourth,
 `Studio:Tests`, controls the test controls, see
-[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed)
-_(planned for M11)_. The Studio page lists the resources with a search, edits them in a form
+[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed).
+The Studio page lists the resources with a search, edits them in a form
 and a JSON view, and shows the diagnostics.
 
 - **`Studio:Folders`.** An array of application folders that Studio may edit,
@@ -997,7 +997,7 @@ and a JSON view, and shows the diagnostics.
   value. The Development settings set it to `publisher`, and the
   development realm gives `hoa` that role. It plays no part in application
   policies, as `Studio:AuthorRole` does not.
-- **`Studio:Tests`** _(planned for M11)_. A boolean. The environment variable
+- **`Studio:Tests`**. A boolean. The environment variable
   is `Studio__Tests`. `true` makes `GET /api/me` answer `studioTest: true` for an
   author, which shows **Run tests** in Studio. It is `false` by default. Turn it
   on together with the publisher's `Scenarios:ServerConnectionString`, because
@@ -1032,7 +1032,7 @@ and a JSON view, and shows the diagnostics.
   empty and the user holds both the author role and the publisher role. It
   also answers `studioPreviewHost`, the first host of the tenant's served
   preview tenant, or null when the user cannot use Studio or the tenant has none.
-  It also answers `studioTest` _(planned for M11)_, true when `studio` is true and
+  It also answers `studioTest`, true when `studio` is true and
   `Studio:Tests` is true.
 
 ## Reference index
