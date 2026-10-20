@@ -3028,8 +3028,7 @@ checks exist. The runner runs record actions, process starts and task
 completions, with or without `expect`, and the `expectRecord`, `expectInstance`
 and `expectTask` steps. It sets `now`. It answers connector and package calls
 from `stubs`. Studio runs scenarios through the publisher, see
-[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed)
-_(planned for M11)_. The runner is a library that runs a scenario from a folder
+[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed). The runner is a library that runs a scenario from a folder
 or from files held in memory, such as a snapshot, and the `Axis.Scenarios`
 command is one caller of it.
 

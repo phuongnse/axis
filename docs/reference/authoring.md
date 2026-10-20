@@ -761,7 +761,9 @@ request has the kind `publish` and the target `preview`.
 stored request are built, and so is the publisher's run, with its 10-minute limit
 and its immediate stop on `SIGTERM`.
 [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees
-the route. The request has the kind `test` and the target `tenant`.
+the route. The request has the kind `test` and the target `tenant`. Studio's
+**Run tests** and **Run** controls send it, and its **Test results** list shows
+the outcome, see [Studio](frontend.md#studio).
 
 - **Who may.** The author role is enough. It needs no publisher role, because
   a test changes no tenant. It costs database time, so the limits below apply.
