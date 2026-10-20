@@ -80,8 +80,10 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/e2e.sh`         | Starts PostgreSQL, Keycloak, the built purchasing system stub, server and worker, runs Playwright in Chromium, then runs the Compose smoke test, the production images smoke test and the on-premises smoke test, which installs `deploy/compose/` from the production images for two tenants, each skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker  |
 | `scripts/scan.sh`        | NuGet and npm vulnerability scan that fails on high or critical findings. CI runs it and once a week _(planned for M10)_                                                                                                                                                                                                                                                          | Network |
 
-A CodeQL workflow _(planned for M10)_ scans C# and TypeScript. A new high or critical alert
-fails its check.
+The CodeQL workflow, `.github/workflows/codeql.yml`, scans C# and TypeScript on pull requests to
+`main` and on `main`. Its alerts go to GitHub code scanning, and its check fails on a new high or
+critical alert. It is not a NexKit check and does not run on NexKit's branches. NexKit starts it on
+`main` after each merge.
 
 The test, integration and E2E scripts run every suite even when one fails. The one
 exception is a smoke test that NexKit's `NEXKIT_BASE_SHA` shows no change can affect. It is

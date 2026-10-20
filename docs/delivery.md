@@ -54,8 +54,8 @@ models, are not copied here. Look them up where they live.
   runs on pushes to `main` and to hand-made branches but not on NexKit's
   branches. NexKit's checks run the same scripts there.
 - **CI runs on `main` after every merge.** A merge by NexKit starts no `push`
-  workflow, so NexKit starts the CI workflow on `main` itself, through its
-  `merge.after_workflows` setting. Two pull requests that pass on their own
+  workflow, so NexKit starts the CI and CodeQL workflows on `main` itself,
+  through its `merge.after_workflows` setting. Two pull requests that pass on their own
   can still break `main` together. When CI on `main` fails, the local agent
   runs it once more if the failure looks flaky. Otherwise it tells the owner
   and opens a bug issue with the failure, which goes before other issues.

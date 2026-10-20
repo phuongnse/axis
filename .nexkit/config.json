@@ -133,7 +133,8 @@
   "merge": {
     "auto": true,
     "after_workflows": [
-      "ci.yml"
+      "ci.yml",
+      "codeql.yml"
     ]
   },
   "conflicts": {
