@@ -268,7 +268,7 @@ What each database role may do:
 | `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                     | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                         | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
-| `publish_requests`                                                                                                                                                                                                                          | Owns it. The publisher changes the status and the lease _(planned for M10)_ | `SELECT` and `INSERT` only. It never updates or deletes a request |
+| `publish_requests`                                                                                                                                                                                                                          | Owns it. The publisher changes the status and the lease | `SELECT` and `INSERT` only. It never updates or deletes a request |
 | `release_activations`                                                                                                                                                                                                                       | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | Sequences in `axis` and `entities`                                                                                                                                                                                                          | Owns them                                                        | `USAGE`, `SELECT`                                                 |
 | Create, alter, drop                                                                                                                                                                                                                         | Yes                                                              | No                                                                |
@@ -372,8 +372,8 @@ host with one database role:
 | Platform migrations, at start, under both tenant sources                                                                | Server                          | `ConnectionStrings:PlatformSchema` |
 | Grants, EF Core migrations, compile, store and activate                                                                 | `Axis.Admin`                    | The tenant's schema role           |
 | Seeding and schedule trigger state                                                                                      | `Axis.Admin`                    | The tenant's runtime role          |
-| Claim, run and finish a publish request: compile, store, activate, release history and audit record _(planned for M10)_ | `axis-admin publisher`          | The tenant's schema role           |
-| Seeding of a publish request _(planned for M10)_                                                                        | `axis-admin publisher`          | The tenant's runtime role          |
+| Claim, run and finish a publish request: compile, store, activate, release history and audit record | `axis-admin publisher`          | The tenant's schema role           |
+| Seeding of a publish request                                                                        | `axis-admin publisher`          | The tenant's runtime role          |
 | Insert and read publish requests                                                                                        | Server                          | The tenant's runtime role          |
 | Read the release history                                                                                                | Server                          | The tenant's runtime role          |
 | Runtime role check                                                                                                      | `Axis.Admin`, server and worker | The tenant's runtime role          |
@@ -1167,11 +1167,12 @@ schema of the tenant database.
 ## Publish requests and release history
 
 `Axis.Configuration` owns both tables, in the `axis`
-schema of each tenant database. `axis.publish_requests` is built, and so is the
-[publisher](administration.md#publisher) for `publish` requests under
-`Tenancy:Source=directory`. The server inserts `validate`, `publish` and `rollback` requests through the
-[authoring API](authoring.md#publishing). The release history is built too. The route for preview is
-planned for M10. See
+schema of each tenant database. Both tables are built, and so are the
+[publisher](administration.md#publisher), the release history and the authoring
+routes: validate, publish, preview and rollback. The server inserts `validate`,
+`publish` and `rollback` requests through the
+[authoring API](authoring.md#publishing). A preview is a `publish` request with
+the target `preview`. See
 [D47](../decisions.md#d47-publishing-from-studio--agreed) and the
 [authoring API](authoring.md#publishing).
 

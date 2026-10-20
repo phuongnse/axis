@@ -361,7 +361,7 @@ what is missing:
   one of its migrations.
 - The tenant id exists in the directory as `active` or `suspended`.
 - A host belongs to another tenant, ignoring letter case.
-- *(Planned for M10.)* The archive is of a preview tenant. Preview data is
+- *(Planned for M16.)* The archive is of a preview tenant. Preview data is
   disposable, so the operator creates the preview again with
   [`tenant create --preview-of`](#tenant-create).
 - A package version with `required` set to `true` is not installed under

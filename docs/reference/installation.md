@@ -478,4 +478,6 @@ These are not decided yet.
 - **Rotating the installation key.** Axis has no rotation, see
   [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
   After a leaked `Platform:SecretKey`, every stored secret must be set again by
-  hand.
+  hand. Changing `Platform:SecretKey` also means deleting the rows of
+  `platform.data_protection_keys`, which signs everyone out. See
+  [several server replicas](#several-server-replicas).

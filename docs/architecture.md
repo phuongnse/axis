@@ -349,8 +349,7 @@ A preview tenant is a tenant that belongs to one main
 tenant. An author tries an application there before publishing it to the main
 tenant. See [D48](decisions.md#d48-preview-tenants--agreed). Under
 `Tenancy:Source=configuration` and under `directory`, `PreviewOf`, sign-in and
-bindings work. The status rules and publishing are planned for M10, and their
-bullets say so.
+bindings work. Status rules and publishing are built too.
 
 - **One main tenant, one preview.** A preview tenant belongs to one main tenant,
   and a main tenant has at most one preview tenant. A preview tenant has no
@@ -374,7 +373,7 @@ bullets say so.
 - **Bindings.** A preview tenant's bindings are its own and empty by default.
   A missing binding is a warning at activation there, not an error, see
   [deployment bindings](reference/configuration.md#deployment-bindings).
-- **Status.** *(Planned for M10.)* Each tenant keeps its own status. Suspending a main tenant does
+- **Status.** Each tenant keeps its own status. Suspending a main tenant does
   not suspend its preview tenant.
 - **Publishing.** Studio on the main tenant's host stores a preview request in
   the main tenant's database. The publisher runs it against the preview tenant.
@@ -631,7 +630,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - It holds the purchase request users with fixed ids: `anna` and `lan`
     the employees, `binh` and `chau` the department managers, `dung` the
     finance reviewer, `giang` the operator, and `hoa` the author. Seed data and E2E journeys already name these ids.
-    *(Planned for M10:)* `hoa` also holds the `publisher` role.
+    `hoa` also holds the `publisher` role. The realm grants it at `samples/keycloak/axis-realm.json:274`.
   - Every user has the same development-only password.
   - The roles are client roles of the confidential client `axis`. A
     client-role mapper writes them to the `roles` claim, so the claim holds

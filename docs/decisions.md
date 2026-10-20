@@ -1795,7 +1795,7 @@ The owner confirmed these points on issue #569 on 2026-10-18.
   - Studio never activates a release in the server process.
     [D47](#d47-publishing-from-studio--agreed) replaces the earlier "Studio
     never activates a release" point: a separate publisher runs a publish
-    request from Studio in M10. Until then, under `scripts/dev.sh`, a saved
+    request from Studio. Under `scripts/dev.sh`, a saved
     file restarts the server, which activates the folder, as it does today.
     Elsewhere a folder is committed and deployed as today.
 - **Who may author:**
@@ -1851,9 +1851,9 @@ forbids replace-all edits and asks for resource versions, so writes are
 patches that carry a version. Editing the folders on disk keeps git the source
 of truth. It also keeps the schema role out of requests, as
 [D31](#d31-separate-database-roles--agreed) asks, because only startup holds
-it and Studio never activates in the server process. The cost is that Studio is a development tool
-for now, until M10 (see [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
-and [D47](#d47-publishing-from-studio--agreed)). Authoring on a shared server, with drafts and publishing from Studio,
+it and Studio never activates in the server process. The cost was that Studio was a development tool.
+[D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed) and
+[D47](#d47-publishing-from-studio--agreed) later added publishing from Studio, so Studio also serves a shared server. Authoring on a shared server, with drafts and publishing from Studio,
 would need a database store and run-time activation. That could come later. An author can change every policy of an application, so no
 application policy can guard authoring. That is why the author role is an
 installation-level setting.
@@ -2107,7 +2107,7 @@ The owner confirmed these points on issue #639 on 2026-10-18.
     (`provisioning`, `active` or `suspended`), its hosts, its database, its
     OIDC settings and its deployment bindings.
   - Hosts are unique across all tenants, ignoring letter case.
-  - *(planned for M10)* An entry may name its main tenant, when it is a
+  - An entry may name its main tenant, when it is a
     preview tenant. See [D48](#d48-preview-tenants--agreed).
   - The database is the server host, the port, the database name, and the
     runtime and schema user names.
@@ -2515,7 +2515,7 @@ The owner confirmed these points on issue #702 on 2026-10-19.
     management, with dashboards, many-to-many, files and import.
   - These samples need no platform code.
 - **How it is planned:**
-  - Rolling wave stays as it is. Only M10 is broken into issues now. A later
+  - Rolling wave stays as it is. M10 was broken into issues first. A later
     milestone is broken down when the one before it is nearly done.
   - Each milestone starts with docs issues that record its design as
     decisions, as M9 did.
@@ -2544,11 +2544,7 @@ change again in M12.
 An author validates, publishes and rolls back an application from Studio. The
 server never gets schema rights. It stores a **publish request**, and a
 separate **publisher** runs it. Every activation also gets a release number in
-a per-tenant history. This decision is planned for M10. Built so far are the
-publish request table, the publisher for `publish`, `validate` and `rollback` requests
-with the audit record of a `publish` and of a `rollback`, the release history with its
-`GET .../releases` route, the Studio `validate`, `publish`, `preview`, `rollback` and request status
-routes, `studioPublisher` and `studioPreviewHost` in `GET /api/me`, and the Studio Preview button.
+a per-tenant history. It was built in M10.
 See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
 for M10, the [authoring API](reference/authoring.md#publishing) for the routes,
 the [publisher](reference/administration.md#publisher) and the
@@ -2666,10 +2662,8 @@ The costs:
 
 An author tries an application on a **preview tenant** before publishing it to
 the real tenant. A preview tenant belongs to one main tenant and keeps its own
-data, database roles, hosts and bindings. This decision is planned for M10. Built
-so far are the `PreviewOf` setting with sign-in and bindings, the publisher's preview
-requests, and the Studio preview route and Preview button. The tenant status rules
-are not built. See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+data, database roles, hosts and bindings. It was built in M10, with one exception:
+refusing to restore a preview tenant's archive is planned for M16. See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
 for M10, [preview tenants](architecture.md#preview-tenants) for how the hosts
 treat one, [preview](reference/authoring.md#preview) for the route,
 [tenant create](reference/administration.md#tenant-create) for the command and
@@ -2724,10 +2718,10 @@ The owner confirmed these points on issue #705 on 2026-10-19.
     the session tenant. A preview request runs for its preview tenant.
 
 *Why:* [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
-asks for a preview on a preview tenant in M10. Today the only way to try a
-change is `scripts/dev.sh`, where a saved file restarts the server and
-activates the folder for every tenant. A tenant has no notion of a preview, and
-its bindings point at real systems. A preview tenant gives the author a place
+asked for a preview on a preview tenant in M10. Before it, the only way to try a
+change was `scripts/dev.sh`, where a saved file restarted the server and
+activated the folder for every tenant. A tenant had no notion of a preview, and
+its bindings pointed at real systems. A preview tenant gives the author a place
 to try a change with its own data and bindings. The costs:
 
 - **One preview per tenant, shared by every application of that tenant.** That
@@ -2835,8 +2829,8 @@ needs a `ReadWriteMany` storage class.
 ## D50. Sign-in audit records and security scanning in CI — Agreed
 
 M10 adds two security baselines. Sign-in, sign-out and refused sign-ins leave
-audit records, and that part is built. CI scans the packages for known
-vulnerabilities and runs static analysis, which is _(planned for M10)_. See
+audit records, and that part is built. CI runs static analysis, which is
+built. Running the dependency scan in CI is _(planned for M16)_. See
 [audit records](reference/storage.md#audit-records-and-sequence-counters) and
 [sign-in and the session](architecture.md#sign-in-and-the-session) for the
 detail. The ASVS level and its verification stay in M16
