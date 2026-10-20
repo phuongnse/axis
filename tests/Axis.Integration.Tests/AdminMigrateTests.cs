@@ -201,9 +201,7 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Tenancy:Source", "directory");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(platform));
-            builder.UseSetting("ConnectionStrings:PlatformSchema", platform);
-            builder.UseSetting("Platform:SecretKey", AdminScenario.TestSecretKey);
+            builder.UseTestPlatform(platform);
 
             // An hour, so the timer never races the refresh that the test triggers itself.
             builder.UseSetting("Tenancy:RefreshInterval", "01:00:00");

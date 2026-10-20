@@ -23,7 +23,7 @@ namespace Axis.Integration.Tests;
 /// </summary>
 public sealed partial class DirectorySignInTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
 {
-    private const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    private const string TestSecretKey = TestPlatform.SecretKey;
 
     // The realm's client accepts redirects to these two addresses, whatever the port.
     private static readonly Uri _addressA = new("http://localhost:5206");
@@ -140,9 +140,7 @@ public sealed partial class DirectorySignInTests(PostgreSqlFixture database, Key
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Tenancy:Source", "directory");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(platform));
-            builder.UseSetting("ConnectionStrings:PlatformSchema", platform);
-            builder.UseSetting("Platform:SecretKey", TestSecretKey);
+            builder.UseTestPlatform(platform);
             builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(logs));
         });
         return (factory, logs, platform, authority);

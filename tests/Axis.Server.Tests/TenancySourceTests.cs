@@ -21,7 +21,7 @@ public sealed class TenancySourceTests
     [Fact]
     public async Task The_directory_source_without_a_platform_schema_connection_string_stops_the_start_naming_it()
     {
-        await using var factory = CreateFactory(("Tenancy:Source", "directory"));
+        await using var factory = CreateFactory(("Tenancy:Source", "directory"), ("ConnectionStrings:PlatformSchema", ""));
 
         var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
 
@@ -45,8 +45,6 @@ public sealed class TenancySourceTests
     {
         await using var factory = CreateFactory(
             ("Tenancy:Source", "directory"),
-            ("ConnectionStrings:PlatformSchema", UnreachableDatabase.Replace("Username=axis", "Username=axis_schema", StringComparison.Ordinal)),
-            ("Platform:SecretKey", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="),
             ("ActivateOnStartup:0", "/x"));
 
         var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
@@ -72,7 +70,7 @@ public sealed class TenancySourceTests
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
+            builder.UseTestPlatform();
             builder.UseSetting("Tenants:default:Hosts:0", "default.example.test");
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);

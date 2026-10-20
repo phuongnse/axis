@@ -79,7 +79,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(a.ConnectionString));
+            builder.UseTestPlatform(a.ConnectionString);
             builder.UseSetting("Tenants:a:Hosts:0", Host(TenantA));
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(a.ConnectionString));
             builder.UseSetting("Tenants:a:SchemaConnectionString", a.ConnectionString);

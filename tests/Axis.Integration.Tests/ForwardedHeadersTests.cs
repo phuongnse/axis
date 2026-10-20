@@ -55,7 +55,7 @@ public sealed class ForwardedHeadersTests(KeycloakFixture keycloak) : IAsyncLife
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
+            builder.UseTestPlatform(UnreachableDatabase);
             builder.UseSetting("Tenants:a:Hosts:0", "localhost");
             builder.UseSetting("Tenants:a:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:a:SchemaConnectionString", UnreachableDatabase);

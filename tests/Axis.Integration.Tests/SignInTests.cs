@@ -297,7 +297,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", _databases["a"]);
+            builder.UseTestPlatform(_databases["a"]);
             builder.UseSetting("Tenants:a:Hosts:0", "localhost");
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(_databases["a"]));
             builder.UseSetting("Tenants:a:SchemaConnectionString", _databases["a"]);

@@ -143,7 +143,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
+            builder.UseTestPlatform(UnreachableDatabase);
             UseTenant(builder, "a", HostA, authority, endpointAudience: "axis-endpoints");
             UseTenant(builder, "b", HostB, masterRealm, endpointAudience: "axis-endpoints");
             UseTenant(builder, "c", HostC, authority, endpointAudience: null);

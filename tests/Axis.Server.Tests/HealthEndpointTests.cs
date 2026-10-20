@@ -64,9 +64,6 @@ public sealed class HealthEndpointTests
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
             builder.UseTestOidc("default");
-            if (connectionString is not null)
-            {
-                builder.UseSetting("ConnectionStrings:Platform", connectionString);
-            }
+            builder.UseTestPlatform(connectionString);
         });
 }

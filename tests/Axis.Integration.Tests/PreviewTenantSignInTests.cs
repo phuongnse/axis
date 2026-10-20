@@ -85,7 +85,7 @@ public sealed partial class PreviewTenantSignInTests(KeycloakFixture keycloak, P
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", databases["main"]);
+            builder.UseTestPlatform(databases["main"]);
             builder.UseSetting("Tenants:main:Hosts:0", MainHost);
             builder.UseSetting("Tenants:main:ConnectionString", PostgreSqlServer.RuntimeConnectionString(databases["main"]));
             builder.UseSetting("Tenants:main:SchemaConnectionString", databases["main"]);

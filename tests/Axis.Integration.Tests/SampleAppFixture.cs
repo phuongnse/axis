@@ -86,7 +86,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(_connectionString));
+            builder.UseTestPlatform(_connectionString);
             builder.UseSetting($"Tenants:{Tenant}:Hosts:0", Host);
             builder.UseSetting($"Tenants:{Tenant}:ConnectionString", PostgreSqlServer.RuntimeConnectionString(_connectionString));
             builder.UseSetting($"Tenants:{Tenant}:SchemaConnectionString", _connectionString);

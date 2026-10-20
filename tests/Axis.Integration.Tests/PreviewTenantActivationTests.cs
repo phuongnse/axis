@@ -66,7 +66,7 @@ public sealed class PreviewTenantActivationTests(PostgreSqlFixture database) : I
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(main));
+            builder.UseTestPlatform(main);
             builder.UseSetting("Tenants:a:Hosts:0", "a.example.test");
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(main));
             builder.UseSetting("Tenants:a:SchemaConnectionString", main);

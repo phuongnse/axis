@@ -39,7 +39,7 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(connectionString));
+            builder.UseTestPlatform(connectionString);
             builder.UseSetting($"Tenants:{Tenant}:Hosts:0", Host);
             builder.UseSetting($"Tenants:{Tenant}:ConnectionString", PostgreSqlServer.RuntimeConnectionString(connectionString));
             builder.UseSetting($"Tenants:{Tenant}:SchemaConnectionString", connectionString);

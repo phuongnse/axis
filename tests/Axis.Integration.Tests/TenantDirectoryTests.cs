@@ -25,7 +25,7 @@ namespace Axis.Integration.Tests;
 
 public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
 {
-    private const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    private const string TestSecretKey = TestPlatform.SecretKey;
     private const string Departments = "/api/apps/RecordsApp/entities/Department/records";
 
     private static readonly TenantSecretCipher _cipher = TenantSecretCipher.Load(
@@ -485,9 +485,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Tenancy:Source", "directory");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(platform));
-            builder.UseSetting("ConnectionStrings:PlatformSchema", platform);
-            builder.UseSetting("Platform:SecretKey", TestSecretKey);
+            builder.UseTestPlatform(platform);
 
             // An hour, so the timer never races the refreshes that a test triggers itself.
             builder.UseSetting("Tenancy:RefreshInterval", "01:00:00");

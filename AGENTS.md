@@ -134,7 +134,7 @@ database with `axis_schema`, run servers and workers as `axis_runtime`, and run 
 `axis_schema` own the tenant database. It also creates the preview tenant's database `axis_preview` and
 its two roles, `axis_preview_schema` and `axis_preview_runtime`, with the development password `axis`,
 which play the same parts for `default-preview`. The server uses `axis_schema` for `SchemaConnectionString` and
-`axis_runtime` for every other connection string. The worker uses only `axis_runtime` and gets no
+`ConnectionStrings:PlatformSchema`, and `axis_runtime` for every other connection string. The worker uses only `axis_runtime` and gets no
 `SchemaConnectionString`. `axis` stays the bootstrap superuser, for setup and health checks only.
 PostgreSQL runs init scripts only on an empty volume, so an existing local Compose volume has no
 `axis_preview` database. It needs `docker compose down -v` once. That deletes its data. Until then

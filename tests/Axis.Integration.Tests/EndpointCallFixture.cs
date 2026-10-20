@@ -82,7 +82,7 @@ public sealed class EndpointCallFixture : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(_connectionString));
+            builder.UseTestPlatform(_connectionString);
             builder.UseSetting("Tenants:a:Hosts:0", Host);
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(_connectionString));
             builder.UseSetting("Tenants:a:SchemaConnectionString", _connectionString);

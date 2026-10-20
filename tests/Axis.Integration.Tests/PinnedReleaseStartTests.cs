@@ -311,7 +311,7 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(connectionString));
+            builder.UseTestPlatform(connectionString);
             builder.UseSetting("Tenants:a:Hosts:0", TenantHost);
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(connectionString));
             builder.UseSetting("Tenants:a:SchemaConnectionString", connectionString);

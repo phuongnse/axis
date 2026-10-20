@@ -37,7 +37,7 @@ public sealed class SchemaConnectionStringTests
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
+            builder.UseTestPlatform();
             foreach (var (tenant, schemaConnectionString) in tenants)
             {
                 builder.UseSetting($"Tenants:{tenant}:Hosts:0", $"{tenant}.example.test");
