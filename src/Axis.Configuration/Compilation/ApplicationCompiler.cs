@@ -28,7 +28,7 @@ namespace Axis.Configuration.Compilation;
 /// the extension packages of the manifest and pins each to the highest installed version in its
 /// range, does the same for its modules, takes the files of each pinned module into the
 /// resources and merges their texts into the application's, resolves references
-/// between entities, forms, pages, sites and seeds, builds the reference index of the references it resolves, and collects the names it loaded.
+/// between entities, forms, pages, sites and seeds, builds the reference index of the references it resolves, collects the names it loaded and builds the policy matrix of its roles and policies.
 /// Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash, which covers its pins and the files of its modules.
 /// Both inputs give the same result for the same resources and installed packages.
@@ -493,6 +493,14 @@ public static class ApplicationCompiler
         {
             References = index,
             Names = DefinedNamesBuilder.Build(loaded, allEntities, allSequences, allEvents, moduleResources.Rules, texts, FindEntity, index),
+            PolicyMatrix = PolicyMatrixBuilder.Build(
+                loaded.Roles,
+                loaded.Policies,
+                allEntities,
+                ownersByChildName.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase),
+                loaded.DataSources,
+                loaded.Processes,
+                loaded.Endpoints),
         };
         if (result.HasErrors || loaded.Application is null)
         {
