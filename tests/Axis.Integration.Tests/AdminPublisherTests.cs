@@ -129,20 +129,17 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
-    public async Task Rollback_requests_are_not_claimed_and_the_oldest_of_an_application_runs_first()
+    public async Task The_oldest_request_of_an_application_runs_first()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var ids = await CreateTenantsAsync(scenario);
         var snapshot = await SnapshotAsync(null);
-        var rollback = await QueueAsync(scenario, ids[0], snapshot, kind: "rollback");
         var first = await QueueAsync(scenario, ids[0], snapshot);
         var second = await QueueAsync(scenario, ids[0], snapshot);
 
         var result = await RunPublisherAsync(scenario, ids[0], second);
 
         Assert.Equal(0, result.Exit);
-        Assert.Equal("queued", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{rollback}'"));
-        Assert.Equal(0, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{rollback}'"));
         Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{first}'"));
         Assert.True((bool)(await ScalarAsync(
             scenario,

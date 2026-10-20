@@ -74,7 +74,7 @@ Every command writes one line per tenant and step to standard output:
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
 `work`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
 `check`, `restore` and `status`. The [publisher](#publisher)
-adds `claim` and `validate`, and *(planned for M10)* `rollback`. A line names the
+adds `claim`, `validate` and `rollback`. A line names the
 tenant and never a database host, a password or a connection string. A `failed` message
 never holds one either. A restore refusal does name the tenant host the operator gave on the
 command line, as typed. A failed `dump` step says only `pg_dump exited with code <n>`
@@ -596,10 +596,10 @@ can call it. The `axis-admin` image runs it. Both production installs start
 one, see [installation](installation.md). `scripts/dev.sh`, the Docker Compose
 file in the repository root and the E2E script each start one too.
 
-**What is built.** The command runs `publish` and `validate` requests for
-`Tenancy:Source=directory` and for `Tenancy:Source=configuration`. These stay
-*(planned for M10)*: `rollback` requests and preview requests. A request of a
-kind that is not built is never claimed, so it stays `queued`.
+**What is built.** The command runs `publish`, `validate` and `rollback` requests for
+`Tenancy:Source=directory` and for `Tenancy:Source=configuration`. Preview requests
+stay *(planned for M10)*. A request of a kind that is not built is never claimed,
+so it stays `queued`.
 
 **Settings.** It reads these, with the meaning they have for the other commands:
 
@@ -641,13 +641,13 @@ then on. It does not check a tenant again after that, so a later schema change
 needs a restart of the publisher. The `directory` source writes neither line.
 
 **Claiming.** Each poll round, for each served tenant, it claims the oldest
-`queued` `publish` or `validate` request with `FOR UPDATE SKIP LOCKED`. It sets the request
+`queued` `publish`, `validate` or `rollback` request with `FOR UPDATE SKIP LOCKED`. It sets the request
 `running`, `claimed_by` to its own name, `lease_until` and adds 1 to `claims`. A
 `running` request whose lease has run out is claimed the same way.
 
 - **One at a time.** For one tenant and application it runs one request at a
   time, oldest first, so when two publishes are queued the newer one ends up
-  live. A `validate` waits behind a running `publish` of the same application. A claim skips an application that already has a `running` request.
+  live, and a rollback that is queued after a publish runs after it. A `validate` waits behind a running `publish` of the same application. A claim skips an application that already has a `running` request.
   Requests of other applications and tenants can run at the same time. Each
   claim takes a lock of the tenant database before it reads the queue, so two
   publishers cannot claim two requests of one application at the same moment.
@@ -657,7 +657,8 @@ needs a restart of the publisher. The `directory` source writes neither line.
   publisher, because its publisher died. A request that has been claimed three
   times and whose lease runs out again ends `failed` with `AXC0215`, see the
   [lifecycle](authoring.md#lifecycle). A `publish` gets a
-  `release.publishFailed` audit record with it, and a `validate` gets none.
+  `release.publishFailed` audit record with it, a `rollback` gets a
+  `release.rollbackFailed` one, and a `validate` gets none.
   The `claims` count is the fencing token. Renewal and the final update change
   the request only while its status is `running` and `claims` is still the value
   this publisher claimed. A publisher that lost its claim writes a
@@ -691,12 +692,21 @@ role unless it says otherwise.
    and it is the only step after `version`. A snapshot that cannot be read
    fails at `validate`. The transaction holds the schema lock until it rolls
    back, so other activations of the tenant wait for it.
-5. *(Planned for M10.)* For `rollback`: read the stored release the request
-   names and activate it as it is, without compiling. It refuses the case where a
-   migration applied after that release is missing from it, with `AXC0174`, and
-   the case where a pinned package version is not installed, with `AXC0146`. The
-   step is called `rollback`. See [rollback](authoring.md#rollback).
-6. Write the audit record of a `publish` *(planned for M10:)* or a `rollback`, with
+5. For `rollback`: the steps are `version`, `rollback`, `activate` and `seed`.
+   The `rollback` step reads the stored release the request names and rebuilds
+   its model from the stored files, as the server does when it serves a release.
+   It reads no folder, compiles nothing and stores no new release. It refuses a
+   release that pins a package version that is not installed under
+   `Extensions:Path`, with `AXC0146`. A release that is missing, or that belongs
+   to another application, fails the step too. The `activate` step then runs
+   every activation check, so a migration that was applied after the release
+   and is missing from it is `AXC0174`, and a field that the release lacks but
+   the tables hold is `AXC0015`. A refused rollback changes nothing. The
+   activation adds a row to the [release history](storage.md#release-history)
+   with the requesting user and the request id, no label and no note, unless
+   the release is already active. `seed` then sets the schedule triggers and
+   the seed records of that release. See [rollback](authoring.md#rollback).
+6. Write the audit record of a `publish` or a `rollback`, with
    the request's final status, then set the request `succeeded` or `failed` and
    store its diagnostics and its release id. These happen in one transaction.
    A `validate` gets its final status and diagnostics the same way, with no

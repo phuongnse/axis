@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Releases;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Microsoft.Net.Http.Headers;
@@ -18,6 +19,9 @@ namespace Axis.Server.Studio;
 /// <c>application/json</c> (415) and a JSON object with only a string <c>label</c> of up to 100 characters and a string
 /// <c>note</c> of up to 2000 (400). A <c>validate</c> ignores its body. The status route answers 404 for a request
 /// of another application or tenant, because it reads this tenant's database for this application only.
+/// <c>POST /api/studio/apps/{application}/releases/{id}/rollback</c> stores a <c>rollback</c> request that names a release of
+/// the application's history in this tenant, with no snapshot, and answers as <c>publish</c> does. It runs the same checks
+/// as <c>publish</c>, and then answers 404 for an <c>id</c> that is not a UUID or is not in the history. It ignores its body.
 /// </summary>
 internal static class StudioPublishEndpoints
 {
@@ -29,7 +33,31 @@ internal static class StudioPublishEndpoints
     {
         endpoints.MapPost("/api/studio/apps/{application}/validate", ValidateAsync);
         endpoints.MapPost("/api/studio/apps/{application}/publish", PublishAsync);
+        endpoints.MapPost("/api/studio/apps/{application}/releases/{id}/rollback", RollbackAsync);
         endpoints.MapGet("/api/studio/apps/{application}/requests/{id}", GetRequestAsync);
+    }
+
+    private static async Task<IResult> RollbackAsync(
+        string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options, publisher: true);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        // A folder without a manifest id has never been activated, so its history is empty and every release is unknown.
+        var cancellationToken = httpContext.RequestAborted;
+        if (!Guid.TryParseExact(id, "D", out var releaseId)
+            || StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest
+            || !(await new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken))
+                .ListActivationsAsync(applicationId, cancellationToken)).Any(row => row.ReleaseId == releaseId))
+        {
+            return StudioEndpoints.NotFound("The application has no release with this id in its history.");
+        }
+
+        var user = (await CurrentUsers.FindAsync(httpContext))!;
+        return await InsertAsync("rollback", application, manifest.Name, applicationId, snapshot: null, releaseId, label: null, note: null, user, database, cancellationToken);
     }
 
     private static async Task<IResult> ValidateAsync(
@@ -142,20 +170,38 @@ internal static class StudioPublishEndpoints
             ["content"] = file.Content,
         })]);
 
+        return await InsertAsync(kind, application, manifest.Name, applicationId, snapshot.ToJsonString(), releaseId: null, label, note, user, database, cancellationToken);
+    }
+
+    // Stores the request as queued and answers 202 with it and its Location.
+    private static async Task<IResult> InsertAsync(
+        string kind,
+        string application,
+        string? name,
+        Guid applicationId,
+        string? snapshot,
+        Guid? releaseId,
+        string? label,
+        string? note,
+        CurrentUserResponse user,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
         var id = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests
-                (id, application_id, kind, status, snapshot, label, note, requested_by, requested_by_name, requested_at)
-            VALUES (@id, @application, @kind, 'queued', @snapshot, @label, @note, @user, @name, clock_timestamp())
+                (id, application_id, kind, status, snapshot, release_id, label, note, requested_by, requested_by_name, requested_at)
+            VALUES (@id, @application, @kind, 'queued', @snapshot, @release, @label, @note, @user, @name, clock_timestamp())
             RETURNING requested_at
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("application", applicationId);
         command.Parameters.AddWithValue("kind", kind);
-        command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlDbType.Jsonb) { Value = snapshot.ToJsonString() });
+        command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlDbType.Jsonb) { Value = (object?)snapshot ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = (object?)releaseId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("label", NpgsqlDbType.Text) { Value = (object?)label ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("note", NpgsqlDbType.Text) { Value = (object?)note ?? DBNull.Value });
         command.Parameters.AddWithValue("user", user.Id);
@@ -165,8 +211,8 @@ internal static class StudioPublishEndpoints
         var requestedAt = inserted.GetFieldValue<DateTimeOffset>(0);
 
         var response = new StudioPublishRequestResponse(
-            id.ToString("D"), manifest.Name ?? application, kind, "tenant", "queued", label, note, user.Id, requestedAt,
-            null, null, null, JsonDocument.Parse("[]").RootElement.Clone());
+            id.ToString("D"), name ?? application, kind, "tenant", "queued", label, note, user.Id, requestedAt,
+            null, null, releaseId?.ToString("D"), JsonDocument.Parse("[]").RootElement.Clone());
         return Results.Accepted($"/api/studio/apps/{Uri.EscapeDataString(application)}/requests/{id:D}", response);
     }
 

@@ -3,8 +3,10 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Audit;
+using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
@@ -14,12 +16,16 @@ using NpgsqlTypes;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>publisher</c>: runs the <c>publish</c> and <c>validate</c> requests that Studio stores in the tenant databases, until it
-/// is stopped. Each poll round it claims the oldest queued request of every active tenant that is on this build's schema
+/// <c>publisher</c>: runs the <c>publish</c>, <c>validate</c> and <c>rollback</c> requests that Studio stores in the tenant
+/// databases, until it is stopped. Each poll round it claims the oldest queued request of every active tenant that is on this build's schema
 /// version. A <c>publish</c> runs the steps of <c>activate</c>, compiling from the stored snapshot and never from a folder. A
-/// <c>validate</c> runs the compile and every activation check in a transaction that it rolls back. A request ends
-/// <c>succeeded</c> or <c>failed</c>, with its diagnostics. A <c>publish</c> writes its audit record in the same transaction,
-/// and a <c>validate</c> writes none. A request of another tenant, and a <c>rollback</c>, stays queued. While a request runs,
+/// <c>validate</c> runs the compile and every activation check in a transaction that it rolls back. A <c>rollback</c> runs the
+/// same steps with the stored release in place of the compile: it rebuilds the release's model from its stored files, refuses
+/// a release that pins a package version that is not installed with <c>AXC0146</c>, and then activates it with every
+/// activation check, so a migration that the release lacks is <c>AXC0174</c>. It never reads a folder and stores no new
+/// release. A request ends <c>succeeded</c> or <c>failed</c>, with its diagnostics. A <c>publish</c> and a <c>rollback</c> write
+/// their audit record in the same transaction, and a <c>validate</c> writes none. A request of another tenant stays queued.
+/// The three kinds share one queue for each application, oldest first. While a request runs,
 /// the publisher renews its lease. A running request whose lease has run out is claimed again, and the third such claim to
 /// run out ends it <c>failed</c> with <c>AXC0215</c>. The <c>claims</c> count fences the final update, so a publisher that
 /// lost its claim changes nothing. Every step runs as the tenant's schema role, and a stop finishes the request that is
@@ -49,8 +55,8 @@ internal sealed class Publisher(
         """
         UPDATE axis.publish_requests
         SET status = 'failed', finished_at = clock_timestamp(), diagnostics = @diagnostics
-        WHERE kind IN ('publish', 'validate') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
-        RETURNING id, application_id, requested_by, requested_by_name, kind
+        WHERE kind IN ('publish', 'validate', 'rollback') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
+        RETURNING id, application_id, requested_by, requested_by_name, kind, release_id
         """;
 
     // clock_timestamp() and not now(): now() is fixed when the transaction starts, before the wait for the lock.
@@ -58,7 +64,7 @@ internal sealed class Publisher(
         """
         WITH next AS (
           SELECT r.id FROM axis.publish_requests r
-          WHERE r.kind IN ('publish', 'validate')
+          WHERE r.kind IN ('publish', 'validate', 'rollback')
             AND (r.status = 'queued'
                  OR (r.status = 'running' AND r.lease_until < clock_timestamp() AND r.claims < @max))
             AND NOT EXISTS (SELECT 1 FROM axis.publish_requests o
@@ -69,7 +75,7 @@ internal sealed class Publisher(
         SET status = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims, p.label, p.note
+        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims, p.label, p.note, p.release_id
         """;
 
     private const string RenewSql =
@@ -224,7 +230,8 @@ internal sealed class Publisher(
                     reader.GetString(5),
                     reader.GetInt32(6),
                     await reader.IsDBNullAsync(7) ? null : reader.GetString(7),
-                    await reader.IsDBNullAsync(8) ? null : reader.GetString(8));
+                    await reader.IsDBNullAsync(8) ? null : reader.GetString(8),
+                    await reader.IsDBNullAsync(9) ? null : reader.GetGuid(9));
             }
         }
 
@@ -232,11 +239,11 @@ internal sealed class Publisher(
         return claimed;
     }
 
-    // A running request that was claimed three times and whose lease ran out again ends failed. A publish gets its audit record.
+    // A running request that was claimed three times and whose lease ran out again ends failed. A publish and a rollback get their audit record.
     private async Task FailExhaustedAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string tenant)
     {
         const string message = "The publisher stopped three times while running the request.";
-        var exhausted = new List<(Guid Id, Guid ApplicationId, string RequestedBy, string? RequestedByName, string Kind)>();
+        var exhausted = new List<(Guid Id, Guid ApplicationId, string RequestedBy, string? RequestedByName, string Kind, Guid? ReleaseId)>();
         await using (var command = new NpgsqlCommand(ExhaustedSql, connection, transaction))
         {
             command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb)
@@ -247,15 +254,15 @@ internal sealed class Publisher(
             await using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                exhausted.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), await reader.IsDBNullAsync(3) ? null : reader.GetString(3), reader.GetString(4)));
+                exhausted.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), await reader.IsDBNullAsync(3) ? null : reader.GetString(3), reader.GetString(4), await reader.IsDBNullAsync(5) ? null : reader.GetGuid(5)));
             }
         }
 
         foreach (var request in exhausted)
         {
-            if (request.Kind == "publish")
+            if (request.Kind is "publish" or "rollback")
             {
-                await AppendAuditAsync(transaction, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, false, null);
+                await AppendAuditAsync(transaction, request.Kind, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, false, request.ReleaseId);
             }
 
             output.WriteLine($"{tenant} claim failed: {DiagnosticCodes.PublishClaimsExhausted} {message}");
@@ -302,6 +309,22 @@ internal sealed class Publisher(
             return;
         }
 
+        if (request.Kind == "rollback")
+        {
+            var rolledBack = await activation.RunAsync(
+                tenant.Id,
+                tenant.SchemaVersion,
+                connections,
+                tenant.Bindings,
+                configuration => LoadStoredAsync(configuration, request, tenant.Id),
+                diagnostics,
+                ActivationActor.User(request.RequestedBy, request.RequestedByName, null, null, request.Id),
+                loadStep: "rollback");
+            await StopRenewalAsync(renewing, renewal);
+            await FinishAsync(tenant.Id, connections, request, rolledBack, diagnostics, audit: true);
+            return;
+        }
+
         ReleaseRun run;
         if (files is null)
         {
@@ -323,6 +346,24 @@ internal sealed class Publisher(
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
         await StopRenewalAsync(renewing, renewal);
         await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: true);
+    }
+
+    // The release of a rollback, rebuilt from its stored files as the server does when it serves a release. A release that
+    // is missing, or that belongs to another application, is a failure of the step, and so is a failure to rebuild it.
+    private async Task<ReleaseCompilationResult> LoadStoredAsync(ConfigurationDbContext configuration, ClaimedRequest request, string tenantId)
+    {
+        var release = request.ReleaseId is { } releaseId
+            ? await new ActiveReleaseStore(configuration).GetReleaseAsync(releaseId)
+            : null;
+        if (release is null || release.ApplicationId != request.ApplicationId)
+        {
+            throw new InvalidOperationException("The release to roll back to is not stored for this application.");
+        }
+
+        var missing = PinnedReleaseCheck.MissingPins(release, tenantId, settings.Packages.Versions);
+        return missing.Count > 0
+            ? new ReleaseCompilationResult(null, null, missing)
+            : new ReleaseCompilationResult(release, ReleaseCompiler.BuildModel(release, settings.Packages.Versions), []);
     }
 
     private static async Task StopRenewalAsync(CancellationTokenSource renewing, Task renewal)
@@ -430,7 +471,7 @@ internal sealed class Publisher(
         await using (var command = new NpgsqlCommand(FinishSql, connection, transaction))
         {
             command.Parameters.AddWithValue("status", run.Succeeded ? "succeeded" : "failed");
-            command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = run.ReleaseId is { } release ? release : DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = ReleaseOf(request, run) is { } release ? release : DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb) { Value = DiagnosticsJson(diagnostics) });
             command.Parameters.AddWithValue("id", request.Id);
             command.Parameters.AddWithValue("claims", request.Claims);
@@ -446,16 +487,21 @@ internal sealed class Publisher(
 
         if (audit)
         {
-            await AppendAuditAsync(transaction, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, run.Succeeded, run.ReleaseId);
+            await AppendAuditAsync(transaction, request.Kind, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, run.Succeeded, ReleaseOf(request, run));
         }
 
         await transaction.CommitAsync();
     }
 
+    // A rollback names its release from the start, so a failed one still has it. A publish has it once it is compiled.
+    private static Guid? ReleaseOf(ClaimedRequest request, ReleaseRun run) =>
+        request.Kind == "rollback" ? request.ReleaseId : run.ReleaseId;
+
     // The number is the release's number in the release history. It is null when the request failed before a release was
     // known, or when the release was never activated.
     private static async Task AppendAuditAsync(
         NpgsqlTransaction transaction,
+        string kind,
         Guid requestId,
         Guid applicationId,
         string requestedBy,
@@ -479,7 +525,9 @@ internal sealed class Publisher(
             transaction,
             new AuditEntry(
                 requestedBy,
-                succeeded ? "release.published" : "release.publishFailed",
+                kind == "rollback"
+                    ? succeeded ? "release.rolledBack" : "release.rollbackFailed"
+                    : succeeded ? "release.published" : "release.publishFailed",
                 applicationId,
                 null,
                 null,
@@ -500,5 +548,5 @@ internal sealed class Publisher(
             ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
         })]).ToJsonString();
 
-    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims, string? Label, string? Note);
+    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId);
 }

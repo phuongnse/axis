@@ -59,23 +59,31 @@ public static class PinnedReleaseCheck
             // A release is never deleted, so a missing row means a broken database.
             var release = await store.GetReleaseAsync(releaseId, cancellationToken)
                 ?? throw new InvalidOperationException($"The release '{releaseId}' could not be found.");
-            var before = diagnostics.Count;
-            foreach (var pin in release.Packages)
-            {
-                if (!installed.Any(package => string.Equals(package.Id, pin.PackageId, StringComparison.Ordinal)
-                    && string.Equals(package.Version, pin.Version, StringComparison.Ordinal)))
-                {
-                    diagnostics.Add(Missing(release, pin, tenantId));
-                }
-            }
-
-            if (diagnostics.Count == before)
+            var missing = MissingPins(release, tenantId, installed);
+            diagnostics.AddRange(missing);
+            if (missing.Count == 0)
             {
                 ReleaseCompiler.BuildModel(release, installed);
             }
         }
 
         return diagnostics;
+    }
+
+    /// <summary>
+    /// The <c>AXC0146</c> diagnostics of <paramref name="release"/>: one for each pinned package version that is not in
+    /// <paramref name="installed"/>, in the order of the release's pins. Empty when every pin is installed.
+    /// </summary>
+    public static IReadOnlyList<Diagnostic> MissingPins(Release release, string tenantId, IReadOnlyCollection<PackageVersion> installed)
+    {
+        ArgumentNullException.ThrowIfNull(release);
+        ArgumentNullException.ThrowIfNull(tenantId);
+        ArgumentNullException.ThrowIfNull(installed);
+
+        return [.. release.Packages
+            .Where(pin => !installed.Any(package => string.Equals(package.Id, pin.PackageId, StringComparison.Ordinal)
+                && string.Equals(package.Version, pin.Version, StringComparison.Ordinal)))
+            .Select(pin => Missing(release, pin, tenantId))];
     }
 
     private static Diagnostic Missing(Release release, ReleasePackage pin, string tenantId)
