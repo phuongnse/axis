@@ -90,7 +90,7 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * stubs and steps, and the JSON view edits the same draft. A connector opens in the connector editor, which shows a
  * binding as a name only. A page opens in the page editor, which lists its widgets and shows a panel for the
  * selected widget's type, and keeps a key it does not show. A process opens in the process editor, which shows its
- * steps as cards, with the decision and end panels and a picker of the draft's step names for every transition. An
+ * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition. An
  * endpoint keeps the generic form and shows its `values` as rows of a field of its entity and an expression. When the
  * server does not answer, the draft stays, and the resource loads again after the reconnect unless the draft has
  * changes.
