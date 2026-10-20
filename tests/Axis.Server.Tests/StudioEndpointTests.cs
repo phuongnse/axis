@@ -170,6 +170,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/releases")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
     [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
+    [InlineData("/api/studio/templates")]
     public async Task User_without_the_author_role_gets_403_and_no_session_gets_401(string url)
     {
         await using var factory = CreateFactory();
@@ -193,6 +194,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/releases")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
     [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
+    [InlineData("/api/studio/templates")]
     public async Task Studio_is_off_without_an_author_role_or_without_folders(string url)
     {
         foreach (var (folder, role) in new[] { (Folder, ""), ("", "author") })

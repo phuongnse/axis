@@ -78,6 +78,8 @@ services:
       Extensions__Path: /extensions
       # The sample module departments, which the image holds.
       Modules__Path: /modules
+      # The sample templates, which the image will hold.
+      Templates__Path: /templates
       # The purchasing system stub on the Compose network. The token is in appsettings.Development.json.
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
     ports:

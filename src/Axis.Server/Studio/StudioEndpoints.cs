@@ -44,7 +44,7 @@ namespace Axis.Server.Studio;
 /// file when <c>If-Match</c> holds its current version and answers <c>{ diagnostics }</c>. It answers 428
 /// without <c>If-Match</c>, 409 for a stale version and 400 for the manifest.
 /// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, and the expression check is in
-/// <see cref="StudioExpressionEndpoints"/>.
+/// <see cref="StudioExpressionEndpoints"/>, and the template list is in <see cref="StudioTemplateEndpoints"/>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
 /// newest first, as <c>{ active, folderContentHash, items }</c>. <c>active</c> is the active release or null, and
 /// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. It reads the
@@ -67,6 +67,7 @@ internal static class StudioEndpoints
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
         endpoints.MapStudioPublishEndpoints();
         endpoints.MapStudioExpressionEndpoints();
+        endpoints.MapStudioTemplateEndpoints();
     }
 
     private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)

@@ -2,6 +2,7 @@ using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Releases;
 
 namespace Axis.Server.Studio;
 
@@ -20,6 +21,11 @@ internal static class StudioDiagnostics
 {
     public static IReadOnlyList<StudioDiagnostic> Compile(string folder, PackageCatalog packages, ModuleCatalog modules) =>
         [.. ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).Diagnostics.Select(Map)];
+
+    /// <summary>Compiles application files held in memory, as <see cref="Compile"/> compiles a folder.</summary>
+    public static IReadOnlyList<StudioDiagnostic> CompileFiles(
+        IReadOnlyList<ResourceContent> files, PackageCatalog packages, ModuleCatalog modules) =>
+        [.. ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules).Diagnostics.Select(Map)];
 
     private static StudioDiagnostic Map(Diagnostic diagnostic) => new(
         diagnostic.Code,

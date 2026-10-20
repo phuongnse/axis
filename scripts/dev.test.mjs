@@ -243,6 +243,10 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.ok(fs.existsSync(path.join(copy, 'artifacts/modules/departments/1.0.0/module.json')))
     assert.doesNotMatch(run.stdout, /The module version is not loaded/)
 
+    // The templates folder exists where Templates:Path points, even with no sample template, or the server would stop.
+    assert.ok(fs.statSync(path.join(copy, 'artifacts/templates')).isDirectory())
+    assert.doesNotMatch(run.stdout, /The template version is not loaded/)
+
     // Keycloak serves the development realm, and starts before the server.
     const discovery = await fetch(`http://localhost:${ports.keycloak}/realms/axis/.well-known/openid-configuration`)
     assert.equal(discovery.status, 200)
