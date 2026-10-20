@@ -86,15 +86,20 @@ function StudioWorkspace() {
   const [folder, setFolder] = useState<FolderState>()
   const [search, setSearch] = useState('')
   const [canPublish, setCanPublish] = useState(false)
+  const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
     fetchCurrentUser(controller.signal).then(
-      (user) => setCanPublish(user?.studioPublisher === true),
+      (user) => {
+        setCanPublish(user?.studioPublisher === true)
+        setPreviewHost(user?.studioPreviewHost ?? null)
+      },
       () => {
         if (!controller.signal.aborted) {
           setCanPublish(false)
+          setPreviewHost(null)
         }
       },
     )
@@ -205,6 +210,8 @@ function StudioWorkspace() {
           key={application}
           application={application}
           canPublish={canPublish}
+          previewHost={previewHost}
+          sites={resources.filter((item) => item.kind === 'site')}
           folderRevision={folderRevision}
           onDiagnostics={(diagnostics) =>
             setFolder((current) =>

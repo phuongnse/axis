@@ -3,13 +3,17 @@ import { useEffect, useRef, useState } from 'react'
 import {
   fetchStudioReleases,
   fetchStudioRequest,
+  fetchStudioResource,
   folderDiffers,
+  previewSiteUrl,
+  previewStudioApp,
   publishStudioApp,
   rollbackStudioRelease,
   ServerUnreachableError,
   type StudioDiagnostic,
   type StudioReleaseRow,
   type StudioReleases,
+  type StudioResourceItem,
   type StudioRequest,
   validateStudioApp,
 } from '../platform/studio'
@@ -22,8 +26,11 @@ import { StudioRequestStatus } from './StudioRequestStatus'
 const pollDelay = 1000
 
 /**
- * The Validate and Publish buttons of the open application, with the status of the request they send, and its
- * release history. Validate sends a validate request. Publish opens a dialog for an optional label and note, then
+ * The Validate, Preview and Publish buttons of the open application, with the status of the request they send, and
+ * its release history. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
+ * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
+ * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
+ * preview tenant's history. Publish opens a dialog for an optional label and note, then
  * sends a publish request. A Roll back button in the history sends a rollback request.
  * Studio checks the request every second until it is `succeeded` or `failed`, with no time limit, and shows its
  * status meanwhile. When it ends, its diagnostics go to the diagnostics panel. A succeeded publish or rollback
@@ -38,11 +45,15 @@ const pollDelay = 1000
 export function StudioPublishing({
   application,
   canPublish,
+  previewHost,
+  sites,
   folderRevision,
   onDiagnostics,
 }: {
   application: string
   canPublish: boolean
+  previewHost: string | null
+  sites: StudioResourceItem[]
   folderRevision: number
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
 }) {
@@ -50,6 +61,7 @@ export function StudioPublishing({
   const { generation, reconnecting, lost } = useStudioConnection()
   const [request, setRequest] = useState<StudioRequest | null>(null)
   const [releaseNumber, setReleaseNumber] = useState<number | null>(null)
+  const [previewLinks, setPreviewLinks] = useState<string[]>([])
   const [sending, setSending] = useState(false)
   const [sendFailed, setSendFailed] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -78,6 +90,10 @@ export function StudioPublishing({
   useEffect(() => {
     diagnosticsHandler.current = onDiagnostics
   }, [onDiagnostics])
+  const sitesRef = useRef(sites)
+  useEffect(() => {
+    sitesRef.current = sites
+  }, [sites])
   const requestId = request?.id
   const running = request !== null && (request.status === 'queued' || request.status === 'running')
 
@@ -97,8 +113,10 @@ export function StudioPublishing({
           return
         }
         const number = await findReleaseNumber(next, controller.signal)
+        const links = await findPreviewLinks(next, controller.signal)
         diagnosticsHandler.current(next.diagnostics)
         setReleaseNumber(number)
+        setPreviewLinks(links)
         setRequest(next)
         setHistoryRevision((value) => value + 1)
       } catch (error) {
@@ -118,6 +136,7 @@ export function StudioPublishing({
 
     async function findReleaseNumber(ended: StudioRequest, signal: AbortSignal): Promise<number | null> {
       if (
+        ended.target === 'preview' ||
         (ended.kind !== 'publish' && ended.kind !== 'rollback') ||
         ended.status !== 'succeeded' ||
         ended.releaseId === null
@@ -128,12 +147,34 @@ export function StudioPublishing({
       return releases.items.find((item) => item.releaseId === ended.releaseId)?.number ?? null
     }
 
+    // The site paths are read from the folder, so a path renamed since the request was sent gives a wrong link.
+    async function findPreviewLinks(ended: StudioRequest, signal: AbortSignal): Promise<string[]> {
+      if (ended.target !== 'preview' || ended.status !== 'succeeded' || previewHost === null) {
+        return []
+      }
+      const links: string[] = []
+      for (const site of sitesRef.current) {
+        try {
+          const { content } = await fetchStudioResource(application, site.id, signal)
+          if (typeof content.path === 'string') {
+            links.push(previewSiteUrl(previewHost, content.path))
+          }
+        } catch (error) {
+          if (signal.aborted || error instanceof ServerUnreachableError) {
+            throw error
+          }
+          console.warn(`Loading the site '${site.id}' for the preview links failed`, error)
+        }
+      }
+      return links
+    }
+
     timer = setTimeout(check, pollDelay)
     return () => {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [application, requestId, running, generation, lost])
+  }, [application, requestId, running, generation, lost, previewHost])
 
   async function send(start: () => Promise<StudioRequest>) {
     setSending(true)
@@ -141,6 +182,7 @@ export function StudioPublishing({
     try {
       const sent = await start()
       setReleaseNumber(null)
+      setPreviewLinks([])
       setRequest(sent)
     } catch (error) {
       if (error instanceof ServerUnreachableError) {
@@ -168,6 +210,15 @@ export function StudioPublishing({
         <Button disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
           {t('shell.studio.validate')}
         </Button>
+        {previewHost !== null && (
+          <Button
+            data-testid="studio-preview"
+            disabled={busy}
+            onClick={() => send(() => previewStudioApp(application))}
+          >
+            {t('shell.studio.preview')}
+          </Button>
+        )}
         {canPublish && (
           <Button type="primary" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
             {t('shell.studio.publish')}
@@ -178,6 +229,15 @@ export function StudioPublishing({
         <Alert data-testid="studio-request-error" type="error" message={t('shell.studio.request.sendFailed')} />
       )}
       {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
+      {previewLinks.length > 0 && (
+        <Flex vertical gap={4}>
+          {previewLinks.map((link) => (
+            <a key={link} data-testid="studio-preview-link" href={link} target="_blank" rel="noreferrer">
+              {link}
+            </a>
+          ))}
+        </Flex>
+      )}
       {history === 'failed' && (
         <Alert data-testid="studio-releases-error" type="error" message={t('shell.studio.releases.loadFailed')} />
       )}

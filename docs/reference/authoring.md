@@ -16,8 +16,7 @@ Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
 restarts the server, which activates the folder, as a hand edit does today.
 A write takes a lock in the platform database, see [Versions](#versions). Reads
 and diagnostics touch no database. Going live from Studio is
-[Publishing](#publishing). `validate`, `publish`, `rollback` and the release history are built, `preview`
-is *(planned for M10)*. It asks for an activation: the
+[Publishing](#publishing). `validate`, `publish`, `preview`, `rollback` and the release history are built. It asks for an activation: the
 server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
 its own process, and
@@ -136,17 +135,17 @@ Check 6 is built for a request and for a release:
 A write that cannot take the [write lock](#versions) answers `503`. It comes after the `400` for a body that
 cannot be read, a patch that is not valid RFC 6902 and a create that has no valid `id`, `kind` or file name. It comes
 before the checks that need the folder under the lock: a patch that does not apply, a patch that changes `id` or
-`kind`, the stale version, and the existing `id` or file of a create. A `validate` or `publish` answers `503` the
+`kind`, the stale version, and the existing `id` or file of a create. A `validate`, `publish` or `preview` answers `503` the
 same way, before it stores a request.
 
-A check 5a sits between checks 5 and 6, on `validate` and `publish` only. A `rollback` takes no body, and it has no check 5a, because it names a release of the history. A folder whose manifest has no UUID `id` answers `409`,
+A check 5a sits between checks 5 and 6, on `validate`, `publish` and `preview`. A `rollback` takes no body, and it has no check 5a, because it names a release of the history. A folder whose manifest has no UUID `id` answers `409`,
 because the request needs the application id for the publisher's queue. It comes after the unknown application `404` and, for a
 `publish`, before the body is read.
 
-*(Planned for M10.)* A check 5b sits between checks 5 and 6, on `preview` only.
-When the session's tenant has no preview tenant, the answer is `409`. It comes
+A check 5b sits between checks 5 and 5a, on `preview` only.
+When the session's tenant has no served preview tenant, the answer is `409`. It comes
 after the unknown application `404`, so a caller cannot learn from it which
-applications exist.
+applications exist. A preview tenant that is suspended is not served, so it counts as none.
 
 The session comes before the role, and the roles before the application. So a
 caller without the roles cannot find out which applications, resources,
@@ -157,8 +156,7 @@ requests or releases exist.
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
 from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics,
-Resource references, Text key references, Release history, Validate, Publish, Rollback and Request status are built. The row for
-Preview is *(planned for M10)*.
+Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
@@ -175,13 +173,13 @@ Preview is *(planned for M10)*.
 | Publish | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Request status | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
 | Release history | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
-| Preview *(planned for M10)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | This tenant has no preview tenant |
+| Preview | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | This tenant has no served preview tenant, or the manifest has no UUID `id` |
 | Rollback | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application, or a release not in the tenant's history | Not used |
 
 The `409` of Validate and Publish is problem details titled "The application
 manifest has no valid id." The `403` for a missing publisher role is titled "You do not hold the publisher role."
-The `409` of Preview is problem details titled "This tenant has no preview
-tenant." *(planned for M10)*. It names no tenant. `400` is a bad body, and `428`
+The `409` of Preview for a tenant without a served preview tenant is problem details titled "This tenant has no preview
+tenant." It names no tenant. A manifest without a UUID `id` answers the title of Validate and Publish. `400` is a bad body, and `428`
 a missing `If-Match`, as [Order of checks](#order-of-checks) says. `400` also answers a bad `publish`
 body, titled "The body is not a valid publish request." A successful `validate`, `publish` or `rollback`
 answers `202`, see [Publishing](#publishing). `415` answers a body of the wrong
@@ -307,8 +305,7 @@ saved, and the diagnostics list the broken references.
 ## Publishing
 
 An author validates, publishes and rolls back an
-application from Studio. `validate`, `publish`, `rollback` and the request status are built.
-`preview` is *(planned for M10)*. The server never activates in its own process and
+application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. The server never activates in its own process and
 holds no tenant schema connection. It stores a **publish request** in the
 tenant database, and a separate [publisher](administration.md#publisher) runs
 it with the tenant's schema role. See
@@ -345,7 +342,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | `id` | The request id, a UUID |
 | `application` | The application `name` |
 | `kind` | `validate`, `publish` or `rollback` |
-| `target` | `tenant` or `preview`. `preview` marks a request that runs on the session tenant's preview tenant, see [Preview](#preview). Every other route writes `tenant` |
+| `target` | `tenant` or `preview`. `preview` marks a request that runs on the session tenant's preview tenant, see [Preview](#preview). Only the preview route writes `preview`. The request status route reports the stored value |
 | `status` | `queued`, `running`, `succeeded` or `failed` |
 | `label` | The optional label of a `publish`, up to 100 characters, or null |
 | `note` | The optional note of a `publish`, up to 2000 characters, or null |
@@ -383,7 +380,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 
 ### Preview
 
-*(Planned for M10.)* `POST .../preview` tries an application on the session
+`POST .../preview` tries an application on the session
 tenant's [preview tenant](../architecture.md#preview-tenants) before it goes
 live. [D48](../decisions.md#d48-preview-tenants--agreed) agrees the route. The
 request has the kind `publish` and the target `preview`.
@@ -464,6 +461,11 @@ newest first.
 - `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
   both the author role and the publisher role and `Studio:Folders` is not
   empty. It is built. Studio uses it to hide Publish and the rollback button.
+- `GET /api/me` also gains `studioPreviewHost`, the first host of the served tenant
+  whose `PreviewOf` is the session's tenant. It is `null` when the user may not
+  use Studio, or when the tenant has no served preview tenant. It is built. Studio
+  shows Preview only when it is set. It names a host and no port, so Studio takes
+  the port and the protocol from its own page.
 
 ### Rollback
 

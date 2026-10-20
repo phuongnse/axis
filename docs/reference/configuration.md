@@ -1003,7 +1003,9 @@ and a JSON view, and shows the diagnostics.
 - **Current user.** `GET /api/me` answers `studio: true` when `Studio:Folders`
   is not empty and the user holds the author role. It also answers
   `studioPublisher: true` when `Studio:Folders` is not
-  empty and the user holds both the author role and the publisher role.
+  empty and the user holds both the author role and the publisher role. It
+  also answers `studioPreviewHost`, the first host of the tenant's served
+  preview tenant, or null when the user cannot use Studio or the tenant has none.
 
 ## Reference index
 

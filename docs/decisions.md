@@ -2547,9 +2547,9 @@ separate **publisher** runs it. Every activation also gets a release number in
 a per-tenant history. This decision is planned for M10. Built so far are the
 publish request table, the publisher for `publish`, `validate` and `rollback` requests
 with the audit record of a `publish` and of a `rollback`, the release history with its
-`GET .../releases` route, the Studio `validate`, `publish`, `rollback` and request status
-routes, and `studioPublisher` in `GET /api/me`. Preview is still
-planned. See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+`GET .../releases` route, the Studio `validate`, `publish`, `preview`, `rollback` and request status
+routes, `studioPublisher` and `studioPreviewHost` in `GET /api/me`, and the Studio Preview button.
+See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
 for M10, the [authoring API](reference/authoring.md#publishing) for the routes,
 the [publisher](reference/administration.md#publisher) and the
 [publish request and release history tables](reference/storage.md#publish-requests-and-release-history).
@@ -2666,8 +2666,10 @@ The costs:
 
 An author tries an application on a **preview tenant** before publishing it to
 the real tenant. A preview tenant belongs to one main tenant and keeps its own
-data, database roles, hosts and bindings. This decision is planned for M10 and
-nothing in it is built yet. See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
+data, database roles, hosts and bindings. This decision is planned for M10. Built
+so far are the `PreviewOf` setting with sign-in and bindings, the publisher's preview
+requests, and the Studio preview route and Preview button. The tenant status rules
+are not built. See [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
 for M10, [preview tenants](architecture.md#preview-tenants) for how the hosts
 treat one, [preview](reference/authoring.md#preview) for the route,
 [tenant create](reference/administration.md#tenant-create) for the command and
