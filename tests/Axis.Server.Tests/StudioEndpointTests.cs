@@ -10,6 +10,8 @@ using Axis.Configuration.Tests;
 using Axis.Server.Studio;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Axis.Server.Tests;
 
@@ -407,6 +409,21 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         var secondLines = File.ReadAllText(path).Split('\n');
         Assert.Equal(firstLines.Length, secondLines.Length);
         Assert.Equal(1, firstLines.Zip(secondLines).Count(pair => pair.First != pair.Second));
+    }
+
+    [Fact]
+    public async Task Patch_answers_503_and_writes_nothing_when_the_platform_write_lock_cannot_be_taken()
+    {
+        var path = Path.Combine(Folder, EntityFile);
+        var before = File.ReadAllBytes(path);
+        await using var factory = CreateFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>()));
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await Patch(client, """[{"op":"replace","path":"/displayField","value":"number"}]""", $"\"{Sha256(path)}\"");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal(before, File.ReadAllBytes(path));
     }
 
     [Fact]

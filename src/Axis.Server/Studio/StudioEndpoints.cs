@@ -231,7 +231,8 @@ internal static class StudioEndpoints
         HttpContext httpContext,
         StudioOptions options,
         PackageCatalog packages,
-        ModuleCatalog modules)
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock)
     {
         var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
         if (folder is null)
@@ -268,9 +269,11 @@ internal static class StudioEndpoints
         }
 
         var outcome = await StudioWrites.PatchAsync(
-            folder, found.Id, patch, request.Headers.IfMatch.ToString(), httpContext.RequestAborted);
+            writeLock, folder, found.Id, patch, request.Headers.IfMatch.ToString(), httpContext.RequestAborted);
         switch (outcome.Refusal)
         {
+            case StudioWriteRefusal.Unavailable:
+                return Problem(StatusCodes.Status503ServiceUnavailable, WriteLockUnavailable);
             case StudioWriteRefusal.NotFound:
                 return NotFound(NoResource);
             case StudioWriteRefusal.DoesNotApply:
@@ -290,7 +293,8 @@ internal static class StudioEndpoints
         HttpContext httpContext,
         StudioOptions options,
         PackageCatalog packages,
-        ModuleCatalog modules)
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock)
     {
         var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
         if (folder is null)
@@ -321,11 +325,13 @@ internal static class StudioEndpoints
             return Problem(StatusCodes.Status400BadRequest, problem!);
         }
 
-        var outcome = await StudioWrites.CreateAsync(folder, id, file, content, httpContext.RequestAborted);
+        var outcome = await StudioWrites.CreateAsync(writeLock, folder, id, file, content, httpContext.RequestAborted);
         switch (outcome.Refusal)
         {
             case StudioWriteRefusal.Exists:
                 return Problem(StatusCodes.Status409Conflict, "A resource with this id or file already exists.");
+            case StudioWriteRefusal.Unavailable:
+                return Problem(StatusCodes.Status503ServiceUnavailable, WriteLockUnavailable);
             case not null:
                 return Problem(StatusCodes.Status400BadRequest, "The file name leads outside the application folder.");
         }
@@ -347,7 +353,8 @@ internal static class StudioEndpoints
         HttpContext httpContext,
         StudioOptions options,
         PackageCatalog packages,
-        ModuleCatalog modules)
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock)
     {
         var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
         if (folder is null)
@@ -367,9 +374,11 @@ internal static class StudioEndpoints
         }
 
         var outcome = await StudioWrites.DeleteAsync(
-            folder, found.Id, request.Headers.IfMatch.ToString(), httpContext.RequestAborted);
+            writeLock, folder, found.Id, request.Headers.IfMatch.ToString(), httpContext.RequestAborted);
         switch (outcome.Refusal)
         {
+            case StudioWriteRefusal.Unavailable:
+                return Problem(StatusCodes.Status503ServiceUnavailable, WriteLockUnavailable);
             case StudioWriteRefusal.NotFound:
                 return NotFound(NoResource);
             case StudioWriteRefusal.Manifest:
@@ -380,6 +389,8 @@ internal static class StudioEndpoints
 
         return Results.Ok(new StudioDeleteResponse(StudioDiagnostics.Compile(folder, packages, modules)));
     }
+
+    internal const string WriteLockUnavailable = "The write lock could not be taken. Try again.";
 
     private const string NoResource = "The application has no resource with this id.";
 

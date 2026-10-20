@@ -14,7 +14,7 @@ agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
 restarts the server, which activates the folder, as a hand edit does today.
-*(planned for M10)* A write will take a lock in the platform database. Reads
+A write takes a lock in the platform database, see [Versions](#versions). Reads
 and diagnostics touch no database. Going live from Studio is
 [Publishing](#publishing). `validate`, `publish`, `preview`, `rollback` and the release history are built. It asks for an activation: the
 server stores a publish request in the tenant database, and a separate
@@ -78,16 +78,24 @@ bytes, in lower-case hex.
 - When the file no longer has that version, the answer is `409` and nothing
   is written. The client reads the resource again and retries. One lock
   covers the check and the write of every write, so two patches that carry the
-  same version cannot both succeed, and neither can two deletes. Today the
-  lock is in the server process.
-- *(planned for M10)* The lock moves to a PostgreSQL advisory lock in the
-  platform database, so it holds across server replicas that share the folder.
-  It is keyed by the folder. A create checks that its `id` is unused anywhere
-  in the folder, so a lock per file would let two creates with the same `id`
-  both succeed. The server takes it over `ConnectionStrings:Platform`, for the
-  check and the write. It needs no grant. A write that cannot take the lock
-  answers `503` and writes nothing. Every replica must mount the folder at the
-  same path. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+  same version cannot both succeed, and neither can two deletes.
+- The lock is a PostgreSQL advisory lock in the platform database, so it
+  holds across server replicas that share the folder. It is keyed by the
+  folder. A create checks that its `id` is unused anywhere in the folder, so a
+  lock per file would let two creates with the same `id` both succeed. Writes
+  to two files of one folder wait for each other. Writes to different folders
+  do not. The server takes it over `ConnectionStrings:Platform`, for the
+  check and the write, and releases it when the write ends, whether it
+  succeeded or was refused. It needs no grant.
+- A write waits up to 10 seconds for the lock. When the wait times out, or the
+  platform database cannot be reached, the answer is `503` and nothing is
+  written. The snapshot of `validate` and `publish` is read under the same
+  lock, so those routes answer `503` too, and store no request.
+- A patch or a delete that finds its resource gone once it holds the lock
+  answers `409`, not `404`. Another write removed it after the request was
+  checked, so the version the client holds is stale.
+- Every replica must mount the folder at the same path, because the lock is
+  keyed by the full path. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - A patch or a delete without `If-Match` is `428`.
 - A create sends the new version as an `ETag`, so the client can patch next
   without reading the resource again.
@@ -123,6 +131,12 @@ Check 6 is built for a request and for a release:
    of more than 100 characters or a `note` of more than 2000.
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
+
+A write that cannot take the [write lock](#versions) answers `503`. It comes after the `400` for a body that
+cannot be read, a patch that is not valid RFC 6902 and a create that has no valid `id`, `kind` or file name. It comes
+before the checks that need the folder under the lock: a patch that does not apply, a patch that changes `id` or
+`kind`, the stale version, and the existing `id` or file of a create. A `validate`, `publish` or `preview` answers `503` the
+same way, before it stores a request.
 
 A check 5a sits between checks 5 and 6, on `validate`, `publish` and `preview`. A `rollback` takes no body, and it has no check 5a, because it names a release of the history. A folder whose manifest has no UUID `id` answers `409`,
 because the request needs the application id for the publisher's queue. It comes after the unknown application `404` and, for a

@@ -65,12 +65,12 @@ internal static class StudioPublishEndpoints
     }
 
     private static async Task<IResult> ValidateAsync(
-        string application, HttpContext httpContext, StudioOptions options, TenantDatabase database)
+        string application, HttpContext httpContext, StudioOptions options, TenantDatabase database, IStudioWriteLock writeLock)
     {
         var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
         return folder is null
             ? refusal!
-            : await StoreAsync("validate", application, folder, label: null, note: null, httpContext, database);
+            : await StoreAsync("validate", application, folder, label: null, note: null, httpContext, database, writeLock);
     }
 
     private static async Task<IResult> PreviewAsync(
@@ -78,6 +78,7 @@ internal static class StudioPublishEndpoints
         HttpContext httpContext,
         StudioOptions options,
         TenantDatabase database,
+        IStudioWriteLock writeLock,
         ITenantCatalog catalog,
         ITenantContextAccessor tenants)
     {
@@ -89,11 +90,11 @@ internal static class StudioPublishEndpoints
 
         return StudioPreview.Find(catalog, tenants.Current!.TenantId) is null
             ? StudioEndpoints.Problem(StatusCodes.Status409Conflict, "This tenant has no preview tenant.")
-            : await StoreAsync("publish", application, folder, label: null, note: null, httpContext, database, target: "preview");
+            : await StoreAsync("publish", application, folder, label: null, note: null, httpContext, database, writeLock, target: "preview");
     }
 
     private static async Task<IResult> PublishAsync(
-        string application, HttpContext httpContext, StudioOptions options, TenantDatabase database)
+        string application, HttpContext httpContext, StudioOptions options, TenantDatabase database, IStudioWriteLock writeLock)
     {
         var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options, publisher: true);
         if (folder is null)
@@ -132,7 +133,7 @@ internal static class StudioPublishEndpoints
             }
         }
 
-        return await StoreAsync("publish", application, folder, label, note, httpContext, database);
+        return await StoreAsync("publish", application, folder, label, note, httpContext, database, writeLock);
     }
 
     // Only label and note, each a string within its limit.
@@ -178,6 +179,7 @@ internal static class StudioPublishEndpoints
         string? note,
         HttpContext httpContext,
         TenantDatabase database,
+        IStudioWriteLock writeLock,
         string target = "tenant")
     {
         if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest)
@@ -187,7 +189,17 @@ internal static class StudioPublishEndpoints
 
         var user = (await CurrentUsers.FindAsync(httpContext))!;
         var cancellationToken = httpContext.RequestAborted;
-        var snapshot = new JsonArray([.. (await StudioWrites.SnapshotAsync(folder, cancellationToken)).Select(file => (JsonNode)new JsonObject
+        IReadOnlyList<StudioSnapshotFile> files;
+        try
+        {
+            files = await StudioWrites.SnapshotAsync(writeLock, folder, cancellationToken);
+        }
+        catch (StudioWriteLockUnavailableException)
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable);
+        }
+
+        var snapshot = new JsonArray([.. files.Select(file => (JsonNode)new JsonObject
         {
             ["file"] = file.File,
             ["version"] = file.Version,
