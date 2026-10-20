@@ -155,6 +155,7 @@
   "shell.studio.editInJson": "Hãy sửa giá trị này trong chế độ xem JSON.",
   "shell.studio.addItem": "Thêm",
   "shell.studio.removeItem": "Xóa",
+  "shell.studio.unknownName": "không xác định",
   "shell.studio.loadResourceFailed": "Không thể tải tài nguyên.",
   "shell.studio.uses": "Sử dụng",
   "shell.studio.usedBy": "Được dùng bởi",

@@ -9,7 +9,7 @@
     "kind": { "const": "migration" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "entity": { "$ref": "#/$defs/qualifiedName" },
+    "entity": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "entity" },
     "changes": {
       "type": "array",
       "minItems": 1,

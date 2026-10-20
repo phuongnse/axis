@@ -9,7 +9,7 @@
     "kind": { "const": "process" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "entity": { "$ref": "#/$defs/qualifiedName" },
+    "entity": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "entity" },
     "startCondition": { "$ref": "#/$defs/startCondition" },
     "start": { "$ref": "#/$defs/name" },
     "steps": {
@@ -43,7 +43,7 @@
       "additionalProperties": false,
       "required": ["textKey"],
       "properties": {
-        "textKey": { "type": "string", "minLength": 1 }
+        "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" }
       }
     },
     "startCondition": {
@@ -80,7 +80,7 @@
           "additionalProperties": false,
           "required": ["name", "operation"],
           "properties": {
-            "name": { "$ref": "#/$defs/name" },
+            "name": { "$ref": "#/$defs/name", "x-axis-reference": "connector" },
             "operation": { "$ref": "#/$defs/name" }
           }
         },
@@ -102,16 +102,16 @@
             "backoff": { "type": "string", "minLength": 1 }
           }
         },
-        "event": { "$ref": "#/$defs/qualifiedName" },
+        "event": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "event" },
         "fields": {
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/name" },
           "additionalProperties": { "type": "string", "minLength": 1 }
         },
-        "next": { "$ref": "#/$defs/name" },
+        "next": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "/name" } },
         "label": { "$ref": "#/$defs/textReference" },
         "assignee": { "$ref": "#/$defs/assignee" },
-        "form": { "$ref": "#/$defs/name" },
+        "form": { "$ref": "#/$defs/name", "x-axis-reference": "form" },
         "dueIn": { "type": "string", "minLength": 1 },
         "outcomes": {
           "type": "array",
@@ -247,7 +247,7 @@
       "required": ["when", "next"],
       "properties": {
         "when": { "type": "string", "minLength": 1 },
-        "next": { "$ref": "#/$defs/name" }
+        "next": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "/name" } }
       }
     },
     "assignee": {
@@ -255,7 +255,7 @@
       "additionalProperties": false,
       "properties": {
         "user": { "type": "string", "minLength": 1 },
-        "role": { "type": "string", "minLength": 1 }
+        "role": { "type": "string", "minLength": 1, "x-axis-reference": "role" }
       }
     },
     "outcome": {
@@ -265,7 +265,7 @@
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "label": { "$ref": "#/$defs/textReference" },
-        "next": { "$ref": "#/$defs/name" }
+        "next": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "/name" } }
       }
     }
   }

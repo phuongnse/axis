@@ -6,6 +6,7 @@ import { forbidden } from '../platform/inspection'
 import {
   fetchStudioApps,
   fetchStudioDiagnostics,
+  fetchStudioNames,
   fetchStudioResources,
   filterResources,
   groupByKind,
@@ -13,10 +14,12 @@ import {
   ServerUnreachableError,
   type StudioApplication,
   type StudioDiagnostic,
+  type StudioNames,
   type StudioResourceItem,
   waitForServer,
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
+import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
 import { StudioPublishing } from './StudioPublishing'
@@ -42,7 +45,7 @@ type FolderState =
  * list. Validate and Publish sit under the application picker, and Publish shows only when `GET /api/me` answers
  * `studioPublisher: true`. Under them, the release list shows the application's releases, with a Roll back button
  * for a publisher. A save or a delete loads the release list again, because the folder may now differ from the
- * active release. The diagnostics panel shows the diagnostics of a request that ended. When the server does not answer, a reconnect message shows at the top. Studio checks the server with a
+ * active release. The names that the reference pickers offer load again after a save, a delete and a reconnect. The diagnostics panel shows the diagnostics of a request that ended. When the server does not answer, a reconnect message shows at the top. Studio checks the server with a
  * back-off, then loads its data again, and an unsaved draft stays on screen.
  */
 export function StudioPage() {
@@ -153,6 +156,30 @@ function StudioWorkspace() {
     )
     return () => controller.abort()
   }, [application, generation, lost])
+
+  const [names, setNames] = useState<{ application: string; names: StudioNames }>()
+  useEffect(() => {
+    if (application === null) {
+      return
+    }
+    const controller = new AbortController()
+    fetchStudioNames(application, controller.signal).then(
+      (loadedNames) => setNames({ application, names: loadedNames }),
+      (error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn(`Loading the Studio names of '${application}' failed`, error)
+        setNames(undefined)
+      },
+    )
+    return () => controller.abort()
+  }, [application, generation, folderRevision, lost])
+  const loadedNames = names?.application === application ? names.names : undefined
 
   const loaded = folder?.application === application ? folder : undefined
   const resources = useMemo(() => (loaded && 'resources' in loaded ? loaded.resources : []), [loaded])
@@ -271,26 +298,28 @@ function StudioWorkspace() {
                       ...(path ? [{ key: 'path', label: t('shell.studio.path'), children: path }] : []),
                     ]}
                   />
-                  <StudioEditor
-                    key={`editor-${selected.id}`}
-                    application={application!}
-                    item={selected}
-                    resources={loaded.resources}
-                    path={path}
-                    onSaved={(diagnostics) => {
-                      setFolder({ ...loaded, diagnostics })
-                      setFolderRevision((value) => value + 1)
-                    }}
-                    onDeleted={(diagnostics) => {
-                      setFolder({
-                        ...loaded,
-                        resources: loaded.resources.filter((item) => item.id !== selected.id),
-                        diagnostics,
-                      })
-                      setFolderRevision((value) => value + 1)
-                      setParams({ app: application! })
-                    }}
-                  />
+                  <StudioNamesContext.Provider value={loadedNames}>
+                    <StudioEditor
+                      key={`editor-${selected.id}`}
+                      application={application!}
+                      item={selected}
+                      resources={loaded.resources}
+                      path={path}
+                      onSaved={(diagnostics) => {
+                        setFolder({ ...loaded, diagnostics })
+                        setFolderRevision((value) => value + 1)
+                      }}
+                      onDeleted={(diagnostics) => {
+                        setFolder({
+                          ...loaded,
+                          resources: loaded.resources.filter((item) => item.id !== selected.id),
+                          diagnostics,
+                        })
+                        setFolderRevision((value) => value + 1)
+                        setParams({ app: application! })
+                      }}
+                    />
+                  </StudioNamesContext.Provider>
                   <StudioReferences
                     key={`references-${selected.id}`}
                     application={application!}
