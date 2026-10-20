@@ -1,0 +1,56 @@
+{
+  "id": "af2c6398-7316-4907-a87e-8cc57fa89379",
+  "kind": "scenario",
+  "name": "RequesterCannotReachAnotherTicket",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["requester"],
+    "lan": ["requester"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Ticket",
+      "as": "anna",
+      "save": "ticket",
+      "values": {
+        "title": "Laptop will not start",
+        "description": "It shows a black screen.",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "updateRecord",
+      "record": "ticket",
+      "as": "lan",
+      "values": {
+        "title": "x"
+      },
+      "expect": "notFound"
+    },
+    {
+      "type": "startProcess",
+      "process": "TicketHandling",
+      "record": "ticket",
+      "as": "lan",
+      "expect": "notFound"
+    },
+    {
+      "type": "updateRecord",
+      "record": "ticket",
+      "as": "anna",
+      "values": {
+        "resolution": "Fixed"
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "expectRecord",
+      "record": "ticket",
+      "values": {
+        "title": "Laptop will not start"
+      }
+    }
+  ]
+}

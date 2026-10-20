@@ -1,0 +1,9 @@
+{
+  "id": "e7c9b5fa-281b-4327-9297-714276c4e912",
+  "kind": "role",
+  "name": "service-desk-lead",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.serviceDeskLead"
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "id": "4822d97a-704c-4ac5-8b97-e9fb80db8587",
+  "kind": "scenario",
+  "name": "ReopenedTicketIsResubmitted",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["requester"],
+    "khoa": ["agent"],
+    "linh": ["service-desk-lead"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Ticket",
+      "as": "anna",
+      "save": "ticket",
+      "values": {
+        "title": "Laptop will not start",
+        "description": "It shows a black screen.",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "TicketHandling",
+      "record": "ticket",
+      "as": "anna"
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "triage",
+      "outcome": "assign",
+      "as": "linh",
+      "values": {
+        "category": "3f1c2a6e-5b0d-4e0a-9c1f-7a2d8b4e6c01",
+        "priority": "high"
+      }
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "resolve",
+      "outcome": "resolve",
+      "as": "khoa",
+      "values": {
+        "resolution": "Replaced the battery."
+      }
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "confirm",
+      "outcome": "reopen",
+      "as": "anna"
+    },
+    {
+      "type": "expectRecord",
+      "record": "ticket",
+      "values": {
+        "status": "reopened"
+      }
+    },
+    {
+      "type": "expectInstance",
+      "process": "TicketHandling",
+      "record": "ticket",
+      "state": "completed"
+    },
+    {
+      "type": "updateRecord",
+      "record": "ticket",
+      "as": "anna",
+      "values": {
+        "description": "It still shows a black screen."
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "TicketHandling",
+      "record": "ticket",
+      "as": "anna"
+    },
+    {
+      "type": "expectTask",
+      "record": "ticket",
+      "step": "triage",
+      "state": "open"
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "triage",
+      "outcome": "assign",
+      "as": "linh",
+      "values": {
+        "category": "3f1c2a6e-5b0d-4e0a-9c1f-7a2d8b4e6c01",
+        "priority": "high"
+      }
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "resolve",
+      "outcome": "resolve",
+      "as": "khoa",
+      "values": {
+        "resolution": "Replaced the screen."
+      }
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "confirm",
+      "outcome": "confirm",
+      "as": "anna"
+    },
+    {
+      "type": "expectRecord",
+      "record": "ticket",
+      "values": {
+        "status": "closed"
+      }
+    },
+    {
+      "type": "expectInstance",
+      "process": "TicketHandling",
+      "record": "ticket",
+      "state": "completed"
+    }
+  ]
+}

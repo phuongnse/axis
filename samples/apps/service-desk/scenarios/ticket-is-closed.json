@@ -1,0 +1,97 @@
+{
+  "id": "8008f31d-256f-41e4-b71b-ee8dcda2c4a9",
+  "kind": "scenario",
+  "name": "TicketIsClosed",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["requester"],
+    "khoa": ["agent"],
+    "linh": ["service-desk-lead"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Ticket",
+      "as": "anna",
+      "save": "ticket",
+      "values": {
+        "title": "Laptop will not start",
+        "description": "It shows a black screen.",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "expectRecord",
+      "record": "ticket",
+      "values": {
+        "number": "SD-2026-00001"
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "TicketHandling",
+      "record": "ticket",
+      "as": "anna"
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "triage",
+      "outcome": "assign",
+      "as": "linh",
+      "values": {
+        "category": "3f1c2a6e-5b0d-4e0a-9c1f-7a2d8b4e6c01",
+        "priority": "high"
+      }
+    },
+    {
+      "type": "expectTask",
+      "record": "ticket",
+      "step": "resolve",
+      "assignee": {
+        "user": "khoa"
+      }
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "resolve",
+      "outcome": "resolve",
+      "as": "khoa",
+      "values": {
+        "resolution": "Replaced the battery."
+      }
+    },
+    {
+      "type": "expectTask",
+      "record": "ticket",
+      "step": "confirm",
+      "assignee": {
+        "user": "anna"
+      }
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "confirm",
+      "outcome": "confirm",
+      "as": "anna"
+    },
+    {
+      "type": "expectRecord",
+      "record": "ticket",
+      "values": {
+        "status": "closed",
+        "assignedAgent": "khoa",
+        "resolution": "Replaced the battery."
+      }
+    },
+    {
+      "type": "expectInstance",
+      "process": "TicketHandling",
+      "record": "ticket",
+      "state": "completed"
+    }
+  ]
+}

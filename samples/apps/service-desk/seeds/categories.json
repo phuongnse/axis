@@ -1,0 +1,31 @@
+{
+  "id": "05f96cdd-8bc7-4d15-8ae8-b1fd4b6abe55",
+  "kind": "seed",
+  "name": "Categories",
+  "formatVersion": 1,
+  "entity": "Category",
+  "sync": true,
+  "records": [
+    {
+      "id": "3f1c2a6e-5b0d-4e0a-9c1f-7a2d8b4e6c01",
+      "values": {
+        "name": "Hardware",
+        "defaultAgent": "khoa"
+      }
+    },
+    {
+      "id": "a7d94b12-0c3e-4f58-8e6a-1b5d2c9f7e02",
+      "values": {
+        "name": "Software",
+        "defaultAgent": "khoa"
+      }
+    },
+    {
+      "id": "5e8b3d70-91a4-4c2f-b6d8-0f3a7c1e9d03",
+      "values": {
+        "name": "Access",
+        "defaultAgent": "khoa"
+      }
+    }
+  ]
+}

@@ -3272,9 +3272,9 @@ right, so a request and a publisher with a new role keep that rule. The costs:
 ## D56. A service desk as the third sample application — Agreed
 
 A service desk is the third sample application, in the thin shape that M11 can
-run. It is _(planned for M11)_. Nothing below exists yet: not the sample
-folder, the realm users, the `request-approval` template or the Playwright
-journeys. See the
+run. The sample folder and the realm users exist. The `request-approval`
+template and the Playwright journeys that build it through Studio do not, and
+are _(planned for M11)_. See the
 [Third application section](product-brief.md#third-application-service-desk)
 of the product brief for the data, flow, security, pages and scenarios. The
 owner confirmed these points on issue #783 on 2026-10-20.

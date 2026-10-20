@@ -1,0 +1,30 @@
+{
+  "id": "c1b119d8-4b18-4e97-b6cf-238532d43d41",
+  "kind": "entity",
+  "name": "Category",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "category.label"
+  },
+  "displayField": "name",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true,
+      "unique": true,
+      "maxLength": 100,
+      "label": {
+        "textKey": "category.name"
+      }
+    },
+    {
+      "name": "defaultAgent",
+      "type": "text",
+      "maxLength": 100,
+      "label": {
+        "textKey": "category.defaultAgent"
+      }
+    }
+  ]
+}

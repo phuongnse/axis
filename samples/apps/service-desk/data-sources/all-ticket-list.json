@@ -1,0 +1,37 @@
+{
+  "id": "79da52f4-a6e0-47fa-b56f-75c70531fd6c",
+  "kind": "dataSource",
+  "name": "AllTicketList",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "fields": [
+    {
+      "name": "number",
+      "path": "number"
+    },
+    {
+      "name": "title",
+      "path": "title"
+    },
+    {
+      "name": "category",
+      "path": "category"
+    },
+    {
+      "name": "priority",
+      "path": "priority"
+    },
+    {
+      "name": "requester",
+      "path": "requester"
+    },
+    {
+      "name": "assignedAgent",
+      "path": "assignedAgent"
+    },
+    {
+      "name": "status",
+      "path": "status"
+    }
+  ]
+}
