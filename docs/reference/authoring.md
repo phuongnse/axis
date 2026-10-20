@@ -449,7 +449,7 @@ newest first.
   with copies.
 - `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
   both the author role and the publisher role and `Studio:Folders` is not
-  empty. It is built. Studio uses it to hide Publish. The rollback button is *(planned for M10)*.
+  empty. It is built. Studio uses it to hide Publish and the rollback button.
 
 ### Rollback
 

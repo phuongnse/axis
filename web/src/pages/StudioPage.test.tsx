@@ -180,6 +180,9 @@ function stubServer(
     if (input === `${folder}/resources`) {
       return json({ items: resources })
     }
+    if (input === `${folder}/releases`) {
+      return json({ active: null, folderContentHash: null, items: [] })
+    }
     if (input === `${folder}/diagnostics`) {
       return json({ diagnostics })
     }
@@ -796,12 +799,21 @@ describe('StudioPage publishing', () => {
         return json(answers.length > 1 ? answers.shift() : answers[0])
       }
       if (input === `${folder}/releases`) {
+        const row = (id: string, number: number, activatedAt: string) => ({
+          releaseId: id,
+          number,
+          contentHash: `hash-${number}`,
+          activatedAt,
+          actor: 'hoa',
+          actorName: null,
+          label: null,
+          note: null,
+          requestId: null,
+        })
         return json({
-          active: { releaseId, number: 3 },
-          items: [
-            { releaseId, number: 3 },
-            { releaseId: 'older', number: 2 },
-          ],
+          active: { releaseId, number: 3, contentHash: 'hash-3' },
+          folderContentHash: 'hash-3',
+          items: [row(releaseId, 3, '2026-05-02T10:00:00Z'), row('older', 2, '2026-05-01T10:00:00Z')],
         })
       }
       return base(input, init)

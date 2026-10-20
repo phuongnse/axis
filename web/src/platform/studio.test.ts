@@ -2,8 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   fetchStudioResource,
   filterResources,
+  folderDiffers,
   groupByKind,
+  releaseRows,
   ServerUnreachableError,
+  type StudioReleaseItem,
+  type StudioReleases,
   type StudioResourceItem,
   waitForServer,
 } from './studio'
@@ -116,5 +120,68 @@ describe('groupByKind', () => {
 
   it('returns no group for no resources', () => {
     expect(groupByKind([])).toEqual([])
+  })
+})
+
+function release(releaseId: string, number: number, activatedAt: string): StudioReleaseItem {
+  return {
+    releaseId,
+    number,
+    contentHash: `hash-${number}`,
+    activatedAt,
+    actor: 'hoa',
+    actorName: null,
+    label: null,
+    note: null,
+    requestId: null,
+  }
+}
+
+describe('releaseRows', () => {
+  const items = [
+    release('r2', 2, '2026-05-02T10:00:00Z'),
+    release('r1', 1, '2026-05-01T10:00:00Z'),
+    release('r2', 2, '2026-05-03T10:00:00Z'),
+    release('r3', 3, '2026-05-03T10:00:00Z'),
+  ]
+
+  it('sorts newest first, keeping the server order on equal times', () => {
+    const rows = releaseRows({ active: null, folderContentHash: null, items })
+
+    expect(rows.map((row) => row.number)).toEqual([2, 3, 2, 1])
+    expect(rows.map((row) => row.active)).toEqual([false, false, false, false])
+  })
+
+  it('marks only the newest row of the active release', () => {
+    const rows = releaseRows({
+      active: { releaseId: 'r2', number: 2, contentHash: 'hash-2' },
+      folderContentHash: null,
+      items,
+    })
+
+    expect(rows.map((row) => row.active)).toEqual([true, false, false, false])
+  })
+})
+
+describe('folderDiffers', () => {
+  const active = { releaseId: 'r1', number: 1, contentHash: 'hash-1' }
+  const history = (overrides: Partial<StudioReleases>): StudioReleases => ({
+    active,
+    folderContentHash: 'hash-1',
+    items: [],
+    ...overrides,
+  })
+
+  it('is false when the folder has the active release content', () => {
+    expect(folderDiffers(history({}))).toBe(false)
+  })
+
+  it('is true when the folder compiles to other content', () => {
+    expect(folderDiffers(history({ folderContentHash: 'other' }))).toBe(true)
+  })
+
+  it('is false when no release is active, or the folder has errors', () => {
+    expect(folderDiffers(history({ active: null, folderContentHash: 'other' }))).toBe(false)
+    expect(folderDiffers(history({ folderContentHash: null }))).toBe(false)
   })
 })

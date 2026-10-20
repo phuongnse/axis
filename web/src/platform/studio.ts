@@ -270,11 +270,31 @@ export interface StudioRequest {
   diagnostics: StudioDiagnostic[]
 }
 
-/** The release history of `GET /api/studio/apps/{application}/releases`, reduced to what Studio reads. */
-export interface StudioReleases {
-  active: { releaseId: string; number: number } | null
-  items: { releaseId: string; number: number }[]
+/** One activation in the release history. `actor` is a user id, `startup`, `operator` or `unknown`. */
+export interface StudioReleaseItem {
+  releaseId: string
+  number: number
+  contentHash: string
+  activatedAt: string
+  actor: string
+  actorName: string | null
+  label: string | null
+  note: string | null
+  requestId: string | null
 }
+
+/**
+ * The release history of `GET /api/studio/apps/{application}/releases`. `folderContentHash` is `null` when the folder
+ * has errors, so it does not compile.
+ */
+export interface StudioReleases {
+  active: { releaseId: string; number: number; contentHash: string } | null
+  folderContentHash: string | null
+  items: StudioReleaseItem[]
+}
+
+/** A row of the release list. `active` is set on one row only. */
+export type StudioReleaseRow = StudioReleaseItem & { active: boolean }
 
 /** The optional label and note of a publish. */
 export interface PublishDetails {
@@ -285,6 +305,16 @@ export interface PublishDetails {
 /** Sends a validate request. It answers at once with the queued request. A 401 starts sign-in and throws, as any other failure does. */
 export async function validateStudioApp(application: string): Promise<StudioRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/validate`
+  const response = await studioFetch(path, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
+/** Sends a rollback request to an earlier release. It answers at once with the queued request. A 401 starts sign-in and throws, as any other failure does. */
+export async function rollbackStudioRelease(application: string, releaseId: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/releases/${encodeURIComponent(releaseId)}/rollback`
   const response = await studioFetch(path, { method: 'POST' })
   if (!response.ok) {
     throw new Error(`Posting '${path}' failed with status ${response.status}.`)
@@ -335,6 +365,30 @@ export async function fetchStudioReleases(application: string, signal?: AbortSig
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
   return (await response.json()) as StudioReleases
+}
+
+/**
+ * The rows of the release list, newest activation first. Rows with the same time keep the server's order. A release
+ * that was activated more than once has a row for each activation, and only its newest row is active.
+ */
+export function releaseRows(history: StudioReleases): StudioReleaseRow[] {
+  const sorted = history.items.toSorted((left, right) => Date.parse(right.activatedAt) - Date.parse(left.activatedAt))
+  const activeId = history.active?.releaseId
+  let activeSeen = false
+  return sorted.map((item) => {
+    const active = !activeSeen && activeId !== undefined && item.releaseId === activeId
+    activeSeen ||= active
+    return { ...item, active }
+  })
+}
+
+/** Whether a release is active and the folder compiles to other content than that release. */
+export function folderDiffers(history: StudioReleases): boolean {
+  return (
+    history.active !== null &&
+    history.folderContentHash !== null &&
+    history.folderContentHash !== history.active.contentHash
+  )
 }
 
 /** The resources whose name or id contains `search`, ignoring letter case and surrounding spaces. An empty search keeps all. */
