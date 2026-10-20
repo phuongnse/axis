@@ -938,7 +938,7 @@ reconnect message are built.
     **Editors by kind** below. The seed editor, the scenario editor, the
     connector editor, the page editor, the endpoint mapping rows, the text
     editor and the process editor's step list, with its decision, end and
-    task panels, are built.
+    task and operation panels, are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1207,7 +1207,7 @@ reconnect message are built.
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
   the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the text
-  editor and the process editor's step list, with its decision, end and task panels, are built. The other typed
+  editor and the process editor's step list, with its decision, end, task and operation panels, are built. The other typed
   editors and the entity designer are *(planned for M11)*, and until they are built those kinds use the generic
   form. The last
   column lists what still needs the JSON view, because the form cannot show it.
@@ -1219,7 +1219,7 @@ reconnect message are built.
   | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives it a panel          |
   | `form`        | Generic form                          | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
-  | `process`     | Typed editor with the process graph   | The properties of `operation` steps other than `next`, until its panel is built |
+  | `process`     | Typed editor with the process graph   | Nothing                                                               |
   | `rule`        | Generic form                          | Nothing                                                               |
   | `sequence`    | Generic form                          | Nothing                                                               |
   | `role`        | Generic form                          | Nothing                                                               |
@@ -1289,11 +1289,29 @@ reconnect message are built.
       panel does not show stays as it is. A diagnostic path inside a task's
       label, assignee, form, `dueIn` or outcomes opens the Form tab at that
       field.
-    - **Operation panel** *(planned for M11)*. A panel for `operation` steps
-      shows that type's properties. `set`, `input`, `output` and `fields` show
-      as rows of target and expression. Until it is built, an operation card
-      shows its `next` and says to edit its other properties in the JSON view.
-      A diagnostic path inside them opens the JSON view.
+    - **Operation panel** *(built)*. An `operation` step shows an operation
+      choice, `updateRecord`, `callConnector`, `raiseEvent` or **Package
+      operation**, above its transition. Changing the operation removes only
+      the keys the new one forbids. It adds no empty key, so the compiler
+      reports what is still missing. Every other key, including unknown keys,
+      stays.
+      - `updateRecord` shows `set` as rows of a field of the process's entity
+        and an expression. `callConnector` shows the connector and its
+        operation as pickers, `input` as rows of a typed input name and an
+        expression, `output` as rows of a typed connector output name and an
+        entity field, and `retry`. `raiseEvent` shows the event as a picker
+        and `fields` as rows of a payload field of that event and an
+        expression.
+      - A package operation is typed in a text box as
+        `<package>/<operation>`, because no route lists the installed
+        operations. It shows `input`, `output` and `retry` as `callConnector`
+        does. The names route lists no connector input or output names, so
+        those are typed too.
+      - `retry` is attempts and backoff. Clearing both removes `retry`.
+      - While the application's names are not loaded, every picker is a name
+        box. A key the step's operation forbids is not shown as rows. It says
+        to edit it in the JSON view, and a diagnostic path inside it opens the
+        JSON view.
   - **Connector editor** *(built)*. The Form tab shows the base URL binding,
     the auth type with its secret binding, `timeout`, `idempotency`, and the
     operations as a list. The JSON view stays as a second view of the same

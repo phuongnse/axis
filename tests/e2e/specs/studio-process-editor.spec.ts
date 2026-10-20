@@ -83,6 +83,26 @@ test.describe('Studio edits a process in the process editor', () => {
     })
   })
 
+  test('an author edits the set expression of markRejected and the file changes only there', async ({ page }) => {
+    await useSession(page, 'hoa')
+    const id = await processId(page)
+    const before = await diagnostics(page)
+    const original = await readFile(path.join(copy, file), 'utf8')
+
+    await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+    await expect(page.getByTestId('studio-step-8')).toContainText('markRejected')
+    const status = page.getByTestId('studio-field-/steps/8/set/status')
+    await expect(status.locator('.cm-editor')).toBeVisible()
+    await status.getByRole('textbox', { name: 'Expression' }).fill("'returned'")
+    await page.getByRole('button', { name: 'Save' }).click()
+
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+    expect(await diagnostics(page)).toEqual(before)
+    const expected = JSON.parse(original) as { steps: { set: Record<string, string> }[] }
+    expected.steps[8].set.status = "'returned'"
+    expect(JSON.parse(await readFile(path.join(copy, file), 'utf8'))).toEqual(expected)
+  })
+
   test('an author changes the due time and an outcome target of a task and saves only those changes', async ({
     page,
   }) => {
