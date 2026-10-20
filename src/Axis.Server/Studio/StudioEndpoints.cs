@@ -28,6 +28,8 @@ namespace Axis.Server.Studio;
 /// extension packages and modules and answers every compile diagnostic. It touches no database and activates nothing.
 /// <c>GET /api/studio/apps/{application}/names</c> answers every name the application defines, module names
 /// included, from the same compile. It touches no database and answers even when the folder has errors.
+/// <c>GET /api/studio/apps/{application}/policy-matrix</c> answers what each role may do on each root entity, data
+/// source, process and endpoint, from the same compile, and answers even when the folder has errors.
 /// <c>GET /api/studio/apps/{application}/resources/{id}/references</c> answers <c>{ uses, usedBy }</c> from the same
 /// compile's reference index, and <c>GET /api/studio/apps/{application}/texts/{key}/references</c> answers
 /// <c>{ usedBy }</c>. A text key that nothing defines or uses answers 404.
@@ -68,6 +70,7 @@ internal static class StudioEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/changes", ChangesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
         endpoints.MapGet("/api/studio/apps/{application}/names", NamesAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/policy-matrix", PolicyMatrixAsync);
         endpoints.MapGet("/api/studio/apps/{application}/releases", ReleasesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}/references", ResourceReferencesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
@@ -215,6 +218,22 @@ internal static class StudioEndpoints
         }
 
         return Results.Ok(ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).Names);
+    }
+
+    private static async Task<IResult> PolicyMatrixAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        return Results.Ok(ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).PolicyMatrix);
     }
 
     private static async Task<IResult> ReleasesAsync(

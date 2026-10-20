@@ -935,8 +935,9 @@ reconnect message are built.
     JSON view as the second view of the same draft. The typed editor saves
     through the same JSON Patch, with the same `If-Match` rules. It never drops
     a value it does not show, so unknown keys stay as they are. See
-    **Editors by kind** below. The seed editor, the connector editor, the page
-    editor, the endpoint mapping rows and the text editor are built.
+    **Editors by kind** below. The seed editor, the scenario editor, the
+    connector editor, the page editor, the endpoint mapping rows and the text
+    editor are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1187,11 +1188,15 @@ reconnect message are built.
     takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
     takes `invoke`. Filter and fields are only on entity grants.
   - A save writes one file, with the single-file routes.
+  - The view reads the [policy matrix route](authoring.md#policy-matrix). The
+    route is built, and the view is not.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
-  the connector editor, the page editor, the endpoint mapping rows and the text editor are built. The other typed
-  editors and the entity designer are *(planned for M11)*, and until they are built those kinds use the generic form. The last
+  the connector editor, the scenario editor, the page editor, the endpoint mapping rows and the
+  text editor are built. The other typed editors and the entity designer are
+  *(planned for M11)*, and until they are built those kinds use the generic
+  form. The last
   column lists what still needs the JSON view, because the form cannot show it.
 
   | Kind          | Editor                                | Still needs the JSON view                                             |
@@ -1270,8 +1275,21 @@ reconnect message are built.
       shows a hint, and the compiler reports the error.
     - **Unknown keys.** A key the editor does not show, in the file, in an
       operation or in `auth`, is saved unchanged.
-  - **Scenario editor.** The users with their roles, then the steps as a list,
-    with a panel per step type.
+  - **Scenario editor** *(built)*. The Form tab shows the scenario's name and
+    `now`, then its users with their roles, its stubs, and its steps as a list
+    with a panel per step type. The JSON view stays as a second view of the
+    same draft.
+    - **Steps.** Each step has a type. Changing the type keeps the properties
+      the new type takes and drops the others. Keys the editor does not show
+      stay in the file. A step can be removed or moved up or down.
+    - **Pickers.** Entities, processes, roles and connectors are picked by
+      name. A `record` is picked from the aliases that earlier `createRecord`
+      steps save. A `step` and its `outcome` come from the processes that the
+      record started.
+    - **Values.** The fields of the step's entity show as typed cells. A value
+      the entity does not name stays as a text row. A step whose entity is not
+      in the folder edits its `values` as a JSON object, and the text is saved
+      only when it is one.
   - **Seed editor** *(built)*. The Form tab shows the seed's name, entity and
     `sync`, then its records as a grid, with a row per record and a column per
     field of the seed's `entity`. The JSON view stays as a second view of the

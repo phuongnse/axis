@@ -219,6 +219,7 @@ describe('ExpressionEditor completion', () => {
     await screen.findByRole('option', { name: /amount/ })
     await act(() => new Promise((resolve) => setTimeout(resolve, 100)))
     await user.keyboard('{ArrowDown}')
+    await waitFor(() => expect(screen.getByRole('option', { name: /length/ })).toHaveAttribute('aria-selected', 'true'))
     await user.keyboard('{Enter}')
 
     const view = viewOf()
