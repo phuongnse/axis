@@ -1,11 +1,19 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { setAt } from '../platform/jsonPatch'
 import type { StudioNames } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
-import { type Step, stepPropertyNames, stepProperties, type StepType, stepTypes } from '../platform/scenarioSteps'
+import {
+  type Step,
+  stepPropertyNames,
+  stepProperties,
+  type StepProperty,
+  type StepType,
+  stepTypes,
+} from '../platform/scenarioSteps'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
@@ -25,6 +33,7 @@ const names: StudioNames = {
         { name: 'lines', type: 'child-collection', target: 'OrderLine', values: null },
       ],
     },
+    { id: 'e2', name: 'Invoice', module: null, fields: [] },
   ],
   dataSources: [],
   processes: [
@@ -36,6 +45,7 @@ const names: StudioNames = {
         { name: 'notify', type: 'service', outcomes: [] },
       ],
     },
+    { id: 'p2', name: 'Shipping', steps: [{ name: 'dispatch', type: 'task', outcomes: ['ship'] }] },
   ],
   rules: [],
   connectors: [{ id: 'c1', name: 'Payments', operations: [{ name: 'charge' }] }],
@@ -52,17 +62,35 @@ const names: StudioNames = {
 
 const fixtures: Record<StepType, Step> = {
   createRecord: { type: 'createRecord', entity: 'Order', as: 'author', values: { code: 'A1' }, save: 'order' },
-  updateRecord: { type: 'updateRecord', record: 'order', as: 'author', values: { size: 2 } },
-  deleteRecord: { type: 'deleteRecord', record: 'order', as: 'author' },
-  startProcess: { type: 'startProcess', process: 'Approval', record: 'order', as: 'author' },
-  completeTask: { type: 'completeTask', record: 'order', step: 'review', outcome: 'approve', as: 'manager' },
+  updateRecord: { type: 'updateRecord', record: 'order', as: 'author', values: { size: 2 }, expect: 'denied' },
+  deleteRecord: { type: 'deleteRecord', record: 'order', as: 'author', expect: 'denied' },
+  startProcess: { type: 'startProcess', process: 'Approval', record: 'order', as: 'author', expect: 'denied' },
+  completeTask: {
+    type: 'completeTask',
+    record: 'order',
+    step: 'review',
+    outcome: 'approve',
+    as: 'author',
+    values: { size: 1 },
+    expect: 'denied',
+  },
   expectRecord: { type: 'expectRecord', record: 'order', values: { code: 'A1' } },
-  expectInstance: { type: 'expectInstance', process: 'Approval', record: 'order', state: 'running' },
-  expectTask: { type: 'expectTask', record: 'order', step: 'review', state: 'open' },
+  expectInstance: { type: 'expectInstance', process: 'Approval', record: 'order', state: 'running', step: 'review' },
+  expectTask: { type: 'expectTask', record: 'order', step: 'review', assignee: { user: 'author' } },
   advanceTime: { type: 'advanceTime', by: 'PT1H' },
 }
 
-function scenario(steps: Step[], users: Record<string, string[]> = { author: ['manager'] }) {
+/** Two earlier creates, so that a later step has the record names `order` and `invoice` to pick from. */
+const prefix: Step[] = [
+  { type: 'createRecord', entity: 'Order', as: 'author', values: {}, save: 'order' },
+  { type: 'createRecord', entity: 'Invoice', as: 'author', values: {}, save: 'invoice' },
+]
+
+const propertyCases: [StepType, StepProperty][] = stepTypes.flatMap((type) =>
+  stepProperties[type].map(({ name }): [StepType, StepProperty] => [type, name]),
+)
+
+function scenario(steps: Step[], users: Record<string, string[]> = { author: ['manager'], lan: ['clerk'] }) {
   return {
     id: '6f0c1c3e-2a4b-4d7e-9c1f-5b8a7d6e4f21',
     kind: 'scenario',
@@ -73,30 +101,166 @@ function scenario(steps: Step[], users: Record<string, string[]> = { author: ['m
   }
 }
 
+/** The fixture of a step that holds the property, shaped so that the step may hold it. */
+function fixtureFor(type: StepType, property: StepProperty): Step {
+  if (type === 'createRecord' && property === 'expect') {
+    return { type, entity: 'Order', as: 'author', values: { code: 'A1' }, expect: 'denied' }
+  }
+  if (type === 'expectTask' && property === 'state') {
+    return { type, record: 'order', step: 'review', state: 'open' }
+  }
+  return fixtures[type]
+}
+
 function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
-function renderEditor(value: Record<string, unknown>) {
-  const onChange = vi.fn()
-  const { container } = render(
+function providers(child: ReactNode) {
+  return (
     <ThemeModeProvider>
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioNamesContext.Provider value={names}>
-            <ScenarioEditor value={value} onChange={onChange} />
-          </StudioNamesContext.Provider>
+          <StudioNamesContext.Provider value={names}>{child}</StudioNamesContext.Provider>
         </TextProvider>
       </ThemeRoot>
-    </ThemeModeProvider>,
+    </ThemeModeProvider>
   )
-  return { onChange, container }
+}
+
+function renderEditor(value: Record<string, unknown>) {
+  const onChange = vi.fn()
+  const { container, rerender } = render(providers(<ScenarioEditor value={value} onChange={onChange} />))
+  return {
+    onChange,
+    container,
+    rerender: (next: Record<string, unknown>) =>
+      rerender(providers(<ScenarioEditor value={next} onChange={onChange} />)),
+  }
+}
+
+/** An editor that applies each change to its draft, as the editor page does. */
+function Harness({
+  value,
+  onChange,
+}: {
+  value: Record<string, unknown>
+  onChange: (pointer: string, next: unknown) => void
+}) {
+  const [draft, setDraft] = useState(value)
+  return (
+    <ScenarioEditor
+      value={draft}
+      onChange={(pointer, next) => {
+        onChange(pointer, next)
+        setDraft((current) => setAt(current, pointer, next) as Record<string, unknown>)
+      }}
+    />
+  )
+}
+
+function renderHarness(value: Record<string, unknown>) {
+  const onChange = vi.fn()
+  render(providers(<Harness value={value} onChange={onChange} />))
+  return { onChange }
+}
+
+type Panel = ReturnType<typeof within>
+
+async function pick(panel: Panel, name: string, option: string) {
+  await userEvent.click(panel.getByRole('combobox', { name }))
+  await userEvent.click(screen.getByRole('option', { name: option }))
+}
+
+/**
+ * Checks the control of a property shows the fixture's value, then edits it. Returns the path under the step and the
+ * value the edit writes.
+ */
+async function showAndEdit(
+  type: StepType,
+  property: StepProperty,
+  fixture: Step,
+  field: HTMLElement,
+  panel: Panel,
+): Promise<{ path: string; next: unknown }> {
+  switch (property) {
+    case 'entity':
+      expect(field).toHaveTextContent('Order')
+      await pick(panel, 'entity', 'Invoice')
+      return { path: 'entity', next: 'Invoice' }
+    case 'record':
+      expect(field).toHaveTextContent('order')
+      await pick(panel, 'record', 'invoice')
+      return { path: 'record', next: 'invoice' }
+    case 'as':
+      expect(field).toHaveTextContent('author')
+      await pick(panel, 'as', 'lan')
+      return { path: 'as', next: 'lan' }
+    case 'process':
+      expect(field).toHaveTextContent('Approval')
+      await pick(panel, 'process', 'Shipping')
+      return { path: 'process', next: 'Shipping' }
+    case 'step': {
+      const next = type === 'expectInstance' ? 'notify' : 'dispatch'
+      expect(field).toHaveTextContent('review')
+      await pick(panel, 'step', next)
+      return { path: 'step', next }
+    }
+    case 'outcome':
+      expect(field).toHaveTextContent('approve')
+      await pick(panel, 'outcome', 'reject')
+      return { path: 'outcome', next: 'reject' }
+    case 'state': {
+      const next = type === 'expectInstance' ? 'failed' : 'completed'
+      expect(field).toHaveTextContent(String(fixture.state))
+      await pick(panel, 'state', next)
+      return { path: 'state', next }
+    }
+    case 'expect':
+      expect(field).toHaveTextContent('denied')
+      await pick(panel, 'expect', 'notFound')
+      return { path: 'expect', next: 'notFound' }
+    case 'assignee':
+      expect(field).toHaveTextContent('author')
+      await pick(panel, 'user', 'lan')
+      return { path: 'assignee/user', next: 'lan' }
+    case 'save':
+    case 'by': {
+      const box = panel.getByRole('textbox', { name: property })
+      const next = property === 'save' ? 'orders' : 'PT2H'
+      expect(box).toHaveValue(String(fixture[property]))
+      fireEvent.change(box, { target: { value: next } })
+      return { path: property, next }
+    }
+    case 'values': {
+      const key = type === 'createRecord' || type === 'expectRecord' ? 'code' : 'size'
+      const box = panel.getByRole('textbox', { name: key })
+      expect(box).toHaveValue(String((fixture.values as Record<string, unknown>)[key]))
+      if (key === 'size') {
+        fireEvent.change(box, { target: { value: '7' } })
+        return { path: 'values/size', next: 7 }
+      }
+      fireEvent.change(box, { target: { value: 'A2' } })
+      return { path: 'values/code', next: 'A2' }
+    }
+  }
 }
 
 afterEach(() => localStorage.clear())
 
 describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
   beforeEach(() => localStorage.setItem('axis.themeMode', mode))
+
+  it('renders inside the theme root with its controls visible', () => {
+    renderEditor(scenario([fixtures.advanceTime]))
+
+    const editor = screen.getByTestId('studio-scenario')
+    expect(editor.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
+    expect(editor).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Add step' })).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'by' })).toBeVisible()
+  })
 
   it.each(stepTypes)('shows the panel of a %s step with only its own properties', (type) => {
     const { container } = renderEditor(scenario([fixtures[type]]))
@@ -109,6 +273,21 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
       expect(field(name)).toBeNull()
     }
   })
+
+  it.each(propertyCases)(
+    'a %s step shows its %s property and writes an edit at its pointer',
+    async (type, property) => {
+      const index = prefix.length
+      const fixture = fixtureFor(type, property)
+      const { onChange } = renderEditor(scenario([...prefix, fixture]))
+      const panel = within(screen.getByTestId(`studio-field-/steps/${index}`))
+      const field = screen.getByTestId(`studio-field-/steps/${index}/${property}`)
+
+      const { path, next } = await showAndEdit(type, property, fixture, field, panel)
+
+      expect(onChange).toHaveBeenLastCalledWith(`/steps/${index}/${path}`, next)
+    },
+  )
 
   it('shows a value row for each entity field the step sets, and keeps a key the entity lacks as text', () => {
     renderEditor(scenario([{ ...fixtures.createRecord, values: { code: 'A1', extra: 'x' } }]))
@@ -139,20 +318,28 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(onChange).toHaveBeenCalledWith('/steps/0', { type: 'advanceTime', note: 'keep me' })
   })
 
-  it('writes only the edited pointers, so unknown keys of the scenario, a stub and a step stay', () => {
-    const { onChange } = renderEditor({
+  it('keeps the unknown keys of the scenario, a stub and a step after edits to other properties', () => {
+    const initial = {
       ...scenario([{ ...fixtures.advanceTime, note: 'kept' }]),
       owner: 'hoa',
       stubs: [{ operation: 'billing/Charge', output: {}, comment: 'kept' }],
-    })
+    }
+    const { onChange } = renderEditor(initial)
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Renamed' } })
     fireEvent.change(screen.getByRole('textbox', { name: 'operation' }), { target: { value: 'billing/Refund' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'by' }), { target: { value: 'PT2H' } })
 
-    expect(onChange.mock.calls).toEqual([
-      ['/name', 'Renamed'],
-      ['/stubs/0/operation', 'billing/Refund'],
-    ])
+    const saved = onChange.mock.calls.reduce(
+      (draft, [pointer, next]) => setAt(draft, pointer, next),
+      initial as unknown,
+    ) as Record<string, unknown>
+    expect(saved).toMatchObject({
+      name: 'Renamed',
+      owner: 'hoa',
+      stubs: [{ operation: 'billing/Refund', comment: 'kept' }],
+      steps: [{ type: 'advanceTime', by: 'PT2H', note: 'kept' }],
+    })
   })
 
   it('edits the time an advanceTime step moves by', async () => {
@@ -239,8 +426,29 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(screen.getByRole('combobox', { name: 'expect' })).toBeDisabled()
   })
 
+  it('shows an invalid expectation with its path and writes an edit to that path', () => {
+    const { onChange } = renderEditor(scenario([{ ...fixtures.deleteRecord, expect: { invalid: '/steps/0/as' } }]))
+    const field = screen.getByTestId('studio-field-/steps/0/expect')
+    const path = within(field).getByRole('textbox', { name: 'invalid' })
+
+    expect(field).toHaveTextContent('invalid')
+    expect(path).toHaveValue('/steps/0/as')
+    fireEvent.change(path, { target: { value: '/steps/0/record' } })
+
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/expect/invalid', '/steps/0/record')
+  })
+
+  it('writes an empty path when an expectation becomes invalid', async () => {
+    const { onChange } = renderEditor(scenario([fixtures.deleteRecord]))
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'expect' }))
+    await userEvent.click(screen.getByRole('option', { name: 'invalid' }))
+
+    expect(onChange).toHaveBeenCalledWith('/steps/0/expect', { invalid: '' })
+  })
+
   it('takes an assignee or a state on an expectTask step, not both', () => {
-    renderEditor(scenario([fixtures.expectTask]))
+    renderEditor(scenario([{ ...fixtures.expectTask, state: 'open' }]))
 
     expect(screen.getByRole('combobox', { name: 'assignee kind' })).toBeDisabled()
   })
@@ -256,5 +464,22 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     fireEvent.change(box, { target: { value: '[1]' } })
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.getByText(/not JSON/)).toBeInTheDocument()
+  })
+
+  it('keeps the JSON values text as typed after it saves a valid object', () => {
+    renderHarness(scenario([{ type: 'expectRecord', record: 'order', values: {} }]))
+    const box = screen.getByRole('textbox', { name: 'values' })
+
+    fireEvent.change(box, { target: { value: '{"size":   3}' } })
+
+    expect(box).toHaveValue('{"size":   3}')
+  })
+
+  it('shows the JSON values again when they change from outside the editor', () => {
+    const { rerender } = renderEditor(scenario([{ type: 'expectRecord', record: 'order', values: { size: 3 } }]))
+
+    rerender(scenario([{ type: 'expectRecord', record: 'order', values: { size: 5 } }]))
+
+    expect(screen.getByRole('textbox', { name: 'values' })).toHaveValue(JSON.stringify({ size: 5 }, null, 2))
   })
 })

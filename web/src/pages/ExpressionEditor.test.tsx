@@ -8,6 +8,7 @@ import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import ExpressionEditor from './ExpressionEditor'
+import type { ScopeOption } from './expressionScope'
 
 const resourceId = 'd9ccbf89-5004-4d52-8885-2ee377b7caa5'
 const checkPath = `/api/studio/apps/PurchaseRequests/expressions/check`
@@ -29,7 +30,13 @@ function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
-function renderEditor(value: string, onChange = vi.fn(), extra: ReactNode = null, required = true) {
+function renderEditor(
+  value: string,
+  onChange = vi.fn(),
+  extra: ReactNode = null,
+  required = true,
+  options: ScopeOption[] = [],
+) {
   render(
     <ThemeModeProvider>
       <ThemeRoot>
@@ -41,6 +48,7 @@ function renderEditor(value: string, onChange = vi.fn(), extra: ReactNode = null
             name="expression"
             value={value}
             required={required}
+            options={options}
             onChange={onChange}
           />
           {extra}
@@ -187,6 +195,34 @@ describe('ExpressionEditor checks', () => {
     const onChange = renderEditor('title > 5')
     await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('boolean'))
     expect(onChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('ExpressionEditor completion', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => json({ type: 'text', diagnostics: [] })),
+    )
+  })
+
+  it('opens with Ctrl+Space and inserts the picked option from the keyboard', async () => {
+    const user = userEvent.setup()
+    renderEditor('', vi.fn(), null, false, [
+      { label: 'requester', type: 'field', cursorInside: false },
+      { label: 'length()', type: 'function', cursorInside: true },
+    ])
+
+    await user.click(screen.getByRole('textbox', { name: 'expression' }))
+    await user.keyboard('{Control>}[Space]{/Control}')
+    await screen.findByRole('option', { name: /requester/ })
+    await user.keyboard('{ArrowDown}')
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)))
+    await user.keyboard('{Enter}')
+
+    const view = viewOf()
+    expect(view.state.doc.toString()).toBe('length()')
+    expect(view.state.selection.main.head).toBe(7)
   })
 })
 

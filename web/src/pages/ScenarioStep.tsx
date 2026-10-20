@@ -61,8 +61,15 @@ export function Field({ pointer, name, children }: { pointer: string; name: stri
 /** The values of a step whose entity is not in the folder. The text is JSON and is saved only when it is an object. */
 function JsonValues({ pointer, values, onChange }: { pointer: string; values: unknown; onChange: ChangeHandler }) {
   const t = useText()
-  const [text, setText] = useState(JSON.stringify(values ?? {}, null, 2))
+  const formatted = JSON.stringify(values ?? {}, null, 2)
+  const [text, setText] = useState(formatted)
+  const [synced, setSynced] = useState(formatted)
   const [invalid, setInvalid] = useState(false)
+  if (formatted !== synced) {
+    setSynced(formatted)
+    setText(formatted)
+    setInvalid(false)
+  }
   return (
     <Flex vertical gap="small">
       <Input.TextArea
@@ -77,6 +84,7 @@ function JsonValues({ pointer, values, onChange }: { pointer: string; values: un
           const ok = parsed.ok && isObject(parsed.value)
           setInvalid(!ok)
           if (parsed.ok && isObject(parsed.value)) {
+            setSynced(JSON.stringify(parsed.value, null, 2))
             onChange(`${pointer}/values`, parsed.value)
           }
         }}

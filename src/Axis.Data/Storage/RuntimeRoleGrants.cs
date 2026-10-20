@@ -15,6 +15,9 @@ namespace Axis.Data.Storage;
 /// </summary>
 public static class RuntimeRoleGrants
 {
+    /// <summary>The <c>pg_advisory_xact_lock</c> key that serializes the grant steps of concurrent servers.</summary>
+    public const long LockKey = 0x4158_4953_4752_4E54; // "AXISGRNT" in ASCII.
+
     /// <summary>
     /// The <c>axis</c> tables that the runtime database role reads and writes. Any other <c>axis</c> table,
     /// including a future one, is read-only for it until someone adds it here.
@@ -58,6 +61,12 @@ public static class RuntimeRoleGrants
     {
         var role = EntityNaming.Quote(runtimeRole);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // Concurrent servers run these grants at the same time, and their GRANT statements update the same catalog rows.
+        await using (var lockCommand = new NpgsqlCommand($"SELECT pg_advisory_xact_lock({LockKey})", connection, transaction))
+        {
+            await lockCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
 
         await using (var check = new NpgsqlCommand("SELECT current_user = @role", connection, transaction))
         {

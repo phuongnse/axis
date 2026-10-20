@@ -145,7 +145,7 @@ const namesPath = `${folder}/names`
 
 const applicationNames = {
   locales: ['en'],
-  entities: [],
+  entities: [{ id: entityId, name: 'PurchaseRequest', module: null, fields: [{ name: 'title', type: 'text' }] }],
   dataSources: [],
   processes: [],
   rules: [],
@@ -215,6 +215,9 @@ function stubServer(
     }
     if (input === `${folder}/diagnostics`) {
       return json({ diagnostics })
+    }
+    if (input === `${folder}/names`) {
+      return json(applicationNames)
     }
     if (input === `${folder}/expressions/check` && expressions.check) {
       checkCalls++
@@ -328,10 +331,9 @@ describe('StudioPage', () => {
     const name = await screen.findByTestId('studio-field-/fields/0/name')
     expect(within(name).getByRole('textbox')).toHaveValue('number')
     expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('200')
-    const label = screen.getByTestId('studio-field-/label/textKey')
-    expect(within(label).getByRole('combobox', { name: 'textKey' })).toBeInTheDocument()
-    expect(label).toHaveTextContent('entity.purchaseRequest')
-    expect(within(label).queryByTestId('studio-reference-unknown')).not.toBeInTheDocument()
+    const label = screen.getByTestId('studio-field-/label')
+    expect(within(label).getByRole('textbox', { name: 'Text key' })).toHaveValue('entity.purchaseRequest')
+    expect(within(label).getByRole('textbox', { name: 'en' })).toHaveValue('Purchase request')
     expect(screen.getByTestId('studio-field-/kind')).toHaveTextContent('entity')
     expect(within(screen.getByTestId('studio-field-/kind')).queryByRole('textbox')).not.toBeInTheDocument()
   })
@@ -510,6 +512,29 @@ describe('StudioPage', () => {
     expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests')
     expect(fetchMock).toHaveBeenCalledWith('/api/studio/apps/PurchaseRequests/resources', expect.anything())
+  })
+
+  it('loads the names of the picked application', async () => {
+    const fetchMock = stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/studio/apps/PurchaseRequests/names', expect.anything())
+  })
+
+  it('keeps the folder usable when the names cannot be loaded', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fetchMock = stubServer()
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+      input === `${folder}/names` ? json({ title: 'No.' }, 500) : base(input, init),
+    )
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-group-entity')).toBeInTheDocument()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   it('waits for the person to pick when there are several applications', async () => {
@@ -1093,6 +1118,38 @@ describe('StudioPage publishing', () => {
     await vi.advanceTimersByTimeAsync(1000)
 
     await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
+  })
+
+  describe('New application', () => {
+    function stubCreateAccess(studioCreate: boolean, apps: { name: string }[] = [{ name: 'PurchaseRequests' }]) {
+      const fetchMock = stubServer(apps)
+      const base = fetchMock.getMockImplementation()!
+      fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+        input === '/api/me' ? json({ id: 'hoa', studio: true, studioCreate }) : base(input, init),
+      )
+      return fetchMock
+    }
+
+    it.each([
+      ['studioCreate is true', true, true],
+      ['studioCreate is false', false, false],
+    ])('shows New application only when it may create: %s', async (_name, studioCreate, shown) => {
+      stubCreateAccess(studioCreate)
+      renderPage()
+
+      expect(await screen.findByTestId(`studio-resource-${entityId}`)).toBeInTheDocument()
+      await waitFor(() =>
+        expect(screen.queryAllByRole('button', { name: 'New application' })).toHaveLength(shown ? 1 : 0),
+      )
+    })
+
+    it('shows New application when Studio lists no application', async () => {
+      stubCreateAccess(true, [])
+      renderPage()
+
+      expect(await screen.findByTestId('studio-no-applications')).toBeInTheDocument()
+      expect(await screen.findByRole('button', { name: 'New application' })).toBeInTheDocument()
+    })
   })
 
   describe('New resource', () => {

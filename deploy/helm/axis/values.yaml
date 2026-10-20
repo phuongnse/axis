@@ -70,11 +70,15 @@ modules:
 #   persistence:
 #     persistentVolumeClaim:
 #       claimName: axis-studio
+# tests renders Studio__Tests on the server only, which shows the test controls to an author.
+# Set it together with secrets.scenarioServerConnection, because the publisher cannot run a
+# test request without that connection.
 studio:
   folders: []
   authorRole: ""
   publisherRole: ""
   persistence: {}
+  tests: false
 
 # Forwarded headers, on the server only. The server reads X-Forwarded-For,
 # X-Forwarded-Proto and X-Forwarded-Host only from these addresses. Use IP
@@ -102,3 +106,9 @@ secrets:
   platformSecretKey:
     name: ""
     key: Platform__SecretKey
+  # Scenarios:ServerConnectionString, the connection of a role with CREATEDB that owns no
+  # database, which the publisher uses to run test scenarios. Optional, and used by the
+  # publisher only. The Secret is mounted only when name is set. Set studio.tests with it.
+  scenarioServerConnection:
+    name: ""
+    key: Scenarios__ServerConnectionString

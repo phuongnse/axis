@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const composeFile = join(root, 'deploy/compose/compose.yaml')
+const scenariosFile = join(root, 'deploy/compose/compose.scenarios.yaml')
 const timeout = 30 * 60 * 1000
 const targets = ['axis-server', 'axis-worker', 'axis-admin']
 const keycloakAuthority = 'https://keycloak:8443/realms/axis'
@@ -70,14 +71,15 @@ const openToAll = (dir) => {
   }
 }
 
-// render: the config of the example with every profile on and no variable set but the version.
-const render = () => {
+// render: the config of the example with every profile on and no variable set but the version. `extraFiles` are
+// added after compose.yaml with -f.
+const render = (extraFiles = []) => {
   const env = { ...process.env, AXIS_VERSION: 'x', AXIS_OIDC_CLIENT_SECRET: '' }
   for (const name of Object.keys(env)) if (name.startsWith('AXIS_') && !['AXIS_VERSION', 'AXIS_OIDC_CLIENT_SECRET'].includes(name)) delete env[name]
   for (const name of Object.keys(env)) if (name.startsWith('Studio__')) delete env[name]
   const rendered = spawnSync(
     'docker',
-    ['compose', '-f', composeFile, '--profile', 'admin', '--profile', 'proxy', '--profile', 'replicas', 'config', '--format', 'json'],
+    ['compose', '-f', composeFile, ...extraFiles.flatMap((file) => ['-f', file]), '--profile', 'admin', '--profile', 'proxy', '--profile', 'replicas', 'config', '--format', 'json'],
     { cwd: root, encoding: 'utf8', env },
   )
   assert.equal(rendered.status, 0, rendered.stderr)
@@ -128,6 +130,34 @@ describe('the example holds no secret', () => {
     assert.deepEqual(publisher.command, ['publisher'])
     assert.match(publisher.image, /axis-admin:/)
     for (const secret of Object.values(config.secrets)) assert.ok(secret.file, 'a secret has no file')
+  })
+
+  test('the scenario secret and Studio__Tests come only with compose.scenarios.yaml, in the publisher and the servers', () => {
+    const scenario = 'Scenarios__ServerConnectionString'
+    for (const [name, service] of Object.entries(render().services)) {
+      assert.equal(
+        (service.secrets ?? []).some((secret) => secret.source === scenario),
+        false,
+        `${name} has the scenario secret without compose.scenarios.yaml`,
+      )
+      assert.equal(service.environment?.Studio__Tests, undefined, `${name} sets Studio__Tests without compose.scenarios.yaml`)
+    }
+
+    const { services, secrets } = render([scenariosFile])
+    const publisherSecrets = (services.publisher.secrets ?? []).map((secret) => secret.source).sort()
+    assert.deepEqual(publisherSecrets, [...secretFiles.publisher, scenario].sort())
+    for (const secret of services.publisher.secrets) assert.equal(secret.target, `/run/secrets/${secret.source}`)
+    assert.ok(secrets[scenario].file, 'the scenario secret has no file')
+    for (const name of ['server', 'server-2']) {
+      assert.equal(services[name].environment.Studio__Tests, 'true', `${name} Studio__Tests`)
+      assert.equal((services[name].secrets ?? []).some((secret) => secret.source === scenario), false, `${name} has the scenario secret`)
+    }
+    for (const name of ['worker', 'admin', 'proxy']) {
+      assert.equal((services[name].secrets ?? []).some((secret) => secret.source === scenario), false, `${name} has the scenario secret`)
+      assert.equal(services[name].environment?.Studio__Tests, undefined, `${name} sets Studio__Tests`)
+    }
+    assert.deepEqual(services['server-2'].profiles, ['replicas'])
+    assert.equal(services.publisher.environment?.Studio__Tests, undefined)
   })
 
   test('the servers publish only on 127.0.0.1, and the proxy takes its certificate from a mounted folder', () => {
