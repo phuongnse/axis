@@ -306,7 +306,8 @@ What each database role may do:
   after the EF Core migrations. The first run sets the default privileges for
   the tables the migrations create. The second run grants the tables that now
   exist. The step refuses a runtime database role that is the schema database
-  role.
+  role. It holds an advisory lock until it ends, so servers that start together
+  run their grant steps one after the other.
 - **Release trigger.** A trigger refuses every `UPDATE`, `DELETE` and
   `TRUNCATE` on the three release tables, for every database role, with
   SQLSTATE `23001`. An `Axis.Configuration` migration creates it. It backs the
