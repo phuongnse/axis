@@ -11,7 +11,9 @@
 # system stub keep running.
 # The server runs startup activation as the database role axis_schema and serves requests as
 # axis_runtime. The worker runs only as axis_runtime. The publisher runs its steps as axis_schema
-# and seeds as axis_runtime. Docker Compose creates both roles.
+# and seeds as axis_runtime. Docker Compose creates both roles. The publisher also gets the role
+# axis_scenario, which has CREATEDB, to run test scenarios. The server turns on Studio's test controls
+# through appsettings.Development.json.
 # The publisher runs from the built Axis.Admin.dll, not under dotnet watch, so a change to its code
 # needs a restart of this script. The admin host reads no appsettings file, so this script sets the
 # publisher's tenant settings as environment variables of its process only. It serves the tenant
@@ -325,6 +327,7 @@ while :; do
       'Tenants__default-preview__Hosts__0=preview.localhost' \
       "Tenants__default-preview__ConnectionString=Host=localhost;Port=$postgres_port;Database=axis_preview;Username=axis_preview_runtime;Password=axis" \
       "Tenants__default-preview__SchemaConnectionString=Host=localhost;Port=$postgres_port;Database=axis_preview;Username=axis_preview_schema;Password=axis" \
+      "Scenarios__ServerConnectionString=Host=localhost;Port=$postgres_port;Database=postgres;Username=axis_scenario;Password=axis" \
       dotnet src/Axis.Admin/bin/Debug/net10.0/Axis.Admin.dll publisher) \
       </dev/null > >(prefix publisher) 2>&1 &
     publisher=$!

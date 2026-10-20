@@ -46,6 +46,10 @@ spec:
             - name: Studio__PublisherRole
               value: {{ . | quote }}
             {{- end }}
+            {{- if .Values.studio.tests }}
+            - name: Studio__Tests
+              value: "true"
+            {{- end }}
             {{- range $i, $proxy := .Values.forwardedHeaders.knownProxies }}
             - name: ForwardedHeaders__KnownProxies__{{ $i }}
               value: {{ $proxy | quote }}

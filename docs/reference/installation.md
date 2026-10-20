@@ -135,11 +135,18 @@ CREATE DATABASE axis_platform OWNER axis_platform_schema;
 | `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema and nothing else. |
 | `axis_admin` | `Admin:ConnectionString`. It has `CREATEDB` and `CREATEROLE` and is not a superuser. |
 
-**The scenario role *(planned for M11)*.** To let Studio run test scenarios,
-create one more role. It has `CREATEDB`, is not a superuser and owns no tenant
-database. Put its connection string in the secret file
-`Scenarios__ServerConnectionString`, mounted in the publisher only, and set
-`Studio__Tests=true` on the server. See
+**The scenario role.** To let Studio run test scenarios, create one more role.
+It has `CREATEDB`, is not a superuser and owns no tenant database. Put its
+connection string in the secret file `Scenarios__ServerConnectionString`, and
+add `deploy/compose/compose.scenarios.yaml` to the Compose files, as
+`docker compose -f compose.yaml -f compose.scenarios.yaml ...` or with
+`COMPOSE_FILE=compose.yaml:compose.scenarios.yaml`. That file mounts the secret
+in the publisher only and sets `Studio__Tests=true` on both servers, so one
+cannot be on without the other. Without it, nothing changes: the publisher gets
+no scenario secret and Studio shows no test controls. `compose.yaml` does not
+declare the secret itself, because Compose fails to start a service whose secret
+file is missing, and that would force every operator to create it. The role owns
+no database, so its connection string names the `postgres` database. See
 [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed).
 
 ```sql
@@ -168,7 +175,7 @@ file is named after its setting, and its content is the value.
 | `ConnectionStrings__PlatformSchema` | server, admin, publisher |
 | `Platform__SecretKey` | server, worker, admin, publisher |
 | `Admin__ConnectionString` | admin |
-| `Scenarios__ServerConnectionString` *(planned for M11, optional)* | publisher |
+| `Scenarios__ServerConnectionString` *(optional, only with `compose.scenarios.yaml`)* | publisher |
 
 Write each file with `printf '%s'`, so it has no trailing newline. Make the
 folder and the files readable by UID 1654, the user the images run as. The
@@ -270,7 +277,10 @@ proxy that ends TLS. The `replicas` profile starts `server-2`, configured like
 steps say, and `scripts/e2e.sh` runs it. It builds the three production images
 and starts a test PostgreSQL and a Keycloak over HTTPS, with a certificate
 authority it makes for the run, and imports a copy of the development realm that
-adds the tenants' `https://` redirect addresses. An override file in a temporary folder holds
+adds the tenants' `https://` redirect addresses. A static check of the rendered configuration shows that
+`compose.yaml` alone gives no service the scenario secret or `Studio__Tests`, and that adding
+`compose.scenarios.yaml` gives the secret to the publisher only and `Studio__Tests` to both servers only. The
+smoke test runs no `test` request against the installed images. An override file in a temporary folder holds
 everything the test adds, so `deploy/compose/compose.yaml` stays as an
 operator uses it. The test then:
 
@@ -348,6 +358,11 @@ kubectl create secret generic axis-platform \
   --from-literal=Platform__SecretKey='<32 bytes in base64>'
 ```
 
+To let Studio run test scenarios, add
+`--from-literal=Scenarios__ServerConnectionString='<connection string>'` to the
+same Secret, or to another one. Then set `secrets.scenarioServerConnection` and
+`studio.tests`, see the table below.
+
 A secret store works too, if it syncs into a Kubernetes Secret.
 
 **Install.** Write a values file that names the Secrets, then run:
@@ -368,7 +383,9 @@ secrets:
 
 Each pod mounts only the secrets it needs as files in `/run/secrets`. The
 server gets all three, the worker gets the first and the last, and the migrate
-Job and the publisher get the last two. Neither has an `Admin:ConnectionString`.
+Job and the publisher get the last two. The publisher also gets
+`Scenarios__ServerConnectionString` when `secrets.scenarioServerConnection` is
+set. Neither has an `Admin:ConnectionString`.
 Rendering fails with a message that names the value when a `name` is missing.
 The values schema rejects any field in a reference other than `name` and `key`.
 
@@ -388,8 +405,8 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 80 | The Service of the server. Put your own Ingress in front of it. |
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
-| `secrets.scenarioServerConnection` | empty | *(planned for M11)* Publisher only. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. Create the role as in [On premises](#on-premises). |
-| `studio.tests` | `false` | *(planned for M11)* Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
+| `secrets.scenarioServerConnection` | empty | Publisher only. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. Create the role as in [On premises](#on-premises). |
+| `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |

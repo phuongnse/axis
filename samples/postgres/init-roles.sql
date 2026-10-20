@@ -5,6 +5,8 @@
 -- It also creates the preview tenant's database axis_preview and its two roles, which play the same
 -- parts for the tenant default-preview: axis_preview_schema owns the database, and
 -- axis_preview_runtime serves requests and runs the worker.
+-- axis_scenario has CREATEDB and owns no database. Only the publisher uses it, to create and drop the
+-- axis_scenario_<uuid> databases of test scenarios.
 -- The postgres image runs this file once, as the bootstrap superuser axis, connected to POSTGRES_DB.
 -- Docker Compose and scripts/e2e.sh mount it into /docker-entrypoint-initdb.d.
 CREATE ROLE axis_schema LOGIN PASSWORD 'axis';
@@ -13,3 +15,4 @@ DO $$ BEGIN EXECUTE format('ALTER DATABASE %I OWNER TO axis_schema', current_dat
 CREATE ROLE axis_preview_schema LOGIN PASSWORD 'axis';
 CREATE ROLE axis_preview_runtime LOGIN PASSWORD 'axis';
 CREATE DATABASE axis_preview OWNER axis_preview_schema;
+CREATE ROLE axis_scenario LOGIN PASSWORD 'axis' CREATEDB;

@@ -61,7 +61,7 @@ describe('the Axis Helm chart', () => {
   })
 
   test('the publisher is one Recreate pod with no port, probe or Service and only its two secrets', () => {
-    const output = renderOk()
+    const output = renderOk('--set', 'secrets.scenarioServerConnection.name=')
     const publisher = find(output, 'Deployment', 'axis-publisher')
     assert.match(publisher, /replicas: 1\n/)
     assert.match(publisher, /type: Recreate\n/)
@@ -78,6 +78,33 @@ describe('the Axis Helm chart', () => {
     for (const service of documents(output).filter((d) => /^kind: Service$/m.test(d))) {
       assert.doesNotMatch(service, /component: publisher/)
     }
+  })
+
+  test('the scenario connection is mounted in the publisher only, and only when it is named', () => {
+    const output = renderOk()
+    const publisher = find(output, 'Deployment', 'axis-publisher')
+    assert.match(publisher, /name: "axis-scenario"\n\s+items:\n\s+- key: "Scenarios__ServerConnectionString"\n\s+path: Scenarios__ServerConnectionString\n/)
+    for (const [kind, name] of [
+      ['Deployment', 'axis-server'],
+      ['Deployment', 'axis-worker'],
+      ['Job', 'axis-migrate'],
+    ]) {
+      assert.doesNotMatch(find(output, kind, name), /Scenarios__ServerConnectionString|axis-scenario/)
+    }
+    assert.doesNotMatch(renderOk('--set', 'secrets.scenarioServerConnection.name='), /Scenarios__ServerConnectionString/)
+  })
+
+  test('studio.tests renders Studio__Tests on the server only', () => {
+    const output = renderOk()
+    assert.match(find(output, 'Deployment', 'axis-server'), /- name: Studio__Tests\n\s+value: "true"/)
+    for (const [kind, name] of [
+      ['Deployment', 'axis-worker'],
+      ['Deployment', 'axis-publisher'],
+      ['Job', 'axis-migrate'],
+    ]) {
+      assert.doesNotMatch(find(output, kind, name), /Studio__Tests/)
+    }
+    assert.doesNotMatch(renderOk('--set', 'studio.tests=false'), /Studio__Tests/)
   })
 
   test('the publisher grace period is a value', () => {
@@ -177,6 +204,8 @@ describe('the Axis Helm chart', () => {
       'studio.authorRole=',
       '--set',
       'studio.publisherRole=',
+      '--set',
+      'studio.tests=false',
     )
     assert.doesNotMatch(output, /\/studio|Studio__|- name: studio\n/)
   })

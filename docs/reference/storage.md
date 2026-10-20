@@ -264,8 +264,11 @@ through role membership.
   [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed)
   agrees. The scenario role has `CREATEDB`, is not a superuser and owns no
   tenant database. Its development name is `axis_scenario`, with the password
-  `axis`. The integration fixtures create it. `samples/postgres/init-roles.sql`
-  is to create it too *(planned for M11)*. Only the publisher holds
+  `axis`. The integration fixtures create it, and so does
+  `samples/postgres/init-roles.sql`. PostgreSQL runs that file only on an empty
+  volume, so an existing Compose volume has no `axis_scenario` and a `test`
+  request fails there until `docker compose down -v`, which deletes the local
+  data. Only the publisher holds
   it, through the setting `Scenarios:ServerConnectionString`. It creates one
   database `axis_scenario_<uuid>` for each scenario, owns it and drops it after
   the scenario. The server holds no right to create databases, and neither does

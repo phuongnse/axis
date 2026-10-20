@@ -11,7 +11,8 @@
 # PostgreSQL loads samples/postgres/init-roles.sql on its first start. It creates the two database
 # roles: the server runs startup activation as axis_schema and serves requests as axis_runtime, the
 # worker runs only as axis_runtime, and the publisher runs its steps as axis_schema. axis stays the
-# bootstrap superuser. It also creates the preview tenant's database axis_preview and its two roles,
+# bootstrap superuser. A third role, axis_scenario, has CREATEDB and owns no database. Only the publisher
+# gets it, to run test scenarios. It also creates the preview tenant's database axis_preview and its two roles,
 # axis_preview_schema and axis_preview_runtime, which the server and the worker use the same way for
 # the tenant default-preview. The server serves that tenant at http://preview.localhost:5206 and
 # activates both samples on it. It has no deployment bindings. The publisher serves both tenants, so it
@@ -153,6 +154,9 @@ services:
       Tenants__default-preview__Hosts__0: preview.localhost
       Tenants__default-preview__ConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_runtime;Password=axis
       Tenants__default-preview__SchemaConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_schema;Password=axis
+      # The role that creates the databases of test scenarios. Only the publisher gets it, and it connects to
+      # the postgres maintenance database because the role owns no database of its own.
+      Scenarios__ServerConnectionString: Host=postgres;Port=5432;Database=postgres;Username=axis_scenario;Password=axis
 
   # The purchasing system stub from tests/Axis.PurchasingStub. It keeps its orders in memory.
   purchasing:
