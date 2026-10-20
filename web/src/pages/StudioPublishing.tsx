@@ -1,5 +1,5 @@
 import { Alert, Button, Flex, Input, Modal } from 'antd'
-import { useEffect, useRef, useState } from 'react'
+import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import {
   fetchStudioReleases,
   fetchStudioRequest,
@@ -15,23 +15,33 @@ import {
   type StudioReleases,
   type StudioResourceItem,
   type StudioRequest,
+  testStudioApp,
   validateStudioApp,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { StudioReleasesList } from './StudioReleases'
 import { StudioRequestStatus } from './StudioRequestStatus'
+import { StudioTestResults } from './StudioTestResults'
 
 /** How long Studio waits between two checks of a request. */
 const pollDelay = 1000
 
+/** What the page calls on this component: a test run of every scenario, or of the named ones. */
+export interface StudioPublishingHandle {
+  runTests(scenarios?: string[]): void
+}
+
 /**
- * The Validate, Preview and Publish buttons of the open application, with the status of the request they send, and
- * its release history. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
+ * The Validate, Preview, Run tests and Publish buttons of the open application, with the status of the request they
+ * send, and its release history. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
  * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
  * preview tenant's history. Publish opens a dialog for an optional label and note, then
  * sends a publish request. A Roll back button in the history sends a rollback request.
+ * Run tests shows only when `canTest`, and sends a test request, which runs every scenario. The ref's `runTests`
+ * sends the same request with the names it is given. A test request shows its results under the status line, and
+ * selecting a failed scenario calls `onOpenScenario`.
  * Studio checks the request every second until it is `succeeded` or `failed`, with no time limit, and shows its
  * status meanwhile. When it ends, its diagnostics go to the diagnostics panel. A succeeded publish or rollback
  * shows its release number, found in the release history by the request's `releaseId`. Publish and Roll back show
@@ -40,22 +50,31 @@ const pollDelay = 1000
  * `folderRevision` changes, which the page does after a save or a delete. A warning shows when the folder differs
  * from the active release. When the server
  * does not answer, the checking starts again after the reconnect. `onDiagnostics` runs while the page may have
- * changed, so it must not depend on a stale copy of the page's state.
+ * changed, so it must not depend on a stale copy of the page's state. `onBusyChange` runs when a request is sent,
+ * checked or finished, or the reconnect starts or ends.
  */
 export function StudioPublishing({
   application,
   canPublish,
+  canTest,
   previewHost,
   sites,
   folderRevision,
   onDiagnostics,
+  onOpenScenario,
+  onBusyChange,
+  ref,
 }: {
   application: string
   canPublish: boolean
+  canTest: boolean
   previewHost: string | null
   sites: StudioResourceItem[]
   folderRevision: number
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
+  onOpenScenario: (resourceId: string, path: string) => void
+  onBusyChange?: (busy: boolean) => void
+  ref?: Ref<StudioPublishingHandle>
 }) {
   const t = useText()
   const { generation, reconnecting, lost } = useStudioConnection()
@@ -204,6 +223,15 @@ export function StudioPublishing({
   }
 
   const busy = running || sending || reconnecting
+
+  useEffect(() => {
+    onBusyChange?.(busy)
+  }, [busy, onBusyChange])
+
+  useImperativeHandle(ref, () => ({
+    runTests: (scenarios) => send(() => testStudioApp(application, scenarios)),
+  }))
+
   return (
     <Flex vertical gap="small">
       <Flex gap="small" align="center">
@@ -219,6 +247,11 @@ export function StudioPublishing({
             {t('shell.studio.preview')}
           </Button>
         )}
+        {canTest && (
+          <Button data-testid="studio-run-tests" disabled={busy} onClick={() => send(() => testStudioApp(application))}>
+            {t('shell.studio.runTests')}
+          </Button>
+        )}
         {canPublish && (
           <Button type="primary" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
             {t('shell.studio.publish')}
@@ -229,6 +262,7 @@ export function StudioPublishing({
         <Alert data-testid="studio-request-error" type="error" message={t('shell.studio.request.sendFailed')} />
       )}
       {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
+      {request?.kind === 'test' && <StudioTestResults request={request} onSelect={onOpenScenario} />}
       {previewLinks.length > 0 && (
         <Flex vertical gap={4}>
           {previewLinks.map((link) => (

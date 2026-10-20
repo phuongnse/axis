@@ -17,6 +17,7 @@ function request(overrides: Partial<StudioRequest>): StudioRequest {
     note: null,
     releaseId: null,
     diagnostics: [],
+    scenarios: null,
     ...overrides,
   }
 }
@@ -97,5 +98,22 @@ describe.each(['light', 'dark'])('StudioRequestStatus in %s mode', (mode) => {
     expect(status).toHaveAttribute('data-status', 'failed')
     expect(status).toHaveTextContent('Rollback failed')
     expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()
+  })
+
+  it('shows a succeeded test as passed, not as a rollback, without a release number', () => {
+    const status = renderStatus(request({ kind: 'test', status: 'succeeded', scenarios: [] }))
+
+    expect(status).toHaveAttribute('data-status', 'succeeded')
+    expect(status).toHaveTextContent('Tests passed')
+    expect(status).not.toHaveTextContent('Rolled back')
+    expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()
+  })
+
+  it('shows a failed test as failed, not as a validation', () => {
+    const status = renderStatus(request({ kind: 'test', status: 'failed', scenarios: [] }))
+
+    expect(status).toHaveAttribute('data-status', 'failed')
+    expect(status).toHaveTextContent('Tests failed')
+    expect(status).not.toHaveTextContent('Validation failed')
   })
 })

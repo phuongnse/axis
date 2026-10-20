@@ -853,8 +853,8 @@ Studio is where authors edit an application's resources. It uses the
 agrees. The route, the link, the application picker, New application, New resource, the resource list with its
 search, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
-the request status and the preview links, the Releases list with Roll back, and the
-reconnect message are built.
+the request status and the preview links, the Releases list with Roll back, Run tests,
+Run and the Test results list, and the reconnect message are built.
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
@@ -1010,24 +1010,33 @@ reconnect message are built.
   - The buttons are off while a request runs and while the reconnect message
     shows. If the server does not answer during a request, Studio checks it again
     after the reconnect.
-- **Running tests.** *(planned for M11)* Studio runs the application's
+- **Running tests.** Studio runs the application's
   [test scenarios](configuration.md#test-scenarios) through the
   [test route](authoring.md#test), as
   [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees.
   - **Run tests** sits next to **Validate**. It sends `POST .../test` with no
     body, so every scenario runs.
-  - A **Run** action in the editor of a selected `scenario` resource sends
+  - **Run** sits in the details of a selected `scenario` resource. It sends
     `{ "scenarios": ["<name>"] }`, so only that scenario runs.
+  - Both run the saved files, not an unsaved draft in the editor, as Validate does.
   - Both show only when `GET /api/me` answers `studioTest: true`. When that
-    answer is `false` or fails, they do not show.
+    answer is `false` or fails, they do not show. They are off while a request
+    runs and while the reconnect message shows.
   - The status line works as for Validate. It shows **queued**, **running** and
     the outcome, and Studio checks `GET .../requests/{id}` every second until the
-    status is `succeeded` or `failed`.
-  - A **Test results** list shows each scenario of the request's `scenarios`
+    status is `succeeded` or `failed`. A test shows **Tests passed** or
+    **Tests failed**, and never a release number.
+  - The **Test results** list shows each scenario of the request's `scenarios`
     field, with **passed** or **failed**, its time and, for a failure, the failing
-    step and its message. Selecting a failure opens the scenario resource at the
-    item's `path`, as a diagnostic does.
-  - The request's diagnostics go in the diagnostics panel, as before.
+    step and its message. Steps count from 1, as the step cards of the editor do.
+    Selecting a failure opens the scenario resource at the item's `path`, as a
+    diagnostic does.
+  - While the request is queued or running, the list shows a note instead of rows,
+    so an empty list never reads as a pass. A failed run with no results says that
+    no scenario ran, and points to the diagnostics. Compile errors, a missing
+    setting and an unknown scenario name fail a run this way.
+  - The list is not kept across a page reload. The request's diagnostics go in the
+    diagnostics panel, as before.
   - The buttons are off while a request runs and while the reconnect message
     shows.
 - **Releases.** A list under the publishing buttons shows the open application's
