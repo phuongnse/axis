@@ -8,7 +8,7 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The application list, resource list, read, patch, create, delete, diagnostics
+in git. The application list, resource list, read, patch, create, delete, changes, diagnostics
 and references routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
@@ -21,8 +21,7 @@ server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
 its own process, and
 [D47](../decisions.md#d47-publishing-from-studio--agreed) agrees this.
-A `changes` route that writes several files in one call is
-*(planned for M11)*, see [Changes](#changes).
+The `changes` route writes several files in one call, see [Changes](#changes).
 
 *(Planned for M11.)* Three more routes help Studio's pickers, label texts and
 expression editor: a [names](#names) route, a [text write](#text-writes) and an
@@ -63,7 +62,7 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
-| `POST /api/studio/apps/{application}/changes` *(planned for M11)* | `200` with `{ items: [{ id, version }], diagnostics }`. The body is `application/json`, see [Changes](#changes) |
+| `POST /api/studio/apps/{application}/changes` | `200` with `{ items: [{ id, version }], diagnostics }`. The body is `application/json`, see [Changes](#changes) |
 | `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
 | `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
@@ -161,24 +160,25 @@ check 6 or a later numbered check, except where a line says so:
   the id is in it. Then `400` for a `path` that holds no expression place. It
   takes no lock, so it has no `503`.
 
-The `changes` route *(planned for M11)* uses checks 1 to 3 and 5. It then checks every change, and the first failure
-refuses the whole call:
+The `changes` route uses checks 1 to 3 and 5. It then checks every change, and the first failure
+refuses the whole call. The checks that need only the body come first, because the body says which change
+is a patch. They run in this order:
 
-- Check 6 is `404` when a patch names an unknown `id`.
-- Check 7 is `428` when a patch change has no `version`.
-- Check 8 is `400` for the rules of [Changes](#changes), such as a list that is
-  empty or longer than 20 changes, a change with both or neither of `create`
-  and `patch`, a delete, or the same `id` twice. It is also `400` for every
-  create and patch rule of check 8.
-- Check 9 is `409` when any version is stale, or when a patched resource is
-  gone under the lock.
-- Check 10 is `409` when any create's `id` or target file exists.
-
-`415` answers a body that is not `application/json`, just before the body is
-read. The lock's `503` falls where it does for the single routes: after the
-`400` for a body that cannot be read, a patch that is not valid RFC 6902 and a
-create without a valid `id`, `kind` or file name, and before the checks that
-need the folder under the lock.
+1. `415` for a body that is not `application/json`.
+2. `400` for the shape of the list: a body that is not a JSON object with only `changes`, a list that is
+   empty or longer than 20 changes, or a change that is not exactly `{ create }` or
+   `{ patch, id, version }`. A change with both or neither of `create` and `patch`, a delete, and a key
+   other than `create`, `patch`, `id` and `version` all fail here.
+3. `404` (check 6) when a patch names an unknown `id`.
+4. `428` (check 7) when a patch change has no `version`.
+5. `400` (check 8) for the content: a `version` that is not a string, a patch that is not valid RFC 6902,
+   a create that has no valid `id`, `kind` or file name, the same `id` twice, or two creates that give the
+   same file.
+6. `503` when the [write lock](#versions) cannot be taken.
+7. Under the lock, each change in list order, with the order of its single route. A patch is checked for a
+   resource that is gone, a patch that does not apply, a patch that changes `id` or `kind`, then the stale
+   version (check 9). A create is checked for an `id` that exists, then a target file that exists
+   (check 10). The first failure decides the answer.
 
 A write that cannot take the [write lock](#versions) answers `503`. It comes after the `400` for a body that
 cannot be read, a patch that is not valid RFC 6902 and a create that has no valid `id`, `kind` or file name. It comes
@@ -203,7 +203,7 @@ requests or releases exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics,
+from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Changes, Diagnostics,
 Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -216,7 +216,7 @@ Resource references, Text key references, Release history, Validate, Publish, Pr
 | Delete | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
 | Resource references | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
 | Text key references | No session | No author role, or no `Studio:Folders` | Unknown application, or a key that no text resource defines and no label uses | Not used |
-| Changes *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or a patch that names an unknown resource | Any stale version, a patched resource that is gone, or a create whose `id` or target file already exists |
+| Changes | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or a patch that names an unknown resource | Any stale version, a patched resource that is gone, or a create whose `id` or target file already exists |
 | Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Names *(planned for M11)* | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Text write *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
@@ -365,7 +365,7 @@ types. The body is `{ resourceId, path, expression }`.
 
 ## Writes
 
-Writes are built for patches, creates and deletes.
+Writes are built for patches, creates, deletes and changes.
 
 - **Atomic.** A write goes to a hidden temporary file in the same folder and
   is then renamed over the target. A reader never sees half a file. A delete removes
@@ -422,7 +422,7 @@ Writes are built for patches, creates and deletes.
 
 ## Changes
 
-*(Planned for M11.)* The entity designer saves an entity and its migration in
+The entity designer saves an entity and its migration in
 one call, so the two files never split. See
 [D54](../decisions.md#d54-the-entity-designer-and-the-policy-matrix--agreed).
 
@@ -433,15 +433,16 @@ one call, so the two files never split. See
 ] }
 ```
 
-- A call holds 1 to 20 changes.
+- A call holds 1 to 20 changes. The body has no key but `changes`.
 - Each change has exactly one of `create` or `patch`. A `create` is a full
   resource, as for [Writes](#writes). A `patch` is an RFC 6902 list and goes
   with the `id` it patches.
-- There are no deletes.
+- There are no deletes. A key other than `create`, `patch`, `id` and
+  `version` is `400`, and a `create` change takes only `create`.
 - A patch change carries its `version`, the bare hex of [Versions](#versions).
   It has no `If-Match` header.
 - The same `id` twice is `400`. That includes a create of an `id` that
-  another change patches.
+  another change patches. Two creates that give the same file are `400` too.
 - One lock covers the folder. Every change is checked against the folder
   first. Then the files are written in list order, each one atomic as in
   [Writes](#writes).
