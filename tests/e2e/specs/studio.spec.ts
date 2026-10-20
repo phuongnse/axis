@@ -235,6 +235,75 @@ test('an author adds a department in the seed grid and the file holds only that 
   }
 })
 
+test('an author adds a connector operation in the connector editor and the file keeps the others', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const connector = items.find((item) => item.file === 'connectors/purchasing-system.json')!
+  const file = path.join(studioFolder, 'connectors/purchasing-system.json')
+  const original = await readFile(file, 'utf8')
+  const before = JSON.parse(original) as { operations: { name: string }[] }
+  const diagnosticsBefore = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+  const name = `ping${Date.now().toString(36)}`
+
+  try {
+    await page.goto(`/studio?app=PurchaseRequests&resource=${connector.id}`)
+    await expect(page.getByRole('textbox', { name: 'URL binding' })).toHaveValue('PurchasingSystemUrl')
+    await page.getByRole('button', { name: 'Add operation' }).click()
+    const added = before.operations.length
+    await page.getByTestId(`studio-field-/operations/${added}/name`).getByRole('textbox').fill(name)
+    await page.getByTestId(`studio-field-/operations/${added}/path`).getByRole('textbox').fill('/ping')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+
+    const diagnosticsAfter = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+    expect(diagnosticsAfter).toEqual(diagnosticsBefore)
+    const after = JSON.parse(await readFile(file, 'utf8')) as {
+      operations: Record<string, unknown>[]
+      baseUrl: unknown
+      auth: unknown
+    }
+    expect(after.operations).toHaveLength(added + 1)
+    expect(after.operations.slice(0, added)).toEqual(before.operations)
+    expect(after.operations[added]).toEqual({ name, method: 'POST', path: '/ping' })
+    expect(after.baseUrl).toEqual({ binding: 'PurchasingSystemUrl' })
+    expect(after.auth).toEqual({ type: 'bearer', token: { binding: 'PurchasingSystemToken' } })
+  } finally {
+    await writeFile(file, original)
+  }
+})
+
+test('an author edits an endpoint mapping row and the file holds only that expression changed', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const endpoint = items.find((item) => item.file === 'endpoints/submit-purchase-request.json')!
+  const file = path.join(studioFolder, 'endpoints/submit-purchase-request.json')
+  const original = await readFile(file, 'utf8')
+  const before = JSON.parse(original) as { values: Record<string, string> }
+  const diagnosticsBefore = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+
+  try {
+    await page.goto(`/studio?app=PurchaseRequests&resource=${endpoint.id}`)
+    const row = page.getByTestId('studio-field-/values/title')
+    const expression = row.getByRole('textbox')
+    await expect(expression).toBeVisible()
+    await expression.click()
+    await page.keyboard.press('ControlOrMeta+A')
+    await page.keyboard.type('trim(title)')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+
+    const diagnosticsAfter = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+    expect(diagnosticsAfter).toEqual(diagnosticsBefore)
+    const after = JSON.parse(await readFile(file, 'utf8')) as typeof before
+    expect(after.values).toEqual({ ...before.values, title: 'trim(title)' })
+    expect(Object.keys(after.values)).toEqual(Object.keys(before.values))
+  } finally {
+    await writeFile(file, original)
+  }
+})
+
 test('someone without the author role sees no Studio link and a forbidden page', async ({ page }) => {
   await useSession(page, 'anna')
 

@@ -932,7 +932,8 @@ reconnect message are built.
     JSON view as the second view of the same draft. The typed editor saves
     through the same JSON Patch, with the same `If-Match` rules. It never drops
     a value it does not show, so unknown keys stay as they are. See
-    **Editors by kind** below. Only the seed editor is built so far.
+    **Editors by kind** below. The seed editor, the connector editor and the
+    endpoint mapping rows are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1162,9 +1163,9 @@ reconnect message are built.
   - A save writes one file, with the single-file routes.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
-  designer for `entity`, and the generic form for the rest. The seed editor is
-  built. The other typed editors and the entity designer are *(planned for
-  M11)*, and until they are built those kinds use the generic form. The last
+  designer for `entity`, and the generic form for the rest. The seed editor,
+  the connector editor and the endpoint mapping rows are built. The other typed
+  editors and the entity designer are *(planned for M11)*, and until they are built those kinds use the generic form. The last
   column lists what still needs the JSON view, because the form cannot show it.
 
   | Kind          | Editor                                | Still needs the JSON view                                             |
@@ -1204,10 +1205,25 @@ reconnect message are built.
     `fields` show as rows of target and expression. A transition, `next`, a
     branch's `next`, `otherwise` or an outcome's `next`, picks its target from
     the process's steps.
-  - **Connector editor.** The `baseUrl` and auth secret bindings are picked by
-    name. No value of a binding is shown or stored. It also shows `timeout`,
-    `idempotency`, and the operations as a list, each with its method, path,
-    input and output fields, and `lookup`.
+  - **Connector editor** *(built)*. The Form tab shows the base URL binding,
+    the auth type with its secret binding, `timeout`, `idempotency`, and the
+    operations as a list. The JSON view stays as a second view of the same
+    draft.
+    - **Bindings.** A binding is a name box, labelled as a URL or a secret
+      binding. It is not a pick from a list, because no route lists a tenant's
+      binding names. No value of a binding is shown or stored: the editor
+      reads and writes only the resource and schema routes, and the values stay
+      in tenant settings.
+    - **Auth.** Choosing a type removes the keys the new type forbids, such as
+      `token` for `header`, and adds the keys it requires, with an empty name.
+      Clearing the type removes `auth`.
+    - **Operations.** A card per operation shows its name, method, path and
+      `lookup`, which is picked from the connector's other operations. Its
+      input and output fields are rows of name, type and required. Operations
+      and rows can be added and removed. A `GET` with input rows keeps them and
+      shows a hint, and the compiler reports the error.
+    - **Unknown keys.** A key the editor does not show, in the file, in an
+      operation or in `auth`, is saved unchanged.
   - **Scenario editor.** The users with their roles, then the steps as a list,
     with a panel per step type.
   - **Seed editor** *(built)*. The Form tab shows the seed's name, entity and
@@ -1236,8 +1252,13 @@ reconnect message are built.
       module entity or a typo, the seed uses the generic form and the JSON view.
   - **Text editor.** One table of keys with a column per locale, and a search
     box. Adding a key adds it to every locale's `text` resource.
-  - **Endpoint `values`.** Rows of field and expression, as for process
-    mappings.
+  - **Endpoint `values`** *(built)*. The endpoint keeps the generic form for
+    its entity, process, input and output. Its `values` show as rows of a field
+    and an expression in the expression editor. The field is picked from the
+    fields of the endpoint's entity, found by name among the application's
+    names, and is typed while those are unknown. **Add mapping** lists the
+    fields that have no row. Renaming a row's field keeps its place in the
+    file, and a value that is not an object is left to the JSON view.
   - **Page editor and M12.** M12 adds layouts and widgets while this editor is
     built, see
     [D46](../decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).

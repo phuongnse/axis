@@ -3090,7 +3090,8 @@ costs:
 
 M11 gives Studio typed editors for pages, process steps and connectors, and
 for the kinds that need JSON today. It also adds a read-only process graph. The
-seed grid is built. The rest is _(planned for M11)_. See the
+seed grid, the connector editor and the endpoint mapping rows are built. The
+rest is _(planned for M11)_. See the
 [Studio section](reference/frontend.md#studio) for the detail. The owner
 confirmed these points on issue #780 on 2026-10-20.
 
@@ -3122,7 +3123,7 @@ confirmed these points on issue #780 on 2026-10-20.
   - Each transition, `next`, a branch, `otherwise` or an outcome, picks its
     target from the process's steps.
 - **Connector editor:**
-  - The base URL binding and the auth secret binding are picked by name. No
+  - The base URL binding and the auth secret binding are set by name, in a name box. No
     value of a binding is shown or stored, as today.
   - The timeout and the idempotency header.
   - The operations as a list, each with its method, path, input and output
