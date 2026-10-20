@@ -9,7 +9,7 @@ using Npgsql;
 
 namespace Axis.Integration.Tests;
 
-public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
+public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private const string UrlBinding = "PurchasingSystemUrl";
     private const string SecretBinding = "PurchasingSystemToken";
@@ -24,6 +24,30 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
     private static readonly TimeSpan _limit = TimeSpan.FromSeconds(180);
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    // A database that an earlier test left behind must not fail this test, so each test starts from none.
+    public async ValueTask InitializeAsync()
+    {
+        await using var connection = new NpgsqlConnection(await PostgreSqlServer.AdminConnectionStringAsync());
+        await connection.OpenAsync(CancellationToken);
+        var names = new List<string>();
+        await using (var list = new NpgsqlCommand("SELECT d.datname FROM pg_database d JOIN pg_roles r ON r.oid = d.datdba WHERE r.rolname = 'axis_scenario'", connection))
+        await using (var reader = await list.ExecuteReaderAsync(CancellationToken))
+        {
+            while (await reader.ReadAsync(CancellationToken))
+            {
+                names.Add(reader.GetString(0));
+            }
+        }
+
+        foreach (var name in names)
+        {
+            await using var drop = new NpgsqlCommand($"""DROP DATABASE IF EXISTS "{name}" WITH (FORCE)""", connection);
+            await drop.ExecuteNonQueryAsync(CancellationToken);
+        }
+    }
 
     [Fact]
     public async Task A_test_request_of_the_purchase_request_sample_passes_every_scenario_and_leaves_no_database()

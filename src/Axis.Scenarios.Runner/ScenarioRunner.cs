@@ -144,7 +144,7 @@ public static class ScenarioRunner
         {
             try
             {
-                await ExecuteAsync(serverConnectionString, $"""DROP DATABASE IF EXISTS "{database}" WITH (FORCE)""", CancellationToken.None);
+                await DropAsync(serverConnectionString, database);
             }
             catch (Exception exception)
             {
@@ -165,6 +165,26 @@ public static class ScenarioRunner
 
     private static string FormatNow(DateTimeOffset now) =>
         now.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", CultureInfo.InvariantCulture);
+
+    // A role that only has CREATEDB cannot use WITH (FORCE) while a superuser's process, such as an autovacuum worker, is in the database.
+    // A plain drop cancels autovacuum and waits for sessions that are closing, so it is tried first and retried. The last try forces it.
+    private static async Task DropAsync(string serverConnectionString, string database)
+    {
+        const int attempts = 5;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                var force = attempt == attempts ? " WITH (FORCE)" : "";
+                await ExecuteAsync(serverConnectionString, $"""DROP DATABASE IF EXISTS "{database}"{force}""", CancellationToken.None);
+                return;
+            }
+            catch (PostgresException) when (attempt < attempts)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(500 * attempt), CancellationToken.None);
+            }
+        }
+    }
 
     // CREATE DATABASE and DROP DATABASE cannot run in a transaction block, so each is its own command.
     private static async Task ExecuteAsync(string connectionString, string sql, CancellationToken cancellationToken)
