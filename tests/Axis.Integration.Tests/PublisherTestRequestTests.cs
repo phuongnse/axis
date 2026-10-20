@@ -9,6 +9,7 @@ using Npgsql;
 
 namespace Axis.Integration.Tests;
 
+[Collection("Test scenario runs")]
 public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private const string UrlBinding = "PurchasingSystemUrl";
@@ -298,7 +299,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         Assert.Equal(0L, await ScenarioDatabasesAsync());
     }
 
-    private static async Task<string> CreateTenantAsync(AdminScenario scenario)
+    internal static async Task<string> CreateTenantAsync(AdminScenario scenario)
     {
         var tenant = scenario.NewTenantId();
         Assert.Equal(0, (await scenario.CreateAsync(tenant, $"{tenant}.example.test")).Exit);
