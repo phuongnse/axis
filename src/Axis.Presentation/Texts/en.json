@@ -167,5 +167,18 @@
   "shell.studio.deleteConfirm": "Delete this resource?",
   "shell.studio.deleteUsedBy": "References that point at this resource, which will break:",
   "shell.studio.deleteFailed": "The resource could not be deleted.",
-  "shell.studio.reconnecting": "The server is restarting. Reconnecting…"
+  "shell.studio.reconnecting": "The server is restarting. Reconnecting…",
+  "shell.studio.validate": "Validate",
+  "shell.studio.publish": "Publish",
+  "shell.studio.publish.title": "Publish this application",
+  "shell.studio.publish.label": "Label (optional)",
+  "shell.studio.publish.note": "Note (optional)",
+  "shell.studio.publish.confirm": "Publish",
+  "shell.studio.request.queued": "Queued. Waiting for the publisher…",
+  "shell.studio.request.running": "Running…",
+  "shell.studio.request.validated": "Validated. The application has no errors.",
+  "shell.studio.request.published": "Published. Release number:",
+  "shell.studio.request.validateFailed": "Validation failed. See the diagnostics.",
+  "shell.studio.request.publishFailed": "Publish failed. See the diagnostics.",
+  "shell.studio.request.sendFailed": "The request could not be sent or checked."
 }

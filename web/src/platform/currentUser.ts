@@ -7,6 +7,8 @@ export interface CurrentUser {
   roles: string[]
   /** Whether the user may use Studio: it is on and the user holds the author role. */
   studio: boolean
+  /** Whether the user may publish from Studio: the author and publisher roles, and Studio has folders. */
+  studioPublisher: boolean
 }
 
 /**

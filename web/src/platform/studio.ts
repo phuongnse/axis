@@ -254,6 +254,89 @@ export async function deleteStudioResource(application: string, id: string, vers
   return { status: 'deleted', diagnostics: body.diagnostics }
 }
 
+/** The status of a publish request. `succeeded` and `failed` are final. */
+export type StudioRequestStatus = 'queued' | 'running' | 'succeeded' | 'failed'
+
+/** A request, as `GET /api/studio/apps/{application}/requests/{id}` answers. The diagnostics are empty until it ends. */
+export interface StudioRequest {
+  id: string
+  application: string
+  kind: 'validate' | 'publish' | 'rollback'
+  target: string
+  status: StudioRequestStatus
+  label: string | null
+  note: string | null
+  releaseId: string | null
+  diagnostics: StudioDiagnostic[]
+}
+
+/** The release history of `GET /api/studio/apps/{application}/releases`, reduced to what Studio reads. */
+export interface StudioReleases {
+  active: { releaseId: string; number: number } | null
+  items: { releaseId: string; number: number }[]
+}
+
+/** The optional label and note of a publish. */
+export interface PublishDetails {
+  label?: string
+  note?: string
+}
+
+/** Sends a validate request. It answers at once with the queued request. A 401 starts sign-in and throws, as any other failure does. */
+export async function validateStudioApp(application: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/validate`
+  const response = await studioFetch(path, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
+/** Sends a publish request. Empty strings are left out of the body. A 401 starts sign-in and throws, as any other failure does. */
+export async function publishStudioApp(application: string, details: PublishDetails = {}): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/publish`
+  const body: PublishDetails = {}
+  if (details.label) {
+    body.label = details.label
+  }
+  if (details.note) {
+    body.note = details.note
+  }
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
+/** Loads a request with its status and diagnostics. A 401 starts sign-in and throws, as any other failure does. */
+export async function fetchStudioRequest(
+  application: string,
+  id: string,
+  signal?: AbortSignal,
+): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/requests/${encodeURIComponent(id)}`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
+/** Loads the release history of an application. A 401 starts sign-in and throws, as any other failure does. */
+export async function fetchStudioReleases(application: string, signal?: AbortSignal): Promise<StudioReleases> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/releases`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioReleases
+}
+
 /** The resources whose name or id contains `search`, ignoring letter case and surrounding spaces. An empty search keeps all. */
 export function filterResources(items: StudioResourceItem[], search: string): StudioResourceItem[] {
   const needle = search.trim().toLowerCase()

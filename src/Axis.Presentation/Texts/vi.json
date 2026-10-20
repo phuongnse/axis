@@ -167,5 +167,18 @@
   "shell.studio.deleteConfirm": "Xóa tài nguyên này?",
   "shell.studio.deleteUsedBy": "Các tham chiếu trỏ đến tài nguyên này, sẽ bị lỗi:",
   "shell.studio.deleteFailed": "Không thể xóa tài nguyên.",
-  "shell.studio.reconnecting": "Máy chủ đang khởi động lại. Đang kết nối lại…"
+  "shell.studio.reconnecting": "Máy chủ đang khởi động lại. Đang kết nối lại…",
+  "shell.studio.validate": "Kiểm tra",
+  "shell.studio.publish": "Xuất bản",
+  "shell.studio.publish.title": "Xuất bản ứng dụng này",
+  "shell.studio.publish.label": "Nhãn (tùy chọn)",
+  "shell.studio.publish.note": "Ghi chú (tùy chọn)",
+  "shell.studio.publish.confirm": "Xuất bản",
+  "shell.studio.request.queued": "Đang chờ. Đang đợi trình xuất bản…",
+  "shell.studio.request.running": "Đang chạy…",
+  "shell.studio.request.validated": "Đã kiểm tra. Ứng dụng không có lỗi.",
+  "shell.studio.request.published": "Đã xuất bản. Số phiên bản:",
+  "shell.studio.request.validateFailed": "Kiểm tra thất bại. Xem các chẩn đoán.",
+  "shell.studio.request.publishFailed": "Xuất bản thất bại. Xem các chẩn đoán.",
+  "shell.studio.request.sendFailed": "Không thể gửi hoặc kiểm tra yêu cầu."
 }

@@ -1,7 +1,7 @@
 import { cp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
-import { activateFolder } from '../activate'
+import { activateFolder, startServer } from '../activate'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
@@ -30,6 +30,52 @@ async function releaseB(testInfo: TestInfo) {
   textsJson.texts['purchaseRequest.sections.decision'] = 'Your decision'
   await writeFile(texts, JSON.stringify(textsJson, null, 2) + '\n')
   return folder
+}
+
+/**
+ * Starts a second server whose Studio edits a fresh copy of the purchase request sample, and returns it with the
+ * copy's folder. The server activates the committed sample when it starts, which also resets the live release.
+ * Publishing from it changes the live sample for the whole run, so the journeys that use it sit in the serial
+ * group below.
+ */
+async function studioServer(testInfo: TestInfo) {
+  const folder = testInfo.outputPath('studio-publish')
+  await rm(folder, { recursive: true, force: true })
+  await cp(purchaseRequests, folder, { recursive: true })
+  const server = await startServer({ Studio__Folders__0: folder })
+  return { server, folder }
+}
+
+/**
+ * Edits the JSON of the resource in `file` through Studio's JSON view and saves it. `change` edits the content
+ * as it is in the copy `folder`.
+ */
+async function editInStudio(
+  page: Page,
+  serverUrl: string,
+  folder: string,
+  file: string,
+  change: (content: Record<string, any>) => void,
+) {
+  const list = await page.request.get(`${serverUrl}/api/studio/apps/PurchaseRequests/resources`)
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const resource = items.find((item) => item.file === file)!
+  const content = JSON.parse(await readFile(path.join(folder, file), 'utf8'))
+  change(content)
+
+  await page.goto(`${serverUrl}/studio?app=PurchaseRequests&resource=${resource.id}`)
+  await page.getByRole('tab', { name: 'JSON' }).click()
+  await page.getByRole('textbox', { name: 'JSON' }).fill(JSON.stringify(content, null, 2))
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByTestId('studio-saved')).toBeVisible()
+}
+
+/** Clicks Publish, fills the dialog's label and confirms. */
+async function publishWithLabel(page: Page, label: string) {
+  await page.getByRole('button', { name: 'Publish' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('textbox', { name: 'Label (optional)' }).fill(label)
+  await dialog.getByRole('button', { name: 'Publish' }).click()
 }
 
 /**
@@ -95,5 +141,62 @@ test.describe('the active release of the purchase request sample changes', () =>
     await useSession(page, 'dung')
     await decide(page, title, 'Finance approval', 'Approve')
     await expectStatus(page, id, 'approved')
+  })
+
+  test('an author publishes from Studio and the site shows the new release', async ({ page }, testInfo) => {
+    test.setTimeout(240_000)
+    const { server, folder } = await studioServer(testInfo)
+    const heading = `Name ${Date.now().toString(36)}`
+    try {
+      await useSession(page, 'hoa')
+      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
+        expect(content.texts['supplier.name']).toBe('Name')
+        content.texts['supplier.name'] = heading
+      })
+
+      await publishWithLabel(page, 'Supplier heading')
+
+      await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
+        timeout: 60_000,
+      })
+      await expect(page.getByTestId('studio-release-number')).toBeVisible()
+      await useSession(page, 'anna')
+      await page.goto('/purchasing/suppliers')
+      await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('a publish with a missing binding fails with its diagnostic and the site stays as it was', async (
+    { page },
+    testInfo,
+  ) => {
+    test.setTimeout(240_000)
+    const { server, folder } = await studioServer(testInfo)
+    const heading = `Name ${Date.now().toString(36)}`
+    try {
+      await useSession(page, 'hoa')
+      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
+        content.texts['supplier.name'] = heading
+      })
+      await editInStudio(page, server.url, folder, 'connectors/purchasing-system.json', (content) => {
+        content.baseUrl.binding = 'NoSuchBinding'
+      })
+
+      await publishWithLabel(page, 'Missing binding')
+
+      await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed', {
+        timeout: 60_000,
+      })
+      await expect(page.getByTestId('studio-release-number')).toHaveCount(0)
+      await expect(page.getByTestId('studio-diagnostics')).toContainText('AXC0100')
+      await useSession(page, 'anna')
+      await page.goto('/purchasing/suppliers')
+      await expect(page.getByRole('columnheader', { name: 'Name', exact: true })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: heading })).toHaveCount(0)
+    } finally {
+      await server.stop()
+    }
   })
 })

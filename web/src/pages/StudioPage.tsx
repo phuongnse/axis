@@ -1,6 +1,7 @@
 import { Alert, Button, Descriptions, Flex, Input, Result, Select, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
 import {
   fetchStudioApps,
@@ -18,6 +19,7 @@ import {
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
+import { StudioPublishing } from './StudioPublishing'
 import { StudioReferences } from './StudioReferences'
 
 /** The applications Studio may edit, or why they could not be listed. */
@@ -37,7 +39,8 @@ type FolderState =
  * as a Used by entry does. A selected resource opens in an editor below its details, with its Uses and Used by
  * lists under the editor. A Used by entry opens its resource at the path of the reference, as `&path=`. After a
  * save, the diagnostics panel shows the diagnostics that the save answered. After a delete, the resource leaves the
- * list. When the server does not answer, a reconnect message shows at the top. Studio checks the server with a
+ * list. Validate and Publish sit under the application picker, and Publish shows only when `GET /api/me` answers
+ * `studioPublisher: true`. The diagnostics panel shows the diagnostics of a request that ended. When the server does not answer, a reconnect message shows at the top. Studio checks the server with a
  * back-off, then loads its data again, and an unsaved draft stays on screen.
  */
 export function StudioPage() {
@@ -80,6 +83,20 @@ function StudioWorkspace() {
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
   const [search, setSearch] = useState('')
+  const [canPublish, setCanPublish] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchCurrentUser(controller.signal).then(
+      (user) => setCanPublish(user?.studioPublisher === true),
+      () => {
+        if (!controller.signal.aborted) {
+          setCanPublish(false)
+        }
+      },
+    )
+    return () => controller.abort()
+  }, [generation])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -180,6 +197,20 @@ function StudioWorkspace() {
         options={apps.map((app) => ({ value: app.name, label: app.name }))}
         onChange={pickApplication}
       />
+      {application !== null && loaded && 'resources' in loaded && (
+        <StudioPublishing
+          key={application}
+          application={application}
+          canPublish={canPublish}
+          onDiagnostics={(diagnostics) =>
+            setFolder((current) =>
+              current && current.application === application && 'resources' in current
+                ? { ...current, diagnostics }
+                : current,
+            )
+          }
+        />
+      )}
       {application !== null && loaded && 'failed' in loaded && (
         <Alert data-testid="studio-load-error" type="error" message={t('shell.studio.loadFailed')} />
       )}

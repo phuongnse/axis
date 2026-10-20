@@ -142,3 +142,18 @@ test('someone without the author role sees no Studio link and a forbidden page',
 
   await expect(page.getByTestId('studio-forbidden')).toBeVisible()
 })
+
+test('an author without the publisher role sees Validate and no Publish', async ({ page }) => {
+  // A second server whose publisher role nobody holds, so hoa is an author but not a publisher.
+  const server = await startServer({ ActivateOnStartup__0: e2eApp, Studio__PublisherRole: 'release-manager' })
+  try {
+    await useSession(page, 'hoa')
+
+    await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+
+    await expect(page.getByRole('button', { name: 'Validate' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Publish' })).toHaveCount(0)
+  } finally {
+    await server.stop()
+  }
+})
