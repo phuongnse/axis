@@ -137,6 +137,8 @@ COPY --from=build /app .
 COPY --from=build /src/artifacts/extensions /extensions
 COPY samples/modules/departments/ /modules/departments/1.0.0/
 COPY samples/ /samples/
+# The sample templates will be copied here, so the folder exists even before there is one.
+RUN mkdir /templates
 USER $APP_UID
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Axis.Server.dll"]

@@ -24,6 +24,7 @@ export const smokeSuites = {
     'samples/modules/',
     'samples/packages/',
     'samples/postgres/',
+    'samples/templates/',
     'src/Axis.Server/appsettings.Development.json',
     'src/Axis.Server/Properties/',
     'src/Axis.Worker/Axis.Worker.csproj',

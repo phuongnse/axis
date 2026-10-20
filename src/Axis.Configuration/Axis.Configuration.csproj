@@ -24,6 +24,7 @@
     <EmbeddedResource Include="Schemas\*.schema.json" LogicalName="Axis.Configuration.Schemas.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Packages\axis-package.schema.json" LogicalName="Axis.Configuration.Packages.axis-package.schema.json" />
     <EmbeddedResource Include="Modules\module.schema.json" LogicalName="Axis.Configuration.Modules.module.schema.json" />
+    <EmbeddedResource Include="Templates\template.schema.json" LogicalName="Axis.Configuration.Templates.template.schema.json" />
   </ItemGroup>
 
 </Project>
