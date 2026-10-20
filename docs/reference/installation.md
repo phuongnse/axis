@@ -288,7 +288,7 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `image.pullPolicy` | `IfNotPresent` | Pull policy. |
 | `image.pullSecrets` | none | Names of image pull Secrets. |
 | `server.repository`, `worker.repository`, `migrate.repository` | `axis-server`, `axis-worker`, `axis-admin` | Repository of each image. `migrate.repository` is also the publisher's image. |
-| `server.replicas` | 1 | Server replicas. *(planned for M10)* Any number works once the key ring is shared, see [several server replicas](#several-server-replicas). |
+| `server.replicas` | 1 | Server replicas. The key ring is shared, so sessions work on every replica. With Studio on, keep 1 *(planned for M10)* until the Studio lock is built, see [several server replicas](#several-server-replicas). |
 | `worker.replicas` | 1 | Worker replicas. |
 | `studio.persistence` | none | *(planned for M10)* A Kubernetes volume source for the Studio folders, mounted on every server replica at the same path. Use it when Studio is on. It needs a `ReadWriteMany` storage class. |
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
@@ -325,17 +325,22 @@ against a live cluster.
 
 ## Several server replicas
 
-*(planned for M10)* The server can run as several replicas behind a reverse
-proxy that ends TLS. See
-[D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
-The forwarded headers and the platform settings under both tenant sources are
-built. The rest is planned.
+The server can run as several replicas behind a reverse proxy that ends TLS.
+See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+The shared key ring, the forwarded headers and the platform settings under both
+tenant sources are built. The Studio write lock, `studio.persistence`, the
+Compose example with two replicas and its smoke test are *(planned for M10)*.
 
 - **A shared key ring.** The server keeps its data protection keys in the
   platform database, encrypted with `Platform:SecretKey`. See
   [platform database](storage.md#platform-database). Sessions survive a
   restart and work on every replica. Every replica needs the same
-  `Platform:SecretKey`.
+  `Platform:SecretKey`. A replica with another one fails to start, and the
+  error names the setting. The server sets the data protection application name
+  to `Axis`, so replicas installed at different paths share the keys. Changing
+  `Platform:SecretKey` on an installation that holds keys means deleting the
+  rows of `platform.data_protection_keys` by hand, which signs everyone out.
+  The first start after this change also signs everyone out once.
 - **Forwarded headers.** Behind a proxy that ends TLS, the server sees plain
   HTTP. Name your proxies so the server can read the real scheme and host:
 
@@ -350,11 +355,11 @@ built. The rest is planned.
   hop, and never reads `X-Forwarded-Prefix`. With both settings empty, it
   reads none. Loopback is not trusted by default. The rules are in
   [forwarded headers](configuration.md#forwarded-headers).
-- **Studio folders.** Put them on a shared volume. Mount it at the same path on
+- **Studio folders.** *(planned for M10)* Put them on a shared volume. Mount it at the same path on
   every replica, because the write lock is keyed by the folder path. In
   Kubernetes that needs a `ReadWriteMany` storage class, set with
   `studio.persistence`. See [Studio](configuration.md#studio).
-- **On premises.** The Compose example runs two server replicas behind a TLS
+- **On premises.** *(planned for M10)* The Compose example runs two server replicas behind a TLS
   proxy.
 - **Platform settings under both tenant sources.** The server needs
   `ConnectionStrings:PlatformSchema` and `Platform:SecretKey` also under

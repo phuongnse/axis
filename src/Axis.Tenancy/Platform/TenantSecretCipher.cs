@@ -61,6 +61,29 @@ public sealed class TenantSecretCipher
         ArgumentException.ThrowIfNullOrEmpty(field);
         ArgumentNullException.ThrowIfNull(plainText);
 
+        return EncryptBound(tenantId, field, plainText);
+    }
+
+    /// <summary>
+    /// Encrypts the XML of a data protection key. The associated data has an empty tenant id, so a key never
+    /// decrypts as a tenant field.
+    /// </summary>
+    public byte[] EncryptDataProtectionKey(Guid id, string xml)
+    {
+        ArgumentNullException.ThrowIfNull(xml);
+        return EncryptBound("", TenantSecretFields.DataProtectionKey(id), xml);
+    }
+
+    /// <summary>Decrypts the stored XML of a data protection key.</summary>
+    /// <exception cref="InvalidOperationException">The value does not decrypt for this key id and installation key.</exception>
+    public SecretValue DecryptDataProtectionKey(Guid id, byte[] stored)
+    {
+        ArgumentNullException.ThrowIfNull(stored);
+        return DecryptBound("", TenantSecretFields.DataProtectionKey(id), stored, $"The data protection key '{id}' does not decrypt with {KeySetting}.");
+    }
+
+    private byte[] EncryptBound(string tenantId, string field, string plainText)
+    {
         var plain = Encoding.UTF8.GetBytes(plainText);
         var stored = new byte[NonceSize + plain.Length + TagSize];
         var nonce = stored.AsSpan(0, NonceSize);
@@ -81,9 +104,14 @@ public sealed class TenantSecretCipher
         ArgumentException.ThrowIfNullOrEmpty(field);
         ArgumentNullException.ThrowIfNull(stored);
 
+        return DecryptBound(tenantId, field, stored, $"The {field} of tenant '{tenantId}' does not decrypt with {KeySetting}.");
+    }
+
+    private SecretValue DecryptBound(string tenantId, string field, byte[] stored, string failureMessage)
+    {
         if (stored.Length < NonceSize + TagSize)
         {
-            throw DecryptionFailed(tenantId, field, inner: null);
+            throw new InvalidOperationException(failureMessage);
         }
 
         var cipherLength = stored.Length - NonceSize - TagSize;
@@ -100,7 +128,7 @@ public sealed class TenantSecretCipher
         }
         catch (CryptographicException exception)
         {
-            throw DecryptionFailed(tenantId, field, exception);
+            throw new InvalidOperationException(failureMessage, exception);
         }
 
         return new SecretValue(Encoding.UTF8.GetString(plain));
@@ -115,7 +143,4 @@ public sealed class TenantSecretCipher
         name.CopyTo(data, tenant.Length + 1);
         return data;
     }
-
-    private static InvalidOperationException DecryptionFailed(string tenantId, string field, Exception? inner) =>
-        new($"The {field} of tenant '{tenantId}' does not decrypt with {KeySetting}.", inner);
 }

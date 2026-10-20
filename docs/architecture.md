@@ -307,7 +307,8 @@ the refresh in its polling loop, between work items.
   [tenancy settings](reference/configuration.md#tenancy-settings). A changed
   host, database setting or OIDC setting applies at the next refresh.
 - **Read only.** The hosts read the directory over a database role that may
-  only read the `platform` schema. [`Axis.Admin`](reference/administration.md)
+  read the `platform` schema, and the server may also insert its data
+  protection keys. [`Axis.Admin`](reference/administration.md)
   writes it, see
   [D43](decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed).
 
@@ -544,9 +545,12 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     Secure flag use the forwarded scheme and host. See
     [D49](decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed) and the
     [forwarded headers settings](reference/configuration.md#forwarded-headers).
-  - *(planned for M10)* The cookie is protected with a key ring that every
-    server replica shares. The keys are in the platform database, so a session
-    survives a restart and works on every replica.
+  - The cookie is protected with a key ring that every server replica shares.
+    The keys are in `platform.data_protection_keys`, encrypted with
+    `Platform:SecretKey`, so a session survives a restart and works on every
+    replica. The server fixes the data protection application name to `Axis`,
+    so replicas at different paths read the same keys. A key that does not
+    decrypt stops the start.
 - **Tenant binding.** A session whose tenant id differs from the tenant
   [resolved from the host](#request-resolution) counts as no session. So a
   cookie taken to another tenant's host signs nobody in there.

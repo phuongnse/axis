@@ -1131,8 +1131,8 @@ read when a refresh fails, and `/health/ready` is Degraded until a refresh works
 | --- | --- | --- |
 | `Tenancy:Source` | `configuration` | `configuration` reads the `Tenants` section. `directory` reads the tenants from the platform database and ignores a `Tenants` section, with a warning at start. |
 | `Tenancy:RefreshInterval` | `00:00:30` | How often the server and the worker read the tenant directory again. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, naming the setting. |
-| `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, and by the worker and `Axis.Admin` under `directory`. A missing or invalid key stops the start. *(planned for M10)* The server will also use it under `configuration`, to encrypt the data protection keys. |
-| `ConnectionStrings:Platform` | none | A role that may only read the `platform` schema. Both hosts need it under `directory`. |
+| `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, and by the worker and `Axis.Admin` under `directory`. A missing or invalid key stops the start. The server also uses it under both sources, to encrypt the data protection keys, and a stored key that does not decrypt stops the start. |
+| `ConnectionStrings:Platform` | none | A role that may only read the `platform` schema, and insert rows into `platform.data_protection_keys`. Both hosts need it under `directory`. |
 | `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations, under both sources. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. |
 
 As environment variables they are `Tenancy__Source`,
@@ -1160,13 +1160,15 @@ As environment variables they are `Tenancy__Source`,
   missing or invalid `Platform:SecretKey`, and a `ConnectionStrings:Platform`
   that names no user or the same user as `ConnectionStrings:PlatformSchema`.
   Under `configuration` the platform migrations run as the first hosted
-  service, before startup activation, and nothing reads a platform table yet.
+  service, before startup activation. Right after them, the server decrypts the
+  stored data protection keys, and a key that does not decrypt stops the start
+  with an error that names `Platform:SecretKey`.
   A platform database that cannot be reached at start stops the server. The
   development settings, Docker Compose, `scripts/dev.sh` and the E2E server
   give the server `ConnectionStrings:PlatformSchema` on the `axis_schema` role
   and a committed development `Platform:SecretKey`. The worker gets neither.
-  The data protection keys that will use the platform tables and the key are
-  *(planned for M10)*. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+  The server keeps its data protection keys in the platform table, encrypted
+  with the key. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **`ActivateOnStartup`.** It must be empty under `directory`, see
   [startup activation](#startup-activation).
 
