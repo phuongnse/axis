@@ -86,6 +86,7 @@ internal static class RuleChecker
             }
             else
             {
+                references?.RecordExpression(rule, "/expression", null, parsed.Diagnostic);
                 Report(parsed.Diagnostic.Code, parsed.Diagnostic.Message, "/expression");
             }
         }
@@ -327,6 +328,7 @@ internal static class RuleChecker
             }
 
             var check = ExpressionTypeChecker.Check(body, new ExpressionScope(parameters, built.Values.Concat(moduleRules), modules: modules), rule.ResultType);
+            references?.RecordExpression(resource, "/expression", check.Type, check.Diagnostic);
             if (!check.Succeeded)
             {
                 diagnostics.Add(new Diagnostic(check.Diagnostic.Code, check.Diagnostic.Message, resource.File, "/expression", resource.Id));

@@ -307,6 +307,7 @@ internal static class PolicyChecker
                 references.AddRuleCalls(policy, $"{path}/filter", check);
             }
 
+            references.RecordExpression(policy, $"{path}/filter", check?.Type, problem);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, $"{path}/filter");

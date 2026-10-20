@@ -498,7 +498,8 @@ evaluation of a rule call always ends.
   is `AXC0053`, see [SQL subset](#sql-subset).
 - **Positions.** A diagnostic's offset is a zero-based index in UTF-16
   characters, the same as a C# string index. Messages show it one-based, as
-  "at character N".
+  "at character N". The [expression check](authoring.md#expression-check) route
+  turns the offset into a range, the token at that offset.
 
 Run-time limit:
 

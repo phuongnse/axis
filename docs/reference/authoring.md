@@ -8,8 +8,8 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The application list, resource list, read, patch, create, delete, diagnostics
-and references routes are built. It is
+in git. The application list, resource list, read, patch, create, delete, diagnostics,
+references and expression check routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
@@ -24,9 +24,10 @@ its own process, and
 A `changes` route that writes several files in one call is
 *(planned for M11)*, see [Changes](#changes).
 
-*(Planned for M11.)* Three more routes help Studio's pickers, label texts and
-expression editor: a [names](#names) route, a [text write](#text-writes) and an
-[expression check](#expression-check). They are agreed in
+The [expression check](#expression-check) route helps Studio's expression
+editor, and is built. *(Planned for M11.)* Two more routes help its pickers and
+label texts: a [names](#names) route and a [text write](#text-writes). They are
+agreed, with the expression check, in
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed).
 
 ## Settings
@@ -70,7 +71,7 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/diagnostics` | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200` |
 | `GET /api/studio/apps/{application}/names` *(planned for M11)* | `200` with the names the application defines, see [Names](#names) |
 | `PUT /api/studio/apps/{application}/texts/{key}` *(planned for M11)* | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes) |
-| `POST /api/studio/apps/{application}/expressions/check` *(planned for M11)* | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
+| `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
@@ -146,8 +147,8 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-*(Planned for M11.)* The three new routes use these checks. None of them has
-check 6 or a later numbered check, except where a line says so:
+The expression check and the two routes planned for M11 use these checks. None of
+them has check 6 or a later numbered check, except where a line says so:
 
 - **Names.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body.
 - **Text write.** Checks 1, 2, 3 and 5, then `415` for a body that is not
@@ -220,7 +221,7 @@ Resource references, Text key references, Release history, Validate, Publish, Pr
 | Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Names *(planned for M11)* | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Text write *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
-| Expression check *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or an unknown `resourceId` | Not used |
+| Expression check | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or an unknown `resourceId` | Not used |
 | Validate | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Publish | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Request status | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
@@ -236,10 +237,9 @@ a missing `If-Match`, as [Order of checks](#order-of-checks) says. `400` also an
 body, titled "The body is not a valid publish request." A successful `validate`, `publish` or `rollback`
 answers `202`, see [Publishing](#publishing). `415` answers a body of the wrong
 content type, just before the body is read. A create needs `application/json`
-and a patch needs `application/json-patch+json`. *(Planned for M11.)* A text write
-and an expression check need `application/json`. A text write answers `400` for a bad body, and also
-`503` when it cannot take the write lock. An expression check answers `400` for a bad body or a path with no
-expression place.
+and a patch needs `application/json-patch+json`. An expression check needs `application/json`. It answers
+`400` for a bad body or a path with no expression place. *(Planned for M11.)* A text write also needs
+`application/json`. It answers `400` for a bad body, and also `503` when it cannot take the write lock.
 
 ## References
 
@@ -340,26 +340,48 @@ at once, so a key is never in one locale only. The body is
 
 ## Expression check
 
-*(Planned for M11.)* `POST .../expressions/check` type-checks one expression
-without saving it, so Studio's expression editor can show errors as the author
-types. The body is `{ resourceId, path, expression }`.
+`POST .../expressions/check` checks one expression without saving it, so
+Studio's expression editor can show errors as the author types. The body is
+`{ resourceId, path, expression }`.
 
-- **The place.** The server resolves the expression's place from the saved
-  resource at `path`: the names in scope, the expected type, whether it is a
-  filter in the [SQL subset](expressions.md#sql-subset), and the policy-filter
-  rules. The body carries no draft content, so a place that the author has just
-  added and not saved is not found. A `path` with no expression place in the
-  saved resource is `400`.
+- **The place.** The server puts `expression` into a copy of the saved resource
+  at `path` and compiles the folder in memory. The compile checks the
+  expression where it stands, so the names in scope, the expected type, the
+  [SQL subset](expressions.md#sql-subset) and the policy-filter rules are the
+  compile's own, not a copy of them. The body carries no draft content, so a
+  place that the author has just added and not saved is not found.
+- **Where it works.** In every place the compile checks an expression: computed
+  fields, validations, rules, data source filters, process conditions and
+  values, policy filters, migration values, endpoint values and trigger
+  conditions.
+- **No expression place.** A `path` that does not point at a string in the saved
+  resource is `400`. So is a place where the compile checks no expression
+  because another problem in the resource skips the check, such as a process
+  step whose subject entity is unknown. A save shows no problem at such a place
+  either.
 - **The rules.** The scope, types, limits and codes are those of
   [expression diagnostics](expressions.md#diagnostics). An expression of more than
   2,000 characters answers `AXC0036` as a diagnostic, not `400`.
 - **The answer.** `{ type, diagnostics }`. `type` is the result type in the
-  notation of [Types](expressions.md#types), or null when it cannot be found.
+  notation of [Types](expressions.md#types): `text`, `integer`, `decimal`,
+  `boolean`, `date`, `date-time`, `enum`, `reference` or `null`. It is the
+  expression's own type, so a text literal is `text` even where an enum is
+  expected. `type` is null when there is a diagnostic, and when the compile
+  cannot find the type yet. A migration value whose type check waits for
+  activation is the second case.
 - **Diagnostics.** There is at most one, because the compile stops at the first
   problem. It is `{ code, message, start, end }`. `start` and `end` are offsets
   into the expression text after JSON decoding, in UTF-16 code units, and `end`
-  is exclusive. The compile reports only a character position today, so the
-  build issue adds the range.
+  is exclusive.
+- **The range.** The compile reports one character position, so the range is
+  the token at that position: a name, a literal or an operator. A qualified
+  call such as `departments:IsManager` is one range. A character that starts no
+  token covers that one character, and text that is never closed runs to the
+  end. `AXC0036` and `AXC0048` cover the whole expression. A limit that the
+  compile reports at the place but outside the expression check, such as a rule
+  cycle (`AXC0055`) or nesting that is too deep (`AXC0065`), is answered over the
+  whole expression. A range is narrower than the faulty subexpression: for
+  `a + 'x'` only the `+` is covered.
 - **Nothing is written.** It compiles in memory, takes no lock and touches no
   database.
 
