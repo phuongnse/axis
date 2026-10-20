@@ -47,6 +47,30 @@ public sealed class StudioWriteLockTests(PostgreSqlFixture database) : IClassFix
     }
 
     [Fact]
+    public async Task Two_changes_calls_with_the_same_patch_version_on_two_instances_give_one_200_and_one_409_and_the_loser_creates_no_file()
+    {
+        await using var replicas = await Replicas.StartAsync(database);
+        var path = Path.Combine(replicas.FolderA, EntityFile);
+        var version = Sha256(path);
+        var held = await HoldAsync(replicas.Platform, replicas.FolderA);
+
+        var first = ChangesAsync(replicas.First, "PurchaseRequests", EntityId, "number", version, "FirstPolicy");
+        var second = ChangesAsync(replicas.Second, "PurchaseRequests", EntityId, "requester", version, "SecondPolicy");
+        await WaitForWaitersAsync(replicas.Platform, 2);
+        await held.ReleaseAsync();
+        var responses = await Task.WhenAll(first, second);
+
+        Assert.Equal([HttpStatusCode.OK, HttpStatusCode.Conflict], responses.Select(response => response.StatusCode).Order());
+        var winnerIsFirst = responses[0].StatusCode == HttpStatusCode.OK;
+        Assert.True(File.Exists(Path.Combine(replicas.FolderA, "policies", winnerIsFirst ? "first-policy.json" : "second-policy.json")));
+        Assert.False(File.Exists(Path.Combine(replicas.FolderA, "policies", winnerIsFirst ? "second-policy.json" : "first-policy.json")));
+        Assert.Contains(
+            $"\"displayField\": \"{(winnerIsFirst ? "number" : "requester")}\"",
+            await File.ReadAllTextAsync(path, CancellationToken),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Two_deletes_with_the_same_version_on_two_instances_give_one_200_and_one_409_and_the_file_is_gone()
     {
         await using var replicas = await Replicas.StartAsync(database);
@@ -140,6 +164,24 @@ public sealed class StudioWriteLockTests(PostgreSqlFixture database) : IClassFix
         };
         request.Headers.Add("X-Axis-Csrf", "1");
         request.Headers.TryAddWithoutValidation("If-Match", $"\"{version}\"");
+        return await client.SendAsync(request, CancellationToken);
+    }
+
+    // A changes call: a create of a policy and a replace of one field, as two instances of the same server send them.
+    private static async Task<HttpResponseMessage> ChangesAsync(
+        HttpClient client, string application, string id, string displayField, string version, string policyName)
+    {
+        var body = $$$"""
+            {"changes":[
+              {"create":{"id":"{{{Guid.NewGuid()}}}","kind":"policy","name":"{{{policyName}}}"}},
+              {"patch":[{"op":"replace","path":"/displayField","value":"{{{displayField}}}"}],"id":"{{{id}}}","version":"{{{version}}}"}
+            ]}
+            """;
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/api/studio/apps/{application}/changes", UriKind.Relative))
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Add("X-Axis-Csrf", "1");
         return await client.SendAsync(request, CancellationToken);
     }
 

@@ -1,5 +1,6 @@
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Templates;
 using Axis.Data;
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
@@ -151,6 +152,7 @@ builder.Services.AddServerTelemetry(builder.Configuration);
 builder.Services.AddTenancy(tenants);
 builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment);
 builder.Services.AddModules(builder.Configuration, builder.Environment);
+builder.Services.AddTemplates(builder.Configuration, builder.Environment);
 
 // Fails startup when a tenant has no complete Oidc block. Only the server signs people in.
 var oidcTenants = new TenantSignInSettings(TenantOidcSettings.Load(tenants));

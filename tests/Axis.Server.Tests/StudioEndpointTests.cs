@@ -170,6 +170,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/releases")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
     [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
+    [InlineData("/api/studio/templates")]
     public async Task User_without_the_author_role_gets_403_and_no_session_gets_401(string url)
     {
         await using var factory = CreateFactory();
@@ -193,6 +194,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/releases")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
     [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
+    [InlineData("/api/studio/templates")]
     public async Task Studio_is_off_without_an_author_role_or_without_folders(string url)
     {
         foreach (var (folder, role) in new[] { (Folder, ""), ("", "author") })
@@ -819,6 +821,227 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         Assert.Equal(before, Snapshot());
     }
 
+    private const string DisplayFieldPatch = """[{"op":"replace","path":"/displayField","value":"number"}]""";
+
+    [Fact]
+    public async Task Changes_with_a_migration_create_and_an_entity_patch_writes_both_and_answers_each_version_in_request_order()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var migrationId = Guid.NewGuid();
+        var entityPath = Path.Combine(Folder, EntityFile);
+        var body = $$$"""
+            {"changes":[
+              {"create":{"id":"{{{migrationId}}}","kind":"migration","name":"PurchaseRequestChange20261020120000","entity":"PurchaseRequest","changes":[]}},
+              {"patch":{{{DisplayFieldPatch}}},"id":"{{{EntityId}}}","version":"{{{Sha256(entityPath)}}}"}
+            ]}
+            """;
+
+        var response = await Changes(client, body);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var migrationPath = Path.Combine(Folder, "migrations", "purchase-request-change20261020120000.json");
+        Assert.True(File.Exists(migrationPath));
+        using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var items = answer.RootElement.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal([migrationId.ToString("D"), EntityId], items.Select(item => item.GetProperty("id").GetString()));
+        Assert.Equal([Sha256(migrationPath), Sha256(entityPath)], items.Select(item => item.GetProperty("version").GetString()));
+        Assert.Equal(JsonValueKind.Array, answer.RootElement.GetProperty("diagnostics").ValueKind);
+        Assert.Contains("\"displayField\": \"number\"", await File.ReadAllTextAsync(entityPath, CancellationToken), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Changes_with_a_stale_second_patch_gets_409_and_writes_nothing()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = Snapshot();
+        var body = $$$"""
+            {"changes":[
+              {"patch":{{{DisplayFieldPatch}}},"id":"{{{EntityId}}}","version":"{{{Sha256(Path.Combine(Folder, EntityFile))}}}"},
+              {"patch":[],"id":"{{{IdOf("entities/department.json")}}}","version":"{{{new string('0', 64)}}}"},
+              {"create":{"id":"{{{Guid.NewGuid()}}}","kind":"policy","name":"Fresh"}}
+            ]}
+            """;
+
+        var response = await Changes(client, body);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Fact]
+    public async Task Changes_with_a_create_whose_target_file_exists_gets_409_and_writes_nothing()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = Snapshot();
+        var body = $$$"""
+            {"changes":[
+              {"patch":{{{DisplayFieldPatch}}},"id":"{{{EntityId}}}","version":"{{{Sha256(Path.Combine(Folder, EntityFile))}}}"},
+              {"create":{"id":"{{{Guid.NewGuid()}}}","kind":"entity","name":"PurchaseRequest"}}
+            ]}
+            """;
+
+        var response = await Changes(client, body);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Theory]
+    [InlineData("""{"changes":[]}""")]
+    [InlineData("""{"changes":"none"}""")]
+    [InlineData("""{"changes":[],"extra":1}""")]
+    [InlineData("""[]""")]
+    [InlineData("""not json""")]
+    [InlineData("""{"changes":[{"create":{"id":"{0}","kind":"policy","name":"Fresh"},"patch":[],"id":"{1}","version":"x"}]}""")]
+    [InlineData("""{"changes":[{"create":{"id":"{0}","kind":"policy","name":"Fresh"},"version":"x"}]}""")]
+    [InlineData("""{"changes":[{"delete":"{1}"}]}""")]
+    [InlineData("""{"changes":[{"id":"{1}","version":"x"}]}""")]
+    [InlineData("""{"changes":[{"patch":[],"id":"{1}","version":"x","extra":1}]}""")]
+    [InlineData("""{"changes":[{"patch":[],"id":"{1}","version":7}]}""")]
+    [InlineData("""{"changes":[{"patch":{"op":"replace"},"id":"{1}","version":"x"}]}""")]
+    [InlineData("""{"changes":[{"create":{"id":"{0}","kind":"policy","name":"Fresh"}},{"create":{"id":"{0}","kind":"policy","name":"Other"}}]}""")]
+    [InlineData("""{"changes":[{"create":{"id":"{0}","kind":"policy","name":"Fresh"}},{"create":{"id":"{2}","kind":"policy","name":"Fresh"}}]}""")]
+    [InlineData("""{"changes":[{"create":{"id":"{1}","kind":"policy","name":"Fresh"}},{"patch":[],"id":"{1}","version":"x"}]}""")]
+    [InlineData("""{"changes":[{"create":{"id":"{0}","kind":"policy","name":"../Fresh"}}]}""")]
+    [InlineData("""{"changes":[{"create":{"id":"{0}","kind":"application","name":"Fresh"}}]}""")]
+    [InlineData("""{"changes":[{"patch":[{"op":"replace","path":"/id","value":"x"}],"id":"{1}","version":"{3}"}]}""")]
+    [InlineData("""{"changes":[{"patch":[{"op":"replace","path":"/missing/deeper","value":"x"}],"id":"{1}","version":"{3}"}]}""")]
+    public async Task Changes_with_a_bad_body_gets_400_and_writes_nothing(string template)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = Snapshot();
+        var body = template
+            .Replace("{0}", Guid.NewGuid().ToString(), StringComparison.Ordinal)
+            .Replace("{1}", EntityId, StringComparison.Ordinal)
+            .Replace("{2}", Guid.NewGuid().ToString(), StringComparison.Ordinal)
+            .Replace("{3}", Sha256(Path.Combine(Folder, EntityFile)), StringComparison.Ordinal);
+
+        var response = await Changes(client, body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Fact]
+    public async Task Changes_with_21_changes_gets_400_and_writes_nothing()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = Snapshot();
+        var creates = Enumerable.Range(0, 21)
+            .Select(index => $$$"""{"create":{"id":"{{{Guid.NewGuid()}}}","kind":"policy","name":"Fresh{{{(char)('A' + index)}}}"}}""");
+
+        var response = await Changes(client, $$$"""{"changes":[{{{string.Join(',', creates)}}}]}""");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Fact]
+    public async Task Changes_with_20_creates_writes_all_of_them()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var creates = Enumerable.Range(0, 20)
+            .Select(index => $$$"""{"create":{"id":"{{{Guid.NewGuid()}}}","kind":"policy","name":"Fresh{{{(char)('A' + index)}}}"}}""");
+
+        var response = await Changes(client, $$$"""{"changes":[{{{string.Join(',', creates)}}}]}""");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(20, Directory.EnumerateFiles(Path.Combine(Folder, "policies"), "fresh*.json").Count());
+    }
+
+    [Fact]
+    public async Task Changes_with_another_content_type_gets_415_and_writes_nothing()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = Snapshot();
+
+        var response = await Changes(client, """{"changes":[]}""", contentType: "application/json-patch+json");
+
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Fact]
+    public async Task Changes_answers_404_for_an_unknown_patch_id_and_428_for_a_patch_without_a_version()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = Snapshot();
+
+        var unknown = await Changes(client, $$$"""{"changes":[{"patch":[],"id":"{{{Guid.NewGuid()}}}","version":"x"}]}""");
+        var notAnId = await Changes(client, """{"changes":[{"patch":[],"id":"nope","version":"x"}]}""");
+        var unversioned = await Changes(client, $$$"""{"changes":[{"patch":{{{DisplayFieldPatch}}},"id":"{{{EntityId}}}"}]}""");
+        var unknownBeforeMissingVersion = await Changes(
+            client, $$$"""{"changes":[{"patch":[],"id":"{{{EntityId}}}"},{"patch":[],"id":"{{{Guid.NewGuid()}}}"}]}""");
+
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, notAnId.StatusCode);
+        Assert.Equal(HttpStatusCode.PreconditionRequired, unversioned.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownBeforeMissingVersion.StatusCode);
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Fact]
+    public async Task Changes_for_an_unknown_application_gets_404()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await Changes(client, """{"changes":[]}""", application: "Nope");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Changes_answers_503_and_writes_nothing_when_the_platform_write_lock_cannot_be_taken()
+    {
+        await using var factory = CreateFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>()));
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = Snapshot();
+        var body = $$$"""
+            {"changes":[
+              {"create":{"id":"{{{Guid.NewGuid()}}}","kind":"policy","name":"Fresh"}},
+              {"patch":{{{DisplayFieldPatch}}},"id":"{{{EntityId}}}","version":"{{{Sha256(Path.Combine(Folder, EntityFile))}}}"}
+            ]}
+            """;
+
+        var response = await Changes(client, body);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Fact]
+    public async Task Changes_without_the_CSRF_header_or_the_author_role_or_a_session_are_refused_and_write_nothing()
+    {
+        await using var factory = CreateFactory();
+        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var anonymous = factory.CreateClient();
+        var before = Snapshot();
+        var body = $$$"""{"changes":[{"create":{"id":"{{{Guid.NewGuid()}}}","kind":"policy","name":"Fresh"}}]}""";
+
+        var responses = new[]
+        {
+            await Changes(hoa, body, csrf: false),
+            await Changes(anna, body),
+            await Changes(anonymous, body),
+        };
+
+        Assert.Equal(
+            [HttpStatusCode.Forbidden, HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized],
+            responses.Select(response => response.StatusCode));
+        Assert.Equal(before, Snapshot());
+    }
+
     [Fact]
     public async Task Delete_with_the_current_version_removes_the_file_and_lists_the_references_it_broke()
     {
@@ -1147,6 +1370,25 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         string application = "PurchaseRequests")
     {
         using var request = new HttpRequestMessage(HttpMethod.Put, new Uri($"/api/studio/apps/{application}/texts/{key}", UriKind.Relative))
+        {
+            Content = new StringContent(body, Encoding.UTF8, contentType),
+        };
+        if (csrf)
+        {
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
+    private static async Task<HttpResponseMessage> Changes(
+        HttpClient client,
+        string body,
+        string contentType = "application/json",
+        bool csrf = true,
+        string application = "PurchaseRequests")
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/api/studio/apps/{application}/changes", UriKind.Relative))
         {
             Content = new StringContent(body, Encoding.UTF8, contentType),
         };

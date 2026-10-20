@@ -12,6 +12,27 @@ internal sealed record StudioWriteOutcome(StudioWriteRefusal? Refusal, string? V
     public static StudioWriteOutcome Refused(StudioWriteRefusal refusal) => new(refusal, null);
 }
 
+/// <summary>What a batch of changes did: the new version of each file in request order, or the reason it was refused.</summary>
+internal sealed record StudioChangesOutcome(StudioWriteRefusal? Refusal, IReadOnlyList<string>? Versions)
+{
+    public static StudioChangesOutcome Refused(StudioWriteRefusal refusal) => new(refusal, null);
+}
+
+/// <summary>One change of a batch: the resource it creates or patches.</summary>
+internal abstract record StudioChange(Guid Id);
+
+/// <summary>A new resource: its file relative to the folder and its full content.</summary>
+internal sealed record StudioCreateChange(Guid Id, string File, JsonObject Content) : StudioChange(Id);
+
+/// <summary>A patch of a resource, with the bare hex version it was made from.</summary>
+internal sealed record StudioPatchChange(Guid Id, JsonPatch Patch, string Version) : StudioChange(Id);
+
+// A change that passed its checks: the file to write and its new bytes, or the reason it was refused.
+internal sealed record StudioCheck(StudioWriteRefusal? Refusal, string? Target, byte[]? Bytes)
+{
+    public static StudioCheck Refused(StudioWriteRefusal refusal) => new(refusal, null, null);
+}
+
 internal enum StudioWriteRefusal
 {
     NotFound,
@@ -81,49 +102,14 @@ internal static class StudioWrites
 
         await using var _ = held;
 
-        // The route found the resource before this lock was held. When it is gone now, another write removed it, so
-        // the version the author holds is stale.
-        if (StudioFolder.List(folder).FirstOrDefault(file => file.Id == id) is not { } current)
+        var check = CheckPatch(folder, StudioFolder.List(folder), id, patch, Unquote(ifMatch));
+        if (check.Refusal is { } refusal)
         {
-            return StudioWriteOutcome.Refused(StudioWriteRefusal.Stale);
+            return StudioWriteOutcome.Refused(refusal);
         }
 
-        if (Target(folder, current.File) is not { } target)
-        {
-            return StudioWriteOutcome.Refused(StudioWriteRefusal.NotFound);
-        }
-
-        JsonNode? original;
-        JsonNode? patched;
-        try
-        {
-            original = JsonNode.Parse(current.Bytes);
-            var result = patch.Apply(JsonNode.Parse(current.Bytes));
-            patched = result.IsSuccess ? result.Result : null;
-        }
-        catch (Exception exception) when (exception is JsonException or InvalidOperationException or ArgumentException)
-        {
-            return StudioWriteOutcome.Refused(StudioWriteRefusal.DoesNotApply);
-        }
-
-        if (patched is not JsonObject patchedObject || original is not JsonObject originalObject)
-        {
-            return StudioWriteOutcome.Refused(StudioWriteRefusal.DoesNotApply);
-        }
-
-        if (!SameString(originalObject, patchedObject, "id") || !SameString(originalObject, patchedObject, "kind"))
-        {
-            return StudioWriteOutcome.Refused(StudioWriteRefusal.ChangesIdOrKind);
-        }
-
-        if (!string.Equals(Unquote(ifMatch), current.Version, StringComparison.Ordinal))
-        {
-            return StudioWriteOutcome.Refused(StudioWriteRefusal.Stale);
-        }
-
-        var bytes = Serialize(patchedObject);
-        await ReplaceAsync(target, bytes, cancellationToken);
-        return new StudioWriteOutcome(null, Convert.ToHexStringLower(SHA256.HashData(bytes)));
+        await ReplaceAsync(check.Target!, check.Bytes!, cancellationToken);
+        return new StudioWriteOutcome(null, Version(check.Bytes!));
     }
 
     /// <summary>
@@ -141,42 +127,68 @@ internal static class StudioWrites
 
         await using var _ = held;
 
-        if (StudioFolder.List(folder).Any(existing => existing.Id == id))
+        var check = CheckCreate(folder, StudioFolder.List(folder), id, file, content);
+        if (check.Refusal is { } refusal)
         {
-            return StudioWriteOutcome.Refused(StudioWriteRefusal.Exists);
+            return StudioWriteOutcome.Refused(refusal);
         }
 
-        if (Target(folder, file) is not { } target)
+        return await WriteNewAsync(check.Target!, check.Bytes!, cancellationToken) is { } refused
+            ? StudioWriteOutcome.Refused(refused)
+            : new StudioWriteOutcome(null, Version(check.Bytes!));
+    }
+
+    /// <summary>
+    /// Applies <paramref name="changes"/> to <paramref name="folder"/> under one lock. Every change is checked
+    /// in list order against the folder as it is now, each as its single route checks it, and the first refusal
+    /// refuses the call with nothing written. Only when every change passes are the files written, in list
+    /// order. A patch carries the bare hex version, compared as it is. The versions of the outcome follow the
+    /// order of <paramref name="changes"/>.
+    /// </summary>
+    public static async Task<StudioChangesOutcome> ChangesAsync(
+        IStudioWriteLock writeLock, string folder, IReadOnlyList<StudioChange> changes, CancellationToken cancellationToken)
+    {
+        if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
         {
-            return StudioWriteOutcome.Refused(StudioWriteRefusal.UnsafePath);
+            return StudioChangesOutcome.Refused(StudioWriteRefusal.Unavailable);
         }
 
-        if (File.Exists(target) || Directory.Exists(target))
-        {
-            return StudioWriteOutcome.Refused(StudioWriteRefusal.Exists);
-        }
+        await using var _ = held;
 
-        var bytes = Serialize(content);
-        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        var temporary = TemporaryName(target);
-        try
+        var files = StudioFolder.List(folder);
+        var checks = new List<StudioCheck>(changes.Count);
+        foreach (var change in changes)
         {
-            await File.WriteAllBytesAsync(temporary, bytes, cancellationToken);
-            File.Move(temporary, target, overwrite: false);
-        }
-        catch (IOException) when (File.Exists(target))
-        {
-            return StudioWriteOutcome.Refused(StudioWriteRefusal.Exists);
-        }
-        finally
-        {
-            if (File.Exists(temporary))
+            var check = change switch
             {
-                File.Delete(temporary);
+                StudioCreateChange create => CheckCreate(folder, files, create.Id, create.File, create.Content),
+                StudioPatchChange patch => CheckPatch(folder, files, patch.Id, patch.Patch, patch.Version),
+                _ => throw new InvalidOperationException("Unknown change."),
+            };
+            if (check.Refusal is { } refusal)
+            {
+                return StudioChangesOutcome.Refused(refusal);
+            }
+
+            checks.Add(check);
+        }
+
+        for (var index = 0; index < changes.Count; index++)
+        {
+            if (changes[index] is StudioCreateChange)
+            {
+                if (await WriteNewAsync(checks[index].Target!, checks[index].Bytes!, cancellationToken) is { } refused)
+                {
+                    return StudioChangesOutcome.Refused(refused);
+                }
+            }
+            else
+            {
+                await ReplaceAsync(checks[index].Target!, checks[index].Bytes!, cancellationToken);
             }
         }
 
-        return new StudioWriteOutcome(null, Convert.ToHexStringLower(SHA256.HashData(bytes)));
+        return new StudioChangesOutcome(null, [.. checks.Select(check => Version(check.Bytes!))]);
     }
 
     /// <summary>
@@ -293,7 +305,7 @@ internal static class StudioWrites
 
             entries[key] = texts[locale];
             var bytes = Serialize(root);
-            writes.Add((target, bytes, new StudioTextVersion(file.Id.ToString("D"), locale, Convert.ToHexStringLower(SHA256.HashData(bytes)))));
+            writes.Add((target, bytes, new StudioTextVersion(file.Id.ToString("D"), locale, Version(bytes))));
         }
 
         var temporaries = new List<(string Temporary, string Target)>();
@@ -324,6 +336,95 @@ internal static class StudioWrites
 
         return new StudioTextWriteOutcome(null, [.. writes.Select(write => write.Version)]);
     }
+
+    // The checks of a patch against the files already listed, in this order: the resource (gone counts as a stale
+    // version), whether the patch applies, whether it changes id or kind, then the version. Nothing is written.
+    private static StudioCheck CheckPatch(string folder, IReadOnlyList<StudioFile> files, Guid id, JsonPatch patch, string version)
+    {
+        // The route found the resource before the lock was held. When it is gone now, another write removed it, so
+        // the version the author holds is stale.
+        if (files.FirstOrDefault(file => file.Id == id) is not { } current)
+        {
+            return StudioCheck.Refused(StudioWriteRefusal.Stale);
+        }
+
+        if (Target(folder, current.File) is not { } target)
+        {
+            return StudioCheck.Refused(StudioWriteRefusal.NotFound);
+        }
+
+        JsonNode? original;
+        JsonNode? patched;
+        try
+        {
+            original = JsonNode.Parse(current.Bytes);
+            var result = patch.Apply(JsonNode.Parse(current.Bytes));
+            patched = result.IsSuccess ? result.Result : null;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or ArgumentException)
+        {
+            return StudioCheck.Refused(StudioWriteRefusal.DoesNotApply);
+        }
+
+        if (patched is not JsonObject patchedObject || original is not JsonObject originalObject)
+        {
+            return StudioCheck.Refused(StudioWriteRefusal.DoesNotApply);
+        }
+
+        if (!SameString(originalObject, patchedObject, "id") || !SameString(originalObject, patchedObject, "kind"))
+        {
+            return StudioCheck.Refused(StudioWriteRefusal.ChangesIdOrKind);
+        }
+
+        return string.Equals(version, current.Version, StringComparison.Ordinal)
+            ? new StudioCheck(null, target, Serialize(patchedObject))
+            : StudioCheck.Refused(StudioWriteRefusal.Stale);
+    }
+
+    // The checks of a create against the files already listed, in this order: the id, the path, then the target file.
+    private static StudioCheck CheckCreate(string folder, IReadOnlyList<StudioFile> files, Guid id, string file, JsonObject content)
+    {
+        if (files.Any(existing => existing.Id == id))
+        {
+            return StudioCheck.Refused(StudioWriteRefusal.Exists);
+        }
+
+        if (Target(folder, file) is not { } target)
+        {
+            return StudioCheck.Refused(StudioWriteRefusal.UnsafePath);
+        }
+
+        return File.Exists(target) || Directory.Exists(target)
+            ? StudioCheck.Refused(StudioWriteRefusal.Exists)
+            : new StudioCheck(null, target, Serialize(content));
+    }
+
+    // Writes a new file without replacing one. The refusal is Exists when the target appeared since the check.
+    private static async Task<StudioWriteRefusal?> WriteNewAsync(string target, byte[] bytes, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        var temporary = TemporaryName(target);
+        try
+        {
+            await File.WriteAllBytesAsync(temporary, bytes, cancellationToken);
+            File.Move(temporary, target, overwrite: false);
+        }
+        catch (IOException) when (File.Exists(target))
+        {
+            return StudioWriteRefusal.Exists;
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
+        }
+
+        return null;
+    }
+
+    private static string Version(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
     // The held lock, or null when it cannot be taken.
     private static async Task<IAsyncDisposable?> TryTakeAsync(IStudioWriteLock writeLock, string folder, CancellationToken cancellationToken)

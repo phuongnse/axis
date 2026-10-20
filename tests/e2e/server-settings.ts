@@ -10,6 +10,7 @@ export const leaveRequests = path.resolve(repoRoot, 'samples', 'apps', 'leave-re
 export const serviceDesk = path.resolve(repoRoot, 'samples', 'apps', 'service-desk')
 export const extensionsPath = path.resolve(repoRoot, 'artifacts', 'extensions')
 export const modulesPath = path.resolve(repoRoot, 'artifacts', 'modules')
+export const templatesPath = path.resolve(repoRoot, 'artifacts', 'templates')
 
 /** The built server, and the folder it runs from. scripts/build.sh builds it in Release. */
 export const serverProject = path.resolve(repoRoot, 'src', 'Axis.Server')
@@ -92,6 +93,8 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // The sample module departments, which scripts/build.sh installs. The worker gets the same folder from
     // scripts/e2e.sh.
     Modules__Path: modulesPath,
+    // The sample templates, which scripts/build.sh installs. Only the server reads them.
+    Templates__Path: templatesPath,
     // Studio edits the copy of the purchase request sample for the author role. appsettings.Development.json
     // lists the sample itself.
     Studio__Folders__0: studioFolder,
