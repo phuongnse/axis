@@ -1,6 +1,10 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
+import { lazy, Suspense, useContext } from 'react'
 import { resolveSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
+import { ExpressionCheckContext } from './expressionCheckContext'
+
+const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 /** Called with the JSON Pointer of the value that changed. `undefined` removes the value. */
 export type ChangeHandler = (pointer: string, next: unknown) => void
@@ -81,6 +85,7 @@ function SchemaNode({
   onChange,
 }: NodeProps & { name: string; required: boolean; readOnly?: boolean; item?: boolean }) {
   const t = useText()
+  const check = useContext(ExpressionCheckContext)
   const schema = resolveSchema(node, root)
   const isObject = schema.type === 'object' && schema.properties !== undefined
   const isArray = schema.type === 'array' && schema.items !== undefined
@@ -105,6 +110,21 @@ function SchemaNode({
         options={schema.enum.map((option) => ({ value: option as string | number, label: String(option) }))}
         onChange={(next) => onChange(pointer, next)}
       />
+    )
+  } else if (schema.type === 'string' && schema['x-axis-expression'] === true && check) {
+    const text = typeof value === 'string' ? value : ''
+    input = (
+      <Suspense fallback={<Input aria-label={name} value={text} readOnly />}>
+        <LazyExpressionEditor
+          application={check.application}
+          resourceId={check.resourceId}
+          path={pointer}
+          name={name}
+          value={text}
+          required={required}
+          onChange={onChange}
+        />
+      </Suspense>
     )
   } else if (schema.type === 'string') {
     input = (

@@ -16,7 +16,7 @@ using NpgsqlTypes;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>publisher</c>: runs the <c>publish</c>, <c>validate</c> and <c>rollback</c> requests that Studio stores in the tenant
+/// <c>publisher</c>: runs the <c>publish</c>, <c>validate</c>, <c>rollback</c> and <c>test</c> requests that Studio stores in the tenant
 /// databases, until it is stopped. Each poll round it claims the oldest queued request of every active tenant that is on this build's schema
 /// version. A <c>publish</c> runs the steps of <c>activate</c>, compiling from the stored snapshot and never from a folder. A
 /// <c>validate</c> runs the compile and every activation check in a transaction that it rolls back. A <c>rollback</c> runs the
@@ -30,7 +30,13 @@ namespace Axis.Admin;
 /// where its final status and diagnostics go, and it writes no audit record. Without a preview tenant it fails with
 /// <c>AXC0216</c>. While the preview tenant exists but is not served, the request stays queued. A <c>validate</c> or
 /// <c>rollback</c> with target <c>preview</c> is never claimed.
-/// The three kinds share one queue for each application, oldest first. While a request runs,
+/// A <c>test</c> compiles the snapshot and runs its test scenarios, each in its own temporary database that the scenario role
+/// of <c>Scenarios:ServerConnectionString</c> creates, and stores each scenario's outcome on the request. It touches no
+/// tenant database except to store the request's status and results, and writes no audit record and no release id. Without the
+/// setting it fails with <c>AXC0217</c>, and an unknown scenario name fails it with <c>AXC0218</c>.
+/// The first three kinds share one queue for each application, oldest first. The <c>test</c> requests form a queue of their
+/// own for each application, and run in a second loop of this process, so a long test holds up no publish and a publish holds
+/// up no test. While a request runs,
 /// the publisher renews its lease. A running request whose lease has run out is claimed again, and the third such claim to
 /// run out ends it <c>failed</c> with <c>AXC0215</c>. The <c>claims</c> count fences the final update, so a publisher that
 /// lost its claim changes nothing. Every step runs as the tenant's schema role, and a stop finishes the request that is
@@ -39,12 +45,17 @@ namespace Axis.Admin;
 /// </summary>
 internal sealed class Publisher(
     ReleaseSettings settings,
+    string? scenarioServer,
     IPublisherTenants tenants,
     TimeSpan leaseDuration,
     TextWriter output,
     TextWriter error,
     CancellationToken stopping)
 {
+    // Both loops write to these.
+    private readonly TextWriter _output = TextWriter.Synchronized(output);
+    private readonly TextWriter _error = TextWriter.Synchronized(error);
+
     internal static readonly TimeSpan DefaultLeaseDuration = TimeSpan.FromMinutes(5);
 
     internal static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
@@ -60,7 +71,7 @@ internal sealed class Publisher(
         """
         UPDATE axis.publish_requests
         SET status = 'failed', finished_at = clock_timestamp(), diagnostics = @diagnostics
-        WHERE kind IN ('publish', 'validate', 'rollback') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
+        WHERE kind IN ('publish', 'validate', 'rollback', 'test') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
         RETURNING id, application_id, requested_by, requested_by_name, kind, release_id, target
         """;
 
@@ -69,19 +80,20 @@ internal sealed class Publisher(
         """
         WITH next AS (
           SELECT r.id FROM axis.publish_requests r
-          WHERE r.kind IN ('publish', 'validate', 'rollback')
+          WHERE r.kind IN ('publish', 'validate', 'rollback', 'test') AND (r.kind = 'test') = @tests
             AND (r.status = 'queued'
                  OR (r.status = 'running' AND r.lease_until < clock_timestamp() AND r.claims < @max))
             AND (r.target = 'tenant' OR (r.target = 'preview' AND r.kind = 'publish' AND @preview))
             AND NOT EXISTS (SELECT 1 FROM axis.publish_requests o
-                            WHERE o.application_id = r.application_id AND o.status = 'running' AND o.id <> r.id)
+                            WHERE o.application_id = r.application_id AND o.status = 'running' AND o.id <> r.id
+                              AND (o.kind = 'test') = (r.kind = 'test'))
           ORDER BY r.requested_at, r.id LIMIT 1
           FOR UPDATE SKIP LOCKED)
         UPDATE axis.publish_requests p
         SET status = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims, p.label, p.note, p.release_id, p.target
+        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims, p.label, p.note, p.release_id, p.target, p.scenario_names::text
         """;
 
     private const string RenewSql =
@@ -95,11 +107,11 @@ internal sealed class Publisher(
     private const string FinishSql =
         """
         UPDATE axis.publish_requests
-        SET status = @status, finished_at = now(), release_id = @release, diagnostics = @diagnostics
+        SET status = @status, finished_at = now(), release_id = @release, diagnostics = @diagnostics, scenario_results = @scenarios
         WHERE id = @id AND status = 'running' AND claims = @claims
         """;
 
-    private IReadOnlyList<PublisherTenant> _served = [];
+    private volatile IReadOnlyList<PublisherTenant> _served = [];
 
     public async Task<int> RunAsync()
     {
@@ -108,7 +120,7 @@ internal sealed class Publisher(
             var problem = await tenants.CheckAsync(stopping);
             if (problem is not null)
             {
-                error.WriteLine(problem);
+                _error.WriteLine(problem);
                 return 1;
             }
 
@@ -120,14 +132,21 @@ internal sealed class Publisher(
         }
         catch (Exception exception)
         {
-            error.WriteLine($"The tenant directory could not be read: {TenantDatabaseSteps.Safe(exception)}");
+            _error.WriteLine($"The tenant directory could not be read: {TenantDatabaseSteps.Safe(exception)}");
             return 1;
         }
 
+        // Two loops, so a long test holds up no publish. Only the first reads the tenants again.
+        await Task.WhenAll(LoopAsync(tests: false), LoopAsync(tests: true));
+        return 0;
+    }
+
+    private async Task LoopAsync(bool tests)
+    {
         var lastRead = Stopwatch.StartNew();
         while (!stopping.IsCancellationRequested)
         {
-            if (lastRead.Elapsed >= tenants.ReadInterval)
+            if (!tests && lastRead.Elapsed >= tenants.ReadInterval)
             {
                 lastRead.Restart();
                 try
@@ -141,7 +160,7 @@ internal sealed class Publisher(
                 catch (Exception exception)
                 {
                     // The previous list stays, so a short outage of the platform database stops no tenant.
-                    error.WriteLine($"The tenant directory could not be read: {TenantDatabaseSteps.Safe(exception)}");
+                    _error.WriteLine($"The tenant directory could not be read: {TenantDatabaseSteps.Safe(exception)}");
                 }
             }
 
@@ -153,7 +172,7 @@ internal sealed class Publisher(
                     break;
                 }
 
-                claimed |= await RunNextAsync(tenant);
+                claimed |= await RunNextAsync(tenant, tests);
             }
 
             if (!claimed)
@@ -168,23 +187,21 @@ internal sealed class Publisher(
                 }
             }
         }
-
-        return 0;
     }
 
     // Claims and runs one request of the tenant. Returns whether one was claimed.
-    private async Task<bool> RunNextAsync(PublisherTenant tenant)
+    private async Task<bool> RunNextAsync(PublisherTenant tenant, bool tests)
     {
         var id = tenant.Id;
         await using var connections = tenant.Connect();
         ClaimedRequest? request;
         try
         {
-            request = await ClaimAsync(connections, tenant);
+            request = await ClaimAsync(connections, tenant, tests);
         }
         catch (Exception exception)
         {
-            output.WriteLine($"{id} claim failed: {TenantDatabaseSteps.Safe(exception)}");
+            _output.WriteLine($"{id} claim failed: {TenantDatabaseSteps.Safe(exception)}");
             return false;
         }
 
@@ -193,20 +210,20 @@ internal sealed class Publisher(
             return false;
         }
 
-        output.WriteLine($"{id} claim ok");
+        _output.WriteLine($"{id} claim ok");
         try
         {
             await RunRequestAsync(tenant, connections, request);
         }
         catch (Exception exception)
         {
-            output.WriteLine($"{id} claim failed: {TenantDatabaseSteps.Safe(exception)}");
+            _output.WriteLine($"{id} claim failed: {TenantDatabaseSteps.Safe(exception)}");
         }
 
         return true;
     }
 
-    private async Task<ClaimedRequest?> ClaimAsync(ITenantConnections connections, PublisherTenant tenant)
+    private async Task<ClaimedRequest?> ClaimAsync(ITenantConnections connections, PublisherTenant tenant, bool tests)
     {
         var connection = await connections.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
@@ -224,6 +241,7 @@ internal sealed class Publisher(
             command.Parameters.AddWithValue("me", _claimedBy);
             command.Parameters.AddWithValue("lease", leaseDuration);
             command.Parameters.AddWithValue("max", MaxClaims);
+            command.Parameters.AddWithValue("tests", tests);
             // A preview request waits while its preview tenant exists but is not served. Without a preview tenant it is claimed, to fail.
             command.Parameters.AddWithValue("preview", !tenant.HasPreview || tenant.Preview is not null);
             await using var reader = await command.ExecuteReaderAsync();
@@ -240,7 +258,8 @@ internal sealed class Publisher(
                     await reader.IsDBNullAsync(7) ? null : reader.GetString(7),
                     await reader.IsDBNullAsync(8) ? null : reader.GetString(8),
                     await reader.IsDBNullAsync(9) ? null : reader.GetGuid(9),
-                    reader.GetString(10));
+                    reader.GetString(10),
+                    await reader.IsDBNullAsync(11) ? null : reader.GetString(11));
             }
         }
 
@@ -274,7 +293,7 @@ internal sealed class Publisher(
                 await AppendAuditAsync(transaction, request.Kind, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, false, request.ReleaseId);
             }
 
-            output.WriteLine($"{tenant} claim failed: {DiagnosticCodes.PublishClaimsExhausted} {message}");
+            _output.WriteLine($"{tenant} claim failed: {DiagnosticCodes.PublishClaimsExhausted} {message}");
         }
     }
 
@@ -301,15 +320,31 @@ internal sealed class Publisher(
     {
         var diagnostics = new List<Diagnostic>();
         var files = ParseSnapshot(request.Snapshot);
-        var activation = new TenantReleaseActivation(settings.InlineRecomputeLimit, output, error, CancellationToken.None);
+        var activation = new TenantReleaseActivation(settings.InlineRecomputeLimit, _output, _error, CancellationToken.None);
         var preview = request.Target == "preview";
         if (preview && tenant.Preview is null)
         {
             const string missing = "The tenant has no preview tenant.";
             diagnostics.Add(new Diagnostic(DiagnosticCodes.PreviewTenantMissing, missing, "", ""));
-            output.WriteLine($"{tenant.Id} preview failed: {DiagnosticCodes.PreviewTenantMissing} {missing}");
+            _output.WriteLine($"{tenant.Id} preview failed: {DiagnosticCodes.PreviewTenantMissing} {missing}");
             await StopRenewalAsync(renewing, renewal);
             await FinishAsync(tenant.Id, connections, request, new ReleaseRun(false, null), diagnostics, audit: false);
+            return;
+        }
+
+        if (request.Kind == "test")
+        {
+            var tested = await activation.TestAsync(
+                tenant.Id,
+                tenant.SchemaVersion,
+                scenarioServer,
+                files,
+                request.ScenarioNames,
+                settings.Packages,
+                settings.Modules,
+                diagnostics);
+            await StopRenewalAsync(renewing, renewal);
+            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(tested.Succeeded, null), diagnostics, audit: false, tested.Scenarios.ToJsonString());
             return;
         }
 
@@ -352,7 +387,7 @@ internal sealed class Publisher(
         ReleaseRun run;
         if (files is null)
         {
-            output.WriteLine($"{target.Id} compile failed: The snapshot cannot be read.");
+            _output.WriteLine($"{target.Id} compile failed: The snapshot cannot be read.");
             run = new ReleaseRun(false, null);
         }
         else
@@ -487,7 +522,7 @@ internal sealed class Publisher(
 
     // The final status, the diagnostics and the audit record commit together, so a request never ends without its record. A
     // validate has no audit record. A publisher that lost its claim changes nothing and writes no record.
-    private async Task FinishAsync(string tenantId, ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit)
+    private async Task FinishAsync(string tenantId, ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit, string? scenarioResults = null)
     {
         var connection = await connections.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
@@ -497,6 +532,7 @@ internal sealed class Publisher(
             command.Parameters.AddWithValue("status", run.Succeeded ? "succeeded" : "failed");
             command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = ReleaseOf(request, run) is { } release ? release : DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb) { Value = DiagnosticsJson(diagnostics) });
+            command.Parameters.Add(new NpgsqlParameter("scenarios", NpgsqlDbType.Jsonb) { Value = (object?)scenarioResults ?? DBNull.Value });
             command.Parameters.AddWithValue("id", request.Id);
             command.Parameters.AddWithValue("claims", request.Claims);
             changed = await command.ExecuteNonQueryAsync();
@@ -505,7 +541,7 @@ internal sealed class Publisher(
         if (changed == 0)
         {
             await transaction.RollbackAsync();
-            output.WriteLine($"{tenantId} claim failed: Another publisher claimed the request again.");
+            _output.WriteLine($"{tenantId} claim failed: Another publisher claimed the request again.");
             return;
         }
 
@@ -572,5 +608,5 @@ internal sealed class Publisher(
             ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
         })]).ToJsonString();
 
-    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId, string Target);
+    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId, string Target, string? ScenarioNames);
 }

@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The test route of the authoring API stores a <c>test</c> publish request with a snapshot of the folder and the
-/// scenario names. No publisher runs it yet, so it stays queued.
+/// scenario names. Until a publisher runs it, it stays queued.
 /// </summary>
 public sealed class StudioTestRequestTests : IAsyncLifetime
 {
@@ -119,7 +119,7 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task The_status_route_answers_scenarios_null_for_a_validate_and_an_empty_list_for_a_queued_test()
+    public async Task The_status_route_answers_scenarios_null_for_a_validate_and_an_empty_list_for_a_test_before_and_after_it_runs()
     {
         using var folder = StudioPublishTests.NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_test_status", CancellationToken);
@@ -134,16 +134,23 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         using var validateAccepted = await StudioPublishTests.ReadAsync(validate);
         Assert.Equal(JsonValueKind.Null, validateAccepted.RootElement.GetProperty("scenarios").ValueKind);
 
+        using var queued = await StudioPublishTests.GetJsonAsync(hoa, test.Headers.Location!.OriginalString, StudioPublishTests.HostA);
+        Assert.Equal("queued", queued.RootElement.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.Array, queued.RootElement.GetProperty("scenarios").ValueKind);
+        Assert.Equal(0, queued.RootElement.GetProperty("scenarios").GetArrayLength());
+
+        // This publisher has no scenario server, so the test ends failed, with no scenario result.
         await using var publisher = StudioPublishTests.RunPublisher("a", StudioPublishTests.HostA, connectionString);
         using var finished = await StudioPublishTests.WaitForFinalAsync(
             hoa, validate.Headers.Location!.OriginalString, StudioPublishTests.HostA);
         Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, finished.RootElement.GetProperty("scenarios").ValueKind);
 
-        using var queued = await StudioPublishTests.GetJsonAsync(hoa, test.Headers.Location!.OriginalString, StudioPublishTests.HostA);
-        Assert.Equal("queued", queued.RootElement.GetProperty("status").GetString());
-        Assert.Equal(JsonValueKind.Array, queued.RootElement.GetProperty("scenarios").ValueKind);
-        Assert.Equal(0, queued.RootElement.GetProperty("scenarios").GetArrayLength());
+        using var ended = await StudioPublishTests.WaitForFinalAsync(
+            hoa, test.Headers.Location!.OriginalString, StudioPublishTests.HostA);
+        Assert.Equal("failed", ended.RootElement.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.Array, ended.RootElement.GetProperty("scenarios").ValueKind);
+        Assert.Equal(0, ended.RootElement.GetProperty("scenarios").GetArrayLength());
     }
 
     private static async Task<string?> StoredRowAsync(string connectionString) =>

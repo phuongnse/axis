@@ -27,6 +27,8 @@ internal static partial class AdminCommands
 
     public const string InlineRecomputeLimitSetting = "Activation:InlineRecomputeLimit";
 
+    public const string ScenarioServerSetting = "Scenarios:ServerConnectionString";
+
     public const string DotnetEnvironmentSetting = "DOTNET_ENVIRONMENT";
 
     private const string Provisioning = "provisioning";
@@ -614,8 +616,14 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        if (!TryReadScenarioServer(configuration, error, out var scenarioServer))
+        {
+            return 2;
+        }
+
         return await new Publisher(
             new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit),
+            scenarioServer,
             new DirectoryPublisherTenants(settings.Platform, refreshInterval),
             lease,
             output,
@@ -655,14 +663,45 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        if (!TryReadScenarioServer(configuration, error, out var scenarioServer))
+        {
+            return 2;
+        }
+
         var allowHttp = (configuration[DotnetEnvironmentSetting] ?? Environments.Production) == Environments.Development;
         return await new Publisher(
             settings,
+            scenarioServer,
             new ConfigurationPublisherTenants(catalog.Tenants, allowHttp, output),
             lease,
             output,
             error,
             cancellationToken).RunAsync();
+    }
+
+    // An empty value is no setting: a test request then fails with AXC0217. A value that is no connection string stops the
+    // publisher, and the message names the setting and never its value.
+    private static bool TryReadScenarioServer(IConfiguration configuration, TextWriter error, out string? scenarioServer)
+    {
+        scenarioServer = null;
+        var value = configuration[ScenarioServerSetting];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        try
+        {
+            _ = new NpgsqlConnectionStringBuilder(value);
+        }
+        catch (ArgumentException)
+        {
+            error.WriteLine($"The setting {ScenarioServerSetting} is not a valid connection string.");
+            return false;
+        }
+
+        scenarioServer = value;
+        return true;
     }
 
     /// <summary>

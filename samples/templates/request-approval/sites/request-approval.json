@@ -1,0 +1,32 @@
+{
+  "id": "86e205cd-a88a-40d4-aea8-3e82d2a38139",
+  "kind": "site",
+  "name": "RequestApproval",
+  "formatVersion": 1,
+  "path": "request-approval",
+  "title": {
+    "textKey": "site.title"
+  },
+  "locales": {
+    "default": "en",
+    "fallback": "en",
+    "available": [
+      "en",
+      "vi"
+    ]
+  },
+  "navigation": [
+    {
+      "page": "MyRequests",
+      "label": {
+        "textKey": "nav.myRequests"
+      }
+    },
+    {
+      "page": "MyTasks",
+      "label": {
+        "textKey": "nav.myTasks"
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "kind": "applicationTemplate",
+  "id": "request-approval",
+  "version": "1.0.0",
+  "title": {
+    "en": "Request approval",
+    "vi": "Phê duyệt yêu cầu"
+  },
+  "description": {
+    "en": "A request form, a list and a two-step approval.",
+    "vi": "Một biểu mẫu yêu cầu, một danh sách và phê duyệt hai bước."
+  }
+}

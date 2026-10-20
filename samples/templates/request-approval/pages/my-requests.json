@@ -1,0 +1,16 @@
+{
+  "id": "9a74855e-3763-467f-b7f7-7798606b9b91",
+  "kind": "page",
+  "name": "MyRequests",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "pages.myRequests.title"
+  },
+  "widgets": [
+    {
+      "type": "table",
+      "dataSource": "RequestList",
+      "formPage": "RequestForm"
+    }
+  ]
+}

@@ -581,7 +581,7 @@ saved, and the diagnostics list the broken references.
 ## Publishing
 
 An author validates, publishes and rolls back an
-application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. Storing a `test` request is built too, and running it is _(planned for M11)_. The server never activates in its own process and
+application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. `test` is built too, except its 10-minute limit, which is _(planned for M11)_. The server never activates in its own process and
 holds no tenant schema connection. It stores a **publish request** in the
 tenant database, and a separate [publisher](administration.md#publisher) runs
 it with the tenant's schema role. See
@@ -630,7 +630,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | `finishedAt` | When it reached `succeeded` or `failed`, or null before |
 | `releaseId` | The release a `publish` activated or a `rollback` named, or null. A `validate` and a `test` have none |
 | `diagnostics` | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings |
-| `scenarios` | Null for every kind but `test`. For `test`, an array with one item for each scenario that ran *(the publisher fills it in, planned for M11)*, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends |
+| `scenarios` | Null for every kind but `test`. For `test`, an array with one item for each scenario that ran, in file order, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends |
 
 - **A snapshot.** `validate` and `publish` store the folder as it is when the
   request is made: every `*.json` file that Studio can reach, with its `version`, as for
@@ -654,13 +654,12 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   happens after activation has committed, so the request ends `failed` with
   `releaseId` set, and the release stays active and stays in the history.
 - **`test`.** The server stores the request with the snapshot, taken as for
-  `validate`. It stays `queued`, because no publisher claims it yet
-  *(planned for M11)*. The publisher is to run the scenarios as the [publisher](administration.md#publisher)
+  `validate`. The publisher runs the scenarios as the [publisher](administration.md#publisher)
   describes, and stores their outcomes in `scenarios`. The request ends
   `failed` when any scenario fails. Scenario failures go only in `scenarios`.
-  Compile errors, the missing `Scenarios:ServerConnectionString` setting, an
-  unknown scenario name and the 10-minute limit go in `diagnostics`. See
-  [Test](#test).
+  Compile diagnostics, the missing `Scenarios:ServerConnectionString` setting
+  (`AXC0217`), an unknown scenario name (`AXC0218`) and the 10-minute limit
+  *(planned for M11)* go in `diagnostics`. See [Test](#test).
 - **Order.** For one tenant and application the publisher runs requests one at
   a time, oldest first. When two publishes are queued, the newer one ends up
   live. A `test` request has its own queue and does not wait behind them, see
@@ -699,8 +698,8 @@ request has the kind `publish` and the target `preview`.
 
 `POST .../test` stores a request to run the application's
 [test scenarios](configuration.md#test-scenarios) from Studio. The route and the
-stored request are built. Running the request is *(planned for M11)*: no
-publisher claims it yet, so it stays `queued`.
+stored request are built, and so is the publisher's run. Its 10-minute limit and
+the immediate stop on `SIGTERM` are *(planned for M11)*.
 [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees
 the route. The request has the kind `test` and the target `tenant`.
 
@@ -709,18 +708,21 @@ the route. The request has the kind `test` and the target `tenant`.
 - **The body.** The optional `scenarios` list names the scenarios to run, by
   their `name`. With no body, no list or an empty list, every scenario runs.
   An unknown name is accepted with `202`, and the request then ends `failed`
-  with a diagnostic, as for a folder with errors.
+  with `AXC0218`, as for a folder with errors.
 - **Where it runs.** The publisher runs it with `Scenarios:ServerConnectionString`,
   in a new database for each scenario, see
   [publisher](administration.md#publisher). It touches the tenant database
   only to store the request's status and outcomes. Without the setting, the
-  request ends `failed` with a diagnostic that names it.
+  request ends `failed` with `AXC0217`, which names it. A scenario name that the
+  application does not have ends it `failed` with `AXC0218`. A snapshot that does
+  not compile ends it `failed` with the compile diagnostics. In all three cases no
+  scenario runs.
 - **The outcome.** `scenarios` holds one item for each scenario that ran. A
   scenario that fails has the failing `step`, its `path` and its `message`.
   Selecting it in Studio opens the scenario at that step, as a diagnostic opens
   a resource.
 - **Limits.** The scenarios of a request run one after another. A request stops
-  after 10 minutes: the scenario that runs fails, its database is dropped and
+  after 10 minutes *(planned for M11)*: the scenario that runs fails, its database is dropped and
   the request ends `failed` with a diagnostic. The work item limit of
   [D32](../decisions.md#d32-test-scenarios--agreed) applies to each scenario.
 - **Order.** At most one `test` request per application runs at a time,
