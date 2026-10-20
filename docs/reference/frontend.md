@@ -913,14 +913,14 @@ reconnect message are built.
     arrays with add and remove. `id`, `kind` and fixed values such as
     `formatVersion` are read-only. Labels are the property names as written in
     the schema, without translation. A part the form cannot show, such as
-    `oneOf`, `anyOf` or a map like a text resource's `texts`, points to the JSON
-    view. An `allOf` whose items hold only `if`, `then` and `else` shows its
+    `oneOf`, `anyOf` or a map, points to the JSON view. A text resource's
+    `texts` map shows in the Text editor, see **Editors by kind** below. An
+    `allOf` whose items hold only `if`, `then` and `else` shows its
     properties, and the form does not show the conditions.
-    A text resource's `texts` map stays in the JSON view. A label, an object
-    whose only property is `textKey`, has its own editor, see Label texts
-    below. Until the names load, a label shows as a reference picker over the
-    application's text keys, and a key that the application does not define is
-    tagged unknown.
+    A label, an object whose only property is `textKey`, has its own editor, see
+    Label texts below. Until the names load, a label shows as a reference picker
+    over the application's text keys, and a key that the application does not
+    define is tagged unknown.
   - A JSON view shows the draft as text. A valid edit there updates the form.
     Invalid JSON shows an error and turns Save off.
   - Save sends only the changes, as a JSON Patch with the version the editor
@@ -936,8 +936,8 @@ reconnect message are built.
     through the same JSON Patch, with the same `If-Match` rules. It never drops
     a value it does not show, so unknown keys stay as they are. See
     **Editors by kind** below. The seed editor, the connector editor, the endpoint
-    mapping rows and the process editor's step list, with its decision and end
-    panels, are built.
+    mapping rows, the text editor and the process editor's step list, with its
+    decision and end panels, are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1191,8 +1191,8 @@ reconnect message are built.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
-  the connector editor, the endpoint mapping rows and the process editor's step
-  list, with its decision and end panels, are built. The other typed
+  the connector editor, the endpoint mapping rows, the text editor and the process
+  editor's step list, with its decision and end panels, are built. The other typed
   editors and the entity designer are *(planned for M11)*, and until they are built those kinds use the generic form. The last
   column lists what still needs the JSON view, because the form cannot show it.
 
@@ -1295,8 +1295,31 @@ reconnect message are built.
     - **Fallback.** The entity is found by name among the folder's `entity`
       resources, ignoring letter case. When it is not there, for example a
       module entity or a typo, the seed uses the generic form and the JSON view.
-  - **Text editor.** One table of keys with a column per locale, and a search
-    box. Adding a key adds it to every locale's `text` resource.
+  - **Text editor** *(built)*. A `text` resource opens as one table of keys
+    with a column per locale, and a search box.
+    - **Columns.** One row per key, sorted by key, and one column per locale in
+      the order of the folder's `text` resources. Only the open resource's
+      column is editable. The other locales show beside it as read-only text,
+      read from their files. To edit another locale, open its `text` resource.
+    - **Missing keys.** A key that the open locale lacks shows an empty cell
+      marked missing. Typing in it adds the key to this locale. A locale that
+      the file lacks the key in shows a missing mark in place of the text.
+    - **Search.** The box keeps the rows whose key, or text in any locale,
+      contains the search, ignoring letter case.
+    - **Cells.** A cell edit goes into the draft, and **Save** sends one JSON
+      Patch for the open resource only. Clearing a cell saves an empty string
+      and keeps the key, because every locale holds the same keys
+      (`AXC0027`).
+    - **Add key.** The row below the table takes a key and a text for each
+      locale. It writes the key to every locale through the
+      [texts route](authoring.md#text-writes) at once. The key cannot be empty,
+      cannot contain `/`, and cannot already be in the table. The editor takes
+      the open file's new version from the route's answer and adds the key to
+      its loaded copy and draft, so unsaved cell edits stay and the next Save
+      does not meet a stale version. The diagnostics and the names reload.
+    - **JSON view.** It stays as the second view of the same draft.
+    - **Removing a key** is not built. No route removes a key from every
+      locale yet.
   - **Endpoint `values`** *(built)*. The endpoint keeps the generic form for
     its entity, process, input and output. Its `values` show as rows of a field
     and an expression in the expression editor. The field is picked from the

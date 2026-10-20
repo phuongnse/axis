@@ -260,6 +260,34 @@ test('an author adds a department in the seed grid and the file holds only that 
   }
 })
 
+test('an author adds a text key in the text table and both locales hold it', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const english = items.find((item) => item.file === 'texts/en.json')!
+  const files = ['texts/en.json', 'texts/vi.json'].map((name) => path.join(studioFolder, name))
+  const originals = await Promise.all(files.map((file) => readFile(file, 'utf8')))
+  const key = `e2e.key${Date.now().toString(36)}`
+
+  try {
+    await page.goto(`/studio?app=PurchaseRequests&resource=${english.id}`)
+    const add = page.getByTestId('studio-text-add')
+    await add.getByRole('textbox', { name: 'New key' }).fill(key)
+    await add.getByRole('textbox', { name: 'en' }).fill('E2E text')
+    await add.getByRole('textbox', { name: 'vi' }).fill('Văn bản E2E')
+    await add.getByRole('button', { name: 'Add key' }).click()
+    await expect(page.locator(`[data-testid="studio-text-row"][data-key="${key}"]`)).toBeVisible()
+
+    const [en, vi] = await Promise.all(
+      files.map(async (file) => JSON.parse(await readFile(file, 'utf8')) as { texts: Record<string, string> }),
+    )
+    expect(en.texts[key]).toBe('E2E text')
+    expect(vi.texts[key]).toBe('Văn bản E2E')
+  } finally {
+    await Promise.all(files.map((file, index) => writeFile(file, originals[index])))
+  }
+})
+
 test('an author adds a connector operation in the connector editor and the file keeps the others', async ({ page }) => {
   await useSession(page, 'hoa')
   const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')

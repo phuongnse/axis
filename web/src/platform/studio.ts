@@ -439,6 +439,39 @@ export async function fetchTextReferences(
   return (await response.json()) as StudioTextReferences
 }
 
+/** What a text write answers: the new version of every locale's file, or `invalid` for a `400`. */
+export type TextKeyWriteResult =
+  | { status: 'written'; resources: { id: string; locale: string; version: string }[]; diagnostics: StudioDiagnostic[] }
+  | { status: 'invalid' }
+
+/**
+ * Writes one text key in every locale at once. `texts` holds the text of each locale. A 400 means the locales or
+ * the key are refused, and nothing was written. A 401 starts sign-in and throws, as any other failure does.
+ */
+export async function writeStudioText(
+  application: string,
+  key: string,
+  texts: Record<string, string>,
+): Promise<TextKeyWriteResult> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/texts/${encodeURIComponent(key)}`
+  const response = await studioFetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texts }),
+  })
+  if (response.status === 400) {
+    return { status: 'invalid' }
+  }
+  if (!response.ok) {
+    throw new Error(`Writing '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as {
+    resources: { id: string; locale: string; version: string }[]
+    diagnostics: StudioDiagnostic[]
+  }
+  return { status: 'written', resources: body.resources, diagnostics: body.diagnostics }
+}
+
 /**
  * Deletes a resource, with the version the editor loaded in `If-Match`. A 409 means the file changed since,
  * and nothing was deleted. A 401 starts sign-in and throws, as any other failure does.
