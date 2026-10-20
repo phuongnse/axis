@@ -39,13 +39,13 @@
 | **M7** | Inspection and operations | Done | The process inspector, with its graph, path, attempts, input and output, and failures, and its widget. Correlated logs, metrics and traces, and health checks of the server and the worker. Operator cancel, retry and resolve for process work and calls. The purchase request sample has an Approvals inspector page for its `operator` role. Carried over from M6 and built: the recompute of stored computed fields ([D33](decisions.md#d33-recomputing-stored-computed-fields--agreed)), the start checks on the runtime database role, and event deliveries and schedule triggers in test scenarios. |
 | **M8** | Studio and modules | Done | Visual authoring that uses the same resource contracts, a dependency graph and a "where is this used" view, reusable modules, and a second sample application, leave requests (see [D41](decisions.md#d41-leave-requests-as-the-second-sample-application--agreed)). Carried over from M7 and built: the tenant health metric of [D37](decisions.md#d37-health-checks-for-the-server-and-the-worker--agreed). |
 | **M9** | Tenancy and deployment | Done | Tenant directory and provisioning, migrations across tenant databases, packaging for on-premises and cloud installation, backup and restore. Carried over from M8 and built: opening a diagnostic at its path, the Studio reconnect message, and module validations that call rules. |
-| **M10** | Publishing from Studio | Next | An author validates, previews on a preview tenant, publishes, activates and rolls back an application from Studio, with a release history, and without the admin CLI. The server runs as more than one replica behind TLS: a shared key ring and forwarded headers. Publish and sign-in write audit records. CI runs static analysis and a dependency scan. |
-| **M11** | Authoring without JSON | Planned | Studio creates an application, blank or from a template, and every resource kind. It has reference pickers, typed editors for pages, process steps and connectors, and an expression editor with type errors as you type. It has an entity designer, a policy matrix, a read-only process graph, and runs test scenarios. A third sample is built only through Studio in a Playwright journey. |
-| **M12** | Pages, layouts and more widgets | Planned | A page holds a tree of widgets in columns, tabs and sections, and works at phone width. Navigate actions with page parameters exist. New widgets: detail, chart and KPI. Tables get row and toolbar actions, delete included. Forms get conditional visible, required and read-only states, validation as you type, and wizard steps. |
+| **M10** | Publishing from Studio | Done | An author validates, previews on a preview tenant, publishes, activates and rolls back an application from Studio, with a release history, and without the admin CLI. The server runs as more than one replica behind TLS: a shared key ring and forwarded headers. Publish and sign-in write audit records. CI runs static analysis. |
+| **M11** | Authoring without JSON | Next | Studio creates an application, blank or from a template, and every resource kind. It has reference pickers, typed editors for pages, process steps and connectors, and an expression editor with type errors as you type. It has an entity designer, a policy matrix, a read-only process graph, and runs test scenarios. A third sample is built only through Studio in a Playwright journey. |
+| **M12** | Pages, layouts and more widgets | Next | A page holds a tree of widgets in columns, tabs and sections, and works at phone width. Navigate actions with page parameters exist. New widgets: detail, chart and KPI. Tables get row and toolbar actions, delete included. Forms get conditional visible, required and read-only states, validation as you type, and wizard steps. |
 | **M13** | Visual page and form designer | Planned | An author builds pages and forms by drag and drop on a canvas that uses the runtime renderers, with a palette, a property panel, data and action binding, and undo. |
 | **M14** | Workflow, automation and notifications | Planned | Processes get timer, wait for event and sub-process steps, loops that hold a task, task escalation and deadlines, claim and reassign, and a create record operation. There are scheduled jobs without a subject, delete triggers, and a limit plus dead letters for event delivery. In-app and email notifications exist. Processes are edited in a visual designer. |
 | **M15** | Data modeling and data management | Planned | New field types: file (with storage bindings), money and enum labels. Indexes, defaults and ranges. References from child rows, and many-to-many. CSV and spreadsheet import and export under policies. Full-text search, more aggregates and query timeouts. |
-| **M16** | Hardening | Planned | Performance SLOs and load tests, the FAPI 2.0 profile, verification against an agreed ASVS level, rate limits and security headers, service accounts for the record and process APIs, tenant binding commands and key rotation. |
+| **M16** | Hardening | Planned | Performance SLOs and load tests, the FAPI 2.0 profile, verification against an agreed ASVS level, rate limits and security headers, service accounts for the record and process APIs, tenant binding commands and key rotation. Carried over from M10: CI runs the dependency scan on its triggers and once a week, and restoring a preview tenant's archive is refused. |
 | **M17** | Extensibility and operator console | Planned | Custom widgets in the designer palette, a published SDK, modules that hold processes, pages and policies and depend on other modules, packages run out of process, connector OAuth2 and structured payloads, outbound webhooks, and an operator web console. |
 
 M3 is complete. See the closed
@@ -76,7 +76,11 @@ M9 is complete. See the closed
 [M9 milestone](https://github.com/phuongnse/axis/milestone/9?closed=1) on
 GitHub.
 
-M10 is next. See the
+M10 is complete. See the closed
+[M10 milestone](https://github.com/phuongnse/axis/milestone/10?closed=1) on
+GitHub.
+
+M11 and M12 are next, and can run in parallel. See the
 [milestones](https://github.com/phuongnse/axis/milestones) on GitHub.
 
 Milestones after M4 may be reordered when business needs require it. M0–M4
@@ -97,7 +101,7 @@ stay in this order.
 - **Proving it is general.** From M11 on, each milestone extends a sample of a
   new shape: a service desk, then asset management. Neither needs platform
   code.
-- **Planning.** Only M10 is broken into issues now. Each milestone starts with
+- **Planning.** Each milestone is broken into issues when the one before it is nearly done. Each milestone starts with
   docs issues that record its design as decisions, as M9 did.
 
 ## M0 — Foundation

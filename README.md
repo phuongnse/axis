@@ -12,9 +12,9 @@ amount, and an approved request is sent to a purchasing system.
 
 ## Status
 
-Milestone **M9, Tenancy and deployment**, is complete. The current milestone is
-**M10, Publishing from Studio**. The [roadmap](docs/roadmap.md) says what each
-milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
+Milestone **M10, Publishing from Studio**, is complete. The current milestones are
+**M11, Authoring without JSON**, and **M12, Pages, layouts and more widgets**, which run in parallel.
+The [roadmap](docs/roadmap.md) says what each milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 
 ## Run Axis
