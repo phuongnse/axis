@@ -215,6 +215,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/resources")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001")]
     [InlineData("/api/studio/apps/PurchaseRequests/diagnostics")]
+    [InlineData("/api/studio/apps/PurchaseRequests/policy-matrix")]
     [InlineData("/api/studio/apps/PurchaseRequests/releases")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
     [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
@@ -239,6 +240,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/resources")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001")]
     [InlineData("/api/studio/apps/PurchaseRequests/diagnostics")]
+    [InlineData("/api/studio/apps/PurchaseRequests/policy-matrix")]
     [InlineData("/api/studio/apps/PurchaseRequests/releases")]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
     [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
@@ -260,6 +262,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [Theory]
     [InlineData("/api/studio/apps/Unknown/resources", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/Unknown/diagnostics", HttpStatusCode.NotFound)]
+    [InlineData("/api/studio/apps/Unknown/policy-matrix", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/Unknown/releases", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/PURCHASEREQUESTS/resources", HttpStatusCode.OK)]
     [InlineData("/api/studio/apps/Unknown/resources/00000000-0000-0000-0000-000000000001", HttpStatusCode.NotFound)]
@@ -355,6 +358,28 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         var diagnostics = body.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
         Assert.DoesNotContain(diagnostics, item => item.GetProperty("severity").GetString() == "error");
+    }
+
+    [Fact]
+    public async Task Author_gets_the_policy_matrix_of_the_application()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/policy-matrix", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var employee = body.RootElement.GetProperty("roles").EnumerateArray()
+            .Single(role => role.GetProperty("name").GetString() == "employee");
+        var cell = employee.GetProperty("cells").EnumerateArray()
+            .Single(candidate => candidate.GetProperty("kind").GetString() == "entity"
+                && candidate.GetProperty("target").GetString() == "PurchaseRequest");
+        var actions = cell.GetProperty("actions").EnumerateArray().Select(action => action.GetString()).ToList();
+        Assert.Contains("read", actions);
+        Assert.Contains("create", actions);
+        Assert.Equal("EmployeeAccess", employee.GetProperty("accessPolicy").GetProperty("name").GetString());
+        Assert.True(body.RootElement.GetProperty("targets").GetArrayLength() > 0);
     }
 
     [Fact]

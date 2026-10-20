@@ -1173,6 +1173,8 @@ reconnect message are built.
     takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
     takes `invoke`. Filter and fields are only on entity grants.
   - A save writes one file, with the single-file routes.
+  - The view reads the [policy matrix route](authoring.md#policy-matrix). The
+    route is built, and the view is not.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
