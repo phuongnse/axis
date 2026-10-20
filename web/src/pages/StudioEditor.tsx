@@ -21,6 +21,7 @@ import { EndpointValues } from './EndpointValues'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
+import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
@@ -88,9 +89,11 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * the entity is not in the folder, the seed uses the generic form. A scenario shows a typed editor of its name, users,
  * stubs and steps, and the JSON view edits the same draft. A connector opens in the connector editor, which shows a
  * binding as a name only. A page opens in the page editor, which lists its widgets and shows a panel for the
- * selected widget's type, and keeps a key it does not show. An endpoint keeps the generic form and shows its `values`
- * as rows of a field of its entity and an expression. When the server does not answer, the draft stays, and the
- * resource loads again after the reconnect unless the draft has changes.
+ * selected widget's type, and keeps a key it does not show. A process opens in the process editor, which shows its
+ * steps as cards, with the decision and end panels and a picker of the draft's step names for every transition. An
+ * endpoint keeps the generic form and shows its `values` as rows of a field of its entity and an expression. When the
+ * server does not answer, the draft stays, and the resource loads again after the reconnect unless the draft has
+ * changes.
  */
 export function StudioEditor({
   application,
@@ -265,6 +268,14 @@ export function StudioEditor({
     const { records: _records, ...properties } = schema.properties ?? {}
     return { ...schema, properties, required: schema.required?.filter((name) => name !== 'records') }
   }, [schema, seedFields])
+
+  const processSchema = useMemo(() => {
+    if (item.kind !== 'process' || !schema) {
+      return undefined
+    }
+    const { start: _start, steps: _steps, ...properties } = schema.properties ?? {}
+    return { ...schema, properties, required: schema.required?.filter((name) => name !== 'start' && name !== 'steps') }
+  }, [item.kind, schema])
 
   const endpointSchema = useMemo(() => {
     if (item.kind !== 'endpoint' || !schema) {
@@ -490,6 +501,8 @@ export function StudioEditor({
                   />
                 ) : item.kind === 'connector' && schema ? (
                   <ConnectorEditor value={draft} onChange={change} />
+                ) : processSchema ? (
+                  <ProcessEditor schema={processSchema} value={draft} onChange={change} />
                 ) : item.kind === 'page' && schema ? (
                   <PageEditor value={draft} onChange={change} />
                 ) : endpointSchema ? (
