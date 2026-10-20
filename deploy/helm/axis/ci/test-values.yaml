@@ -1,5 +1,21 @@
 # Values for the lint, the schema check and the render tests. They name every
-# Secret and both volumes, so the checks cover every branch of the templates.
+# Secret and both volumes, run two server replicas, turn Studio on and name one
+# proxy and one network, so the checks cover every branch of the templates.
+server:
+  replicas: 2
+studio:
+  folders:
+    - purchase-requests
+  authorRole: author
+  publisherRole: publisher
+  persistence:
+    persistentVolumeClaim:
+      claimName: axis-studio
+forwardedHeaders:
+  knownProxies:
+    - 10.0.0.10
+  knownNetworks:
+    - 10.0.0.0/8
 secrets:
   platformConnection:
     name: axis-platform
