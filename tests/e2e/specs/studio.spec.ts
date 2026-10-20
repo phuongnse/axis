@@ -169,6 +169,52 @@ test('an author sees what the employee role may do in the policy matrix', async 
   await expect(page.getByTestId('studio-matrix-cell-employee-process-PurchaseRequestApproval')).toContainText('start')
 })
 
+test('an author gives a new role read on Supplier in the policy matrix and the access policy is created', async ({
+  page,
+}) => {
+  await useSession(page, 'hoa')
+  const roleFile = path.join(studioFolder, 'roles/matrix-tester.json')
+  const policyFile = path.join(studioFolder, 'policies/matrix-tester-access.json')
+  await rm(roleFile, { force: true })
+  await rm(policyFile, { force: true })
+
+  try {
+    await writeFile(
+      roleFile,
+      JSON.stringify({
+        id: randomUUID(),
+        kind: 'role',
+        name: 'matrix-tester',
+        formatVersion: 1,
+        label: { textKey: 'role.employee' },
+      }),
+    )
+    const diagnosticsBefore = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+
+    await page.goto('/studio?app=PurchaseRequests&view=policies')
+    await page.getByTestId('studio-matrix-cell-matrix-tester-entity-Supplier').click()
+    await page.getByRole('button', { name: 'Add grant' }).click()
+    await page.getByTestId('studio-matrix-actions').getByRole('checkbox', { name: 'read' }).check()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-matrix-saved')).toBeVisible()
+
+    const written = JSON.parse(await readFile(policyFile, 'utf8')) as Record<string, unknown>
+    expect(written).toEqual({
+      id: expect.any(String),
+      kind: 'policy',
+      name: 'MatrixTesterAccess',
+      formatVersion: 1,
+      roles: ['matrix-tester'],
+      grants: [{ entity: 'Supplier', actions: ['read'] }],
+    })
+    const diagnosticsAfter = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+    expect(diagnosticsAfter).toEqual(diagnosticsBefore)
+  } finally {
+    await rm(roleFile, { force: true })
+    await rm(policyFile, { force: true })
+  }
+})
+
 test('an author saves a resource while the server restarts, and sees the saved version after the reconnect', async ({
   page,
 }) => {

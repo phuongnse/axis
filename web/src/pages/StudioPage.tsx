@@ -226,6 +226,15 @@ function StudioWorkspace() {
     setParams({ app: application!, resource: item.id })
   }
 
+  function onWritten(diagnostics: StudioDiagnostic[], created?: StudioResourceItem) {
+    setFolder((current) =>
+      current && current.application === application && 'resources' in current
+        ? { ...current, resources: created ? [...current.resources, created] : current.resources, diagnostics }
+        : current,
+    )
+    setFolderRevision((value) => value + 1)
+  }
+
   function onApplicationCreated(name: string) {
     setApps((current) => (Array.isArray(current) ? [...current, { name }] : [{ name }]))
     pickApplication(name)
@@ -315,7 +324,9 @@ function StudioWorkspace() {
             <StudioPolicyMatrix
               application={application!}
               folderRevision={folderRevision}
+              names={names}
               onOpenPolicy={(id) => setParams({ app: application!, resource: id })}
+              onWritten={onWritten}
             />
           ) : (
             <Flex gap="large" align="flex-start">

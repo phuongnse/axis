@@ -1169,7 +1169,7 @@ reconnect message are built.
     before a publish.
   - See [migrations](storage.md#migrations) and the
     [resource file shape](configuration.md#resource-file-shape).
-- **Policy matrix** *(read-only view built, editing planned for M11)*. One view per application shows who
+- **Policy matrix** *(built)*. One view per application shows who
   may do what.
   - Roles are the rows. The columns are the entities without child entities,
     the data sources, the processes and the endpoints.
@@ -1188,21 +1188,39 @@ reconnect message are built.
     `create`, `update` and `delete`. A data source takes `read`. A process
     takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
     takes `invoke`. Filter and fields are only on entity grants.
-  - A save writes one file, with the single-file routes.
   - The view reads the [policy matrix route](authoring.md#policy-matrix).
   - A Resources / Policy matrix switch sits under the application picker. The
     matrix view is kept in the address as `&view=policies`, so a reload or a
     shared link reopens it. The diagnostics panel shows in both views.
-  - The read-only view is built. A cell lists the role's combined actions, and
-    selecting it opens its grants under the table with each grant's policy,
-    actions, filter and fields. A shared grant is tagged Shared, and its Open
-    policy link opens that policy in the Resources view. A data source cell
-    that lacks the `read` of its root entity warns and names that entity. A
-    read-only row shows its reason.
-  - Editing a cell, creating `<Role>Access` and showing the filter in the
-    expression editor and the fields in the field picker are *(planned for
-    M11)*. The grant panel shows the filter as plain text and the fields as
-    tags until then.
+  - Selecting a cell opens its grants under the table. A cell lists the
+    role's combined actions. A data source cell that lacks the `read` of its
+    root entity warns and names that entity. A read-only row shows its reason.
+    A shared grant is tagged Shared, and its Open policy link opens that policy
+    in the Resources view.
+  - In an editable row, the cell's own grants are editable. They are the
+    grants of `<Role>Access` that name exactly this target. The panel reads
+    that policy with the resource route, so every edit fits the file that a
+    save patches.
+    - Each grant has checkboxes for the actions its target takes, and nothing
+      else. An action the target does not take stays in the file and shows as
+      a warning tag, and only Validate reports it.
+    - An entity grant also edits its record filter in the expression editor
+      and its fields in a field picker. An empty field list means all fields,
+      so clearing the picker removes the `fields` key.
+    - Add grant adds a grant for the cell's target. Remove deletes a grant,
+      but not the policy's last one.
+    - Save is off while a grant has no ticked action, and while nothing
+      changed.
+  - A save writes one file. It sends one patch with the version the panel
+    loaded, and the patch changes only what the author edited. When the role
+    has no `<Role>Access`, Save creates `policies/<role>-access.json` with
+    `roles` set to that role only. A stale version shows a conflict message,
+    keeps the draft and offers Reload, which discards it.
+  - After a save, the diagnostics panel, the matrix and the names load again,
+    and the selected cell stays open. Selecting another cell, or a matrix that
+    loads again after another write, discards an unsaved draft.
+  - A shared grant, a grant of a read-only row and a grant in any other policy
+    stay read-only. Splitting a shared policy is not done here.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
