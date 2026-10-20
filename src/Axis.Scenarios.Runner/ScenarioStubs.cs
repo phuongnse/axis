@@ -6,7 +6,7 @@ using Axis.Configuration.Resources;
 using Axis.Extensions;
 using Axis.Processes.Instances;
 
-namespace Axis.Scenarios;
+namespace Axis.Scenarios.Runner;
 
 /// <summary>
 /// The stubs of a scenario. They stand in for the HTTP request of a connector call and for the

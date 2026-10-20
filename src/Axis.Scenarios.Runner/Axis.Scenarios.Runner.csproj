@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Axis.Configuration\Axis.Configuration.csproj" />
+    <ProjectReference Include="..\Axis.Data\Axis.Data.csproj" />
+    <ProjectReference Include="..\Axis.Processes\Axis.Processes.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Integration.Tests" />
+  </ItemGroup>
+
+</Project>

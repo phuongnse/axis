@@ -1,10 +1,13 @@
 using System.Xml.Linq;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Scenarios;
+using Axis.Scenarios.Runner;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
@@ -54,6 +57,65 @@ public sealed class ScenarioRunnerTests
         Assert.Contains("'quantity'", result.Failure);
         Assert.Contains("expected 3", result.Failure);
         Assert.Contains("but was 4", result.Failure);
+        Assert.False(await DatabaseExistsAsync(result.Database));
+    }
+
+    [Fact]
+    public async Task A_scenario_of_the_purchase_request_sample_passes_from_files_held_in_memory_and_drops_its_database()
+    {
+        var files = ReadJsonFiles(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"));
+        var scenario = Axis.Configuration.Loading.ApplicationLoader.Load(files).Scenarios.Single(candidate => candidate.Name == "ApprovalBelowThreshold");
+
+        var result = await ScenarioRunner.RunAsync(
+            files,
+            scenario,
+            await PostgreSqlServer.AdminConnectionStringAsync(),
+            NullLoggerFactory.Instance,
+            CancellationToken,
+            packages: _packages.Value,
+            modules: ModuleCatalog.Load(SampleModules.Path));
+
+        Assert.True(result.Passed, result.Failure);
+        Assert.Null(result.Step);
+        Assert.StartsWith("axis_scenario_", result.Database);
+        Assert.False(await DatabaseExistsAsync(result.Database));
+    }
+
+    [Fact]
+    public async Task A_failing_third_step_reports_its_index_and_its_message_without_the_step_prefix()
+    {
+        using var folder = Application(Scenario("ThirdStep", Clerk, """
+            { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk", "quantity": 3 } },
+            { "type": "updateRecord", "record": "note", "as": "anna", "values": { "title": "Desk", "quantity": 4 } },
+            { "type": "expectRecord", "record": "note", "values": { "title": "Desk", "quantity": 3 } }
+            """));
+
+        var result = await RunAsync(folder, "ThirdStep");
+
+        Assert.False(result.Passed);
+        Assert.Equal(2, result.Step);
+        Assert.Equal("expectRecord", result.StepType);
+        Assert.Contains("'quantity'", result.Message);
+        Assert.Contains("expected 3", result.Message);
+        Assert.Contains("but was 4", result.Message);
+        Assert.False(result.Message!.StartsWith("Step ", StringComparison.Ordinal));
+        Assert.StartsWith("Step 3 (expectRecord): ", result.Failure);
+        Assert.False(await DatabaseExistsAsync(result.Database));
+    }
+
+    [Fact]
+    public async Task A_scenario_of_an_application_that_does_not_compile_reports_no_step()
+    {
+        using var folder = Application(Scenario("Broken", Clerk, """
+            { "type": "createRecord", "entity": "Missing", "as": "anna", "values": { "title": "Desk" } }
+            """));
+
+        var result = await RunAsync(folder, "Broken");
+
+        Assert.False(result.Passed);
+        Assert.Null(result.Step);
+        Assert.Null(result.StepType);
+        Assert.StartsWith("The application could not be compiled", result.Message);
         Assert.False(await DatabaseExistsAsync(result.Database));
     }
 
@@ -845,6 +907,12 @@ public sealed class ScenarioRunnerTests
         return await ScenarioRunner.RunAsync(
             folder.Path, scenario, await PostgreSqlServer.AdminConnectionStringAsync(), NullLoggerFactory.Instance, CancellationToken, workItemLimit, packages);
     }
+
+    /// <summary>The <c>*.json</c> files of a folder as resources, with relative paths that use <c>/</c>.</summary>
+    private static List<ResourceContent> ReadJsonFiles(string folder) =>
+        Directory.EnumerateFiles(folder, "*.json", SearchOption.AllDirectories)
+            .Select(file => new ResourceContent(Path.GetRelativePath(folder, file).Replace('\\', '/'), File.ReadAllText(file)))
+            .ToList();
 
     private static async Task<bool> DatabaseExistsAsync(string name)
     {

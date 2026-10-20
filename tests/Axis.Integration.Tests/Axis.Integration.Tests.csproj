@@ -27,6 +27,7 @@
     <ProjectReference Include="..\..\src\Axis.Data\Axis.Data.csproj" />
     <ProjectReference Include="..\..\src\Axis.Processes\Axis.Processes.csproj" />
     <ProjectReference Include="..\..\src\Axis.Scenarios\Axis.Scenarios.csproj" />
+    <ProjectReference Include="..\..\src\Axis.Scenarios.Runner\Axis.Scenarios.Runner.csproj" />
     <ProjectReference Include="..\..\src\Axis.Server\Axis.Server.csproj" />
     <ProjectReference Include="..\..\src\Axis.Worker\Axis.Worker.csproj" />
     <ProjectReference Include="..\Axis.PurchasingStub\Axis.PurchasingStub.csproj" />
