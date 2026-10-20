@@ -5,8 +5,8 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// Gives test hosts the platform settings every environment supplies: the platform connection string, the
-/// platform schema connection string and the secret key. It also removes the platform migration step, so a host
-/// starts without a database.
+/// platform schema connection string and the secret key. It also removes the platform migration step and keeps the
+/// data protection keys in memory, so a host starts without a database.
 /// </summary>
 internal static class TestPlatform
 {

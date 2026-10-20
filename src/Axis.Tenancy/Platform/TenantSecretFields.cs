@@ -12,6 +12,9 @@ public static class TenantSecretFields
 
     public const string OidcClientSecret = "oidc_client_secret";
 
+    /// <summary>The field of a data protection key. It is bound with an empty tenant id.</summary>
+    public static string DataProtectionKey(Guid id) => "data_protection_key:" + id.ToString("D");
+
     /// <summary>The field of a <c>secret</c> binding. The name is lower case, because binding names ignore letter case.</summary>
     public static string Binding(string name)
     {

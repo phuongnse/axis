@@ -19,6 +19,8 @@ using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
@@ -59,11 +61,12 @@ if (string.Equals(readerRole, new NpgsqlConnectionStringBuilder(platformSchemaCo
 }
 
 var cipher = TenantSecretCipher.Load(builder.Configuration);
+builder.Services.AddSingleton(cipher);
 var platformMigration = new PlatformMigrationOptions(platformSchemaConnectionString, readerRole);
 
 // Under directory, the platform migrations and the first directory load run now, before the services are
 // built, because sign-in registers one client per tenant. Under configuration, the migrations run as a hosted
-// service, and nothing reads the platform tables yet.
+// service. Either way the platform migrations run before anything else reads the platform tables.
 ITenantCatalog tenants;
 var directorySource = TenancySettings.Source(builder.Configuration) == TenancySource.Directory;
 if (directorySource)
@@ -90,7 +93,6 @@ if (directorySource)
     tenants = directory;
 
     // Registered first, so it logs before the release check runs.
-    builder.Services.AddSingleton(cipher);
     builder.Services.AddSingleton(directory);
     builder.Services.AddSingleton<TenantDirectoryRefreshStatus>();
     builder.Services.AddSingleton(new TenantDirectoryRefreshOptions(platformConnectionString, refreshInterval));
@@ -116,6 +118,14 @@ else
     // and the worker never uses it.
     builder.Services.AddSingleton(TenantSchemaConnections.Load(tenants));
 }
+
+// Every replica reads the same keys, encrypted with Platform:SecretKey. The start check decrypts them all, after
+// the platform migrations and before startup activation. The application name is fixed, because ASP.NET otherwise
+// isolates keys by content root path, and replicas at different paths would refuse each other's cookies.
+builder.Services.AddSingleton<PlatformKeyRing>();
+builder.Services.AddDataProtection().SetApplicationName("Axis");
+builder.Services.AddOptions<KeyManagementOptions>().Configure<PlatformKeyRing>((options, ring) => options.XmlRepository = ring);
+builder.Services.AddHostedService<PlatformKeyRingStart>();
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
 builder.Services.AddSingleton<TenantDatabaseGauge>();

@@ -501,9 +501,8 @@ removed. Everything in this decision is in place. See
   - It holds the user id, the display name, the roles and the tenant id.
   - It holds no tokens, and no token reaches the browser.
   - It ends after 8 hours, or after 1 hour without requests.
-  - *(planned for M10)* The cookie is protected with a key ring shared by every
-    replica, and behind a named proxy the server uses the forwarded scheme and
-    host. See
+  - The cookie is protected with a key ring shared by every replica, and
+    behind a named proxy the server uses the forwarded scheme and host. See
     [D49](#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **Bound to its tenant:** a session used on another tenant's host is no
   session.
@@ -2160,9 +2159,8 @@ The owner confirmed these points on issue #639 on 2026-10-18.
   - The server applies the platform migrations over a separate setting,
     `ConnectionStrings:PlatformSchema`. It uses it only at start, as D31 does
     for the tenant databases.
-  - *(planned for M10)* The read-only role gains `INSERT` on the data
-    protection key table, and under `configuration` the server now creates the
-    platform tables too. See
+  - The read-only role gains `INSERT` on the data protection key table, and
+    under `configuration` the server now creates the platform tables too. See
     [D49](#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **First load:** the server stops its start when it cannot load the directory
   the first time, because there is no earlier directory that is safe to serve.
@@ -2743,8 +2741,8 @@ to try a change with its own data and bindings. The costs:
 ## D49. Several server replicas behind a TLS proxy — Agreed
 
 M10 runs the server as several replicas behind a reverse proxy that ends TLS.
-That is what a shared Studio server needs. The forwarded headers and the
-platform tables under both tenant sources are built so far. See the [installation guide](reference/installation.md#several-server-replicas),
+That is what a shared Studio server needs. The forwarded headers, the shared
+key ring and the platform tables under both tenant sources are built so far. See the [installation guide](reference/installation.md#several-server-replicas),
 the [forwarded headers settings](reference/configuration.md#forwarded-headers),
 the [platform database](reference/storage.md#platform-database) and the
 [authoring API](reference/authoring.md#versions).

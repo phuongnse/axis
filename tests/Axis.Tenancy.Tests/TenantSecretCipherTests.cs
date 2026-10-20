@@ -102,6 +102,52 @@ public sealed class TenantSecretCipherTests
     }
 
     [Fact]
+    public void A_data_protection_key_round_trips_and_hides_the_xml()
+    {
+        var id = Guid.NewGuid();
+        var plain = Encoding.UTF8.GetBytes(PlainText);
+
+        var stored = _cipher.EncryptDataProtectionKey(id, PlainText);
+
+        Assert.Equal(plain.Length + TenantSecretCipher.NonceSize + TenantSecretCipher.TagSize, stored.Length);
+        Assert.False(Contains(stored, plain));
+        Assert.Equal(PlainText, _cipher.DecryptDataProtectionKey(id, stored).Reveal());
+    }
+
+    [Fact]
+    public void A_data_protection_key_does_not_decrypt_for_another_key_id()
+    {
+        var id = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var stored = _cipher.EncryptDataProtectionKey(id, PlainText);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => _cipher.DecryptDataProtectionKey(other, stored));
+
+        Assert.Contains($"'{other}'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Platform:SecretKey", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(PlainText, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_data_protection_key_does_not_decrypt_as_a_tenant_field_and_a_tenant_field_does_not_decrypt_as_a_key()
+    {
+        var id = Guid.NewGuid();
+        var key = _cipher.EncryptDataProtectionKey(id, PlainText);
+        var secret = _cipher.Encrypt("a", TenantSecretFields.RuntimePassword, PlainText);
+
+        Assert.Throws<InvalidOperationException>(() => _cipher.Decrypt("a", TenantSecretFields.DataProtectionKey(id), key));
+        Assert.Throws<InvalidOperationException>(() => _cipher.DecryptDataProtectionKey(id, secret));
+    }
+
+    [Fact]
+    public void A_data_protection_key_field_names_the_key_id()
+    {
+        var id = Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e");
+
+        Assert.Equal("data_protection_key:0f8fad5b-d9cb-469f-a165-70867728950e", TenantSecretFields.DataProtectionKey(id));
+    }
+
+    [Fact]
     public void A_binding_field_is_lower_case()
     {
         Assert.Equal("binding:purchasingtoken", TenantSecretFields.Binding("PurchasingToken"));

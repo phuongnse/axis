@@ -13,8 +13,9 @@ image:
 
 server:
   repository: axis-server
-  # More than one replica needs a shared data protection key ring, which
-  # D44 has not decided. Keep 1 until then.
+  # Replicas share the data protection key ring in the platform database, so
+  # sessions work on every replica. With Studio on, keep 1 until the Studio
+  # write lock is built, see docs/reference/installation.md.
   replicas: 1
   # A Kubernetes resources block: requests and limits.
   resources: {}

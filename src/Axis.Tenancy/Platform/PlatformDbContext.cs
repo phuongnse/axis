@@ -3,8 +3,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Axis.Tenancy.Platform;
 
 /// <summary>
-/// The tenant directory in the <c>platform</c> schema of the platform database: the tenants, their hosts
-/// and their deployment bindings. The caller supplies the connection to the platform database.
+/// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts
+/// and their deployment bindings, and the data protection keys of the server. The caller supplies the connection to the platform database.
 /// </summary>
 public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> options) : DbContext(options)
 {
@@ -17,6 +17,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantHostRow> TenantHosts => Set<TenantHostRow>();
 
     public DbSet<TenantBindingRow> TenantBindings => Set<TenantBindingRow>();
+
+    public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
@@ -87,6 +89,16 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             binding.Property(b => b.Kind).HasColumnName("kind");
             binding.Property(b => b.Url).HasColumnName("url");
             binding.Property(b => b.SecretValue).HasColumnName("secret_value").HasColumnType("bytea");
+        });
+
+        modelBuilder.Entity<DataProtectionKeyRow>(key =>
+        {
+            key.ToTable("data_protection_keys");
+            key.HasKey(k => k.Id).HasName("pk_data_protection_keys");
+            key.Property(k => k.Id).HasColumnName("id").ValueGeneratedNever();
+            key.Property(k => k.FriendlyName).HasColumnName("friendly_name");
+            key.HasIndex(k => k.FriendlyName).IsUnique().HasDatabaseName("ix_data_protection_keys_friendly_name");
+            key.Property(k => k.Xml).HasColumnName("xml").HasColumnType("bytea");
         });
     }
 }

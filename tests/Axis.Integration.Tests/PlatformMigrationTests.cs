@@ -27,7 +27,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             platform,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'platform' ORDER BY table_name");
 
-        Assert.Equal(["__platform_migrations", "tenant_bindings", "tenant_hosts", "tenants"], tables);
+        Assert.Equal(["__platform_migrations", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenants"], tables);
     }
 
     [Theory]
@@ -41,6 +41,30 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
         Assert.Equal(0L, await ScalarAsync(reader, "SELECT count(*) FROM platform.tenants"));
         await AssertSqlStateAsync(reader, InsertTenant("reader"), PermissionDenied);
         await AssertSqlStateAsync(reader, "CREATE TABLE platform.x (id int)", PermissionDenied);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_platform_reader_role_can_insert_data_protection_keys_but_nothing_else_is_writable(bool directory)
+    {
+        var platform = await StartServerAsync(directory);
+        var reader = PostgreSqlServer.RuntimeConnectionString(platform);
+        var readerRole = new NpgsqlConnectionStringBuilder(reader).Username;
+        var id = Guid.NewGuid();
+
+        await ExecuteAsync(reader, $"INSERT INTO platform.data_protection_keys (id, friendly_name, xml) VALUES ('{id}', 'key-{id}', '\\x00')");
+        await AssertSqlStateAsync(reader, "UPDATE platform.data_protection_keys SET friendly_name = 'x'", PermissionDenied);
+        await AssertSqlStateAsync(reader, "DELETE FROM platform.data_protection_keys", PermissionDenied);
+        Assert.Equal(
+            0L,
+            await ScalarAsync(
+                platform,
+                $"""
+                SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'platform' AND c.relkind IN ('r', 'p') AND c.relname <> 'data_protection_keys'
+                AND has_table_privilege('{readerRole}', c.oid, 'INSERT,UPDATE,DELETE,TRUNCATE')
+                """));
     }
 
     [Fact]
@@ -110,7 +134,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             }));
         using var client = factory.CreateClient();
 
-        Assert.Equal(["__platform_migrations", "tenant_bindings", "tenant_hosts", "tenants"], probe.Tables);
+        Assert.Equal(["__platform_migrations", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenants"], probe.Tables);
     }
 
     private async Task<string> StartServerAsync(bool directory)
