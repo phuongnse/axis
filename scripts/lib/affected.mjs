@@ -44,6 +44,7 @@ export const smokeSuites = {
     'samples/modules/',
     'samples/packages/',
     'samples/postgres/',
+    'samples/templates/',
     'scripts/compose.test.mjs',
     'scripts/lib/',
     'scripts/e2e.sh',

@@ -1,0 +1,24 @@
+{
+  "id": "54a6204a-4cce-4701-8df7-88ab328f6392",
+  "kind": "page",
+  "name": "RequestForm",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "pages.requestForm.title"
+  },
+  "widgets": [
+    {
+      "type": "form",
+      "entity": "Request",
+      "actions": [
+        {
+          "type": "startProcess",
+          "process": "RequestApproval",
+          "label": {
+            "textKey": "request.submit"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -2420,8 +2420,8 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 
 This section follows
 [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
-The manifest, the one-site rule, installation and listing are built. The copy and
-the sample are _(planned for M11)_.
+The manifest, the one-site rule, installation, listing and the sample are built.
+The copy is _(planned for M11)_.
 An application template is an application folder with a `template.json`
 manifest. Studio creates a new application by copying an installed template, see
 [creating an application](authoring.md#creating-an-application).
@@ -2469,7 +2469,7 @@ The manifest is `template.json` at the root of the folder:
   - References are by name, so they still resolve.
   - The copy has the template's diagnostics. `template.json` is not copied,
     because template metadata does not belong in an application.
-- **Sample** _(planned for M11)_. `samples/templates/request-approval` is the sample template. It
+- **Sample.** `samples/templates/request-approval` is the sample template. It
   holds one entity with a sequence number, a form page, a table page, a two-step
   approval process, two roles and their policies, texts in `en` and `vi`, and one
   test scenario. `scripts/build.sh` installs it into `artifacts/templates`. The
@@ -3257,7 +3257,8 @@ which plays the role of `Modules:Path`, and works the same way for modules. A
 missing folder is a setup error. A user's display name is their id.
 
 `scripts/integration.sh` runs the scenarios of every application under
-`samples/apps/` from the integration tests, on their Testcontainers PostgreSQL.
+`samples/apps/` and of every sample template under `samples/templates/` from the
+integration tests, on their Testcontainers PostgreSQL.
 
 What runs now:
 
