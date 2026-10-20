@@ -208,7 +208,13 @@ export interface StudioNames {
   entities: StudioNameEntity[]
   dataSources: { id: string; name: string; module: string | null }[]
   processes: { id: string; name: string; steps: StudioNameStep[] }[]
-  rules: { id: string; name: string; module: string | null }[]
+  rules: {
+    id: string
+    name: string
+    module: string | null
+    parameters: { name: string; type: string }[]
+    resultType: string
+  }[]
   connectors: { id: string; name: string; operations: { name: string }[] }[]
   events: { id: string; name: string; fields: { name: string; type: string }[] }[]
   roles: StudioNameResource[]
@@ -271,7 +277,7 @@ export async function fetchStudioDiagnostics(application: string, signal?: Abort
   return ((await response.json()) as { diagnostics: StudioDiagnostic[] }).diagnostics
 }
 
-/** Loads every name the application defines, for the reference pickers. */
+/** Loads every name the application defines, for the reference pickers and expression completion. */
 export async function fetchStudioNames(application: string, signal?: AbortSignal): Promise<StudioNames> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/names`
   const response = await studioFetch(path, { signal })

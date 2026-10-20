@@ -69,6 +69,31 @@ test('an author sees an expression error as they type, and its type once fixed, 
   expect(await readFile(file, 'utf8')).toBe(before)
 })
 
+
+test('an author completes the names of a policy filter without saving', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const policy = items.find((item) => item.file === 'policies/employee-access.json')!
+  const file = path.join(studioFolder, 'policies/employee-access.json')
+  const before = await readFile(file, 'utf8')
+
+  await page.goto(`/studio?app=PurchaseRequests&resource=${policy.id}`)
+  const field = page.getByTestId('studio-field-/grants/0/filter')
+  await expect(field.getByTestId('studio-expression-type')).toContainText('boolean')
+  const editor = field.getByRole('textbox')
+  await editor.click()
+  await editor.press('ControlOrMeta+A')
+  await editor.pressSequentially('req')
+  await expect(page.getByRole('option', { name: 'requester' })).toBeVisible()
+
+  await editor.press('ControlOrMeta+A')
+  await editor.pressSequentially('cur')
+  await expect(page.getByRole('option', { name: 'currentUser()' })).toBeVisible()
+
+  expect(await readFile(file, 'utf8')).toBe(before)
+})
+
 test('an author follows a Used by entry from a department to the entity that uses it', async ({ page }) => {
   await useSession(page, 'hoa')
   const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
@@ -230,6 +255,74 @@ test('an author adds a department in the seed grid and the file holds only that 
     const added = after.records[before.records.length]
     expect(added.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
     expect(added.values).toEqual({ code, name: 'Test department' })
+  } finally {
+    await writeFile(file, original)
+  }
+})
+
+test('an author adds a connector operation in the connector editor and the file keeps the others', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const connector = items.find((item) => item.file === 'connectors/purchasing-system.json')!
+  const file = path.join(studioFolder, 'connectors/purchasing-system.json')
+  const original = await readFile(file, 'utf8')
+  const before = JSON.parse(original) as { operations: { name: string }[] }
+  const diagnosticsBefore = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+  const name = `ping${Date.now().toString(36)}`
+
+  try {
+    await page.goto(`/studio?app=PurchaseRequests&resource=${connector.id}`)
+    await expect(page.getByRole('textbox', { name: 'URL binding' })).toHaveValue('PurchasingSystemUrl')
+    await page.getByRole('button', { name: 'Add operation' }).click()
+    const added = before.operations.length
+    await page.getByTestId(`studio-field-/operations/${added}/name`).getByRole('textbox').fill(name)
+    await page.getByTestId(`studio-field-/operations/${added}/path`).getByRole('textbox').fill('/ping')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+
+    const diagnosticsAfter = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+    expect(diagnosticsAfter).toEqual(diagnosticsBefore)
+    const after = JSON.parse(await readFile(file, 'utf8')) as {
+      operations: Record<string, unknown>[]
+      baseUrl: unknown
+      auth: unknown
+    }
+    expect(after.operations).toHaveLength(added + 1)
+    expect(after.operations.slice(0, added)).toEqual(before.operations)
+    expect(after.operations[added]).toEqual({ name, method: 'POST', path: '/ping' })
+    expect(after.baseUrl).toEqual({ binding: 'PurchasingSystemUrl' })
+    expect(after.auth).toEqual({ type: 'bearer', token: { binding: 'PurchasingSystemToken' } })
+  } finally {
+    await writeFile(file, original)
+  }
+})
+
+test('an author edits an endpoint mapping row and the file holds only that expression changed', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const endpoint = items.find((item) => item.file === 'endpoints/submit-purchase-request.json')!
+  const file = path.join(studioFolder, 'endpoints/submit-purchase-request.json')
+  const original = await readFile(file, 'utf8')
+  const before = JSON.parse(original) as { values: Record<string, string> }
+  const diagnosticsBefore = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+
+  try {
+    await page.goto(`/studio?app=PurchaseRequests&resource=${endpoint.id}`)
+    const row = page.getByTestId('studio-field-/values/title')
+    const expression = row.getByRole('textbox')
+    // The type line shows only once CodeMirror has replaced the read-only Suspense fallback.
+    await expect(row.getByTestId('studio-expression-type')).toBeVisible()
+    await expression.fill('trim(title)')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+
+    const diagnosticsAfter = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+    expect(diagnosticsAfter).toEqual(diagnosticsBefore)
+    const after = JSON.parse(await readFile(file, 'utf8')) as typeof before
+    expect(after.values).toEqual({ ...before.values, title: 'trim(title)' })
+    expect(Object.keys(after.values)).toEqual(Object.keys(before.values))
   } finally {
     await writeFile(file, original)
   }

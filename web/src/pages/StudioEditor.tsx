@@ -1,5 +1,5 @@
 import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
 import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
 import {
@@ -12,8 +12,11 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
+import { ConnectorEditor } from './ConnectorEditor'
+import { EndpointValues } from './EndpointValues'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
@@ -82,7 +85,9 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * form at the field that holds it and scrolls to that field once the resource has loaded. A path the form cannot
  * show opens the JSON view instead. A seed whose entity is a resource of the folder shows its records as a grid with
  * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
- * the entity is not in the folder, the seed uses the generic form. When the server does not answer, the draft stays, and the resource loads again
+ * the entity is not in the folder, the seed uses the generic form. A connector opens in the connector editor, which
+ * shows a binding as a name only. An endpoint keeps the generic form and shows its `values` as rows of a field of its
+ * entity and an expression. When the server does not answer, the draft stays, and the resource loads again
  * after the reconnect unless the draft has changes. A process shows its step graph above the tabs, drawn from the draft.
  * Its diagnostic paths mark steps, and selecting a node or an edge opens its path, as a diagnostic does.
  */
@@ -106,6 +111,7 @@ export function StudioEditor({
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
+  const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
   const dirtyRef = useRef(false)
@@ -193,7 +199,10 @@ export function StudioEditor({
   }, [application, entityId, generation, lost])
 
   const seedFields = entityId !== undefined && seedEntity?.id === entityId ? seedEntity.fields : null
-  const checkContext = useMemo(() => ({ application, resourceId: item.id }), [application, item.id])
+  const checkContext = useMemo(
+    () => ({ application, resourceId: item.id, kind: item.kind, draft, names }),
+    [application, item.id, item.kind, draft, names],
+  )
   // The form is final once the seed's entity has loaded, so a path into a record finds its cell.
   const formReady = entityId === undefined || seedEntity?.id === entityId
   const problems = useMemo(
@@ -207,6 +216,18 @@ export function StudioEditor({
     const { records: _records, ...properties } = schema.properties ?? {}
     return { ...schema, properties, required: schema.required?.filter((name) => name !== 'records') }
   }, [schema, seedFields])
+
+  const endpointSchema = useMemo(() => {
+    if (item.kind !== 'endpoint' || !schema) {
+      return undefined
+    }
+    const { values: _values, ...properties } = schema.properties ?? {}
+    return { ...schema, properties, required: schema.required?.filter((name) => name !== 'values') }
+  }, [item.kind, schema])
+  const endpointEntity = item.kind === 'endpoint' ? String(draft.entity).toLowerCase() : undefined
+  const endpointFields = names?.entities
+    .find((entity) => entity.name.toLowerCase() === endpointEntity)
+    ?.fields.map((field) => field.name)
 
   const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
   const isLoaded = loaded !== undefined
@@ -371,6 +392,13 @@ export function StudioEditor({
                 <Flex vertical gap="middle">
                   <SchemaForm schema={seedSchema} value={draft} onChange={change} />
                   <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={update} />
+                </Flex>
+              ) : item.kind === 'connector' && schema ? (
+                <ConnectorEditor value={draft} onChange={change} />
+              ) : endpointSchema ? (
+                <Flex vertical gap="middle">
+                  <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
+                  <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
                 </Flex>
               ) : schema ? (
                 <SchemaForm schema={schema} value={draft} onChange={change} />

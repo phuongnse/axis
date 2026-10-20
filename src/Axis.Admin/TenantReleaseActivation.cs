@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
@@ -6,6 +7,7 @@ using Axis.Configuration.Loading;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Resources;
 using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Seeding;
@@ -165,6 +167,10 @@ internal sealed class TenantReleaseActivation(
     /// <paramref name="scenarioNames"/>, a JSON array of strings or null for every scenario, that the application does not have.
     /// In each of these cases no scenario runs. Otherwise it runs the chosen scenarios in file order, and fails when one
     /// failed. Every compile diagnostic, warnings included, is added to <paramref name="diagnostics"/>.
+    /// The scenarios may run for at most <paramref name="limit"/>, counted from the first of them. A run that
+    /// reaches it fails with <c>AXC0219</c>, and one that <paramref name="stopping"/> ends fails with <c>AXC0220</c>. In both
+    /// cases the running scenario, or the one about to start, is stored as failed and its database is dropped, and the scenarios
+    /// that follow do not run.
     /// </summary>
     public async Task<ScenarioTestRun> TestAsync(
         string id,
@@ -174,7 +180,9 @@ internal sealed class TenantReleaseActivation(
         string? scenarioNames,
         PackageCatalog packages,
         ModuleCatalog modules,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        TimeSpan limit,
+        CancellationToken stopping)
     {
         var results = new JsonArray();
         var succeeded = await Step(id, "version", () => CheckVersionAsync(schemaVersion))
@@ -219,16 +227,61 @@ internal sealed class TenantReleaseActivation(
                     scenarios = scenarios.Where(scenario => names.Contains(scenario.Name, StringComparer.Ordinal)).ToList();
                 }
 
+                // The limit counts from here, so a claim that runs again gets the whole time again.
+                using var limited = CancellationTokenSource.CreateLinkedTokenSource(stopping);
+                limited.CancelAfter(limit);
+
+                // A stop is what ended the run when both happened, because the operator caused it and the test did not.
+                Exception Cut(ScenarioResource? cut, TimeSpan elapsed)
+                {
+                    var stoppedByOperator = stopping.IsCancellationRequested;
+                    var (code, message) = stoppedByOperator
+                        ? (DiagnosticCodes.ScenarioStopped, "The publisher stopped while the test request ran.")
+                        : (DiagnosticCodes.ScenarioTimeLimit, $"The test request ran past its time limit of {limit.TotalMinutes:0.##} minutes.");
+                    if (cut is not null)
+                    {
+                        results.Add(ScenarioJson(cut.Id, new ScenarioResult(cut.Name, cut.File, "", elapsed, null, null, message)));
+                        output.WriteLine($"{id} scenario {cut.Name} failed: {message}");
+                    }
+
+                    var diagnostic = new Diagnostic(code, message, "", "");
+                    diagnostics.Add(diagnostic);
+                    return new DiagnosticsFailure([diagnostic]);
+                }
+
                 var failed = 0;
                 foreach (var scenario in scenarios)
                 {
-                    var result = await ScenarioRunner.RunAsync(
-                        files, scenario, scenarioServer, NullLoggerFactory.Instance, cancellationToken, packages: packages, modules: modules);
+                    var started = Stopwatch.StartNew();
+                    ScenarioResult? result = null;
+                    if (!limited.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            result = await ScenarioRunner.RunAsync(
+                                files, scenario, scenarioServer, NullLoggerFactory.Instance, limited.Token, packages: packages, modules: modules);
+                        }
+                        catch (OperationCanceledException) when (limited.IsCancellationRequested)
+                        {
+                            // The runner has dropped its database.
+                        }
+                    }
+
+                    if (result is null)
+                    {
+                        throw Cut(scenario, started.Elapsed);
+                    }
+
                     results.Add(ScenarioJson(scenario.Id, result));
                     if (result.Failure is { } failure)
                     {
                         failed++;
                         output.WriteLine($"{id} scenario {result.Name} failed: {failure}");
+                        if (limited.IsCancellationRequested)
+                        {
+                            // The cancel surfaced as a failure of the scenario, not as a cancel.
+                            throw Cut(null, started.Elapsed);
+                        }
                     }
                     else
                     {

@@ -177,6 +177,37 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
+    public async Task Stopping_the_publisher_during_a_publish_lets_the_publish_finish()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null));
+        await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
+        var publisher = StartPublisher(scenario, _testLease);
+        AdminResult result;
+        try
+        {
+            await WaitForStatusAsync(scenario, ids[0], request, "running");
+
+            // The publish is held at its activation. The stop comes first, and the publisher must still wait for the publish.
+            await publisher.Stop.CancelAsync();
+            await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken);
+            Assert.False(publisher.Run.IsCompleted);
+            Assert.Equal("running", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+        }
+        finally
+        {
+            result = await publisher.StopAsync();
+        }
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.active_releases"));
+        Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.published'"));
+    }
+
+    [Fact]
     public async Task A_request_whose_publisher_stopped_is_claimed_again_after_its_lease()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);

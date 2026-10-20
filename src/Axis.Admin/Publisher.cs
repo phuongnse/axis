@@ -39,8 +39,10 @@ namespace Axis.Admin;
 /// up no test. While a request runs,
 /// the publisher renews its lease. A running request whose lease has run out is claimed again, and the third such claim to
 /// run out ends it <c>failed</c> with <c>AXC0215</c>. The <c>claims</c> count fences the final update, so a publisher that
-/// lost its claim changes nothing. Every step runs as the tenant's schema role, and a stop finishes the request that is
-/// running, then ends the loop. The tenants come from the tenant directory or from the <c>Tenants</c> configuration section,
+/// lost its claim changes nothing. Every step runs as the tenant's schema role. A <c>test</c> may run for at most
+/// 10 minutes, and past that its running scenario fails, its database is dropped and the request ends <c>failed</c> with
+/// <c>AXC0219</c>. A stop ends a running <c>test</c> at once in the same way, with <c>AXC0220</c>, and lets a running
+/// <c>publish</c>, <c>validate</c> or <c>rollback</c> finish. Then the loops end. The tenants come from the tenant directory or from the <c>Tenants</c> configuration section,
 /// see <see cref="IPublisherTenants"/>.
 /// </summary>
 internal sealed class Publisher(
@@ -48,6 +50,7 @@ internal sealed class Publisher(
     string? scenarioServer,
     IPublisherTenants tenants,
     TimeSpan leaseDuration,
+    TimeSpan testLimit,
     TextWriter output,
     TextWriter error,
     CancellationToken stopping)
@@ -57,6 +60,8 @@ internal sealed class Publisher(
     private readonly TextWriter _error = TextWriter.Synchronized(error);
 
     internal static readonly TimeSpan DefaultLeaseDuration = TimeSpan.FromMinutes(5);
+
+    internal static readonly TimeSpan DefaultTestLimit = TimeSpan.FromMinutes(10);
 
     internal static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
 
@@ -342,7 +347,9 @@ internal sealed class Publisher(
                 request.ScenarioNames,
                 settings.Packages,
                 settings.Modules,
-                diagnostics);
+                diagnostics,
+                testLimit,
+                stopping);
             await StopRenewalAsync(renewing, renewal);
             await FinishAsync(tenant.Id, connections, request, new ReleaseRun(tested.Succeeded, null), diagnostics, audit: false, tested.Scenarios.ToJsonString());
             return;

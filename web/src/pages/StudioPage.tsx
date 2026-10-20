@@ -34,6 +34,9 @@ type FolderState =
   | { application: string; resources: StudioResourceItem[]; diagnostics: StudioDiagnostic[] }
   | { application: string; failed: true }
 
+/** The names of one application, or null when they did not load. `application` says which one they were loaded for. */
+type NamesState = { application: string; names: StudioNames | null }
+
 /**
  * Studio, the authoring page. The address holds the picked application and the selected resource, as
  * `/studio?app=PurchaseRequests&resource=<id>`. A person without the author role sees a forbidden page.
@@ -48,10 +51,10 @@ type FolderState =
  * Validate and Publish sit under the application picker, and Publish shows only when `GET /api/me` answers
  * `studioPublisher: true`. Under them, the release list shows the application's releases, with a Roll back button
  * for a publisher. A save or a delete loads the release list again, because the folder may now differ from the
- * active release. The names that the reference pickers offer load again after a save, a delete and a reconnect.
- * The diagnostics panel shows the diagnostics of a request that ended. When the server does not answer, a reconnect
- * message shows at the top. Studio checks the server with a
- * back-off, then loads its data again, and an unsaved draft stays on screen.
+ * active release. The diagnostics panel shows the diagnostics of a request that ended. When the server does not
+ * answer, a reconnect message shows at the top. Studio checks the server with a
+ * back-off, then loads its data again, and an unsaved draft stays on screen. The names that the reference pickers
+ * and expression completion offer load with the application too, and again after a save, a delete and a reconnect.
  * A process opens with its step graph above the editor. The diagnostics of the open resource mark its steps, and
  * selecting a node or an edge opens that path in the editor.
  */
@@ -98,6 +101,7 @@ function StudioWorkspace() {
   const [canPublish, setCanPublish] = useState(false)
   const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
+  const [namesState, setNamesState] = useState<NamesState>()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -164,14 +168,13 @@ function StudioWorkspace() {
     return () => controller.abort()
   }, [application, generation, lost])
 
-  const [names, setNames] = useState<{ application: string; names: StudioNames }>()
   useEffect(() => {
     if (application === null) {
       return
     }
     const controller = new AbortController()
     fetchStudioNames(application, controller.signal).then(
-      (loadedNames) => setNames({ application, names: loadedNames }),
+      (names) => setNamesState({ application, names }),
       (error: unknown) => {
         if (controller.signal.aborted) {
           return
@@ -181,14 +184,14 @@ function StudioWorkspace() {
           return
         }
         console.warn(`Loading the Studio names of '${application}' failed`, error)
-        setNames(undefined)
+        setNamesState({ application, names: null })
       },
     )
     return () => controller.abort()
   }, [application, generation, folderRevision, lost])
-  const loadedNames = names?.application === application ? names.names : undefined
 
   const loaded = folder?.application === application ? folder : undefined
+  const names = namesState?.application === application ? namesState.names : null
   const resources = useMemo(() => (loaded && 'resources' in loaded ? loaded.resources : []), [loaded])
   const groups = useMemo(() => groupByKind(filterResources(resources, search)), [resources, search])
   const selected = resourceId === null ? undefined : resources.find((item) => item.id === resourceId.toLowerCase())
@@ -324,7 +327,7 @@ function StudioWorkspace() {
                       ...(path ? [{ key: 'path', label: t('shell.studio.path'), children: path }] : []),
                     ]}
                   />
-                  <StudioNamesContext.Provider value={loadedNames}>
+                  <StudioNamesContext.Provider value={names ?? undefined}>
                     <StudioEditor
                       key={`editor-${selected.id}`}
                       application={application!}

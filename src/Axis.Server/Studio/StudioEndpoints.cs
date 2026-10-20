@@ -43,6 +43,11 @@ namespace Axis.Server.Studio;
 /// <c>id</c> or the file exists. <c>DELETE /api/studio/apps/{application}/resources/{id}</c> removes one
 /// file when <c>If-Match</c> holds its current version and answers <c>{ diagnostics }</c>. It answers 428
 /// without <c>If-Match</c>, 409 for a stale version and 400 for the manifest.
+/// <c>PUT /api/studio/apps/{application}/texts/{key}</c> sets one text key in every locale's text resource from
+/// <c>{ texts: { &lt;locale&gt;: &lt;text&gt; } }</c> and answers <c>{ resources: [{ id, locale, version }], diagnostics }</c>.
+/// After the checks above it answers 415 for a content type other than <c>application/json</c>, 400 for a body that
+/// does not name exactly the folder's locales with string texts, 409 for a text resource whose <c>texts</c> is not an
+/// object and 503 when the write lock cannot be taken. It takes no <c>If-Match</c>.
 /// <c>POST /api/studio/apps/{application}/changes</c> applies 1 to 20 creates and patches in one call under one write
 /// lock, checks every change before it writes any, and answers <c>{ items: [{ id, version }], diagnostics }</c>.
 /// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, and the expression check is in
@@ -68,9 +73,11 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
+        endpoints.MapPut("/api/studio/apps/{application}/texts/{key}", TextWriteAsync);
         endpoints.MapStudioPublishEndpoints();
         endpoints.MapStudioExpressionEndpoints();
         endpoints.MapStudioTemplateEndpoints();
+        endpoints.MapStudioApplicationEndpoints();
     }
 
     private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)
@@ -554,6 +561,74 @@ internal static class StudioEndpoints
         return Results.Ok(new StudioDeleteResponse(StudioDiagnostics.Compile(folder, packages, modules)));
     }
 
+    private static async Task<IResult> TextWriteAsync(
+        string application,
+        string key,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var request = httpContext.Request;
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+            || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+        }
+
+        var texts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            if (await JsonNode.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted) is not JsonObject { Count: 1 } root
+                || root["texts"] is not JsonObject entries)
+            {
+                throw new JsonException();
+            }
+
+            foreach (var (locale, value) in entries)
+            {
+                if (value is not JsonValue text || !text.TryGetValue<string>(out var content) || !texts.TryAdd(locale, content))
+                {
+                    throw new JsonException();
+                }
+            }
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
+        {
+            return Problem(StatusCodes.Status400BadRequest, InvalidTextWrite);
+        }
+
+        var locales = StudioWrites.TextFiles(folder);
+        if (locales.Count != texts.Count || locales.Any(file => !texts.ContainsKey(file.Locale)))
+        {
+            return Problem(StatusCodes.Status400BadRequest, InvalidTextWrite);
+        }
+
+        var outcome = await StudioWrites.WriteTextAsync(writeLock, folder, key, texts, httpContext.RequestAborted);
+        switch (outcome.Refusal)
+        {
+            case StudioWriteRefusal.Unavailable:
+                return Problem(StatusCodes.Status503ServiceUnavailable, WriteLockUnavailable);
+            case StudioWriteRefusal.LocalesChanged:
+                return Problem(StatusCodes.Status400BadRequest, InvalidTextWrite);
+            case StudioWriteRefusal.TextsNotObject:
+                return Problem(StatusCodes.Status409Conflict, "A text resource has no texts object.");
+            case not null:
+                return Problem(StatusCodes.Status400BadRequest, "The file name leads outside the application folder.");
+        }
+
+        return Results.Ok(new StudioTextWriteResponse(outcome.Resources, StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
+    private const string InvalidTextWrite = "The body is not a valid text write.";
+
     internal const string WriteLockUnavailable = "The write lock could not be taken. Try again.";
 
     internal const string NoResource = "The application has no resource with this id.";
@@ -642,6 +717,9 @@ internal sealed record StudioChangeItem(string Id, string Version);
 
 /// <summary>The answer to a delete: the folder's compile diagnostics, which show the references it broke.</summary>
 internal sealed record StudioDeleteResponse(IReadOnlyList<StudioDiagnostic> Diagnostics);
+
+/// <summary>The answer to a text write: each text resource's new version and the folder's compile diagnostics.</summary>
+internal sealed record StudioTextWriteResponse(IReadOnlyList<StudioTextVersion> Resources, IReadOnlyList<StudioDiagnostic> Diagnostics);
 
 /// <summary>
 /// The release history of an application, newest first. <c>Active</c> is the active release, or null when there

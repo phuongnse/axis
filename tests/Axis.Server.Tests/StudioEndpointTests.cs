@@ -138,6 +138,54 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Me_answers_studioCreate_only_for_an_author_while_Studio_ApplicationsPath_is_set()
+    {
+        foreach (var (user, applicationsPath, expected) in new[]
+        {
+            ("hoa", Path.Combine(_root, "created"), true),
+            ("hoa", null, false),
+            ("anna", Path.Combine(_root, "created"), false),
+        })
+        {
+            await using var factory = CreateFactory(applicationsPath: applicationsPath);
+            using var client = factory.CreateClient().SignedInAs(user);
+
+            var response = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+            Assert.Equal(expected, body.RootElement.GetProperty("studioCreate").GetBoolean());
+        }
+    }
+
+    [Fact]
+    public async Task Setting_only_Studio_ApplicationsPath_turns_Studio_on_and_creates_the_folder()
+    {
+        var applicationsPath = Path.Combine(_root, "created");
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseTestPlatform();
+            builder.UseSetting("Tenants:default:Hosts:0", "localhost");
+            builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
+            builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
+            builder.UseSetting("Extensions:Path", SamplePackages.Path);
+            builder.UseSetting("Studio:AuthorRole", "author");
+            builder.UseSetting("Studio:ApplicationsPath", applicationsPath);
+            builder.UseTestOidc("default");
+            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+        });
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+
+        Assert.True(Directory.Exists(applicationsPath));
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.True(body.RootElement.GetProperty("studio").GetBoolean());
+        Assert.True(body.RootElement.GetProperty("studioCreate").GetBoolean());
+    }
+
+    [Fact]
     public async Task Author_reads_a_resource_by_id_in_either_letter_case()
     {
         await using var factory = CreateFactory();
@@ -1220,6 +1268,102 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             && entry.GetProperty("relation").GetString() == "field target");
     }
 
+    [Fact]
+    public async Task Text_write_answers_415_for_another_content_type()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = TextBytes();
+
+        var response = await PutText(client, """{"texts":{"en":"A","vi":"B"}}""", contentType: "text/plain");
+
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+        Assert.Equal(before, TextBytes());
+    }
+
+    [Theory]
+    [InlineData("""{"texts":{"en":"A"}}""")]
+    [InlineData("""{"texts":{"en":"A","vi":"B","fr":"C"}}""")]
+    [InlineData("""{"texts":{"en":"A","vi":1}}""")]
+    [InlineData("""{"texts":{"en":"A","vi":null}}""")]
+    [InlineData("""{"texts":{"en":"A","EN":"B","vi":"C"}}""")]
+    [InlineData("""{"texts":{"en":"A","vi":"B"},"extra":1}""")]
+    [InlineData("""{"texts":["A","B"]}""")]
+    [InlineData("""{"en":"A","vi":"B"}""")]
+    [InlineData("""["en","vi"]""")]
+    [InlineData("not json")]
+    public async Task Text_write_answers_400_for_a_bad_body_and_changes_no_file(string body)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var before = TextBytes();
+
+        var response = await PutText(client, body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("The body is not a valid text write.", await TitleAsync(response));
+        Assert.Equal(before, TextBytes());
+    }
+
+    [Fact]
+    public async Task Text_write_accepts_locale_keys_in_any_letter_case_and_keeps_the_order_of_keys()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var added = await PutText(client, """{"texts":{"EN":"Hello","VI":"Xin chào"}}""", "greeting.new");
+        var changed = await PutText(client, """{"texts":{"en":"Purchasing system","vi":"Mua hàng"}}""", "site.title");
+
+        Assert.Equal(HttpStatusCode.OK, added.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        var en = (JsonObject)JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, "texts", "en.json")))!["texts"]!;
+        Assert.Equal("site.title", en.First().Key);
+        Assert.Equal("Purchasing system", (string?)en["site.title"]);
+        Assert.Equal("greeting.new", en.Last().Key);
+        Assert.Equal("Hello", (string?)en["greeting.new"]);
+        var vi = (JsonObject)JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, "texts", "vi.json")))!["texts"]!;
+        Assert.Equal("Xin chào", (string?)vi["greeting.new"]);
+        using var body = JsonDocument.Parse(await changed.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(
+            ["en", "vi"],
+            body.RootElement.GetProperty("resources").EnumerateArray().Select(item => item.GetProperty("locale").GetString()).Order());
+    }
+
+    [Fact]
+    public async Task Text_write_answers_409_and_changes_no_file_when_texts_is_not_an_object()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var path = Path.Combine(Folder, "texts", "vi.json");
+        var root = (JsonObject)JsonNode.Parse(File.ReadAllBytes(path))!;
+        root["texts"] = new JsonArray();
+        File.WriteAllText(path, root.ToJsonString());
+        var before = TextBytes();
+
+        var response = await PutText(client, """{"texts":{"en":"A","vi":"B"}}""");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("A text resource has no texts object.", await TitleAsync(response));
+        Assert.Equal(before, TextBytes());
+    }
+
+    [Fact]
+    public async Task Text_write_checks_the_session_the_role_the_csrf_header_and_the_application()
+    {
+        await using var factory = CreateFactory();
+        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var anonymous = factory.CreateClient();
+        var before = TextBytes();
+        const string body = """{"texts":{"en":"A","vi":"B"}}""";
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await PutText(hoa, body, csrf: false)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PutText(anna, body)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PutText(anonymous, body)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PutText(hoa, body, application: "Unknown")).StatusCode);
+        Assert.Equal(before, TextBytes());
+    }
+
     private static async Task<HttpResponseMessage> Patch(
         HttpClient client,
         string patch,
@@ -1265,6 +1409,26 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         return await client.SendAsync(request, CancellationToken);
     }
 
+    private static async Task<HttpResponseMessage> PutText(
+        HttpClient client,
+        string body,
+        string key = "greeting.new",
+        string contentType = "application/json",
+        bool csrf = true,
+        string application = "PurchaseRequests")
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, new Uri($"/api/studio/apps/{application}/texts/{key}", UriKind.Relative))
+        {
+            Content = new StringContent(body, Encoding.UTF8, contentType),
+        };
+        if (csrf)
+        {
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
     private static async Task<HttpResponseMessage> Changes(
         HttpClient client,
         string body,
@@ -1283,6 +1447,18 @@ public sealed class StudioEndpointTests : IAsyncLifetime
 
         return await client.SendAsync(request, CancellationToken);
     }
+
+    private static async Task<string?> TitleAsync(HttpResponseMessage response)
+    {
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return body.RootElement.GetProperty("title").GetString();
+    }
+
+    private List<string> TextBytes() =>
+        Directory.EnumerateFiles(Path.Combine(Folder, "texts"), "*.json")
+            .Order(StringComparer.Ordinal)
+            .Select(path => Path.GetFileName(path) + ":" + Sha256(path))
+            .ToList();
 
     private static async Task<HttpResponseMessage> Delete(
         HttpClient client,
@@ -1315,7 +1491,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             .Order(StringComparer.Ordinal)
             .ToList();
 
-    private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author", string? modulesPath = null, bool tests = false) =>
+    private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author", string? modulesPath = null, bool tests = false, string? applicationsPath = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -1334,6 +1510,11 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             if (tests)
             {
                 builder.UseSetting("Studio:Tests", "true");
+            }
+
+            if (applicationsPath is not null)
+            {
+                builder.UseSetting("Studio:ApplicationsPath", applicationsPath);
             }
 
             builder.UseTestOidc("default");
