@@ -1,0 +1,73 @@
+{
+  "id": "0ad61a9e-dc34-4945-adb1-cd483420f266",
+  "kind": "scenario",
+  "name": "RequestApproved",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": [
+      "requester"
+    ],
+    "binh": [
+      "approver"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "anna",
+      "save": "request",
+      "values": {
+        "title": "New laptop",
+        "description": "The current one is too slow.",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "expectRecord",
+      "record": "request",
+      "values": {
+        "number": "REQ-2026-00001"
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "RequestApproval",
+      "record": "request",
+      "as": "anna"
+    },
+    {
+      "type": "expectTask",
+      "record": "request",
+      "step": "approval",
+      "assignee": {
+        "role": "approver"
+      }
+    },
+    {
+      "type": "completeTask",
+      "record": "request",
+      "step": "approval",
+      "outcome": "approve",
+      "as": "binh",
+      "values": {
+        "decisionComment": "Approved"
+      }
+    },
+    {
+      "type": "expectInstance",
+      "process": "RequestApproval",
+      "record": "request",
+      "state": "completed"
+    },
+    {
+      "type": "expectRecord",
+      "record": "request",
+      "values": {
+        "status": "approved",
+        "decisionComment": "Approved"
+      }
+    }
+  ]
+}

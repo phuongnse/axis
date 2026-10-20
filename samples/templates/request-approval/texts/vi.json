@@ -1,0 +1,31 @@
+{
+  "id": "113693ff-c400-43c9-b75c-b6cb4675ab60",
+  "kind": "text",
+  "name": "TextsVi",
+  "formatVersion": 1,
+  "locale": "vi",
+  "texts": {
+    "site.title": "Phê duyệt yêu cầu",
+    "nav.myRequests": "Yêu cầu của tôi",
+    "nav.myTasks": "Công việc của tôi",
+    "pages.myRequests.title": "Yêu cầu của tôi",
+    "pages.requestForm.title": "Yêu cầu",
+    "pages.myTasks.title": "Công việc của tôi",
+    "request.label": "Yêu cầu",
+    "request.number": "Số",
+    "request.requester": "Người yêu cầu",
+    "request.title": "Tiêu đề",
+    "request.description": "Mô tả",
+    "request.status": "Trạng thái",
+    "request.decisionComment": "Ý kiến quyết định",
+    "request.submit": "Gửi",
+    "request.cannotSubmit": "Chỉ có thể gửi yêu cầu ở trạng thái nháp.",
+    "request.approval": "Phê duyệt",
+    "request.sections.request": "Yêu cầu",
+    "request.sections.decision": "Quyết định",
+    "task.approve": "Phê duyệt",
+    "task.reject": "Từ chối",
+    "role.requester": "Người yêu cầu",
+    "role.approver": "Người phê duyệt"
+  }
+}
