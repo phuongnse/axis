@@ -5,6 +5,8 @@ import { resolveSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
+import { LabelTexts } from './LabelTexts'
+import { LabelTextsContext } from './labelTextsContext'
 import { ReferencePicker } from './ReferencePicker'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
@@ -99,10 +101,13 @@ function SchemaNode({
   const t = useText()
   const names = useContext(StudioNamesContext)
   const check = useContext(ExpressionCheckContext)
+  const label = useContext(LabelTextsContext)
   const schema = resolveSchema(node, root)
   const reference = node['x-axis-reference'] ?? schema['x-axis-reference']
   const isObject = schema.type === 'object' && schema.properties !== undefined
   const isArray = schema.type === 'array' && schema.items !== undefined
+  // A label is an object whose only property is `textKey`. It needs the names and the resource to show its texts.
+  const isLabel = isObject && label !== null && names !== undefined && isLabelSchema(schema)
   const unsupported = !isSupported(schema)
 
   let input
@@ -183,6 +188,13 @@ function SchemaNode({
         onChange={(event) => onChange(pointer, event.target.checked)}
       />
     )
+  } else if (isLabel) {
+    input = (
+      <fieldset style={{ margin: 0 }}>
+        <legend>{name}</legend>
+        <LabelTexts pointer={pointer} value={value} onChange={onChange} />
+      </fieldset>
+    )
   } else if (isObject) {
     input = (
       <fieldset style={{ margin: 0 }}>
@@ -241,6 +253,12 @@ function SchemaNode({
       {input}
     </div>
   )
+}
+
+/** Whether the schema is a label: an object whose only property is `textKey`. */
+function isLabelSchema(schema: JsonSchema): boolean {
+  const keys = Object.keys(schema.properties ?? {})
+  return keys.length === 1 && keys[0] === 'textKey'
 }
 
 /**

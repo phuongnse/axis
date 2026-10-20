@@ -413,11 +413,13 @@ function Outcomes({
 
   return (
     <div data-testid={`studio-field-${pointer}/outcomes`}>
-      <Flex vertical gap="small">
+      <div>
         <Typography.Text strong>{t('shell.studio.process.outcomes')}</Typography.Text>
-        <Typography.Text type="secondary" data-testid="studio-json-only">
-          {t('shell.studio.editInJson')}
-        </Typography.Text>
+      </div>
+      <Typography.Text type="secondary" data-testid="studio-json-only">
+        {t('shell.studio.editInJson')}
+      </Typography.Text>
+      <Flex vertical gap="small">
         {outcomes.map((outcome, index) => (
           <Transition
             key={index}

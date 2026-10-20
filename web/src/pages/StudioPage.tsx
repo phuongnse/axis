@@ -22,6 +22,7 @@ import { StudioConnectionContext, useStudioConnection } from '../platform/studio
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
+import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioPublishing } from './StudioPublishing'
 import { StudioReferences } from './StudioReferences'
@@ -48,13 +49,17 @@ type NamesState = { application: string; names: StudioNames | null }
  * save, the diagnostics panel shows the diagnostics that the save answered. After a delete, the resource leaves the
  * list. A New resource button above the search box creates a resource of any kind from its starter. The new resource
  * joins the list, the diagnostics panel shows the diagnostics of the create, and the editor opens the resource.
+ * A New application button sits beside the application picker, and also shows when Studio lists no application. It shows
+ * only when `GET /api/me` answers `studioCreate: true`. A created application joins the picker and is picked at once.
  * Validate and Publish sit under the application picker, and Publish shows only when `GET /api/me` answers
  * `studioPublisher: true`. Under them, the release list shows the application's releases, with a Roll back button
- * for a publisher. A save or a delete loads the release list again, because the folder may now differ from the
+ * for a publisher. A save, a text write or a delete loads the release list again, because the folder may now differ from the
  * active release. The diagnostics panel shows the diagnostics of a request that ended. When the server does not
  * answer, a reconnect message shows at the top. Studio checks the server with a
  * back-off, then loads its data again, and an unsaved draft stays on screen. The names that the reference pickers
- * and expression completion offer load with the application too, and again after a save, a delete and a reconnect.
+ * and expression completion offer load with the application too, and again after a save, a text write, a delete and a
+ * reconnect. A text write, which a label's Write texts button sends, updates the diagnostics panel and loads the names
+ * and the release list again, as a save does.
  */
 export function StudioPage() {
   const t = useText()
@@ -97,6 +102,7 @@ function StudioWorkspace() {
   const [folder, setFolder] = useState<FolderState>()
   const [search, setSearch] = useState('')
   const [canPublish, setCanPublish] = useState(false)
+  const [canCreate, setCanCreate] = useState(false)
   const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
   const [namesState, setNamesState] = useState<NamesState>()
@@ -106,11 +112,13 @@ function StudioWorkspace() {
     fetchCurrentUser(controller.signal).then(
       (user) => {
         setCanPublish(user?.studioPublisher === true)
+        setCanCreate(user?.studioCreate === true)
         setPreviewHost(user?.studioPreviewHost ?? null)
       },
       () => {
         if (!controller.signal.aborted) {
           setCanPublish(false)
+          setCanCreate(false)
           setPreviewHost(null)
         }
       },
@@ -214,6 +222,11 @@ function StudioWorkspace() {
     setParams({ app: application!, resource: item.id })
   }
 
+  function onApplicationCreated(name: string) {
+    setApps((current) => (Array.isArray(current) ? [...current, { name }] : [{ name }]))
+    pickApplication(name)
+  }
+
   function openReference(id: string, referencePath: string | null) {
     setParams({ app: application!, resource: id, ...(referencePath ? { path: referencePath } : {}) })
   }
@@ -237,20 +250,28 @@ function StudioWorkspace() {
     return <Alert data-testid="studio-load-error" type="error" message={t('shell.studio.loadFailed')} />
   }
   if (apps.length === 0) {
-    return <Alert data-testid="studio-no-applications" type="info" message={t('shell.studio.noApplications')} />
+    return (
+      <Flex vertical gap="middle">
+        <Alert data-testid="studio-no-applications" type="info" message={t('shell.studio.noApplications')} />
+        {canCreate && <StudioNewApplication onCreated={onApplicationCreated} />}
+      </Flex>
+    )
   }
 
   return (
     <Flex vertical gap="middle">
       <Typography.Title level={2}>{t('shell.studio.title')}</Typography.Title>
-      <Select
-        aria-label={t('shell.studio.application')}
-        placeholder={t('shell.studio.application')}
-        style={{ maxWidth: 360 }}
-        value={application}
-        options={apps.map((app) => ({ value: app.name, label: app.name }))}
-        onChange={pickApplication}
-      />
+      <Flex gap="small">
+        <Select
+          aria-label={t('shell.studio.application')}
+          placeholder={t('shell.studio.application')}
+          style={{ maxWidth: 360 }}
+          value={application}
+          options={apps.map((app) => ({ value: app.name, label: app.name }))}
+          onChange={pickApplication}
+        />
+        {canCreate && <StudioNewApplication onCreated={onApplicationCreated} />}
+      </Flex>
       {application !== null && loaded && 'resources' in loaded && (
         <StudioPublishing
           key={application}
@@ -326,6 +347,10 @@ function StudioWorkspace() {
                       resources={loaded.resources}
                       path={path}
                       onSaved={(diagnostics) => {
+                        setFolder({ ...loaded, diagnostics })
+                        setFolderRevision((value) => value + 1)
+                      }}
+                      onTextsWritten={(diagnostics) => {
                         setFolder({ ...loaded, diagnostics })
                         setFolderRevision((value) => value + 1)
                       }}
