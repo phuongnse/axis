@@ -61,6 +61,47 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
+/** A diagnostic of an expression check. `start` and `end` are UTF-16 offsets into the expression, and `end` is exclusive. */
+export interface ExpressionDiagnostic {
+  code: string
+  message: string
+  start: number
+  end: number
+}
+
+/** The answer of an expression check. `type` is `null` when there is a diagnostic. */
+export interface ExpressionCheck {
+  type: string | null
+  diagnostics: ExpressionDiagnostic[]
+}
+
+/**
+ * Checks one expression where it stands, without saving it. Any status other than 200 answers `null`, and the
+ * check does not start sign-in on a 401. It rejects when the server does not answer.
+ */
+export async function checkStudioExpression(
+  application: string,
+  resourceId: string,
+  path: string,
+  expression: string,
+  signal?: AbortSignal,
+): Promise<ExpressionCheck | null> {
+  const response = await apiFetch(
+    `/api/studio/apps/${encodeURIComponent(application)}/expressions/check`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resourceId, path, expression }),
+      signal,
+    },
+    { signInOnUnauthorized: false },
+  )
+  if (!response.ok) {
+    return null
+  }
+  return (await response.json()) as ExpressionCheck
+}
+
 /** An application in the list of `GET /api/studio/apps`. */
 export interface StudioApplication {
   name: string
@@ -125,6 +166,58 @@ export interface StudioTextReferences {
   usedBy: StudioReference[]
 }
 
+/** A field of an entity in `GET .../names`. `target` and `values` are `null` when the field has none. */
+export interface StudioNameField {
+  name: string
+  type: string
+  target: string | null
+  values: string[] | null
+}
+
+/** The names of one kind in `GET .../names`. `module` is the module id, or `null` for the application's own. */
+export interface StudioNameEntity {
+  id: string
+  name: string
+  module: string | null
+  fields: StudioNameField[]
+}
+
+/** A process step in `GET .../names`. `outcomes` is empty for a step that is not a task. */
+export interface StudioNameStep {
+  name: string
+  type: string
+  outcomes: string[]
+}
+
+/** A named resource in `GET .../names`, such as a role, form or page. */
+export interface StudioNameResource {
+  id: string
+  name: string
+}
+
+/** A text key in `GET .../names`, with its text in each locale that has it. */
+export interface StudioNameText {
+  key: string
+  texts: Record<string, string>
+  usedBy: number
+}
+
+/** Every name an application defines, as `GET /api/studio/apps/{application}/names` answers it. */
+export interface StudioNames {
+  locales: string[]
+  entities: StudioNameEntity[]
+  dataSources: { id: string; name: string; module: string | null }[]
+  processes: { id: string; name: string; steps: StudioNameStep[] }[]
+  rules: { id: string; name: string; module: string | null }[]
+  connectors: { id: string; name: string; operations: { name: string }[] }[]
+  events: { id: string; name: string; fields: { name: string; type: string }[] }[]
+  roles: StudioNameResource[]
+  sequences: StudioNameResource[]
+  forms: StudioNameResource[]
+  pages: StudioNameResource[]
+  texts: StudioNameText[]
+}
+
 /**
  * The answer to a create: the new resource as the list shows it and the folder's diagnostics after the write, `conflict`
  * when the id or the target file exists, or `invalid` when the name or the locale is refused.
@@ -176,6 +269,16 @@ export async function fetchStudioDiagnostics(application: string, signal?: Abort
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
   return ((await response.json()) as { diagnostics: StudioDiagnostic[] }).diagnostics
+}
+
+/** Loads every name the application defines, for the reference pickers. */
+export async function fetchStudioNames(application: string, signal?: AbortSignal): Promise<StudioNames> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/names`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioNames
 }
 
 /** Loads one resource with its content. A 401 starts sign-in and throws, as any other failure does. */

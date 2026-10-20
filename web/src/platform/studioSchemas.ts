@@ -1,6 +1,13 @@
+/**
+ * What a string property names: a resource kind, or a part of the resource named by `of`, a JSON Pointer or a
+ * Relative JSON Pointer from the property.
+ */
+export type ReferenceMark = string | { part: 'field' | 'step'; of: string }
+
 /** The part of JSON Schema that Studio's form reads. Other keywords are ignored. */
 export interface JsonSchema {
   type?: 'string' | 'integer' | 'number' | 'boolean' | 'object' | 'array'
+  'x-axis-reference'?: ReferenceMark
   properties?: Record<string, JsonSchema>
   required?: string[]
   items?: JsonSchema
@@ -14,6 +21,8 @@ export interface JsonSchema {
   additionalProperties?: boolean | JsonSchema
   minimum?: number
   maximum?: number
+  /** Marks a string that holds an expression, which Studio shows in the expression editor. */
+  'x-axis-expression'?: boolean
 }
 
 // These are the files the server embeds, so the form and the server's compile cannot drift apart.

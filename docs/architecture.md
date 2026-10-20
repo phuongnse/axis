@@ -560,10 +560,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   sign-in.
 - **Current user.** `GET /api/me` keeps its shape,
   `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean
-  `studio`, true when `Studio:Folders` is not empty and the user holds
+  `studio`, true when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set, and the user holds
   `Studio:AuthorRole`. See [D38](decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
   It adds a boolean `studioPublisher`, true when
-  `Studio:Folders` is not empty and the user holds both `Studio:AuthorRole` and
+  Studio is on and the user holds both `Studio:AuthorRole` and
   `Studio:PublisherRole`. See [D47](decisions.md#d47-publishing-from-studio--agreed).
   It adds `studioPreviewHost`, the host of the tenant's served preview tenant. It
   is null for a user who may not use Studio and for a tenant without a preview
@@ -571,6 +571,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   It adds a boolean `studioTest`, true when `studio` is true
   and `Studio:Tests` is true. See
   [D55](decisions.md#d55-running-test-scenarios-from-studio--agreed).
+  It adds a boolean `studioCreate`, true when `studio` is true and `Studio:ApplicationsPath` is set. See
+  [D51](decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
   Without a session it is a `401`, as today. Record writes, process starts and the
   task API read the current user the same way, and their audit records store
   the user's id and display name.
@@ -1157,7 +1159,8 @@ Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
 
 `scripts/integration.sh` runs the scenarios of every application under
-`samples/apps/` from the integration tests, on their Testcontainers PostgreSQL. See
+`samples/apps/` and of every sample template under `samples/templates/` from the
+integration tests, on their Testcontainers PostgreSQL. See
 [test scenarios](reference/configuration.md#test-scenarios).
 
 The integration tests share one Keycloak container with the development realm

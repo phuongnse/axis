@@ -1,9 +1,11 @@
+import { EditorView } from '@codemirror/view'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { assignLocation } from '../platform/navigation'
+import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
 import { StudioPage } from './StudioPage'
@@ -139,9 +141,32 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-/** While `down` is set, the entity routes and `/api/me` fail: with no answer when `status` is null, else with `status`. */
+const namesPath = `${folder}/names`
+
+const applicationNames = {
+  locales: ['en'],
+  entities: [],
+  dataSources: [],
+  processes: [],
+  rules: [],
+  connectors: [],
+  events: [],
+  roles: [],
+  sequences: [],
+  forms: [],
+  pages: [],
+  texts: [{ key: 'entity.purchaseRequest', texts: { en: 'Purchase request' }, usedBy: 1 }],
+}
+
+/** While `down` is set, the entity routes, the names and `/api/me` fail: with no answer when `status` is null, else with `status`. */
 interface Outage {
   down: { status: number | null } | null
+}
+
+/** What the expression stubs answer: the entity's content, and the answer of each check in order. */
+interface ExpressionStub {
+  content?: Record<string, unknown>
+  check?: (call: number) => Response
 }
 
 /** Stubs `fetch` with the Studio list routes, the read, patch and delete of the purchase request entity, and its references. `apps` is the status or list of `/api/studio/apps`. */
@@ -149,11 +174,13 @@ function stubServer(
   apps: { name: string }[] | number = [{ name: 'PurchaseRequests' }],
   patch: PatchAnswer = { status: 200, body: { version: 'b2', diagnostics: [savedDiagnostic] } },
   outage: Outage = { down: null },
+  expressions: ExpressionStub = {},
 ) {
+  let checkCalls = 0
   const entityPath = `${folder}/resources/${entityId}`
   const manifestPath = `${folder}/resources/${manifestId}`
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-    if ((input === entityPath || input === '/api/me') && outage.down) {
+    if ((input === entityPath || input === namesPath || input === '/api/me') && outage.down) {
       if (outage.down.status === null) {
         throw new TypeError('Failed to fetch')
       }
@@ -169,10 +196,13 @@ function stubServer(
       return json({ diagnostics: [] })
     }
     if (input === entityPath) {
-      return json({ ...resources[1], content: entityContent() })
+      return json({ ...resources[1], content: expressions.content ?? entityContent() })
     }
     if (input === manifestPath) {
       return json({ ...resources[3], content: { id: manifestId, kind: 'application', name: 'PurchaseRequests' } })
+    }
+    if (input === namesPath) {
+      return json(applicationNames)
     }
     if (input === '/api/studio/apps') {
       return typeof apps === 'number' ? json({ title: 'No.' }, apps) : json({ items: apps })
@@ -185,6 +215,10 @@ function stubServer(
     }
     if (input === `${folder}/diagnostics`) {
       return json({ diagnostics })
+    }
+    if (input === `${folder}/expressions/check` && expressions.check) {
+      checkCalls++
+      return expressions.check(checkCalls)
     }
     if (input === `${folder}/texts/purchaseRequest.label/references`) {
       return json(labelUsers)
@@ -206,12 +240,14 @@ function Location() {
 
 function renderPage(entry = '/studio?app=PurchaseRequests') {
   render(
-    <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-      <MemoryRouter initialEntries={[entry]}>
-        <StudioPage />
-        <Location />
-      </MemoryRouter>
-    </TextProvider>,
+    <ThemeModeProvider>
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <MemoryRouter initialEntries={[entry]}>
+          <StudioPage />
+          <Location />
+        </MemoryRouter>
+      </TextProvider>
+    </ThemeModeProvider>,
   )
 }
 
@@ -292,9 +328,10 @@ describe('StudioPage', () => {
     const name = await screen.findByTestId('studio-field-/fields/0/name')
     expect(within(name).getByRole('textbox')).toHaveValue('number')
     expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('200')
-    expect(within(screen.getByTestId('studio-field-/label/textKey')).getByRole('textbox')).toHaveValue(
-      'entity.purchaseRequest',
-    )
+    const label = screen.getByTestId('studio-field-/label/textKey')
+    expect(within(label).getByRole('combobox', { name: 'textKey' })).toBeInTheDocument()
+    expect(label).toHaveTextContent('entity.purchaseRequest')
+    expect(within(label).queryByTestId('studio-reference-unknown')).not.toBeInTheDocument()
     expect(screen.getByTestId('studio-field-/kind')).toHaveTextContent('entity')
     expect(within(screen.getByTestId('studio-field-/kind')).queryByRole('textbox')).not.toBeInTheDocument()
   })
@@ -594,6 +631,35 @@ describe('StudioPage', () => {
     expect(screen.getByRole('textbox', { name: 'JSON' })).toHaveValue(JSON.stringify(textContent, null, 2))
   })
 
+  it('keeps the last expression result and Save enabled when a check gets no answer', async () => {
+    const fetchMock = stubServer(undefined, undefined, undefined, {
+      content: {
+        ...entityContent(),
+        validations: [{ expression: 'totalAmount > 0', message: { textKey: 'validation.total' }, field: 'title' }],
+      },
+      check: (call) => {
+        if (call === 1) {
+          return json({ type: 'boolean', diagnostics: [] })
+        }
+        throw new TypeError('Failed to fetch')
+      },
+    })
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    const field = await screen.findByTestId('studio-field-/validations/0/expression')
+    await waitFor(() => expect(within(field).getByTestId('studio-expression-type')).toHaveTextContent('boolean'))
+
+    const view = EditorView.findFromDOM(within(field).getByRole('textbox'))!
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'totalAmount > 1' } })
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([input]) => input === `${folder}/expressions/check`)).toHaveLength(2),
+    )
+
+    expect(within(field).getByTestId('studio-expression-type')).toHaveTextContent('boolean')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(screen.queryByTestId('studio-reconnecting')).not.toBeInTheDocument()
+  })
+
   it('shows the form again for a path it can show after a path it cannot show', async () => {
     const scrollIntoView = vi.fn()
     Element.prototype.scrollIntoView = scrollIntoView
@@ -657,6 +723,38 @@ describe('StudioPage', () => {
     const [, init] = deletes[0]
     expect(new Headers(init!.headers).get('If-Match')).toBe('"b"')
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/))
+  })
+
+  it('loads the names again after a save and after a delete', async () => {
+    const fetchMock = stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    const loads = () => fetchMock.mock.calls.filter(([input]) => input === namesPath).length
+    await waitFor(() => expect(loads()).toBe(1))
+
+    await userEvent.clear(maxLength)
+    await userEvent.type(maxLength, '250')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByTestId('studio-saved')
+    await waitFor(() => expect(loads()).toBe(2))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(loads()).toBe(3))
+  })
+
+  it('loads the names again once the server answers after an outage', async () => {
+    const outage: Outage = { down: { status: 503 } }
+    const fetchMock = stubServer(undefined, undefined, outage)
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    await screen.findByTestId('studio-reconnecting', {}, { timeout: 3000 })
+    const loads = () => fetchMock.mock.calls.filter(([input]) => input === namesPath).length
+    expect(loads()).toBe(1)
+
+    outage.down = null
+
+    await waitFor(() => expect(screen.queryByTestId('studio-reconnecting')).not.toBeInTheDocument(), { timeout: 3000 })
+    await waitFor(() => expect(loads()).toBe(2))
   })
 
   it('does not offer a delete for the application manifest', async () => {

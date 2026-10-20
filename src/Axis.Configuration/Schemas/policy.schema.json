@@ -12,7 +12,7 @@
     "roles": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "minLength": 1 }
+      "items": { "type": "string", "minLength": 1, "x-axis-reference": "role" }
     },
     "grants": {
       "type": "array",
@@ -36,20 +36,20 @@
       "additionalProperties": false,
       "required": ["actions"],
       "properties": {
-        "entity": { "type": "string", "minLength": 1 },
-        "dataSource": { "type": "string", "minLength": 1 },
-        "process": { "type": "string", "minLength": 1 },
+        "entity": { "type": "string", "minLength": 1, "x-axis-reference": "entity" },
+        "dataSource": { "type": "string", "minLength": 1, "x-axis-reference": "dataSource" },
+        "process": { "type": "string", "minLength": 1, "x-axis-reference": "process" },
         "endpoint": { "type": "string", "minLength": 1 },
         "actions": {
           "type": "array",
           "minItems": 1,
           "items": { "enum": ["read", "create", "update", "delete", "start", "invoke", "inspect", "cancel", "retry", "resolve"] }
         },
-        "filter": { "type": "string", "minLength": 1 },
+        "filter": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "fields": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string", "minLength": 1 }
+          "items": { "type": "string", "minLength": 1, "x-axis-reference": { "part": "field", "of": "2/entity" } }
         }
       }
     }

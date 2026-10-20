@@ -30,7 +30,13 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
     /// <summary>The login role that servers and workers connect as. It gets row access only.</summary>
     public const string RuntimeRole = "axis_runtime";
 
-    /// <summary>The development password of both roles.</summary>
+    /// <summary>
+    /// The login role that creates and drops the temporary databases of test scenarios. It has <c>CREATEDB</c> and owns no
+    /// test database.
+    /// </summary>
+    public const string ScenarioRole = "axis_scenario";
+
+    /// <summary>The development password of the three roles.</summary>
     public const string RolePassword = "axis";
 
     // The start takes no test's cancellation token, so cancelling one test does not fail the others.
@@ -97,6 +103,15 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
         return value is DBNull ? null : value;
     }
 
+    /// <summary>The connection string of <see cref="ScenarioRole"/> to the maintenance database, as <c>Scenarios:ServerConnectionString</c> takes it.</summary>
+    public static async Task<string> ScenarioConnectionStringAsync() =>
+        new NpgsqlConnectionStringBuilder(await AdminConnectionStringAsync())
+        {
+            Database = "postgres",
+            Username = ScenarioRole,
+            Password = RolePassword,
+        }.ConnectionString;
+
     /// <summary>Drops the database and ends every session still connected to it.</summary>
     public static async Task DropDatabaseAsync(string name, CancellationToken cancellationToken = default) =>
         await ExecuteAsync(await AdminConnectionStringAsync(), $"""DROP DATABASE IF EXISTS "{name}" WITH (FORCE)""", cancellationToken);
@@ -134,7 +149,7 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
             await container.StartAsync();
             await ExecuteAsync(
                 container.GetConnectionString(),
-                $"CREATE ROLE {SchemaRole} LOGIN PASSWORD '{RolePassword}'; CREATE ROLE {RuntimeRole} LOGIN PASSWORD '{RolePassword}'",
+                $"CREATE ROLE {SchemaRole} LOGIN PASSWORD '{RolePassword}'; CREATE ROLE {RuntimeRole} LOGIN PASSWORD '{RolePassword}'; CREATE ROLE {ScenarioRole} LOGIN PASSWORD '{RolePassword}' CREATEDB",
                 CancellationToken.None);
             return container;
         }
