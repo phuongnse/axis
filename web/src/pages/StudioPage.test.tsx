@@ -327,7 +327,7 @@ describe('StudioPage', () => {
     )
   })
 
-  it('builds the form of an entity from its schema', async () => {
+  it('opens an entity in the entity designer', async () => {
     stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
 
@@ -337,8 +337,7 @@ describe('StudioPage', () => {
     const label = screen.getByTestId('studio-field-/label')
     expect(within(label).getByRole('textbox', { name: 'Text key' })).toHaveValue('entity.purchaseRequest')
     expect(within(label).getByRole('textbox', { name: 'en' })).toHaveValue('Purchase request')
-    expect(screen.getByTestId('studio-field-/kind')).toHaveTextContent('entity')
-    expect(within(screen.getByTestId('studio-field-/kind')).queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getByTestId('studio-entity-designer')).toBeInTheDocument()
   })
 
   it('sends only the changed value, with the loaded version', async () => {

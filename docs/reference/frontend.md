@@ -937,8 +937,8 @@ reconnect message are built.
     a value it does not show, so unknown keys stay as they are. See
     **Editors by kind** below. The seed editor, the scenario editor, the
     connector editor, the page editor, the endpoint mapping rows, the text
-    editor and the process editor's step list, with its decision, end and
-    task panels, are built.
+    editor, the process editor's step list, with its decision, end and
+    task panels, and the entity designer are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1128,19 +1128,34 @@ reconnect message are built.
     have no answer. When there is no answer, or the check answers `400` or
     `401`, the last result stays on screen. A `401` does not start sign-in, so
     the draft is kept. The editor never blocks Save.
-- **Entity designer** *(planned for M11)*. An `entity` resource opens in a
-  designer in place of the generic form. The JSON view stays. See
+- **Entity designer** *(built)*. An `entity` resource opens in a designer on
+  the Form tab in place of the generic form. The JSON tab stays and edits the
+  same draft. See
   [D54](../decisions.md#d54-the-entity-designer-and-the-policy-matrix--agreed).
+  - The header shows the entity's name, its label with a text box per locale,
+    and a display field picker. The picker lists the field names of the draft.
+    It does not show `id`, `kind` or `formatVersion`.
   - The fields are a table. Its columns are name, label, type, required,
-    unique and the type's own settings: `maxLength`, `precision` and `scale`,
-    `values`, `target` and the child entity of a `child-collection`. The
-    settings follow the
+    unique and a settings column. A field's label is a picker of the existing
+    text keys. The settings column shows only what the row's type takes:
+    `maxLength`, `precision` and `scale`, `values`, `target`, `expression`,
+    `sequence`, `creator` and `sensitive`. The settings follow the
     [field types](configuration.md#entity-field-types-and-constraints), so a
     setting a type does not take cannot be edited.
-  - A computed field's `expression` and each validation use the
+  - Changing a field's type drops the settings the new type does not take and
+    keeps the rest. It does not add an empty `values` or `target`, and Validate
+    reports the missing setting.
+  - Clearing a field's label, the display field, `maxLength`, `precision`,
+    `scale`, `sequence`, `expression` or the last enum value removes the key.
+  - A computed field's `expression` and each validation's expression use the
     [expression editor](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed).
-  - Fields can be added, removed and reordered. A display field picker lists
-    the entity's fields.
+    A validation also has a message key picker and a field picker, and can be
+    added and removed.
+  - Fields can be added, removed and moved up or down. Each of these replaces
+    the `fields` array.
+  - Every input keeps its `studio-field-<pointer>` id, and each row has the id
+    of its field, so a diagnostic opens at its input, or at the row when the
+    row does not show the setting.
   - A module entity is read-only, as it is in the generic form.
 - **Migrations from the designer** *(planned for M11)*. The designer compares
   with the entity as Studio loaded it. "Loaded" means as Studio read the
@@ -1207,8 +1222,8 @@ reconnect message are built.
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
   the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the text
-  editor and the process editor's step list, with its decision, end and task panels, are built. The other typed
-  editors and the entity designer are *(planned for M11)*, and until they are built those kinds use the generic
+  editor, the process editor's step list, with its decision, end and task panels, and the entity designer are
+  built. The other typed editors are *(planned for M11)*, and until they are built those kinds use the generic
   form. The last
   column lists what still needs the JSON view, because the form cannot show it.
 
