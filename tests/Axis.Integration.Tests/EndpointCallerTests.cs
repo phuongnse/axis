@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axis.Server.Authentication;
+using Axis.Server.Tests;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -144,6 +145,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
         {
             builder.UseEnvironment("Testing");
             builder.UseTestPlatform(UnreachableDatabase);
+            builder.WithoutPlatformMigration();
             UseTenant(builder, "a", HostA, authority, endpointAudience: "axis-endpoints");
             UseTenant(builder, "b", HostB, masterRealm, endpointAudience: "axis-endpoints");
             UseTenant(builder, "c", HostC, authority, endpointAudience: null);

@@ -38,33 +38,38 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
 var forwardedHeaders = ForwardedHeadersSettings.Load(builder.Configuration);
 builder.Services.PostConfigure<ForwardedHeadersOptions>(forwardedHeaders.Apply);
 
+// Both sources need the schema connection, a reader role and the key, so a missing setting stops the start
+// before any database work.
+var platformSchemaConnectionString = builder.Configuration.GetConnectionString("PlatformSchema");
+if (string.IsNullOrWhiteSpace(platformSchemaConnectionString))
+{
+    throw new InvalidOperationException("Connection string 'PlatformSchema' is not configured.");
+}
+
+var readerRole = new NpgsqlConnectionStringBuilder(platformConnectionString).Username;
+if (string.IsNullOrWhiteSpace(readerRole))
+{
+    throw new InvalidOperationException("Connection string 'Platform' must name a user.");
+}
+
+if (string.Equals(readerRole, new NpgsqlConnectionStringBuilder(platformSchemaConnectionString).Username, StringComparison.Ordinal))
+{
+    throw new InvalidOperationException(
+        "Connection strings 'Platform' and 'PlatformSchema' name the same user. They must be different roles.");
+}
+
+var cipher = TenantSecretCipher.Load(builder.Configuration);
+var platformMigration = new PlatformMigrationOptions(platformSchemaConnectionString, readerRole);
+
 // Under directory, the platform migrations and the first directory load run now, before the services are
-// built, because sign-in registers one client per tenant. Under configuration, nothing about the platform
-// schema is read.
+// built, because sign-in registers one client per tenant. Under configuration, the migrations run as a hosted
+// service, and nothing reads the platform tables yet.
 ITenantCatalog tenants;
 var directorySource = TenancySettings.Source(builder.Configuration) == TenancySource.Directory;
 if (directorySource)
 {
     // Read first, so a bad value stops the start even when the database is not there.
     var refreshInterval = TenancySettings.RefreshInterval(builder.Configuration);
-
-    var platformSchemaConnectionString = builder.Configuration.GetConnectionString("PlatformSchema");
-    if (string.IsNullOrWhiteSpace(platformSchemaConnectionString))
-    {
-        throw new InvalidOperationException("Connection string 'PlatformSchema' is required when Tenancy:Source is 'directory'.");
-    }
-
-    var readerRole = new NpgsqlConnectionStringBuilder(platformConnectionString).Username;
-    if (string.IsNullOrWhiteSpace(readerRole))
-    {
-        throw new InvalidOperationException("Connection string 'Platform' must name a user when Tenancy:Source is 'directory'.");
-    }
-
-    if (string.Equals(readerRole, new NpgsqlConnectionStringBuilder(platformSchemaConnectionString).Username, StringComparison.Ordinal))
-    {
-        throw new InvalidOperationException(
-            "Connection strings 'Platform' and 'PlatformSchema' name the same user. They must be different roles.");
-    }
 
     // Activation needs schema connections, which the directory source does not give. Axis.Admin activates releases.
     var activateOnStartup = builder.Configuration.GetSection(StartupActivationOptions.SectionName).Get<string[]>() ?? [];
@@ -74,8 +79,7 @@ if (directorySource)
             "ActivateOnStartup must be empty when Tenancy:Source is 'directory'. Activate releases with Axis.Admin.");
     }
 
-    var cipher = TenantSecretCipher.Load(builder.Configuration);
-    await PlatformMigration.ApplyAsync(new PlatformMigrationOptions(platformSchemaConnectionString, readerRole), CancellationToken.None);
+    await PlatformMigration.ApplyAsync(platformMigration, CancellationToken.None);
     var loaded = await DirectoryTenantCatalog.LoadAsync(platformConnectionString, cipher, CancellationToken.None);
 
     // The server serves a tenant only on its own schema version. Axis.Admin migrate brings a tenant there.
@@ -101,6 +105,10 @@ if (directorySource)
 }
 else
 {
+    // The first hosted service, so it runs before StartupActivation. Nothing above registers one.
+    builder.Services.AddSingleton(platformMigration);
+    builder.Services.AddHostedService<PlatformMigrationStart>();
+
     tenants = ConfigurationTenantCatalog.Load(builder.Configuration, builder.Environment);
 
     // Fails startup when a tenant has no schema connection string. Only startup activation uses it,

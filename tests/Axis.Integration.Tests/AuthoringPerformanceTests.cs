@@ -212,6 +212,7 @@ public sealed class AuthoringPerformanceTests
         {
             builder.UseEnvironment("Testing");
             builder.UseTestPlatform(UnreachableDatabase);
+            builder.WithoutPlatformMigration();
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);

@@ -12,10 +12,12 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
     private const string PermissionDenied = "42501";
     private const string UniqueViolation = "23505";
 
-    [Fact]
-    public async Task The_directory_source_creates_the_platform_tables_at_start()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_server_creates_the_platform_tables_at_start(bool directory)
     {
-        var platform = await StartDirectoryServerAsync();
+        var platform = await StartServerAsync(directory);
 
         var tables = await ScalarListAsync(
             platform,
@@ -24,10 +26,12 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
         Assert.Equal(["__platform_migrations", "tenant_bindings", "tenant_hosts", "tenants"], tables);
     }
 
-    [Fact]
-    public async Task The_platform_reader_role_can_select_but_cannot_insert_or_create()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_platform_reader_role_can_select_but_cannot_insert_or_create(bool directory)
     {
-        var platform = await StartDirectoryServerAsync();
+        var platform = await StartServerAsync(directory);
         var reader = PostgreSqlServer.RuntimeConnectionString(platform);
 
         Assert.Equal(0L, await ScalarAsync(reader, "SELECT count(*) FROM platform.tenants"));
@@ -38,7 +42,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
     [Fact]
     public async Task Two_hosts_that_differ_only_in_letter_case_cannot_both_be_stored()
     {
-        var platform = await StartDirectoryServerAsync();
+        var platform = await StartServerAsync(directory: true);
         await ExecuteAsync(platform, InsertTenant("one"));
         await ExecuteAsync(platform, "INSERT INTO platform.tenant_hosts (tenant_id, host) VALUES ('one', 'a.example.test')");
 
@@ -51,7 +55,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
     [Fact]
     public async Task Two_binding_names_of_one_tenant_that_differ_only_in_letter_case_cannot_both_be_stored()
     {
-        var platform = await StartDirectoryServerAsync();
+        var platform = await StartServerAsync(directory: true);
         await ExecuteAsync(platform, InsertTenant("one"));
         await ExecuteAsync(platform, "INSERT INTO platform.tenant_bindings (tenant_id, name, kind, url) VALUES ('one', 'PurchasingUrl', 'url', 'http://a.test')");
 
@@ -61,34 +65,34 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             UniqueViolation);
     }
 
-    [Fact]
-    public async Task Without_a_tenancy_source_the_server_starts_and_creates_no_platform_schema()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Without_a_secret_key_the_server_start_fails_naming_the_setting(bool directory)
     {
         var platform = await database.CreateDatabaseAsync("platform", TestContext.Current.CancellationToken);
-        await using var factory = CreateFactory(platform, directory: false);
-        using var client = factory.CreateClient();
-
-        var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Null(await ScalarAsync(platform, "SELECT to_regnamespace('platform')::text"));
-    }
-
-    [Fact]
-    public async Task Under_directory_without_a_secret_key_the_server_start_fails_naming_the_setting()
-    {
-        var platform = await database.CreateDatabaseAsync("platform", TestContext.Current.CancellationToken);
-        await using var factory = CreateFactory(platform, directory: true, secretKey: false);
+        await using var factory = CreateFactory(platform, directory, (TenantSecretCipher.KeySetting, ""));
 
         var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
 
         Assert.Contains("Platform:SecretKey", exception.Message, StringComparison.Ordinal);
     }
 
-    private async Task<string> StartDirectoryServerAsync()
+    [Fact]
+    public async Task Under_configuration_without_a_platform_schema_connection_string_the_server_start_fails_naming_it()
     {
         var platform = await database.CreateDatabaseAsync("platform", TestContext.Current.CancellationToken);
-        await using var factory = CreateFactory(platform, directory: true);
+        await using var factory = CreateFactory(platform, directory: false, ("ConnectionStrings:PlatformSchema", ""));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("PlatformSchema", exception.Message, StringComparison.Ordinal);
+    }
+
+    private async Task<string> StartServerAsync(bool directory)
+    {
+        var platform = await database.CreateDatabaseAsync("platform", TestContext.Current.CancellationToken);
+        await using var factory = CreateFactory(platform, directory);
         using var client = factory.CreateClient();
 
         var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -98,14 +102,17 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
     }
 
     // The tenant stays on the class database. Only the platform database is a separate one.
-    private WebApplicationFactory<Program> CreateFactory(string platformSchemaConnectionString, bool directory, bool secretKey = true) =>
+    private WebApplicationFactory<Program> CreateFactory(
+        string platformSchemaConnectionString,
+        bool directory,
+        params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseTestPlatform(platformSchemaConnectionString);
-            if (!secretKey)
+            foreach (var (key, value) in settings)
             {
-                builder.UseSetting(TenantSecretCipher.KeySetting, "");
+                builder.UseSetting(key, value);
             }
 
             if (directory)

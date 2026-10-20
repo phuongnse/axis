@@ -41,6 +41,7 @@
     <Compile Include="..\Axis.Server.Tests\TestAuthentication.cs" Link="TestAuthentication.cs" />
     <Compile Include="..\Axis.Server.Tests\TestEndpointCallers.cs" Link="TestEndpointCallers.cs" />
     <Compile Include="..\Axis.Server.Tests\TestOidc.cs" Link="TestOidc.cs" />
+    <Compile Include="..\Axis.Server.Tests\TestPlatformMigration.cs" Link="TestPlatformMigration.cs" />
   </ItemGroup>
 
   <ItemGroup>

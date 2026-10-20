@@ -37,7 +37,7 @@ public sealed class TenantSecretCipher
         var value = configuration[KeySetting];
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new InvalidOperationException($"The setting {KeySetting} is required when Tenancy:Source is 'directory'.");
+            throw new InvalidOperationException($"The setting {KeySetting} is required.");
         }
 
         var buffer = new byte[64];

@@ -153,13 +153,12 @@ The `platform` schema, its migrations, the read-only grant, the secret cipher
 and the directory source of the server and the worker are built. `Axis.Admin
 tenant create` writes the tables and encrypts the stored passwords and the OIDC
 client secret. `tenant suspend` and `tenant resume` change a tenant's status,
-and `tenant restore` adds a suspended tenant. Today, under `Tenancy:Source=configuration`
-the platform database holds no tables, and its connection string only serves the
-readiness check. _(planned for M10)_ That changes: the platform tables exist
-under both tenant sources, because the server also keeps its data protection
-keys there, see [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
-Under `Tenancy:Source=directory` the server creates the tables at
-start, then reads the `active` tenants, their hosts and their bindings over
+and `tenant restore` adds a suspended tenant. The platform tables exist
+under both tenant sources: the server creates them at start and sets the
+read-only grant. Under `configuration` nothing reads them yet. _(planned for M10)_
+The server will keep its data protection keys there, see
+[D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+Under `Tenancy:Source=directory` the server then reads the `active` tenants, their hosts and their bindings over
 `ConnectionStrings:Platform`. Both hosts read them again every
 `Tenancy:RefreshInterval`. The server and the worker keep each password, the client
 secret and each `secret` binding encrypted in memory, and decrypt one only when a
@@ -170,8 +169,8 @@ and creates no tables. See
 
 - **The `platform` schema.** Its EF Core migrations ship with Axis, with their
   history in `platform.__platform_migrations`. The server applies them at
-  start over `ConnectionStrings:PlatformSchema`, and uses that setting for
-  nothing else.
+  start over `ConnectionStrings:PlatformSchema` under both tenant sources, and
+  uses that setting for nothing else.
 - **Read-only hosts.** The server reads the directory over
   `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
   and `SELECT` on its tables, and nothing else. The server sets this in one
@@ -366,7 +365,7 @@ host with one database role:
 | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------- |
 | Create the database and the two roles                                                                                   | `Axis.Admin`                    | `Admin:ConnectionString`           |
 | Directory writes                                                                                                        | `Axis.Admin`                    | `ConnectionStrings:PlatformSchema` |
-| Platform migrations, at start                                                                                           | Server                          | `ConnectionStrings:PlatformSchema` |
+| Platform migrations, at start, under both tenant sources                                                                | Server                          | `ConnectionStrings:PlatformSchema` |
 | Grants, EF Core migrations, compile, store and activate                                                                 | `Axis.Admin`                    | The tenant's schema role           |
 | Seeding and schedule trigger state                                                                                      | `Axis.Admin`                    | The tenant's runtime role          |
 | Claim, run and finish a publish request: compile, store, activate, release history and audit record _(planned for M10)_ | `axis-admin publisher`          | The tenant's schema role           |

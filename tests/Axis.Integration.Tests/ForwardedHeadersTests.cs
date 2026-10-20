@@ -1,4 +1,5 @@
 using System.Net;
+using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -56,6 +57,7 @@ public sealed class ForwardedHeadersTests(KeycloakFixture keycloak) : IAsyncLife
         {
             builder.UseEnvironment("Testing");
             builder.UseTestPlatform(UnreachableDatabase);
+            builder.WithoutPlatformMigration();
             builder.UseSetting("Tenants:a:Hosts:0", "localhost");
             builder.UseSetting("Tenants:a:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:a:SchemaConnectionString", UnreachableDatabase);
