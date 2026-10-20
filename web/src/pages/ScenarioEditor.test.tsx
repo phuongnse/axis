@@ -139,6 +139,22 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(onChange).toHaveBeenCalledWith('/steps/0', { type: 'advanceTime', note: 'keep me' })
   })
 
+  it('writes only the edited pointers, so unknown keys of the scenario, a stub and a step stay', () => {
+    const { onChange } = renderEditor({
+      ...scenario([{ ...fixtures.advanceTime, note: 'kept' }]),
+      owner: 'hoa',
+      stubs: [{ operation: 'billing/Charge', output: {}, comment: 'kept' }],
+    })
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Renamed' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'operation' }), { target: { value: 'billing/Refund' } })
+
+    expect(onChange.mock.calls).toEqual([
+      ['/name', 'Renamed'],
+      ['/stubs/0/operation', 'billing/Refund'],
+    ])
+  })
+
   it('edits the time an advanceTime step moves by', async () => {
     const { onChange } = renderEditor(scenario([fixtures.advanceTime]))
 
