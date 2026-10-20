@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
-import { readFile, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { startServer } from '../activate'
 import { e2eApp, studioFolder } from '../server-settings'
@@ -325,6 +326,42 @@ test('an author edits an endpoint mapping row and the file holds only that expre
     expect(Object.keys(after.values)).toEqual(Object.keys(before.values))
   } finally {
     await writeFile(file, original)
+  }
+})
+
+test('an author gives a new page a title in two locales, writes the texts and saves', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const pageFile = path.join(studioFolder, 'pages/label-texts-e2e.json')
+  const textFiles = ['en', 'vi'].map((locale) => path.join(studioFolder, `texts/${locale}.json`))
+  const [originalEn, originalVi] = await Promise.all(textFiles.map((file) => readFile(file, 'utf8')))
+  const id = randomUUID()
+  await writeFile(
+    pageFile,
+    JSON.stringify({ id, kind: 'page', name: 'LabelTextsE2e', formatVersion: 1, widgets: [{ type: 'taskInbox' }] }),
+  )
+
+  try {
+    await page.goto(`/studio?app=PurchaseRequests&resource=${id}`)
+    await expect(page.getByRole('textbox', { name: 'Text key' })).toHaveValue('pages.labelTextsE2e.title')
+    await page.getByRole('textbox', { name: 'en' }).fill('Label texts')
+    await page.getByRole('textbox', { name: 'vi' }).fill('Văn bản nhãn')
+    await page.getByRole('button', { name: 'Write texts' }).click()
+    await expect(page.getByTestId('studio-label-written')).toBeVisible()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+
+    const [en, vi] = await Promise.all(
+      textFiles.map(
+        async (file) => (JSON.parse(await readFile(file, 'utf8')) as { texts: Record<string, string> }).texts,
+      ),
+    )
+    expect(en['pages.labelTextsE2e.title']).toBe('Label texts')
+    expect(vi['pages.labelTextsE2e.title']).toBe('Văn bản nhãn')
+    const saved = JSON.parse(await readFile(pageFile, 'utf8')) as { title: { textKey: string } }
+    expect(saved.title.textKey).toBe('pages.labelTextsE2e.title')
+  } finally {
+    await rm(pageFile, { force: true })
+    await Promise.all([writeFile(textFiles[0], originalEn), writeFile(textFiles[1], originalVi)])
   }
 })
 
