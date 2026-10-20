@@ -83,6 +83,30 @@ test.describe('Studio edits a process in the process editor', () => {
     })
   })
 
+  test('an author changes the due time and an outcome target of a task and saves only those changes', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    const id = await processId(page)
+    const before = JSON.parse(await readFile(path.join(copy, file), 'utf8')) as {
+      steps: { dueIn?: string; outcomes: { next: string }[] }[]
+    }
+    const beforeDiagnostics = await diagnostics(page)
+
+    await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+    await expect(page.getByTestId('studio-step-3')).toContainText('financeApproval')
+    await page.getByTestId('studio-field-/steps/3/dueIn').getByRole('textbox').fill('P5D')
+    await pick(page, '/steps/3/outcomes/1/next', 'markRejected')
+    await page.getByRole('button', { name: 'Save' }).click()
+
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+    const expected = structuredClone(before)
+    expected.steps[3].dueIn = 'P5D'
+    expected.steps[3].outcomes[1].next = 'markRejected'
+    expect(JSON.parse(await readFile(path.join(copy, file), 'utf8'))).toEqual(expected)
+    expect(await diagnostics(page)).toEqual(beforeDiagnostics)
+  })
+
   test('an author removes a step, and the diagnostic of the transition that names it opens its picker', async ({
     page,
   }) => {
