@@ -94,7 +94,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         return body.RootElement.Clone();
     }
 
-    private static async Task ActivateAsync(string connectionString, string folder, ActivationActor actor)
+    internal static async Task ActivateAsync(string connectionString, string folder, ActivationActor actor)
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(CancellationToken);
