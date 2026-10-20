@@ -82,6 +82,7 @@ beforeAll(() =>
     loadKindSchema('seed'),
     loadKindSchema('connector'),
     loadKindSchema('endpoint'),
+    loadKindSchema('text'),
     loadKindSchema('page'),
   ]),
 )
@@ -433,6 +434,124 @@ describe('StudioEditor for an endpoint', () => {
     expect(await screen.findByTestId('studio-field-/entity', {}, slow)).toBeInTheDocument()
     expect(screen.getAllByTestId('studio-field-/values')).toHaveLength(1)
     expect(screen.getByTestId('studio-field-/values/status')).toBeInTheDocument()
+  })
+})
+
+describe('StudioEditor for a text resource', () => {
+  const enId = '5b0f8c1e-27d7-4d4e-9d0f-0b1b8d7a1111'
+  const viId = '5b0f8c1e-27d7-4d4e-9d0f-0b1b8d7a2222'
+  const enItem: StudioResourceItem = {
+    id: enId,
+    kind: 'text',
+    name: 'en',
+    file: 'texts/en.json',
+    version: 'e1',
+    usedBy: 0,
+  }
+  const viItem: StudioResourceItem = { ...enItem, id: viId, name: 'vi', file: 'texts/vi.json', version: 'v1' }
+  const enUrl = `${folder}/resources/${enId}`
+  const viUrl = `${folder}/resources/${viId}`
+
+  function textContent(id: string, locale: string, texts: Record<string, string>) {
+    return { id, kind: 'text', name: locale, formatVersion: 1, locale, texts }
+  }
+
+  function stubTexts() {
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === enUrl && init?.method === 'PATCH') {
+        return json({ version: 'e3', diagnostics: [] })
+      }
+      if (input === enUrl) {
+        return json({ ...enItem, content: textContent(enId, 'en', { greeting: 'Hello' }) })
+      }
+      if (input === viUrl) {
+        return json({ ...viItem, content: textContent(viId, 'vi', { greeting: 'Xin chào' }) })
+      }
+      if (input === `${folder}/texts/added` && init?.method === 'PUT') {
+        return json({
+          resources: [
+            { id: enId, locale: 'en', version: 'e2' },
+            { id: viId, locale: 'vi', version: 'v2' },
+          ],
+          diagnostics: [],
+        })
+      }
+      return new Response(null, { status: 404 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  function renderTexts() {
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioEditor
+            application="Shop"
+            item={enItem}
+            resources={[enItem, viItem]}
+            path={null}
+            onSaved={vi.fn()}
+            onTextsWritten={vi.fn()}
+            onDeleted={vi.fn()}
+          />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+  }
+
+  function calls(fetchMock: ReturnType<typeof vi.fn>, method: string) {
+    return fetchMock.mock.calls.filter(([, init]) => init?.method === method) as [string, RequestInit][]
+  }
+
+  it('saves one patch to the open locale only, holding only the edited key', async () => {
+    const fetchMock = stubTexts()
+    renderTexts()
+
+    const row = (await screen.findAllByTestId('studio-text-row', undefined, slow))[0]
+    expect(within(row).getByText('Xin chào')).toBeVisible()
+    await userEvent.clear(within(row).getByRole('textbox', { name: 'en' }))
+    await userEvent.type(within(row).getByRole('textbox', { name: 'en' }), 'Hi')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByTestId('studio-saved')
+
+    const patches = calls(fetchMock, 'PATCH')
+    expect(patches).toHaveLength(1)
+    expect(patches[0][0]).toBe(enUrl)
+    expect(new Headers(patches[0][1].headers).get('If-Match')).toBe('"e1"')
+    expect(JSON.parse(patches[0][1].body as string)).toEqual([{ op: 'replace', path: '/texts/greeting', value: 'Hi' }])
+    expect(calls(fetchMock, 'PUT')).toHaveLength(0)
+    expect(fetchMock.mock.calls.some(([input, init]) => input === viUrl && init?.method !== undefined)).toBe(false)
+  })
+
+  it('sends the version of the texts route answer on the next save, without the added key', async () => {
+    const fetchMock = stubTexts()
+    renderTexts()
+
+    await screen.findAllByTestId('studio-text-row', undefined, slow)
+    const add = screen.getByTestId('studio-text-add')
+    await userEvent.type(within(add).getByRole('textbox', { name: 'New key' }), 'added')
+    await userEvent.type(within(add).getByRole('textbox', { name: 'en' }), 'A')
+    await userEvent.type(within(add).getByRole('textbox', { name: 'vi' }), 'B')
+    await userEvent.click(within(add).getByRole('button', { name: 'Add key' }))
+
+    const added = await screen.findAllByTestId('studio-text-row')
+    expect(added.map((row) => row.getAttribute('data-key'))).toEqual(['added', 'greeting'])
+    const puts = calls(fetchMock, 'PUT')
+    expect(puts).toHaveLength(1)
+    expect(JSON.parse(puts[0][1].body as string)).toEqual({ texts: { en: 'A', vi: 'B' } })
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+
+    const greeting = within(added[1]).getByRole('textbox', { name: 'en' })
+    await userEvent.clear(greeting)
+    await userEvent.type(greeting, 'Hi')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByTestId('studio-saved')
+
+    const patches = calls(fetchMock, 'PATCH')
+    expect(patches).toHaveLength(1)
+    expect(new Headers(patches[0][1].headers).get('If-Match')).toBe('"e2"')
+    expect(JSON.parse(patches[0][1].body as string)).toEqual([{ op: 'replace', path: '/texts/greeting', value: 'Hi' }])
   })
 })
 
