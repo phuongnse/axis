@@ -1,5 +1,6 @@
-import { Button, Card, Flex, Input, Select, Typography } from 'antd'
+import { Button, Card, Flex, Input, Radio, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
+import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -75,11 +76,6 @@ const requiredStepKeys: Record<string, Content> = {
   end: {},
 }
 
-/** The keys of a task step that the editor does not edit yet. */
-const jsonOnlyKeys: Record<string, string[]> = {
-  task: ['label', 'assignee', 'form', 'dueIn'],
-}
-
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -109,9 +105,9 @@ function withType(step: Content, type: string): Content {
 /**
  * The editor of a process. It shows the process's name, entity and start condition with the generic form, the start
  * step, and the steps as cards in file order. A decision shows its branches and its `otherwise`, an end shows only
- * its name and type, and every transition is a picker over the step names of the draft. An operation shows its
- * operation panel and its `next`. A task shows its transitions and points to the JSON view for its other properties.
- * The editor edits the draft through
+ * its name and type, and every transition is a picker over the step names of the draft. A task shows its full panel:
+ * label, assignee, form, due time and outcomes. An operation shows its operation panel and its `next`. The editor
+ * edits the draft through
  * `onChange`, so a key it does not show stays as it is, and removing a step leaves the transitions that name it for
  * the compiler to report.
  */
@@ -214,7 +210,6 @@ function Step({
   const t = useText()
   const pointer = `/steps/${index}`
   const type = typeof step.type === 'string' ? step.type : undefined
-  const present = (keys: string[]) => keys.filter((key) => step[key] !== undefined)
 
   return (
     <Card
@@ -269,12 +264,7 @@ function Step({
             <JsonOnlyKeys pointer={pointer} keys={operationJsonOnlyKeys(step)} />
           </>
         )}
-        {type === 'task' && (
-          <>
-            <Outcomes pointer={pointer} step={step} names={names} onChange={onChange} />
-            <JsonOnlyKeys pointer={pointer} keys={present(jsonOnlyKeys.task)} />
-          </>
-        )}
+        {type === 'task' && <Task pointer={pointer} step={step} names={names} onChange={onChange} />}
       </Flex>
     </Card>
   )
@@ -320,6 +310,161 @@ function JsonOnlyKeys({ pointer, keys }: { pointer: string; keys: string[] }) {
   ))
 }
 
+/** The editor of an expression: the expression editor when the draft can check expressions, a plain box otherwise. */
+function Expression({
+  pointer,
+  name,
+  value,
+  onChange,
+}: {
+  pointer: string
+  name: string
+  value: string
+  onChange: ChangeHandler
+}) {
+  const check = useContext(ExpressionCheckContext)
+
+  return check ? (
+    <Suspense fallback={<Input aria-label={name} value={value} readOnly />}>
+      <LazyExpressionEditor
+        application={check.application}
+        resourceId={check.resourceId}
+        path={pointer}
+        name={name}
+        value={value}
+        required
+        options={expressionScope(check.kind, check.draft, pointer, check.names)}
+        onChange={onChange}
+      />
+    </Suspense>
+  ) : (
+    <Input aria-label={name} value={value} onChange={(event) => onChange(pointer, event.target.value)} />
+  )
+}
+
+/** A picker over the application's names of one kind, or a plain box while the names have not loaded. */
+function NamePicker({
+  pointer,
+  label,
+  kind,
+  value,
+  onPick,
+}: {
+  pointer: string
+  label: string
+  kind: string
+  value: unknown
+  onPick: (next: string) => void
+}) {
+  const names = useContext(StudioNamesContext)
+
+  return (
+    <div data-testid={`studio-field-${pointer}`}>
+      <div>{label}</div>
+      {names === undefined ? (
+        <Input aria-label={label} value={text(value)} onChange={(event) => onPick(event.target.value)} />
+      ) : (
+        <ReferencePicker
+          name={label}
+          value={text(value)}
+          required
+          options={referenceOptions(names, kind, undefined, pointer)}
+          onChange={(next) => onPick(next ?? '')}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * The panel of a task: its label, assignee, form, due time and outcomes. Each value is edited through its own pointer,
+ * so a key the panel does not show stays as it is. The assignee is a user expression or a role, and a switch replaces
+ * the `assignee` object so that it holds only the chosen key.
+ */
+function Task({
+  pointer,
+  step,
+  names,
+  onChange,
+}: {
+  pointer: string
+  step: Content
+  names: string[]
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const label = isContent(step.label) ? step.label : {}
+  const assignee = isContent(step.assignee) ? step.assignee : {}
+  const mode = assignee.role !== undefined && assignee.user === undefined ? 'role' : 'user'
+  const assigneePointer = `${pointer}/assignee`
+
+  function switchTo(next: 'user' | 'role') {
+    const { user: _user, role: _role, ...others } = assignee
+    onChange(assigneePointer, { ...others, [next]: text(assignee[next]) })
+  }
+
+  return (
+    <>
+      <NamePicker
+        pointer={`${pointer}/label/textKey`}
+        label={t('shell.studio.process.label')}
+        kind="text"
+        value={label.textKey}
+        onPick={(next) => onChange(`${pointer}/label/textKey`, next)}
+      />
+      <div data-testid={`studio-field-${assigneePointer}`}>
+        <Flex vertical gap="small">
+          <Typography.Text strong>{t('shell.studio.process.assignee')}</Typography.Text>
+          <Radio.Group
+            optionType="button"
+            aria-label={t('shell.studio.process.assignee')}
+            value={mode}
+            options={[
+              { value: 'user', label: t('shell.studio.process.assigneeUser') },
+              { value: 'role', label: t('shell.studio.process.assigneeRole') },
+            ]}
+            onChange={(event) => switchTo(event.target.value)}
+          />
+          {mode === 'user' ? (
+            <div data-testid={`studio-field-${assigneePointer}/user`}>
+              <Expression
+                pointer={`${assigneePointer}/user`}
+                name={t('shell.studio.process.assigneeUser')}
+                value={text(assignee.user)}
+                onChange={onChange}
+              />
+            </div>
+          ) : (
+            <NamePicker
+              pointer={`${assigneePointer}/role`}
+              label={t('shell.studio.process.assigneeRole')}
+              kind="role"
+              value={assignee.role}
+              onPick={(next) => onChange(`${assigneePointer}/role`, next)}
+            />
+          )}
+        </Flex>
+      </div>
+      <NamePicker
+        pointer={`${pointer}/form`}
+        label={t('shell.studio.process.form')}
+        kind="form"
+        value={step.form}
+        onPick={(next) => onChange(`${pointer}/form`, next)}
+      />
+      <div data-testid={`studio-field-${pointer}/dueIn`}>
+        <div>{t('shell.studio.process.dueIn')}</div>
+        <Input
+          aria-label={t('shell.studio.process.dueIn')}
+          value={text(step.dueIn)}
+          onChange={(event) => onChange(`${pointer}/dueIn`, event.target.value === '' ? undefined : event.target.value)}
+        />
+      </div>
+      <Outcomes pointer={pointer} step={step} names={names} onChange={onChange} />
+    </>
+  )
+}
+
 function Decision({
   pointer,
   step,
@@ -332,7 +477,6 @@ function Decision({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const check = useContext(ExpressionCheckContext)
   const branchesPointer = `${pointer}/branches`
   const branches = Array.isArray(step.branches) ? step.branches : []
 
@@ -350,26 +494,7 @@ function Decision({
               <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${branchPointer}`}>
                 <div data-testid={`studio-field-${whenPointer}`} style={{ flex: 1, minWidth: 240 }}>
                   <div>{name}</div>
-                  {check ? (
-                    <Suspense fallback={<Input aria-label={name} value={when} readOnly />}>
-                      <LazyExpressionEditor
-                        application={check.application}
-                        resourceId={check.resourceId}
-                        path={whenPointer}
-                        name={name}
-                        value={when}
-                        required
-                        options={expressionScope(check.kind, check.draft, whenPointer, check.names)}
-                        onChange={onChange}
-                      />
-                    </Suspense>
-                  ) : (
-                    <Input
-                      aria-label={name}
-                      value={when}
-                      onChange={(event) => onChange(whenPointer, event.target.value)}
-                    />
-                  )}
+                  <Expression pointer={whenPointer} name={name} value={when} onChange={onChange} />
                 </div>
                 <Transition
                   pointer={`${branchPointer}/next`}
@@ -402,7 +527,7 @@ function Decision({
   )
 }
 
-/** The outcomes of a task: only their targets are edited. The rest of an outcome stays as the file has it. */
+/** The outcomes of a task as rows of name, label and target step. Each value is edited through its own pointer. */
 function Outcomes({
   pointer,
   step,
@@ -415,27 +540,53 @@ function Outcomes({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const outcomesPointer = `${pointer}/outcomes`
   const outcomes = Array.isArray(step.outcomes) ? step.outcomes : []
 
   return (
-    <div data-testid={`studio-field-${pointer}/outcomes`}>
-      <div>
-        <Typography.Text strong>{t('shell.studio.process.outcomes')}</Typography.Text>
-      </div>
-      <Typography.Text type="secondary" data-testid="studio-json-only">
-        {t('shell.studio.editInJson')}
-      </Typography.Text>
+    <div data-testid={`studio-field-${outcomesPointer}`}>
       <Flex vertical gap="small">
-        {outcomes.map((outcome, index) => (
-          <Transition
-            key={index}
-            pointer={`${pointer}/outcomes/${index}/next`}
-            label={text(isContent(outcome) ? outcome.name : undefined) || t('shell.studio.process.next')}
-            value={isContent(outcome) ? outcome.next : undefined}
-            names={names}
-            onChange={onChange}
-          />
-        ))}
+        <Typography.Text strong>{t('shell.studio.process.outcomes')}</Typography.Text>
+        {outcomes.map((outcome, index) => {
+          const outcomePointer = `${outcomesPointer}/${index}`
+          const content = isContent(outcome) ? outcome : {}
+          return (
+            <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${outcomePointer}`}>
+              <div data-testid={`studio-field-${outcomePointer}/name`}>
+                <div>{t('shell.studio.process.outcomeName')}</div>
+                <Input
+                  aria-label={t('shell.studio.process.outcomeName')}
+                  value={text(content.name)}
+                  onChange={(event) => onChange(`${outcomePointer}/name`, event.target.value)}
+                />
+              </div>
+              <NamePicker
+                pointer={`${outcomePointer}/label/textKey`}
+                label={t('shell.studio.process.outcomeLabel')}
+                kind="text"
+                value={isContent(content.label) ? content.label.textKey : undefined}
+                onPick={(next) => onChange(`${outcomePointer}/label/textKey`, next)}
+              />
+              <Transition
+                pointer={`${outcomePointer}/next`}
+                label={t('shell.studio.process.next')}
+                value={content.next}
+                names={names}
+                onChange={onChange}
+              />
+              <Button onClick={() => onChange(outcomePointer, undefined)}>
+                {t('shell.studio.process.removeOutcome')}
+              </Button>
+            </Flex>
+          )
+        })}
+        <div>
+          <Button
+            onClick={() => onChange(outcomesPointer, [...outcomes, { name: '', label: { textKey: '' }, next: '' }])}
+          >
+            {t('shell.studio.process.addOutcome')}
+          </Button>
+        </div>
       </Flex>
     </div>
   )
