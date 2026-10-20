@@ -1057,20 +1057,23 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     with the next Save. An unused key does no harm.
   - A key that other labels use shows how many, from `usedBy` in the names
     answer, so the author knows the edit changes them too.
-- **Expression editor.** *(Planned for M11.)* A string property that the schema
-  marks with `x-axis-expression` shows a code editor in place of a text box.
-  - It is CodeMirror 6, about 120 KB gzipped, in a chunk that loads only when
+- **Expression editor.** A string property that the schema marks with
+  `x-axis-expression` shows a code editor in place of a text box.
+  - It is CodeMirror 6, about 100 KB gzipped, in a chunk that loads only when
     Studio first shows an expression. It highlights the
     [expression grammar](expressions.md#grammar).
   - It checks the text 300 ms after the last keystroke, through the
     [expression check route](authoring.md#expression-check). Only the latest
-    answer is shown. It underlines the range from `start` to `end` and shows the
-    result `type`.
-  - Completion offers the fields of the entity that the resource names, the
-    parameters of the data source in a filter, the rules and the functions.
+    answer is shown. It underlines the range from `start` to `end`, shows the
+    error code and message under the editor, and shows the result `type` when
+    there is no error.
+  - *(Planned for M11.)* **Completion.** Completion offers the fields of the
+    entity that the resource names, the parameters of the data source in a
+    filter, the rules and the functions.
   - The check uses the saved resource, so a draft path that is not saved yet may
-    have no answer. When there is no answer, the last result stays on screen.
-    The editor never blocks Save.
+    have no answer. When there is no answer, or the check answers `400` or
+    `401`, the last result stays on screen. A `401` does not start sign-in, so
+    the draft is kept. The editor never blocks Save.
 - **Entity designer** *(planned for M11)*. An `entity` resource opens in a
   designer in place of the generic form. The JSON view stays. See
   [D54](../decisions.md#d54-the-entity-designer-and-the-policy-matrix--agreed).

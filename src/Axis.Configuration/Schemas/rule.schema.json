@@ -14,7 +14,7 @@
       "items": { "$ref": "#/$defs/parameter" }
     },
     "resultType": { "$ref": "#/$defs/type" },
-    "expression": { "type": "string" }
+    "expression": { "type": "string", "x-axis-expression": true }
   },
   "$defs": {
     "id": {

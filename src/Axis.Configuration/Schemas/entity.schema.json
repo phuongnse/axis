@@ -45,7 +45,7 @@
       "additionalProperties": false,
       "required": ["expression", "message", "field"],
       "properties": {
-        "expression": { "type": "string", "minLength": 1 },
+        "expression": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "message": { "$ref": "#/$defs/textReference" },
         "field": { "type": "string" }
       }
@@ -72,7 +72,7 @@
           "uniqueItems": true,
           "items": { "type": "string" }
         },
-        "expression": { "type": "string", "minLength": 1 },
+        "expression": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "sequence": { "type": "string" },
         "creator": { "type": "boolean" },
         "sensitive": { "type": "boolean" }
