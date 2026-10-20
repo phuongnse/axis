@@ -7,12 +7,15 @@ namespace Axis.Configuration.Compilation;
 /// <summary>
 /// The outcome of compiling an application folder. <see cref="Model"/>, <see cref="ContentHash"/>
 /// and <see cref="Resources"/> are present only when no diagnostic is an error. <see cref="References"/>
-/// is always present, and is not stored in the release.
+/// and <see cref="Names"/> are always present, and are not stored in the release.
 /// </summary>
 public sealed record CompilationResult(ApplicationModel? Model, IReadOnlyList<Diagnostic> Diagnostics)
 {
     /// <summary>The reference index of the references the compile resolved, even when it has errors.</summary>
     public ReferenceIndex References { get; init; } = ReferenceIndex.Empty;
+
+    /// <summary>The names of the loaded resources, even when the compile has errors. A file left out for its own errors is absent.</summary>
+    public DefinedNames Names { get; init; } = DefinedNames.Empty;
 
     /// <summary>The application's content hash; see <see cref="Releases.ContentHash"/>.</summary>
     public string? ContentHash { get; init; }

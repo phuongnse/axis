@@ -28,7 +28,7 @@ namespace Axis.Configuration.Compilation;
 /// the extension packages of the manifest and pins each to the highest installed version in its
 /// range, does the same for its modules, takes the files of each pinned module into the
 /// resources and merges their texts into the application's, resolves references
-/// between entities, forms, pages, sites and seeds, and builds the reference index of the references it resolves.
+/// between entities, forms, pages, sites and seeds, builds the reference index of the references it resolves, and collects the names it loaded.
 /// Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash, which covers its pins and the files of its modules.
 /// Both inputs give the same result for the same resources and installed packages.
@@ -188,7 +188,7 @@ public static class ApplicationCompiler
         return modules;
     }
 
-    private static bool IsModuleResource(Resource resource) =>
+    internal static bool IsModuleResource(Resource resource) =>
         resource.File.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
 
     private static CompilationResult Compile(
@@ -488,7 +488,12 @@ public static class ApplicationCompiler
             references,
             diagnostics);
 
-        var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics)) { References = references.Build() };
+        var index = references.Build();
+        var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics))
+        {
+            References = index,
+            Names = DefinedNamesBuilder.Build(loaded, allEntities, allSequences, allEvents, moduleResources.Rules, texts, FindEntity, index),
+        };
         if (result.HasErrors || loaded.Application is null)
         {
             return result;
@@ -1498,7 +1503,7 @@ public static class ApplicationCompiler
     /// not loaded. Each reference field of the path whose target resolves, the last name included,
     /// is passed to <paramref name="reach"/>, even when the path fails further on.
     /// </summary>
-    private static string? ResolvePath(
+    internal static string? ResolvePath(
         EntityResource root,
         string path,
         Func<string, EntityResource?> findEntity,

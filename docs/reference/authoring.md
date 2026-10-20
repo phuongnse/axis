@@ -9,7 +9,7 @@ of [architecture.md](../architecture.md) apply: sections marked
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
 in git. The application list, resource list, read, patch, create, delete, diagnostics,
-references and expression check routes are built. It is
+references, names and expression check routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
@@ -24,10 +24,10 @@ its own process, and
 A `changes` route that writes several files in one call is
 *(planned for M11)*, see [Changes](#changes).
 
-The [expression check](#expression-check) route helps Studio's expression
-editor, and is built. *(Planned for M11.)* Two more routes help its pickers and
-label texts: a [names](#names) route and a [text write](#text-writes). They are
-agreed, with the expression check, in
+The [names](#names) route feeds Studio's reference pickers, and the
+[expression check](#expression-check) route helps its expression editor. Both
+are built. *(Planned for M11.)* A [text write](#text-writes) route helps its label
+texts. All three are agreed in
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed).
 
 ## Settings
@@ -74,7 +74,7 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/diagnostics` | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200` |
-| `GET /api/studio/apps/{application}/names` *(planned for M11)* | `200` with the names the application defines, see [Names](#names) |
+| `GET /api/studio/apps/{application}/names` | `200` with the names the application defines, see [Names](#names) |
 | `PUT /api/studio/apps/{application}/texts/{key}` *(planned for M11)* | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes) |
 | `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
 
@@ -154,8 +154,9 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-The expression check and the two routes planned for M11 use these checks. None of
-them has check 6 or a later numbered check, except where a line says so:
+The names route and the expression check are built. *(Planned for M11.)* The text
+write uses these checks as well. None of the three has check 6 or a later numbered
+check, except where a line says so:
 
 - **Names.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body.
 - **Text write.** Checks 1, 2, 3 and 5, then `415` for a body that is not
@@ -211,7 +212,7 @@ requests or releases exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics,
+from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics, Names,
 Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -226,7 +227,7 @@ Resource references, Text key references, Release history, Validate, Publish, Pr
 | Text key references | No session | No author role, or no `Studio:Folders` | Unknown application, or a key that no text resource defines and no label uses | Not used |
 | Changes *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or a patch that names an unknown resource | Any stale version, a patched resource that is gone, or a create whose `id` or target file already exists |
 | Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
-| Names *(planned for M11)* | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
+| Names | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Text write *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
 | Expression check | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or an unknown `resourceId` | Not used |
 | Validate | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
@@ -286,7 +287,7 @@ agrees.
 
 ## Names
 
-*(Planned for M11.)* `GET .../names` answers every name the application
+`GET .../names` answers every name the application
 defines, so Studio's [reference pickers](frontend.md#studio) load them once.
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
 agrees it. The answer is:
@@ -306,6 +307,18 @@ agrees it. The answer is:
 - **`name`.** It is written as a reference writes it. A module entity is
   `<module id>/<name>`, and a module rule is `<module id>:<name>`. `module` is
   the module id, or null for an entity or rule of the application.
+- **Module names.** A module's events, sequences and forms are listed
+  under their `<module id>/<name>` names too, but only entities, data sources
+  and rules carry `module`. A module resource's `id` is the id written in its
+  module file.
+- **`columns`.** The projected fields of a data source, in order. A column's
+  `type` is the type of the field at the end of its path, or null when the path
+  does not resolve. A grouped data source also lists its measures. A `count`
+  measure is an `integer`, and any other measure has the type of the field it
+  measures.
+- **Order.** Each list holds the module resources first, then the
+  application's own in file path order. A step that is not a task has
+  `outcomes: []`. Text keys are sorted ordinally.
 - **`locales`.** The locales of the folder's text resources.
 - **`texts`.** Each key comes with its text in every locale, and `usedBy`, the
   number of `label text` edges in the [reference index](configuration.md#reference-index).
