@@ -10,6 +10,10 @@ The first application built on Axis is **purchase requests**. An employee
 drafts a request, a manager approves it, finance reviews it above a configured
 amount, and an approved request is sent to a purchasing system.
 
+Leave requests is the second sample. A third, a service desk built only through
+Studio, is planned for M11. See
+[D56](docs/decisions.md#d56-a-service-desk-as-the-third-sample-application--agreed).
+
 ## Status
 
 Milestone **M10, Publishing from Studio**, is complete. The current milestones are
