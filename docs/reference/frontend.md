@@ -936,7 +936,8 @@ reconnect message are built.
     through the same JSON Patch, with the same `If-Match` rules. It never drops
     a value it does not show, so unknown keys stay as they are. See
     **Editors by kind** below. The seed editor, the scenario editor, the
-    connector editor, the endpoint mapping rows and the text editor are built.
+    connector editor, the page editor, the endpoint mapping rows and the text
+    editor are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1192,7 +1193,7 @@ reconnect message are built.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
-  the connector editor, the scenario editor, the endpoint mapping rows and the
+  the connector editor, the scenario editor, the page editor, the endpoint mapping rows and the
   text editor are built. The other typed editors and the entity designer are
   *(planned for M11)*, and until they are built those kinds use the generic
   form. The last
@@ -1225,10 +1226,30 @@ reconnect message are built.
   and `else`, is an object with no `properties`, such as a map, or has no type. The last column follows that rule. A new kind or property that the
   form cannot show goes to the JSON view until an editor covers it.
 
-  - **Page editor.** A list of the page's widgets, each with its type and a
-    summary. A panel per widget type, `table`, `form`, `taskInbox` and
-    `processInspector`, shows the properties the widget has today. The `form`
-    panel also shows its `startProcess` actions.
+  - **Page editor** *(built)*. The Form tab shows the page's name, its title
+    with a text box for each locale, and a list of its widgets, each with its
+    type and a summary such as `table · PurchaseRequestList`. A panel per
+    widget type, `table`, `form`, `taskInbox` and `processInspector`, shows the
+    properties the widget has today. A `table` panel has entity, data source
+    and form page pickers. A `form` panel has entity and form pickers and its
+    `startProcess` actions, each with a process picker and a label. A
+    `taskInbox` panel has no properties. A `processInspector` panel has a
+    process picker. The JSON view stays as a second view of the same draft.
+    - **Type change.** Choosing another type removes the known properties the
+      new type does not take, because the compiler rejects them. A switch to
+      `processInspector` adds an empty `process`, which the schema requires.
+    - **Exclusive bindings.** The compiler accepts exactly one of a table's
+      entity and data source, and one of a form's entity and form. Picking one
+      clears the other.
+    - **Pickers.** The form page picker lists every page except the current
+      one. The action's process picker lists every process. Neither checks
+      what the choice holds, so a wrong choice shows as a diagnostic after the
+      save.
+    - **Widgets.** A page holds one widget today, so the list has no add,
+      remove or reorder.
+    - **Unknown keys.** A key the editor does not show, on the page or on a
+      widget, is saved unchanged. A widget of a type with no panel, such as one
+      M12 adds, shows its type and points to the JSON view.
   - **Process step editor.** The steps show as a list in graph order, with add,
     remove and reorder. A panel per step type, `operation`, `decision`, `task`
     and `end`, shows that type's properties. `set`, `input`, `output` and
