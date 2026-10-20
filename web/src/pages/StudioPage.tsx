@@ -19,6 +19,7 @@ import {
   waitForServer,
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
+import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
 import { StudioNewResource } from './StudioNewResource'
@@ -52,9 +53,8 @@ type NamesState = { application: string; names: StudioNames | null }
  * for a publisher. A save or a delete loads the release list again, because the folder may now differ from the
  * active release. The diagnostics panel shows the diagnostics of a request that ended. When the server does not
  * answer, a reconnect message shows at the top. Studio checks the server with a
- * back-off, then loads its data again, and an unsaved draft stays on screen. The names that expression
- * completion offers load with the application too.
- * back-off, then loads its data again, and an unsaved draft stays on screen.
+ * back-off, then loads its data again, and an unsaved draft stays on screen. The names that the reference pickers
+ * and expression completion offer load with the application too, and again after a save, a delete and a reconnect.
  */
 export function StudioPage() {
   const t = useText()
@@ -318,27 +318,29 @@ function StudioWorkspace() {
                       ...(path ? [{ key: 'path', label: t('shell.studio.path'), children: path }] : []),
                     ]}
                   />
-                  <StudioEditor
-                    key={`editor-${selected.id}`}
-                    application={application!}
-                    item={selected}
-                    resources={loaded.resources}
-                    names={names}
-                    path={path}
-                    onSaved={(diagnostics) => {
-                      setFolder({ ...loaded, diagnostics })
-                      setFolderRevision((value) => value + 1)
-                    }}
-                    onDeleted={(diagnostics) => {
-                      setFolder({
-                        ...loaded,
-                        resources: loaded.resources.filter((item) => item.id !== selected.id),
-                        diagnostics,
-                      })
-                      setFolderRevision((value) => value + 1)
-                      setParams({ app: application! })
-                    }}
-                  />
+                  <StudioNamesContext.Provider value={names ?? undefined}>
+                    <StudioEditor
+                      key={`editor-${selected.id}`}
+                      application={application!}
+                      item={selected}
+                      resources={loaded.resources}
+                      names={names}
+                      path={path}
+                      onSaved={(diagnostics) => {
+                        setFolder({ ...loaded, diagnostics })
+                        setFolderRevision((value) => value + 1)
+                      }}
+                      onDeleted={(diagnostics) => {
+                        setFolder({
+                          ...loaded,
+                          resources: loaded.resources.filter((item) => item.id !== selected.id),
+                          diagnostics,
+                        })
+                        setFolderRevision((value) => value + 1)
+                        setParams({ app: application! })
+                      }}
+                    />
+                  </StudioNamesContext.Provider>
                   <StudioReferences
                     key={`references-${selected.id}`}
                     application={application!}

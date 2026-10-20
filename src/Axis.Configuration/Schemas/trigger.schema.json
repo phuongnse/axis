@@ -10,8 +10,8 @@
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
     "type": { "enum": ["event", "dataChange", "schedule"] },
-    "event": { "$ref": "#/$defs/qualifiedName" },
-    "entity": { "$ref": "#/$defs/name" },
+    "event": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "event" },
+    "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
     "on": {
       "type": "array",
       "minItems": 1,
@@ -28,9 +28,9 @@
     "mode": { "enum": ["async", "sync"] },
     "schedule": { "type": "string", "minLength": 1 },
     "timeZone": { "type": "string", "minLength": 1 },
-    "dataSource": { "$ref": "#/$defs/name" },
+    "dataSource": { "$ref": "#/$defs/name", "x-axis-reference": "dataSource" },
     "parameters": { "type": "object", "propertyNames": { "$ref": "#/$defs/name" } },
-    "process": { "$ref": "#/$defs/name" }
+    "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" }
   },
   "allOf": [
     {

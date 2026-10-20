@@ -1,9 +1,11 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
+import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { resolveSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
+import { ReferencePicker } from './ReferencePicker'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -13,9 +15,13 @@ export type ChangeHandler = (pointer: string, next: unknown) => void
 /** Properties that are read-only at the root: the file's identity. */
 const readOnlyRootProperties = new Set(['id', 'kind'])
 
+/** The keywords of a conditional. A combination of only these is shown as a form, because the form does not enforce them. */
+const conditionalKeywords = new Set(['if', 'then', 'else'])
+
 /**
  * A form built from the JSON Schema of a resource kind, for the draft `value`. It shows text, number,
- * boolean and enum values, nested objects and arrays. Anything else points to the JSON view.
+ * boolean and enum values, nested objects and arrays. A string that names a resource gets a picker of the
+ * application's names. Anything else points to the JSON view.
  */
 export function SchemaForm({
   schema,
@@ -30,6 +36,7 @@ export function SchemaForm({
     <Properties
       node={schema}
       root={schema}
+      rootValue={value}
       pointer=""
       value={value}
       onChange={onChange}
@@ -41,6 +48,7 @@ export function SchemaForm({
 interface NodeProps {
   node: JsonSchema
   root: JsonSchema
+  rootValue: unknown
   pointer: string
   value: unknown
   onChange: ChangeHandler
@@ -49,6 +57,7 @@ interface NodeProps {
 function Properties({
   node,
   root,
+  rootValue,
   pointer,
   value,
   onChange,
@@ -62,6 +71,7 @@ function Properties({
           key={name}
           node={child}
           root={root}
+          rootValue={rootValue}
           pointer={`${pointer}/${name.replaceAll('~', '~0').replaceAll('/', '~1')}`}
           name={name}
           value={(value as Record<string, unknown> | undefined)?.[name]}
@@ -77,6 +87,7 @@ function Properties({
 function SchemaNode({
   node,
   root,
+  rootValue,
   pointer,
   name,
   value,
@@ -86,8 +97,10 @@ function SchemaNode({
   onChange,
 }: NodeProps & { name: string; required: boolean; readOnly?: boolean; item?: boolean }) {
   const t = useText()
+  const names = useContext(StudioNamesContext)
   const check = useContext(ExpressionCheckContext)
   const schema = resolveSchema(node, root)
+  const reference = node['x-axis-reference'] ?? schema['x-axis-reference']
   const isObject = schema.type === 'object' && schema.properties !== undefined
   const isArray = schema.type === 'array' && schema.items !== undefined
   const unsupported = !isSupported(schema)
@@ -109,6 +122,16 @@ function SchemaNode({
         allowClear={!required}
         value={value as string | number | undefined}
         options={schema.enum.map((option) => ({ value: option as string | number, label: String(option) }))}
+        onChange={(next) => onChange(pointer, next)}
+      />
+    )
+  } else if (reference !== undefined && schema.type === 'string' && names !== undefined) {
+    input = (
+      <ReferencePicker
+        name={name}
+        value={typeof value === 'string' ? value : undefined}
+        required={required}
+        options={referenceOptions(names, reference, rootValue, pointer)}
         onChange={(next) => onChange(pointer, next)}
       />
     )
@@ -164,7 +187,14 @@ function SchemaNode({
     input = (
       <fieldset style={{ margin: 0 }}>
         <legend>{name}</legend>
-        <Properties node={schema} root={root} pointer={pointer} value={value} onChange={onChange} />
+        <Properties
+          node={schema}
+          root={root}
+          rootValue={rootValue}
+          pointer={pointer}
+          value={value}
+          onChange={onChange}
+        />
       </fieldset>
     )
   } else if (isArray) {
@@ -183,6 +213,7 @@ function SchemaNode({
               <SchemaNode
                 node={itemSchema}
                 root={root}
+                rootValue={rootValue}
                 pointer={`${pointer}/${index}`}
                 name={`${name} ${index + 1}`}
                 value={item}
@@ -212,9 +243,18 @@ function SchemaNode({
   )
 }
 
-/** Whether the form can show a node. Combinations, maps and nodes without a type go to the JSON view. */
+/**
+ * Whether the form can show a node. Alternatives, maps and nodes without a type go to the JSON view. A combination
+ * of only conditionals is shown, because the form does not enforce its conditions.
+ */
 function isSupported(schema: JsonSchema): boolean {
-  if (schema.oneOf !== undefined || schema.anyOf !== undefined || schema.allOf !== undefined) {
+  if (schema.oneOf !== undefined || schema.anyOf !== undefined) {
+    return false
+  }
+  if (
+    schema.allOf !== undefined &&
+    !schema.allOf.every((part) => Object.keys(part).every((key) => conditionalKeywords.has(key)))
+  ) {
     return false
   }
   if (schema.const !== undefined || schema.enum !== undefined) {

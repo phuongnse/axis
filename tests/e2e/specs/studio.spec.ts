@@ -113,6 +113,50 @@ test('an author follows a Used by entry from a department to the entity that use
   await expect(page.getByTestId('studio-resource-details')).toContainText('entities/purchase-request.json')
 })
 
+test('an author picks a data source of a page from the names and the Uses list shows it', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const pageResource = items.find((item) => item.file === 'pages/requests-by-department.json')!
+  const file = path.join(studioFolder, 'pages/requests-by-department.json')
+  const original = await readFile(file, 'utf8')
+
+  try {
+    await page.goto(`/studio?app=PurchaseRequests&resource=${pageResource.id}`)
+    await page.getByTestId('studio-field-/widgets/0/dataSource').locator('.ant-select-selector').click()
+    await page.getByRole('option', { name: 'PurchaseRequestList' }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+
+    await page.reload()
+    await expect(
+      page
+        .getByTestId('studio-uses')
+        .getByTestId('studio-reference')
+        .filter({ hasText: 'pages/requests-by-department.json · Path: /widgets/0/dataSource' })
+        .getByRole('button', { name: 'PurchaseRequestList' }),
+    ).toBeVisible()
+  } finally {
+    await writeFile(file, original)
+  }
+})
+
+test('an author opens a grant field picker and it offers the fields of the granted entity', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const policy = items.find((item) => item.file === 'policies/employee-access.json')!
+  const names = (await (await page.request.get('/api/studio/apps/PurchaseRequests/names')).json()) as {
+    entities: { name: string; fields: { name: string }[] }[]
+  }
+  const expected = names.entities.find((entity) => entity.name === 'PurchaseRequest')!.fields.map((field) => field.name)
+
+  await page.goto(`/studio?app=PurchaseRequests&resource=${policy.id}`)
+  await page.getByTestId('studio-field-/grants/1/fields/0').locator('.ant-select-selector').click()
+
+  await expect(page.getByRole('option')).toHaveText(expected)
+})
+
 test('an author saves a resource while the server restarts, and sees the saved version after the reconnect', async ({
   page,
 }) => {
@@ -160,10 +204,11 @@ test('an author selects a diagnostic and the editor shows the field at its path'
   const original = await readFile(file, 'utf8')
 
   try {
+    const content = JSON.parse(original) as { input: { target?: string }[] }
+    content.input[2].target = 'NoSuchEntity'
+    await writeFile(file, `${JSON.stringify(content, null, 2)}\n`)
     await page.goto(`/studio?app=PurchaseRequests&resource=${endpoint.id}`)
-    await page.getByTestId('studio-field-/input/2/target').getByRole('textbox').fill('NoSuchEntity')
-    await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page.getByTestId('studio-saved')).toBeVisible()
+    await expect(page.getByTestId('studio-field-/input/2/target').getByTestId('studio-reference-unknown')).toBeVisible()
 
     await page.goto('/studio?app=PurchaseRequests')
     const diagnostic = page

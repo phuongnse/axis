@@ -138,12 +138,6 @@ export interface StudioDiagnostic {
   resourceId: string | null
 }
 
-/** The names an application defines, as completion needs them. A module rule's name is `<module>:<name>`. */
-export interface StudioNames {
-  entities: { name: string; module: string | null; fields: { name: string; type: string }[] }[]
-  rules: { name: string; module: string | null; parameters: { name: string; type: string }[]; resultType: string }[]
-}
-
 /** The other end of a reference. Each type writes only its own fields. */
 export type StudioReferenceNode =
   | { type: 'resource'; id: string; kind: string; name: string | null; file: string }
@@ -170,6 +164,64 @@ export interface StudioResourceReferences {
 /** The `usedBy` entries of a text key: the labels and text resources that use it. */
 export interface StudioTextReferences {
   usedBy: StudioReference[]
+}
+
+/** A field of an entity in `GET .../names`. `target` and `values` are `null` when the field has none. */
+export interface StudioNameField {
+  name: string
+  type: string
+  target: string | null
+  values: string[] | null
+}
+
+/** The names of one kind in `GET .../names`. `module` is the module id, or `null` for the application's own. */
+export interface StudioNameEntity {
+  id: string
+  name: string
+  module: string | null
+  fields: StudioNameField[]
+}
+
+/** A process step in `GET .../names`. `outcomes` is empty for a step that is not a task. */
+export interface StudioNameStep {
+  name: string
+  type: string
+  outcomes: string[]
+}
+
+/** A named resource in `GET .../names`, such as a role, form or page. */
+export interface StudioNameResource {
+  id: string
+  name: string
+}
+
+/** A text key in `GET .../names`, with its text in each locale that has it. */
+export interface StudioNameText {
+  key: string
+  texts: Record<string, string>
+  usedBy: number
+}
+
+/** Every name an application defines, as `GET /api/studio/apps/{application}/names` answers it. */
+export interface StudioNames {
+  locales: string[]
+  entities: StudioNameEntity[]
+  dataSources: { id: string; name: string; module: string | null }[]
+  processes: { id: string; name: string; steps: StudioNameStep[] }[]
+  rules: {
+    id: string
+    name: string
+    module: string | null
+    parameters: { name: string; type: string }[]
+    resultType: string
+  }[]
+  connectors: { id: string; name: string; operations: { name: string }[] }[]
+  events: { id: string; name: string; fields: { name: string; type: string }[] }[]
+  roles: StudioNameResource[]
+  sequences: StudioNameResource[]
+  forms: StudioNameResource[]
+  pages: StudioNameResource[]
+  texts: StudioNameText[]
 }
 
 /**
@@ -225,7 +277,7 @@ export async function fetchStudioDiagnostics(application: string, signal?: Abort
   return ((await response.json()) as { diagnostics: StudioDiagnostic[] }).diagnostics
 }
 
-/** Loads the names an application defines. A 401 starts sign-in and throws, as any other failure does. */
+/** Loads every name the application defines, for the reference pickers and expression completion. */
 export async function fetchStudioNames(application: string, signal?: AbortSignal): Promise<StudioNames> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/names`
   const response = await studioFetch(path, { signal })

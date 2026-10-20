@@ -29,6 +29,7 @@ internal static class UserEndpoints
                 studio.Allows(user.Roles),
                 studio.AllowsPublish(user.Roles),
                 studio.AllowsTests(user.Roles),
+                studio.AllowsCreate(user.Roles),
                 PreviewHost(studio.Allows(user.Roles), catalog, tenants)))
             : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Nobody is signed in.");
 
@@ -40,9 +41,9 @@ internal static class UserEndpoints
 internal sealed record CurrentUserResponse(string Id, string DisplayName, IReadOnlyList<string> Roles);
 
 /// <summary>
-/// The answer of <c>GET /api/me</c>: the current user, whether they may use Studio, publish from it and see its test controls, and the host of
+/// The answer of <c>GET /api/me</c>: the current user, whether they may use Studio, publish from it, see its test controls and create applications in it, and the host of
 /// the tenant's preview tenant. <c>StudioPreviewHost</c> is <c>null</c> when the user may not use Studio or the tenant has
 /// no served preview tenant.
 /// </summary>
 internal sealed record CurrentUserMeResponse(
-    string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, string? StudioPreviewHost);
+    string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, bool StudioCreate, string? StudioPreviewHost);

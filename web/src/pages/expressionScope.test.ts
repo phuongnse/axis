@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { StudioNames } from '../platform/studio'
 import { expressionScope } from './expressionScope'
 
-const names: StudioNames = {
+const names = {
   entities: [
     {
       name: 'PurchaseRequest',
@@ -15,7 +15,7 @@ const names: StudioNames = {
     { name: 'Department', module: null, fields: [{ name: 'code', type: 'text' }] },
   ],
   rules: [{ name: 'departments:IsManager', module: 'departments', parameters: [], resultType: 'boolean' }],
-}
+} as unknown as StudioNames
 
 function labelsOf(options: ReturnType<typeof expressionScope>) {
   return options.map((option) => option.label)

@@ -961,7 +961,7 @@ Studio edits application folders through the
 [authoring API](authoring.md), as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. Three server settings control it. They are built, and the authoring
-API reads them. The third, `Studio:PublisherRole`, controls publishing, see
+API reads them. `Studio:ApplicationsPath` names the folder for new applications, see below. The third, `Studio:PublisherRole`, controls publishing, see
 [D47](../decisions.md#d47-publishing-from-studio--agreed). A fourth,
 `Studio:Tests`, controls the test controls, see
 [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed).
@@ -974,7 +974,7 @@ and a JSON view, and shows the diagnostics.
   paths are resolved against the server content root. It is empty by default,
   so Production has no Studio. The Development settings list the purchase
   request sample. A folder entry that is empty is ignored.
-- **`Studio:ApplicationsPath`** _(planned for M11)_. The folder where Studio
+- **`Studio:ApplicationsPath`**. The folder where Studio
   creates new applications, such as `artifacts/studio-apps`. The environment
   variable is `Studio__ApplicationsPath`. It has no default, and relative paths
   are resolved against the server content root. With no value, Studio cannot
@@ -982,7 +982,7 @@ and a JSON view, and shows the diagnostics.
   the server stops if it cannot create it. Under several replicas it sits on
   the shared Studio volume, such as `/studio/apps`, see
   [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
-  Development, Compose and E2E use `artifacts/studio-apps`. Studio is on when
+  _(Planned for M11.)_ Development, Compose and E2E use `artifacts/studio-apps`. Studio is on when
   `Studio:Folders` is not empty or this setting is set. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
@@ -1026,12 +1026,12 @@ and a JSON view, and shows the diagnostics.
   [publisher](administration.md#publisher) runs it. The server never activates
   in its own process.
 - **Current user.** `GET /api/me` answers `studio: true` when `Studio:Folders`
-  is not empty and the user holds the author role. From M11 it also answers
+  is not empty and the user holds the author role. It also answers
   `studio: true` when `Studio:ApplicationsPath` is set, and answers
-  `studioCreate: true` when the user may use Studio and the setting is set
-  _(planned for M11)_. It also answers
-  `studioPublisher: true` when `Studio:Folders` is not
-  empty and the user holds both the author role and the publisher role. It
+  `studioCreate: true` when the user may use Studio and the setting is set.
+  It also answers
+  `studioPublisher: true` when Studio is on
+  and the user holds both the author role and the publisher role. It
   also answers `studioPreviewHost`, the first host of the tenant's served
   preview tenant, or null when the user cannot use Studio or the tenant has none.
   It also answers `studioTest`, true when `studio` is true and
@@ -1135,33 +1135,45 @@ to show where a resource is used and what it uses.
 
 ## Schema keywords
 
-Two custom keywords in the resource schemas tell
-[Studio](frontend.md#studio) where to show a picker and where to show the
-expression editor, as
+Two custom keywords in the resource schemas tell [Studio](frontend.md#studio)
+where to show a picker and where to show the expression editor, as
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
 agrees. The schemas stay the single source of what the form shows.
 
-- *(Planned for M11.)* **Kind form.** `"x-axis-reference": "<kind>"` marks a
-  property that holds the name of a resource. The kind is one of `entity`,
-  `dataSource`, `process`, `role`, `rule`, `connector`, `event`, `sequence`,
-  `form`, `page` or `text`. The kind `text` marks a `textKey`.
-- *(Planned for M11.)* **Part form.**
-  `"x-axis-reference": { "part": "<part>", "of": "<pointer>" }` marks a
-  property that holds a part of another resource.
-  - `part` is `field`, `parameter`, `column`, `step`, `outcome` or `operation`.
-  - `of` is a JSON Pointer from the resource root, or a Relative JSON Pointer,
-    to the property that names the resource the part belongs to.
-- *(Planned for M11.)* **Examples.** A form section's `field` is
-  `{ "part": "field", "of": "/entity" }`, because the form's `entity` names
-  the entity whose fields it lists. The keys of a process `updateRecord`
-  step's `set` map are fields of the process's `/entity` in the same way.
-- **Expressions.** `"x-axis-expression": true` marks a
-  string property that holds an [expression](expressions.md). The form then
-  shows the expression editor there.
-- **Annotations only.** JsonSchema.Net ignores unknown
-  keywords when it validates, so neither keyword changes what a resource may
-  hold, and no resource file changes. The [reference index](#reference-index)
-  stays the list of reference paths.
+- **Kind form.** `"x-axis-reference": "<kind>"` marks a property that holds
+  the name of a resource. The kind is one of `entity`, `dataSource`, `process`,
+  `role`, `rule`, `connector`, `event`, `sequence`, `form`, `page` or `text`.
+  The kind `text` marks a `textKey`.
+- **Part form.** `"x-axis-reference": { "part": "<part>", "of": "<pointer>" }`
+  marks a property that holds a part of another resource.
+  - `part` is `field` or `step`. The schemas mark no other part yet. Planned
+    for M11: `parameter`, `column`, `outcome` and `operation`.
+  - `of` is a JSON Pointer from the resource root, or a Relative JSON Pointer
+    `N/<pointer>`, to the property that names the resource the part belongs
+    to. A relative pointer goes up `N` segments from the marked property.
+- **Examples.** A form field's `field` is `{ "part": "field", "of": "/entity" }`,
+  because the form's `entity` names the entity whose fields it lists. A grant's
+  `fields` item is `{ "part": "field", "of": "2/entity" }`, because the entity
+  sits two levels above the item. A process step's `next` is
+  `{ "part": "step", "of": "/name" }`, because the process's `name` names the
+  process whose steps it lists.
+- *(Planned.)* **Set keys.** The keys of a process `updateRecord` step's `set`
+  map are fields of the process's `/entity` in the same way.
+- **Exempt relations.** Text entries, packages, modules, rule calls and field
+  paths name no single property, so they have no mark. Stub packages and
+  package operations name a package, and a grant's `endpoint` has no kind, so
+  they have none either. Two entity marks, a data source parameter's `target`
+  and an endpoint input's `target`, have no edge in the reference index yet.
+  They offer entities, and the schema test checks them apart from the index.
+- A test keeps the marks and the [reference index](#reference-index) in step:
+  each indexed relation has a mark or is listed as exempt.
+- **Expressions.** `"x-axis-expression": true` marks a string property that
+  holds an [expression](expressions.md). The form then shows the expression
+  editor there.
+- **Annotations only.** JsonSchema.Net ignores unknown keywords when it
+  validates, so neither keyword changes what a resource may hold, and no
+  resource file changes. The [reference index](#reference-index) stays the
+  list of reference paths.
 
 ## Tenancy settings
 
@@ -2422,8 +2434,7 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 
 This section follows
 [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
-The manifest, the one-site rule, installation, listing and the sample are built.
-The copy is _(planned for M11)_.
+The manifest, the one-site rule, installation, listing, the sample and the copy are built.
 An application template is an application folder with a `template.json`
 manifest. Studio creates a new application by copying an installed template, see
 [creating an application](authoring.md#creating-an-application).
@@ -2461,7 +2472,7 @@ The manifest is `template.json` at the root of the folder:
 - **Listing.** `GET /api/studio/templates` lists the newest version of each
   template, with the diagnostics of compiling it in memory. A template that does
   not compile is still listed.
-- **Copy** _(planned for M11)_. A copy takes every `*.json` file of the template except
+- **Copy**. A copy takes every `*.json` file of the template except
   `template.json`, in the same folders.
   - The top-level `id` of each resource becomes a new UUID. Seed record ids stay,
     because they are row ids in the new application's own tables and cannot
