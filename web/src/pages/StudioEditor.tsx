@@ -1,6 +1,7 @@
 import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
+import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
   fetchStudioResource,
@@ -14,6 +15,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { SchemaForm } from './SchemaForm'
+import { SeedGrid } from './SeedGrid'
 
 type Content = Record<string, unknown>
 
@@ -21,6 +23,23 @@ type Content = Record<string, unknown>
 interface Loaded {
   content: Content
   version: string
+}
+
+/** The fields of the entity a seed names, or `null` when they could not be read. */
+interface SeedEntity {
+  id: string
+  fields: SeedField[] | null
+}
+
+const noProblems = new Map<string, string>()
+
+function seedFieldsOf(content: Content): SeedField[] | null {
+  if (!Array.isArray(content.fields)) {
+    return null
+  }
+  return content.fields.filter(
+    (field): field is SeedField => isContent(field) && typeof field.name === 'string' && typeof field.type === 'string',
+  )
 }
 
 function isContent(value: unknown): value is Content {
@@ -55,18 +74,22 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * offers Reload, which reads the file again and drops the draft. Delete asks first and warns with the number of
  * references to the resource, and it is off for the application manifest. When `path` is set, the editor opens the
  * form at the field that holds it and scrolls to that field once the resource has loaded. A path the form cannot
- * show opens the JSON view instead. When the server does not answer, the draft stays, and the resource loads again
+ * show opens the JSON view instead. A seed whose entity is a resource of the folder shows its records as a grid with
+ * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
+ * the entity is not in the folder, the seed uses the generic form. When the server does not answer, the draft stays, and the resource loads again
  * after the reconnect unless the draft has changes.
  */
 export function StudioEditor({
   application,
   item,
+  resources,
   path,
   onSaved,
   onDeleted,
 }: {
   application: string
   item: StudioResourceItem
+  resources: StudioResourceItem[]
   path: string | null
   onSaved: (diagnostics: StudioDiagnostic[]) => void
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
@@ -90,6 +113,8 @@ export function StudioEditor({
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
   const [tab, setTab] = useState<'form' | 'json'>('form')
+  const [seedEntity, setSeedEntity] = useState<SeedEntity>()
+  const handledPath = useRef<string | null>(null)
   // A field to scroll to once the form tab is shown, because a hidden field cannot be scrolled to.
   const pendingField = useRef<HTMLElement | null>(null)
 
@@ -128,6 +153,49 @@ export function StudioEditor({
     return () => controller.abort()
   }, [application, item.id, item.kind, generation, lost])
 
+  // The entity of a seed is found by name among the folder's entities, ignoring letter case, as the compiler does.
+  const entityName = item.kind === 'seed' && typeof draft.entity === 'string' ? draft.entity.toLowerCase() : undefined
+  const entityId = entityName
+    ? resources.find((resource) => resource.kind === 'entity' && resource.name?.toLowerCase() === entityName)?.id
+    : undefined
+
+  useEffect(() => {
+    if (entityId === undefined) {
+      return
+    }
+    const controller = new AbortController()
+    fetchStudioResource(application, entityId, controller.signal).then(
+      (entity) => setSeedEntity({ id: entityId, fields: seedFieldsOf(entity.content) }),
+      (error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn(`Loading the entity '${entityId}' of the seed failed`, error)
+        setSeedEntity({ id: entityId, fields: null })
+      },
+    )
+    return () => controller.abort()
+  }, [application, entityId, generation, lost])
+
+  const seedFields = entityId !== undefined && seedEntity?.id === entityId ? seedEntity.fields : null
+  // The form is final once the seed's entity has loaded, so a path into a record finds its cell.
+  const formReady = entityId === undefined || seedEntity?.id === entityId
+  const problems = useMemo(
+    () => (seedFields ? seedProblems(draft.records, seedColumns(seedFields)) : noProblems),
+    [seedFields, draft.records],
+  )
+  const seedSchema = useMemo(() => {
+    if (!schema || !seedFields) {
+      return undefined
+    }
+    const { records: _records, ...properties } = schema.properties ?? {}
+    return { ...schema, properties, required: schema.required?.filter((name) => name !== 'records') }
+  }, [schema, seedFields])
+
   const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
   const isLoaded = loaded !== undefined
 
@@ -136,9 +204,14 @@ export function StudioEditor({
   }, [patch, jsonInvalid])
 
   useEffect(() => {
-    if (!isLoaded || !path || !rootRef.current) {
+    if (!path) {
+      handledPath.current = null
       return
     }
+    if (!isLoaded || !formReady || !rootRef.current || handledPath.current === path) {
+      return
+    }
+    handledPath.current = path
     const field = fieldElement(rootRef.current, path)
     if (field === undefined || isJsonOnlyField(field)) {
       setTab('json')
@@ -146,7 +219,7 @@ export function StudioEditor({
     }
     pendingField.current = field
     setTab('form')
-  }, [isLoaded, path])
+  }, [isLoaded, formReady, path])
 
   useEffect(() => {
     if (tab === 'form' && pendingField.current) {
@@ -168,8 +241,14 @@ export function StudioEditor({
     // Unticking a box that the file never had leaves the key out, so the undo of a tick is no change.
     // An array item always keeps its value, because a missing item would shift the others.
     const parent = getAt(loaded!.content, pointer.slice(0, pointer.lastIndexOf('/')))
-    const value =
-      next === false && !Array.isArray(parent) && getAt(loaded!.content, pointer) === undefined ? undefined : next
+    update(
+      pointer,
+      next === false && !Array.isArray(parent) && getAt(loaded!.content, pointer) === undefined ? undefined : next,
+    )
+  }
+
+  /** Sets the draft's value at the pointer as it is. A seed cell that picks `false` must keep it. */
+  function update(pointer: string, value: unknown) {
     setDraft((current) => setAt(current, pointer, value) as Content)
     setJsonText(null)
     setJsonInvalid(false)
@@ -266,7 +345,12 @@ export function StudioEditor({
           {
             key: 'form',
             label: t('shell.studio.form'),
-            children: schema ? (
+            children: seedSchema ? (
+              <Flex vertical gap="middle">
+                <SchemaForm schema={seedSchema} value={draft} onChange={change} />
+                <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={update} />
+              </Flex>
+            ) : schema ? (
               <SchemaForm schema={schema} value={draft} onChange={change} />
             ) : (
               <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
@@ -308,7 +392,7 @@ export function StudioEditor({
       <Flex gap="small" align="center">
         <Button
           type="primary"
-          disabled={patch.length === 0 || jsonInvalid || conflict || saving || reconnecting}
+          disabled={patch.length === 0 || jsonInvalid || problems.size > 0 || conflict || saving || reconnecting}
           onClick={save}
         >
           {t('shell.studio.save')}

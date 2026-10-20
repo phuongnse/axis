@@ -199,5 +199,15 @@
   "shell.studio.rollback.confirm": "Roll back",
   "shell.studio.request.rolledBack": "Rolled back. Release number:",
   "shell.studio.request.rollbackFailed": "Rollback failed. See the diagnostics.",
-  "shell.studio.request.sendFailed": "The request could not be sent or checked."
+  "shell.studio.request.sendFailed": "The request could not be sent or checked.",
+  "shell.studio.seed.records": "Records",
+  "shell.studio.seed.addRecord": "Add record",
+  "shell.studio.seed.removeRecord": "Remove",
+  "shell.studio.seed.recordId": "Id",
+  "shell.studio.seed.required": "A value is required.",
+  "shell.studio.seed.wrongType": "The value does not fit the field's type.",
+  "shell.studio.seed.tooLong": "The value is too long.",
+  "shell.studio.seed.outOfBounds": "The value is out of bounds.",
+  "shell.studio.seed.notInValues": "The value is not one of the field's values.",
+  "shell.studio.seed.invalidDate": "The date or time is not valid."
 }

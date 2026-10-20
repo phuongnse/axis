@@ -892,7 +892,7 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     JSON view as the second view of the same draft. The typed editor saves
     through the same JSON Patch, with the same `If-Match` rules. It never drops
     a value it does not show, so unknown keys stay as they are. See
-    **Editors by kind** below *(planned for M11)*.
+    **Editors by kind** below. Only the seed editor is built so far.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1016,9 +1016,11 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     resend a save that got no answer, so the author clicks Save again.
   - Save and Delete are off while the message shows.
   - A `401` from a reload starts sign-in, as elsewhere.
-- **Editors by kind** *(planned for M11)*. Studio uses a typed editor for six
-  kinds, and the generic form for the rest. The last column lists what still
-  needs the JSON view, because the form cannot show it.
+- **Editors by kind.** Studio uses a typed editor for six kinds, and the
+  generic form for the rest. The seed editor is built. The other typed editors
+  are *(planned for M11)*, and until they are built those kinds use the generic
+  form. The last column lists what still needs the JSON view, because the form
+  cannot show it.
 
   | Kind          | Editor                                | Still needs the JSON view                                             |
   | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
@@ -1063,8 +1065,30 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     input and output fields, and `lookup`.
   - **Scenario editor.** The users with their roles, then the steps as a list,
     with a panel per step type.
-  - **Seed editor.** The records show as a grid with a column per field of the
-    seed's `entity`.
+  - **Seed editor** *(built)*. The Form tab shows the seed's name, entity and
+    `sync`, then its records as a grid, with a row per record and a column per
+    field of the seed's `entity`. The JSON view stays as a second view of the
+    same draft.
+    - **Columns.** The input fits the field type: a text box for `text`,
+      `date`, `date-time` and `reference`, a text box for `integer` and
+      `decimal` that stores a number, a true/false choice for `boolean` and a
+      choice of `values` for `enum`. A `reference` is a text box that checks
+      the UUID form, and the record picker is separate work. Each input follows
+      the [record API's value rules](record-api.md#request-bodies-and-values).
+    - **No column.** A computed field, a `sequence` field, a `creator` field
+      and a `child-collection` field get no column, because seeding rejects a
+      value for the first three, and child collections stay as the file has
+      them. A value the grid does not show, including an unknown key, is saved
+      unchanged.
+    - **Rows.** **Add record** adds a row with a new record id, and **Remove**
+      deletes the record from the draft. Clearing a cell removes its key from
+      the record's `values`. The grid never writes `null`.
+    - **Save.** A cell whose value would fail seeding, because it has the wrong
+      type, is out of bounds or is missing a required value, shows an error
+      and turns Save off, also when the value comes from the JSON view.
+    - **Fallback.** The entity is found by name among the folder's `entity`
+      resources, ignoring letter case. When it is not there, for example a
+      module entity or a typo, the seed uses the generic form and the JSON view.
   - **Text editor.** One table of keys with a column per locale, and a search
     box. Adding a key adds it to every locale's `text` resource.
   - **Endpoint `values`.** Rows of field and expression, as for process
