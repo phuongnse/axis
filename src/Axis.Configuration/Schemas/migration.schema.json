@@ -41,7 +41,7 @@
         "from": { "$ref": "#/$defs/name" },
         "to": { "$ref": "#/$defs/name" },
         "field": { "$ref": "#/$defs/name" },
-        "value": { "type": "string", "minLength": 1 }
+        "value": { "type": "string", "minLength": 1, "x-axis-expression": true }
       },
       "allOf": [
         {

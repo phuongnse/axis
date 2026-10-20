@@ -19,7 +19,7 @@
       "type": "array",
       "items": { "$ref": "#/$defs/parameter" }
     },
-    "filter": { "type": "string" },
+    "filter": { "type": "string", "x-axis-expression": true },
     "aggregate": { "$ref": "#/$defs/aggregate" },
     "sort": {
       "type": "string",

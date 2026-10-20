@@ -45,6 +45,30 @@ test('an author changes the maxLength of an entity field and the file holds only
   expect(JSON.stringify(after)).toBe(JSON.stringify(before))
 })
 
+test('an author sees an expression error as they type, and its type once fixed, without saving', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const entity = items.find((item) => item.file === 'entities/purchase-request.json')!
+  const file = path.join(studioFolder, 'entities/purchase-request.json')
+  const before = await readFile(file, 'utf8')
+
+  await page.goto(`/studio?app=PurchaseRequests&resource=${entity.id}`)
+  const field = page.getByTestId('studio-field-/validations/0/expression')
+  const editor = field.getByRole('textbox')
+  await expect(field.getByTestId('studio-expression-type')).toContainText('boolean')
+
+  await editor.fill('title > 5')
+  await expect(field.locator('.cm-lintRange-error')).toBeVisible()
+  await expect(field.getByTestId('studio-expression-error')).toBeVisible()
+
+  await editor.fill('totalAmount > 0')
+  await expect(field.locator('.cm-lintRange-error')).toHaveCount(0)
+  await expect(field.getByTestId('studio-expression-type')).toContainText('boolean')
+
+  expect(await readFile(file, 'utf8')).toBe(before)
+})
+
 test('an author follows a Used by entry from a department to the entity that uses it', async ({ page }) => {
   await useSession(page, 'hoa')
   const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')

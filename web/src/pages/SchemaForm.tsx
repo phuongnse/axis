@@ -1,9 +1,12 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
-import { useContext } from 'react'
+import { lazy, Suspense, useContext } from 'react'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { resolveSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
+import { ExpressionCheckContext } from './expressionCheckContext'
 import { ReferencePicker } from './ReferencePicker'
+
+const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 /** Called with the JSON Pointer of the value that changed. `undefined` removes the value. */
 export type ChangeHandler = (pointer: string, next: unknown) => void
@@ -94,6 +97,7 @@ function SchemaNode({
 }: NodeProps & { name: string; required: boolean; readOnly?: boolean; item?: boolean }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
+  const check = useContext(ExpressionCheckContext)
   const schema = resolveSchema(node, root)
   const reference = node['x-axis-reference'] ?? schema['x-axis-reference']
   const isObject = schema.type === 'object' && schema.properties !== undefined
@@ -129,6 +133,21 @@ function SchemaNode({
         options={referenceOptions(names, reference, rootValue, pointer)}
         onChange={(next) => onChange(pointer, next)}
       />
+    )
+  } else if (schema.type === 'string' && schema['x-axis-expression'] === true && check) {
+    const text = typeof value === 'string' ? value : ''
+    input = (
+      <Suspense fallback={<Input aria-label={name} value={text} readOnly />}>
+        <LazyExpressionEditor
+          application={check.application}
+          resourceId={check.resourceId}
+          path={pointer}
+          name={name}
+          value={text}
+          required={required}
+          onChange={onChange}
+        />
+      </Suspense>
     )
   } else if (schema.type === 'string') {
     input = (

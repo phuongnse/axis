@@ -1,0 +1,43 @@
+{
+  "id": "6ff3edf2-a24a-4aff-9e0d-c9b68c04432f",
+  "kind": "policy",
+  "name": "RequesterAccess",
+  "formatVersion": 1,
+  "roles": [
+    "requester"
+  ],
+  "grants": [
+    {
+      "entity": "Request",
+      "actions": [
+        "read"
+      ],
+      "filter": "requester == currentUser()"
+    },
+    {
+      "entity": "Request",
+      "actions": [
+        "create",
+        "update"
+      ],
+      "filter": "requester == currentUser() and status == 'draft'",
+      "fields": [
+        "title",
+        "description",
+        "status"
+      ]
+    },
+    {
+      "dataSource": "RequestList",
+      "actions": [
+        "read"
+      ]
+    },
+    {
+      "process": "RequestApproval",
+      "actions": [
+        "start"
+      ]
+    }
+  ]
+}

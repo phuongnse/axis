@@ -144,6 +144,7 @@
   "shell.studio.loadFailed": "Không thể tải Studio.",
   "shell.studio.forbidden.title": "Studio không khả dụng",
   "shell.studio.forbidden.message": "Bạn cần vai trò tác giả để dùng Studio.",
+  "shell.studio.expressionType": "Kiểu:",
   "shell.studio.form": "Biểu mẫu",
   "shell.studio.json": "JSON",
   "shell.studio.save": "Lưu",

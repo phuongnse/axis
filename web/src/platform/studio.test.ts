@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { assignLocation } from './navigation'
 import {
+  checkStudioExpression,
   fetchStudioResource,
   filterResources,
   folderDiffers,
@@ -12,6 +14,8 @@ import {
   type StudioResourceItem,
   waitForServer,
 } from './studio'
+
+vi.mock('./navigation')
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -40,6 +44,46 @@ describe('fetchStudioResource', () => {
 
     expect(error).toBeInstanceOf(Error)
     expect(error).not.toBeInstanceOf(ServerUnreachableError)
+  })
+})
+
+function json(body: unknown) {
+  return new Response(JSON.stringify(body), { status: 200 })
+}
+
+describe('checkStudioExpression', () => {
+  it('answers the type and diagnostics of an expression check', async () => {
+    const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => json({ type: 'boolean', diagnostics: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const check = await checkStudioExpression('PurchaseRequests', 'r', '/validations/0/expression', 'a > 0')
+
+    expect(check).toEqual({ type: 'boolean', diagnostics: [] })
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/studio/apps/PurchaseRequests/expressions/check')
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toEqual({
+      resourceId: 'r',
+      path: '/validations/0/expression',
+      expression: 'a > 0',
+    })
+  })
+
+  it.each([400, 401, 503])('answers null for %i and does not start sign-in', async (status) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status })),
+    )
+
+    await expect(checkStudioExpression('PurchaseRequests', 'r', '/p', 'a')).resolves.toBeNull()
+    expect(assignLocation).not.toHaveBeenCalled()
+  })
+
+  it('rejects when the server does not answer', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))),
+    )
+
+    await expect(checkStudioExpression('PurchaseRequests', 'r', '/p', 'a')).rejects.toThrow(TypeError)
   })
 })
 

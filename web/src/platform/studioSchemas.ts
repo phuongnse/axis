@@ -21,6 +21,8 @@ export interface JsonSchema {
   additionalProperties?: boolean | JsonSchema
   minimum?: number
   maximum?: number
+  /** Marks a string that holds an expression, which Studio shows in the expression editor. */
+  'x-axis-expression'?: boolean
 }
 
 // These are the files the server embeds, so the form and the server's compile cannot drift apart.

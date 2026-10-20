@@ -61,6 +61,47 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
+/** A diagnostic of an expression check. `start` and `end` are UTF-16 offsets into the expression, and `end` is exclusive. */
+export interface ExpressionDiagnostic {
+  code: string
+  message: string
+  start: number
+  end: number
+}
+
+/** The answer of an expression check. `type` is `null` when there is a diagnostic. */
+export interface ExpressionCheck {
+  type: string | null
+  diagnostics: ExpressionDiagnostic[]
+}
+
+/**
+ * Checks one expression where it stands, without saving it. Any status other than 200 answers `null`, and the
+ * check does not start sign-in on a 401. It rejects when the server does not answer.
+ */
+export async function checkStudioExpression(
+  application: string,
+  resourceId: string,
+  path: string,
+  expression: string,
+  signal?: AbortSignal,
+): Promise<ExpressionCheck | null> {
+  const response = await apiFetch(
+    `/api/studio/apps/${encodeURIComponent(application)}/expressions/check`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resourceId, path, expression }),
+      signal,
+    },
+    { signInOnUnauthorized: false },
+  )
+  if (!response.ok) {
+    return null
+  }
+  return (await response.json()) as ExpressionCheck
+}
+
 /** An application in the list of `GET /api/studio/apps`. */
 export interface StudioApplication {
   name: string
