@@ -852,7 +852,7 @@ Studio is where authors edit an application's resources. It uses the
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. The route, the link, the application picker, the resource list with its
 search, the editor, the Uses and Used by lists, the delete button and its warning,
-the diagnostics panel, and the reconnect message are built.
+the diagnostics panel, Validate and Publish with the request status, and the reconnect message are built.
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
@@ -922,6 +922,28 @@ the diagnostics panel, and the reconnect message are built.
   opens the resource at the diagnostic's `path`, as a Used by entry does. A
   diagnostic with an empty path opens the resource at its top. A diagnostic that
   names no resource cannot be selected. A diagnostic never blocks a save.
+- **Publishing.** Two buttons sit under the application picker. They use the
+  [publishing routes](authoring.md#publishing). Rollback, preview and the release
+  history view are *(planned for M10)*.
+  - **Validate** sends a validate request. **Publish** opens a dialog with an
+    optional label, up to 100 characters, and an optional note, up to 2000.
+    Confirming sends the publish request. Empty values are left out of the body.
+  - **Publish** shows only when `GET /api/me` answers `studioPublisher: true`.
+    When that answer is `false` or fails, only **Validate** shows.
+  - Studio then checks `GET .../requests/{id}` every second until the status is
+    `succeeded` or `failed`, with no time limit. A status line shows **queued** or
+    **running** meanwhile. It shows the outcome only once the publisher has finished
+    the request.
+  - A succeeded publish shows its release number. Studio reads it from
+    `GET .../releases`, by matching the request's `releaseId`. A failed publish shows
+    the failure and no release number, even when the request names a release, so a
+    failure never looks like a success.
+  - When a request ends, the diagnostics panel shows the request's diagnostics in
+    place of the loaded ones, for a failed request and for a succeeded one that holds
+    warnings. They open at their paths as before.
+  - Both buttons are off while a request runs and while the reconnect message
+    shows. If the server does not answer during a request, Studio checks it again
+    after the reconnect.
 - **Reconnect.** Under `scripts/dev.sh` a saved file restarts the server.
   Studio shows a reconnect message at the top of the page when a request gets
   no answer, or answers `502`, `503` or `504`. The Vite dev proxy answers `502`

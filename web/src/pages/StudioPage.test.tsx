@@ -749,3 +749,153 @@ describe('StudioPage', () => {
     )
   })
 })
+
+describe('StudioPage publishing', () => {
+  const requestId = '7a8b9c0d-1e2f-4a3b-9c4d-5e6f70819203'
+  const releaseId = '0192f4a7-3b1c-7e2d-9a4f-aaaaaaaaaaaa'
+  const published: StudioDiagnostic = {
+    code: 'AXC0900',
+    severity: 'warning',
+    message: 'The release has a warning.',
+    file: 'application.json',
+    path: '',
+    resourceId: null,
+  }
+
+  function request(status: string, extra: Record<string, unknown> = {}) {
+    return {
+      id: requestId,
+      application: 'PurchaseRequests',
+      kind: 'publish',
+      target: 'tenant',
+      status,
+      label: 'May',
+      note: null,
+      releaseId: null,
+      diagnostics: [],
+      ...extra,
+    }
+  }
+
+  /** `stubServer` where `/api/me` answers `me`, and the request routes answer in turn with `statuses`. */
+  function stubPublishing(me: () => Response, statuses: unknown[] = []) {
+    const fetchMock = stubServer()
+    const base = fetchMock.getMockImplementation()!
+    const answers = [...statuses]
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === '/api/me') {
+        return me()
+      }
+      if (input === `${folder}/publish` && init?.method === 'POST') {
+        return json(request('queued'), 202)
+      }
+      if (input === `${folder}/validate` && init?.method === 'POST') {
+        return json(request('queued', { kind: 'validate', label: null }), 202)
+      }
+      if (input === `${folder}/requests/${requestId}`) {
+        return json(answers.length > 1 ? answers.shift() : answers[0])
+      }
+      if (input === `${folder}/releases`) {
+        return json({
+          active: { releaseId, number: 3 },
+          items: [
+            { releaseId, number: 3 },
+            { releaseId: 'older', number: 2 },
+          ],
+        })
+      }
+      return base(input, init)
+    })
+    return fetchMock
+  }
+
+  const publisher = () => json({ id: 'hoa', studio: true, studioPublisher: true })
+
+  afterEach(() => vi.useRealTimers())
+
+  it.each([
+    ['studioPublisher is true', publisher, true],
+    ['studioPublisher is false', () => json({ id: 'hoa', studio: true, studioPublisher: false }), false],
+    ['GET /api/me fails', () => new Response(null, { status: 500 }), false],
+  ])('shows Publish only when it may: %s', async (_name, me, shown) => {
+    stubPublishing(me)
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Validate' })).toBeEnabled()
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: 'Publish' })).toHaveLength(shown ? 1 : 0))
+  })
+
+  it('shows the status while a publish runs and the release number when it succeeds', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const fetchMock = stubPublishing(publisher, [
+      request('running'),
+      request('succeeded', { releaseId, diagnostics: [published] }),
+    ])
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Label (optional)' }), 'May')
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+
+    const status = await screen.findByTestId('studio-request-status')
+    expect(status).toHaveAttribute('data-status', 'queued')
+    expect(screen.getByRole('button', { name: 'Validate' })).toBeDisabled()
+    expect(screen.getByTestId('studio-publish')).toBeDisabled()
+    const posts = fetchMock.mock.calls.filter(
+      ([input, init]) => input === `${folder}/publish` && init?.method === 'POST',
+    )
+    expect(JSON.parse(posts[0][1]!.body as string)).toEqual({ label: 'May' })
+    expect(new Headers(posts[0][1]!.headers).get('Content-Type')).toBe('application/json')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'running')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
+    expect(screen.getByTestId('studio-release-number')).toHaveTextContent('3')
+    const panel = screen.getByTestId('studio-diagnostics')
+    expect(within(panel).getByText('AXC0900')).toBeInTheDocument()
+    expect(within(panel).queryByText('AXC0101')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Validate' })).toBeEnabled()
+  })
+
+  it('puts the diagnostics of a failed validate in the panel and shows no release number', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    stubPublishing(publisher, [request('failed', { kind: 'validate', releaseId, diagnostics: [savedDiagnostic] })])
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Validate' }))
+    await screen.findByTestId('studio-request-status')
+
+    await vi.advanceTimersByTimeAsync(1000)
+
+    await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed'))
+    expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-diagnostics')).getByText('AXC0777')).toBeInTheDocument()
+  })
+
+  it('keeps checking the request after a reconnect', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let down = false
+    const fetchMock = stubPublishing(publisher, [request('succeeded', { releaseId })])
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (down && (input === `${folder}/requests/${requestId}` || input === '/api/me')) {
+        return new Response(null, { status: 503 })
+      }
+      return base(input, init)
+    })
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Validate' }))
+    await screen.findByTestId('studio-request-status')
+    down = true
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(await screen.findByTestId('studio-reconnecting')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Validate' })).toBeDisabled()
+    down = false
+    await vi.advanceTimersByTimeAsync(1000)
+    await waitFor(() => expect(screen.queryByTestId('studio-reconnecting')).not.toBeInTheDocument())
+    await vi.advanceTimersByTimeAsync(1000)
+
+    await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
+  })
+})

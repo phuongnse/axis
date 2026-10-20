@@ -11,8 +11,20 @@ import { UserMenu } from './UserMenu'
 
 vi.mock('./navigation')
 
-const anna: CurrentUser = { id: 'anna', displayName: 'Anna Employee', roles: ['employee'], studio: false }
-const hoa: CurrentUser = { id: 'hoa', displayName: 'Hoa Author', roles: ['author'], studio: true }
+const anna: CurrentUser = {
+  id: 'anna',
+  displayName: 'Anna Employee',
+  roles: ['employee'],
+  studio: false,
+  studioPublisher: false,
+}
+const hoa: CurrentUser = {
+  id: 'hoa',
+  displayName: 'Hoa Author',
+  roles: ['author'],
+  studio: true,
+  studioPublisher: true,
+}
 const signOutUrl = 'http://127.0.0.1:8080/realms/axis/protocol/openid-connect/logout?client_id=axis'
 
 const locales = [
