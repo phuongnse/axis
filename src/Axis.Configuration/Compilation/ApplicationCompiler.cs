@@ -77,6 +77,23 @@ public static class ApplicationCompiler
     }
 
     /// <summary>
+    /// Compiles the files as the overload without a probe does, and tells <paramref name="probe"/> what the compile
+    /// saw at its expression place.
+    /// </summary>
+    /// <exception cref="ArgumentException">A path appears more than once.</exception>
+    public static CompilationResult CompileFiles(
+        IReadOnlyList<ResourceContent> files,
+        IReadOnlyCollection<PackageVersion>? installedPackages,
+        IReadOnlyCollection<InstalledModule>? installedModules,
+        ExpressionProbe probe)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(probe);
+
+        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: true, probe);
+    }
+
+    /// <summary>
     /// Compiles resources held in memory, such as the stored resources of a release, against
     /// <paramref name="installedPackages"/>. Null means no package is installed. Entries under
     /// <c>modules/&lt;id&gt;/</c> are the release's own copies of its pinned modules, and the
@@ -178,12 +195,13 @@ public static class ApplicationCompiler
         ApplicationLoadResult loaded,
         IReadOnlyCollection<PackageVersion> installedPackages,
         IReadOnlyCollection<InstalledModule> installedModules,
-        bool collectReferences)
+        bool collectReferences,
+        ExpressionProbe? probe = null)
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
-        var references = new ReferenceIndexBuilder(textKeys, loaded.Rules, collectReferences);
+        var references = new ReferenceIndexBuilder(textKeys, loaded.Rules, collectReferences, probe);
         foreach (var text in loaded.Texts)
         {
             foreach (var key in text.Texts.Keys)
@@ -737,7 +755,7 @@ public static class ApplicationCompiler
             }
         }
 
-        CheckComputedFields(entity, findEntity, Report);
+        CheckComputedFields(entity, findEntity, references, Report);
         CheckValidations(entity, findEntity, references, rules, modules, diagnostics, Report);
     }
 
@@ -750,7 +768,10 @@ public static class ApplicationCompiler
     /// refused. An expression problem is reported at the expression with its own code.
     /// </summary>
     private static void CheckComputedFields(
-        EntityResource entity, Func<string, EntityResource?> findEntity, Action<string, string, string> report)
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
     {
         if (entity.Fields.All(field => field.Expression is null))
         {
@@ -772,9 +793,11 @@ public static class ApplicationCompiler
             }
 
             var parsed = ExpressionParser.Parse(field.Expression);
-            ExpressionDiagnostic? problem = parsed.Succeeded
-                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!, storedValue: true).Diagnostic
-                : parsed.Diagnostic;
+            var check = parsed.Succeeded
+                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!, storedValue: true)
+                : null;
+            var problem = parsed.Succeeded ? check!.Diagnostic : parsed.Diagnostic;
+            references.RecordExpression(entity, $"/fields/{index}/expression", check?.Type, problem);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, $"/fields/{index}/expression");
@@ -821,6 +844,7 @@ public static class ApplicationCompiler
 
             var parsed = ExpressionParser.Parse(validation.Expression);
             ExpressionDiagnostic? problem = parsed.Succeeded ? null : parsed.Diagnostic;
+            ExpressionType? type = null;
             if (parsed.Succeeded)
             {
                 var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
@@ -831,7 +855,10 @@ public static class ApplicationCompiler
                 }
 
                 problem = check.Diagnostic;
+                type = check.Type;
             }
+
+            references.RecordExpression(entity, $"{path}/expression", type, problem);
 
             if (problem is not null)
             {
@@ -1361,6 +1388,7 @@ public static class ApplicationCompiler
                     references.AddRuleCalls(dataSource, "/filter", check);
                 }
 
+                references.RecordExpression(dataSource, "/filter", check?.Type, problem);
                 if (problem is not null)
                 {
                     Report(problem.Code, problem.Message, "/filter");

@@ -104,9 +104,11 @@ internal static class TriggerChecker
             if (trigger.When is { } when)
             {
                 var parsed = ExpressionParser.Parse(when);
-                var problem = parsed.Succeeded
-                    ? ExpressionTypeChecker.Check(parsed.Expression!, ExpressionScopes.ForEventPayload(@event.Fields), ExpressionType.Boolean).Diagnostic
-                    : parsed.Diagnostic;
+                var check = parsed.Succeeded
+                    ? ExpressionTypeChecker.Check(parsed.Expression!, ExpressionScopes.ForEventPayload(@event.Fields), ExpressionType.Boolean)
+                    : null;
+                var problem = parsed.Succeeded ? check!.Diagnostic : parsed.Diagnostic;
+                references.RecordExpression(trigger, "/when", check?.Type, problem);
                 if (problem is not null)
                 {
                     Report(problem.Code, problem.Message, "/when");
@@ -182,6 +184,7 @@ internal static class TriggerChecker
         {
             var parsed = ExpressionParser.Parse(when);
             ExpressionDiagnostic? problem;
+            ExpressionType? type = null;
             if (parsed.Succeeded)
             {
                 var check = ExpressionTypeChecker.Check(
@@ -192,12 +195,14 @@ internal static class TriggerChecker
                 }
 
                 problem = check.Diagnostic;
+                type = check.Type;
             }
             else
             {
                 problem = parsed.Diagnostic;
             }
 
+            references.RecordExpression(trigger, "/when", type, problem);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, "/when");

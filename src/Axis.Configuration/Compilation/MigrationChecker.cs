@@ -98,7 +98,7 @@ internal static class MigrationChecker
                 }
             }
 
-            CheckEntity(group, entity, diagnostics);
+            CheckEntity(group, entity, references, diagnostics);
         }
     }
 
@@ -126,7 +126,8 @@ internal static class MigrationChecker
     private static Dictionary<string, FieldDefinition?>? Copy(Dictionary<string, FieldDefinition?>? state) =>
         state is null ? null : new Dictionary<string, FieldDefinition?>(state, StringComparer.OrdinalIgnoreCase);
 
-    private static void CheckEntity(List<MigrationResource> group, EntityResource? entity, List<Diagnostic> diagnostics)
+    private static void CheckEntity(
+        List<MigrationResource> group, EntityResource? entity, ReferenceIndexBuilder references, List<Diagnostic> diagnostics)
     {
         var changes = group
             .SelectMany(migration => migration.Changes.Select((change, index) => (Migration: migration, Index: index, Change: change)))
@@ -241,7 +242,8 @@ internal static class MigrationChecker
 
             if (change.Type is "fill" or "convert")
             {
-                var problem = CheckValue(change, before[k], after[k], missingAfter || droppedBefore[k]);
+                var problem = CheckValue(change, before[k], after[k], missingAfter || droppedBefore[k], out var type);
+                references.RecordExpression(migration, $"/changes/{index}/value", type, problem);
                 if (problem is not null)
                 {
                     Report(problem.Code, problem.Message, $"/changes/{index}/value");
@@ -289,13 +291,16 @@ internal static class MigrationChecker
     /// Parses a <c>fill</c> or <c>convert</c> value and checks it against the SQL subset. It is also
     /// type-checked against the field's type when <paramref name="untyped"/> is false and the
     /// types of the field and of every field the value names are known. Returns the first problem.
+    /// <paramref name="type"/> is the value's type when that check ran and succeeded, and null otherwise.
     /// </summary>
     private static ExpressionDiagnostic? CheckValue(
         MigrationChangeDefinition change,
         Dictionary<string, FieldDefinition?>? before,
         Dictionary<string, FieldDefinition?>? after,
-        bool untyped)
+        bool untyped,
+        out ExpressionType? type)
     {
+        type = null;
         var parsed = ExpressionParser.Parse(change.Value!);
         if (!parsed.Succeeded)
         {
@@ -309,7 +314,7 @@ internal static class MigrationChecker
             && before is not null
             && after is not null
             && after.GetValueOrDefault(change.Field!) is { } field
-            && !NamedFields(expression).Any(name => before.TryGetValue(name, out var type) && type is null))
+            && !NamedFields(expression).Any(name => before.TryGetValue(name, out var known) && known is null))
         {
             var scope = ExpressionScopes.ForMigration(
                 before.Where(pair => pair.Value is not null).Select(pair => (pair.Key, pair.Value!)));
@@ -318,6 +323,8 @@ internal static class MigrationChecker
             {
                 return check.Diagnostic;
             }
+
+            type = check.Type;
 
             var typed = SqlTranslator.Translate(expression, Column, check);
             return typed.Succeeded ? null : typed.Diagnostic;

@@ -549,6 +549,7 @@ internal static class ProcessChecker
         var parsed = ExpressionParser.Parse(expression);
         if (!parsed.Succeeded)
         {
+            references.RecordExpression(process, path, null, parsed.Diagnostic);
             return parsed.Diagnostic;
         }
 
@@ -558,6 +559,7 @@ internal static class ProcessChecker
             references.AddRuleCalls(process, path, check);
         }
 
+        references.RecordExpression(process, path, check.Type, check.Diagnostic);
         return check.Diagnostic;
     }
 
