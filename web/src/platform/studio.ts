@@ -166,6 +166,58 @@ export interface StudioTextReferences {
   usedBy: StudioReference[]
 }
 
+/** A field of an entity in `GET .../names`. `target` and `values` are `null` when the field has none. */
+export interface StudioNameField {
+  name: string
+  type: string
+  target: string | null
+  values: string[] | null
+}
+
+/** The names of one kind in `GET .../names`. `module` is the module id, or `null` for the application's own. */
+export interface StudioNameEntity {
+  id: string
+  name: string
+  module: string | null
+  fields: StudioNameField[]
+}
+
+/** A process step in `GET .../names`. `outcomes` is empty for a step that is not a task. */
+export interface StudioNameStep {
+  name: string
+  type: string
+  outcomes: string[]
+}
+
+/** A named resource in `GET .../names`, such as a role, form or page. */
+export interface StudioNameResource {
+  id: string
+  name: string
+}
+
+/** A text key in `GET .../names`, with its text in each locale that has it. */
+export interface StudioNameText {
+  key: string
+  texts: Record<string, string>
+  usedBy: number
+}
+
+/** Every name an application defines, as `GET /api/studio/apps/{application}/names` answers it. */
+export interface StudioNames {
+  locales: string[]
+  entities: StudioNameEntity[]
+  dataSources: { id: string; name: string; module: string | null }[]
+  processes: { id: string; name: string; steps: StudioNameStep[] }[]
+  rules: { id: string; name: string; module: string | null }[]
+  connectors: { id: string; name: string; operations: { name: string }[] }[]
+  events: { id: string; name: string; fields: { name: string; type: string }[] }[]
+  roles: StudioNameResource[]
+  sequences: StudioNameResource[]
+  forms: StudioNameResource[]
+  pages: StudioNameResource[]
+  texts: StudioNameText[]
+}
+
 /**
  * The answer to a create: the new resource as the list shows it and the folder's diagnostics after the write, `conflict`
  * when the id or the target file exists, or `invalid` when the name or the locale is refused.
@@ -217,6 +269,16 @@ export async function fetchStudioDiagnostics(application: string, signal?: Abort
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
   return ((await response.json()) as { diagnostics: StudioDiagnostic[] }).diagnostics
+}
+
+/** Loads every name the application defines, for the reference pickers. */
+export async function fetchStudioNames(application: string, signal?: AbortSignal): Promise<StudioNames> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/names`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioNames
 }
 
 /** Loads one resource with its content. A 401 starts sign-in and throws, as any other failure does. */

@@ -8,7 +8,7 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The application list, resource list, read, patch, create, delete, changes, diagnostics,
+in git. The application list, application create, resource list, read, patch, create, delete, changes, diagnostics,
 references, names and expression check routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
@@ -38,7 +38,7 @@ folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. S
   has nothing to edit, and every route answers `403`. `studio: false` on
   `GET /api/me` says the same.
 - `Studio:ApplicationsPath` names the folder where Studio creates new
-  applications _(planned for M11)_. With no value, Studio cannot create an
+  applications. With no value, Studio cannot create an
   application. See [Creating an application](#creating-an-application).
 - `Studio:AuthorRole` names the roles claim value that may use the API. With
   no value, nobody may. Application policies play no part.
@@ -61,8 +61,8 @@ in the application. File names and names can change.
 
 | Method and path | Response |
 | --- | --- |
-| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.` is skipped _(planned for M11)_ |
-| `POST /api/studio/apps` | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application) _(planned for M11)_ |
+| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.`, and a link, is skipped |
+| `POST /api/studio/apps` | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application) |
 | `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template, sorted by `id`. See [application templates](configuration.md#application-templates) |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
@@ -130,9 +130,9 @@ Check 6 is built for a request and for a release:
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs `Studio:AuthorRole` to be set and held in
    the session's roles, and `Studio:Folders` to be non-empty. This holds for
-   every route. From M11, a set `Studio:ApplicationsPath` also turns the API
+   every route. A set `Studio:ApplicationsPath` also turns the API
    on, so the check needs a non-empty `Studio:Folders` or a set
-   `Studio:ApplicationsPath` _(planned for M11)_.
+   `Studio:ApplicationsPath`.
 4. The publisher role, `403`, on `publish` and `rollback` only. It needs
    `Studio:PublisherRole` to be set and held in the session's roles. It comes
    right after the author role and before the application is looked up.
@@ -236,7 +236,7 @@ Resource references, Text key references, Release history, Validate, Publish, Pr
 | Release history | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Preview | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | This tenant has no served preview tenant, or the manifest has no UUID `id` |
 | Rollback | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application, or a release not in the tenant's history | Not used |
-| Create application _(planned for M11)_ | No session | No author role, no CSRF header, or no `Studio:ApplicationsPath` | Unknown template | The name or the folder already exists |
+| Create application | No session | No author role, no CSRF header, or no `Studio:ApplicationsPath` | Unknown template | The name or the folder already exists |
 | List templates | No session | No author role, or Studio is off | Not used | Not used |
 
 The `409` of Validate and Publish is problem details titled "The application
@@ -288,7 +288,8 @@ agrees.
 ## Names
 
 `GET .../names` answers every name the application
-defines, so Studio's [reference pickers](frontend.md#studio) load them once.
+defines. Studio's [reference pickers](frontend.md#studio) load them with the
+application, and again after a save, a delete and a reconnect.
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
 agrees it. The answer is:
 
@@ -466,7 +467,7 @@ Writes are built for patches, creates, deletes and changes.
 
 ## Creating an application
 
-_(planned for M11)_ `POST /api/studio/apps` creates a new application folder in
+`POST /api/studio/apps` creates a new application folder in
 `Studio:ApplicationsPath`, blank or from an installed
 [application template](configuration.md#application-templates). It follows
 [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
@@ -581,7 +582,7 @@ saved, and the diagnostics list the broken references.
 ## Publishing
 
 An author validates, publishes and rolls back an
-application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. `test` is built too, except its 10-minute limit, which is _(planned for M11)_. The server never activates in its own process and
+application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. `test` is built too, with its 10-minute limit and its stop on `SIGTERM`. The server never activates in its own process and
 holds no tenant schema connection. It stores a **publish request** in the
 tenant database, and a separate [publisher](administration.md#publisher) runs
 it with the tenant's schema role. See
@@ -658,8 +659,8 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   describes, and stores their outcomes in `scenarios`. The request ends
   `failed` when any scenario fails. Scenario failures go only in `scenarios`.
   Compile diagnostics, the missing `Scenarios:ServerConnectionString` setting
-  (`AXC0217`), an unknown scenario name (`AXC0218`) and the 10-minute limit
-  *(planned for M11)* go in `diagnostics`. See [Test](#test).
+  (`AXC0217`), an unknown scenario name (`AXC0218`), the 10-minute limit
+  (`AXC0219`) and a stop of the publisher (`AXC0220`) go in `diagnostics`. See [Test](#test).
 - **Order.** For one tenant and application the publisher runs requests one at
   a time, oldest first. When two publishes are queued, the newer one ends up
   live. A `test` request has its own queue and does not wait behind them, see
@@ -698,8 +699,8 @@ request has the kind `publish` and the target `preview`.
 
 `POST .../test` stores a request to run the application's
 [test scenarios](configuration.md#test-scenarios) from Studio. The route and the
-stored request are built, and so is the publisher's run. Its 10-minute limit and
-the immediate stop on `SIGTERM` are *(planned for M11)*.
+stored request are built, and so is the publisher's run, with its 10-minute limit
+and its immediate stop on `SIGTERM`.
 [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees
 the route. The request has the kind `test` and the target `tenant`.
 
@@ -722,8 +723,11 @@ the route. The request has the kind `test` and the target `tenant`.
   Selecting it in Studio opens the scenario at that step, as a diagnostic opens
   a resource.
 - **Limits.** The scenarios of a request run one after another. A request stops
-  after 10 minutes *(planned for M11)*: the scenario that runs fails, its database is dropped and
-  the request ends `failed` with a diagnostic. The work item limit of
+  after 10 minutes: the scenario that runs fails, its database is dropped and
+  the request ends `failed` with `AXC0219`. A stop of the publisher does the same
+  at once, with `AXC0220`. The scenarios that finished keep their outcomes in
+  `scenarios`, and the one that was cut is stored as `failed` with no `step` and no
+  `path`. The work item limit of
   [D32](../decisions.md#d32-test-scenarios--agreed) applies to each scenario.
 - **Order.** At most one `test` request per application runs at a time,
   oldest first. The queue is separate from the one of `validate`, `publish` and
@@ -753,6 +757,8 @@ stateDiagram-v2
 - A request that has been claimed three times, and whose lease runs out again,
   ends `failed` with `AXC0215` in place of a fourth claim. A request that
   crashes the publisher cannot block the queue for good.
+- A `test` that runs past 10 minutes ends `failed` with `AXC0219`, and one that a
+  stop of the publisher ends fails with `AXC0220`, see [Test](#test).
 - `succeeded` and `failed` are final. Studio polls
   `GET .../requests/{id}` until the status is one of them.
 - A request that runs again does no harm. Activating the same content hash
@@ -784,11 +790,13 @@ newest first.
   number. Otherwise every restart under `scripts/dev.sh` would fill the history
   with copies.
 - `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
-  both the author role and the publisher role and `Studio:Folders` is not
-  empty. It is built. Studio uses it to hide Publish and the rollback button.
+  both the author role and the publisher role and Studio is on. It is built. Studio uses it to hide Publish and the rollback button.
 - `GET /api/me` gains a boolean `studioTest`, true when
   `studio` is true and `Studio:Tests` is true. Studio uses it to hide **Run
   tests** and the **Run** action of a scenario.
+- `GET /api/me` gains a boolean `studioCreate`, true when `studio` is true and
+  `Studio:ApplicationsPath` is set. It is built. Studio uses it to show **New
+  application**.
 - `GET /api/me` also gains `studioPreviewHost`, the first host of the served tenant
   whose `PreviewOf` is the session's tenant. It is `null` when the user may not
   use Studio, or when the tenant has no served preview tenant. It is built. Studio

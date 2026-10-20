@@ -851,8 +851,10 @@ Studio is where authors edit an application's resources. It uses the
 [authoring API](authoring.md) and writes the same JSON files that git keeps, as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. The route, the link, the application picker, New resource, the resource list with its
-search, the editor, the Uses and Used by lists, the delete button and its warning,
-the diagnostics panel, Validate, Preview and Publish with the request status and the preview links, the Releases list with Roll back, and the reconnect message are built.
+search, the editor, the reference pickers, the Uses and Used by lists, the delete
+button and its warning, the diagnostics panel, Validate, Preview and Publish with
+the request status and the preview links, the Releases list with Roll back, and the
+reconnect message are built.
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
@@ -909,9 +911,13 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     arrays with add and remove. `id`, `kind` and fixed values such as
     `formatVersion` are read-only. Labels are the property names as written in
     the schema, without translation. A part the form cannot show, such as
-    `oneOf` or a map like a text resource's `texts`, points to the JSON view.
+    `oneOf`, `anyOf` or a map like a text resource's `texts`, points to the JSON
+    view. An `allOf` whose items hold only `if`, `then` and `else` shows its
+    properties, and the form does not show the conditions.
     *(Planned for M11.)* A text resource's `texts` map stays in the JSON view.
-    Label texts have their own editor, see Label texts below.
+    Label texts have their own editor, see Label texts below. Until then, a
+    `textKey` shows as a reference picker over the application's text keys, and
+    a key that the application does not define is tagged unknown.
   - A JSON view shows the draft as text. A valid edit there updates the form.
     Invalid JSON shows an error and turns Save off.
   - Save sends only the changes, as a JSON Patch with the version the editor
@@ -926,7 +932,8 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     JSON view as the second view of the same draft. The typed editor saves
     through the same JSON Patch, with the same `If-Match` rules. It never drops
     a value it does not show, so unknown keys stay as they are. See
-    **Editors by kind** below. Only the seed editor is built so far.
+    **Editors by kind** below. The seed editor, the connector editor and the
+    endpoint mapping rows are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1044,20 +1051,27 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   - Studio then calls `GET /api/me` with a back-off of 0.5, 1, 2 and then 4
     seconds, with no limit, until the server answers with any other status.
   - Then the resource list, the diagnostics, the open resource and its Uses
-    and Used by lists load again, and the message goes away. *(Planned for
-    M11.)* The names load again too.
+    and Used by lists load again, and the message goes away. The names load again
+    too.
   - An unsaved draft stays on screen, with the version it was based on. If the
     file changed in the meantime, the next save gets a `409`. Studio does not
     resend a save that got no answer, so the author clicks Save again.
   - Save and Delete are off while the message shows.
   - A `401` from a reload starts sign-in, as elsewhere.
-- **Reference pickers.** *(Planned for M11.)* A property that the schema marks
-  with [`x-axis-reference`](configuration.md#schema-keywords) shows as a select
-  over the [names route](authoring.md#names), in place of a text box.
-  - A value that does not resolve stays in the select, tagged as unknown, so
-    nothing is lost.
-  - The names load with the application. They load again after a save, a
-    delete, a text write and a reconnect.
+- **Reference pickers.** A property that the schema marks with
+  [`x-axis-reference`](configuration.md#schema-keywords) shows as a select over
+  the names that the [names route](authoring.md#names) lists, in place of a text
+  box.
+  - The select is searchable, and it matches a typed name without regard to
+    letter case. A field or step part lists the fields of the entity, or the
+    steps of the process, that the draft names.
+  - A value that is not one of the names stays in the select as the first
+    option, tagged **unknown**, so nothing is lost. The select takes only the
+    listed names. To set a name that is not listed, the author edits the value
+    in the JSON view.
+  - Until the names load, the property shows a text box.
+  - The names load with the application. They load again after a save, a delete
+    and a reconnect.
 - **Label texts.** *(Planned for M11.)* A label property, a `textKey`, shows one
   text box for each locale in place of the key. Saving writes every locale
   through the [text write route](authoring.md#text-writes).
@@ -1149,9 +1163,9 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   - A save writes one file, with the single-file routes.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
-  designer for `entity`, and the generic form for the rest. The seed editor is
-  built. The other typed editors and the entity designer are *(planned for
-  M11)*, and until they are built those kinds use the generic form. The last
+  designer for `entity`, and the generic form for the rest. The seed editor,
+  the connector editor and the endpoint mapping rows are built. The other typed
+  editors and the entity designer are *(planned for M11)*, and until they are built those kinds use the generic form. The last
   column lists what still needs the JSON view, because the form cannot show it.
 
   | Kind          | Editor                                | Still needs the JSON view                                             |
@@ -1176,9 +1190,9 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   | `scenario`    | Typed editor                          | Nothing                                                               |
   | `text`        | Typed editor                          | Nothing                                                               |
 
-  The generic form sends a part to the JSON view when it holds `oneOf`,
-  `anyOf` or `allOf`, is an object with no `properties`, such as a map, or has
-  no type. The last column follows that rule. A new kind or property that the
+  The generic form sends a part to the JSON view when it holds `oneOf` or
+  `anyOf`, when it holds `allOf` with an item that has more than `if`, `then`
+  and `else`, is an object with no `properties`, such as a map, or has no type. The last column follows that rule. A new kind or property that the
   form cannot show goes to the JSON view until an editor covers it.
 
   - **Page editor.** A list of the page's widgets, each with its type and a
@@ -1191,10 +1205,25 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     `fields` show as rows of target and expression. A transition, `next`, a
     branch's `next`, `otherwise` or an outcome's `next`, picks its target from
     the process's steps.
-  - **Connector editor.** The `baseUrl` and auth secret bindings are picked by
-    name. No value of a binding is shown or stored. It also shows `timeout`,
-    `idempotency`, and the operations as a list, each with its method, path,
-    input and output fields, and `lookup`.
+  - **Connector editor** *(built)*. The Form tab shows the base URL binding,
+    the auth type with its secret binding, `timeout`, `idempotency`, and the
+    operations as a list. The JSON view stays as a second view of the same
+    draft.
+    - **Bindings.** A binding is a name box, labelled as a URL or a secret
+      binding. It is not a pick from a list, because no route lists a tenant's
+      binding names. No value of a binding is shown or stored: the editor
+      reads and writes only the resource and schema routes, and the values stay
+      in tenant settings.
+    - **Auth.** Choosing a type removes the keys the new type forbids, such as
+      `token` for `header`, and adds the keys it requires, with an empty name.
+      Clearing the type removes `auth`.
+    - **Operations.** A card per operation shows its name, method, path and
+      `lookup`, which is picked from the connector's other operations. Its
+      input and output fields are rows of name, type and required. Operations
+      and rows can be added and removed. A `GET` with input rows keeps them and
+      shows a hint, and the compiler reports the error.
+    - **Unknown keys.** A key the editor does not show, in the file, in an
+      operation or in `auth`, is saved unchanged.
   - **Scenario editor.** The users with their roles, then the steps as a list,
     with a panel per step type.
   - **Seed editor** *(built)*. The Form tab shows the seed's name, entity and
@@ -1223,8 +1252,13 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
       module entity or a typo, the seed uses the generic form and the JSON view.
   - **Text editor.** One table of keys with a column per locale, and a search
     box. Adding a key adds it to every locale's `text` resource.
-  - **Endpoint `values`.** Rows of field and expression, as for process
-    mappings.
+  - **Endpoint `values`** *(built)*. The endpoint keeps the generic form for
+    its entity, process, input and output. Its `values` show as rows of a field
+    and an expression in the expression editor. The field is picked from the
+    fields of the endpoint's entity, found by name among the application's
+    names, and is typed while those are unknown. **Add mapping** lists the
+    fields that have no row. Renaming a row's field keeps its place in the
+    file, and a value that is not an object is left to the JSON view.
   - **Page editor and M12.** M12 adds layouts and widgets while this editor is
     built, see
     [D46](../decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).

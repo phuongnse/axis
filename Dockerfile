@@ -20,10 +20,9 @@ WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
-# The type check also reads the platform texts that web tests import.
+# The type check also reads the platform texts and the sample process that web tests import.
 COPY src/Axis.Presentation/Texts/ /src/src/Axis.Presentation/Texts/
-# It also reads the sample process that processGraph.test.ts imports. Only the SPA output leaves this stage.
-COPY samples/apps/purchase-requests/processes/ /src/samples/apps/purchase-requests/processes/
+COPY samples/apps/purchase-requests/processes/purchase-request-approval.json /src/samples/apps/purchase-requests/processes/
 RUN npm run build
 
 # The server, published with the SPA in its web root, the worker, the admin tool and the sample extension package.

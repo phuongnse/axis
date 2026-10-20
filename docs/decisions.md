@@ -1804,8 +1804,7 @@ The owner confirmed these points on issue #569 on 2026-10-18.
   - The server setting `Studio:Folders` lists the application folders Studio
     may edit, like `ActivateOnStartup`. It is empty by default, so Production
     has no Studio. The Development settings list the purchase request sample.
-    New applications that Studio creates live in `Studio:ApplicationsPath`
-    _(planned for M11)_, see
+    New applications that Studio creates live in `Studio:ApplicationsPath`, see
     [D51](#d51-creating-applications-and-resources-from-studio--agreed).
   - The server setting `Studio:AuthorRole` names a roles claim value. Only a
     signed-in user whose roles claim holds it may use Studio. With no value,
@@ -2892,8 +2891,9 @@ is that lower severities pass.
 ## D51. Creating applications and resources from Studio — Agreed
 
 Studio creates a new application, blank or from an installed application
-template, and starts a resource of every kind. D46 plans this for M11. It is
-_(planned for M11)_. See the
+template, and starts a resource of every kind. D46 plans this for M11. The
+`Studio:ApplicationsPath` setting, `POST /api/studio/apps` and `studioCreate`
+are built. The rest is _(planned for M11)_. See the
 [authoring API](reference/authoring.md#creating-an-application), the
 [application templates](reference/configuration.md#application-templates) and
 the [Studio section of the frontend](reference/frontend.md#studio). The owner
@@ -2912,7 +2912,7 @@ confirmed these points on issue #778 on 2026-10-20.
   - Under several server replicas, the folder is on the shared Studio folder
     ([D49](#d49-several-server-replicas-behind-a-tls-proxy--agreed)).
   - Development, Compose and E2E set it to `artifacts/studio-apps`, which git
-    ignores.
+    ignores _(planned for M11)_.
 - **Creating an application:**
   - `POST /api/studio/apps` takes `{ name, template? }`. It needs the author
     role and the CSRF header.
@@ -3090,7 +3090,8 @@ costs:
 
 M11 gives Studio typed editors for pages, process steps and connectors, and
 for the kinds that need JSON today. It also adds a read-only process graph. The
-seed grid is built. The rest is _(planned for M11)_. See the
+seed grid, the connector editor and the endpoint mapping rows are built. The
+rest is _(planned for M11)_. See the
 [Studio section](reference/frontend.md#studio) for the detail. The owner
 confirmed these points on issue #780 on 2026-10-20.
 
@@ -3122,7 +3123,7 @@ confirmed these points on issue #780 on 2026-10-20.
   - Each transition, `next`, a branch, `otherwise` or an outcome, picks its
     target from the process's steps.
 - **Connector editor:**
-  - The base URL binding and the auth secret binding are picked by name. No
+  - The base URL binding and the auth secret binding are set by name, in a name box. No
     value of a binding is shown or stored, as today.
   - The timeout and the idempotency header.
   - The operations as a list, each with its method, path, input and output
@@ -3269,7 +3270,7 @@ a server that dies in the middle can leave one file written.
 An author runs an application's test scenarios from Studio. Studio stores a
 new kind of publish request, `test`, and the publisher runs it with a separate
 database role that may create databases. The server still gets no such right.
-The route, the stored request and the publisher's run are built. The wiring of the scenario role in Compose, `scripts/dev.sh`, E2E, `init-roles.sql` and the chart is built too. The rest is _(planned for M11)_: the 10-minute limit and the immediate stop on `SIGTERM`. See
+The route, the stored request and the publisher's run are built. The limit and the stop are built too, with `AXC0219` and `AXC0220`. The wiring of the scenario role in Compose, `scripts/dev.sh`, E2E, `init-roles.sql` and the chart is built as well. See
 [D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)
 for M11, the [authoring API](reference/authoring.md#test) for the route, the
 [publisher](reference/administration.md#publisher) for how it runs, and

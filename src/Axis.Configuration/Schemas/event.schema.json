@@ -9,7 +9,7 @@
     "kind": { "const": "event" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "entity": { "$ref": "#/$defs/qualifiedName" },
+    "entity": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "entity" },
     "fields": {
       "type": "array",
       "items": { "$ref": "#/$defs/field" }

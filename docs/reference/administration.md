@@ -758,10 +758,12 @@ role unless it says otherwise.
    `<tenant> scenario <name> failed: <failure>` for each scenario, and fails
    when one failed. It then stores the outcomes of the
    scenarios and the request's status over the tenant's schema role. That is the
-   only use of the tenant database by a `test`. A request has a limit of 10
-   minutes *(planned for M11)*. Past it, the scenario that runs fails, its database is dropped, and
-   the request ends `failed` with a diagnostic. Until then a stuck test keeps
-   renewing its lease. A `test` gets no audit record
+   only use of the tenant database by a `test`. The scenarios of a request may run
+   for 10 minutes, counted from the first scenario of each claim. Past that, the
+   scenario that runs fails with a message that names the limit, its database is
+   dropped, and the request ends `failed` with `AXC0219`. The scenarios that
+   finished keep their outcomes, and those that had not started get none. The step
+   writes `<tenant> test failed: AXC0219 …`. A `test` gets no audit record
    and no release id.
 7. Write the audit record of a `publish` or a `rollback`, with
    the request's final status, then set the request `succeeded` or `failed` and
@@ -802,13 +804,14 @@ stays active and the request ends `failed` with its `releaseId`, as with
 `activate`.
 
 **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the
-request it is running, then exits. Until the exception below is built, a stop
-waits for a running `test` request too. A running `test` request is the exception
-*(planned for M11)*: a test may run for 10 minutes, which is longer than the
-stop grace period of both installs. The publisher stops it at once, drops its
-scenario database and sets the request `failed`. A stop that comes mid-request leaves a lease
+request it is running, then exits. A running `test` request is the exception: a
+test may run for 10 minutes, which is longer than the stop grace period of both
+installs. The publisher stops it at once. The running scenario fails, its
+scenario database is dropped, and the request ends `failed` with `AXC0220`. The
+step writes `<tenant> test failed: AXC0220 …`. A `publish`, `validate` or
+`rollback` still finishes first. A stop that comes mid-request leaves a lease
 that runs out. Another publisher then claims the request again. The platform's shutdown grace period must be longer than the longest
-request, or the request is claimed twice.
+`publish`, `validate` or `rollback`, or the request is claimed twice.
 
 **Leftover databases.** A publisher that crashes in the
 middle of a scenario leaves its `axis_scenario_<uuid>` database behind. The

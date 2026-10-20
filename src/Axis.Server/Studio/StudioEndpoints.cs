@@ -71,6 +71,7 @@ internal static class StudioEndpoints
         endpoints.MapStudioPublishEndpoints();
         endpoints.MapStudioExpressionEndpoints();
         endpoints.MapStudioTemplateEndpoints();
+        endpoints.MapStudioApplicationEndpoints();
     }
 
     private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)
