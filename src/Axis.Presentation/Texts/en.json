@@ -209,5 +209,14 @@
   "shell.studio.seed.tooLong": "The value is too long.",
   "shell.studio.seed.outOfBounds": "The value is out of bounds.",
   "shell.studio.seed.notInValues": "The value is not one of the field's values.",
-  "shell.studio.seed.invalidDate": "The date or time is not valid."
+  "shell.studio.seed.invalidDate": "The date or time is not valid.",
+  "shell.studio.newResource.button": "New resource",
+  "shell.studio.newResource.title": "New resource",
+  "shell.studio.newResource.kind": "Kind",
+  "shell.studio.newResource.name": "Name",
+  "shell.studio.newResource.locale": "Locale",
+  "shell.studio.newResource.create": "Create",
+  "shell.studio.newResource.exists": "A resource with this name or locale already exists.",
+  "shell.studio.newResource.invalid": "This name or locale is not allowed. A name uses letters and digits and starts with a letter. A role name uses lower-case letters, digits and hyphens. A locale looks like en or pt-BR.",
+  "shell.studio.newResource.failed": "The resource could not be created."
 }

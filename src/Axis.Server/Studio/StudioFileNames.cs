@@ -37,6 +37,9 @@ internal static partial class StudioFileNames
         [ResourceKinds.Scenario] = "scenarios",
     };
 
+    /// <summary>The kinds that a create accepts: every resource kind except the manifest.</summary>
+    internal static IEnumerable<string> Kinds => _folders.Keys;
+
     /// <summary>
     /// The path of the new file, such as <c>entities/cost-centre.json</c>, with <paramref name="id"/> set to the
     /// resource's id. When the content cannot form a safe path, it is null and <paramref name="problem"/> is a
