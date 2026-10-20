@@ -287,10 +287,9 @@ test('an author edits an endpoint mapping row and the file holds only that expre
     await page.goto(`/studio?app=PurchaseRequests&resource=${endpoint.id}`)
     const row = page.getByTestId('studio-field-/values/title')
     const expression = row.getByRole('textbox')
-    await expect(expression).toBeVisible()
-    await expression.click()
-    await page.keyboard.press('ControlOrMeta+A')
-    await page.keyboard.type('trim(title)')
+    // The type line shows only once CodeMirror has replaced the read-only Suspense fallback.
+    await expect(row.getByTestId('studio-expression-type')).toBeVisible()
+    await expression.fill('trim(title)')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()
 
