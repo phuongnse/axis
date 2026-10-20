@@ -888,6 +888,11 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   - A stale version is a `409`. The editor keeps the author's draft on screen
     and offers Reload. Reload reads the resource again and drops the draft.
     Selecting another resource also drops an unsaved draft, without a warning.
+  - A kind with a typed editor shows it in place of the form, and keeps the
+    JSON view as the second view of the same draft. The typed editor saves
+    through the same JSON Patch, with the same `If-Match` rules. It never drops
+    a value it does not show, so unknown keys stay as they are. See
+    **Editors by kind** below *(planned for M11)*.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -900,7 +905,8 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     entry's own lists. It loads them once. Collapsing and expanding again shows
     the same lists.
   - A package or a module entry is plain text. It cannot be opened or expanded.
-  - There is no drawn graph and no graph drawing library.
+  - Uses and Used by stay lists. The **Process graph** below is the only
+    drawn graph *(planned for M11)*.
 - **Text keys.** A text resource's **Uses** list holds its keys, each as an
   entry. Expanding a key lists the labels that use it and the locales that
   define it, as its **Used by** list.
@@ -990,8 +996,85 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     resend a save that got no answer, so the author clicks Save again.
   - Save and Delete are off while the message shows.
   - A `401` from a reload starts sign-in, as elsewhere.
+- **Editors by kind** *(planned for M11)*. Studio uses a typed editor for six
+  kinds, and the generic form for the rest. The last column lists what still
+  needs the JSON view, because the form cannot show it.
+
+  | Kind          | Editor                                | Still needs the JSON view                                             |
+  | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
+  | `application` | Generic form                          | Nothing                                                               |
+  | `entity`      | Generic form                          | Nothing                                                               |
+  | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives it a panel          |
+  | `form`        | Generic form                          | Nothing                                                               |
+  | `site`        | Generic form                          | Nothing                                                               |
+  | `process`     | Typed editor with the process graph   | Nothing                                                               |
+  | `rule`        | Generic form                          | Nothing                                                               |
+  | `sequence`    | Generic form                          | Nothing                                                               |
+  | `role`        | Generic form                          | Nothing                                                               |
+  | `policy`      | Generic form                          | Nothing                                                               |
+  | `dataSource`  | Generic form                          | Nothing                                                               |
+  | `connector`   | Typed editor                          | Nothing                                                               |
+  | `endpoint`    | Generic form, typed rows for `values` | Nothing                                                               |
+  | `event`       | Generic form                          | Nothing                                                               |
+  | `trigger`     | Generic form                          | The `parameters` map of a data source trigger                         |
+  | `migration`   | Generic form                          | The `changes` list, because each change's fields depend on its `type` |
+  | `seed`        | Typed editor                          | Nothing                                                               |
+  | `scenario`    | Typed editor                          | Nothing                                                               |
+  | `text`        | Typed editor                          | Nothing                                                               |
+
+  The generic form sends a part to the JSON view when it holds `oneOf`,
+  `anyOf` or `allOf`, is an object with no `properties`, such as a map, or has
+  no type. The last column follows that rule. A new kind or property that the
+  form cannot show goes to the JSON view until an editor covers it.
+
+  - **Page editor.** A list of the page's widgets, each with its type and a
+    summary. A panel per widget type, `table`, `form`, `taskInbox` and
+    `processInspector`, shows the properties the widget has today. The `form`
+    panel also shows its `startProcess` actions.
+  - **Process step editor.** The steps show as a list in graph order, with add,
+    remove and reorder. A panel per step type, `operation`, `decision`, `task`
+    and `end`, shows that type's properties. `set`, `input`, `output` and
+    `fields` show as rows of target and expression. A transition, `next`, a
+    branch's `next`, `otherwise` or an outcome's `next`, picks its target from
+    the process's steps.
+  - **Connector editor.** The `baseUrl` and auth secret bindings are picked by
+    name. No value of a binding is shown or stored. It also shows `timeout`,
+    `idempotency`, and the operations as a list, each with its method, path,
+    input and output fields, and `lookup`.
+  - **Scenario editor.** The users with their roles, then the steps as a list,
+    with a panel per step type.
+  - **Seed editor.** The records show as a grid with a column per field of the
+    seed's `entity`.
+  - **Text editor.** One table of keys with a column per locale, and a search
+    box. Adding a key adds it to every locale's `text` resource.
+  - **Endpoint `values`.** Rows of field and expression, as for process
+    mappings.
+  - **Page editor and M12.** M12 adds layouts and widgets while this editor is
+    built, see
+    [D46](../decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
+    The page editor changes again then.
+- **Process graph** *(planned for M11)*. A process shows a drawn graph of its
+  steps and transitions above its editor, see
+  [D53](../decisions.md#d53-typed-editors-and-the-process-graph-in-studio--agreed).
+  It is read-only. The author edits steps in the list.
+  - Dagre, `@dagrejs/dagre`, lays out the graph, and React Flow,
+    `@xyflow/react`, draws it. Their sizes are about 30 KB and 50 KB min+gzip.
+    Neither is in the SPA yet. M14's process designer builds on both.
+  - The graph and the step editor stay in step. Both read the same unsaved
+    draft, so an edit in the list redraws the graph at once.
+  - Selecting a node selects that step in the list. Selecting an edge opens its
+    transition: the outcome, the branch, `otherwise` or `next`. Selecting a step
+    in the list highlights its node.
+  - A transition to a step that does not exist draws no edge. The graph never
+    invents a node.
+  - A step that a diagnostic in the diagnostics panel names, by a path such as
+    `/steps/{i}`, is marked. The marks come from the panel's last loaded list,
+    so they change on a save or a request, not on every edit.
+  - Nodes are reached with Tab and opened with Enter. Each node has a text label
+    with the step's name and type.
 - **Designers.** Visual page, form and process designers are not built yet.
   They are planned for M13 and M14, see
   [D46](../decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
+  The process graph is read-only, and not a designer.
 - **Texts.** Its texts, including those of the lists above, are the platform
   texts under `shell.studio.*`, in `en` and `vi`, like the other shell texts.
