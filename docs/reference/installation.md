@@ -99,7 +99,9 @@ Read the rules of each setting in
 
 This installs Axis on one machine with Docker Compose. PostgreSQL and the OIDC
 provider run elsewhere. The example lives in `deploy/compose/`. Its
-`compose.yaml` has the server, the worker, the publisher and the admin host. The server and
+`compose.yaml` has the server, the worker, the publisher and the admin host. Two
+more services sit under profiles: a TLS proxy and a second server replica, see
+"TLS proxy and a second replica" below. The server and
 the worker run the production images with a read-only root file system. The
 admin host runs only when asked, through `docker compose run --rm admin`, so
 `docker compose up` does not start it. The file holds no password, client
@@ -184,19 +186,59 @@ sets it, 30 seconds by default.
   comes from your own authority, add its certificate to the server's trust
   store. Do not replace the store: pointing `SSL_CERT_FILE` at one file makes
   the server trust only that file.
-- **Ports.** The server listens on `127.0.0.1:8080` of the host, and the
-  worker's health endpoints on `127.0.0.1:5208`. Without TLS in the server, put
-  a reverse proxy on the same machine in front of the server. See
+- **Ports.** The server listens on `127.0.0.1:8080` of the host, the second
+  replica on `127.0.0.1:8081`, and the worker's health endpoints on
+  `127.0.0.1:5208`. The proxy is the only service published beyond the machine,
+  on port 443. Without the proxy, put a reverse proxy of your own on the same
+  machine in front of the server. See
   [forwarded headers](#several-server-replicas). The images hold no `curl`, so the
   example has no container health check. Probe `/health/ready` from the host.
 - **The purchase request sample** needs a purchasing system binding, which no
   admin command sets, see [open points](#open-points). This guide activates
   the leave request sample.
 
+**TLS proxy and a second replica.** The `proxy` profile starts a pinned Caddy
+proxy that ends TLS. The `replicas` profile starts `server-2`, configured like
+`server`. Use either profile alone or both.
+
+- **The certificate.** Put `tls.crt` and `tls.key` in `AXIS_TLS_DIR`, which
+  defaults to `./tls`. Compose mounts the folder read-only at `/certs`, so no
+  compose file holds a certificate or a key. The files must be readable by the
+  proxy. The certificate must cover every tenant host.
+- **The ports.** The proxy publishes `AXIS_HTTPS_PORT`, 443 by default.
+  `server-2` publishes `127.0.0.1:${AXIS_SERVER_2_PORT}`, 8081 by default, for
+  health probes.
+- **The replicas.** Both servers answer to the network alias `servers`. The
+  proxy looks that name up again every five seconds, so a restarted replica
+  rejoins on its own. A request to a replica that is down is retried on the
+  other one.
+- **The forwarded headers.** The Compose network has a fixed subnet,
+  `AXIS_NETWORK_SUBNET`, 172.31.250.0/24 by default. The proxy has a fixed
+  address in it, `AXIS_PROXY_ADDRESS`, 172.31.250.10 by default. Both servers
+  get it as `ForwardedHeaders__KnownProxies__0`, so they trust forwarded
+  headers from that address only. The proxy replaces any `X-Forwarded-For`,
+  `X-Forwarded-Proto` and `X-Forwarded-Host` a client sends. Behind it, sign-in
+  returns to `https://<tenant host>/api/auth/callback` and the session cookie
+  is `Secure`.
+- **The address range.** Docker hands out addresses without a fixed one only
+  from `AXIS_NETWORK_IP_RANGE`, 172.31.250.128/25 by default. A short-lived
+  `admin` container then cannot take the proxy's address.
+- **The start order.** Start `server` first and wait for `/health/ready`. Then
+  run `docker compose --profile replicas up -d server-2` and wait for its
+  `/health/ready`. Then run `docker compose --profile proxy up -d proxy`.
+- **An existing install.** The network gains fixed address settings, and
+  Compose does not change an existing network in place. Run
+  `docker compose down` once before the first start with this file. If the
+  default subnet overlaps a network of the machine, `docker compose up` fails.
+  Set `AXIS_NETWORK_SUBNET`, `AXIS_NETWORK_IP_RANGE` and `AXIS_PROXY_ADDRESS`.
+- **Studio.** The example has no shared Studio volume, because production
+  Compose does not turn Studio on.
+
 **The smoke test.** `scripts/onprem.test.mjs` installs the example as the five
 steps say, and `scripts/e2e.sh` runs it. It builds the three production images
 and starts a test PostgreSQL and a Keycloak over HTTPS, with a certificate
-authority it makes for the run. An override file in a temporary folder holds
+authority it makes for the run, and imports a copy of the development realm that
+adds the tenants' `https://` redirect addresses. An override file in a temporary folder holds
 everything the test adds, so `deploy/compose/compose.yaml` stays as an
 operator uses it. The test then:
 
@@ -218,14 +260,21 @@ operator uses it. The test then:
    `psql`, and checks that the installed publisher runs both to `succeeded`.
    The publisher's log shows `one claim ok` and `two claim ok`, and the
    `publisher` service is still running.
-8. *(planned for M10)* Starts two server replicas behind a TLS proxy, signs in
-   through the proxy, restarts one replica and checks that the session still
-   works on both.
+8. Starts the second replica and the TLS proxy, with a proxy certificate from
+   the test's authority. Signs `anna` in through the proxy over HTTPS with plain
+   HTTP requests, posting Keycloak's login form directly. Checks that the
+   redirect carries `redirect_uri=https://one.axis.test/api/auth/callback` even
+   when the client sends its own `X-Forwarded-Proto` and `X-Forwarded-Host`,
+   that every `Axis.Session` cookie is `Secure`, and that `GET /api/me`
+   answers `200`. Then restarts `server` and checks that `GET /api/me` with the
+   same cookie answers `200` through the proxy and on the ports of `server` and
+   `server-2`.
 
-The test checks sign-in up to the redirect and does not complete it. Another
-test checks that nothing under `deploy/compose/` holds a secret, and that the
+Other tests check that nothing under `deploy/compose/` holds a secret, that the
 rendered configuration takes every connection string and the installation key
-only from `secrets:` files.
+only from `secrets:` files, that every published port of both servers is on
+`127.0.0.1`, that the proxy mounts its certificate folder read-only, and that
+both servers trust the proxy's fixed address only.
 
 ## In the cloud
 
@@ -334,8 +383,8 @@ The server can run as several replicas behind a reverse proxy that ends TLS.
 See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 The shared key ring, the forwarded headers and the platform settings under both
 tenant sources, the Studio write lock and the Helm chart's `studio.persistence`
-are built. The Compose example with two replicas and its smoke test are
-*(planned for M10)*.
+and the Compose example with two replicas behind a TLS proxy, with its smoke
+test, are built.
 
 - **A shared key ring.** The server keeps its data protection keys in the
   platform database, encrypted with `Platform:SecretKey`. See
@@ -367,8 +416,8 @@ are built. The Compose example with two replicas and its smoke test are
   Kubernetes that needs a `ReadWriteMany` storage class, set with
   `studio.persistence`. The volume must be writable by the non-root user of the
   image, and the chart sets no `fsGroup`. See [Studio](configuration.md#studio).
-- **On premises.** *(planned for M10)* The Compose example runs two server replicas behind a TLS
-  proxy.
+- **On premises.** The Compose example runs two server replicas behind a TLS
+  proxy. See "TLS proxy and a second replica" in [on premises](#on-premises).
 - **Platform settings under both tenant sources.** The server needs
   `ConnectionStrings:PlatformSchema` and `Platform:SecretKey` also under
   `Tenancy:Source=configuration`, because it creates the platform tables there

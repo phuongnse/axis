@@ -12,6 +12,18 @@
 # AXIS_SERVER_PORT      The host port of the server, on 127.0.0.1 only. Default 8080. Without TLS, put a
 #                       reverse proxy on the same machine in front of it.
 # AXIS_WORKER_HEALTH_PORT  The host port of the worker's health endpoints, on 127.0.0.1 only. Default 5208.
+# AXIS_TLS_DIR          The folder with tls.crt and tls.key for the proxy, mounted read-only at /certs. Default ./tls.
+# AXIS_HTTPS_PORT       The host port of the proxy. Default 443.
+# AXIS_SERVER_2_PORT    The host port of the second server replica, on 127.0.0.1 only. Default 8081.
+# AXIS_NETWORK_SUBNET   The subnet of the Compose network. Default 172.31.250.0/24. Change it when it overlaps a
+#                       network of the machine.
+# AXIS_NETWORK_IP_RANGE The part of the subnet that Docker hands out to containers without a fixed address.
+#                       Default 172.31.250.128/25. It must not hold AXIS_PROXY_ADDRESS.
+# AXIS_PROXY_ADDRESS    The fixed address of the proxy in the subnet. Both servers trust the forwarded headers
+#                       from this address only. Default 172.31.250.10.
+#
+# Profiles. `proxy` starts the TLS proxy. `replicas` starts the second server, server-2. `admin` is for
+# `docker compose run --rm admin`.
 # AXIS_OIDC_CLIENT_SECRET  Passes through from the shell to `tenant create`. It is never stored here.
 x-host: &host
   read_only: true
@@ -22,20 +34,60 @@ x-host: &host
     Extensions__Path: /extensions
     Modules__Path: /modules
 
+# The server and its second replica. Both trust forwarded headers from the proxy's fixed address only, and
+# both answer to the network alias `servers`, which the proxy looks up.
+x-server: &server
+  <<: *host
+  image: ${AXIS_IMAGE_PREFIX:-}axis-server:${AXIS_VERSION:?Set AXIS_VERSION}
+  restart: unless-stopped
+  environment:
+    <<: *host-environment
+    ForwardedHeaders__KnownProxies__0: ${AXIS_PROXY_ADDRESS:-172.31.250.10}
+  networks:
+    default:
+      aliases:
+        - servers
+  volumes:
+    - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
+    - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
+  secrets:
+    - ConnectionStrings__Platform
+    - ConnectionStrings__PlatformSchema
+    - Platform__SecretKey
+
 services:
   server:
-    <<: *host
-    image: ${AXIS_IMAGE_PREFIX:-}axis-server:${AXIS_VERSION:?Set AXIS_VERSION}
-    restart: unless-stopped
+    <<: *server
     ports:
       - "127.0.0.1:${AXIS_SERVER_PORT:-8080}:8080"
+
+  # The second replica. Start it only after `server` is ready.
+  server-2:
+    <<: *server
+    profiles:
+      - replicas
+    ports:
+      - "127.0.0.1:${AXIS_SERVER_2_PORT:-8081}:8080"
+
+  # Ends TLS with /certs/tls.crt and /certs/tls.key and forwards to every server that answers to `servers`.
+  # It holds no secret: the folder is mounted from the host.
+  proxy:
+    image: caddy:2.10.2-alpine
+    profiles:
+      - proxy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /data
+      - /config
+    ports:
+      - "${AXIS_HTTPS_PORT:-443}:443"
     volumes:
-      - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
-      - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
-    secrets:
-      - ConnectionStrings__Platform
-      - ConnectionStrings__PlatformSchema
-      - Platform__SecretKey
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${AXIS_TLS_DIR:-./tls}:/certs:ro
+    networks:
+      default:
+        ipv4_address: ${AXIS_PROXY_ADDRESS:-172.31.250.10}
 
   worker:
     <<: *host
@@ -88,6 +140,15 @@ services:
       - Admin__ConnectionString
       - ConnectionStrings__PlatformSchema
       - Platform__SecretKey
+
+# A fixed subnet gives the proxy a fixed address. Docker hands out the other addresses from the ip_range only,
+# so a short-lived container cannot take the proxy's address.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${AXIS_NETWORK_SUBNET:-172.31.250.0/24}
+          ip_range: ${AXIS_NETWORK_IP_RANGE:-172.31.250.128/25}
 
 # One file per setting, named like the setting. Compose mounts each at /run/secrets/<name>.
 secrets:
