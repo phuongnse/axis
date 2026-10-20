@@ -855,6 +855,8 @@ sorted by file and then path.
 | `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
 | `AXC0215` | The publisher stopped three times while running a publish or validate request. Reported on the request, with an empty file and path, see [lifecycle](authoring.md#lifecycle). |
 | `AXC0216` | The main tenant has no preview tenant when a preview request runs, see [preview](authoring.md#preview). Reported on the request, with an empty file and path. |
+| `AXC0217` | A `test` request runs and the publisher has no `Scenarios:ServerConnectionString`, see [test](authoring.md#test). The message names the setting. Reported on the request, with an empty file and path. |
+| `AXC0218` | A `test` request names a scenario that the application does not have. The message names the scenario. Reported on the request, with an empty file and path, once for each unknown name. |
 
 ## Startup activation
 

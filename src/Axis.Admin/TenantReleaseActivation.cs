@@ -1,4 +1,10 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Loading;
+using Axis.Configuration.Modules;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data;
@@ -6,19 +12,26 @@ using Axis.Data.Seeding;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
+using Axis.Scenarios.Runner;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Axis.Admin;
 
 /// <summary>The outcome of the steps for one tenant: whether all passed, and the release once <c>compile</c> stored one.</summary>
 internal readonly record struct ReleaseRun(bool Succeeded, Guid? ReleaseId);
 
+/// <summary>The outcome of a test: whether the steps passed, and one JSON object for each scenario that ran, in the order they ran.</summary>
+internal readonly record struct ScenarioTestRun(bool Succeeded, JsonArray Scenarios);
+
 /// <summary>
 /// The version, compile, activate and seed steps for one tenant, which <c>activate</c> and the publisher share. The caller
 /// says how to compile: from a folder, or from a snapshot. A tenant stops at its first failed step and keeps its previous
 /// active release. A validate runs the version step and one validate step instead: the compile and every activation check
-/// run in one transaction that is always rolled back, and no seed or schedule trigger step runs. Each step writes one <c>ok</c> line, or one <c>failed</c> line for each error diagnostic. A line names the
+/// run in one transaction that is always rolled back, and no seed or schedule trigger step runs. A test runs the version step
+/// and one test step: it compiles the snapshot, then runs the chosen scenarios one at a time, each in its own temporary
+/// database on the scenario server, and touches no tenant database. Each step writes one <c>ok</c> line, or one <c>failed</c> line for each error diagnostic. A line names the
 /// tenant and never a password, a host or a connection string. Compile and activate run as the tenant's schema role. The
 /// schedule trigger state and the seed records run as its runtime role. Warnings go to the error writer.
 /// </summary>
@@ -145,6 +158,106 @@ internal sealed class TenantReleaseActivation(
             });
     }
 
+    /// <summary>
+    /// Runs the <c>version</c> step and then the <c>test</c> step for the tenant <paramref name="id"/>. The test step fails
+    /// with <c>AXC0217</c> when <paramref name="scenarioServer"/> is null, and when the snapshot cannot be read, which is a null
+    /// <paramref name="files"/>, or does not compile. It fails with <c>AXC0218</c> for each name of
+    /// <paramref name="scenarioNames"/>, a JSON array of strings or null for every scenario, that the application does not have.
+    /// In each of these cases no scenario runs. Otherwise it runs the chosen scenarios in file order, and fails when one
+    /// failed. Every compile diagnostic, warnings included, is added to <paramref name="diagnostics"/>.
+    /// </summary>
+    public async Task<ScenarioTestRun> TestAsync(
+        string id,
+        string schemaVersion,
+        string? scenarioServer,
+        IReadOnlyList<ResourceContent>? files,
+        string? scenarioNames,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        List<Diagnostic> diagnostics)
+    {
+        var results = new JsonArray();
+        var succeeded = await Step(id, "version", () => CheckVersionAsync(schemaVersion))
+            && await Step(id, "test", async () =>
+            {
+                if (scenarioServer is null)
+                {
+                    const string message = "The setting Scenarios:ServerConnectionString is not set, so test scenarios cannot run.";
+                    var missing = new Diagnostic(DiagnosticCodes.ScenarioServerMissing, message, "", "");
+                    diagnostics.Add(missing);
+                    throw new DiagnosticsFailure([missing]);
+                }
+
+                if (files is null)
+                {
+                    throw new InvalidOperationException("The snapshot cannot be read.");
+                }
+
+                var compiled = ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules);
+                diagnostics.AddRange(compiled.Diagnostics);
+                WriteWarnings(id, compiled.Diagnostics);
+                if (compiled.HasErrors || compiled.Model is null)
+                {
+                    throw new DiagnosticsFailure(compiled.Diagnostics);
+                }
+
+                var scenarios = ApplicationLoader.Load(files).Scenarios.OrderBy(scenario => scenario.File, StringComparer.Ordinal).ToList();
+                if (scenarioNames is not null)
+                {
+                    var names = JsonSerializer.Deserialize<List<string>>(scenarioNames) ?? [];
+                    var known = scenarios.Select(scenario => scenario.Name).ToHashSet(StringComparer.Ordinal);
+                    var unknown = names.Distinct(StringComparer.Ordinal)
+                        .Where(name => !known.Contains(name))
+                        .Select(name => new Diagnostic(DiagnosticCodes.UnknownScenario, $"The scenario '{name}' is not in the application.", "", ""))
+                        .ToList();
+                    if (unknown.Count > 0)
+                    {
+                        diagnostics.AddRange(unknown);
+                        throw new DiagnosticsFailure(unknown);
+                    }
+
+                    scenarios = scenarios.Where(scenario => names.Contains(scenario.Name, StringComparer.Ordinal)).ToList();
+                }
+
+                var failed = 0;
+                foreach (var scenario in scenarios)
+                {
+                    var result = await ScenarioRunner.RunAsync(
+                        files, scenario, scenarioServer, NullLoggerFactory.Instance, cancellationToken, packages: packages, modules: modules);
+                    results.Add(ScenarioJson(scenario.Id, result));
+                    if (result.Failure is { } failure)
+                    {
+                        failed++;
+                        output.WriteLine($"{id} scenario {result.Name} failed: {failure}");
+                    }
+                    else
+                    {
+                        output.WriteLine($"{id} scenario {result.Name} passed");
+                    }
+                }
+
+                if (failed > 0)
+                {
+                    throw new ScenariosFailure($"{failed} of {scenarios.Count} scenarios failed.");
+                }
+            });
+        return new ScenarioTestRun(succeeded, results);
+    }
+
+    // The shape of a scenario result in the authoring API. The path is that of the failing step in the scenario file.
+    private static JsonObject ScenarioJson(Guid resourceId, ScenarioResult result) =>
+        new()
+        {
+            ["name"] = result.Name,
+            ["resourceId"] = resourceId.ToString("D"),
+            ["file"] = result.File,
+            ["outcome"] = result.Passed ? "passed" : "failed",
+            ["durationMs"] = (long)result.Duration.TotalMilliseconds,
+            ["step"] = result.Step,
+            ["path"] = result.Step is { } index ? $"/steps/{index}" : null,
+            ["message"] = result.Message,
+        };
+
     public static bool IsError(Diagnostic diagnostic) => diagnostic.Severity != DiagnosticSeverity.Warning;
 
     // The hosts compare the version recorded in the directory with their build's to decide whether to serve a tenant,
@@ -200,6 +313,11 @@ internal sealed class TenantReleaseActivation(
 
             return false;
         }
+        catch (ScenariosFailure failure)
+        {
+            output.WriteLine($"{id} {name} failed: {failure.Message}");
+            return false;
+        }
         catch (Exception exception)
         {
             output.WriteLine($"{id} {name} failed: {TenantDatabaseSteps.Safe(exception)}");
@@ -209,6 +327,9 @@ internal sealed class TenantReleaseActivation(
         output.WriteLine($"{id} {name} ok");
         return true;
     }
+
+    // A scenario that failed is not a diagnostic: its outcome is in the results, and this only ends the step.
+    private sealed class ScenariosFailure(string message) : Exception(message);
 
     private sealed class DiagnosticsFailure(IReadOnlyList<Diagnostic> diagnostics) : Exception
     {
