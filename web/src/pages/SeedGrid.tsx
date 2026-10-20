@@ -67,7 +67,7 @@ function NumberCell({ field, value, problem, onChange }: CellProps) {
   )
 }
 
-function Cell(props: CellProps) {
+export function FieldCell(props: CellProps) {
   const { field, value, problem, onChange } = props
   const status = problem ? ('error' as const) : undefined
   switch (field.type) {
@@ -169,7 +169,7 @@ export function SeedGrid({
                 const problem = problems.get(pointer)
                 return (
                   <div data-testid={`studio-field-${pointer}`}>
-                    <Cell
+                    <FieldCell
                       field={field}
                       value={Object.hasOwn(row.values, field.name) ? row.values[field.name] : undefined}
                       problem={problem}
