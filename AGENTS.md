@@ -171,6 +171,11 @@ works on a fresh clone:
   `artifacts/modules/<id>/<version>/`, where the Development settings of the server and
   the worker point `Modules:Path`. The server reads the module catalog only when it starts,
   so a module edit needs a restart of the script.
+- _(planned for M11)_ Development, Compose and E2E set `Studio:ApplicationsPath`
+  to `artifacts/studio-apps` and `Templates:Path` to `artifacts/templates`. The
+  sample templates, `samples/templates/*`, are installed there, and the Compose
+  image holds them in `/templates`. `artifacts/` is already git-ignored. See
+  [D51](docs/decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
 - It runs the server and the worker under `dotnet watch` and the SPA on Vite in
   one terminal. It starts the worker once the server has migrated the tenant
   databases. Each line starts with `[server]`, `[worker]` or `[web]`, and the

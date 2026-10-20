@@ -862,6 +862,26 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   address, as `/studio?app=PurchaseRequests&resource=<id>`, so a reload keeps
   them. A Used by entry or a diagnostic that opens a resource at a path adds
   `&path=<path>`.
+- **New application** _(planned for M11)_. A **New application** button shows
+  when `GET /api/me` answers `studioCreate: true`. It asks for a name and
+  offers Blank or a template from `GET /api/studio/templates`, with the title
+  and description in the UI locale and `en` as the fallback. A `409` or a `400`
+  shows next to the name. A success picks the new application and shows its
+  diagnostics. See
+  [creating an application](authoring.md#creating-an-application) and
+  [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
+- **New resource** _(planned for M11)_. A **New resource** button asks for the
+  kind and the name, or the locale for a `text` resource.
+  - It sends the kind's starter with an id from `crypto.randomUUID()`. A starter
+    is the smallest content that passes the kind's schema. A reference the
+    author must still choose is an empty string, so it shows up as a diagnostic.
+  - The starters live in the SPA, next to the bundled schemas. A Vitest test
+    checks each one against its schema, except for the reference paths left
+    empty.
+  - A new text resource copies every key and text of the default locale of the
+    first site in file order, or `en` when there is no site, so every label still
+    resolves. The author then translates.
+  - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 - **Application picker.** The first step picks one of the applications that
   `GET /api/studio/apps` lists. With only one application, it is picked at
   once.
