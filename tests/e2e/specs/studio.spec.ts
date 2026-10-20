@@ -157,6 +157,18 @@ test('an author opens a grant field picker and it offers the fields of the grant
   await expect(page.getByRole('option')).toHaveText(expected)
 })
 
+test('an author sees what the employee role may do in the policy matrix', async ({ page }) => {
+  await useSession(page, 'hoa')
+
+  await page.goto('/studio?app=PurchaseRequests&view=policies')
+
+  const entity = page.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest')
+  await expect(entity).toContainText('read')
+  await expect(entity).toContainText('create')
+  await expect(entity).toContainText('update')
+  await expect(page.getByTestId('studio-matrix-cell-employee-process-PurchaseRequestApproval')).toContainText('start')
+})
+
 test('an author saves a resource while the server restarts, and sees the saved version after the reconnect', async ({
   page,
 }) => {
