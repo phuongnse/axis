@@ -1,0 +1,21 @@
+{
+  "id": "b6a3403b-9e94-4c6f-848b-6a39cea929de",
+  "kind": "policy",
+  "name": "ServiceDeskLeadAccess",
+  "formatVersion": 1,
+  "roles": ["service-desk-lead"],
+  "grants": [
+    {
+      "entity": "Ticket",
+      "actions": ["read"]
+    },
+    {
+      "entity": "Category",
+      "actions": ["read"]
+    },
+    {
+      "dataSource": "AllTicketList",
+      "actions": ["read"]
+    }
+  ]
+}

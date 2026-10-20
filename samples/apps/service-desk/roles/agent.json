@@ -1,0 +1,9 @@
+{
+  "id": "a798c7fd-e0de-4793-b0b4-8c172f2ab371",
+  "kind": "role",
+  "name": "agent",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.agent"
+  }
+}

@@ -131,6 +131,41 @@ test('an author selects a diagnostic and the editor shows the field at its path'
   }
 })
 
+test('an author adds a department in the seed grid and the file holds only that new record', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const seed = items.find((item) => item.file === 'seeds/departments.json')!
+  const file = path.join(studioFolder, 'seeds/departments.json')
+  const original = await readFile(file, 'utf8')
+  const before = JSON.parse(original) as { records: { id: string; values: Record<string, unknown> }[] }
+  const diagnosticsBefore = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+  // Short and unique, because the code holds at most 20 characters.
+  const code = `T${Date.now().toString(36)}`
+
+  try {
+    await page.goto(`/studio?app=PurchaseRequests&resource=${seed.id}`)
+    await expect(page.getByTestId('studio-seed-row')).toHaveCount(before.records.length)
+    await page.getByRole('button', { name: 'Add record' }).click()
+    const row = page.getByTestId('studio-seed-row').nth(before.records.length)
+    await row.getByRole('textbox', { name: 'code' }).fill(code)
+    await row.getByRole('textbox', { name: 'name' }).fill('Test department')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+
+    const diagnosticsAfter = await (await page.request.get('/api/studio/apps/PurchaseRequests/diagnostics')).json()
+    expect(diagnosticsAfter).toEqual(diagnosticsBefore)
+    const after = JSON.parse(await readFile(file, 'utf8')) as typeof before
+    expect(after.records).toHaveLength(before.records.length + 1)
+    expect(after.records.slice(0, before.records.length)).toEqual(before.records)
+    const added = after.records[before.records.length]
+    expect(added.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+    expect(added.values).toEqual({ code, name: 'Test department' })
+  } finally {
+    await writeFile(file, original)
+  }
+})
+
 test('someone without the author role sees no Studio link and a forbidden page', async ({ page }) => {
   await useSession(page, 'anna')
 

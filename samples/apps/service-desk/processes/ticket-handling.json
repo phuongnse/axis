@@ -1,0 +1,152 @@
+{
+  "id": "98f8e210-6ab5-4526-8c03-8d459bd2b38d",
+  "kind": "process",
+  "name": "TicketHandling",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "startCondition": {
+    "expression": "status in ('draft', 'reopened')",
+    "message": {
+      "textKey": "ticket.cannotSubmit"
+    }
+  },
+  "start": "submit",
+  "steps": [
+    {
+      "name": "submit",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'submitted'"
+      },
+      "next": "triage"
+    },
+    {
+      "name": "triage",
+      "type": "task",
+      "label": {
+        "textKey": "ticket.triage"
+      },
+      "assignee": {
+        "role": "service-desk-lead"
+      },
+      "form": "TicketTriage",
+      "dueIn": "P1D",
+      "outcomes": [
+        {
+          "name": "assign",
+          "label": {
+            "textKey": "task.assign"
+          },
+          "next": "markAssigned"
+        },
+        {
+          "name": "reject",
+          "label": {
+            "textKey": "task.reject"
+          },
+          "next": "markRejected"
+        }
+      ]
+    },
+    {
+      "name": "markAssigned",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'assigned'",
+        "assignedAgent": "coalesce(assignedAgent, category.defaultAgent)"
+      },
+      "next": "resolve"
+    },
+    {
+      "name": "resolve",
+      "type": "task",
+      "label": {
+        "textKey": "ticket.resolve"
+      },
+      "assignee": {
+        "user": "assignedAgent"
+      },
+      "form": "TicketResolution",
+      "dueIn": "P3D",
+      "outcomes": [
+        {
+          "name": "resolve",
+          "label": {
+            "textKey": "task.resolve"
+          },
+          "next": "markResolved"
+        }
+      ]
+    },
+    {
+      "name": "markResolved",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'resolved'"
+      },
+      "next": "confirm"
+    },
+    {
+      "name": "confirm",
+      "type": "task",
+      "label": {
+        "textKey": "ticket.confirm"
+      },
+      "assignee": {
+        "user": "requester"
+      },
+      "form": "TicketConfirmation",
+      "dueIn": "P3D",
+      "outcomes": [
+        {
+          "name": "confirm",
+          "label": {
+            "textKey": "task.confirm"
+          },
+          "next": "markClosed"
+        },
+        {
+          "name": "reopen",
+          "label": {
+            "textKey": "task.reopen"
+          },
+          "next": "markReopened"
+        }
+      ]
+    },
+    {
+      "name": "markClosed",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'closed'"
+      },
+      "next": "done"
+    },
+    {
+      "name": "markRejected",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'rejected'"
+      },
+      "next": "done"
+    },
+    {
+      "name": "markReopened",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'reopened'"
+      },
+      "next": "done"
+    },
+    {
+      "name": "done",
+      "type": "end"
+    }
+  ]
+}

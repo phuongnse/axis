@@ -1,0 +1,52 @@
+{
+  "id": "56d7e028-8521-4232-840d-ee6dfc0b0467",
+  "kind": "form",
+  "name": "TicketConfirmation",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "sections": [
+    {
+      "title": {
+        "textKey": "ticket.sections.ticket"
+      },
+      "fields": [
+        {
+          "field": "number",
+          "readOnly": true
+        },
+        {
+          "field": "title",
+          "readOnly": true
+        },
+        {
+          "field": "description",
+          "readOnly": true
+        },
+        {
+          "field": "category",
+          "readOnly": true
+        },
+        {
+          "field": "priority",
+          "readOnly": true
+        },
+        {
+          "field": "requester",
+          "readOnly": true
+        },
+        {
+          "field": "assignedAgent",
+          "readOnly": true
+        },
+        {
+          "field": "status",
+          "readOnly": true
+        },
+        {
+          "field": "resolution",
+          "readOnly": true
+        }
+      ]
+    }
+  ]
+}

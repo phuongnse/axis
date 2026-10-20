@@ -43,7 +43,8 @@ namespace Axis.Server.Studio;
 /// <c>id</c> or the file exists. <c>DELETE /api/studio/apps/{application}/resources/{id}</c> removes one
 /// file when <c>If-Match</c> holds its current version and answers <c>{ diagnostics }</c>. It answers 428
 /// without <c>If-Match</c>, 409 for a stale version and 400 for the manifest.
-/// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>.
+/// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, and the expression check is in
+/// <see cref="StudioExpressionEndpoints"/>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
 /// newest first, as <c>{ active, folderContentHash, items }</c>. <c>active</c> is the active release or null, and
 /// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. It reads the
@@ -65,6 +66,7 @@ internal static class StudioEndpoints
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
         endpoints.MapStudioPublishEndpoints();
+        endpoints.MapStudioExpressionEndpoints();
     }
 
     private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)
@@ -411,7 +413,7 @@ internal static class StudioEndpoints
 
     internal const string WriteLockUnavailable = "The write lock could not be taken. Try again.";
 
-    private const string NoResource = "The application has no resource with this id.";
+    internal const string NoResource = "The application has no resource with this id.";
 
     private const string NoTextKey = "The application has no text key with this name.";
 

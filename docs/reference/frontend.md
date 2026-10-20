@@ -862,6 +862,26 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   address, as `/studio?app=PurchaseRequests&resource=<id>`, so a reload keeps
   them. A Used by entry or a diagnostic that opens a resource at a path adds
   `&path=<path>`.
+- **New application** _(planned for M11)_. A **New application** button shows
+  when `GET /api/me` answers `studioCreate: true`. It asks for a name and
+  offers Blank or a template from `GET /api/studio/templates`, with the title
+  and description in the UI locale and `en` as the fallback. A `409` or a `400`
+  shows next to the name. A success picks the new application and shows its
+  diagnostics. See
+  [creating an application](authoring.md#creating-an-application) and
+  [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
+- **New resource** _(planned for M11)_. A **New resource** button asks for the
+  kind and the name, or the locale for a `text` resource.
+  - It sends the kind's starter with an id from `crypto.randomUUID()`. A starter
+    is the smallest content that passes the kind's schema. A reference the
+    author must still choose is an empty string, so it shows up as a diagnostic.
+  - The starters live in the SPA, next to the bundled schemas. A Vitest test
+    checks each one against its schema, except for the reference paths left
+    empty.
+  - A new text resource copies every key and text of the default locale of the
+    first site in file order, or `en` when there is no site, so every label still
+    resolves. The author then translates.
+  - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 - **Application picker.** The first step picks one of the applications that
   `GET /api/studio/apps` lists. With only one application, it is picked at
   once.
@@ -894,7 +914,7 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     JSON view as the second view of the same draft. The typed editor saves
     through the same JSON Patch, with the same `If-Match` rules. It never drops
     a value it does not show, so unknown keys stay as they are. See
-    **Editors by kind** below *(planned for M11)*.
+    **Editors by kind** below. Only the seed editor is built so far.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1051,14 +1071,78 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   - The check uses the saved resource, so a draft path that is not saved yet may
     have no answer. When there is no answer, the last result stays on screen.
     The editor never blocks Save.
-- **Editors by kind** *(planned for M11)*. Studio uses a typed editor for six
-  kinds, and the generic form for the rest. The last column lists what still
-  needs the JSON view, because the form cannot show it.
+- **Entity designer** *(planned for M11)*. An `entity` resource opens in a
+  designer in place of the generic form. The JSON view stays. See
+  [D54](../decisions.md#d54-the-entity-designer-and-the-policy-matrix--agreed).
+  - The fields are a table. Its columns are name, label, type, required,
+    unique and the type's own settings: `maxLength`, `precision` and `scale`,
+    `values`, `target` and the child entity of a `child-collection`. The
+    settings follow the
+    [field types](configuration.md#entity-field-types-and-constraints), so a
+    setting a type does not take cannot be edited.
+  - A computed field's `expression` and each validation use the
+    [expression editor](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed).
+  - Fields can be added, removed and reordered. A display field picker lists
+    the entity's fields.
+  - A module entity is read-only, as it is in the generic form.
+- **Migrations from the designer** *(planned for M11)*. The designer compares
+  with the entity as Studio loaded it. "Loaded" means as Studio read the
+  entity, not the active release. It asks a question for a change to a loaded
+  field and adds the migration change that goes with the answer:
+
+  | Change to a loaded field | Question | Migration added |
+  | --- | --- | --- |
+  | Rename | Keep its data? | `renameField` with `from` and `to`. |
+  | Remove | Drop its data? | `dropField`. Answering No keeps the field. |
+  | Type change | A `convert` expression | `convert` with the author's expression. |
+  | Narrower `maxLength` | A `convert` expression | `convert`. |
+  | Removed enum values | A `convert` expression that maps them to kept values | `convert`. |
+  | Now required, or a new required field | Fill the nulls? A `fill` expression | `fill`. |
+  | To or from `enum`, or `unique` added | None | None. The designer warns, and Validate reports `AXC0016`. |
+  | Rename or remove of a `child-collection` field | None | None, because it has no column. |
+
+  - The migration resource is named `<Entity>Change<UTC yyyyMMddHHmmss>`, for
+    example `PurchaseRequestChange20261020093000` in
+    `migrations/purchase-request-change20261020093000.json`. It holds the
+    changes of one save in edit order. It never edits an existing migration.
+  - The save sends the entity patch and the migration create in one
+    [`changes` call](authoring.md#changes). A `409` keeps the draft, as for a
+    single save.
+  - Validate still runs every activation check, so a missing migration shows
+    before a publish.
+  - See [migrations](storage.md#migrations) and the
+    [resource file shape](configuration.md#resource-file-shape).
+- **Policy matrix** *(planned for M11)*. One view per application shows who
+  may do what.
+  - Roles are the rows. The columns are the entities without child entities,
+    the data sources, the processes and the endpoints.
+  - A cell shows the OR of the role's actions from all its policies, as in
+    [combining grants](../architecture.md#combining-grants).
+  - A cell opens its grants. Each shows its actions, its filter in the
+    expression editor and its fields in the field picker.
+  - An edit writes to `<Role>Access`, the PascalCase role name plus
+    `Access`. So `department-manager` writes `DepartmentManagerAccess`. The
+    policy is created when it is missing, with `roles` set to that role only.
+  - A grant from a policy that names several roles shows as shared and opens
+    that policy. So does a grant from another policy of this role. A
+    `<Role>Access` that names other roles counts as shared too. Its row is
+    read-only, with a message.
+  - Only the actions a target takes can be chosen. An entity takes `read`,
+    `create`, `update` and `delete`. A data source takes `read`. A process
+    takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
+    takes `invoke`. Filter and fields are only on entity grants.
+  - A save writes one file, with the single-file routes.
+  - See [roles and policies](configuration.md#roles-and-policies).
+- **Editors by kind.** Studio uses a typed editor for six kinds, the entity
+  designer for `entity`, and the generic form for the rest. The seed editor is
+  built. The other typed editors and the entity designer are *(planned for
+  M11)*, and until they are built those kinds use the generic form. The last
+  column lists what still needs the JSON view, because the form cannot show it.
 
   | Kind          | Editor                                | Still needs the JSON view                                             |
   | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
   | `application` | Generic form                          | Nothing                                                               |
-  | `entity`      | Generic form                          | Nothing                                                               |
+  | `entity`      | Entity designer                       | Nothing                                                               |
   | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives it a panel          |
   | `form`        | Generic form                          | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
@@ -1098,8 +1182,30 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     input and output fields, and `lookup`.
   - **Scenario editor.** The users with their roles, then the steps as a list,
     with a panel per step type.
-  - **Seed editor.** The records show as a grid with a column per field of the
-    seed's `entity`.
+  - **Seed editor** *(built)*. The Form tab shows the seed's name, entity and
+    `sync`, then its records as a grid, with a row per record and a column per
+    field of the seed's `entity`. The JSON view stays as a second view of the
+    same draft.
+    - **Columns.** The input fits the field type: a text box for `text`,
+      `date`, `date-time` and `reference`, a text box for `integer` and
+      `decimal` that stores a number, a true/false choice for `boolean` and a
+      choice of `values` for `enum`. A `reference` is a text box that checks
+      the UUID form, and the record picker is separate work. Each input follows
+      the [record API's value rules](record-api.md#request-bodies-and-values).
+    - **No column.** A computed field, a `sequence` field, a `creator` field
+      and a `child-collection` field get no column, because seeding rejects a
+      value for the first three, and child collections stay as the file has
+      them. A value the grid does not show, including an unknown key, is saved
+      unchanged.
+    - **Rows.** **Add record** adds a row with a new record id, and **Remove**
+      deletes the record from the draft. Clearing a cell removes its key from
+      the record's `values`. The grid never writes `null`.
+    - **Save.** A cell whose value would fail seeding, because it has the wrong
+      type, is out of bounds or is missing a required value, shows an error
+      and turns Save off, also when the value comes from the JSON view.
+    - **Fallback.** The entity is found by name among the folder's `entity`
+      resources, ignoring letter case. When it is not there, for example a
+      module entity or a typo, the seed uses the generic form and the JSON view.
   - **Text editor.** One table of keys with a column per locale, and a search
     box. Adding a key adds it to every locale's `text` resource.
   - **Endpoint `values`.** Rows of field and expression, as for process

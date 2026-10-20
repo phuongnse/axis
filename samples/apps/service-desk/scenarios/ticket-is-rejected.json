@@ -1,0 +1,50 @@
+{
+  "id": "da3fc3f1-bdda-4837-a33b-a71600e51df3",
+  "kind": "scenario",
+  "name": "TicketIsRejected",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["requester"],
+    "linh": ["service-desk-lead"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Ticket",
+      "as": "anna",
+      "save": "ticket",
+      "values": {
+        "title": "Laptop will not start",
+        "description": "It shows a black screen.",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "TicketHandling",
+      "record": "ticket",
+      "as": "anna"
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "triage",
+      "outcome": "reject",
+      "as": "linh"
+    },
+    {
+      "type": "expectRecord",
+      "record": "ticket",
+      "values": {
+        "status": "rejected"
+      }
+    },
+    {
+      "type": "expectInstance",
+      "process": "TicketHandling",
+      "record": "ticket",
+      "state": "completed"
+    }
+  ]
+}

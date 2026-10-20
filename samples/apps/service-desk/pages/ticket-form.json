@@ -1,0 +1,24 @@
+{
+  "id": "9ceb8608-5e41-426a-b475-c7697eb8dd73",
+  "kind": "page",
+  "name": "TicketForm",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "pages.ticketForm.title"
+  },
+  "widgets": [
+    {
+      "type": "form",
+      "entity": "Ticket",
+      "actions": [
+        {
+          "type": "startProcess",
+          "process": "TicketHandling",
+          "label": {
+            "textKey": "ticket.submit"
+          }
+        }
+      ]
+    }
+  ]
+}
