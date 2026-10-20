@@ -84,7 +84,8 @@
         "folders": { "type": "array", "items": { "type": "string" } },
         "authorRole": { "type": "string" },
         "publisherRole": { "type": "string" },
-        "persistence": { "$ref": "#/definitions/volume" }
+        "persistence": { "$ref": "#/definitions/volume" },
+        "tests": { "type": "boolean" }
       }
     },
     "forwardedHeaders": {
@@ -99,7 +100,8 @@
       "properties": {
         "platformConnection": { "$ref": "#/definitions/secretReference" },
         "platformSchemaConnection": { "$ref": "#/definitions/secretReference" },
-        "platformSecretKey": { "$ref": "#/definitions/secretReference" }
+        "platformSecretKey": { "$ref": "#/definitions/secretReference" },
+        "scenarioServerConnection": { "$ref": "#/definitions/secretReference" }
       },
       "additionalProperties": false
     }

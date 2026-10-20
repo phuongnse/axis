@@ -1,0 +1,24 @@
+# Optional: lets Studio run test scenarios. Add it to compose.yaml:
+#   docker compose -f compose.yaml -f compose.scenarios.yaml ...
+# or set COMPOSE_FILE=compose.yaml:compose.scenarios.yaml. See docs/reference/installation.md#on-premises.
+#
+# It does two things together, so one cannot be on without the other. It mounts the secret file
+# Scenarios__ServerConnectionString in the publisher only, and it sets Studio__Tests on both servers. That file holds the
+# connection string of a database role with CREATEDB that owns no database. This file holds no secret.
+# Without this file, no service gets the secret and Studio shows no test controls.
+services:
+  server:
+    environment:
+      Studio__Tests: "true"
+
+  server-2:
+    environment:
+      Studio__Tests: "true"
+
+  publisher:
+    secrets:
+      - Scenarios__ServerConnectionString
+
+secrets:
+  Scenarios__ServerConnectionString:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/Scenarios__ServerConnectionString

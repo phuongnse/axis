@@ -29,7 +29,7 @@ namespace Axis.Server.Studio;
 /// <c>tenant</c>, a snapshot and the scenario names, and answers as <c>publish</c> does. It does not check <c>Studio:Tests</c>.
 /// The manifest check (409) comes before the body. A body is optional. It must be <c>application/json</c> (415) and a JSON
 /// object with only <c>scenarios</c>, a list of strings (400). No body, no list and an empty list store no names, which
-/// means every scenario. No publisher runs a <c>test</c> yet, so it stays <c>queued</c>. The status route answers
+/// means every scenario. The publisher runs it. The status route answers
 /// <c>scenarios</c> for a <c>test</c>, an empty list until it ends, and null for every other kind.
 /// </summary>
 internal static class StudioPublishEndpoints

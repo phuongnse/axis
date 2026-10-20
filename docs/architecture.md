@@ -108,7 +108,7 @@ tests/
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
   keycloak/               the development Keycloak realm with the sample's users
-  postgres/               init-roles.sql, which creates the axis_schema and axis_runtime database roles, and the preview tenant's database and roles
+  postgres/               init-roles.sql, which creates the axis_schema, axis_runtime and axis_scenario database roles, and the preview tenant's database and roles
   packages/               the sample extension package payment-references and its unit tests
 deploy/
   compose/                production Compose example

@@ -50,8 +50,8 @@ The volume of /run/secrets. It projects the Kubernetes Secret keys of the named 
 dict of "root" and "entries", the list of entry names the host needs.
 */}}
 {{- define "axis.secretsVolume" -}}
-{{- $files := dict "platformConnection" "ConnectionStrings__Platform" "platformSchemaConnection" "ConnectionStrings__PlatformSchema" "platformSecretKey" "Platform__SecretKey" -}}
-{{- $descriptions := dict "platformConnection" "the Kubernetes Secret that holds the platform connection string" "platformSchemaConnection" "the Kubernetes Secret that holds the platform schema connection string" "platformSecretKey" "the Kubernetes Secret that holds the installation key" -}}
+{{- $files := dict "platformConnection" "ConnectionStrings__Platform" "platformSchemaConnection" "ConnectionStrings__PlatformSchema" "platformSecretKey" "Platform__SecretKey" "scenarioServerConnection" "Scenarios__ServerConnectionString" -}}
+{{- $descriptions := dict "platformConnection" "the Kubernetes Secret that holds the platform connection string" "platformSchemaConnection" "the Kubernetes Secret that holds the platform schema connection string" "platformSecretKey" "the Kubernetes Secret that holds the installation key" "scenarioServerConnection" "the Kubernetes Secret that holds the scenario connection string" -}}
 name: secrets
 projected:
   # Readable by the non-root user of the image.

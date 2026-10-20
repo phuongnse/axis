@@ -1005,7 +1005,7 @@ and a JSON view, and shows the diagnostics.
   on together with the publisher's `Scenarios:ServerConnectionString`, because
   the server cannot see the publisher's settings. It grants no right. A `test`
   request needs the author role only, and the publisher runs it, see
-  [test](authoring.md#test).
+  [test](authoring.md#test). The Development settings turn it on.
 - **Where Studio reads and writes.** Studio's edit routes read and write only
   `*.json` files inside the listed folders. A write takes an advisory lock in
   the platform database, over `ConnectionStrings:Platform`, keyed by the
