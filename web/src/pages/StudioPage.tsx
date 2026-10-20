@@ -275,6 +275,7 @@ function StudioWorkspace() {
                     key={`editor-${selected.id}`}
                     application={application!}
                     item={selected}
+                    resources={loaded.resources}
                     path={path}
                     onSaved={(diagnostics) => {
                       setFolder({ ...loaded, diagnostics })
