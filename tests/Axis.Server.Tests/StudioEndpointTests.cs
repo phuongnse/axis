@@ -122,6 +122,22 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Me_answers_studioTest_only_for_an_author_while_Studio_Tests_is_on()
+    {
+        foreach (var (user, tests, expected) in new[] { ("hoa", true, true), ("hoa", false, false), ("anna", true, false) })
+        {
+            await using var factory = CreateFactory(tests: tests);
+            using var client = factory.CreateClient().SignedInAs(user);
+
+            var response = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+            Assert.Equal(expected, body.RootElement.GetProperty("studioTest").GetBoolean());
+        }
+    }
+
+    [Fact]
     public async Task Author_reads_a_resource_by_id_in_either_letter_case()
     {
         await using var factory = CreateFactory();
@@ -1057,7 +1073,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             .Order(StringComparer.Ordinal)
             .ToList();
 
-    private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author", string? modulesPath = null) =>
+    private WebApplicationFactory<Program> CreateFactory(string? folder = null, string authorRole = "author", string? modulesPath = null, bool tests = false) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -1073,6 +1089,11 @@ public sealed class StudioEndpointTests : IAsyncLifetime
 
             builder.UseSetting("Studio:Folders:0", folder ?? Folder);
             builder.UseSetting("Studio:AuthorRole", authorRole);
+            if (tests)
+            {
+                builder.UseSetting("Studio:Tests", "true");
+            }
+
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
                 new TestIdentity("hoa", "Hoa Author", "author"),

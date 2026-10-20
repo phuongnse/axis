@@ -566,7 +566,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   It adds `studioPreviewHost`, the host of the tenant's served preview tenant. It
   is null for a user who may not use Studio and for a tenant without a preview
   tenant. See [D48](decisions.md#d48-preview-tenants--agreed).
-  It adds a boolean `studioTest` _(planned for M11)_, true when `studio` is true
+  It adds a boolean `studioTest`, true when `studio` is true
   and `Studio:Tests` is true. See
   [D55](decisions.md#d55-running-test-scenarios-from-studio--agreed).
   Without a session it is a `401`, as today. Record writes, process starts and the
