@@ -3090,7 +3090,7 @@ costs:
 
 M11 gives Studio typed editors for pages, process steps and connectors, and
 for the kinds that need JSON today. It also adds a read-only process graph. The
-seed grid is built. The rest is _(planned for M11)_. See the
+seed grid and the scenario editor are built. The rest is _(planned for M11)_. See the
 [Studio section](reference/frontend.md#studio) for the detail. The owner
 confirmed these points on issue #780 on 2026-10-20.
 

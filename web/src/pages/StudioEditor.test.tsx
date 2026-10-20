@@ -192,3 +192,56 @@ describe('StudioEditor for a seed', () => {
     await waitFor(() => expect(screen.queryByTestId('studio-seed-grid')).not.toBeInTheDocument())
   })
 })
+
+describe('StudioEditor for a scenario', () => {
+  const scenarioId = '6f0c1c3e-2a4b-4d7e-9c1f-5b8a7d6e4f21'
+  const scenarioItem: StudioResourceItem = {
+    id: scenarioId,
+    kind: 'scenario',
+    name: 'Approve',
+    file: 'scenarios/approve.json',
+    version: 'c1',
+    usedBy: 0,
+  }
+
+  it('shows the typed editor and saves an edited step as one operation', async () => {
+    const content = {
+      id: scenarioId,
+      kind: 'scenario',
+      name: 'Approve',
+      formatVersion: 1,
+      users: { author: [] },
+      steps: [{ type: 'advanceTime', by: 'PT1H' }],
+    }
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${folder}/resources/${scenarioId}` && init?.method === 'PATCH') {
+        return json({ version: 'c2', diagnostics: [] })
+      }
+      if (input === `${folder}/resources/${scenarioId}`) {
+        return json({ ...scenarioItem, content })
+      }
+      return new Response(null, { status: 404 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <StudioEditor
+          application="Shop"
+          item={scenarioItem}
+          resources={[scenarioItem]}
+          path={null}
+          onSaved={vi.fn()}
+          onDeleted={vi.fn()}
+        />
+      </TextProvider>,
+    )
+
+    expect(await screen.findByTestId('studio-scenario-step', {}, slow)).toBeInTheDocument()
+    await userEvent.type(screen.getByRole('textbox', { name: 'by' }), '0')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'PATCH')!
+    expect(JSON.parse(init!.body as string)).toEqual([{ op: 'replace', path: '/steps/0/by', value: 'PT1H0' }])
+  })
+})

@@ -15,6 +15,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
+import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
 
@@ -77,8 +78,9 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * form at the field that holds it and scrolls to that field once the resource has loaded. A path the form cannot
  * show opens the JSON view instead. A seed whose entity is a resource of the folder shows its records as a grid with
  * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
- * the entity is not in the folder, the seed uses the generic form. When the server does not answer, the draft stays, and the resource loads again
- * after the reconnect unless the draft has changes.
+ * the entity is not in the folder, the seed uses the generic form. A scenario shows a typed editor of its name, users,
+ * stubs and steps, and the JSON view edits the same draft. When the server does not answer, the draft stays, and the
+ * resource loads again after the reconnect unless the draft has changes.
  */
 export function StudioEditor({
   application,
@@ -353,6 +355,8 @@ export function StudioEditor({
                   <SchemaForm schema={seedSchema} value={draft} onChange={change} />
                   <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={update} />
                 </Flex>
+              ) : item.kind === 'scenario' ? (
+                <ScenarioEditor value={draft} onChange={update} />
               ) : schema ? (
                 <SchemaForm schema={schema} value={draft} onChange={change} />
               ) : (

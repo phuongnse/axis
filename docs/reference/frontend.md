@@ -1208,8 +1208,21 @@ reconnect message are built.
     name. No value of a binding is shown or stored. It also shows `timeout`,
     `idempotency`, and the operations as a list, each with its method, path,
     input and output fields, and `lookup`.
-  - **Scenario editor.** The users with their roles, then the steps as a list,
-    with a panel per step type.
+  - **Scenario editor** *(built)*. The Form tab shows the scenario's name and
+    `now`, then its users with their roles, its stubs, and its steps as a list
+    with a panel per step type. The JSON view stays as a second view of the
+    same draft.
+    - **Steps.** Each step has a type. Changing the type keeps the properties
+      the new type takes and drops the others. Keys the editor does not show
+      stay in the file. A step can be removed or moved up or down.
+    - **Pickers.** Entities, processes, roles and connectors are picked by
+      name. A `record` is picked from the aliases that earlier `createRecord`
+      steps save. A `step` and its `outcome` come from the processes that the
+      record started.
+    - **Values.** The fields of the step's entity show as typed cells. A value
+      the entity does not name stays as a text row. A step whose entity is not
+      in the folder edits its `values` as a JSON object, and the text is saved
+      only when it is one.
   - **Seed editor** *(built)*. The Form tab shows the seed's name, entity and
     `sync`, then its records as a grid, with a row per record and a column per
     field of the seed's `entity`. The JSON view stays as a second view of the
