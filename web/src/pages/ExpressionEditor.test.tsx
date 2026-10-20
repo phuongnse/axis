@@ -208,16 +208,18 @@ describe('ExpressionEditor completion', () => {
 
   it('opens with Ctrl+Space and inserts the picked option from the keyboard', async () => {
     const user = userEvent.setup()
+    // The list sorts by label, so 'amount' comes first and ArrowDown reaches 'length()'.
     renderEditor('', vi.fn(), null, false, [
-      { label: 'requester', type: 'field', cursorInside: false },
+      { label: 'amount', type: 'field', cursorInside: false },
       { label: 'length()', type: 'function', cursorInside: true },
     ])
 
     await user.click(screen.getByRole('textbox', { name: 'expression' }))
     await user.keyboard('{Control>}[Space]{/Control}')
-    await screen.findByRole('option', { name: /requester/ })
-    await user.keyboard('{ArrowDown}')
+    await screen.findByRole('option', { name: /amount/ })
     await act(() => new Promise((resolve) => setTimeout(resolve, 100)))
+    await user.keyboard('{ArrowDown}')
+    await waitFor(() => expect(screen.getByRole('option', { name: /length/ })).toHaveAttribute('aria-selected', 'true'))
     await user.keyboard('{Enter}')
 
     const view = viewOf()

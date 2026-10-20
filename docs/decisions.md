@@ -2892,8 +2892,8 @@ is that lower severities pass.
 
 Studio creates a new application, blank or from an installed application
 template, and starts a resource of every kind. D46 plans this for M11. The
-`Studio:ApplicationsPath` setting, `POST /api/studio/apps` and `studioCreate`
-are built. The rest is _(planned for M11)_. See the
+`Studio:ApplicationsPath` setting, `POST /api/studio/apps`, `studioCreate` and
+the Studio New application dialog are built. The rest is _(planned for M11)_. See the
 [authoring API](reference/authoring.md#creating-an-application), the
 [application templates](reference/configuration.md#application-templates) and
 the [Studio section of the frontend](reference/frontend.md#studio). The owner
@@ -3090,8 +3090,8 @@ costs:
 
 M11 gives Studio typed editors for pages, process steps and connectors, and
 for the kinds that need JSON today. It also adds a read-only process graph. The
-seed grid, the connector editor and the endpoint mapping rows are built. The
-rest is _(planned for M11)_. See the
+seed grid, the connector editor, the endpoint mapping rows and the text table
+are built. The rest is _(planned for M11)_. See the
 [Studio section](reference/frontend.md#studio) for the detail. The owner
 confirmed these points on issue #780 on 2026-10-20.
 
