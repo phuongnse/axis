@@ -120,7 +120,7 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
         });
 
     /// <summary>Signs anna in on the server and returns the value of the session cookie.</summary>
-    private static async Task<string> SignInAsync(WebApplicationFactory<Program> factory)
+    internal static async Task<string> SignInAsync(WebApplicationFactory<Program> factory)
     {
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
         var response = await client.GetAsync(new Uri("/test/session", UriKind.Relative), CancellationToken);
@@ -163,7 +163,7 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
     }
 
     /// <summary>Answers <c>GET /test/session</c> by signing anna in to the default tenant.</summary>
-    private sealed class SessionStartupFilter : IStartupFilter
+    internal sealed class SessionStartupFilter : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
