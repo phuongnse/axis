@@ -14,8 +14,8 @@ image:
 server:
   repository: axis-server
   # Replicas share the data protection key ring in the platform database, so
-  # sessions work on every replica. With Studio on, keep 1 until the Studio
-  # write lock is built, see docs/reference/installation.md.
+  # sessions work on every replica. With Studio on, they also share the
+  # studio.persistence volume, see docs/reference/installation.md.
   replicas: 1
   # A Kubernetes resources block: requests and limits.
   resources: {}
@@ -59,6 +59,30 @@ extensions:
 # Modules, mounted read-only at /modules. Same form as extensions.volume.
 modules:
   volume: {}
+
+# Studio, on the server only. Setting folders turns Studio on. Each folder is a
+# path relative to the Studio volume, which is mounted read-write at /studio on
+# every server replica, so "purchase-requests" becomes /studio/purchase-requests.
+# The roles are roles claim values. Without one, nobody may author or publish.
+# persistence is required when folders is set. It is any Kubernetes volume source,
+# and it needs a ReadWriteMany volume source when the server runs several
+# replicas. The chart creates no claim. For example:
+#   persistence:
+#     persistentVolumeClaim:
+#       claimName: axis-studio
+studio:
+  folders: []
+  authorRole: ""
+  publisherRole: ""
+  persistence: {}
+
+# Forwarded headers, on the server only. The server reads X-Forwarded-For,
+# X-Forwarded-Proto and X-Forwarded-Host only from these addresses. Use IP
+# addresses for knownProxies and CIDR ranges for knownNetworks. Empty trusts no
+# proxy.
+forwardedHeaders:
+  knownProxies: []
+  knownNetworks: []
 
 # References to existing Kubernetes Secrets. The chart creates no Secret and
 # never takes a secret value. Each reference holds the Secret's name and the

@@ -243,7 +243,9 @@ Job. It has no Ingress. The server and worker Deployments each have a startup,
 liveness and readiness probe, see
 [health checks](../architecture.md#health-checks). The chart sets
 `Health__Urls` to `http://0.0.0.0:5208` for the worker, so the kubelet can
-reach it. The pods run as a non-root user with a read-only root file system.
+reach it. The server alone mounts the Studio volume and gets the Studio and
+forwarded headers settings. The pods run as a non-root user with a read-only root
+file system.
 
 **Before the first install.** Create the database roles of
 [On premises](#on-premises). Then create the Kubernetes Secrets. The chart
@@ -288,9 +290,12 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `image.pullPolicy` | `IfNotPresent` | Pull policy. |
 | `image.pullSecrets` | none | Names of image pull Secrets. |
 | `server.repository`, `worker.repository`, `migrate.repository` | `axis-server`, `axis-worker`, `axis-admin` | Repository of each image. `migrate.repository` is also the publisher's image. |
-| `server.replicas` | 1 | Server replicas. The key ring is shared, so sessions work on every replica. With Studio on, keep 1 *(planned for M10)* until `studio.persistence` is built, see [several server replicas](#several-server-replicas). |
+| `server.replicas` | 1 | Server replicas. The key ring is shared, so sessions work on every replica. With Studio on, the replicas also share the `studio.persistence` volume, see [several server replicas](#several-server-replicas). |
 | `worker.replicas` | 1 | Worker replicas. |
-| `studio.persistence` | none | *(planned for M10)* A Kubernetes volume source for the Studio folders, mounted on every server replica at the same path. Use it when Studio is on. It needs a `ReadWriteMany` storage class. |
+| `studio.folders` | none | Server only. The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>`. Setting it turns Studio on. |
+| `studio.authorRole`, `studio.publisherRole` | empty | Server only. `Studio__AuthorRole` and `Studio__PublisherRole`. Rendered only when set. Without one, nobody may author or publish. |
+| `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica. It is required when `studio.folders` is set, and rendering fails with a message that names it when it is missing. On its own it does nothing. The chart creates no claim. With several replicas it needs a `ReadWriteMany` storage class. |
+| `forwardedHeaders.knownProxies`, `forwardedHeaders.knownNetworks` | none | Server only. IP addresses and CIDR ranges of your proxies, rendered as `ForwardedHeaders__KnownProxies__N` and `ForwardedHeaders__KnownNetworks__N`. Empty trusts no proxy. |
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 80 | The Service of the server. Put your own Ingress in front of it. |
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
@@ -319,7 +324,7 @@ The chart has no Job for them.
 **Checks.** `scripts/lint.sh` runs `helm lint --strict` and validates the
 rendered manifests against the Kubernetes schemas with kubeconform.
 `scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
-Job, the publisher Deployment and the secret references. `scripts/setup.sh` installs the pinned Helm,
+Job, the publisher Deployment, the secret references, the Studio volume and the forwarded headers. `scripts/setup.sh` installs the pinned Helm,
 kubeconform and Kubernetes schemas into `~/.cache/axis-tools`. Axis has no test
 against a live cluster.
 
@@ -328,8 +333,9 @@ against a live cluster.
 The server can run as several replicas behind a reverse proxy that ends TLS.
 See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 The shared key ring, the forwarded headers and the platform settings under both
-tenant sources and the Studio write lock are built. `studio.persistence`, the
-Compose example with two replicas and its smoke test are *(planned for M10)*.
+tenant sources, the Studio write lock and the Helm chart's `studio.persistence`
+are built. The Compose example with two replicas and its smoke test are
+*(planned for M10)*.
 
 - **A shared key ring.** The server keeps its data protection keys in the
   platform database, encrypted with `Platform:SecretKey`. See
@@ -359,7 +365,8 @@ Compose example with two replicas and its smoke test are *(planned for M10)*.
   every replica, because the write lock is keyed by the folder path. The lock
   is built. It lives in the platform database. In
   Kubernetes that needs a `ReadWriteMany` storage class, set with
-  `studio.persistence` *(planned for M10)*. See [Studio](configuration.md#studio).
+  `studio.persistence`. The volume must be writable by the non-root user of the
+  image, and the chart sets no `fsGroup`. See [Studio](configuration.md#studio).
 - **On premises.** *(planned for M10)* The Compose example runs two server replicas behind a TLS
   proxy.
 - **Platform settings under both tenant sources.** The server needs

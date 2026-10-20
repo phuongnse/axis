@@ -74,6 +74,7 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(publisher, /Probe:/)
     assert.doesNotMatch(publisher, /path: ConnectionStrings__Platform\n/)
     assert.doesNotMatch(publisher, /Admin__ConnectionString/)
+    assert.doesNotMatch(publisher, /\/studio|Studio__/)
     for (const service of documents(output).filter((d) => /^kind: Service$/m.test(d))) {
       assert.doesNotMatch(service, /component: publisher/)
     }
@@ -138,5 +139,59 @@ describe('the Axis Helm chart', () => {
     const server = find(renderOk(), 'Deployment', 'axis-server')
     assert.match(server, /mountPath: \/extensions\n\s+readOnly: true/)
     assert.match(server, /mountPath: \/modules\n\s+readOnly: true/)
+  })
+
+  test('several server replicas share one Studio volume', () => {
+    const output = renderOk()
+    const server = find(output, 'Deployment', 'axis-server')
+    assert.match(server, /replicas: 2\n/)
+    assert.match(server, /- name: studio\n\s+persistentVolumeClaim:\n\s+claimName: axis-studio\n/)
+    assert.match(server, /- name: studio\n\s+mountPath: \/studio\n(?!\s+readOnly)/)
+    assert.match(server, /- name: Studio__Folders__0\n\s+value: "\/studio\/purchase-requests"/)
+    assert.match(server, /- name: Studio__AuthorRole\n\s+value: "author"/)
+    assert.match(server, /- name: Studio__PublisherRole\n\s+value: "publisher"/)
+    for (const [kind, name] of [
+      ['Deployment', 'axis-worker'],
+      ['Deployment', 'axis-publisher'],
+      ['Job', 'axis-migrate'],
+    ]) {
+      const document = find(output, kind, name)
+      assert.doesNotMatch(document, /\/studio/)
+      assert.doesNotMatch(document, /Studio__/)
+    }
+  })
+
+  test('Studio folders without a volume fail and name studio.persistence', () => {
+    const result = render('--set', 'studio.persistence=null')
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /studio\.persistence/)
+  })
+
+  test('without Studio folders the server mounts no Studio volume', () => {
+    const output = renderOk(
+      '--set',
+      'studio.folders=null',
+      '--set',
+      'studio.persistence=null',
+      '--set',
+      'studio.authorRole=',
+      '--set',
+      'studio.publisherRole=',
+    )
+    assert.doesNotMatch(output, /\/studio|Studio__|- name: studio\n/)
+  })
+
+  test('forwarded headers render on the server only', () => {
+    const output = renderOk()
+    const server = find(output, 'Deployment', 'axis-server')
+    assert.match(server, /- name: ForwardedHeaders__KnownProxies__0\n\s+value: "10\.0\.0\.10"/)
+    assert.match(server, /- name: ForwardedHeaders__KnownNetworks__0\n\s+value: "10\.0\.0\.0\/8"/)
+    for (const [kind, name] of [
+      ['Deployment', 'axis-worker'],
+      ['Deployment', 'axis-publisher'],
+      ['Job', 'axis-migrate'],
+    ]) {
+      assert.doesNotMatch(find(output, kind, name), /ForwardedHeaders__/)
+    }
   })
 })

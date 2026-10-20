@@ -78,6 +78,22 @@
       "type": "object",
       "properties": { "volume": { "$ref": "#/definitions/volume" } }
     },
+    "studio": {
+      "type": "object",
+      "properties": {
+        "folders": { "type": "array", "items": { "type": "string" } },
+        "authorRole": { "type": "string" },
+        "publisherRole": { "type": "string" },
+        "persistence": { "$ref": "#/definitions/volume" }
+      }
+    },
+    "forwardedHeaders": {
+      "type": "object",
+      "properties": {
+        "knownProxies": { "type": "array", "items": { "type": "string" } },
+        "knownNetworks": { "type": "array", "items": { "type": "string" } }
+      }
+    },
     "secrets": {
       "type": "object",
       "properties": {
