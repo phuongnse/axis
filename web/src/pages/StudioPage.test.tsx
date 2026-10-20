@@ -219,6 +219,9 @@ function stubServer(
     if (input === `${folder}/names`) {
       return json(applicationNames)
     }
+    if (input === `${folder}/policy-matrix`) {
+      return json({ targets: [], roles: [] })
+    }
     if (input === `${folder}/expressions/check` && expressions.check) {
       checkCalls++
       return expressions.check(checkCalls)
@@ -512,6 +515,35 @@ describe('StudioPage', () => {
     expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests')
     expect(fetchMock).toHaveBeenCalledWith('/api/studio/apps/PurchaseRequests/resources', expect.anything())
+  })
+
+  it('switches between the resources and the policy matrix, kept in the address', async () => {
+    const fetchMock = stubServer()
+    renderPage()
+
+    expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalledWith(`${folder}/policy-matrix`, expect.anything())
+
+    await userEvent.click(screen.getByText('Policy matrix'))
+
+    expect(await screen.findByTestId('studio-matrix')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests&view=policies')
+    expect(fetchMock).toHaveBeenCalledWith(`${folder}/policy-matrix`, expect.anything())
+    expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
+    expect(screen.getByTestId('studio-diagnostics')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByText('Resources', { selector: '.ant-segmented-item-label' }))
+
+    expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)
+  })
+
+  it('reopens the policy matrix from the address', async () => {
+    const fetchMock = stubServer()
+    renderPage('/studio?app=PurchaseRequests&view=policies')
+
+    expect(await screen.findByTestId('studio-matrix')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith(`${folder}/policy-matrix`, expect.anything())
   })
 
   it('loads the names of the picked application', async () => {

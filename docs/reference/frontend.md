@@ -937,8 +937,8 @@ Run and the Test results list, and the reconnect message are built.
     a value it does not show, so unknown keys stay as they are. See
     **Editors by kind** below. The seed editor, the scenario editor, the
     connector editor, the page editor, the endpoint mapping rows, the text
-    editor and the process editor's step list, with its decision and end
-    panels, are built.
+    editor and the process editor's step list, with its decision, end and
+    task panels, are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1178,7 +1178,7 @@ Run and the Test results list, and the reconnect message are built.
     before a publish.
   - See [migrations](storage.md#migrations) and the
     [resource file shape](configuration.md#resource-file-shape).
-- **Policy matrix** *(planned for M11)*. One view per application shows who
+- **Policy matrix** *(read-only view built, editing planned for M11)*. One view per application shows who
   may do what.
   - Roles are the rows. The columns are the entities without child entities,
     the data sources, the processes and the endpoints.
@@ -1198,13 +1198,25 @@ Run and the Test results list, and the reconnect message are built.
     takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
     takes `invoke`. Filter and fields are only on entity grants.
   - A save writes one file, with the single-file routes.
-  - The view reads the [policy matrix route](authoring.md#policy-matrix). The
-    route is built, and the view is not.
+  - The view reads the [policy matrix route](authoring.md#policy-matrix).
+  - A Resources / Policy matrix switch sits under the application picker. The
+    matrix view is kept in the address as `&view=policies`, so a reload or a
+    shared link reopens it. The diagnostics panel shows in both views.
+  - The read-only view is built. A cell lists the role's combined actions, and
+    selecting it opens its grants under the table with each grant's policy,
+    actions, filter and fields. A shared grant is tagged Shared, and its Open
+    policy link opens that policy in the Resources view. A data source cell
+    that lacks the `read` of its root entity warns and names that entity. A
+    read-only row shows its reason.
+  - Editing a cell, creating `<Role>Access` and showing the filter in the
+    expression editor and the fields in the field picker are *(planned for
+    M11)*. The grant panel shows the filter as plain text and the fields as
+    tags until then.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
   the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the text
-  editor and the process editor's step list, with its decision and end panels, are built. The other typed
+  editor and the process editor's step list, with its decision, end and task panels, are built. The other typed
   editors and the entity designer are *(planned for M11)*, and until they are built those kinds use the generic
   form. The last
   column lists what still needs the JSON view, because the form cannot show it.
@@ -1216,7 +1228,7 @@ Run and the Test results list, and the reconnect message are built.
   | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives it a panel          |
   | `form`        | Generic form                          | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
-  | `process`     | Typed editor with the process graph   | The properties of `task` and `operation` steps other than their transitions, until their panels are built |
+  | `process`     | Typed editor with the process graph   | The properties of `operation` steps other than `next`, until its panel is built |
   | `rule`        | Generic form                          | Nothing                                                               |
   | `sequence`    | Generic form                          | Nothing                                                               |
   | `role`        | Generic form                          | Nothing                                                               |
@@ -1277,12 +1289,20 @@ Run and the Test results list, and the reconnect message are built.
       of the unsaved draft. A target that is not a step stays visible and is
       tagged unknown. Removing a step does not rewrite the transitions that
       name it, so the compiler reports them.
-    - **Task and operation panels** *(planned for M11)*. A panel per step type,
-      `operation` and `task`, shows that type's properties. `set`, `input`,
-      `output` and `fields` show as rows of target and expression. Until they
-      are built, a task or an operation card shows its transitions and says to
-      edit its other properties in the JSON view. A diagnostic path inside them
-      opens the JSON view.
+    - **Task panel** *(built)*. A task shows its label and its form as pickers
+      over the application's text keys and forms. The assignee has a User and
+      Role switch. User shows the expression editor and Role shows a role
+      picker. A switch removes the other key, so the step never holds both.
+      `dueIn` is a text box, and clearing it removes the key. The outcomes are
+      rows of name, label and target step, with add and remove. A key the
+      panel does not show stays as it is. A diagnostic path inside a task's
+      label, assignee, form, `dueIn` or outcomes opens the Form tab at that
+      field.
+    - **Operation panel** *(planned for M11)*. A panel for `operation` steps
+      shows that type's properties. `set`, `input`, `output` and `fields` show
+      as rows of target and expression. Until it is built, an operation card
+      shows its `next` and says to edit its other properties in the JSON view.
+      A diagnostic path inside them opens the JSON view.
   - **Connector editor** *(built)*. The Form tab shows the base URL binding,
     the auth type with its secret binding, `timeout`, `idempotency`, and the
     operations as a list. The JSON view stays as a second view of the same

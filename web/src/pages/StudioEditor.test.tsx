@@ -682,13 +682,13 @@ describe('StudioEditor for a process', () => {
   })
 
   it.each(['/steps/1/outcomes/0/label/textKey', '/steps/1/label/textKey'])(
-    'opens the JSON view for the path %s inside a task property the editor does not show',
+    'opens the form at the field for the path %s inside a task',
     async (path) => {
       stubResource(processItem, processContent)
       renderResource(processItem, undefined, vi.fn(), path)
 
       await screen.findByTestId('studio-step-1', {}, slow)
-      await waitFor(() => expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true'))
+      await waitFor(() => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'))
     },
   )
 

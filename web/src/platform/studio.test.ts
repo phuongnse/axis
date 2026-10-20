@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { assignLocation } from './navigation'
 import {
   checkStudioExpression,
+  fetchStudioPolicyMatrix,
   fetchStudioResource,
   filterResources,
   folderDiffers,
@@ -51,6 +52,26 @@ describe('fetchStudioResource', () => {
 function json(body: unknown) {
   return new Response(JSON.stringify(body), { status: 200 })
 }
+
+describe('fetchStudioPolicyMatrix', () => {
+  it('loads the matrix of the application', async () => {
+    const matrix = { targets: [], roles: [] }
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(matrix), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchStudioPolicyMatrix('Purchase Requests')).resolves.toEqual(matrix)
+    expect(fetchMock).toHaveBeenCalledWith('/api/studio/apps/Purchase%20Requests/policy-matrix', expect.anything())
+  })
+
+  it('throws on a failed answer', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 500 })),
+    )
+
+    await expect(fetchStudioPolicyMatrix('PurchaseRequests')).rejects.toThrow('failed with status 500')
+  })
+})
 
 describe('putStudioTexts', () => {
   it('puts every locale to the key route and answers the new versions and diagnostics', async () => {

@@ -331,6 +331,62 @@ export async function fetchStudioNames(application: string, signal?: AbortSignal
   return (await response.json()) as StudioNames
 }
 
+/** A column of the policy matrix: a root entity, data source, process or endpoint. */
+export interface StudioMatrixTarget {
+  kind: 'entity' | 'dataSource' | 'process' | 'endpoint'
+  id: string
+  name: string
+  module: string | null
+  actions: string[]
+  entity: string | null
+}
+
+/** One grant behind a matrix cell, as written in its policy. `fields` is null for every field. */
+export interface StudioMatrixGrant {
+  policyId: string
+  policy: string
+  index: number
+  actions: string[]
+  filter: string | null
+  fields: string[] | null
+  shared: boolean
+}
+
+/** What one role may do on one target. `missingEntityRead` names the root entity a data source `read` lacks. */
+export interface StudioMatrixCell {
+  kind: string
+  target: string
+  actions: string[]
+  missingEntityRead: string | null
+  grants: StudioMatrixGrant[]
+}
+
+/** A row of the policy matrix. `cells[i]` belongs to `targets[i]`. */
+export interface StudioMatrixRole {
+  id: string
+  name: string
+  accessPolicy: { name: string; id: string | null }
+  editable: boolean
+  readOnlyReason: string | null
+  cells: StudioMatrixCell[]
+}
+
+/** What each role may do on each root entity, data source, process and endpoint. */
+export interface StudioPolicyMatrix {
+  targets: StudioMatrixTarget[]
+  roles: StudioMatrixRole[]
+}
+
+/** Loads the policy matrix of an application's folder. A 401 starts sign-in and throws, as any other failure does. */
+export async function fetchStudioPolicyMatrix(application: string, signal?: AbortSignal): Promise<StudioPolicyMatrix> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/policy-matrix`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioPolicyMatrix
+}
+
 /** Loads one resource with its content. A 401 starts sign-in and throws, as any other failure does. */
 export async function fetchStudioResource(
   application: string,
