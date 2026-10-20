@@ -69,6 +69,31 @@ test('an author sees an expression error as they type, and its type once fixed, 
   expect(await readFile(file, 'utf8')).toBe(before)
 })
 
+
+test('an author completes the names of a policy filter without saving', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const policy = items.find((item) => item.file === 'policies/employee-access.json')!
+  const file = path.join(studioFolder, 'policies/employee-access.json')
+  const before = await readFile(file, 'utf8')
+
+  await page.goto(`/studio?app=PurchaseRequests&resource=${policy.id}`)
+  const field = page.getByTestId('studio-field-/grants/0/filter')
+  await expect(field.getByTestId('studio-expression-type')).toContainText('boolean')
+  const editor = field.getByRole('textbox')
+  await editor.click()
+  await editor.press('ControlOrMeta+A')
+  await editor.pressSequentially('req')
+  await expect(page.getByRole('option', { name: 'requester' })).toBeVisible()
+
+  await editor.press('ControlOrMeta+A')
+  await editor.pressSequentially('cur')
+  await expect(page.getByRole('option', { name: 'currentUser()' })).toBeVisible()
+
+  expect(await readFile(file, 'utf8')).toBe(before)
+})
+
 test('an author follows a Used by entry from a department to the entity that uses it', async ({ page }) => {
   await useSession(page, 'hoa')
   const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')

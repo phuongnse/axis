@@ -64,6 +64,7 @@ function renderEditor() {
         application="Shop"
         item={resources[0]}
         resources={resources}
+        names={null}
         path={null}
         onSaved={vi.fn()}
         onDeleted={vi.fn()}

@@ -1093,9 +1093,21 @@ reconnect message are built.
     answer is shown. It underlines the range from `start` to `end`, shows the
     error code and message under the editor, and shows the result `type` when
     there is no error.
-  - *(Planned for M11.)* **Completion.** Completion offers the fields of the
-    entity that the resource names, the parameters of the data source in a
-    filter, the rules and the functions.
+  - **Completion.** Typing a word, or Ctrl+Space, opens a list of the names in
+    scope. The arrow keys and Enter pick an option. The names come from the
+    [names route](authoring.md#names), loaded with the application and again
+    after a save, a delete and a reconnect.
+    - The fields of the entity at the place: the entity being edited, a policy
+      grant's `entity`, or a data source's or process's `entity`.
+    - A data source filter offers its parameters, and a rule offers its own.
+    - The application's rules, with module rules as `<module>:<name>`, and the
+      functions and aggregates of the [expression language](expressions.md#functions).
+    - `currentUser()` only in a policy grant's filter. Other expressions, such
+      as triggers, migrations and endpoints, offer the rules and the functions only.
+    - A function or rule inserts with its brackets and puts the cursor inside
+      them. `now()` and `currentUser()` put the cursor after them.
+    - When the names do not load, the list offers the functions only. Typing and
+      Save keep working.
   - The check uses the saved resource, so a draft path that is not saved yet may
     have no answer. When there is no answer, or the check answers `400` or
     `401`, the last result stays on screen. A `401` does not start sign-in, so

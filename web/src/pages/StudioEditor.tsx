@@ -8,6 +8,7 @@ import {
   patchStudioResource,
   ServerUnreachableError,
   type StudioDiagnostic,
+  type StudioNames,
   type StudioResource,
   type StudioResourceItem,
 } from '../platform/studio'
@@ -89,6 +90,7 @@ export function StudioEditor({
   application,
   item,
   resources,
+  names,
   path,
   onSaved,
   onDeleted,
@@ -96,6 +98,7 @@ export function StudioEditor({
   application: string
   item: StudioResourceItem
   resources: StudioResourceItem[]
+  names: StudioNames | null
   path: string | null
   onSaved: (diagnostics: StudioDiagnostic[]) => void
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
@@ -189,7 +192,10 @@ export function StudioEditor({
   }, [application, entityId, generation, lost])
 
   const seedFields = entityId !== undefined && seedEntity?.id === entityId ? seedEntity.fields : null
-  const checkContext = useMemo(() => ({ application, resourceId: item.id }), [application, item.id])
+  const checkContext = useMemo(
+    () => ({ application, resourceId: item.id, kind: item.kind, draft, names }),
+    [application, item.id, item.kind, draft, names],
+  )
   // The form is final once the seed's entity has loaded, so a path into a record finds its cell.
   const formReady = entityId === undefined || seedEntity?.id === entityId
   const problems = useMemo(

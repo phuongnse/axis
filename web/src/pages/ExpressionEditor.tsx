@@ -1,3 +1,9 @@
+import {
+  autocompletion,
+  type Completion,
+  type CompletionContext,
+  type CompletionResult,
+} from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
@@ -9,6 +15,7 @@ import { checkStudioExpression, type ExpressionCheck } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useThemeMode } from '../platform/themeMode'
 import { expressionLanguage } from './expressionLanguage'
+import type { ScopeOption } from './expressionScope'
 
 /** How long the author must stop typing before the expression is checked. */
 const checkDelay = 300
@@ -24,6 +31,8 @@ export interface ExpressionEditorProps {
   name: string
   value: string
   required: boolean
+  /** The names an author can complete at this place. */
+  options: ScopeOption[]
   onChange: (path: string, next: string | undefined) => void
 }
 
@@ -40,6 +49,7 @@ export default function ExpressionEditor({
   name,
   value,
   required,
+  options,
   onChange,
 }: ExpressionEditorProps) {
   const t = useText()
@@ -49,10 +59,10 @@ export default function ExpressionEditor({
   const viewRef = useRef<EditorView | null>(null)
   const [themeCompartment] = useState(() => new Compartment())
   const [result, setResult] = useState<Result>({ type: null, error: null })
-  const latest = useRef({ onChange, required, value, theme: editorTheme(token, mode), themeCompartment })
+  const latest = useRef({ onChange, required, options, value, theme: editorTheme(token, mode), themeCompartment })
 
   useEffect(() => {
-    latest.current = { onChange, required, value, theme: editorTheme(token, mode), themeCompartment }
+    latest.current = { onChange, required, options, value, theme: editorTheme(token, mode), themeCompartment }
   })
 
   useEffect(() => {
@@ -78,6 +88,7 @@ export default function ExpressionEditor({
     }
 
     const initial = latest.current
+    const complete = (context: CompletionContext) => completeAt(context, latest.current.options)
     const view = new EditorView({
       parent: hostRef.current!,
       state: EditorState.create({
@@ -87,6 +98,7 @@ export default function ExpressionEditor({
           syntaxHighlighting(defaultHighlightStyle),
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
+          autocompletion({ override: [complete] }),
           initial.themeCompartment.of(initial.theme),
           EditorView.contentAttributes.of({ 'aria-label': name }),
           EditorView.updateListener.of((update) => {
@@ -170,6 +182,26 @@ export default function ExpressionEditor({
     })
     view.dispatch(setDiagnostics(view.state, diagnostics))
     setResult({ type: null, error: diagnostics[0].message })
+  }
+}
+
+/** Completes the word before the cursor, or opens the list at the cursor when Ctrl+Space asks for it. */
+function completeAt(context: CompletionContext, options: ScopeOption[]): CompletionResult | null {
+  const word = context.matchBefore(/[A-Za-z][A-Za-z0-9-]*(:[A-Za-z0-9]*)?/)
+  if (!word && !context.explicit) {
+    return null
+  }
+  return { from: word?.from ?? context.pos, options: options.map(toCompletion) }
+}
+
+function toCompletion(option: ScopeOption): Completion {
+  return {
+    label: option.label,
+    type: option.type === 'field' || option.type === 'parameter' ? 'variable' : 'function',
+    apply: (view, completion, from, to) => {
+      const cursor = from + completion.label.length - (option.cursorInside ? 1 : 0)
+      view.dispatch({ changes: { from, to, insert: completion.label }, selection: { anchor: cursor } })
+    },
   }
 }
 
