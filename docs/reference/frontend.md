@@ -1071,14 +1071,76 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   - The check uses the saved resource, so a draft path that is not saved yet may
     have no answer. When there is no answer, the last result stays on screen.
     The editor never blocks Save.
+- **Entity designer** *(planned for M11)*. An `entity` resource opens in a
+  designer in place of the generic form. The JSON view stays. See
+  [D54](../decisions.md#d54-the-entity-designer-and-the-policy-matrix--agreed).
+  - The fields are a table. Its columns are name, label, type, required,
+    unique and the type's own settings: `maxLength`, `precision` and `scale`,
+    `values`, `target` and the child entity of a `child-collection`. The
+    settings follow the
+    [field types](configuration.md#entity-field-types-and-constraints), so a
+    setting a type does not take cannot be edited.
+  - A computed field's `expression` and each validation use the
+    [expression editor](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed).
+  - Fields can be added, removed and reordered. A display field picker lists
+    the entity's fields.
+  - A module entity is read-only, as it is in the generic form.
+- **Migrations from the designer** *(planned for M11)*. The designer compares
+  with the entity as Studio loaded it. "Loaded" means as Studio read the
+  entity, not the active release. It asks a question for a change to a loaded
+  field and adds the migration change that goes with the answer:
+
+  | Change to a loaded field | Question | Migration added |
+  | --- | --- | --- |
+  | Rename | Keep its data? | `renameField` with `from` and `to`. |
+  | Remove | Drop its data? | `dropField`. Answering No keeps the field. |
+  | Type change | A `convert` expression | `convert` with the author's expression. |
+  | Narrower `maxLength` | A `convert` expression | `convert`. |
+  | Removed enum values | A `convert` expression that maps them to kept values | `convert`. |
+  | Now required, or a new required field | Fill the nulls? A `fill` expression | `fill`. |
+  | To or from `enum`, or `unique` added | None | None. The designer warns, and Validate reports `AXC0016`. |
+  | Rename or remove of a `child-collection` field | None | None, because it has no column. |
+
+  - The migration resource is named `<Entity>Change<UTC yyyyMMddHHmmss>`, for
+    example `PurchaseRequestChange20261020093000` in
+    `migrations/purchase-request-change20261020093000.json`. It holds the
+    changes of one save in edit order. It never edits an existing migration.
+  - The save sends the entity patch and the migration create in one
+    [`changes` call](authoring.md#changes). A `409` keeps the draft, as for a
+    single save.
+  - Validate still runs every activation check, so a missing migration shows
+    before a publish.
+  - See [migrations](storage.md#migrations) and the
+    [resource file shape](configuration.md#resource-file-shape).
+- **Policy matrix** *(planned for M11)*. One view per application shows who
+  may do what.
+  - Roles are the rows. The columns are the entities without child entities,
+    the data sources, the processes and the endpoints.
+  - A cell shows the OR of the role's actions from all its policies, as in
+    [combining grants](../architecture.md#combining-grants).
+  - A cell opens its grants. Each shows its actions, its filter in the
+    expression editor and its fields in the field picker.
+  - An edit writes to `<Role>Access`, the PascalCase role name plus
+    `Access`. So `department-manager` writes `DepartmentManagerAccess`. The
+    policy is created when it is missing, with `roles` set to that role only.
+  - A grant from a policy that names several roles shows as shared and opens
+    that policy. So does a grant from another policy of this role. A
+    `<Role>Access` that names other roles counts as shared too. Its row is
+    read-only, with a message.
+  - Only the actions a target takes can be chosen. An entity takes `read`,
+    `create`, `update` and `delete`. A data source takes `read`. A process
+    takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
+    takes `invoke`. Filter and fields are only on entity grants.
+  - A save writes one file, with the single-file routes.
+  - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind** *(planned for M11)*. Studio uses a typed editor for six
-  kinds, and the generic form for the rest. The last column lists what still
+  kinds, the entity designer for `entity`, and the generic form for the rest. The last column lists what still
   needs the JSON view, because the form cannot show it.
 
   | Kind          | Editor                                | Still needs the JSON view                                             |
   | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
   | `application` | Generic form                          | Nothing                                                               |
-  | `entity`      | Generic form                          | Nothing                                                               |
+  | `entity`      | Entity designer                       | Nothing                                                               |
   | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives it a panel          |
   | `form`        | Generic form                          | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
