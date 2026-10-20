@@ -2,11 +2,13 @@
 // production images exactly as docs/reference/installation.md says. It runs against a test PostgreSQL
 // and Keycloak, creates two tenants, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
-// publisher runs in each tenant. Requires Docker and openssl, and the
+// publisher runs in each tenant. It then starts a second server replica and a TLS proxy, signs anna in
+// through the proxy, and restarts the first replica. Requires Docker and openssl, and the
 // sample modules in artifacts/modules (scripts/build.sh). Run from scripts/e2e.sh.
 //
 // Everything the test adds lives in an override file in a temporary folder: PostgreSQL, Keycloak over
 // HTTPS with a certificate authority made for the run, the modules folder and a short refresh interval.
+// Keycloak imports a copy of the development realm that adds the https redirect addresses of the tenants.
 // The production server refuses an identity provider over plain http, so Keycloak serves https and only
 // the server in this test trusts the certificate authority, through SSL_CERT_FILE.
 import assert from 'node:assert/strict'
@@ -31,6 +33,8 @@ const hosts = { one: 'one.axis.test', two: 'two.axis.test' }
 
 const secretFiles = {
   server: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
+  'server-2': ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
+  proxy: [],
   worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
   admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
   publisher: ['ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
@@ -55,6 +59,19 @@ const files = (dir) =>
     entry.isDirectory() ? files(join(dir, entry.name)) : [join(dir, entry.name)],
   )
 
+// render: the config of the example with every profile on and no variable set but the version.
+const render = () => {
+  const env = { ...process.env, AXIS_VERSION: 'x', AXIS_OIDC_CLIENT_SECRET: '' }
+  for (const name of Object.keys(env)) if (name.startsWith('AXIS_') && !['AXIS_VERSION', 'AXIS_OIDC_CLIENT_SECRET'].includes(name)) delete env[name]
+  const rendered = spawnSync(
+    'docker',
+    ['compose', '-f', composeFile, '--profile', 'admin', '--profile', 'proxy', '--profile', 'replicas', 'config', '--format', 'json'],
+    { cwd: root, encoding: 'utf8', env },
+  )
+  assert.equal(rendered.status, 0, rendered.stderr)
+  return JSON.parse(rendered.stdout)
+}
+
 describe('the example holds no secret', () => {
   test('no file under deploy/compose holds a password, a client secret or a key', () => {
     const found = files(join(root, 'deploy/compose'))
@@ -68,14 +85,8 @@ describe('the example holds no secret', () => {
   })
 
   test('the rendered config takes every connection string and the installation key only from secrets files', () => {
-    const rendered = spawnSync('docker', ['compose', '-f', composeFile, '--profile', 'admin', 'config', '--format', 'json'], {
-      cwd: root,
-      encoding: 'utf8',
-      env: { ...process.env, AXIS_VERSION: 'x', AXIS_OIDC_CLIENT_SECRET: '' },
-    })
-    assert.equal(rendered.status, 0, rendered.stderr)
-    const config = JSON.parse(rendered.stdout)
-    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'publisher', 'server', 'worker'])
+    const config = render()
+    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
 
     for (const [name, service] of Object.entries(config.services)) {
       for (const [key, value] of Object.entries(service.environment ?? {})) {
@@ -96,6 +107,8 @@ describe('the example holds no secret', () => {
     )
     assert.deepEqual(config.services.admin.profiles, ['admin'])
     assert.equal(config.services.server.profiles, undefined)
+    assert.deepEqual(config.services.proxy.profiles, ['proxy'])
+    assert.deepEqual(config.services['server-2'].profiles, ['replicas'])
     assert.equal(config.services.worker.profiles, undefined)
     const publisher = config.services.publisher
     assert.equal(publisher.profiles, undefined)
@@ -103,6 +116,30 @@ describe('the example holds no secret', () => {
     assert.deepEqual(publisher.command, ['publisher'])
     assert.match(publisher.image, /axis-admin:/)
     for (const secret of Object.values(config.secrets)) assert.ok(secret.file, 'a secret has no file')
+  })
+
+  test('the servers publish only on 127.0.0.1, and the proxy takes its certificate from a mounted folder', () => {
+    const { server, 'server-2': second, proxy } = render().services
+    for (const [name, service] of Object.entries({ server, 'server-2': second })) {
+      assert.ok(service.ports.length > 0, `${name} publishes no port`)
+      for (const port of service.ports) assert.equal(port.host_ip, '127.0.0.1', `${name} publishes ${port.published} beyond 127.0.0.1`)
+    }
+
+    const certs = proxy.volumes.filter((volume) => volume.target === '/certs')
+    assert.equal(certs.length, 1)
+    assert.equal(certs[0].type, 'bind')
+    assert.equal(certs[0].read_only, true)
+    assert.equal(certs[0].source, join(root, 'deploy/compose/tls'))
+    assert.deepEqual(proxy.secrets ?? [], [])
+
+    // Both servers trust the forwarded headers of the proxy's fixed address and of no other.
+    const address = proxy.networks.default.ipv4_address
+    assert.match(address, /^\d+\.\d+\.\d+\.\d+$/)
+    for (const [name, service] of Object.entries({ server, 'server-2': second })) {
+      assert.equal(service.environment.ForwardedHeaders__KnownProxies__0, address, `${name} proxy address`)
+      assert.equal(service.environment.ForwardedHeaders__KnownProxies__1, undefined)
+      assert.equal(service.environment.ForwardedHeaders__KnownNetworks__0, undefined)
+    }
   })
 })
 
@@ -114,7 +151,10 @@ describe('the on-premises installation', () => {
   let serverPort
   let workerPort
   let keycloakPort
+  let httpsPort
+  let server2Port
   let overrideFile
+  let caCertificate
 
   const docker = (args, options = {}) => spawnSync('docker', args, { cwd: root, encoding: 'utf8', ...options })
 
@@ -133,7 +173,7 @@ describe('the on-premises installation', () => {
   }
 
   const dumpLogs = () => {
-    for (const service of ['server', 'worker', 'publisher']) {
+    for (const service of ['server', 'server-2', 'proxy', 'worker', 'publisher']) {
       console.log(`--- docker compose logs ${service}`)
       console.log(compose(['logs', '--no-color', service]).stdout)
     }
@@ -151,9 +191,9 @@ describe('the on-premises installation', () => {
   }
 
   // request: sends a request to the server or the worker with a Host header, which fetch cannot set.
-  const request = (port, host, path) =>
+  const request = (port, host, path, headers = {}) =>
     new Promise((resolve) => {
-      const req = http.request({ host: '127.0.0.1', port, path, method: 'GET', headers: { host } }, (response) => {
+      const req = http.request({ host: '127.0.0.1', port, path, method: 'GET', headers: { host, ...headers } }, (response) => {
         const chunks = []
         response.on('data', (chunk) => chunks.push(chunk))
         response.on('end', () =>
@@ -166,6 +206,60 @@ describe('the on-premises installation', () => {
     })
 
   const server = (host, path) => request(serverPort, host, path)
+
+  // tlsRequest: sends a request over HTTPS to a port on this machine. It sets the Host header and the name
+  // the certificate is checked against, and trusts only the test certificate authority.
+  const tlsRequest = (port, host, path, { method = 'GET', headers = {}, body } = {}) =>
+    new Promise((resolve) => {
+      const req = https.request(
+        { host: '127.0.0.1', port, path, method, servername: host.split(':')[0], ca: caCertificate, headers: { host, ...headers } },
+        (response) => {
+          const chunks = []
+          response.on('data', (chunk) => chunks.push(chunk))
+          response.on('end', () =>
+            resolve({
+              status: response.statusCode,
+              headers: response.headers,
+              setCookie: response.headers['set-cookie'] ?? [],
+              body: Buffer.concat(chunks).toString(),
+            }),
+          )
+        },
+      )
+      req.setTimeout(10000, () => req.destroy())
+      req.on('error', () => resolve({ status: 0, headers: {}, setCookie: [], body: '' }))
+      req.end(body)
+    })
+
+  // A cookie jar is a map from a cookie's name to its value.
+  const remember = (jar, response) => {
+    for (const line of response.setCookie) {
+      const [pair] = line.split(';')
+      const at = pair.indexOf('=')
+      const name = pair.slice(0, at).trim()
+      const value = pair.slice(at + 1).trim()
+      if (value === '') jar.delete(name)
+      else jar.set(name, value)
+    }
+  }
+
+  const cookieHeader = (jar) => ({ cookie: [...jar].map(([name, value]) => `${name}=${value}`).join('; ') })
+
+  const viaProxy = (path, jar, headers = {}) =>
+    tlsRequest(httpsPort, hosts.one, path, { headers: { ...cookieHeader(jar), ...headers } })
+
+  // keycloak: sends a request to Keycloak for a URL on its own origin, which only the containers can resolve.
+  const keycloak = (url, jar, { method = 'GET', form } = {}) => {
+    const target = new URL(url)
+    assert.equal(target.origin, 'https://keycloak:8443', `unexpected Keycloak address ${url}`)
+    const body = form ? new URLSearchParams(form).toString() : undefined
+    const headers = { ...cookieHeader(jar) }
+    if (body !== undefined) {
+      headers['content-type'] = 'application/x-www-form-urlencoded'
+      headers['content-length'] = String(Buffer.byteLength(body))
+    }
+    return tlsRequest(keycloakPort, target.host, `${target.pathname}${target.search}`, { method, headers, body })
+  }
 
   // waitFor: polls until the status is the expected one and returns the last response.
   const waitFor = async (get, status, seconds) => {
@@ -222,7 +316,8 @@ describe('the on-premises installation', () => {
         ].join('\n'),
       )
 
-      // Step 4, the certificates: a certificate authority and a certificate of Keycloak for the name keycloak.
+      // Step 4, the certificates: a certificate authority, a certificate of Keycloak for the name keycloak,
+      // and a certificate of the proxy for the two tenant hosts.
       const certs = join(folder, 'certs')
       mkdirSync(certs)
       chmodSync(certs, 0o755)
@@ -232,12 +327,40 @@ describe('the on-premises installation', () => {
       openssl('req', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=keycloak', '-keyout', at('tls.key'), '-out', at('tls.csr'))
       openssl('x509', '-req', '-in', at('tls.csr'), '-CA', at('ca.crt'), '-CAkey', at('ca.key'), '-CAcreateserial', '-days', '2', '-extfile', 'leaf.ext', '-out', at('tls.crt'))
       for (const name of readdirSync(certs)) chmodSync(join(certs, name), 0o644)
+      caCertificate = readFileSync(join(certs, 'ca.crt'))
+
+      // The proxy's folder holds tls.crt and tls.key, which is what AXIS_TLS_DIR names.
+      const tls = join(folder, 'tls')
+      mkdirSync(tls)
+      chmodSync(tls, 0o755)
+      writeFile(join(folder, 'proxy.ext'), `subjectAltName=DNS:${hosts.one},DNS:${hosts.two}\nbasicConstraints=CA:FALSE\n`)
+      openssl('req', '-newkey', 'rsa:2048', '-nodes', '-subj', `/CN=${hosts.one}`, '-keyout', join('tls', 'tls.key'), '-out', join('certs', 'proxy.csr'))
+      openssl('x509', '-req', '-in', join('certs', 'proxy.csr'), '-CA', at('ca.crt'), '-CAkey', at('ca.key'), '-CAcreateserial', '-days', '2', '-extfile', 'proxy.ext', '-out', join('tls', 'tls.crt'))
+      for (const name of readdirSync(tls)) chmodSync(join(tls, name), 0o644)
+
+      // A copy of the development realm that also accepts the https addresses of the two tenants.
+      const realm = join(folder, 'realm')
+      mkdirSync(realm)
+      chmodSync(realm, 0o755)
+      const realmJson = JSON.parse(readFileSync(join(root, 'samples/keycloak/axis-realm.json'), 'utf8'))
+      const client = realmJson.clients.find((candidate) => candidate.clientId === 'axis')
+      assert.ok(client, 'the development realm has no axis client')
+      const origins = Object.values(hosts).map((host) => `https://${host}/*`)
+      client.redirectUris.push(...origins)
+      client.attributes['post.logout.redirect.uris'] += `##${origins.join('##')}`
+      writeFile(join(realm, 'axis-realm.json'), JSON.stringify(realmJson))
 
       serverPort = await freePort()
       workerPort = await freePort()
+      httpsPort = await freePort()
+      server2Port = await freePort()
 
       // The override file. JSON is valid YAML, so the test writes it as JSON.
       const refresh = { Tenancy__RefreshInterval: '00:00:02' }
+      const serverOverride = {
+        environment: { ...refresh, SSL_CERT_FILE: '/run/test-ca/ca.crt' },
+        volumes: [`${certs}:/run/test-ca:ro`],
+      }
       overrideFile = join(folder, 'override.json')
       writeFile(
         overrideFile,
@@ -257,13 +380,11 @@ describe('the on-premises installation', () => {
                 '--https-certificate-file=/certs/tls.crt',
                 '--https-certificate-key-file=/certs/tls.key',
               ],
-              volumes: [`${join(root, 'samples/keycloak')}:/opt/keycloak/data/import:ro`, `${certs}:/certs:ro`],
+              volumes: [`${realm}:/opt/keycloak/data/import:ro`, `${certs}:/certs:ro`],
               ports: ['127.0.0.1::8443'],
             },
-            server: {
-              environment: { ...refresh, SSL_CERT_FILE: '/run/test-ca/ca.crt' },
-              volumes: [`${certs}:/run/test-ca:ro`],
-            },
+            server: serverOverride,
+            'server-2': serverOverride,
             worker: { environment: refresh },
             publisher: { environment: refresh },
           },
@@ -277,6 +398,9 @@ describe('the on-premises installation', () => {
         AXIS_MODULES_DIR: join(root, 'artifacts/modules'),
         AXIS_APPS_DIR: join(root, 'samples/apps'),
         AXIS_SERVER_PORT: String(serverPort),
+        AXIS_SERVER_2_PORT: String(server2Port),
+        AXIS_HTTPS_PORT: String(httpsPort),
+        AXIS_TLS_DIR: tls,
         AXIS_WORKER_HEALTH_PORT: String(workerPort),
       }
       delete env.AXIS_OIDC_CLIENT_SECRET
@@ -286,7 +410,7 @@ describe('the on-premises installation', () => {
   )
 
   after(() => {
-    compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore' })
+    compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore', env: { ...env, COMPOSE_PROFILES: 'admin,proxy,replicas' } })
     if (folder) rmSync(folder, { recursive: true, force: true })
     for (const target of targets) docker(['rmi', '-f', `${target}:${version}`], { stdio: 'ignore' })
   })
@@ -448,6 +572,71 @@ RETURNING id;`,
       const publisherLog = compose(['logs', '--no-color', '--no-log-prefix', 'publisher']).stdout
       for (const id of Object.keys(hosts)) assert.match(publisherLog, new RegExp(`^${id} claim ok$`, 'm'))
       assert.match(run(['ps', '--status', 'running', '--services']), /^publisher$/m)
+
+      // Step 8, a second replica and the TLS proxy. The second replica starts once the first is ready.
+      run(['up', '-d', 'server-2'])
+      const ready2 = await waitFor(() => request(server2Port, 'localhost', '/health/ready'), 200, 120)
+      assert.equal(ready2.status, 200, 'the second server never answered /health/ready with 200')
+      const site2 = await waitFor(() => request(server2Port, hosts.one, '/leave'), 200, 60)
+      assert.equal(site2.status, 200, 'the second server did not serve /leave')
+
+      run(['up', '-d', 'proxy'])
+      const proxied = await waitFor(() => viaProxy('/leave', new Map()), 200, 60)
+      assert.equal(proxied.status, 200, 'the proxy did not serve /leave')
+
+      // The sign-in redirect names the tenant host over https, even when the client sends its own
+      // forwarded headers, which the proxy replaces.
+      const proxyJar = new Map()
+      let signIn
+      for (let i = 0; i < 15; i++) {
+        if (i > 0) await sleep(1000)
+        signIn = await viaProxy('/api/auth/sign-in?returnUrl=%2Fleave', proxyJar, {
+          'x-forwarded-proto': 'http',
+          'x-forwarded-host': hosts.two,
+          'x-forwarded-for': '203.0.113.9',
+        })
+        if (signIn.status === 302) break
+      }
+      assert.equal(signIn.status, 302, `sign-in through the proxy: ${signIn.body}`)
+      remember(proxyJar, signIn)
+      const authorize = new URL(signIn.headers.location)
+      assert.equal(authorize.searchParams.get('redirect_uri'), `https://${hosts.one}/api/auth/callback`)
+
+      // Sign anna in at Keycloak: the login page, then its form.
+      const keycloakJar = new Map()
+      const loginPage = await keycloak(authorize.href, keycloakJar)
+      assert.equal(loginPage.status, 200, `the Keycloak login page: ${loginPage.body}`)
+      remember(keycloakJar, loginPage)
+      const form = loginPage.body.match(/<form[^>]*id="kc-form-login"[^>]*>/)
+      assert.ok(form, 'the Keycloak login page has no kc-form-login form')
+      const action = form[0].match(/action="([^"]+)"/)[1].replaceAll('&amp;', '&')
+      const login = await keycloak(action, keycloakJar, { method: 'POST', form: { username: 'anna', password: 'axis' } })
+      assert.equal(login.status, 302, `the Keycloak login: ${login.body}`)
+      const callback = new URL(login.headers.location)
+      assert.equal(`${callback.origin}${callback.pathname}`, `https://${hosts.one}/api/auth/callback`)
+
+      // The callback creates the session. Every session cookie it sets is Secure.
+      const done = await viaProxy(`${callback.pathname}${callback.search}`, proxyJar)
+      assert.equal(done.status, 302, `the callback: ${done.body}`)
+      remember(proxyJar, done)
+      const sessionCookies = done.setCookie.filter((line) => line.startsWith('Axis.Session'))
+      assert.ok(sessionCookies.length > 0, 'the callback set no Axis.Session cookie')
+      for (const line of sessionCookies) assert.match(line, /;\s*secure/i, `not Secure: ${line}`)
+      const me = await viaProxy('/api/me', proxyJar)
+      assert.equal(me.status, 200, `GET /api/me through the proxy: ${me.body}`)
+
+      // Restart the first replica. The same cookie works through the proxy and on each replica's own port.
+      run(['restart', 'server'])
+      const restarted = await waitFor(() => server('localhost', '/health/ready'), 200, 120)
+      assert.equal(restarted.status, 200, 'the server never answered /health/ready after the restart')
+      const back = await waitFor(() => server(hosts.one, '/leave'), 200, 60)
+      assert.equal(back.status, 200, 'the server did not serve /leave after the restart')
+      const meAfter = await waitFor(() => viaProxy('/api/me', proxyJar), 200, 30)
+      assert.equal(meAfter.status, 200, `GET /api/me through the proxy after the restart: ${meAfter.body}`)
+      for (const port of [serverPort, server2Port]) {
+        const direct = await request(port, hosts.one, '/api/me', cookieHeader(proxyJar))
+        assert.equal(direct.status, 200, `GET /api/me on port ${port} after the restart: ${direct.body}`)
+      }
     } catch (error) {
       dumpLogs()
       throw error

@@ -1,0 +1,18 @@
+# Ends TLS and forwards to every server replica. It looks up the network alias `servers` every five seconds,
+# so a restarted replica rejoins, and it retries a request on the other replica when one is down.
+# No trusted_proxies is set, so Caddy replaces any X-Forwarded-For, X-Forwarded-Proto and X-Forwarded-Host
+# that a client sends with its own values. The server trusts these headers only from this proxy.
+{
+	admin off
+}
+
+:443 {
+	tls /certs/tls.crt /certs/tls.key
+	reverse_proxy {
+		dynamic a servers 8080 {
+			refresh 5s
+		}
+		lb_try_duration 10s
+		fail_duration 10s
+	}
+}

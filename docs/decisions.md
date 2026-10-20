@@ -2745,7 +2745,8 @@ to try a change with its own data and bindings. The costs:
 M10 runs the server as several replicas behind a reverse proxy that ends TLS.
 That is what a shared Studio server needs. The forwarded headers, the shared
 key ring, the platform tables under both tenant sources, the Studio write
-lock and the Helm chart's `studio.persistence` are built so far. See the [installation guide](reference/installation.md#several-server-replicas),
+lock, the Helm chart's `studio.persistence` and the Compose example with two
+replicas behind a TLS proxy, with its smoke test, are built. See the [installation guide](reference/installation.md#several-server-replicas),
 the [forwarded headers settings](reference/configuration.md#forwarded-headers),
 the [platform database](reference/storage.md#platform-database) and the
 [authoring API](reference/authoring.md#versions).
