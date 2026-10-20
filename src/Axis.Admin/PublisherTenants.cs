@@ -9,8 +9,18 @@ using Npgsql;
 
 namespace Axis.Admin;
 
-/// <summary>One tenant the publisher serves: its id, its schema version, its bindings and how to connect to its database.</summary>
-internal sealed record PublisherTenant(string Id, string SchemaVersion, ActivationBindings Bindings, Func<ITenantConnections> Connect);
+/// <summary>
+/// One tenant the publisher serves: its id, its schema version, its bindings and how to connect to its database.
+/// <paramref name="HasPreview"/> means the tenant has a preview tenant in any state. <paramref name="Preview"/> is that tenant,
+/// only when the publisher serves it.
+/// </summary>
+internal sealed record PublisherTenant(
+    string Id,
+    string SchemaVersion,
+    ActivationBindings Bindings,
+    Func<ITenantConnections> Connect,
+    bool HasPreview = false,
+    PublisherTenant? Preview = null);
 
 /// <summary>Where the publisher learns the tenants it serves: the tenant directory or the <c>Tenants</c> configuration section.</summary>
 internal interface IPublisherTenants
@@ -43,13 +53,26 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, TimeS
             .OrderBy(row => row.Id, StringComparer.Ordinal)
             .ToList();
         var bindings = await AdminCommands.ReadBindingsAsync(platform, [.. served.Select(row => row.Id)], cancellationToken);
-        return
-        [
-            .. served.Select(row => new PublisherTenant(
+        var records = served.ToDictionary(
+            row => row.Id,
+            row => new PublisherTenant(
                 row.Id,
                 row.SchemaVersion,
                 bindings[row.Id],
-                () => new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, CancellationToken.None))),
+                () => new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, CancellationToken.None)),
+            StringComparer.Ordinal);
+        var previewIds = rows
+            .Where(row => row.PreviewOf is not null)
+            .ToDictionary(row => row.PreviewOf!, row => row.Id, StringComparer.Ordinal);
+        return
+        [
+            .. served.Select(row => row.PreviewOf is null
+                ? records[row.Id] with
+                {
+                    HasPreview = previewIds.ContainsKey(row.Id),
+                    Preview = previewIds.TryGetValue(row.Id, out var previewId) && records.TryGetValue(previewId, out var preview) ? preview : null,
+                }
+                : records[row.Id]),
         ];
     }
 }
@@ -91,7 +114,22 @@ internal sealed class ConfigurationPublisherTenants(
             _served.Add(new PublisherTenant(entry.Id, TenantSchemaVersion.Current, Bindings(entry), () => new ConfiguredTenantConnections(entry)));
         }
 
-        return [.. _served.OrderBy(tenant => tenant.Id, StringComparer.Ordinal)];
+        var previewIds = entries
+            .Where(entry => entry.PreviewOf is not null)
+            .ToDictionary(entry => entry.PreviewOf!, entry => entry.Id, StringComparer.Ordinal);
+        var served = _served.ToDictionary(tenant => tenant.Id, StringComparer.Ordinal);
+        return
+        [
+            .. _served
+                .OrderBy(tenant => tenant.Id, StringComparer.Ordinal)
+                .Select(tenant => tenant.Bindings.IsPreview
+                    ? tenant
+                    : tenant with
+                    {
+                        HasPreview = previewIds.ContainsKey(tenant.Id),
+                        Preview = previewIds.TryGetValue(tenant.Id, out var previewId) && served.TryGetValue(previewId, out var preview) ? preview : null,
+                    }),
+        ];
     }
 
     // Mirrors the server's TenantActivationBindings, which this host does not reference.

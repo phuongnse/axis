@@ -238,8 +238,12 @@ worker_pid=$!
 # The publisher waits for the server's migration as the worker does. The admin host reads no appsettings
 # file, so the tenant settings are here. It gets the schema role for its steps and the runtime role for
 # seeding, and runs in Development for the http stub, as the worker does. It runs from the built dll, so
-# that kill stops it.
-DOTNET_ENVIRONMENT=Development Tenants__default__Hosts__0=127.0.0.1 \
+# that kill stops it. It serves the preview tenant default-preview too, so it runs preview requests. Bash
+# cannot export a name with a hyphen, so the preview tenant's settings go through env.
+env 'Tenants__default-preview__PreviewOf=default' 'Tenants__default-preview__Hosts__0=localhost' \
+  "Tenants__default-preview__ConnectionString=$AXIS_E2E_PREVIEW_DATABASE" \
+  "Tenants__default-preview__SchemaConnectionString=$preview_schema_database" \
+  DOTNET_ENVIRONMENT=Development Tenants__default__Hosts__0=127.0.0.1 \
   Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" \
   Tenants__default__SchemaConnectionString="$schema_database" \
   Extensions__Path="$root/artifacts/extensions" Modules__Path="$root/artifacts/modules" \

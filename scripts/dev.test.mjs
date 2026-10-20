@@ -284,6 +284,8 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
 
     // The worker starts only after the server has migrated the tenant databases.
     await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)
+    // The worker answers ready only once it has found every tenant migrated, so it also waits for the preview tenant.
+    await waitForOutput(run, /\[worker\] .*Tenant default-preview is ready for work/)
     const listening = run.stdout.search(/\[server\].*Now listening on/)
     assert.ok(listening >= 0, run.stdout)
     assert.ok(run.stdout.indexOf('[worker]') > listening, `Worker output before the server listened:\n${run.stdout}`)
