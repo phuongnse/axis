@@ -210,6 +210,60 @@ describe('StudioEditor for a seed', () => {
   })
 })
 
+describe('StudioEditor for a scenario', () => {
+  const scenarioId = '6f0c1c3e-2a4b-4d7e-9c1f-5b8a7d6e4f21'
+  const scenarioItem: StudioResourceItem = {
+    id: scenarioId,
+    kind: 'scenario',
+    name: 'Approve',
+    file: 'scenarios/approve.json',
+    version: 'c1',
+    usedBy: 0,
+  }
+
+  it('shows the typed editor and saves an edited step as one operation', async () => {
+    const content = {
+      id: scenarioId,
+      kind: 'scenario',
+      name: 'Approve',
+      formatVersion: 1,
+      users: { author: [] },
+      steps: [{ type: 'advanceTime', by: 'PT1H' }],
+    }
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${folder}/resources/${scenarioId}` && init?.method === 'PATCH') {
+        return json({ version: 'c2', diagnostics: [] })
+      }
+      if (input === `${folder}/resources/${scenarioId}`) {
+        return json({ ...scenarioItem, content })
+      }
+      return new Response(null, { status: 404 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <StudioEditor
+          application="Shop"
+          item={scenarioItem}
+          resources={[scenarioItem]}
+          path={null}
+          onSaved={vi.fn()}
+          onTextsWritten={vi.fn()}
+          onDeleted={vi.fn()}
+        />
+      </TextProvider>,
+    )
+
+    expect(await screen.findByTestId('studio-scenario-step', {}, slow)).toBeInTheDocument()
+    await userEvent.type(screen.getByRole('textbox', { name: 'by' }), '0')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'PATCH')!
+    expect(JSON.parse(init!.body as string)).toEqual([{ op: 'replace', path: '/steps/0/by', value: 'PT1H0' }])
+  })
+})
+
 const connectorId = '409bc638-0aec-4084-ada2-e3baed50057d'
 const endpointId = 'bc241668-fe85-45a4-b7cf-d36da8d56b71'
 
@@ -890,5 +944,81 @@ describe('StudioEditor for a label', () => {
     expect(await screen.findByTestId('studio-label-write-error')).toHaveTextContent('The texts could not be written.')
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     expect(sentTexts(fetchMock)).toHaveLength(1)
+  })
+})
+
+const pageNames = {
+  ...namesWithTexts,
+  dataSources: [
+    { id: 'd1', name: 'PurchaseRequestList', module: null },
+    { id: 'd2', name: 'SupplierList', module: null },
+  ],
+  pages: [{ id: 'g1', name: 'ReviewForm' }],
+  forms: [{ id: 'f1', name: 'RequestForm' }],
+  texts: [{ key: 'pages.home.title', texts: { en: 'Home', vi: 'Trang chủ' }, usedBy: 1 }],
+} as unknown as StudioNames
+
+const tablePage = {
+  id: pageId,
+  kind: 'page',
+  name: 'MyTasks',
+  formatVersion: 1,
+  title: { textKey: 'pages.home.title' },
+  widgets: [
+    {
+      type: 'form',
+      entity: 'PurchaseRequest',
+      actions: [{ type: 'startProcess', process: 'Approval', label: { textKey: 'pages.home.title' } }],
+      'x-note': 'keep',
+    },
+  ],
+  'x-extra': 1,
+}
+
+describe('StudioEditor for a page', () => {
+  it('opens the page editor with the widget list and the selected widget panel', async () => {
+    stubResource(pageItem, tablePage)
+    renderResource(pageItem, pageNames)
+
+    expect(await screen.findByTestId('studio-page-editor', {}, slow)).toBeInTheDocument()
+    expect(screen.getByTestId('studio-widget-0')).toHaveTextContent('form · PurchaseRequest')
+    expect(screen.getByTestId('studio-field-/widgets/0/actions/0/process')).toBeInTheDocument()
+  })
+
+  it('patches only the edit and keeps the unknown keys on the file and the widget', async () => {
+    const content = { ...tablePage, widgets: [{ type: 'table', dataSource: 'PurchaseRequestList', 'x-note': 'keep' }] }
+    const { fetchMock } = stubResource(pageItem, content)
+    renderResource(pageItem, pageNames)
+
+    const field = await screen.findByTestId('studio-field-/widgets/0/dataSource', {}, slow)
+    await userEvent.click(within(field).getByRole('combobox'))
+    await userEvent.click(await screen.findByTitle('SupplierList'))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([{ op: 'replace', path: '/widgets/0/dataSource', value: 'SupplierList' }])
+  })
+
+  it('removes the keys of the old type in one patch and leaves an unknown key alone', async () => {
+    const content = {
+      ...tablePage,
+      widgets: [{ type: 'form', form: 'RequestForm', actions: tablePage.widgets[0].actions, 'x-note': 'keep' }],
+    }
+    const { fetchMock } = stubResource(pageItem, content)
+    renderResource(pageItem, pageNames)
+
+    const field = await screen.findByTestId('studio-field-/widgets/0/type', {}, slow)
+    await userEvent.click(within(field).getByRole('combobox'))
+    await userEvent.click(await screen.findByTitle('table'))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    const operations = sentPatch(fetchMock)
+    expect(operations).toEqual([
+      { op: 'replace', path: '/widgets/0/type', value: 'table' },
+      { op: 'remove', path: '/widgets/0/form' },
+      { op: 'remove', path: '/widgets/0/actions' },
+    ])
+    expect(operations.some((operation) => operation.path.includes('x-note'))).toBe(false)
   })
 })

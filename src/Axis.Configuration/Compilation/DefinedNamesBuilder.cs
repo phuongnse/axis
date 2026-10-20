@@ -52,7 +52,7 @@ internal static class DefinedNamesBuilder
             Texts(texts, index));
     }
 
-    private static string? ModuleOf(Resource resource) =>
+    internal static string? ModuleOf(Resource resource) =>
         ApplicationCompiler.IsModuleResource(resource) ? resource.Name[..resource.Name.IndexOf('/')] : null;
 
     private static DefinedRule Rule(RuleResource rule, string name, string? module) =>

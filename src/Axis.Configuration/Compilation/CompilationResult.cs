@@ -6,8 +6,8 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// The outcome of compiling an application folder. <see cref="Model"/>, <see cref="ContentHash"/>
-/// and <see cref="Resources"/> are present only when no diagnostic is an error. <see cref="References"/>
-/// and <see cref="Names"/> are always present, and are not stored in the release.
+/// and <see cref="Resources"/> are present only when no diagnostic is an error. <see cref="References"/>,
+/// <see cref="Names"/> and <see cref="PolicyMatrix"/> are always present, and are not stored in the release.
 /// </summary>
 public sealed record CompilationResult(ApplicationModel? Model, IReadOnlyList<Diagnostic> Diagnostics)
 {
@@ -16,6 +16,9 @@ public sealed record CompilationResult(ApplicationModel? Model, IReadOnlyList<Di
 
     /// <summary>The names of the loaded resources, even when the compile has errors. A file left out for its own errors is absent.</summary>
     public DefinedNames Names { get; init; } = DefinedNames.Empty;
+
+    /// <summary>The policy matrix of the loaded roles and policies, even when the compile has errors. A file left out for its own errors is absent.</summary>
+    public PolicyMatrix PolicyMatrix { get; init; } = PolicyMatrix.Empty;
 
     /// <summary>The application's content hash; see <see cref="Releases.ContentHash"/>.</summary>
     public string? ContentHash { get; init; }

@@ -20,7 +20,9 @@ import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointValues } from './EndpointValues'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
+import { PageEditor } from './PageEditor'
 import { ProcessEditor } from './ProcessEditor'
+import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
 import { TextTable, type TextColumn } from './TextTable'
@@ -84,11 +86,14 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * form at the field that holds it and scrolls to that field once the resource has loaded. A path the form cannot
  * show opens the JSON view instead. A seed whose entity is a resource of the folder shows its records as a grid with
  * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
- * the entity is not in the folder, the seed uses the generic form. A connector opens in the connector editor, which
- * shows a binding as a name only. A process opens in the process editor, which shows its steps as cards, with the
- * decision and end panels and a picker of the draft's step names for every transition. An endpoint keeps the generic
- * form and shows its `values` as rows of a field of its entity and an expression. When the server does not answer, the
- * draft stays, and the resource loads again after the reconnect unless the draft has changes.
+ * the entity is not in the folder, the seed uses the generic form. A scenario shows a typed editor of its name, users,
+ * stubs and steps, and the JSON view edits the same draft. A connector opens in the connector editor, which shows a
+ * binding as a name only. A page opens in the page editor, which lists its widgets and shows a panel for the
+ * selected widget's type, and keeps a key it does not show. A process opens in the process editor, which shows its
+ * steps as cards, with the decision and end panels and a picker of the draft's step names for every transition. An
+ * endpoint keeps the generic form and shows its `values` as rows of a field of its entity and an expression. When the
+ * server does not answer, the draft stays, and the resource loads again after the reconnect unless the draft has
+ * changes.
  */
 export function StudioEditor({
   application,
@@ -474,6 +479,8 @@ export function StudioEditor({
                     <SchemaForm schema={seedSchema} value={draft} onChange={change} />
                     <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={update} />
                   </Flex>
+                ) : item.kind === 'scenario' ? (
+                  <ScenarioEditor value={draft} onChange={update} />
                 ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
                   <TextTable
                     columns={resources
@@ -496,6 +503,8 @@ export function StudioEditor({
                   <ConnectorEditor value={draft} onChange={change} />
                 ) : processSchema ? (
                   <ProcessEditor schema={processSchema} value={draft} onChange={change} />
+                ) : item.kind === 'page' && schema ? (
+                  <PageEditor value={draft} onChange={change} />
                 ) : endpointSchema ? (
                   <Flex vertical gap="middle">
                     <SchemaForm schema={endpointSchema} value={draft} onChange={change} />

@@ -935,9 +935,10 @@ reconnect message are built.
     JSON view as the second view of the same draft. The typed editor saves
     through the same JSON Patch, with the same `If-Match` rules. It never drops
     a value it does not show, so unknown keys stay as they are. See
-    **Editors by kind** below. The seed editor, the connector editor, the endpoint
-    mapping rows, the text editor and the process editor's step list, with its
-    decision and end panels, are built.
+    **Editors by kind** below. The seed editor, the scenario editor, the
+    connector editor, the page editor, the endpoint mapping rows, the text
+    editor and the process editor's step list, with its decision and end
+    panels, are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1188,12 +1189,15 @@ reconnect message are built.
     takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
     takes `invoke`. Filter and fields are only on entity grants.
   - A save writes one file, with the single-file routes.
+  - The view reads the [policy matrix route](authoring.md#policy-matrix). The
+    route is built, and the view is not.
   - See [roles and policies](configuration.md#roles-and-policies).
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
-  the connector editor, the endpoint mapping rows, the text editor and the process
-  editor's step list, with its decision and end panels, are built. The other typed
-  editors and the entity designer are *(planned for M11)*, and until they are built those kinds use the generic form. The last
+  the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the text
+  editor and the process editor's step list, with its decision and end panels, are built. The other typed
+  editors and the entity designer are *(planned for M11)*, and until they are built those kinds use the generic
+  form. The last
   column lists what still needs the JSON view, because the form cannot show it.
 
   | Kind          | Editor                                | Still needs the JSON view                                             |
@@ -1223,10 +1227,30 @@ reconnect message are built.
   and `else`, is an object with no `properties`, such as a map, or has no type. The last column follows that rule. A new kind or property that the
   form cannot show goes to the JSON view until an editor covers it.
 
-  - **Page editor.** A list of the page's widgets, each with its type and a
-    summary. A panel per widget type, `table`, `form`, `taskInbox` and
-    `processInspector`, shows the properties the widget has today. The `form`
-    panel also shows its `startProcess` actions.
+  - **Page editor** *(built)*. The Form tab shows the page's name, its title
+    with a text box for each locale, and a list of its widgets, each with its
+    type and a summary such as `table · PurchaseRequestList`. A panel per
+    widget type, `table`, `form`, `taskInbox` and `processInspector`, shows the
+    properties the widget has today. A `table` panel has entity, data source
+    and form page pickers. A `form` panel has entity and form pickers and its
+    `startProcess` actions, each with a process picker and a label. A
+    `taskInbox` panel has no properties. A `processInspector` panel has a
+    process picker. The JSON view stays as a second view of the same draft.
+    - **Type change.** Choosing another type removes the known properties the
+      new type does not take, because the compiler rejects them. A switch to
+      `processInspector` adds an empty `process`, which the schema requires.
+    - **Exclusive bindings.** The compiler accepts exactly one of a table's
+      entity and data source, and one of a form's entity and form. Picking one
+      clears the other.
+    - **Pickers.** The form page picker lists every page except the current
+      one. The action's process picker lists every process. Neither checks
+      what the choice holds, so a wrong choice shows as a diagnostic after the
+      save.
+    - **Widgets.** A page holds one widget today, so the list has no add,
+      remove or reorder.
+    - **Unknown keys.** A key the editor does not show, on the page or on a
+      widget, is saved unchanged. A widget of a type with no panel, such as one
+      M12 adds, shows its type and points to the JSON view.
   - **Process step editor.** The Form tab opens the process with its name,
     entity and optional start condition, and its start step. The JSON view
     stays as a second view of the same draft.
@@ -1269,8 +1293,21 @@ reconnect message are built.
       shows a hint, and the compiler reports the error.
     - **Unknown keys.** A key the editor does not show, in the file, in an
       operation or in `auth`, is saved unchanged.
-  - **Scenario editor.** The users with their roles, then the steps as a list,
-    with a panel per step type.
+  - **Scenario editor** *(built)*. The Form tab shows the scenario's name and
+    `now`, then its users with their roles, its stubs, and its steps as a list
+    with a panel per step type. The JSON view stays as a second view of the
+    same draft.
+    - **Steps.** Each step has a type. Changing the type keeps the properties
+      the new type takes and drops the others. Keys the editor does not show
+      stay in the file. A step can be removed or moved up or down.
+    - **Pickers.** Entities, processes, roles and connectors are picked by
+      name. A `record` is picked from the aliases that earlier `createRecord`
+      steps save. A `step` and its `outcome` come from the processes that the
+      record started.
+    - **Values.** The fields of the step's entity show as typed cells. A value
+      the entity does not name stays as a text row. A step whose entity is not
+      in the folder edits its `values` as a JSON object, and the text is saved
+      only when it is one.
   - **Seed editor** *(built)*. The Form tab shows the seed's name, entity and
     `sync`, then its records as a grid, with a row per record and a column per
     field of the seed's `entity`. The JSON view stays as a second view of the

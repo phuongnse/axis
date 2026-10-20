@@ -9,7 +9,7 @@ of [architecture.md](../architecture.md) apply: sections marked
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
 in git. The application list, application create, resource list, read, patch, create, delete, changes, text write, diagnostics,
-references, names and expression check routes are built. It is
+references, names, policy matrix and expression check routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
@@ -74,6 +74,7 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/diagnostics` | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200` |
 | `GET /api/studio/apps/{application}/names` | `200` with the names the application defines, see [Names](#names) |
+| `GET /api/studio/apps/{application}/policy-matrix` | `200` with what each role may do on each target, see [Policy matrix](#policy-matrix) |
 | `PUT /api/studio/apps/{application}/texts/{key}` | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes) |
 | `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
 
@@ -332,6 +333,59 @@ agrees it. The answer is:
   absent.
 - **Size.** The answer holds every name and every text. At the typical
   application size it is a few hundred kilobytes.
+
+## Policy matrix
+
+`GET .../policy-matrix` answers what each role may do on each root entity,
+data source, process and endpoint, and which grants give that access.
+Studio's [policy matrix](frontend.md#studio) is built on it, and
+[D54](../decisions.md#d54-the-entity-designer-and-the-policy-matrix--agreed)
+agrees it. The answer is:
+
+```
+{ targets: [{ kind, id, name, module, actions: [...], entity }],
+  roles: [{ id, name, accessPolicy: { name, id }, editable, readOnlyReason,
+            cells: [{ kind, target, actions: [...], missingEntityRead,
+                      grants: [{ policyId, policy, index, actions, filter, fields, shared }] }] }] }
+```
+
+- **Columns.** `targets` lists root entities first, with module entities
+  before the application's own. Then it lists data sources, processes and
+  endpoints. Child entities are left out. `kind` is `entity`, `dataSource`,
+  `process` or `endpoint`. A name is written as in [Names](#names). `module` is
+  the module id, or null. `entity` is a data source's root entity, and null for
+  the other kinds. A column is identified by `kind` and `name`, not by `id`.
+- **`actions`.** On a target, they are the actions it accepts, in the order
+  [roles and policies](configuration.md#roles-and-policies) lists them. An
+  entity takes `read`, `create`, `update` and `delete`. A data source takes
+  `read`. A process takes `start`, `inspect`, `cancel`, `retry` and `resolve`.
+  An endpoint takes `invoke`.
+- **Rows and cells.** Each declared role is one row, in the order of the
+  `roles` resources. Each row has one cell per column, in column order, empty
+  ones included. A cell's `actions` are the role's actions there from all its
+  policies, combined with OR as in
+  [combining grants](../architecture.md#combining-grants). An action that the
+  column does not accept is left out. The grant still lists its actions as
+  written.
+- **Data source `read`.** A data source cell has `read` only when the role can
+  also read the data source's root entity. When it has a `read` grant but not
+  that entity read, `read` is left out and `missingEntityRead` names the root
+  entity. It is null otherwise.
+- **`grants`.** Each grant of a policy that names the role, with its `policyId`
+  and `policy` name, its `index` in the policy, and its `actions`, `filter` and
+  `fields` as written. `fields` is null for every field. Filters and field lists
+  are not evaluated here.
+- **`shared`.** A grant is shared unless it comes from the role's own
+  `<Role>Access` policy and that policy names only that role.
+- **`<Role>Access`.** `accessPolicy` is the PascalCase role name plus `Access`.
+  It is found by name, ignoring letter case, and `id` is null when it does not
+  exist. `editable` is true when it does not exist, or when its `roles` is
+  exactly that one role. Otherwise `editable` is false and `readOnlyReason` is
+  `accessPolicyShared`. Studio writes its own message for the code.
+- **Compiled in memory.** The folder is compiled in memory, as for
+  [diagnostics](#diagnostics), and no database is touched. A folder with errors
+  still answers, from the files that loaded. A policy file left out for its own
+  errors is absent, so its grants are missing.
 
 ## Text writes
 
