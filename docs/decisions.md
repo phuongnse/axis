@@ -1804,6 +1804,9 @@ The owner confirmed these points on issue #569 on 2026-10-18.
   - The server setting `Studio:Folders` lists the application folders Studio
     may edit, like `ActivateOnStartup`. It is empty by default, so Production
     has no Studio. The Development settings list the purchase request sample.
+    New applications that Studio creates live in `Studio:ApplicationsPath`
+    _(planned for M11)_, see
+    [D51](#d51-creating-applications-and-resources-from-studio--agreed).
   - The server setting `Studio:AuthorRole` names a roles claim value. Only a
     signed-in user whose roles claim holds it may use Studio. With no value,
     nobody may. Application policies play no part. It is the first
@@ -2886,6 +2889,103 @@ auditing it would flood the table. A scan that stops at high and critical
 blocks the real risks without blocking a merge on every low finding. The cost
 is that lower severities pass.
 
+## D51. Creating applications and resources from Studio — Agreed
+
+Studio creates a new application, blank or from an installed application
+template, and starts a resource of every kind. D46 plans this for M11. It is
+_(planned for M11)_. See the
+[authoring API](reference/authoring.md#creating-an-application), the
+[application templates](reference/configuration.md#application-templates) and
+the [Studio section of the frontend](reference/frontend.md#studio). The owner
+confirmed these points on issue #778 on 2026-10-20.
+
+- **Where new applications go:**
+  - A new server setting, `Studio:ApplicationsPath`, names one folder. Studio
+    creates new application folders in it.
+  - Every direct subfolder of it that holds an `application.json` is listed by
+    `GET /api/studio/apps`, after the folders of `Studio:Folders`. The same
+    first-match rule applies to names.
+  - Studio is on when `Studio:Folders` is not empty or `Studio:ApplicationsPath`
+    is set. `GET /api/me` answers `studioCreate: true` when the user holds the
+    author role and the setting is set.
+  - A missing folder is created at start. The server stops if it cannot.
+  - Under several server replicas, the folder is on the shared Studio folder
+    ([D49](#d49-several-server-replicas-behind-a-tls-proxy--agreed)).
+  - Development, Compose and E2E set it to `artifacts/studio-apps`, which git
+    ignores.
+- **Creating an application:**
+  - `POST /api/studio/apps` takes `{ name, template? }`. It needs the author
+    role and the CSRF header.
+  - The new folder is the kebab-case `name`. A name or folder that already
+    exists is `409`. A `name` that does not match the manifest name pattern is
+    `400`. So is a name whose kebab-case form is longer than 60 characters or
+    is a reserved site path (`api`, `health`, `assets`, `studio`).
+  - The whole folder is written under the write lock, to a hidden temporary
+    folder that is then renamed. A reader never sees half an application.
+  - The answer is `201` with the application's `name`, a `Location` and the
+    folder's diagnostics. A new application is not activated. The author
+    publishes it ([D47](#d47-publishing-from-studio--agreed)).
+- **Blank application:**
+  - It holds a manifest with a new UUID `id`, one site at `/<kebab-name>` with
+    the default locale `en`, one `Home` page with a `taskInbox` widget, and an
+    `en` text resource.
+  - The text resource holds three keys: the site title, the page title and the
+    navigation label.
+  - The site schema needs at least one navigation entry that names a page. So a
+    blank folder without a page would not compile.
+- **Application templates:**
+  - An application template is an application folder with a `template.json`:
+    `id`, a SemVer `version`, a title text and a description text, in `en` and
+    `vi`.
+  - Operators install templates under `Templates:Path/<id>/<version>/`, like
+    modules. A missing setting means no templates. A folder named in it that
+    does not exist stops the server.
+  - A template must hold exactly one site. A template with a bad
+    `template.json`, folder names that differ from it, or any other number of
+    sites is left out and logged as a warning at start.
+  - `GET /api/studio/templates` lists the newest version of each template. The
+    create body names a template by `id` only, and the server uses the newest
+    installed version.
+  - A copy takes every `*.json` file except `template.json`. Each resource's
+    top-level `id` becomes a new UUID. Seed record ids stay, because they are
+    row ids in the new application's own tables.
+  - The manifest gets the new `name`, and the site path becomes the kebab-case
+    name. References are by name, so they still resolve.
+  - The copy has the same diagnostics as the template. A template that does not
+    compile is listed, and its diagnostics come with the create answer.
+  - Sample templates live under `samples/templates/`. `scripts/build.sh`
+    installs them into `artifacts/templates`. The production images hold none.
+    The sample `request-approval` has one entity with a sequence number, a form
+    page, a table page, a two-step approval process, two roles and their
+    policies, texts in `en` and `vi`, and one test scenario.
+  - Templates are installed, not uploaded. An author cannot save an application
+    as a template in M11.
+- **Creating a resource:**
+  - Studio's **New resource** asks for the kind and the name, or the locale for
+    a text resource.
+  - It sends the kind's starter: the smallest content that passes the kind's
+    schema. References the author must still choose are left as empty strings.
+    The schema's name patterns reject an empty string, so they show up as
+    diagnostics.
+  - The starters live in the SPA, next to the schemas it bundles. The create
+    route stays as it is. A Vitest test checks each starter against its schema.
+  - A new text resource copies every key and text of the default locale of the
+    first site, so every label still resolves. The author then translates.
+- **Effect on [D38](#d38-studio-edits-application-folders-through-an-authoring-api--agreed):**
+  - `Studio:Folders` stays for folders kept in git. New applications live in
+    `Studio:ApplicationsPath`, which nothing commits to git yet.
+
+_Why:_ an author who cannot start an application or a resource without
+hand-written JSON cannot use Studio alone. A second folder setting keeps the
+git-kept folders apart from the ones Studio creates, and a fixed list could not
+grow. Writing the folder to a hidden name and renaming it means a reader never
+sees half an application. Installing templates like modules reuses a rule the
+operator knows, and the cost is that authors cannot share their own in M11.
+New ids on a copy mean two applications made from one template share no
+resource id, so they never clash in one tenant. Starters in the SPA keep the
+server's create route simple. The cost is that a starter broken by a schema
+change shows up in the Vitest tests, not in a server check.
+
 ## D52. Reference pickers, label texts and the expression editor — Agreed
 
 Studio lets an author pick references, edit label texts in every locale and
@@ -2989,8 +3089,8 @@ costs:
 ## D53. Typed editors and the process graph in Studio — Agreed
 
 M11 gives Studio typed editors for pages, process steps and connectors, and
-for the kinds that need JSON today. It also adds a read-only process graph. All
-of it is _(planned for M11)_. See the
+for the kinds that need JSON today. It also adds a read-only process graph. The
+seed grid is built. The rest is _(planned for M11)_. See the
 [Studio section](reference/frontend.md#studio) for the detail. The owner
 confirmed these points on issue #780 on 2026-10-20.
 
@@ -3070,6 +3170,99 @@ support and custom nodes, which M14 needs. Dagre lays out directed step graphs
 of the size Axis processes have. ELK lays out better but weighs over 400 KB.
 The cost is two new libraries in the SPA bundle. The page editor changes again
 in M12, which D46 accepts.
+
+## D54. The entity designer and the policy matrix — Agreed
+
+M11 gives Studio an entity designer and a policy matrix _(planned for M11)_.
+The designer edits the fields of an entity and adds the migrations that keep
+stored data. The matrix shows who may do what in one place. A new `changes`
+route writes an entity and its migration in one call. See
+[Studio](reference/frontend.md#studio) for the screens and
+[the changes route](reference/authoring.md#changes) for the route. The
+designer follows
+[D24](#d24-roles-and-policies--agreed),
+[D30](#d30-schema-migrations--agreed),
+[D38](#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
+and
+[D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
+The owner confirmed these points on issue #781 on 2026-10-20.
+
+- **Entity designer:**
+  - An `entity` resource opens in the designer in place of the generic form.
+    The JSON view stays.
+  - The fields are a table. Its columns are name, label, type, required,
+    unique and the type's own settings: `maxLength`, precision and scale,
+    enum `values`, the reference `target` and the child entity.
+  - A computed field's expression and each validation use the expression
+    editor.
+  - Fields can be added, removed and reordered. The display field is picked
+    from the fields.
+  - A module entity is read-only, as today.
+- **Migrations from the designer:**
+  - The designer compares with the entity as Studio loaded it. It does not
+    read the active release.
+  - Renaming a loaded field asks whether to keep its data. Yes adds a
+    `renameField` change. Removing a loaded field asks whether to drop its
+    data. Yes adds a `dropField` change, and No keeps the field.
+  - A change the column cannot follow asks for a `convert` expression. That
+    covers a new type, a narrower `maxLength` and a removed enum value.
+  - A field that becomes required, or a new required field, offers a `fill`.
+  - Switching to or from `enum`, and adding `unique`, offer no migration. The
+    designer warns, and Validate reports `AXC0016`. No migration type covers
+    these two changes.
+  - Renaming or removing a `child-collection` field offers no migration,
+    because it has no column.
+  - Each save that needs migrations creates one new `migration` resource,
+    named `<Entity>Change<UTC yyyyMMddHHmmss>`. It holds every change of that
+    save in edit order. It never edits an existing migration, so applied
+    files stay unchanged. Migrations run in file path order, so the files of
+    one entity sort by time.
+  - A hand-written migration of the same entity whose name sorts later runs
+    after the designer's files. Nothing enforces this.
+  - Validate still runs every activation check, so a missing migration shows
+    before a publish.
+- **The changes route:**
+  - `POST /api/studio/apps/{application}/changes` takes a list of creates and
+    patches, each patch with its version.
+  - It takes the write lock once and checks every change before it writes
+    any. A stale version or a bad change refuses the whole call.
+  - It takes at most 20 changes and no deletes. Two changes for the same `id`
+    are `400`. A patch change without `version` is `428`.
+  - A server that dies during the writes can leave the first files written.
+    The next diagnostics show the mismatch.
+- **Policy matrix:**
+  - One view per application shows roles as rows. The columns are entities,
+    data sources, processes and endpoints. Child entities are left out,
+    because a grant on one is `AXC0093`.
+  - A cell shows the actions the role holds on that target from all its
+    policies, combined with OR, as the runtime does.
+  - A cell opens its grants. Each grant shows its actions, its record filter
+    and its field list. The filter uses the expression editor, and the fields
+    use the field picker.
+  - An edit writes to the policy `<Role>Access`, where `<Role>` is the
+    PascalCase form of the role name. So `department-manager` writes
+    `DepartmentManagerAccess`. The policy is created when it is missing, with
+    only that role in `roles`.
+  - A grant from a policy that names several roles is shown as shared and
+    opens that policy. So does a grant from another policy that names only
+    this role. The matrix never rewrites a hand-written policy.
+  - A `<Role>Access` that names other roles, or more than one, counts as
+    shared. The matrix does not write to it, turns editing off for that role
+    and says why.
+  - An action that a target does not take cannot be chosen.
+- **Not in M11:** deleting an entity with `dropEntity`, splitting shared
+  policies and comparing against the active release.
+
+_Why:_ the designer asks about each change while the author still remembers
+it. Today a missing migration shows only when activation refuses it. The cost
+is that it compares with what it loaded, not with the tenant. A field added
+and renamed before any publish gets a migration it does not need, and
+Validate reports it. One policy per role keeps a matrix edit from widening the
+access of other roles. The cost is that a hand-written policy with several
+roles still works, but the matrix does not split it. The `changes` route lets
+an entity and its migration be saved together. The cost is a multi-file write,
+which is new in the authoring API. It checks everything before it writes, but
+a server that dies in the middle can leave one file written.
 
 ## D55. Running test scenarios from Studio — Agreed
 
@@ -3179,9 +3372,9 @@ right, so a request and a publisher with a new role keep that rule. The costs:
 ## D56. A service desk as the third sample application — Agreed
 
 A service desk is the third sample application, in the thin shape that M11 can
-run. It is _(planned for M11)_. Nothing below exists yet: not the sample
-folder, the realm users, the `request-approval` template or the Playwright
-journeys. See the
+run. The sample folder and the realm users exist. The `request-approval`
+template and the Playwright journeys that build it through Studio do not, and
+are _(planned for M11)_. See the
 [Third application section](product-brief.md#third-application-service-desk)
 of the product brief for the data, flow, security, pages and scenarios. The
 owner confirmed these points on issue #783 on 2026-10-20.

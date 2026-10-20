@@ -121,7 +121,7 @@ test('the stack runs from source', { timeout }, async () => {
     'axis=axis_preview_schema,entities=axis_preview_schema',
   )
   const serverLogs = compose(['logs', 'server']).stdout
-  for (const application of ['PurchaseRequests', 'LeaveRequests']) {
+  for (const application of ['PurchaseRequests', 'LeaveRequests', 'ServiceDesk']) {
     assert.match(serverLogs, new RegExp(`Activated application ${application} .* for tenant default-preview\\.`), serverLogs)
   }
   assert.match(serverLogs, /AXC0100 in application folder .* for tenant default-preview/, serverLogs)

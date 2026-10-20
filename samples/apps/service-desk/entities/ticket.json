@@ -1,0 +1,96 @@
+{
+  "id": "4a4372e6-8a54-4c8f-b784-b18ddbcd7770",
+  "kind": "entity",
+  "name": "Ticket",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "ticket.label"
+  },
+  "displayField": "title",
+  "fields": [
+    {
+      "name": "number",
+      "type": "text",
+      "maxLength": 20,
+      "unique": true,
+      "sequence": "TicketNumber",
+      "label": {
+        "textKey": "ticket.number"
+      }
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "required": true,
+      "maxLength": 200,
+      "label": {
+        "textKey": "ticket.title"
+      }
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "maxLength": 4000,
+      "label": {
+        "textKey": "ticket.description"
+      }
+    },
+    {
+      "name": "category",
+      "type": "reference",
+      "target": "Category",
+      "label": {
+        "textKey": "ticket.category"
+      }
+    },
+    {
+      "name": "priority",
+      "type": "enum",
+      "values": ["low", "normal", "high", "urgent"],
+      "label": {
+        "textKey": "ticket.priority"
+      }
+    },
+    {
+      "name": "requester",
+      "type": "text",
+      "maxLength": 100,
+      "creator": true,
+      "label": {
+        "textKey": "ticket.requester"
+      }
+    },
+    {
+      "name": "assignedAgent",
+      "type": "text",
+      "maxLength": 100,
+      "label": {
+        "textKey": "ticket.assignedAgent"
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "values": [
+        "draft",
+        "submitted",
+        "assigned",
+        "resolved",
+        "closed",
+        "rejected",
+        "reopened"
+      ],
+      "label": {
+        "textKey": "ticket.status"
+      }
+    },
+    {
+      "name": "resolution",
+      "type": "text",
+      "maxLength": 4000,
+      "label": {
+        "textKey": "ticket.resolution"
+      }
+    }
+  ]
+}

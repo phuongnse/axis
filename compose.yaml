@@ -73,6 +73,7 @@ services:
       Tenants__default-preview__SchemaConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_schema;Password=axis
       ActivateOnStartup__0: /samples/apps/purchase-requests
       ActivateOnStartup__1: /samples/apps/leave-requests
+      ActivateOnStartup__2: /samples/apps/service-desk
       # The sample extension package payment-references, which the image holds, that the sample declares.
       Extensions__Path: /extensions
       # The sample module departments, which the image holds.

@@ -46,7 +46,8 @@ namespace Axis.Server.Studio;
 /// After the checks above it answers 415 for a content type other than <c>application/json</c>, 400 for a body that
 /// does not name exactly the folder's locales with string texts, 409 for a text resource whose <c>texts</c> is not an
 /// object and 503 when the write lock cannot be taken. It takes no <c>If-Match</c>.
-/// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>.
+/// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, and the expression check is in
+/// <see cref="StudioExpressionEndpoints"/>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
 /// newest first, as <c>{ active, folderContentHash, items }</c>. <c>active</c> is the active release or null, and
 /// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. It reads the
@@ -68,6 +69,7 @@ internal static class StudioEndpoints
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
         endpoints.MapPut("/api/studio/apps/{application}/texts/{key}", TextWriteAsync);
         endpoints.MapStudioPublishEndpoints();
+        endpoints.MapStudioExpressionEndpoints();
     }
 
     private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)
@@ -466,7 +468,7 @@ internal static class StudioEndpoints
 
     internal const string WriteLockUnavailable = "The write lock could not be taken. Try again.";
 
-    private const string NoResource = "The application has no resource with this id.";
+    internal const string NoResource = "The application has no resource with this id.";
 
     private const string NoTextKey = "The application has no text key with this name.";
 

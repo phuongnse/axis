@@ -29,6 +29,18 @@
           "clientRole": true
         },
         {
+          "name": "requester",
+          "clientRole": true
+        },
+        {
+          "name": "agent",
+          "clientRole": true
+        },
+        {
+          "name": "service-desk-lead",
+          "clientRole": true
+        },
+        {
           "name": "purchasing-system",
           "clientRole": true
         }
@@ -138,7 +150,8 @@
       "requiredActions": [],
       "clientRoles": {
         "axis": [
-          "employee"
+          "employee",
+          "requester"
         ]
       }
     },
@@ -272,6 +285,50 @@
         "axis": [
           "author",
           "publisher"
+        ]
+      }
+    },
+    {
+      "id": "khoa",
+      "username": "khoa",
+      "enabled": true,
+      "email": "khoa@axis.local",
+      "emailVerified": true,
+      "firstName": "Khoa",
+      "lastName": "Agent",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "agent"
+        ]
+      }
+    },
+    {
+      "id": "linh",
+      "username": "linh",
+      "enabled": true,
+      "email": "linh@axis.local",
+      "emailVerified": true,
+      "firstName": "Linh",
+      "lastName": "Service Desk Lead",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "service-desk-lead"
         ]
       }
     },

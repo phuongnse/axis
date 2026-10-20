@@ -14,13 +14,15 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
 
     public static TheoryData<string, string, string[]> Users => new()
     {
-        { "anna", "Anna Employee", ["employee"] },
+        { "anna", "Anna Employee", ["employee", "requester"] },
         { "lan", "Lan Employee", ["employee"] },
         { "binh", "Binh Engineering Manager", ["department-manager"] },
         { "chau", "Chau Operations Manager", ["department-manager"] },
         { "dung", "Dung Finance Reviewer", ["finance-reviewer"] },
         { "giang", "Giang Operator", ["operator"] },
         { "hoa", "Hoa Author", ["author", "publisher"] },
+        { "khoa", "Khoa Agent", ["agent"] },
+        { "linh", "Linh Service Desk Lead", ["service-desk-lead"] },
     };
 
     public async ValueTask InitializeAsync() => _authority = await keycloak.StartAsync();
@@ -43,7 +45,8 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
             Assert.Equal(id, claims.GetProperty("sub").GetString());
             Assert.Equal(displayName, claims.GetProperty("name").GetString());
             Assert.Equal(JsonValueKind.Array, claims.GetProperty("roles").ValueKind);
-            Assert.Equal(roles, claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
+            // Keycloak does not keep the order of a user's roles.
+            Assert.Equal(roles.Order(StringComparer.Ordinal), claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()).Order(StringComparer.Ordinal));
         }
     }
 
@@ -106,7 +109,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
         Assert.Equal("anna", claims.GetProperty("sub").GetString());
         Assert.Contains("axis-endpoints", Audiences(claims));
         Assert.Equal(JsonValueKind.Array, claims.GetProperty("roles").ValueKind);
-        Assert.Equal(["employee"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
+        Assert.Equal(["employee", "requester"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()).Order(StringComparer.Ordinal));
     }
 
     // The password grant gets a token without a login page.

@@ -1,0 +1,22 @@
+{
+  "id": "742f053e-1824-42e4-94fe-76f65d69440d",
+  "kind": "policy",
+  "name": "AgentAccess",
+  "formatVersion": 1,
+  "roles": ["agent"],
+  "grants": [
+    {
+      "entity": "Ticket",
+      "actions": ["read"],
+      "filter": "assignedAgent == currentUser()"
+    },
+    {
+      "entity": "Category",
+      "actions": ["read"]
+    },
+    {
+      "dataSource": "MyTicketList",
+      "actions": ["read"]
+    }
+  ]
+}

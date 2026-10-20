@@ -166,8 +166,9 @@ The server activates this sample next to purchase requests under
 
 ## Third application: service desk
 
-_(planned for M11)_ A third application, of a different shape from the first
-two, is the sample that M11 builds only through Studio. It lives as
+A third application, of a different shape from the first
+two, is the sample that M11 builds only through Studio. It runs as a sample
+today. It lives as
 configuration in `samples/apps/service-desk/`. It is not platform code. It is
 thin on purpose: SLAs, escalation, loops that hold a task and notifications
 wait for M14. See
@@ -215,6 +216,9 @@ a site at path `service-desk`. Texts are in `en` and `vi`.
   cannot act on a task that is not theirs.
 
 ### Built through Studio
+
+_(planned for M11)_ The sample runs today under `scripts/dev.sh`, Compose and
+E2E, and CI runs its scenarios. Building it only through Studio is planned.
 
 - The committed folder `samples/apps/service-desk` records what the journey
   builds. CI activates it and runs its scenarios, as for the other samples.

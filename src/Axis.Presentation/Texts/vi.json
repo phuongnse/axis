@@ -199,5 +199,15 @@
   "shell.studio.rollback.confirm": "Quay lại",
   "shell.studio.request.rolledBack": "Đã quay lại. Số phiên bản:",
   "shell.studio.request.rollbackFailed": "Quay lại thất bại. Xem các chẩn đoán.",
-  "shell.studio.request.sendFailed": "Không thể gửi hoặc kiểm tra yêu cầu."
+  "shell.studio.request.sendFailed": "Không thể gửi hoặc kiểm tra yêu cầu.",
+  "shell.studio.seed.records": "Bản ghi",
+  "shell.studio.seed.addRecord": "Thêm bản ghi",
+  "shell.studio.seed.removeRecord": "Xóa",
+  "shell.studio.seed.recordId": "Id",
+  "shell.studio.seed.required": "Cần nhập một giá trị.",
+  "shell.studio.seed.wrongType": "Giá trị không đúng kiểu của trường.",
+  "shell.studio.seed.tooLong": "Giá trị quá dài.",
+  "shell.studio.seed.outOfBounds": "Giá trị nằm ngoài giới hạn.",
+  "shell.studio.seed.notInValues": "Giá trị không nằm trong các giá trị của trường.",
+  "shell.studio.seed.invalidDate": "Ngày hoặc giờ không hợp lệ."
 }

@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
-import { e2eApp, leaveRequests, purchaseRequests, serverEnv } from './server-settings'
+import { e2eApp, leaveRequests, purchaseRequests, serverEnv, serviceDesk } from './server-settings'
 
 const port = Number(process.env.AXIS_E2E_PORT ?? 5280)
 const baseURL = `http://127.0.0.1:${port}`
@@ -15,6 +15,7 @@ const environment = {
   ActivateOnStartup__0: e2eApp,
   ActivateOnStartup__1: purchaseRequests,
   ActivateOnStartup__2: leaveRequests,
+  ActivateOnStartup__3: serviceDesk,
 }
 const isShellName = (name: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)
 const hyphenated = Object.entries(environment).filter(([name]) => !isShellName(name))
@@ -47,9 +48,9 @@ export default defineConfig({
     url: `${baseURL}/health/ready`,
     timeout: 120_000,
     reuseExistingServer: false,
-    // The server compiles and activates all three applications in the tenant when it starts: the generic
-    // test application, the purchase request sample and the leave request sample. Index 1 replaces the
-    // entry of appsettings.Development.json, so the leave request sample is listed again at index 2.
+    // The server compiles and activates all four applications in the tenant when it starts: the generic
+    // test application, the purchase request, leave request and service desk samples. Index 1 replaces the
+    // entry of appsettings.Development.json, so the other samples are listed again at indexes 2 and 3.
     env: Object.fromEntries(Object.entries(environment).filter(([name]) => isShellName(name))),
   },
 })

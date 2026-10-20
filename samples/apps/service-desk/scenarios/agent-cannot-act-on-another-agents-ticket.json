@@ -1,0 +1,78 @@
+{
+  "id": "b0706d6c-c755-4ffe-aa9b-22939b1c6553",
+  "kind": "scenario",
+  "name": "AgentCannotActOnAnotherAgentsTicket",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["requester"],
+    "khoa": ["agent"],
+    "minh": ["agent"],
+    "linh": ["service-desk-lead"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Ticket",
+      "as": "anna",
+      "save": "ticket",
+      "values": {
+        "title": "Laptop will not start",
+        "description": "It shows a black screen.",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "TicketHandling",
+      "record": "ticket",
+      "as": "anna"
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "triage",
+      "outcome": "assign",
+      "as": "linh",
+      "values": {
+        "category": "3f1c2a6e-5b0d-4e0a-9c1f-7a2d8b4e6c01",
+        "priority": "high",
+        "assignedAgent": "minh"
+      }
+    },
+    {
+      "type": "completeTask",
+      "record": "ticket",
+      "step": "resolve",
+      "outcome": "resolve",
+      "as": "khoa",
+      "values": {
+        "resolution": "Replaced the battery."
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "updateRecord",
+      "record": "ticket",
+      "as": "khoa",
+      "values": {
+        "resolution": "Fixed"
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "expectTask",
+      "record": "ticket",
+      "step": "resolve",
+      "state": "open"
+    },
+    {
+      "type": "expectTask",
+      "record": "ticket",
+      "step": "resolve",
+      "assignee": {
+        "user": "minh"
+      }
+    }
+  ]
+}
