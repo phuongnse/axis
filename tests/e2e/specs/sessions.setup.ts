@@ -14,7 +14,8 @@ for (const user of Object.keys(sampleUsers) as SampleUser[]) {
     expect(me.status(), `GET /api/me as ${user}`).toBe(200)
     const body = await me.json()
     expect(body.id).toBe(user)
-    expect(body.roles).toEqual(sampleUsers[user])
+    // Keycloak does not keep the order of a user's roles.
+    expect([...body.roles].sort()).toEqual([...sampleUsers[user]].sort())
 
     await page.context().storageState({ path: sessionFile(user) })
   })

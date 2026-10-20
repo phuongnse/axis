@@ -1,0 +1,16 @@
+{
+  "id": "4ff52d55-8194-45c4-901b-bdc18e269096",
+  "kind": "page",
+  "name": "AllTickets",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "pages.allTickets.title"
+  },
+  "widgets": [
+    {
+      "type": "table",
+      "dataSource": "AllTicketList",
+      "formPage": "TicketForm"
+    }
+  ]
+}

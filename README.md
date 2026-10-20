@@ -10,8 +10,8 @@ The first application built on Axis is **purchase requests**. An employee
 drafts a request, a manager approves it, finance reviews it above a configured
 amount, and an approved request is sent to a purchasing system.
 
-Leave requests is the second sample. A third, a service desk built only through
-Studio, is planned for M11. See
+Leave requests is the second sample. A third, a service desk, runs as a sample
+too. Building it only through Studio is planned for M11. See
 [D56](docs/decisions.md#d56-a-service-desk-as-the-third-sample-application--agreed).
 
 ## Status
@@ -25,7 +25,7 @@ the commands.
 
 Run `docker compose up --build`. It needs only Docker. It builds Axis from source
 and starts PostgreSQL, Keycloak with the development realm at http://localhost:8080,
-the server with the purchase request and leave request samples at http://localhost:5206, the worker,
+the server with the purchase request, leave request and service desk samples at http://localhost:5206, the worker,
 and a purchasing system stub at http://localhost:5207 that stands in for the
 external purchasing system. The server also serves a preview tenant of the same samples at
 http://preview.localhost:5206, with its own database and no purchasing system bindings. An existing

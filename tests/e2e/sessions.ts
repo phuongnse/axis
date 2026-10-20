@@ -2,17 +2,19 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 
-export type SampleUser = "anna" | "lan" | "binh" | "chau" | "dung" | "giang" | "hoa";
+export type SampleUser = "anna" | "lan" | "binh" | "chau" | "dung" | "giang" | "hoa" | "khoa" | "linh";
 
 /** The sample users and the roles the development realm gives them. */
 export const sampleUsers: Record<SampleUser, string[]> = {
-  anna: ["employee"],
+  anna: ["employee", "requester"],
   lan: ["employee"],
   binh: ["department-manager"],
   chau: ["department-manager"],
   dung: ["finance-reviewer"],
   giang: ["operator"],
   hoa: ["author", "publisher"],
+  khoa: ["agent"],
+  linh: ["service-desk-lead"],
 };
 
 /** The file where the setup step saves `user`'s browser session. */

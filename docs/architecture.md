@@ -630,7 +630,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - It holds the purchase request users with fixed ids: `anna` and `lan`
     the employees, `binh` and `chau` the department managers, `dung` the
     finance reviewer, `giang` the operator, and `hoa` the author. Seed data and E2E journeys already name these ids.
-    `hoa` also holds the `publisher` role. The realm grants it at `samples/keycloak/axis-realm.json:274`.
+    `hoa` also holds the `publisher` role. The realm grants it at `samples/keycloak/axis-realm.json:287`.
+  - It also holds the service desk users: `khoa` the agent and `linh` the
+    service desk lead. `anna` holds the `requester` role as well as `employee`.
   - Every user has the same development-only password.
   - The roles are client roles of the confidential client `axis`. A
     client-role mapper writes them to the `roles` claim, so the claim holds
@@ -1173,7 +1175,7 @@ kinds in the [configuration pipeline](reference/configuration.md#configuration-p
 `DiagnosticCodes`, `ResourceKinds` and the schema files. They find them by
 heading or table header, so the sections may move within `docs/`.
 
-The E2E server starts with three applications listed in `ActivateOnStartup` (see
+The E2E server starts with four applications listed in `ActivateOnStartup` (see
 [Startup activation](reference/configuration.md#startup-activation)), so Playwright journeys run against
 real metadata and records:
 
@@ -1182,7 +1184,9 @@ real metadata and records:
 - the purchase request sample in `samples/apps/purchase-requests`, for the
   purchase request skeleton journeys;
 - the leave request sample in `samples/apps/leave-requests`, for the leave
-  request journeys.
+  request journeys;
+- the service desk sample in `samples/apps/service-desk`, for the service
+  desk journeys.
 
 The E2E server's `Studio:Folders` does not list that sample. It lists a copy
 that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on

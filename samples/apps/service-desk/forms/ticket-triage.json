@@ -1,0 +1,52 @@
+{
+  "id": "e5650c79-b0cb-449b-a5c2-1bd8d9acd452",
+  "kind": "form",
+  "name": "TicketTriage",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "sections": [
+    {
+      "title": {
+        "textKey": "ticket.sections.ticket"
+      },
+      "fields": [
+        {
+          "field": "number",
+          "readOnly": true
+        },
+        {
+          "field": "title",
+          "readOnly": true
+        },
+        {
+          "field": "description",
+          "readOnly": true
+        },
+        {
+          "field": "requester",
+          "readOnly": true
+        },
+        {
+          "field": "status",
+          "readOnly": true
+        }
+      ]
+    },
+    {
+      "title": {
+        "textKey": "ticket.sections.triage"
+      },
+      "fields": [
+        {
+          "field": "category"
+        },
+        {
+          "field": "priority"
+        },
+        {
+          "field": "assignedAgent"
+        }
+      ]
+    }
+  ]
+}

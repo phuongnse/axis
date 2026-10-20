@@ -1,0 +1,35 @@
+{
+  "id": "26a21477-00ac-40d0-b4b9-d6eb9346a12e",
+  "kind": "site",
+  "name": "ServiceDesk",
+  "formatVersion": 1,
+  "path": "service-desk",
+  "title": {
+    "textKey": "site.title"
+  },
+  "locales": {
+    "default": "en",
+    "fallback": "en",
+    "available": ["en", "vi"]
+  },
+  "navigation": [
+    {
+      "page": "MyTickets",
+      "label": {
+        "textKey": "nav.myTickets"
+      }
+    },
+    {
+      "page": "MyTasks",
+      "label": {
+        "textKey": "nav.myTasks"
+      }
+    },
+    {
+      "page": "AllTickets",
+      "label": {
+        "textKey": "nav.allTickets"
+      }
+    }
+  ]
+}

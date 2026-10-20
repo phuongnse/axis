@@ -768,11 +768,16 @@ public sealed class ScenarioRunnerTests
             CancellationToken);
 
         Assert.True(exitCode == 0, output.ToString());
-        var suites = new Dictionary<string, string> { ["purchase-requests"] = "PurchaseRequests", ["leave-requests"] = "LeaveRequests" };
-        if (suites.TryGetValue(application, out var suiteName))
+        var suites = new Dictionary<string, (string Name, string Tests)>
         {
-            var suite = XDocument.Load(Path.Combine(root, "artifacts", "test-results", $"scenarios-{suiteName}.xml")).Root!.Element("testsuite")!;
-            Assert.Equal("5", suite.Attribute("tests")!.Value);
+            ["purchase-requests"] = ("PurchaseRequests", "5"),
+            ["leave-requests"] = ("LeaveRequests", "5"),
+            ["service-desk"] = ("ServiceDesk", "6"),
+        };
+        if (suites.TryGetValue(application, out var expected))
+        {
+            var suite = XDocument.Load(Path.Combine(root, "artifacts", "test-results", $"scenarios-{expected.Name}.xml")).Root!.Element("testsuite")!;
+            Assert.Equal(expected.Tests, suite.Attribute("tests")!.Value);
             Assert.Equal("0", suite.Attribute("failures")!.Value);
         }
     }

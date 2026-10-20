@@ -1,0 +1,16 @@
+{
+  "id": "8da3d870-fe4d-41ae-839a-fb2db5eeea06",
+  "kind": "page",
+  "name": "MyTickets",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "pages.myTickets.title"
+  },
+  "widgets": [
+    {
+      "type": "table",
+      "dataSource": "MyTicketList",
+      "formPage": "TicketForm"
+    }
+  ]
+}
