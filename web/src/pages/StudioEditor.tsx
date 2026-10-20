@@ -106,7 +106,7 @@ export function StudioEditor({
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
-  const names = useContext(StudioNamesContext)
+  const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
   const dirtyRef = useRef(false)
