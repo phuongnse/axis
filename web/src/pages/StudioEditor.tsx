@@ -14,6 +14,7 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
+import { ExpressionCheckContext } from './expressionCheckContext'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
 import { buildProcessGraph } from './processGraph'
@@ -192,6 +193,7 @@ export function StudioEditor({
   }, [application, entityId, generation, lost])
 
   const seedFields = entityId !== undefined && seedEntity?.id === entityId ? seedEntity.fields : null
+  const checkContext = useMemo(() => ({ application, resourceId: item.id }), [application, item.id])
   // The form is final once the seed's entity has loaded, so a path into a record finds its cell.
   const formReady = entityId === undefined || seedEntity?.id === entityId
   const problems = useMemo(
@@ -357,45 +359,47 @@ export function StudioEditor({
           <StudioProcessGraph graph={graph} openPath={path} onOpen={onOpenPath} />
         </Suspense>
       )}
-      <Tabs
-        activeKey={tab}
-        onChange={(key) => setTab(key as 'form' | 'json')}
-        items={[
-          {
-            key: 'form',
-            label: t('shell.studio.form'),
-            children: seedSchema ? (
-              <Flex vertical gap="middle">
-                <SchemaForm schema={seedSchema} value={draft} onChange={change} />
-                <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={update} />
-              </Flex>
-            ) : schema ? (
-              <SchemaForm schema={schema} value={draft} onChange={change} />
-            ) : (
-              <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
-            ),
-          },
-          {
-            key: 'json',
-            label: t('shell.studio.json'),
-            children: (
-              <Flex vertical gap="small">
-                <Input.TextArea
-                  aria-label={t('shell.studio.json')}
-                  autoSize={{ minRows: 10, maxRows: 40 }}
-                  spellCheck={false}
-                  style={{ fontFamily: 'monospace' }}
-                  value={jsonText ?? JSON.stringify(draft, null, 2)}
-                  onChange={(event) => changeJson(event.target.value)}
-                />
-                {jsonInvalid && (
-                  <Alert data-testid="studio-json-error" type="error" message={t('shell.studio.invalidJson')} />
-                )}
-              </Flex>
-            ),
-          },
-        ]}
-      />
+      <ExpressionCheckContext.Provider value={checkContext}>
+        <Tabs
+          activeKey={tab}
+          onChange={(key) => setTab(key as 'form' | 'json')}
+          items={[
+            {
+              key: 'form',
+              label: t('shell.studio.form'),
+              children: seedSchema ? (
+                <Flex vertical gap="middle">
+                  <SchemaForm schema={seedSchema} value={draft} onChange={change} />
+                  <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={update} />
+                </Flex>
+              ) : schema ? (
+                <SchemaForm schema={schema} value={draft} onChange={change} />
+              ) : (
+                <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
+              ),
+            },
+            {
+              key: 'json',
+              label: t('shell.studio.json'),
+              children: (
+                <Flex vertical gap="small">
+                  <Input.TextArea
+                    aria-label={t('shell.studio.json')}
+                    autoSize={{ minRows: 10, maxRows: 40 }}
+                    spellCheck={false}
+                    style={{ fontFamily: 'monospace' }}
+                    value={jsonText ?? JSON.stringify(draft, null, 2)}
+                    onChange={(event) => changeJson(event.target.value)}
+                  />
+                  {jsonInvalid && (
+                    <Alert data-testid="studio-json-error" type="error" message={t('shell.studio.invalidJson')} />
+                  )}
+                </Flex>
+              ),
+            },
+          ]}
+        />
+      </ExpressionCheckContext.Provider>
       {conflict && (
         <Alert
           data-testid="studio-conflict"

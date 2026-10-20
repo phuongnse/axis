@@ -1,0 +1,75 @@
+{
+  "id": "03294589-0371-4fda-9cc1-24cb87d3c3d8",
+  "kind": "process",
+  "name": "RequestApproval",
+  "formatVersion": 1,
+  "entity": "Request",
+  "startCondition": {
+    "expression": "status == 'draft'",
+    "message": {
+      "textKey": "request.cannotSubmit"
+    }
+  },
+  "start": "submit",
+  "steps": [
+    {
+      "name": "submit",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'submitted'"
+      },
+      "next": "approval"
+    },
+    {
+      "name": "approval",
+      "type": "task",
+      "label": {
+        "textKey": "request.approval"
+      },
+      "assignee": {
+        "role": "approver"
+      },
+      "form": "RequestReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        {
+          "name": "approve",
+          "label": {
+            "textKey": "task.approve"
+          },
+          "next": "markApproved"
+        },
+        {
+          "name": "reject",
+          "label": {
+            "textKey": "task.reject"
+          },
+          "next": "markRejected"
+        }
+      ]
+    },
+    {
+      "name": "markApproved",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'approved'"
+      },
+      "next": "done"
+    },
+    {
+      "name": "markRejected",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'rejected'"
+      },
+      "next": "done"
+    },
+    {
+      "name": "done",
+      "type": "end"
+    }
+  ]
+}

@@ -1157,7 +1157,8 @@ Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
 
 `scripts/integration.sh` runs the scenarios of every application under
-`samples/apps/` from the integration tests, on their Testcontainers PostgreSQL. See
+`samples/apps/` and of every sample template under `samples/templates/` from the
+integration tests, on their Testcontainers PostgreSQL. See
 [test scenarios](reference/configuration.md#test-scenarios).
 
 The integration tests share one Keycloak container with the development realm

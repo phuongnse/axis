@@ -1,0 +1,7 @@
+{
+  "id": "615e8412-deed-4e04-a755-a93954cfdaf7",
+  "kind": "sequence",
+  "name": "RequestNumber",
+  "formatVersion": 1,
+  "format": "REQ-{yyyy}-{n:5}"
+}

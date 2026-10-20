@@ -76,7 +76,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/build.sh`       | Builds the SPA into the server web root, then the .NET solution, which installs the sample extension package in `artifacts/extensions`, then installs the sample modules in `artifacts/modules` and the sample templates in `artifacts/templates`                                                                                                                                                                                   |         |
 | `scripts/lint.sh`        | `dotnet format` check, oxlint, TypeScript and Prettier checks, the Markdown link and anchor check, and the Helm chart lint and schema check                                                                                                                                                                                                                                       |         |
 | `scripts/test.sh`        | .NET unit tests and Vitest                                                                                                                                                                                                                                                                                                                                                        |         |
-| `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, which also run the test scenarios of every application under `samples/apps/` on that PostgreSQL, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list                                                                                      | Docker  |
+| `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, which also run the test scenarios of every application under `samples/apps/` and of every sample template under `samples/templates/` on that PostgreSQL, and a smoke test of `scripts/dev.sh`, skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list                                                                                      | Docker  |
 | `scripts/e2e.sh`         | Starts PostgreSQL, Keycloak, the built purchasing system stub, server and worker, runs Playwright in Chromium, then runs the Compose smoke test, the production images smoke test and the on-premises smoke test, which installs `deploy/compose/` from the production images for two tenants, each skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list | Docker  |
 | `scripts/scan.sh`        | NuGet and npm vulnerability scan that fails on high or critical findings. CI is to run it on its triggers and once a week _(planned for M16)_                                                                                                                                                                                                                                                          | Network |
 
@@ -174,13 +174,12 @@ works on a fresh clone:
 - It installs the sample templates, `samples/templates/*`, into
   `artifacts/templates/<id>/<version>/`, and creates that folder even when there is no
   sample. The Development settings of the server point `Templates:Path` there, and so do
-  the E2E settings. The Compose server sets it to `/templates`, an empty folder in
-  the image. The server reads the template catalog only when it starts, so a template
+  the E2E settings. The Compose server sets it to `/templates`, which holds the
+  `request-approval` sample template. The server reads the template catalog only when it starts, so a template
   edit needs a restart of the script. The production images and `deploy/` set no
   `Templates:Path`, so they list no template.
 - _(planned for M11)_ Development, Compose and E2E set `Studio:ApplicationsPath`
-  to `artifacts/studio-apps`, and the sample templates are installed in
-  `artifacts/templates` and the Compose image's `/templates`. `artifacts/` is already
+  to `artifacts/studio-apps`. `artifacts/` is already
   git-ignored. See
   [D51](docs/decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
 - It runs the server and the worker under `dotnet watch` and the SPA on Vite in

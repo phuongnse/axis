@@ -1,0 +1,25 @@
+{
+  "id": "91298562-9fca-4b0e-b657-577508bcb685",
+  "kind": "dataSource",
+  "name": "RequestList",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    {
+      "name": "number",
+      "path": "number"
+    },
+    {
+      "name": "requester",
+      "path": "requester"
+    },
+    {
+      "name": "title",
+      "path": "title"
+    },
+    {
+      "name": "status",
+      "path": "status"
+    }
+  ]
+}

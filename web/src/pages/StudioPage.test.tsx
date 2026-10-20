@@ -1,9 +1,11 @@
+import { EditorView } from '@codemirror/view'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { assignLocation } from '../platform/navigation'
+import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
 import { StudioPage } from './StudioPage'
@@ -144,12 +146,20 @@ interface Outage {
   down: { status: number | null } | null
 }
 
+/** What the expression stubs answer: the entity's content, and the answer of each check in order. */
+interface ExpressionStub {
+  content?: Record<string, unknown>
+  check?: (call: number) => Response
+}
+
 /** Stubs `fetch` with the Studio list routes, the read, patch and delete of the purchase request entity, and its references. `apps` is the status or list of `/api/studio/apps`. */
 function stubServer(
   apps: { name: string }[] | number = [{ name: 'PurchaseRequests' }],
   patch: PatchAnswer = { status: 200, body: { version: 'b2', diagnostics: [savedDiagnostic] } },
   outage: Outage = { down: null },
+  expressions: ExpressionStub = {},
 ) {
+  let checkCalls = 0
   const entityPath = `${folder}/resources/${entityId}`
   const manifestPath = `${folder}/resources/${manifestId}`
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
@@ -169,7 +179,7 @@ function stubServer(
       return json({ diagnostics: [] })
     }
     if (input === entityPath) {
-      return json({ ...resources[1], content: entityContent() })
+      return json({ ...resources[1], content: expressions.content ?? entityContent() })
     }
     if (input === manifestPath) {
       return json({ ...resources[3], content: { id: manifestId, kind: 'application', name: 'PurchaseRequests' } })
@@ -185,6 +195,10 @@ function stubServer(
     }
     if (input === `${folder}/diagnostics`) {
       return json({ diagnostics })
+    }
+    if (input === `${folder}/expressions/check` && expressions.check) {
+      checkCalls++
+      return expressions.check(checkCalls)
     }
     if (input === `${folder}/texts/purchaseRequest.label/references`) {
       return json(labelUsers)
@@ -206,12 +220,14 @@ function Location() {
 
 function renderPage(entry = '/studio?app=PurchaseRequests') {
   render(
-    <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-      <MemoryRouter initialEntries={[entry]}>
-        <StudioPage />
-        <Location />
-      </MemoryRouter>
-    </TextProvider>,
+    <ThemeModeProvider>
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <MemoryRouter initialEntries={[entry]}>
+          <StudioPage />
+          <Location />
+        </MemoryRouter>
+      </TextProvider>
+    </ThemeModeProvider>,
   )
 }
 
@@ -592,6 +608,35 @@ describe('StudioPage', () => {
 
     await waitFor(() => expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true'))
     expect(screen.getByRole('textbox', { name: 'JSON' })).toHaveValue(JSON.stringify(textContent, null, 2))
+  })
+
+  it('keeps the last expression result and Save enabled when a check gets no answer', async () => {
+    const fetchMock = stubServer(undefined, undefined, undefined, {
+      content: {
+        ...entityContent(),
+        validations: [{ expression: 'totalAmount > 0', message: { textKey: 'validation.total' }, field: 'title' }],
+      },
+      check: (call) => {
+        if (call === 1) {
+          return json({ type: 'boolean', diagnostics: [] })
+        }
+        throw new TypeError('Failed to fetch')
+      },
+    })
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    const field = await screen.findByTestId('studio-field-/validations/0/expression')
+    await waitFor(() => expect(within(field).getByTestId('studio-expression-type')).toHaveTextContent('boolean'))
+
+    const view = EditorView.findFromDOM(within(field).getByRole('textbox'))!
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'totalAmount > 1' } })
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([input]) => input === `${folder}/expressions/check`)).toHaveLength(2),
+    )
+
+    expect(within(field).getByTestId('studio-expression-type')).toHaveTextContent('boolean')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(screen.queryByTestId('studio-reconnecting')).not.toBeInTheDocument()
   })
 
   it('shows the form again for a path it can show after a path it cannot show', async () => {

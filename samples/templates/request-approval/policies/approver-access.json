@@ -1,0 +1,24 @@
+{
+  "id": "bd749c7e-d34d-4f95-ba82-56ef97925bda",
+  "kind": "policy",
+  "name": "ApproverAccess",
+  "formatVersion": 1,
+  "roles": [
+    "approver"
+  ],
+  "grants": [
+    {
+      "entity": "Request",
+      "actions": [
+        "read"
+      ],
+      "filter": "status in ('submitted', 'approved', 'rejected')"
+    },
+    {
+      "dataSource": "RequestList",
+      "actions": [
+        "read"
+      ]
+    }
+  ]
+}

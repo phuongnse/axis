@@ -1,0 +1,31 @@
+{
+  "id": "8b771556-c731-49e2-9d99-b45be0d6df58",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Request approval",
+    "nav.myRequests": "My requests",
+    "nav.myTasks": "My tasks",
+    "pages.myRequests.title": "My requests",
+    "pages.requestForm.title": "Request",
+    "pages.myTasks.title": "My tasks",
+    "request.label": "Request",
+    "request.number": "Number",
+    "request.requester": "Requester",
+    "request.title": "Title",
+    "request.description": "Description",
+    "request.status": "Status",
+    "request.decisionComment": "Decision comment",
+    "request.submit": "Submit",
+    "request.cannotSubmit": "Only a draft request can be submitted.",
+    "request.approval": "Approval",
+    "request.sections.request": "Request",
+    "request.sections.decision": "Decision",
+    "task.approve": "Approve",
+    "task.reject": "Reject",
+    "role.requester": "Requester",
+    "role.approver": "Approver"
+  }
+}

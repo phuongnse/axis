@@ -855,6 +855,8 @@ sorted by file and then path.
 | `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
 | `AXC0215` | The publisher stopped three times while running a publish or validate request. Reported on the request, with an empty file and path, see [lifecycle](authoring.md#lifecycle). |
 | `AXC0216` | The main tenant has no preview tenant when a preview request runs, see [preview](authoring.md#preview). Reported on the request, with an empty file and path. |
+| `AXC0217` | A `test` request runs and the publisher has no `Scenarios:ServerConnectionString`, see [test](authoring.md#test). The message names the setting. Reported on the request, with an empty file and path. |
+| `AXC0218` | A `test` request names a scenario that the application does not have. The message names the scenario. Reported on the request, with an empty file and path, once for each unknown name. |
 
 ## Startup activation
 
@@ -1133,7 +1135,7 @@ to show where a resource is used and what it uses.
 
 ## Schema keywords
 
-*(Planned for M11.)* Two custom keywords in the resource schemas tell
+Two custom keywords in the resource schemas tell
 [Studio](frontend.md#studio) where to show a picker and where to show the
 expression editor, as
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
@@ -1153,10 +1155,10 @@ agrees. The schemas stay the single source of what the form shows.
   `{ "part": "field", "of": "/entity" }`, because the form's `entity` names
   the entity whose fields it lists. The keys of a process `updateRecord`
   step's `set` map are fields of the process's `/entity` in the same way.
-- *(Planned for M11.)* **Expressions.** `"x-axis-expression": true` marks a
+- **Expressions.** `"x-axis-expression": true` marks a
   string property that holds an [expression](expressions.md). The form then
   shows the expression editor there.
-- *(Planned for M11.)* **Annotations only.** JsonSchema.Net ignores unknown
+- **Annotations only.** JsonSchema.Net ignores unknown
   keywords when it validates, so neither keyword changes what a resource may
   hold, and no resource file changes. The [reference index](#reference-index)
   stays the list of reference paths.
@@ -2420,8 +2422,8 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 
 This section follows
 [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
-The manifest, the one-site rule, installation and listing are built. The copy and
-the sample are _(planned for M11)_.
+The manifest, the one-site rule, installation, listing and the sample are built.
+The copy is _(planned for M11)_.
 An application template is an application folder with a `template.json`
 manifest. Studio creates a new application by copying an installed template, see
 [creating an application](authoring.md#creating-an-application).
@@ -2469,7 +2471,7 @@ The manifest is `template.json` at the root of the folder:
   - References are by name, so they still resolve.
   - The copy has the template's diagnostics. `template.json` is not copied,
     because template metadata does not belong in an application.
-- **Sample** _(planned for M11)_. `samples/templates/request-approval` is the sample template. It
+- **Sample.** `samples/templates/request-approval` is the sample template. It
   holds one entity with a sequence number, a form page, a table page, a two-step
   approval process, two roles and their policies, texts in `en` and `vi`, and one
   test scenario. `scripts/build.sh` installs it into `artifacts/templates`. The
@@ -3257,7 +3259,8 @@ which plays the role of `Modules:Path`, and works the same way for modules. A
 missing folder is a setup error. A user's display name is their id.
 
 `scripts/integration.sh` runs the scenarios of every application under
-`samples/apps/` from the integration tests, on their Testcontainers PostgreSQL.
+`samples/apps/` and of every sample template under `samples/templates/` from the
+integration tests, on their Testcontainers PostgreSQL.
 
 What runs now:
 
