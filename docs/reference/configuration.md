@@ -1135,7 +1135,7 @@ to show where a resource is used and what it uses.
 
 ## Schema keywords
 
-*(Planned for M11.)* Two custom keywords in the resource schemas tell
+Two custom keywords in the resource schemas tell
 [Studio](frontend.md#studio) where to show a picker and where to show the
 expression editor, as
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
@@ -1155,10 +1155,10 @@ agrees. The schemas stay the single source of what the form shows.
   `{ "part": "field", "of": "/entity" }`, because the form's `entity` names
   the entity whose fields it lists. The keys of a process `updateRecord`
   step's `set` map are fields of the process's `/entity` in the same way.
-- *(Planned for M11.)* **Expressions.** `"x-axis-expression": true` marks a
+- **Expressions.** `"x-axis-expression": true` marks a
   string property that holds an [expression](expressions.md). The form then
   shows the expression editor there.
-- *(Planned for M11.)* **Annotations only.** JsonSchema.Net ignores unknown
+- **Annotations only.** JsonSchema.Net ignores unknown
   keywords when it validates, so neither keyword changes what a resource may
   hold, and no resource file changes. The [reference index](#reference-index)
   stays the list of reference paths.

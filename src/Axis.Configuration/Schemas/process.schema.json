@@ -51,7 +51,7 @@
       "additionalProperties": false,
       "required": ["expression", "message"],
       "properties": {
-        "expression": { "type": "string", "minLength": 1 },
+        "expression": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "message": { "$ref": "#/$defs/textReference" }
       }
     },
@@ -73,7 +73,7 @@
           "type": "object",
           "minProperties": 1,
           "propertyNames": { "$ref": "#/$defs/name" },
-          "additionalProperties": { "type": "string", "minLength": 1 }
+          "additionalProperties": { "type": "string", "minLength": 1, "x-axis-expression": true }
         },
         "connector": {
           "type": "object",
@@ -87,7 +87,7 @@
         "input": {
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/name" },
-          "additionalProperties": { "type": "string", "minLength": 1 }
+          "additionalProperties": { "type": "string", "minLength": 1, "x-axis-expression": true }
         },
         "output": {
           "type": "object",
@@ -106,7 +106,7 @@
         "fields": {
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/name" },
-          "additionalProperties": { "type": "string", "minLength": 1 }
+          "additionalProperties": { "type": "string", "minLength": 1, "x-axis-expression": true }
         },
         "next": { "$ref": "#/$defs/name" },
         "label": { "$ref": "#/$defs/textReference" },
@@ -246,7 +246,7 @@
       "additionalProperties": false,
       "required": ["when", "next"],
       "properties": {
-        "when": { "type": "string", "minLength": 1 },
+        "when": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "next": { "$ref": "#/$defs/name" }
       }
     },
@@ -254,7 +254,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "user": { "type": "string", "minLength": 1 },
+        "user": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "role": { "type": "string", "minLength": 1 }
       }
     },
