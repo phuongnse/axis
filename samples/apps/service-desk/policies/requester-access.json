@@ -1,0 +1,32 @@
+{
+  "id": "8447ebd3-8436-4d28-8dd6-9dfb1f62ea87",
+  "kind": "policy",
+  "name": "RequesterAccess",
+  "formatVersion": 1,
+  "roles": ["requester"],
+  "grants": [
+    {
+      "entity": "Ticket",
+      "actions": ["read"],
+      "filter": "requester == currentUser()"
+    },
+    {
+      "entity": "Ticket",
+      "actions": ["create", "update"],
+      "filter": "requester == currentUser() and status in ('draft', 'reopened')",
+      "fields": ["title", "description", "status"]
+    },
+    {
+      "entity": "Category",
+      "actions": ["read"]
+    },
+    {
+      "dataSource": "MyTicketList",
+      "actions": ["read"]
+    },
+    {
+      "process": "TicketHandling",
+      "actions": ["start"]
+    }
+  ]
+}

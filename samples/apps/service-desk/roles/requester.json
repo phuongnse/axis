@@ -1,0 +1,9 @@
+{
+  "id": "bce24839-05ab-4b60-9aea-648cf76fdfe2",
+  "kind": "role",
+  "name": "requester",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.requester"
+  }
+}

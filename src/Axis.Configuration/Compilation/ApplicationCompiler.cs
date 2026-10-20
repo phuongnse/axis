@@ -28,7 +28,7 @@ namespace Axis.Configuration.Compilation;
 /// the extension packages of the manifest and pins each to the highest installed version in its
 /// range, does the same for its modules, takes the files of each pinned module into the
 /// resources and merges their texts into the application's, resolves references
-/// between entities, forms, pages, sites and seeds, and builds the reference index of the references it resolves.
+/// between entities, forms, pages, sites and seeds, builds the reference index of the references it resolves, and collects the names it loaded.
 /// Every problem is reported, together with the loader's, in one
 /// sorted list. An application without errors also gets its content hash, which covers its pins and the files of its modules.
 /// Both inputs give the same result for the same resources and installed packages.
@@ -74,6 +74,23 @@ public static class ApplicationCompiler
         ArgumentNullException.ThrowIfNull(files);
 
         return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: true);
+    }
+
+    /// <summary>
+    /// Compiles the files as the overload without a probe does, and tells <paramref name="probe"/> what the compile
+    /// saw at its expression place.
+    /// </summary>
+    /// <exception cref="ArgumentException">A path appears more than once.</exception>
+    public static CompilationResult CompileFiles(
+        IReadOnlyList<ResourceContent> files,
+        IReadOnlyCollection<PackageVersion>? installedPackages,
+        IReadOnlyCollection<InstalledModule>? installedModules,
+        ExpressionProbe probe)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(probe);
+
+        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: true, probe);
     }
 
     /// <summary>
@@ -171,19 +188,20 @@ public static class ApplicationCompiler
         return modules;
     }
 
-    private static bool IsModuleResource(Resource resource) =>
+    internal static bool IsModuleResource(Resource resource) =>
         resource.File.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
 
     private static CompilationResult Compile(
         ApplicationLoadResult loaded,
         IReadOnlyCollection<PackageVersion> installedPackages,
         IReadOnlyCollection<InstalledModule> installedModules,
-        bool collectReferences)
+        bool collectReferences,
+        ExpressionProbe? probe = null)
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
         var textKeys = CheckTexts(loaded.Texts, diagnostics);
-        var references = new ReferenceIndexBuilder(textKeys, loaded.Rules, collectReferences);
+        var references = new ReferenceIndexBuilder(textKeys, loaded.Rules, collectReferences, probe);
         foreach (var text in loaded.Texts)
         {
             foreach (var key in text.Texts.Keys)
@@ -470,7 +488,12 @@ public static class ApplicationCompiler
             references,
             diagnostics);
 
-        var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics)) { References = references.Build() };
+        var index = references.Build();
+        var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics))
+        {
+            References = index,
+            Names = DefinedNamesBuilder.Build(loaded, allEntities, allSequences, allEvents, moduleResources.Rules, texts, FindEntity, index),
+        };
         if (result.HasErrors || loaded.Application is null)
         {
             return result;
@@ -737,7 +760,7 @@ public static class ApplicationCompiler
             }
         }
 
-        CheckComputedFields(entity, findEntity, Report);
+        CheckComputedFields(entity, findEntity, references, Report);
         CheckValidations(entity, findEntity, references, rules, modules, diagnostics, Report);
     }
 
@@ -750,7 +773,10 @@ public static class ApplicationCompiler
     /// refused. An expression problem is reported at the expression with its own code.
     /// </summary>
     private static void CheckComputedFields(
-        EntityResource entity, Func<string, EntityResource?> findEntity, Action<string, string, string> report)
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
     {
         if (entity.Fields.All(field => field.Expression is null))
         {
@@ -772,9 +798,11 @@ public static class ApplicationCompiler
             }
 
             var parsed = ExpressionParser.Parse(field.Expression);
-            ExpressionDiagnostic? problem = parsed.Succeeded
-                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!, storedValue: true).Diagnostic
-                : parsed.Diagnostic;
+            var check = parsed.Succeeded
+                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!, storedValue: true)
+                : null;
+            var problem = parsed.Succeeded ? check!.Diagnostic : parsed.Diagnostic;
+            references.RecordExpression(entity, $"/fields/{index}/expression", check?.Type, problem);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, $"/fields/{index}/expression");
@@ -821,6 +849,7 @@ public static class ApplicationCompiler
 
             var parsed = ExpressionParser.Parse(validation.Expression);
             ExpressionDiagnostic? problem = parsed.Succeeded ? null : parsed.Diagnostic;
+            ExpressionType? type = null;
             if (parsed.Succeeded)
             {
                 var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
@@ -831,7 +860,10 @@ public static class ApplicationCompiler
                 }
 
                 problem = check.Diagnostic;
+                type = check.Type;
             }
+
+            references.RecordExpression(entity, $"{path}/expression", type, problem);
 
             if (problem is not null)
             {
@@ -1361,6 +1393,7 @@ public static class ApplicationCompiler
                     references.AddRuleCalls(dataSource, "/filter", check);
                 }
 
+                references.RecordExpression(dataSource, "/filter", check?.Type, problem);
                 if (problem is not null)
                 {
                     Report(problem.Code, problem.Message, "/filter");
@@ -1470,7 +1503,7 @@ public static class ApplicationCompiler
     /// not loaded. Each reference field of the path whose target resolves, the last name included,
     /// is passed to <paramref name="reach"/>, even when the path fails further on.
     /// </summary>
-    private static string? ResolvePath(
+    internal static string? ResolvePath(
         EntityResource root,
         string path,
         Func<string, EntityResource?> findEntity,

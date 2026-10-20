@@ -1,4 +1,5 @@
 using Axis.Configuration.Resources;
+using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Typing;
 
 namespace Axis.Configuration.Compilation;
@@ -10,11 +11,13 @@ internal sealed class ReferenceIndexBuilder
     private readonly HashSet<ReferenceEdge> _added = [];
     private readonly Dictionary<string, RuleResource> _rulesByName;
     private readonly bool _collect;
+    private readonly ExpressionProbe? _probe;
 
-    public ReferenceIndexBuilder(IReadOnlySet<string> textKeys, IReadOnlyList<RuleResource> rules, bool collect)
+    public ReferenceIndexBuilder(IReadOnlySet<string> textKeys, IReadOnlyList<RuleResource> rules, bool collect, ExpressionProbe? probe = null)
     {
         TextKeys = textKeys;
         _collect = collect;
+        _probe = probe;
 
         // Rule names are unique ignoring letter case; a second rule with the same name is already
         // reported by the loader, so calls resolve to the first one.
@@ -27,6 +30,13 @@ internal sealed class ReferenceIndexBuilder
 
     /// <summary>The text keys that some locale has.</summary>
     public IReadOnlySet<string> TextKeys { get; }
+
+    /// <summary>
+    /// Tells the probe of an expression check, with its type or its problem. Every place that checks an
+    /// expression calls it, whether or not the compile collects edges.
+    /// </summary>
+    public void RecordExpression(Resource owner, string path, ExpressionType? type, ExpressionDiagnostic? problem) =>
+        _probe?.Record(owner.File, path, type, problem);
 
     public void Add(Resource from, string path, string relation, ReferenceNode to)
     {

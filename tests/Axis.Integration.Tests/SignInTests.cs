@@ -56,7 +56,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         using var body = JsonDocument.Parse(await me.Content.ReadAsStringAsync(CancellationToken));
         Assert.Equal("anna", body.RootElement.GetProperty("id").GetString());
         Assert.Equal("Anna Employee", body.RootElement.GetProperty("displayName").GetString());
-        Assert.Equal(["employee"], body.RootElement.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
+        Assert.Equal(["employee", "requester"], body.RootElement.GetProperty("roles").EnumerateArray().Select(role => role.GetString()).Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         var ticket = options.TicketDataFormat.Unprotect(signIn.SessionCookie);
         Assert.NotNull(ticket);
         Assert.Equal(
-            ["axis:display_name", "axis:role", "axis:tenant_id", "axis:user_id"],
+            ["axis:display_name", "axis:role", "axis:role", "axis:tenant_id", "axis:user_id"],
             ticket.Principal.Claims.Select(claim => claim.Type).Order(StringComparer.Ordinal));
         Assert.Equal("a", ticket.Principal.FindFirst("axis:tenant_id")?.Value);
         Assert.DoesNotContain(ticket.Properties.Items.Keys, key => key.StartsWith(".Token", StringComparison.Ordinal));

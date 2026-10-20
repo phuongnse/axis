@@ -115,7 +115,7 @@ and `deploy/helm/axis/`, see [installation](docs/reference/installation.md).
 
 To run Axis, run `docker compose up --build`. It builds Axis from source and starts
 PostgreSQL, Keycloak with the `axis` development realm at http://localhost:8080, the server
-with the purchase request and leave request samples at http://localhost:5206, the worker, the publisher, and the purchasing
+with the purchase request, leave request and service desk samples at http://localhost:5206, the worker, the publisher, and the purchasing
 system stub at http://localhost:5207. The stub, in `tests/Axis.PurchasingStub`, stands in for
 the purchasing system that the sample calls when a request is approved. It needs only
 Docker. The images hold the `departments` sample module in `/modules`.
@@ -145,7 +145,7 @@ the server stops at start, because it cannot reach `axis_preview`. See
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
 realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `lan`,
-`binh`, `chau`, `dung`, `giang` and `hoa`, and the development password is `axis` for each. `giang` holds the `operator` role, which opens the purchase request sample's Approvals inspector page. The leave request sample, `samples/apps/leave-requests`, reuses `anna`, `lan`, `binh` and `chau` with the same `employee` and `department-manager` roles, in a site at `/leave`. _(planned for M11)_ The service desk sample, `samples/apps/service-desk`, adds the realm users `khoa`, with the `agent` role, and `linh`, with the `service-desk-lead` role, and gives `anna` the `requester` role, in a site at `/service-desk`. `hoa` holds the `author` role, which lets the authoring API list and read the purchase request sample's resources under `scripts/dev.sh`. `hoa` also holds the `publisher` role, which lets the authoring API publish and shows **Publish** on the Studio page. `hoa` can also roll back from the release history on the Studio page. The Studio page at http://localhost:5173/studio opens for `hoa`. Under `scripts/dev.sh`,
+`binh`, `chau`, `dung`, `giang` and `hoa`, and the development password is `axis` for each. `giang` holds the `operator` role, which opens the purchase request sample's Approvals inspector page. The leave request sample, `samples/apps/leave-requests`, reuses `anna`, `lan`, `binh` and `chau` with the same `employee` and `department-manager` roles, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`, adds the realm users `khoa`, with the `agent` role, and `linh`, with the `service-desk-lead` role, and gives `anna` the `requester` role, in a site at `/service-desk`. `hoa` holds the `author` role, which lets the authoring API list and read the purchase request sample's resources under `scripts/dev.sh`. `hoa` also holds the `publisher` role, which lets the authoring API publish and shows **Publish** on the Studio page. `hoa` can also roll back from the release history on the Studio page. The Studio page at http://localhost:5173/studio opens for `hoa`. Under `scripts/dev.sh`,
 the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
 answers `GET /api/me`. The SPA header offers sign-in and sign-out there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the
@@ -171,6 +171,11 @@ works on a fresh clone:
   `artifacts/modules/<id>/<version>/`, where the Development settings of the server and
   the worker point `Modules:Path`. The server reads the module catalog only when it starts,
   so a module edit needs a restart of the script.
+- _(planned for M11)_ Development, Compose and E2E set `Studio:ApplicationsPath`
+  to `artifacts/studio-apps` and `Templates:Path` to `artifacts/templates`. The
+  sample templates, `samples/templates/*`, are installed there, and the Compose
+  image holds them in `/templates`. `artifacts/` is already git-ignored. See
+  [D51](docs/decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
 - It runs the server and the worker under `dotnet watch` and the SPA on Vite in
   one terminal. It starts the worker once the server has migrated the tenant
   databases. Each line starts with `[server]`, `[worker]` or `[web]`, and the
@@ -190,7 +195,7 @@ works on a fresh clone:
   and its own roles, `axis_preview_schema` and `axis_preview_runtime`. It has no deployment
   bindings, so the purchase request sample logs `AXC0100` warnings on it, and a connector call
   there fails. It signs people in through the same Keycloak realm as `default`. The server
-  activates the purchase request and leave request samples on it at start. The worker runs it too,
+  activates the purchase request, leave request and service desk samples on it at start. The worker runs it too,
   with only its runtime connection string. Its host is `preview.localhost`: Compose and
   `scripts/dev.sh` serve it at `http://preview.localhost:5206`, and `scripts/dev.sh` also serves it
   through the SPA at `http://preview.localhost:5173`. The E2E server and worker serve it on
@@ -239,13 +244,14 @@ works on a fresh clone:
   `bash scripts/lib/install-sample-modules.sh`. Until then `Modules:Path` names a
   folder that does not exist, and they stop too.
 - `src/Axis.Server/appsettings.Development.json` lists the purchase request
-  sample, `../../samples/apps/purchase-requests`, and the leave request sample,
-  `../../samples/apps/leave-requests`, in `ActivateOnStartup`. So
-  `scripts/dev.sh` migrates every tenant database, then compiles and activates both
+  sample, `../../samples/apps/purchase-requests`, the leave request sample,
+  `../../samples/apps/leave-requests`, and the service desk sample,
+  `../../samples/apps/service-desk`, in `ActivateOnStartup`. So
+  `scripts/dev.sh` migrates every tenant database, then compiles and activates all three
   samples before it listens, and stops on any diagnostic.
 - To activate another application folder, add it to that list, or set
   `ActivateOnStartup__0=<folder>` to activate it in place of the purchase request
-  sample. The leave request sample stays active.
+  sample. The leave request and service desk samples stay active.
   Relative paths are resolved from `src/Axis.Server`.
 
 Formatting fixes: `dotnet format Axis.slnx` and `npm run format --prefix web`.

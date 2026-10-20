@@ -26,6 +26,8 @@ namespace Axis.Server.Studio;
 /// Only real <c>*.json</c> files inside a listed folder are reachable.
 /// <c>GET /api/studio/apps/{application}/diagnostics</c> compiles the folder in memory against the installed
 /// extension packages and modules and answers every compile diagnostic. It touches no database and activates nothing.
+/// <c>GET /api/studio/apps/{application}/names</c> answers every name the application defines, module names
+/// included, from the same compile. It touches no database and answers even when the folder has errors.
 /// <c>GET /api/studio/apps/{application}/resources/{id}/references</c> answers <c>{ uses, usedBy }</c> from the same
 /// compile's reference index, and <c>GET /api/studio/apps/{application}/texts/{key}/references</c> answers
 /// <c>{ usedBy }</c>. A text key that nothing defines or uses answers 404.
@@ -43,7 +45,8 @@ namespace Axis.Server.Studio;
 /// without <c>If-Match</c>, 409 for a stale version and 400 for the manifest.
 /// <c>POST /api/studio/apps/{application}/changes</c> applies 1 to 20 creates and patches in one call under one write
 /// lock, checks every change before it writes any, and answers <c>{ items: [{ id, version }], diagnostics }</c>.
-/// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>.
+/// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, and the expression check is in
+/// <see cref="StudioExpressionEndpoints"/>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
 /// newest first, as <c>{ active, folderContentHash, items }</c>. <c>active</c> is the active release or null, and
 /// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. It reads the
@@ -59,12 +62,14 @@ internal static class StudioEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
         endpoints.MapPost("/api/studio/apps/{application}/changes", ChangesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/names", NamesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/releases", ReleasesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}/references", ResourceReferencesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
         endpoints.MapStudioPublishEndpoints();
+        endpoints.MapStudioExpressionEndpoints();
     }
 
     private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)
@@ -186,6 +191,22 @@ internal static class StudioEndpoints
         // The compile step of activation, before it touches a database. The folder is read from disk as
         // activation reads it, not through the filtered list of the other routes.
         return Results.Ok(new StudioDiagnosticsResponse(StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
+    private static async Task<IResult> NamesAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        return Results.Ok(ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).Names);
     }
 
     private static async Task<IResult> ReleasesAsync(
@@ -534,7 +555,7 @@ internal static class StudioEndpoints
 
     internal const string WriteLockUnavailable = "The write lock could not be taken. Try again.";
 
-    private const string NoResource = "The application has no resource with this id.";
+    internal const string NoResource = "The application has no resource with this id.";
 
     private const string NoTextKey = "The application has no text key with this name.";
 

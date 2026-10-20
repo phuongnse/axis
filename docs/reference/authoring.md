@@ -8,8 +8,8 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The application list, resource list, read, patch, create, delete, changes, diagnostics
-and references routes are built. It is
+in git. The application list, resource list, read, patch, create, delete, changes, diagnostics,
+references, names and expression check routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
@@ -23,9 +23,10 @@ its own process, and
 [D47](../decisions.md#d47-publishing-from-studio--agreed) agrees this.
 The `changes` route writes several files in one call, see [Changes](#changes).
 
-*(Planned for M11.)* Three more routes help Studio's pickers, label texts and
-expression editor: a [names](#names) route, a [text write](#text-writes) and an
-[expression check](#expression-check). They are agreed in
+The [names](#names) route feeds Studio's reference pickers, and the
+[expression check](#expression-check) route helps its expression editor. Both
+are built. *(Planned for M11.)* A [text write](#text-writes) route helps its label
+texts. All three are agreed in
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed).
 
 ## Settings
@@ -36,6 +37,9 @@ folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. S
 - `Studio:Folders` lists the application folders. With no folder, the API
   has nothing to edit, and every route answers `403`. `studio: false` on
   `GET /api/me` says the same.
+- `Studio:ApplicationsPath` names the folder where Studio creates new
+  applications _(planned for M11)_. With no value, Studio cannot create an
+  application. See [Creating an application](#creating-an-application).
 - `Studio:AuthorRole` names the roles claim value that may use the API. With
   no value, nobody may. Application policies play no part.
 - `Studio:PublisherRole` names the roles claim value that
@@ -45,7 +49,7 @@ folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. S
   too, see [Preview](#preview).
 - `Studio:Tests` turns on `studioTest` on `GET /api/me`, which shows the test
   controls in Studio. It is off by default. A `test` request needs the author
-  role only, see [Test](#test). *(planned for M11)*
+  role only, see [Test](#test).
 
 ## Routes
 
@@ -57,7 +61,9 @@ in the application. File names and names can change.
 
 | Method and path | Response |
 | --- | --- |
-| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below |
+| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.` is skipped _(planned for M11)_ |
+| `POST /api/studio/apps` | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application) _(planned for M11)_ |
+| `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template, sorted by `id`. See [application templates](configuration.md#application-templates) _(planned for M11)_ |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
@@ -67,9 +73,9 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/diagnostics` | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200` |
-| `GET /api/studio/apps/{application}/names` *(planned for M11)* | `200` with the names the application defines, see [Names](#names) |
+| `GET /api/studio/apps/{application}/names` | `200` with the names the application defines, see [Names](#names) |
 | `PUT /api/studio/apps/{application}/texts/{key}` *(planned for M11)* | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes) |
-| `POST /api/studio/apps/{application}/expressions/check` *(planned for M11)* | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
+| `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
@@ -124,7 +130,9 @@ Check 6 is built for a request and for a release:
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs `Studio:AuthorRole` to be set and held in
    the session's roles, and `Studio:Folders` to be non-empty. This holds for
-   every route.
+   every route. From M11, a set `Studio:ApplicationsPath` also turns the API
+   on, so the check needs a non-empty `Studio:Folders` or a set
+   `Studio:ApplicationsPath` _(planned for M11)_.
 4. The publisher role, `403`, on `publish` and `rollback` only. It needs
    `Studio:PublisherRole` to be set and held in the session's roles. It comes
    right after the author role and before the application is looked up.
@@ -145,8 +153,9 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-*(Planned for M11.)* The three new routes use these checks. None of them has
-check 6 or a later numbered check, except where a line says so:
+The names route and the expression check are built. *(Planned for M11.)* The text
+write uses these checks as well. None of the three has check 6 or a later numbered
+check, except where a line says so:
 
 - **Names.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body.
 - **Text write.** Checks 1, 2, 3 and 5, then `415` for a body that is not
@@ -203,7 +212,7 @@ requests or releases exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Changes, Diagnostics,
+from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Changes, Diagnostics, Names,
 Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -218,15 +227,17 @@ Resource references, Text key references, Release history, Validate, Publish, Pr
 | Text key references | No session | No author role, or no `Studio:Folders` | Unknown application, or a key that no text resource defines and no label uses | Not used |
 | Changes | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or a patch that names an unknown resource | Any stale version, a patched resource that is gone, or a create whose `id` or target file already exists |
 | Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
-| Names *(planned for M11)* | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
+| Names | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Text write *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
-| Expression check *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or an unknown `resourceId` | Not used |
+| Expression check | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or an unknown `resourceId` | Not used |
 | Validate | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Publish | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Request status | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
 | Release history | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Preview | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | This tenant has no served preview tenant, or the manifest has no UUID `id` |
 | Rollback | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application, or a release not in the tenant's history | Not used |
+| Create application _(planned for M11)_ | No session | No author role, no CSRF header, or no `Studio:ApplicationsPath` | Unknown template | The name or the folder already exists |
+| List templates _(planned for M11)_ | No session | No author role, or Studio is off | Not used | Not used |
 
 The `409` of Validate and Publish is problem details titled "The application
 manifest has no valid id." The `403` for a missing publisher role is titled "You do not hold the publisher role."
@@ -236,10 +247,9 @@ a missing `If-Match`, as [Order of checks](#order-of-checks) says. `400` also an
 body, titled "The body is not a valid publish request." A successful `validate`, `publish` or `rollback`
 answers `202`, see [Publishing](#publishing). `415` answers a body of the wrong
 content type, just before the body is read. A create needs `application/json`
-and a patch needs `application/json-patch+json`. *(Planned for M11.)* A text write
-and an expression check need `application/json`. A text write answers `400` for a bad body, and also
-`503` when it cannot take the write lock. An expression check answers `400` for a bad body or a path with no
-expression place.
+and a patch needs `application/json-patch+json`. An expression check needs `application/json`. It answers
+`400` for a bad body or a path with no expression place. *(Planned for M11.)* A text write also needs
+`application/json`. It answers `400` for a bad body, and also `503` when it cannot take the write lock.
 
 ## References
 
@@ -277,7 +287,7 @@ agrees.
 
 ## Names
 
-*(Planned for M11.)* `GET .../names` answers every name the application
+`GET .../names` answers every name the application
 defines, so Studio's [reference pickers](frontend.md#studio) load them once.
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
 agrees it. The answer is:
@@ -297,6 +307,18 @@ agrees it. The answer is:
 - **`name`.** It is written as a reference writes it. A module entity is
   `<module id>/<name>`, and a module rule is `<module id>:<name>`. `module` is
   the module id, or null for an entity or rule of the application.
+- **Module names.** A module's events, sequences and forms are listed
+  under their `<module id>/<name>` names too, but only entities, data sources
+  and rules carry `module`. A module resource's `id` is the id written in its
+  module file.
+- **`columns`.** The projected fields of a data source, in order. A column's
+  `type` is the type of the field at the end of its path, or null when the path
+  does not resolve. A grouped data source also lists its measures. A `count`
+  measure is an `integer`, and any other measure has the type of the field it
+  measures.
+- **Order.** Each list holds the module resources first, then the
+  application's own in file path order. A step that is not a task has
+  `outcomes: []`. Text keys are sorted ordinally.
 - **`locales`.** The locales of the folder's text resources.
 - **`texts`.** Each key comes with its text in every locale, and `usedBy`, the
   number of `label text` edges in the [reference index](configuration.md#reference-index).
@@ -340,26 +362,48 @@ at once, so a key is never in one locale only. The body is
 
 ## Expression check
 
-*(Planned for M11.)* `POST .../expressions/check` type-checks one expression
-without saving it, so Studio's expression editor can show errors as the author
-types. The body is `{ resourceId, path, expression }`.
+`POST .../expressions/check` checks one expression without saving it, so
+Studio's expression editor can show errors as the author types. The body is
+`{ resourceId, path, expression }`.
 
-- **The place.** The server resolves the expression's place from the saved
-  resource at `path`: the names in scope, the expected type, whether it is a
-  filter in the [SQL subset](expressions.md#sql-subset), and the policy-filter
-  rules. The body carries no draft content, so a place that the author has just
-  added and not saved is not found. A `path` with no expression place in the
-  saved resource is `400`.
+- **The place.** The server puts `expression` into a copy of the saved resource
+  at `path` and compiles the folder in memory. The compile checks the
+  expression where it stands, so the names in scope, the expected type, the
+  [SQL subset](expressions.md#sql-subset) and the policy-filter rules are the
+  compile's own, not a copy of them. The body carries no draft content, so a
+  place that the author has just added and not saved is not found.
+- **Where it works.** In every place the compile checks an expression: computed
+  fields, validations, rules, data source filters, process conditions and
+  values, policy filters, migration values, endpoint values and trigger
+  conditions.
+- **No expression place.** A `path` that does not point at a string in the saved
+  resource is `400`. So is a place where the compile checks no expression
+  because another problem in the resource skips the check, such as a process
+  step whose subject entity is unknown. A save shows no problem at such a place
+  either.
 - **The rules.** The scope, types, limits and codes are those of
   [expression diagnostics](expressions.md#diagnostics). An expression of more than
   2,000 characters answers `AXC0036` as a diagnostic, not `400`.
 - **The answer.** `{ type, diagnostics }`. `type` is the result type in the
-  notation of [Types](expressions.md#types), or null when it cannot be found.
+  notation of [Types](expressions.md#types): `text`, `integer`, `decimal`,
+  `boolean`, `date`, `date-time`, `enum`, `reference` or `null`. It is the
+  expression's own type, so a text literal is `text` even where an enum is
+  expected. `type` is null when there is a diagnostic, and when the compile
+  cannot find the type yet. A migration value whose type check waits for
+  activation is the second case.
 - **Diagnostics.** There is at most one, because the compile stops at the first
   problem. It is `{ code, message, start, end }`. `start` and `end` are offsets
   into the expression text after JSON decoding, in UTF-16 code units, and `end`
-  is exclusive. The compile reports only a character position today, so the
-  build issue adds the range.
+  is exclusive.
+- **The range.** The compile reports one character position, so the range is
+  the token at that position: a name, a literal or an operator. A qualified
+  call such as `departments:IsManager` is one range. A character that starts no
+  token covers that one character, and text that is never closed runs to the
+  end. `AXC0036` and `AXC0048` cover the whole expression. A limit that the
+  compile reports at the place but outside the expression check, such as a rule
+  cycle (`AXC0055`) or nesting that is too deep (`AXC0065`), is answered over the
+  whole expression. A range is narrower than the faulty subexpression: for
+  `a + 'x'` only the `+` is covered.
 - **Nothing is written.** It compiles in memory, takes no lock and touches no
   database.
 
@@ -419,6 +463,61 @@ Writes are built for patches, creates, deletes and changes.
   stores a release and never activates one. Only a [publish request](#publishing)
   leads to an activation, and the
   [publisher](administration.md#publisher) runs it, never the server.
+
+## Creating an application
+
+_(planned for M11)_ `POST /api/studio/apps` creates a new application folder in
+`Studio:ApplicationsPath`, blank or from an installed
+[application template](configuration.md#application-templates). It follows
+[D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
+The body is `{ "name": "...", "template": "<template id>" }`, and `template` is
+optional. Without it the application is blank.
+
+This route has its own order of checks. The first failure is the response:
+
+1. The CSRF header `X-Axis-Csrf: 1`, `403`.
+2. The session, `401`.
+3. The author role, `403`.
+4. `Studio:ApplicationsPath` not set, `403`, titled "Studio cannot create
+   applications here."
+5. A body that is not `application/json`, `415`.
+6. A bad body, `400`. That is:
+   - a body that is not a JSON object, or has a key other than `name` and
+     `template`;
+   - a `name` that does not match `^[A-Za-z][A-Za-z0-9]*$` or is longer than 60
+     characters;
+   - a `name` whose [kebab-case](#writes) form is longer than 60 characters, or
+     is a reserved site path: `api`, `health`, `assets` or `studio`;
+   - a `template` that is not a string.
+7. An unknown template, `404`. It is an `id` that no installed template has.
+8. A write lock that cannot be taken, `503`. See [Versions](#versions).
+9. A name already used, ignoring letter case, by an application of
+   `Studio:Folders` or of `Studio:ApplicationsPath`, or a target folder that
+   already exists, `409`.
+
+- **Atomic.** The whole folder is written to a hidden temporary folder,
+  `.<kebab>-<random>`, inside `Studio:ApplicationsPath`, and then renamed to
+  the kebab-case name. A reader never sees half an application. The write lock
+  is the folder write lock of [Versions](#versions), keyed by
+  `Studio:ApplicationsPath`. A temporary folder starts with `.`, so the
+  application list skips it.
+- **Never an activation.** The route never compiles against a database, never
+  stores a release and never activates one. The author publishes the new
+  application, see [Publishing](#publishing). The diagnostics in the answer are
+  the folder's, compiled in memory as for [Diagnostics](#diagnostics).
+- **Blank.** Without a `template`, the folder holds the smallest application
+  that compiles with no error. See
+  [blank application](configuration.md#blank-application).
+- **From a template.** With a `template`, the server uses the newest installed
+  version, copies its files and changes the ids, the name and the site path. See
+  [application templates](configuration.md#application-templates). The answer
+  has the template's diagnostics, so a template that does not compile gives a
+  copy that does not compile.
+- **Listing templates.** `GET /api/studio/templates` checks the session, the
+  author role and Studio as for every read route, in that order. It needs no
+  CSRF header and does not need `Studio:ApplicationsPath`. It answers each
+  template's title and description in both `en` and `vi`, and the SPA picks the
+  locale.
 
 ## Changes
 
@@ -482,7 +581,7 @@ saved, and the diagnostics list the broken references.
 ## Publishing
 
 An author validates, publishes and rolls back an
-application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. The server never activates in its own process and
+application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. Storing a `test` request is built too, and running it is _(planned for M11)_. The server never activates in its own process and
 holds no tenant schema connection. It stores a **publish request** in the
 tenant database, and a separate [publisher](administration.md#publisher) runs
 it with the tenant's schema role. See
@@ -498,7 +597,7 @@ host publishes to that tenant only.
 | `POST /api/studio/apps/{application}/validate` | `202` with the request and a `Location` header for `.../requests/{id}`. It needs the author role |
 | `POST /api/studio/apps/{application}/publish` | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role |
 | `POST /api/studio/apps/{application}/preview` | `202` with the request and a `Location` header. It takes no body. It needs the author role only. `409` when the tenant has no preview tenant, see [Preview](#preview) |
-| `POST /api/studio/apps/{application}/test` | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`. None or an empty list means every scenario. It needs the author role only, see [Test](#test) *(planned for M11)* |
+| `POST /api/studio/apps/{application}/test` | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`. None or an empty list means every scenario. It needs the author role only, see [Test](#test) |
 | `GET /api/studio/apps/{application}/requests/{id}` | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes |
 | `GET /api/studio/apps/{application}/releases` | `200` with the activation history, newest first, and which release is active |
 | `POST /api/studio/apps/{application}/releases/{id}/rollback` | `202` with the request and a `Location` header. It takes no body. It needs the author role and the publisher role |
@@ -520,7 +619,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | --- | --- |
 | `id` | The request id, a UUID |
 | `application` | The application `name` |
-| `kind` | `validate`, `publish`, `rollback` or `test` *(planned for M11)* |
+| `kind` | `validate`, `publish`, `rollback` or `test` |
 | `target` | `tenant` or `preview`. `preview` marks a request that runs on the session tenant's preview tenant, see [Preview](#preview). Only the preview route writes `preview`. The request status route reports the stored value |
 | `status` | `queued`, `running`, `succeeded` or `failed` |
 | `label` | The optional label of a `publish`, up to 100 characters, or null |
@@ -531,7 +630,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | `finishedAt` | When it reached `succeeded` or `failed`, or null before |
 | `releaseId` | The release a `publish` activated or a `rollback` named, or null. A `validate` and a `test` have none |
 | `diagnostics` | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings |
-| `scenarios` | *(planned for M11)* Null for every kind but `test`. For `test`, an array with one item for each scenario that ran, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends |
+| `scenarios` | Null for every kind but `test`. For `test`, an array with one item for each scenario that ran *(the publisher fills it in, planned for M11)*, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends |
 
 - **A snapshot.** `validate` and `publish` store the folder as it is when the
   request is made: every `*.json` file that Studio can reach, with its `version`, as for
@@ -554,8 +653,9 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   [`axis-admin activate`](administration.md#activate). A `seed` failure
   happens after activation has committed, so the request ends `failed` with
   `releaseId` set, and the release stays active and stays in the history.
-- **`test`.** *(planned for M11)* The snapshot is taken as for `validate`.
-  The publisher runs the scenarios as the [publisher](administration.md#publisher)
+- **`test`.** The server stores the request with the snapshot, taken as for
+  `validate`. It stays `queued`, because no publisher claims it yet
+  *(planned for M11)*. The publisher is to run the scenarios as the [publisher](administration.md#publisher)
   describes, and stores their outcomes in `scenarios`. The request ends
   `failed` when any scenario fails. Scenario failures go only in `scenarios`.
   Compile errors, the missing `Scenarios:ServerConnectionString` setting, an
@@ -597,8 +697,10 @@ request has the kind `publish` and the target `preview`.
 
 ### Test
 
-*(planned for M11)* `POST .../test` runs the application's
-[test scenarios](configuration.md#test-scenarios) from Studio.
+`POST .../test` stores a request to run the application's
+[test scenarios](configuration.md#test-scenarios) from Studio. The route and the
+stored request are built. Running the request is *(planned for M11)*: no
+publisher claims it yet, so it stays `queued`.
 [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees
 the route. The request has the kind `test` and the target `tenant`.
 
@@ -682,7 +784,7 @@ newest first.
 - `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
   both the author role and the publisher role and `Studio:Folders` is not
   empty. It is built. Studio uses it to hide Publish and the rollback button.
-- `GET /api/me` gains a boolean `studioTest` *(planned for M11)*, true when
+- `GET /api/me` gains a boolean `studioTest`, true when
   `studio` is true and `Studio:Tests` is true. Studio uses it to hide **Run
   tests** and the **Run** action of a scenario.
 - `GET /api/me` also gains `studioPreviewHost`, the first host of the served tenant

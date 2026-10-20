@@ -3,9 +3,10 @@
 # Keycloak runs with the development realm from samples/keycloak, and Playwright starts the
 # server only once the realm answers. The server signs people in through that realm at
 # /api/auth/sign-in. The SPA does not offer it yet.
-# The server starts with three applications active: the generic E2E test application in
-# tests/e2e/fixtures/e2e-app, the purchase request sample in samples/apps/purchase-requests and the
-# leave request sample in samples/apps/leave-requests.
+# The server starts with four applications active: the generic E2E test application in
+# tests/e2e/fixtures/e2e-app, the purchase request sample in samples/apps/purchase-requests, the
+# leave request sample in samples/apps/leave-requests and the service desk sample in
+# samples/apps/service-desk.
 # A spec can activate another folder during the run: tests/e2e/activate.ts starts the built server
 # once more on a spare port with that folder in ActivateOnStartup, waits until it is ready and
 # stops it. The main server then serves the new release. The release-pinning spec activates

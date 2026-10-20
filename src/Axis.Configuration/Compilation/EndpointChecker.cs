@@ -114,7 +114,7 @@ internal static class EndpointChecker
                 continue;
             }
 
-            CheckValues(endpoint, entity, findEntity, inputValid, Report);
+            CheckValues(endpoint, entity, findEntity, inputValid, references, Report);
 
             var output = endpoint.Output ?? [];
             for (var index = 0; index < output.Count; index++)
@@ -249,6 +249,7 @@ internal static class EndpointChecker
         EntityResource entity,
         Func<string, EntityResource?> findEntity,
         bool inputValid,
+        ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         var scope = ExpressionScopes.ForEndpointInput(endpoint.Input);
@@ -308,9 +309,11 @@ internal static class EndpointChecker
             }
 
             var parsed = ExpressionParser.Parse(value);
-            var problem = parsed.Succeeded
-                ? ExpressionTypeChecker.Check(parsed.Expression!, scope, ExpressionScopes.TypeOf(field)!).Diagnostic
-                : parsed.Diagnostic;
+            var check = parsed.Succeeded
+                ? ExpressionTypeChecker.Check(parsed.Expression!, scope, ExpressionScopes.TypeOf(field)!)
+                : null;
+            var problem = parsed.Succeeded ? check!.Diagnostic : parsed.Diagnostic;
+            references.RecordExpression(endpoint, path, check?.Type, problem);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, path);

@@ -1,0 +1,7 @@
+{
+  "id": "de2cb639-988f-448e-b7b1-f0928ee0476f",
+  "kind": "sequence",
+  "name": "TicketNumber",
+  "formatVersion": 1,
+  "format": "SD-{yyyy}-{n:5}"
+}

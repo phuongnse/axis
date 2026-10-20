@@ -17,7 +17,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Axis.Configuration.Tests" />
     <InternalsVisibleTo Include="Axis.Integration.Tests" />
-    <InternalsVisibleTo Include="Axis.Scenarios" />
+    <InternalsVisibleTo Include="Axis.Scenarios.Runner" />
   </ItemGroup>
 
   <ItemGroup>

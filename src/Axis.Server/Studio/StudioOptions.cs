@@ -5,8 +5,9 @@ namespace Axis.Server.Studio;
 /// Studio may edit, resolved against the content root. <c>Studio:AuthorRole</c> is the roles claim
 /// value an author holds. With no folder or no role, Studio is off and nobody may use it.
 /// <c>Studio:PublisherRole</c> is the roles claim value that may also publish. With no value, nobody may.
+/// <c>Studio:Tests</c> shows the test controls to the users of Studio. It is off by default and grants no right.
 /// </summary>
-internal sealed record StudioOptions(IReadOnlyList<string> Folders, string? AuthorRole, string? PublisherRole)
+internal sealed record StudioOptions(IReadOnlyList<string> Folders, string? AuthorRole, string? PublisherRole, bool Tests = false)
 {
     public const string SectionName = "Studio";
 
@@ -19,7 +20,8 @@ internal sealed record StudioOptions(IReadOnlyList<string> Folders, string? Auth
         return new StudioOptions(
             [.. folders.Where(folder => !string.IsNullOrWhiteSpace(folder)).Select(folder => Path.GetFullPath(folder, contentRoot))],
             string.IsNullOrWhiteSpace(role) ? null : role,
-            string.IsNullOrWhiteSpace(publisherRole) ? null : publisherRole);
+            string.IsNullOrWhiteSpace(publisherRole) ? null : publisherRole,
+            section.GetValue<bool>("Tests"));
     }
 
     /// <summary>True when Studio is on and <paramref name="roles"/> holds the author role.</summary>
@@ -29,4 +31,7 @@ internal sealed record StudioOptions(IReadOnlyList<string> Folders, string? Auth
     /// <summary>True when <see cref="Allows"/> holds and <paramref name="roles"/> holds the publisher role.</summary>
     public bool AllowsPublish(IReadOnlyList<string> roles) =>
         Allows(roles) && PublisherRole is not null && roles.Contains(PublisherRole, StringComparer.Ordinal);
+
+    /// <summary>True when <see cref="Allows"/> holds and <c>Studio:Tests</c> is on.</summary>
+    public bool AllowsTests(IReadOnlyList<string> roles) => Allows(roles) && Tests;
 }

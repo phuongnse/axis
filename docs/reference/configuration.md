@@ -962,8 +962,8 @@ agrees. Three server settings control it. They are built, and the authoring
 API reads them. The third, `Studio:PublisherRole`, controls publishing, see
 [D47](../decisions.md#d47-publishing-from-studio--agreed). A fourth,
 `Studio:Tests`, controls the test controls, see
-[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed)
-_(planned for M11)_. The Studio page lists the resources with a search, edits them in a form
+[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed).
+The Studio page lists the resources with a search, edits them in a form
 and a JSON view, and shows the diagnostics.
 
 - **`Studio:Folders`.** An array of application folders that Studio may edit,
@@ -972,6 +972,18 @@ and a JSON view, and shows the diagnostics.
   paths are resolved against the server content root. It is empty by default,
   so Production has no Studio. The Development settings list the purchase
   request sample. A folder entry that is empty is ignored.
+- **`Studio:ApplicationsPath`** _(planned for M11)_. The folder where Studio
+  creates new applications, such as `artifacts/studio-apps`. The environment
+  variable is `Studio__ApplicationsPath`. It has no default, and relative paths
+  are resolved against the server content root. With no value, Studio cannot
+  create an application. A folder that does not exist is created at start, and
+  the server stops if it cannot create it. Under several replicas it sits on
+  the shared Studio volume, such as `/studio/apps`, see
+  [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+  Development, Compose and E2E use `artifacts/studio-apps`. Studio is on when
+  `Studio:Folders` is not empty or this setting is set. See
+  [creating an application](authoring.md#creating-an-application) and
+  [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
 - **`Studio:AuthorRole`.** A roles claim value, such as `author`. The
   environment variable is `Studio__AuthorRole`. Only a signed-in user whose
   roles claim holds the value may use Studio. It has no default, and with no
@@ -985,7 +997,7 @@ and a JSON view, and shows the diagnostics.
   value. The Development settings set it to `publisher`, and the
   development realm gives `hoa` that role. It plays no part in application
   policies, as `Studio:AuthorRole` does not.
-- **`Studio:Tests`** _(planned for M11)_. A boolean. The environment variable
+- **`Studio:Tests`**. A boolean. The environment variable
   is `Studio__Tests`. `true` makes `GET /api/me` answer `studioTest: true` for an
   author, which shows **Run tests** in Studio. It is `false` by default. Turn it
   on together with the publisher's `Scenarios:ServerConnectionString`, because
@@ -1012,12 +1024,15 @@ and a JSON view, and shows the diagnostics.
   [publisher](administration.md#publisher) runs it. The server never activates
   in its own process.
 - **Current user.** `GET /api/me` answers `studio: true` when `Studio:Folders`
-  is not empty and the user holds the author role. It also answers
+  is not empty and the user holds the author role. From M11 it also answers
+  `studio: true` when `Studio:ApplicationsPath` is set, and answers
+  `studioCreate: true` when the user may use Studio and the setting is set
+  _(planned for M11)_. It also answers
   `studioPublisher: true` when `Studio:Folders` is not
   empty and the user holds both the author role and the publisher role. It
   also answers `studioPreviewHost`, the first host of the tenant's served
   preview tenant, or null when the user cannot use Studio or the tenant has none.
-  It also answers `studioTest` _(planned for M11)_, true when `studio` is true and
+  It also answers `studioTest`, true when `studio` is true and
   `Studio:Tests` is true.
 
 ## Reference index
@@ -2401,6 +2416,100 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
 | `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
 
+## Application templates
+
+_(planned for M11)_ This section follows
+[D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
+An application template is an application folder with a `template.json`
+manifest. Studio creates a new application by copying an installed template, see
+[creating an application](authoring.md#creating-an-application).
+
+The manifest is `template.json` at the root of the folder:
+
+```json
+{
+  "kind": "applicationTemplate",
+  "id": "request-approval",
+  "version": "1.0.0",
+  "title": { "en": "Request approval", "vi": "Phê duyệt yêu cầu" },
+  "description": {
+    "en": "A request form, a list and a two-step approval.",
+    "vi": "Một biểu mẫu yêu cầu, một danh sách và phê duyệt hai bước."
+  }
+}
+```
+
+- **Manifest.** `template.json` has `kind: applicationTemplate`, an `id`
+  (lower-case letters, digits and `-`, starting with a letter), a SemVer
+  `version`, a `title` and a `description`. The title and the description each
+  have an `en` and a `vi` text.
+- **One site.** A template holds exactly one site. The site path of a copy
+  follows the new name, and that rule is only clear for a single site.
+- **Installation.** Templates are installed per installation under
+  `Templates:Path/<id>/<version>/`. The environment variable is
+  `Templates__Path`, and relative paths are resolved against the server content
+  root. The server reads them. Without the setting no
+  template is installed. A setting that names a missing folder stops the
+  server. A template version with a bad manifest, with folder names that differ
+  from its manifest, or without exactly one site is left out and logged as a
+  warning at start, and the other versions still load.
+- **Listing.** `GET /api/studio/templates` lists the newest version of each
+  template, with the diagnostics of compiling it in memory. A template that does
+  not compile is still listed.
+- **Copy.** A copy takes every `*.json` file of the template except
+  `template.json`, in the same folders.
+  - The top-level `id` of each resource becomes a new UUID. Seed record ids stay,
+    because they are row ids in the new application's own tables and cannot
+    clash.
+  - The manifest gets the new `name`, and the site's `path` becomes the
+    kebab-case name.
+  - References are by name, so they still resolve.
+  - The copy has the template's diagnostics. `template.json` is not copied,
+    because template metadata does not belong in an application.
+- **Sample.** `samples/templates/request-approval` is the sample template. It
+  holds one entity with a sequence number, a form page, a table page, a two-step
+  approval process, two roles and their policies, texts in `en` and `vi`, and one
+  test scenario. `scripts/build.sh` installs it into `artifacts/templates`. The
+  production images hold no template, and the Compose image holds the samples in
+  `/templates`.
+
+### Blank application
+
+A blank application is the smallest folder that compiles with no error. A site
+needs at least one navigation entry that names a page, so a blank application
+also holds one `Home` page with a `taskInbox` widget. That page names no entity,
+form or data source. For the name `PurchaseRequests`, it holds:
+
+- `application.json`: a new UUID `id`, `kind: application`, the `name` and
+  `formatVersion: 1`.
+- `sites/<kebab-name>.json`: the site, with the `name` of the application, the
+  `path` set to the kebab-case name, the title key `site.title`, the locales
+  `{ "default": "en", "fallback": "en", "available": ["en"] }` and one navigation
+  entry to `Home` with the label key `nav.home`.
+- `pages/home.json`: the page `Home` with the title key `pages.home.title` and
+  `widgets` of one `taskInbox`.
+- `texts/en.json`: the `en` text resource, with three keys: `site.title`, which
+  equals the application `name`, `pages.home.title` and `nav.home`.
+
+Every resource gets a new UUID `id`. The site JSON is:
+
+```json
+{
+  "id": "0f6c1c1e-3f43-4a52-8f27-0b2b6a6a3d11",
+  "kind": "site",
+  "name": "PurchaseRequests",
+  "formatVersion": 1,
+  "path": "purchase-requests",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [{ "page": "Home", "label": { "textKey": "nav.home" } }]
+}
+```
+
+A `name` whose kebab-case form is longer than 60 characters, or is a reserved
+site path (`api`, `health`, `assets`, `studio`), is refused with `400`, so a
+blank application cannot fail with `AXC0024` or a schema error.
+
 ## Roles and policies
 
 This section follows
@@ -2902,7 +3011,9 @@ completions, with or without `expect`, and the `expectRecord`, `expectInstance`
 and `expectTask` steps. It sets `now`. It answers connector and package calls
 from `stubs`. Studio runs scenarios through the publisher, see
 [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed)
-_(planned for M11)_.
+_(planned for M11)_. The runner is a library that runs a scenario from a folder
+or from files held in memory, such as a snapshot, and the `Axis.Scenarios`
+command is one caller of it.
 
 This scenario submits a purchase request above the finance threshold. The
 manager approves it, the finance reviewer takes the finance decision and the

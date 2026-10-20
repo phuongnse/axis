@@ -1204,7 +1204,7 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 | ------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`                | `uuid`              | Primary key, a version 7 UUID                                                                                                          |
 | `application_id`    | `uuid`              | The application `id`                                                                                                                   |
-| `kind`              | `text`              | `validate`, `publish`, `rollback` or `test` *(planned for M11)*                                                                    |
+| `kind`              | `text`              | `validate`, `publish`, `rollback` or `test`                                                                  |
 | `target`            | `text`              | `tenant` or `preview`. It defaults to `tenant`. See the preview note below |
 | `status`            | `text`              | `queued`, `running`, `succeeded` or `failed`                                                                                           |
 | `snapshot`          | `jsonb`, null       | For `validate`, `publish` and `test`, an array of `{ file, version, content }`, one for every `*.json` file of the folder. Null for `rollback` |
@@ -1220,7 +1220,8 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 | `started_at`        | `timestamptz`, null | When it was first claimed                                                                                                              |
 | `finished_at`       | `timestamptz`, null | When it reached `succeeded` or `failed`                                                                                                |
 | `diagnostics`       | `jsonb`, null       | The diagnostics, as an array                                                                                                           |
-| `scenario_results`  | `jsonb`, null       | *(planned for M11)* For `test`, an array of `{ name, resourceId, file, outcome, durationMs, step, path, message }`, one for each scenario that ran. Null for every other kind. See [the request](authoring.md#the-request) |
+| `scenario_names`    | `jsonb`, null       | For `test`, the names of the scenarios to run, as an array of strings in the order sent. Null means every scenario, and it is null for every other kind. See [Test](authoring.md#test) |
+| `scenario_results`  | `jsonb`, null       | For `test`, an array of an array of `{ name, resourceId, file, outcome, durationMs, step, path, message }`, one for each scenario that ran. The publisher does not fill it yet *(planned for M11)*. Null for every other kind. See [the request](authoring.md#the-request) |
 
 - **A snapshot.** `content` is the file's text as a JSON string, not an embedded
   object, so the file reads back exactly as the author saw it. `version` is the
