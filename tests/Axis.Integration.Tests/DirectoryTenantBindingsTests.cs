@@ -28,7 +28,7 @@ namespace Axis.Integration.Tests;
 /// </summary>
 public sealed class DirectoryTenantBindingsTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
-    private const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    private const string TestSecretKey = TestPlatform.SecretKey;
 
     private static readonly TenantSecretCipher _cipher = TenantSecretCipher.Load(
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [TenantSecretCipher.KeySetting] = TestSecretKey }).Build());

@@ -210,6 +210,7 @@ test('the server and the publisher run on both database roles and the worker onl
   const { services } = JSON.parse(config.stdout)
   const server = services.server.environment
   assert.match(server.ConnectionStrings__Platform, /Username=axis_runtime;/)
+  assert.match(server.ConnectionStrings__PlatformSchema, /Username=axis_schema;/)
   assert.match(server.Tenants__default__ConnectionString, /Username=axis_runtime;/)
   assert.match(server.Tenants__default__SchemaConnectionString, /Username=axis_schema;/)
   assert.match(server['Tenants__default-preview__ConnectionString'], /Database=axis_preview;Username=axis_preview_runtime;/)
@@ -220,6 +221,10 @@ test('the server and the publisher run on both database roles and the worker onl
   const worker = services.worker.environment
   assert.deepEqual(
     Object.keys(worker).filter((key) => /SchemaConnectionString/.test(key)),
+    [],
+  )
+  assert.deepEqual(
+    Object.keys(worker).filter((key) => /PlatformSchema/.test(key)),
     [],
   )
   assert.match(worker.Tenants__default__ConnectionString, /Username=axis_runtime;/)

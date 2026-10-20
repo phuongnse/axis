@@ -68,7 +68,7 @@ public sealed class TenantIsolationTests(PostgreSqlFixture database) : IClassFix
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(database.ConnectionString));
+            builder.UseTestPlatform(database.ConnectionString);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", PostgreSqlServer.RuntimeConnectionString(database.ConnectionString));
             builder.UseSetting("Tenants:default:SchemaConnectionString", database.ConnectionString);

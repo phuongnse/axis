@@ -1159,12 +1159,15 @@ As environment variables they are `Tenancy__Source`,
   server refuses a missing or blank `ConnectionStrings:PlatformSchema`, and a
   `ConnectionStrings:Platform` that names no user or the same user as
   `ConnectionStrings:PlatformSchema`. Today, under `configuration` it reads
-  neither `ConnectionStrings:PlatformSchema` nor any platform table.
+  neither `ConnectionStrings:PlatformSchema` nor any platform table. The
+  development settings, Docker Compose, `scripts/dev.sh` and the E2E server
+  already give the server `ConnectionStrings:PlatformSchema` on the
+  `axis_schema` role and a committed development `Platform:SecretKey`. The
+  server does not read them under `configuration` yet. The worker gets neither.
   *(planned for M10)* That changes. Under `configuration` the server also
   applies the platform migrations, so it needs `ConnectionStrings:PlatformSchema`
   and `Platform:SecretKey` there too. It needs them to create the platform
-  tables and to encrypt the data protection keys. Development settings carry
-  a committed development key. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+  tables and to encrypt the data protection keys. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
 - **`ActivateOnStartup`.** It must be empty under `directory`, see
   [startup activation](#startup-activation).
 

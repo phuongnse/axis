@@ -359,7 +359,7 @@ public sealed class AdminBackupFixture : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", runtimeConnection);
+            builder.UseTestPlatform(Scenario.Platform);
             builder.UseSetting($"Tenants:{TenantId}:Hosts:0", Host);
             builder.UseSetting($"Tenants:{TenantId}:ConnectionString", runtimeConnection);
             builder.UseSetting($"Tenants:{TenantId}:SchemaConnectionString", _schemaConnection);

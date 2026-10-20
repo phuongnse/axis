@@ -21,7 +21,7 @@ namespace Axis.Integration.Tests;
 public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string RecordKind = "test.record";
-    private const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    private const string TestSecretKey = TestPlatform.SecretKey;
     private const string LoadFailedLog = "Loading the tenant directory failed";
     private const string RefreshedLog = "Read the tenant directory again";
     private const string RefreshFailedLog = "could not be read again";

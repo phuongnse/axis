@@ -70,8 +70,8 @@ if [ -n "${AXIS_POSTGRES_PORT:-}" ]; then
   # The worker reads the same tenant connection string, so this export moves it too.
   export ConnectionStrings__Platform="$runtime_connection"
   export Tenants__default__ConnectionString="$runtime_connection"
-  # Only the server reads the schema connection string, and startup activation uses it. It is
-  # not exported, so the worker never holds the schema credentials.
+  # Only the server reads the schema connection string, and startup activation and the platform
+  # database use it. It is not exported at the top, so the worker never holds the schema credentials.
   schema_connection="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis;Username=axis_schema;Password=axis"
   # The preview tenant has its own database and roles. The worker gets only its runtime connection string.
   preview_runtime="Host=localhost;Port=$AXIS_POSTGRES_PORT;Database=axis_preview;Username=axis_preview_runtime;Password=axis"
@@ -225,7 +225,9 @@ start_server() {
   generation=$((generation + 1))
   # With the default port the server reads the schema connection string from appsettings.Development.json.
   (cd src/Axis.Server && export ASPNETCORE_ENVIRONMENT=Development DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
-    if [ -n "$schema_connection" ]; then export Tenants__default__SchemaConnectionString="$schema_connection"; fi
+    if [ -n "$schema_connection" ]; then
+      export Tenants__default__SchemaConnectionString="$schema_connection" ConnectionStrings__PlatformSchema="$schema_connection"
+    fi
     exec env ${server_env[@]+"${server_env[@]}"} dotnet watch --non-interactive -- --urls "http://localhost:$server_port") \
     </dev/null > >(prefix server "$state/server-exited-$generation") 2>&1 &
   server=$!

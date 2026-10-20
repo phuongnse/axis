@@ -63,6 +63,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Platform: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
+      # Only the server gets this setting. The development key Platform:SecretKey is in appsettings.Development.json.
+      ConnectionStrings__PlatformSchema: Host=postgres;Port=5432;Database=axis;Username=axis_schema;Password=axis
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
       # Only the server reads this setting. Startup activation uses it.
       Tenants__default__SchemaConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_schema;Password=axis

@@ -116,7 +116,7 @@ public sealed class TenantResolutionTests
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", UnreachableDatabase);
+            builder.UseTestPlatform();
             if (withOidc)
             {
                 builder.UseTestOidc("default");

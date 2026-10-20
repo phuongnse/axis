@@ -242,7 +242,7 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(a));
+            builder.UseTestPlatform(a);
             builder.UseSetting("Tenants:a:Hosts:0", HostA);
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(a));
             builder.UseSetting("Tenants:a:SchemaConnectionString", a);

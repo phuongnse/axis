@@ -199,7 +199,7 @@ public sealed class RuntimeRoleCheckTests(PostgreSqlFixture database) : IClassFi
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:Platform", RuntimeConnectionString(schemaConnection, role));
+            builder.UseTestPlatform(schemaConnection);
             builder.UseSetting("Tenants:a:Hosts:0", TenantHost);
             builder.UseSetting("Tenants:a:ConnectionString", RuntimeConnectionString(schemaConnection, role));
             builder.UseSetting("Tenants:a:SchemaConnectionString", schemaConnection);

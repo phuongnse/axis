@@ -23,7 +23,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
-    public const string TestSecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    public const string TestSecretKey = TestPlatform.SecretKey;
 
     public const string Authority = "https://127.0.0.1:1/realms/axis";
 
@@ -64,9 +64,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Tenancy:Source", "directory");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(platform));
-            builder.UseSetting("ConnectionStrings:PlatformSchema", platform);
-            builder.UseSetting("Platform:SecretKey", TestSecretKey);
+            builder.UseTestPlatform(platform);
 
             // A release that pins an extension package or uses a module needs them to be rebuilt.
             builder.UseSetting("Extensions:Path", SamplePackages.Path);

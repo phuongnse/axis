@@ -60,6 +60,9 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // set here, so it does not depend on which appsettings files the server finds.
     ASPNETCORE_ENVIRONMENT: 'Development',
     ConnectionStrings__Platform: connectionString,
+    ConnectionStrings__PlatformSchema: schemaConnectionString,
+    // The development key from appsettings.Development.json. A unit test keeps the two equal.
+    Platform__SecretKey: 'x7lhedPPY+Gx/xkG67W8XRybLeK3gghTBhDhDv9TIVw=',
     // The browser reaches the server as 127.0.0.1, so that host is the tenant's.
     Tenants__default__Hosts__0: '127.0.0.1',
     Tenants__default__ConnectionString: connectionString,

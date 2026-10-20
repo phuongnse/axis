@@ -61,9 +61,7 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Tenancy:Source", "directory");
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(scenario.Platform));
-            builder.UseSetting("ConnectionStrings:PlatformSchema", scenario.Platform);
-            builder.UseSetting("Platform:SecretKey", AdminScenario.TestSecretKey);
+            builder.UseTestPlatform(scenario.Platform);
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("Modules:Path", SampleModules.Path);
         });

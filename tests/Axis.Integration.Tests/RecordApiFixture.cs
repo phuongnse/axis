@@ -129,7 +129,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureLogging(logging => logging.AddProvider(_logs));
-            builder.UseSetting("ConnectionStrings:Platform", PostgreSqlServer.RuntimeConnectionString(ConnectionString(TenantA)));
+            builder.UseTestPlatform(ConnectionString(TenantA));
             builder.UseSetting("Tenants:a:Hosts:0", HostA);
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(ConnectionString(TenantA)));
             builder.UseSetting("Tenants:a:SchemaConnectionString", ConnectionString(TenantA));
