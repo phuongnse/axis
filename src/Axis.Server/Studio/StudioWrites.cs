@@ -43,7 +43,18 @@ internal enum StudioWriteRefusal
     Manifest,
     UnsafePath,
     Unavailable,
+    LocalesChanged,
+    TextsNotObject,
 }
+
+/// <summary>What a text write did: each text resource's new version, or the reason it was refused.</summary>
+internal sealed record StudioTextWriteOutcome(StudioWriteRefusal? Refusal, IReadOnlyList<StudioTextVersion> Resources)
+{
+    public static StudioTextWriteOutcome Refused(StudioWriteRefusal refusal) => new(refusal, []);
+}
+
+/// <summary>The new version of one text resource: its id, its locale as written and its version.</summary>
+internal sealed record StudioTextVersion(string Id, string Locale, string Version);
 
 /// <summary>
 /// Writes to the resource files of a Studio folder. One lock covers the whole check-version-then-write step
@@ -218,6 +229,112 @@ internal static class StudioWrites
 
         File.Delete(target);
         return new StudioWriteOutcome(null, null);
+    }
+
+    /// <summary>
+    /// The text resources of <paramref name="folder"/> in path order, one per locale ignoring letter case. With a
+    /// repeated locale (<c>AXC0026</c>) the first file in path order counts. A text file without a string
+    /// <c>locale</c> is left out.
+    /// </summary>
+    public static IReadOnlyList<(StudioFile File, string Locale)> TextFiles(string folder)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var files = new List<(StudioFile, string)>();
+        foreach (var file in StudioFolder.List(folder).Where(file => file.Kind == "text"))
+        {
+            try
+            {
+                if (JsonNode.Parse(file.Bytes) is JsonObject { } root
+                    && root["locale"] is JsonValue value
+                    && value.TryGetValue<string>(out var locale)
+                    && seen.Add(locale))
+                {
+                    files.Add((file, locale));
+                }
+            }
+            catch (JsonException)
+            {
+                // A file that is not JSON has no locale. The list has left such a file out already.
+            }
+        }
+
+        return files;
+    }
+
+    /// <summary>
+    /// Sets the text <paramref name="key"/> in every text resource of <paramref name="folder"/>: <paramref name="texts"/>
+    /// holds one text per locale, with a comparer that ignores letter case. A new key goes at the end of
+    /// <c>texts</c> and an existing key keeps its place. The locales are read again under the lock, and the write
+    /// is refused when they are not the keys of <paramref name="texts"/> any more, or when a file has a <c>texts</c>
+    /// that is not an object. Every temporary file is written before the first rename, and nothing is written when it refuses.
+    /// </summary>
+    public static async Task<StudioTextWriteOutcome> WriteTextAsync(
+        IStudioWriteLock writeLock, string folder, string key, IReadOnlyDictionary<string, string> texts, CancellationToken cancellationToken)
+    {
+        if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
+        {
+            return StudioTextWriteOutcome.Refused(StudioWriteRefusal.Unavailable);
+        }
+
+        await using var _ = held;
+
+        var files = TextFiles(folder);
+        if (files.Count != texts.Count || files.Any(file => !texts.ContainsKey(file.Locale)))
+        {
+            return StudioTextWriteOutcome.Refused(StudioWriteRefusal.LocalesChanged);
+        }
+
+        var writes = new List<(string Target, byte[] Bytes, StudioTextVersion Version)>();
+        foreach (var (file, locale) in files)
+        {
+            if (Target(folder, file.File) is not { } target)
+            {
+                return StudioTextWriteOutcome.Refused(StudioWriteRefusal.UnsafePath);
+            }
+
+            var root = (JsonObject)JsonNode.Parse(file.Bytes)!;
+            if (root["texts"] is null)
+            {
+                root["texts"] = new JsonObject();
+            }
+
+            if (root["texts"] is not JsonObject entries)
+            {
+                return StudioTextWriteOutcome.Refused(StudioWriteRefusal.TextsNotObject);
+            }
+
+            entries[key] = texts[locale];
+            var bytes = Serialize(root);
+            writes.Add((target, bytes, new StudioTextVersion(file.Id.ToString("D"), locale, Version(bytes))));
+        }
+
+        var temporaries = new List<(string Temporary, string Target)>();
+        try
+        {
+            foreach (var (target, bytes, _) in writes)
+            {
+                var temporary = TemporaryName(target);
+                temporaries.Add((temporary, target));
+                await File.WriteAllBytesAsync(temporary, bytes, cancellationToken);
+            }
+
+            foreach (var (temporary, target) in temporaries)
+            {
+                File.Move(temporary, target, overwrite: true);
+            }
+        }
+        finally
+        {
+            foreach (var (temporary, _) in temporaries)
+            {
+                if (File.Exists(temporary))
+                {
+                    File.Delete(temporary);
+                }
+            }
+        }
+
+        return new StudioTextWriteOutcome(null, [.. writes.Select(write => write.Version)]);
     }
 
     // The checks of a patch against the files already listed, in this order: the resource (gone counts as a stale

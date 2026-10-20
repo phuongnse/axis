@@ -8,7 +8,7 @@ of [architecture.md](../architecture.md) apply: sections marked
 
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
-in git. The application list, application create, resource list, read, patch, create, delete, changes, diagnostics,
+in git. The application list, application create, resource list, read, patch, create, delete, changes, text write, diagnostics,
 references, names and expression check routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
@@ -23,10 +23,10 @@ its own process, and
 [D47](../decisions.md#d47-publishing-from-studio--agreed) agrees this.
 The `changes` route writes several files in one call, see [Changes](#changes).
 
-The [names](#names) route feeds Studio's reference pickers, and the
-[expression check](#expression-check) route helps its expression editor. Both
-are built. *(Planned for M11.)* A [text write](#text-writes) route helps its label
-texts. All three are agreed in
+The [names](#names) route feeds Studio's reference pickers, the
+[text write](#text-writes) route helps its label texts and the
+[expression check](#expression-check) route helps its expression editor. All
+three are built, and agreed in
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed).
 
 ## Settings
@@ -74,7 +74,7 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/diagnostics` | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200` |
 | `GET /api/studio/apps/{application}/names` | `200` with the names the application defines, see [Names](#names) |
-| `PUT /api/studio/apps/{application}/texts/{key}` *(planned for M11)* | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes) |
+| `PUT /api/studio/apps/{application}/texts/{key}` | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes) |
 | `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
 
 `file` is the path of the resource's file relative to the application folder,
@@ -153,15 +153,17 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-The names route and the expression check are built. *(Planned for M11.)* The text
-write uses these checks as well. None of the three has check 6 or a later numbered
-check, except where a line says so:
+The names route, the text write and the expression check are built.
+The three routes use these checks. None of them has
+check 6 or a later numbered check, except where a line says so:
 
 - **Names.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body.
 - **Text write.** Checks 1, 2, 3 and 5, then `415` for a body that is not
   `application/json`, then `400` for a bad body, then `503` when the
-  [write lock](#versions) cannot be taken. There is no `404` for an unknown key,
-  because a `PUT` creates the key.
+  [write lock](#versions) cannot be taken. Under the lock, it answers `400` when a
+  text resource was created or deleted since the body was checked, and `409` when
+  a text resource has a `texts` that is not an object. There is no `404` for an
+  unknown key, because a `PUT` creates the key.
 - **Expression check.** Checks 1, 2, 3 and 5, then `415`, then `400` for a bad
   body: a body that is not a JSON object, a `resourceId` that is not a UUID, a
   `path` that is not a JSON Pointer or an `expression` that is not a string.
@@ -213,7 +215,7 @@ requests or releases exist.
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
 from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Changes, Diagnostics, Names,
-Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
+Text write, Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
@@ -228,7 +230,7 @@ Resource references, Text key references, Release history, Validate, Publish, Pr
 | Changes | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or a patch that names an unknown resource | Any stale version, a patched resource that is gone, or a create whose `id` or target file already exists |
 | Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Names | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
-| Text write *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
+| Text write | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | A text resource whose `texts` is not an object |
 | Expression check | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or an unknown `resourceId` | Not used |
 | Validate | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Publish | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
@@ -248,8 +250,9 @@ body, titled "The body is not a valid publish request." A successful `validate`,
 answers `202`, see [Publishing](#publishing). `415` answers a body of the wrong
 content type, just before the body is read. A create needs `application/json`
 and a patch needs `application/json-patch+json`. An expression check needs `application/json`. It answers
-`400` for a bad body or a path with no expression place. *(Planned for M11.)* A text write also needs
-`application/json`. It answers `400` for a bad body, and also `503` when it cannot take the write lock.
+`400` for a bad body or a path with no expression place. A text write also needs `application/json`. It answers
+`400` for a bad body, `409`, titled "A text resource has no texts object.", for a text resource whose
+`texts` is not an object, and `503` when it cannot take the write lock.
 
 ## References
 
@@ -332,7 +335,7 @@ agrees it. The answer is:
 
 ## Text writes
 
-*(Planned for M11.)* `PUT .../texts/{key}` writes one text key in every locale
+`PUT .../texts/{key}` writes one text key in every locale
 at once, so a key is never in one locale only. The body is
 `{ texts: { <locale>: <text> } }`.
 
@@ -340,14 +343,16 @@ at once, so a key is never in one locale only. The body is
   `text` resources, matched ignoring letter case. With duplicate locales
   (`AXC0026`), the first file in path order counts. A missing locale, an extra
   locale, a value that is not a string, or another top-level key is `400`. A
-  value may be any string, as the text schema allows.
+  value may be any string, as the text schema allows. The body is `400` too
+  when a text resource was created or deleted between this check and the lock.
 - **The key.** `{key}` is matched ordinally and cannot contain `/`, as in the
   [text key references](#references) route. A new key is added at the end of
   `texts`. An existing key keeps its position.
 - **The lock.** The write takes the folder [write lock](#versions). Under it,
   the server reads each text file and writes every temporary file. Then it renames
   each one over its target. It changes only that key, and leaves the other
-  keys as they are.
+  keys as they are. A text resource with no `texts` object gets one. A `texts`
+  that is not an object is `409`, and nothing is written.
 - **No `If-Match`.** A text write takes no version, and the last write to a
   key wins. One version per file does not fit a write that spans files. Only
   that key can be lost.
@@ -410,7 +415,7 @@ Studio's expression editor can show errors as the author types. The body is
 
 ## Writes
 
-Writes are built for patches, creates, deletes and changes.
+Writes are built for patches, creates, deletes, changes and text writes.
 
 - **Atomic.** A write goes to a hidden temporary file in the same folder and
   is then renamed over the target. A reader never sees half a file. A delete removes
@@ -556,7 +561,7 @@ one call, so the two files never split. See
 
 ## Diagnostics
 
-A patch, a create and a delete answer with the folder's diagnostics, and
+A patch, a create, a delete and a text write answer with the folder's diagnostics, and
 `GET /api/studio/apps/{application}/diagnostics` returns them on demand. All
 are built. A diagnostic never blocks a save. A delete that breaks references is
 saved, and the diagnostics list the broken references.

@@ -107,6 +107,27 @@ public sealed class StudioWriteLockTests(PostgreSqlFixture database) : IClassFix
     }
 
     [Fact]
+    public async Task A_text_write_waits_for_the_lock_of_the_folder_and_then_writes_both_locales()
+    {
+        await using var replicas = await Replicas.StartAsync(database);
+        var held = await HoldAsync(replicas.Platform, replicas.FolderA);
+
+        var write = StudioTextWriteTests.PutAsync(replicas.First, "greeting.new", """{"texts":{"en":"Hello","vi":"Xin chào"}}""");
+        await WaitForWaitersAsync(replicas.Platform, 1);
+        Assert.False(write.IsCompleted);
+        await held.ReleaseAsync();
+
+        using var response = await write;
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        foreach (var locale in new[] { "en", "vi" })
+        {
+            var texts = (System.Text.Json.Nodes.JsonObject)System.Text.Json.Nodes.JsonNode.Parse(
+                File.ReadAllBytes(Path.Combine(replicas.FolderA, "texts", $"{locale}.json")))!["texts"]!;
+            Assert.True(texts.ContainsKey("greeting.new"));
+        }
+    }
+
+    [Fact]
     public async Task A_write_that_is_refused_leaves_no_lock_held()
     {
         await using var replicas = await Replicas.StartAsync(database);
