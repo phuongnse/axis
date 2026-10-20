@@ -235,6 +235,15 @@ test('the server and the publisher run on both database roles and the worker onl
   assert.match(publisher['Tenants__default-preview__ConnectionString'], /Database=axis_preview;Username=axis_preview_runtime;/)
   assert.match(publisher['Tenants__default-preview__SchemaConnectionString'], /Database=axis_preview;Username=axis_preview_schema;/)
   assert.match(worker['Tenants__default-preview__ConnectionString'], /Database=axis_preview;Username=axis_preview_runtime;/)
+  // Only the publisher gets the role that creates the databases of test scenarios.
+  assert.match(publisher.Scenarios__ServerConnectionString, /Database=postgres;Username=axis_scenario;/)
+  for (const [name, environment] of Object.entries({ server, worker })) {
+    assert.deepEqual(
+      Object.keys(environment).filter((key) => /^Scenarios__/.test(key)),
+      [],
+      `${name} has a scenario setting`,
+    )
+  }
 })
 
 test('the worker checks /health/ready and publishes no port', () => {

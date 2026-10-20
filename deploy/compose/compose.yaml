@@ -2,6 +2,7 @@
 # and the admin tool runs only on demand. PostgreSQL 18 and the OIDC provider run elsewhere. Tenants come from the
 # tenant directory. Every secret is a file under secrets:, mounted in /run/secrets. This file holds no
 # password, client secret or key. See docs/reference/installation.md#on-premises for the steps.
+# compose.scenarios.yaml is an optional second file that turns on test scenarios.
 #
 # AXIS_VERSION          Required. The tag of the three images.
 # AXIS_IMAGE_PREFIX     Optional. A registry prefix for the image names, such as registry.example.com/axis/.

@@ -1,6 +1,13 @@
 import Ajv2020 from 'ajv/dist/2020'
 import { describe, expect, it } from 'vitest'
-import { createStarter, emptyReferences, kebabName, starterKinds, textResourceName } from './studioStarters'
+import {
+  createStarter,
+  emptyReferences,
+  isApplicationName,
+  kebabName,
+  starterKinds,
+  textResourceName,
+} from './studioStarters'
 
 // The files the server embeds. A kind that gains a schema file fails here until it gains a starter.
 const schemas = import.meta.glob<Record<string, unknown>>('../../../src/Axis.Configuration/Schemas/*.schema.json', {
@@ -94,5 +101,29 @@ describe('kebabName', () => {
     ['Overview', 'overview'],
   ])('turns %s into %s', (name, expected) => {
     expect(kebabName(name)).toBe(expected)
+  })
+})
+
+describe('isApplicationName', () => {
+  it.each([
+    ['Inventory', true],
+    ['PurchaseRequests2', true],
+    ['a'.repeat(60), true],
+    ['1abc', false],
+    ['a-b', false],
+    ['Api', false],
+    ['STUDIO', false],
+    ['a'.repeat(61), false],
+    ['', false],
+  ])('checks the name %j, which is valid: %s', (name, expected) => {
+    expect(isApplicationName(name)).toBe(expected)
+  })
+
+  it('refuses a name whose kebab-case form is longer than 60 characters', () => {
+    const name = 'Ab'.repeat(30)
+
+    expect(name.length).toBe(60)
+    expect(kebabName(name).length).toBeGreaterThan(60)
+    expect(isApplicationName(name)).toBe(false)
   })
 })

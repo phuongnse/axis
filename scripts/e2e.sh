@@ -34,6 +34,8 @@
 # axis_preview_runtime. The server and the worker serve the preview tenant default-preview on localhost,
 # while the main tenant stays on 127.0.0.1, so one server serves both. The preview tenant has no
 # deployment bindings, and the worker gets only its runtime connection string.
+# The same file creates axis_scenario, a role with CREATEDB that owns no database. Only the publisher gets it, as
+# Scenarios__ServerConnectionString, to run test scenarios, and the server sets Studio__Tests=true.
 # A Compose smoke test then builds the image and runs the stack on free ports. An images smoke test
 # then builds the production images axis-server, axis-worker and axis-admin and runs them read-only
 # against a throwaway PostgreSQL. An on-premises smoke test then installs deploy/compose/compose.yaml
@@ -203,6 +205,11 @@ schema_database="Host=127.0.0.1;Port=$port;Database=axis;Username=axis_schema;Pa
 export AXIS_E2E_PREVIEW_DATABASE="Host=127.0.0.1;Port=$port;Database=axis_preview;Username=axis_preview_runtime;Password=axis"
 preview_schema_database="Host=127.0.0.1;Port=$port;Database=axis_preview;Username=axis_preview_schema;Password=axis"
 export AXIS_E2E_KEYCLOAK_URL="http://127.0.0.1:$keycloak_port"
+# The role spec asks PostgreSQL for the roles in this container.
+export AXIS_E2E_POSTGRES_CONTAINER="$container"
+# The role that creates the databases of test scenarios. Only the publisher gets it, below, and it connects to
+# the postgres maintenance database because it owns no database.
+scenario_database="Host=127.0.0.1;Port=$port;Database=postgres;Username=axis_scenario;Password=axis"
 
 # The worker waits until the server, which Playwright starts, has migrated the database. It runs
 # from the built dll, because dotnet run starts a child process that kill would miss.
@@ -249,6 +256,7 @@ env 'Tenants__default-preview__PreviewOf=default' 'Tenants__default-preview__Hos
   DOTNET_ENVIRONMENT=Development Tenants__default__Hosts__0=127.0.0.1 \
   Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" \
   Tenants__default__SchemaConnectionString="$schema_database" \
+  Scenarios__ServerConnectionString="$scenario_database" \
   Extensions__Path="$root/artifacts/extensions" Modules__Path="$root/artifacts/modules" \
   Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
   Tenants__default__Bindings__PurchasingSystemUrl__Value="$AXIS_E2E_PURCHASING_URL" \

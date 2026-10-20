@@ -48,4 +48,8 @@ spec:
           volumeMounts:
             {{- include "axis.volumeMounts" . | nindent 12 }}
       volumes:
-        {{- include "axis.volumes" (dict "root" . "entries" (list "platformSchemaConnection" "platformSecretKey")) | nindent 8 }}
+        {{- $entries := list "platformSchemaConnection" "platformSecretKey" }}
+        {{- if .Values.secrets.scenarioServerConnection.name }}
+        {{- $entries = append $entries "scenarioServerConnection" }}
+        {{- end }}
+        {{- include "axis.volumes" (dict "root" . "entries" $entries) | nindent 8 }}
