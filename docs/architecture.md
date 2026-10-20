@@ -32,7 +32,7 @@ flowchart LR
   folders that `Studio:Folders` lists and needs a session and the author role.
   Its routes that list applications, list, read, patch, create and delete resources, give
   diagnostics and answer where a resource or text key is used are built.
-  *(Planned for M10:)* Its routes that validate, publish and roll back store a
+  Its routes that validate, publish and roll back are built too. They store a
   publish request in the tenant database over the runtime role. The server
   never activates a release in its own process, see
   [D47](decisions.md#d47-publishing-from-studio--agreed).

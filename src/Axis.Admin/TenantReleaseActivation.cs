@@ -31,6 +31,7 @@ internal sealed class TenantReleaseActivation(
     /// <summary>
     /// Runs the steps for the tenant <paramref name="id"/>, whose directory entry or build records <paramref name="schemaVersion"/>. Every diagnostic of compile, activate and seed, warnings included, is added
     /// to <paramref name="diagnostics"/>. The release history records <paramref name="actor"/> for the activation.
+    /// <paramref name="loadStep"/> names the second step, which loads the release: <c>compile</c>, or <c>rollback</c> for a stored release.
     /// </summary>
     public async Task<ReleaseRun> RunAsync(
         string id,
@@ -39,7 +40,8 @@ internal sealed class TenantReleaseActivation(
         ActivationBindings bindings,
         Func<ConfigurationDbContext, Task<ReleaseCompilationResult>> compile,
         List<Diagnostic> diagnostics,
-        ActivationActor actor)
+        ActivationActor actor,
+        string loadStep = "compile")
     {
         ConfigurationDbContext? configuration = null;
         DataDbContext? data = null;
@@ -47,7 +49,7 @@ internal sealed class TenantReleaseActivation(
         try
         {
             var succeeded = await Step(id, "version", () => CheckVersionAsync(schemaVersion))
-                && await Step(id, "compile", async () =>
+                && await Step(id, loadStep, async () =>
                 {
                     var connection = await connections.SchemaConnectionAsync();
                     configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connection).Options);

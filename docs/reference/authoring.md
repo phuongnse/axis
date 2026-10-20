@@ -16,8 +16,8 @@ Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
 restarts the server, which activates the folder, as a hand edit does today.
 *(planned for M10)* A write will take a lock in the platform database. Reads
 and diagnostics touch no database. Going live from Studio is
-[Publishing](#publishing). `validate`, `publish` and the release history are built, `preview` and `rollback`
-are *(planned for M10)*. It asks for an activation: the
+[Publishing](#publishing). `validate`, `publish`, `rollback` and the release history are built, `preview`
+is *(planned for M10)*. It asks for an activation: the
 server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
 its own process, and
@@ -98,7 +98,7 @@ bytes, in lower-case hex.
 Like the [record API](record-api.md#errors), a request is
 checked in this order, and the first failure is the response. Checks 1 to 6
 and 8 to 10 are built for every route that is built, and so is check 5a. Check 7 is built for a patch and a delete.
-Check 6 is built for a request. For a release it is *(planned for M10)*, with the release routes:
+Check 6 is built for a request and for a release:
 
 1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PATCH` or `DELETE`, `403`.
 2. The session, `401`. A session from another tenant counts as no session.
@@ -125,7 +125,7 @@ Check 6 is built for a request. For a release it is *(planned for M10)*, with th
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-A check 5a sits between checks 5 and 6, on `validate` and `publish` only. A folder whose manifest has no UUID `id` answers `409`,
+A check 5a sits between checks 5 and 6, on `validate` and `publish` only. A `rollback` takes no body, and it has no check 5a, because it names a release of the history. A folder whose manifest has no UUID `id` answers `409`,
 because the request needs the application id for the publisher's queue. It comes after the unknown application `404` and, for a
 `publish`, before the body is read.
 
@@ -143,8 +143,8 @@ requests or releases exist.
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
 from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics,
-Resource references, Text key references, Release history, Validate, Publish and Request status are built. The rows for
-Preview and Rollback are *(planned for M10)*.
+Resource references, Text key references, Release history, Validate, Publish, Rollback and Request status are built. The row for
+Preview is *(planned for M10)*.
 
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
@@ -162,7 +162,7 @@ Preview and Rollback are *(planned for M10)*.
 | Request status | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
 | Release history | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Preview *(planned for M10)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | This tenant has no preview tenant |
-| Rollback *(planned for M10)* | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application, or a release not in the tenant's history | Not used |
+| Rollback | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application, or a release not in the tenant's history | Not used |
 
 The `409` of Validate and Publish is problem details titled "The application
 manifest has no valid id." The `403` for a missing publisher role is titled "You do not hold the publisher role."
@@ -293,8 +293,8 @@ saved, and the diagnostics list the broken references.
 ## Publishing
 
 An author validates, publishes and rolls back an
-application from Studio. `validate`, `publish` and the request status are built.
-`preview` and `rollback` are *(planned for M10)*. The server never activates in its own process and
+application from Studio. `validate`, `publish`, `rollback` and the request status are built.
+`preview` is *(planned for M10)*. The server never activates in its own process and
 holds no tenant schema connection. It stores a **publish request** in the
 tenant database, and a separate [publisher](administration.md#publisher) runs
 it with the tenant's schema role. See
@@ -424,8 +424,7 @@ stateDiagram-v2
 
 ### Release history
 
-This route is built. The rows of a publish and a rollback *(planned for M10)*
-come with the publisher.
+This route is built. The publisher writes the rows of a publish and a rollback.
 
 `GET .../releases` answers
 `{ active: { releaseId, number, contentHash }, folderContentHash, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId }] }`,
@@ -455,8 +454,14 @@ newest first.
 ### Rollback
 
 A `rollback` request names a release from the history. The publisher activates
-the stored release as it is, **without compiling it again**. It records an
-activation with the rollback's actor.
+the stored release as it is, **without compiling it again**. It rebuilds the
+release's model from its stored files, never from the folder, and stores no new
+release. It records an activation with the rollback's actor, which is the
+requesting user, and the request id. The row has no label and no note. The
+route takes no body. Instances that are already pinned to a newer release keep
+running on it. New starts use the rolled-back release. A rollback runs the
+`seed` step of the release as well, so its schedule triggers and seed records
+are the ones of the release that is live.
 
 It is refused, and the request ends `failed`, in these cases:
 
@@ -465,7 +470,13 @@ It is refused, and the request ends `failed`, in these cases:
 | A migration that was applied after that release is missing from it, see [applied migrations](storage.md#applied-migrations) | `AXC0174` |
 | An extension package version that the release pins is no longer installed | `AXC0146` |
 
-These are the codes that activation already gives for the same causes. A refused
+These are the codes that activation already gives for the same causes. A
+rollback also gets every other refusal of activation, because those checks
+protect stored data. For example, rolling back past a release that added a
+field is refused with `AXC0015`, because the column has no field in the older
+release. So a rollback is possible only across releases that did not change the
+storage. Records that the newer release created stay in place, and seeds with
+`sync` go back to the values of the older release. A refused
 rollback changes nothing: the active release and the history stay as they were.
 Rolling back to the release that is already active succeeds and adds no row.
 

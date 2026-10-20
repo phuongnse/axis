@@ -15,7 +15,7 @@ namespace Axis.Integration.Tests;
 /// </summary>
 public sealed class StudioPublishTests : IAsyncLifetime
 {
-    private const string HostA = "a.example.test";
+    internal const string HostA = "a.example.test";
 
     private const string HostB = "b.example.test";
 
@@ -205,7 +205,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         Assert.Equal(2L, await CountRequestsAsync(connectionString));
     }
 
-    private static TemporaryFolder NewFolder()
+    internal static TemporaryFolder NewFolder()
     {
         var folder = new TemporaryFolder();
         CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
@@ -213,7 +213,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
     }
 
     // A server for the tenants, which activates the folder on each of them at start.
-    private static WebApplicationFactory<Program> NewFactory(string folder, (string Tenant, string Host, string ConnectionString)[] tenants) =>
+    internal static WebApplicationFactory<Program> NewFactory(string folder, (string Tenant, string Host, string ConnectionString)[] tenants) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -243,7 +243,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         });
 
     // Runs the publisher of one tenant in this process until it is disposed. The server has migrated the database by now.
-    private static RunningPublisher RunPublisher(string tenant, string host, string connectionString)
+    internal static RunningPublisher RunPublisher(string tenant, string host, string connectionString)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -264,7 +264,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         return new RunningPublisher(stop, AdminCommands.RunAsync(["publisher"], configuration, output, error, stop.Token));
     }
 
-    private sealed class RunningPublisher(CancellationTokenSource stop, Task<int> run) : IAsyncDisposable
+    internal sealed class RunningPublisher(CancellationTokenSource stop, Task<int> run) : IAsyncDisposable
     {
         public async ValueTask DisposeAsync()
         {
@@ -275,7 +275,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
     }
 
     // Polls the request through the API until it is succeeded or failed.
-    private static async Task<JsonDocument> WaitForFinalAsync(HttpClient client, string location, string host)
+    internal static async Task<JsonDocument> WaitForFinalAsync(HttpClient client, string location, string host)
     {
         var deadline = DateTime.UtcNow.AddSeconds(60);
         while (DateTime.UtcNow < deadline)
@@ -294,7 +294,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         return null!;
     }
 
-    private static async Task EditTextsAsync(string folder, string from, string to)
+    internal static async Task EditTextsAsync(string folder, string from, string to)
     {
         var path = Path.Combine(folder, "texts", "en.json");
         var texts = await File.ReadAllTextAsync(path, CancellationToken);
@@ -303,24 +303,24 @@ public sealed class StudioPublishTests : IAsyncLifetime
         await File.WriteAllTextAsync(path, edited, CancellationToken);
     }
 
-    private static async Task<HttpResponseMessage> SendAsync(
+    internal static async Task<HttpResponseMessage> SendAsync(
         HttpClient client, HttpMethod method, string path, string host, string? body = null, string? contentType = "application/json")
     {
         using var request = RecordApiFixture.Request(method, path, host, body, contentType);
         return await client.SendAsync(request, CancellationToken);
     }
 
-    private static async Task<JsonDocument> GetJsonAsync(HttpClient client, string path, string host)
+    internal static async Task<JsonDocument> GetJsonAsync(HttpClient client, string path, string host)
     {
         using var response = await SendAsync(client, HttpMethod.Get, path, host);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return await ReadAsync(response);
     }
 
-    private static async Task<JsonDocument> ReadAsync(HttpResponseMessage response) =>
+    internal static async Task<JsonDocument> ReadAsync(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
 
-    private static async Task<long> CountRequestsAsync(string connectionString) =>
+    internal static async Task<long> CountRequestsAsync(string connectionString) =>
         (long)(await PostgreSqlServer.AdminScalarAsync(connectionString, "SELECT count(*) FROM axis.publish_requests", CancellationToken))!;
 
     private static void CopyDirectory(string source, string target)
