@@ -34,7 +34,7 @@ internal static class StudioFolder
     /// letter case, or null. The manifest is read on every call, so an edited name takes effect at once.
     /// </summary>
     public static string? Find(StudioOptions options, string application) =>
-        options.Folders.FirstOrDefault(folder =>
+        Candidates(options).FirstOrDefault(folder =>
             string.Equals(ReadName(folder), application, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
@@ -44,7 +44,56 @@ internal static class StudioFolder
     public static IReadOnlyList<string> Applications(StudioOptions options)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        return [.. options.Folders.Select(ReadName).OfType<string>().Where(seen.Add)];
+        return [.. Candidates(options).Select(ReadName).OfType<string>().Where(seen.Add)];
+    }
+
+    // The listed folders, then the direct subfolders of Studio:ApplicationsPath that hold a manifest, sorted by
+    // folder name ordinally. A hidden folder, which includes a temporary one of a create, and a link are skipped.
+    private static IEnumerable<string> Candidates(StudioOptions options)
+    {
+        foreach (var folder in options.Folders)
+        {
+            yield return folder;
+        }
+
+        if (options.ApplicationsPath is not { } root)
+        {
+            yield break;
+        }
+
+        string[] subfolders;
+        try
+        {
+            subfolders = Directory.GetDirectories(root);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // A folder that cannot be listed holds no application.
+            yield break;
+        }
+
+        Array.Sort(subfolders, (left, right) => string.CompareOrdinal(Path.GetFileName(left), Path.GetFileName(right)));
+        foreach (var subfolder in subfolders)
+        {
+            if (!Path.GetFileName(subfolder).StartsWith('.')
+                && !IsLink(subfolder)
+                && File.Exists(Path.Combine(subfolder, ManifestFile)))
+            {
+                yield return subfolder;
+            }
+        }
+    }
+
+    private static bool IsLink(string folder)
+    {
+        try
+        {
+            return new DirectoryInfo(folder).Attributes.HasFlag(FileAttributes.ReparsePoint);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
     }
 
     private static string? ReadName(string folder) => ReadManifest(folder)?.Name;

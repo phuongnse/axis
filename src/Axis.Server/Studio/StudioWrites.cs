@@ -331,7 +331,7 @@ internal static class StudioWrites
     private static string Unquote(string value) =>
         value.Length >= 2 && value[0] == '"' && value[^1] == '"' ? value[1..^1] : value;
 
-    private static byte[] Serialize(JsonObject content)
+    internal static byte[] Serialize(JsonObject content)
     {
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream, _writer))

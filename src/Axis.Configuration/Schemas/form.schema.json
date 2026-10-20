@@ -9,7 +9,7 @@
     "kind": { "const": "form" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "entity": { "$ref": "#/$defs/entityName" },
+    "entity": { "$ref": "#/$defs/entityName", "x-axis-reference": "entity" },
     "sections": {
       "type": "array",
       "minItems": 1,
@@ -36,7 +36,7 @@
       "additionalProperties": false,
       "required": ["textKey"],
       "properties": {
-        "textKey": { "type": "string", "minLength": 1 }
+        "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" }
       }
     },
     "section": {
@@ -57,7 +57,7 @@
       "additionalProperties": false,
       "required": ["field"],
       "properties": {
-        "field": { "$ref": "#/$defs/name" },
+        "field": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "field", "of": "/entity" } },
         "readOnly": { "type": "boolean" }
       }
     }
