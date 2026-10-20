@@ -1200,6 +1200,12 @@ that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on
 exit, and passes in `AXIS_E2E_STUDIO_FOLDER`. A spec that saves a resource in
 Studio therefore never changes a file under `samples/`.
 
+The new-resource spec creates files, and the other Studio specs compare the
+diagnostics of the shared copy. So it copies that folder once more into a
+temporary folder, removes `texts/vi.json` from the copy, and starts a second
+server over it with `startServer`. It deletes the copy and stops the server
+when it ends.
+
 A spec can also activate another folder during the run, to test releases. The
 helper `tests/e2e/activate.ts` starts the built server once more on a spare
 port, with the same settings as the E2E server and that folder in
