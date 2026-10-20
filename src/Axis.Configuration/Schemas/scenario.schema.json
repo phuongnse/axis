@@ -19,7 +19,7 @@
       "additionalProperties": {
         "type": "array",
         "uniqueItems": true,
-        "items": { "$ref": "#/$defs/roleName" }
+        "items": { "$ref": "#/$defs/roleName", "x-axis-reference": "role" }
       }
     },
     "stubs": {
@@ -61,7 +61,7 @@
           "additionalProperties": false,
           "required": ["name", "operation"],
           "properties": {
-            "name": { "$ref": "#/$defs/name" },
+            "name": { "$ref": "#/$defs/name", "x-axis-reference": "connector" },
             "operation": { "$ref": "#/$defs/name" }
           }
         },
@@ -82,7 +82,7 @@
       "additionalProperties": false,
       "properties": {
         "user": { "$ref": "#/$defs/reference" },
-        "role": { "$ref": "#/$defs/roleName" }
+        "role": { "$ref": "#/$defs/roleName", "x-axis-reference": "role" }
       },
       "oneOf": [{ "required": ["user"] }, { "required": ["role"] }]
     },
@@ -115,12 +115,12 @@
             "advanceTime"
           ]
         },
-        "entity": { "$ref": "#/$defs/name" },
+        "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
         "record": { "$ref": "#/$defs/reference" },
         "save": { "$ref": "#/$defs/reference" },
         "as": { "$ref": "#/$defs/reference" },
-        "process": { "$ref": "#/$defs/name" },
-        "step": { "$ref": "#/$defs/name" },
+        "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" },
+        "step": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "1/process" } },
         "outcome": { "$ref": "#/$defs/name" },
         "state": { "enum": ["running", "waiting", "completed", "failed", "open"] },
         "assignee": { "$ref": "#/$defs/assignee" },

@@ -9,7 +9,7 @@
     "kind": { "const": "seed" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "entity": { "$ref": "#/$defs/name" },
+    "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
     "sync": { "type": "boolean" },
     "records": {
       "type": "array",

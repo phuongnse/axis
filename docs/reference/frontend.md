@@ -851,8 +851,10 @@ Studio is where authors edit an application's resources. It uses the
 [authoring API](authoring.md) and writes the same JSON files that git keeps, as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
 agrees. The route, the link, the application picker, New resource, the resource list with its
-search, the editor, the Uses and Used by lists, the delete button and its warning,
-the diagnostics panel, Validate, Preview and Publish with the request status and the preview links, the Releases list with Roll back, and the reconnect message are built.
+search, the editor, the reference pickers, the Uses and Used by lists, the delete
+button and its warning, the diagnostics panel, Validate, Preview and Publish with
+the request status and the preview links, the Releases list with Roll back, and the
+reconnect message are built.
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
@@ -909,9 +911,13 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
     arrays with add and remove. `id`, `kind` and fixed values such as
     `formatVersion` are read-only. Labels are the property names as written in
     the schema, without translation. A part the form cannot show, such as
-    `oneOf` or a map like a text resource's `texts`, points to the JSON view.
+    `oneOf`, `anyOf` or a map like a text resource's `texts`, points to the JSON
+    view. An `allOf` whose items hold only `if`, `then` and `else` shows its
+    properties, and the form does not show the conditions.
     *(Planned for M11.)* A text resource's `texts` map stays in the JSON view.
-    Label texts have their own editor, see Label texts below.
+    Label texts have their own editor, see Label texts below. Until then, a
+    `textKey` shows as a reference picker over the application's text keys, and
+    a key that the application does not define is tagged unknown.
   - A JSON view shows the draft as text. A valid edit there updates the form.
     Invalid JSON shows an error and turns Save off.
   - Save sends only the changes, as a JSON Patch with the version the editor
@@ -1044,20 +1050,27 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   - Studio then calls `GET /api/me` with a back-off of 0.5, 1, 2 and then 4
     seconds, with no limit, until the server answers with any other status.
   - Then the resource list, the diagnostics, the open resource and its Uses
-    and Used by lists load again, and the message goes away. *(Planned for
-    M11.)* The names load again too.
+    and Used by lists load again, and the message goes away. The names load again
+    too.
   - An unsaved draft stays on screen, with the version it was based on. If the
     file changed in the meantime, the next save gets a `409`. Studio does not
     resend a save that got no answer, so the author clicks Save again.
   - Save and Delete are off while the message shows.
   - A `401` from a reload starts sign-in, as elsewhere.
-- **Reference pickers.** *(Planned for M11.)* A property that the schema marks
-  with [`x-axis-reference`](configuration.md#schema-keywords) shows as a select
-  over the [names route](authoring.md#names), in place of a text box.
-  - A value that does not resolve stays in the select, tagged as unknown, so
-    nothing is lost.
-  - The names load with the application. They load again after a save, a
-    delete, a text write and a reconnect.
+- **Reference pickers.** A property that the schema marks with
+  [`x-axis-reference`](configuration.md#schema-keywords) shows as a select over
+  the names that the [names route](authoring.md#names) lists, in place of a text
+  box.
+  - The select is searchable, and it matches a typed name without regard to
+    letter case. A field or step part lists the fields of the entity, or the
+    steps of the process, that the draft names.
+  - A value that is not one of the names stays in the select as the first
+    option, tagged **unknown**, so nothing is lost. The select takes only the
+    listed names. To set a name that is not listed, the author edits the value
+    in the JSON view.
+  - Until the names load, the property shows a text box.
+  - The names load with the application. They load again after a save, a delete
+    and a reconnect.
 - **Label texts.** *(Planned for M11.)* A label property, a `textKey`, shows one
   text box for each locale in place of the key. Saving writes every locale
   through the [text write route](authoring.md#text-writes).
@@ -1176,9 +1189,9 @@ the diagnostics panel, Validate, Preview and Publish with the request status and
   | `scenario`    | Typed editor                          | Nothing                                                               |
   | `text`        | Typed editor                          | Nothing                                                               |
 
-  The generic form sends a part to the JSON view when it holds `oneOf`,
-  `anyOf` or `allOf`, is an object with no `properties`, such as a map, or has
-  no type. The last column follows that rule. A new kind or property that the
+  The generic form sends a part to the JSON view when it holds `oneOf` or
+  `anyOf`, when it holds `allOf` with an item that has more than `if`, `then`
+  and `else`, is an object with no `properties`, such as a map, or has no type. The last column follows that rule. A new kind or property that the
   form cannot show goes to the JSON view until an editor covers it.
 
   - **Page editor.** A list of the page's widgets, each with its type and a
