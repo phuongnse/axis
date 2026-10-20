@@ -118,8 +118,8 @@ shape. It shows that the platform is reused with no platform code change. It
 lives as configuration in `samples/apps/leave-requests/`. It is not platform
 code. See
 [D41](decisions.md#d41-leave-requests-as-the-second-sample-application--agreed).
-Later samples of different shapes, a service desk and asset management, follow
-from M11. See [D46](decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
+Later samples of different shapes follow from M11: a service desk, see
+[Third application](#third-application-service-desk), and asset management. See [D46](decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
 
 ### Data
 
@@ -163,3 +163,68 @@ My leave requests, the request form and My tasks, in a site at path `leave`.
 
 The server activates this sample next to purchase requests under
 `scripts/dev.sh`, Compose and E2E.
+
+## Third application: service desk
+
+_(planned for M11)_ A third application, of a different shape from the first
+two, is the sample that M11 builds only through Studio. It lives as
+configuration in `samples/apps/service-desk/`. It is not platform code. It is
+thin on purpose: SLAs, escalation, loops that hold a task and notifications
+wait for M14. See
+[D56](decisions.md#d56-a-service-desk-as-the-third-sample-application--agreed).
+
+### Data
+
+- **Ticket**: number (sequence `SD-{yyyy}-{n:5}`), title, description,
+  category, priority (`low`, `normal`, `high` or `urgent`), requester,
+  assigned agent, status and resolution. The title is the display field.
+- **Category**: name and default agent. A few categories are seeded.
+
+### Flow
+
+1. A requester submits a ticket.
+2. The service desk lead triages it. They set the category and priority and
+   assign an agent, or they reject the ticket.
+3. The agent resolves the ticket with a resolution.
+4. The requester confirms the resolution, which closes the ticket, or
+   reopens it.
+5. A reopened ticket ends the process with the status `reopened`. The
+   requester submits it again. A loop that holds a task comes in M14.
+
+### Security
+
+- The roles are `requester`, `agent` and `service-desk-lead`.
+- The development users are `anna` as a requester, `khoa` as an agent and
+  `linh` as the service desk lead. `khoa` and `linh` are new, and `anna` gets
+  the `requester` role. The roles of the existing users stay as they are.
+- A requester reads and edits only their own tickets. An agent reads the
+  tickets assigned to them. The lead reads every ticket.
+- The requester cannot edit the resolution.
+- Everything else is denied by default.
+
+### Pages
+
+My tickets, the ticket form, the task inbox and All tickets for the lead, in
+a site at path `service-desk`. Texts are in `en` and `vi`.
+
+### Scenarios the application must pass
+
+- The happy path, a rejection, and a reopen then resubmit.
+- Denied access for each role. A requester cannot see another requester's
+  ticket, an agent cannot see a ticket assigned to someone else, and a user
+  cannot act on a task that is not theirs.
+
+### Built through Studio
+
+- The committed folder `samples/apps/service-desk` records what the journey
+  builds. CI activates it and runs its scenarios, as for the other samples.
+- The main Playwright journey starts from a blank application in Studio. It
+  builds the same application with Studio only.
+- The journey may not use a file edit, the JSON view or an `axis-admin`
+  command.
+- At the end, the journey compares the folder it built with the committed
+  sample. The comparison ignores resource ids and key order. Any other
+  difference fails the journey.
+- Then the journey runs the scenarios from Studio and publishes. Then `anna`,
+  `linh` and `khoa` take one ticket through the process on the site.
+- A second, smaller journey starts from the `request-approval` template.
