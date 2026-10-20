@@ -82,4 +82,20 @@ describe.each(['light', 'dark'])('StudioRequestStatus in %s mode', (mode) => {
     expect(status).toHaveAttribute('data-status', 'failed')
     expect(status).toHaveTextContent('Validation failed')
   })
+
+  it('shows the release number of a succeeded rollback', () => {
+    const status = renderStatus(request({ kind: 'rollback', status: 'succeeded', releaseId: 'r1' }), 1)
+
+    expect(status).toHaveAttribute('data-status', 'succeeded')
+    expect(status).toHaveTextContent('Rolled back')
+    expect(screen.getByTestId('studio-release-number')).toHaveTextContent('1')
+  })
+
+  it('shows a failed rollback as a failure, without a release number', () => {
+    const status = renderStatus(request({ kind: 'rollback', status: 'failed', releaseId: 'r1' }), 1)
+
+    expect(status).toHaveAttribute('data-status', 'failed')
+    expect(status).toHaveTextContent('Rollback failed')
+    expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()
+  })
 })

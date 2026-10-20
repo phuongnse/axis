@@ -40,7 +40,9 @@ type FolderState =
  * lists under the editor. A Used by entry opens its resource at the path of the reference, as `&path=`. After a
  * save, the diagnostics panel shows the diagnostics that the save answered. After a delete, the resource leaves the
  * list. Validate and Publish sit under the application picker, and Publish shows only when `GET /api/me` answers
- * `studioPublisher: true`. The diagnostics panel shows the diagnostics of a request that ended. When the server does not answer, a reconnect message shows at the top. Studio checks the server with a
+ * `studioPublisher: true`. Under them, the release list shows the application's releases, with a Roll back button
+ * for a publisher. A save or a delete loads the release list again, because the folder may now differ from the
+ * active release. The diagnostics panel shows the diagnostics of a request that ended. When the server does not answer, a reconnect message shows at the top. Studio checks the server with a
  * back-off, then loads its data again, and an unsaved draft stays on screen.
  */
 export function StudioPage() {
@@ -84,6 +86,7 @@ function StudioWorkspace() {
   const [folder, setFolder] = useState<FolderState>()
   const [search, setSearch] = useState('')
   const [canPublish, setCanPublish] = useState(false)
+  const [folderRevision, setFolderRevision] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -202,6 +205,7 @@ function StudioWorkspace() {
           key={application}
           application={application}
           canPublish={canPublish}
+          folderRevision={folderRevision}
           onDiagnostics={(diagnostics) =>
             setFolder((current) =>
               current && current.application === application && 'resources' in current
@@ -265,13 +269,17 @@ function StudioWorkspace() {
                     application={application!}
                     item={selected}
                     path={path}
-                    onSaved={(diagnostics) => setFolder({ ...loaded, diagnostics })}
+                    onSaved={(diagnostics) => {
+                      setFolder({ ...loaded, diagnostics })
+                      setFolderRevision((value) => value + 1)
+                    }}
                     onDeleted={(diagnostics) => {
                       setFolder({
                         ...loaded,
                         resources: loaded.resources.filter((item) => item.id !== selected.id),
                         diagnostics,
                       })
+                      setFolderRevision((value) => value + 1)
                       setParams({ app: application! })
                     }}
                   />

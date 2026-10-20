@@ -1,4 +1,5 @@
-import { cp, readFile, rm, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 import { activateFolder, startServer } from '../activate'
@@ -195,6 +196,148 @@ test.describe('the active release of the purchase request sample changes', () =>
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: 'Name', exact: true })).toBeVisible()
       await expect(page.getByRole('columnheader', { name: heading })).toHaveCount(0)
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('an author rolls back to an earlier release and Studio warns that the folder differs', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(300_000)
+    const { server, folder } = await studioServer(testInfo)
+    const stamp = Date.now().toString(36)
+    const headingA = `Name A ${stamp}`
+    const headingB = `Name B ${stamp}`
+    const status = page.getByTestId('studio-request-status')
+    try {
+      await useSession(page, 'hoa')
+      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
+        content.texts['supplier.name'] = headingA
+      })
+      await publishWithLabel(page, `First ${stamp}`)
+      await expect(status).toHaveAttribute('data-status', 'succeeded', {
+        timeout: 60_000,
+      })
+      // The folder is the active release now, so there is nothing to warn about.
+      await expect(page.getByTestId('studio-release-row').filter({ hasText: `First ${stamp}` })).toHaveAttribute(
+        'data-active',
+        'true',
+      )
+      await expect(page.getByTestId('studio-folder-differs')).toHaveCount(0)
+
+      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
+        content.texts['supplier.name'] = headingB
+      })
+      await publishWithLabel(page, `Second ${stamp}`)
+      await expect(page.getByTestId('studio-release-row').filter({ hasText: `Second ${stamp}` })).toHaveAttribute(
+        'data-active',
+        'true',
+        { timeout: 60_000 },
+      )
+
+      const first = page.getByTestId('studio-release-row').filter({ hasText: `First ${stamp}` })
+      const number = await first.getAttribute('data-number')
+      await first.getByRole('button', { name: 'Roll back' }).click()
+      const dialog = page.getByRole('dialog')
+      await expect(dialog).toContainText(`Release ${number} First ${stamp}`)
+      await dialog.getByRole('button', { name: 'Roll back' }).click()
+
+      await expect(status).toContainText('Rolled back', { timeout: 60_000 })
+      await expect(status).toHaveAttribute('data-status', 'succeeded')
+      // The rollback adds a row, without a label, and only that newest row of the release is marked.
+      await expect(
+        page.locator(`[data-testid="studio-release-row"][data-number="${number}"][data-active="true"]`),
+      ).toHaveCount(1)
+      await expect(page.getByTestId('studio-release-row').and(page.locator('[data-active="true"]'))).toHaveCount(1)
+      // The folder still has heading B, so it differs from the release that is active again.
+      await expect(page.getByTestId('studio-folder-differs')).toBeVisible()
+
+      await useSession(page, 'anna')
+      await page.goto('/purchasing/suppliers')
+      await expect(page.getByRole('columnheader', { name: headingA })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: headingB })).toHaveCount(0)
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('a rollback across a rename migration is refused and the later release stays active', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(300_000)
+    // A throwaway application, because a rename migration in the purchase request sample would stop the
+    // committed sample from activating again.
+    const name = `Rollback${Date.now().toString(36)}`
+    const folder = testInfo.outputPath('studio-rollback')
+    const orderId = randomUUID()
+    const order = (field: string) =>
+      JSON.stringify({
+        id: orderId,
+        kind: 'entity',
+        name: 'Order',
+        formatVersion: 1,
+        fields: [
+          { name: 'number', type: 'text', required: true, maxLength: 20 },
+          { name: field, type: 'text' },
+        ],
+      })
+    await rm(folder, { recursive: true, force: true })
+    await mkdir(path.join(folder, 'entities'), { recursive: true })
+    await mkdir(path.join(folder, 'migrations'), { recursive: true })
+    await writeFile(
+      path.join(folder, 'application.json'),
+      JSON.stringify({
+        id: randomUUID(),
+        kind: 'application',
+        name,
+        formatVersion: 1,
+      }),
+    )
+    await writeFile(path.join(folder, 'entities', 'order.json'), order('note'))
+    const server = await startServer({ Studio__Folders__0: folder })
+    const rows = page.getByTestId('studio-release-row')
+    try {
+      await useSession(page, 'hoa')
+      await page.goto(`${server.url}/studio?app=${name}`)
+      await publishWithLabel(page, 'Before the rename')
+      await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
+        timeout: 60_000,
+      })
+      await expect(rows).toHaveCount(1)
+
+      await writeFile(path.join(folder, 'entities', 'order.json'), order('remark'))
+      await writeFile(
+        path.join(folder, 'migrations', '0001-rename-note.json'),
+        JSON.stringify({
+          id: randomUUID(),
+          kind: 'migration',
+          name: 'RenameNote',
+          formatVersion: 1,
+          entity: 'Order',
+          changes: [{ type: 'renameField', from: 'note', to: 'remark' }],
+        }),
+      )
+      await publishWithLabel(page, 'After the rename')
+      await expect(rows).toHaveCount(2, { timeout: 60_000 })
+      await expect(rows.and(page.locator('[data-number="2"]'))).toHaveAttribute('data-active', 'true')
+
+      const earlier = page.locator('[data-testid="studio-release-row"][data-number="1"]')
+      await earlier.getByRole('button', { name: 'Roll back' }).click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Roll back' }).click()
+
+      await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed', {
+        timeout: 60_000,
+      })
+      await expect(page.getByTestId('studio-diagnostics')).toContainText('AXC0174')
+      await expect(page.locator('[data-testid="studio-release-row"][data-number="2"]')).toHaveAttribute(
+        'data-active',
+        'true',
+      )
+      await expect(page.locator('[data-testid="studio-release-row"][data-number="1"]')).not.toHaveAttribute(
+        'data-active',
+        'true',
+      )
     } finally {
       await server.stop()
     }
