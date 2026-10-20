@@ -5,7 +5,8 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function escapeSegment(segment: string): string {
+/** A text as one segment of a JSON Pointer: `~` and `/` are escaped. */
+export function escapePointerSegment(segment: string): string {
   return segment.replaceAll('~', '~0').replaceAll('/', '~1')
 }
 
@@ -46,7 +47,7 @@ export function diffPatch(before: unknown, after: unknown, path = ''): JsonPatch
   if (isObject(before) && isObject(after)) {
     const operations: JsonPatchOperation[] = []
     for (const key of Object.keys(before)) {
-      const child = `${path}/${escapeSegment(key)}`
+      const child = `${path}/${escapePointerSegment(key)}`
       if (!Object.hasOwn(after, key)) {
         operations.push({ op: 'remove', path: child })
       } else {
@@ -55,7 +56,7 @@ export function diffPatch(before: unknown, after: unknown, path = ''): JsonPatch
     }
     for (const key of Object.keys(after)) {
       if (!Object.hasOwn(before, key)) {
-        operations.push({ op: 'add', path: `${path}/${escapeSegment(key)}`, value: after[key] })
+        operations.push({ op: 'add', path: `${path}/${escapePointerSegment(key)}`, value: after[key] })
       }
     }
     return operations

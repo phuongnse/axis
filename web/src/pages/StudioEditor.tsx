@@ -1,6 +1,6 @@
 import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
+import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
@@ -10,6 +10,7 @@ import {
   type StudioDiagnostic,
   type StudioResource,
   type StudioResourceItem,
+  writeStudioText,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { StudioNamesContext } from '../platform/studioNames'
@@ -22,6 +23,7 @@ import { LabelTextsContext } from './labelTextsContext'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
+import { TextTable, type TextColumn } from './TextTable'
 
 type Content = Record<string, unknown>
 
@@ -106,7 +108,7 @@ export function StudioEditor({
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
-  const names = useContext(StudioNamesContext)
+  const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
   const dirtyRef = useRef(false)
@@ -126,6 +128,8 @@ export function StudioEditor({
   const [deleteFailed, setDeleteFailed] = useState(false)
   const [tab, setTab] = useState<'form' | 'json'>('form')
   const [seedEntity, setSeedEntity] = useState<SeedEntity>()
+  // The other locales of a text resource, read from their files, for the text table to show beside the open one.
+  const [otherTexts, setOtherTexts] = useState<TextColumn[]>()
   const handledPath = useRef<string | null>(null)
   // A field to scroll to once the form tab is shown, because a hidden field cannot be scrolled to.
   const pendingField = useRef<HTMLElement | null>(null)
@@ -193,6 +197,43 @@ export function StudioEditor({
     return () => controller.abort()
   }, [application, entityId, generation, lost])
 
+  const textIds = resources
+    .filter((resource) => resource.kind === 'text' && resource.id !== item.id)
+    .map((resource) => resource.id)
+    .join(',')
+
+  useEffect(() => {
+    if (item.kind !== 'text') {
+      return
+    }
+    const controller = new AbortController()
+    Promise.all(
+      (textIds === '' ? [] : textIds.split(',')).map((id) => fetchStudioResource(application, id, controller.signal)),
+    ).then(
+      (others) =>
+        setOtherTexts(
+          others.map((other) => ({
+            id: other.id,
+            locale: String(other.content.locale),
+            texts: isContent(other.content.texts) ? other.content.texts : {},
+            editable: false,
+          })),
+        ),
+      (error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn(`Loading the other texts of '${item.id}' failed`, error)
+        setOtherTexts([])
+      },
+    )
+    return () => controller.abort()
+  }, [application, item.id, item.kind, textIds, generation, lost])
+
   const seedFields = entityId !== undefined && seedEntity?.id === entityId ? seedEntity.fields : null
   const labelContext = useMemo(
     () => ({
@@ -209,7 +250,8 @@ export function StudioEditor({
     [application, item.id, item.kind, draft, names],
   )
   // The form is final once the seed's entity has loaded, so a path into a record finds its cell.
-  const formReady = entityId === undefined || seedEntity?.id === entityId
+  const formReady =
+    (entityId === undefined || seedEntity?.id === entityId) && (item.kind !== 'text' || otherTexts !== undefined)
   const problems = useMemo(
     () => (seedFields ? seedProblems(draft.records, seedColumns(seedFields)) : noProblems),
     [seedFields, draft.records],
@@ -337,6 +379,40 @@ export function StudioEditor({
     }
   }
 
+  /** Writes a key in every locale. The open file changed, so the editor takes its new version and the key. */
+  async function addTextKey(key: string, texts: Record<string, string>): Promise<'added' | 'invalid' | 'failed'> {
+    try {
+      const result = await writeStudioText(application, key, texts)
+      if (result.status === 'invalid') {
+        return 'invalid'
+      }
+      const pointer = `/texts/${escapePointerSegment(key)}`
+      const openLocale = String(loaded!.content.locale)
+      const version = result.resources.find((resource) => resource.id === item.id)?.version
+      setLoaded(
+        (current) =>
+          current && {
+            content: setAt(current.content, pointer, texts[openLocale]) as Content,
+            version: version ?? current.version,
+          },
+      )
+      setDraft((current) => setAt(current, pointer, texts[openLocale]) as Content)
+      setJsonText(null)
+      setOtherTexts((current) =>
+        current?.map((column) => ({ ...column, texts: { ...column.texts, [key]: texts[column.locale] } })),
+      )
+      onTextsWritten(result.diagnostics)
+      return 'added'
+    } catch (error) {
+      if (error instanceof ServerUnreachableError) {
+        lost()
+      } else {
+        console.warn(`Adding the text key '${key}' failed`, error)
+      }
+      return 'failed'
+    }
+  }
+
   async function reload() {
     try {
       adopt(await fetchStudioResource(application, item.id))
@@ -392,6 +468,24 @@ export function StudioEditor({
                   </Flex>
                 ) : item.kind === 'scenario' ? (
                   <ScenarioEditor value={draft} onChange={update} />
+                ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
+                  <TextTable
+                    columns={resources
+                      .filter((resource) => resource.kind === 'text')
+                      .map((resource) =>
+                        resource.id === item.id
+                          ? {
+                              id: item.id,
+                              locale: String(loaded.content.locale),
+                              texts: draft.texts as Record<string, unknown>,
+                              editable: true,
+                            }
+                          : otherTexts.find((column) => column.id === resource.id),
+                      )
+                      .filter((column): column is TextColumn => column !== undefined)}
+                    onChange={update}
+                    onAdd={addTextKey}
+                  />
                 ) : item.kind === 'connector' && schema ? (
                   <ConnectorEditor value={draft} onChange={change} />
                 ) : endpointSchema ? (
