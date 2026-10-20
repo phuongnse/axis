@@ -1116,6 +1116,36 @@ to show where a resource is used and what it uses.
   resource, written `<module id>/<name>`, appears in the index is left to the
   issue that builds modules.
 
+## Schema keywords
+
+*(Planned for M11.)* Two custom keywords in the resource schemas tell
+[Studio](frontend.md#studio) where to show a picker and where to show the
+expression editor, as
+[D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
+agrees. The schemas stay the single source of what the form shows.
+
+- *(Planned for M11.)* **Kind form.** `"x-axis-reference": "<kind>"` marks a
+  property that holds the name of a resource. The kind is one of `entity`,
+  `dataSource`, `process`, `role`, `rule`, `connector`, `event`, `sequence`,
+  `form`, `page` or `text`. The kind `text` marks a `textKey`.
+- *(Planned for M11.)* **Part form.**
+  `"x-axis-reference": { "part": "<part>", "of": "<pointer>" }` marks a
+  property that holds a part of another resource.
+  - `part` is `field`, `parameter`, `column`, `step`, `outcome` or `operation`.
+  - `of` is a JSON Pointer from the resource root, or a Relative JSON Pointer,
+    to the property that names the resource the part belongs to.
+- *(Planned for M11.)* **Examples.** A form section's `field` is
+  `{ "part": "field", "of": "/entity" }`, because the form's `entity` names
+  the entity whose fields it lists. The keys of a process `updateRecord`
+  step's `set` map are fields of the process's `/entity` in the same way.
+- *(Planned for M11.)* **Expressions.** `"x-axis-expression": true` marks a
+  string property that holds an [expression](expressions.md). The form then
+  shows the expression editor there.
+- *(Planned for M11.)* **Annotations only.** JsonSchema.Net ignores unknown
+  keywords when it validates, so neither keyword changes what a resource may
+  hold, and no resource file changes. The [reference index](#reference-index)
+  stays the list of reference paths.
+
 ## Tenancy settings
 
 See

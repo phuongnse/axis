@@ -21,6 +21,13 @@ server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
 its own process, and
 [D47](../decisions.md#d47-publishing-from-studio--agreed) agrees this.
+A `changes` route that writes several files in one call is
+*(planned for M11)*, see [Changes](#changes).
+
+*(Planned for M11.)* Three more routes help Studio's pickers, label texts and
+expression editor: a [names](#names) route, a [text write](#text-writes) and an
+[expression check](#expression-check). They are agreed in
+[D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed).
 
 ## Settings
 
@@ -56,10 +63,14 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
+| `POST /api/studio/apps/{application}/changes` *(planned for M11)* | `200` with `{ items: [{ id, version }], diagnostics }`. The body is `application/json`, see [Changes](#changes) |
 | `DELETE /api/studio/apps/{application}/resources/{id}` | `200` with `{ diagnostics }` |
 | `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/diagnostics` | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200` |
+| `GET /api/studio/apps/{application}/names` *(planned for M11)* | `200` with the names the application defines, see [Names](#names) |
+| `PUT /api/studio/apps/{application}/texts/{key}` *(planned for M11)* | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes) |
+| `POST /api/studio/apps/{application}/expressions/check` *(planned for M11)* | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
@@ -135,6 +146,40 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
+*(Planned for M11.)* The three new routes use these checks. None of them has
+check 6 or a later numbered check, except where a line says so:
+
+- **Names.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body.
+- **Text write.** Checks 1, 2, 3 and 5, then `415` for a body that is not
+  `application/json`, then `400` for a bad body, then `503` when the
+  [write lock](#versions) cannot be taken. There is no `404` for an unknown key,
+  because a `PUT` creates the key.
+- **Expression check.** Checks 1, 2, 3 and 5, then `415`, then `400` for a bad
+  body: a body that is not a JSON object, a `resourceId` that is not a UUID, a
+  `path` that is not a JSON Pointer or an `expression` that is not a string.
+  Then `404` for an unknown `resourceId`, which comes after the body because
+  the id is in it. Then `400` for a `path` that holds no expression place. It
+  takes no lock, so it has no `503`.
+
+The `changes` route *(planned for M11)* uses checks 1 to 3 and 5. It then checks every change, and the first failure
+refuses the whole call:
+
+- Check 6 is `404` when a patch names an unknown `id`.
+- Check 7 is `428` when a patch change has no `version`.
+- Check 8 is `400` for the rules of [Changes](#changes), such as a list that is
+  empty or longer than 20 changes, a change with both or neither of `create`
+  and `patch`, a delete, or the same `id` twice. It is also `400` for every
+  create and patch rule of check 8.
+- Check 9 is `409` when any version is stale, or when a patched resource is
+  gone under the lock.
+- Check 10 is `409` when any create's `id` or target file exists.
+
+`415` answers a body that is not `application/json`, just before the body is
+read. The lock's `503` falls where it does for the single routes: after the
+`400` for a body that cannot be read, a patch that is not valid RFC 6902 and a
+create without a valid `id`, `kind` or file name, and before the checks that
+need the folder under the lock.
+
 A write that cannot take the [write lock](#versions) answers `503`. It comes after the `400` for a body that
 cannot be read, a patch that is not valid RFC 6902 and a create that has no valid `id`, `kind` or file name. It comes
 before the checks that need the folder under the lock: a patch that does not apply, a patch that changes `id` or
@@ -171,7 +216,11 @@ Resource references, Text key references, Release history, Validate, Publish, Pr
 | Delete | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
 | Resource references | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
 | Text key references | No session | No author role, or no `Studio:Folders` | Unknown application, or a key that no text resource defines and no label uses | Not used |
+| Changes *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or a patch that names an unknown resource | Any stale version, a patched resource that is gone, or a create whose `id` or target file already exists |
 | Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
+| Names *(planned for M11)* | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
+| Text write *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | Not used |
+| Expression check *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or an unknown `resourceId` | Not used |
 | Validate | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Publish | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Request status | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
@@ -187,7 +236,10 @@ a missing `If-Match`, as [Order of checks](#order-of-checks) says. `400` also an
 body, titled "The body is not a valid publish request." A successful `validate`, `publish` or `rollback`
 answers `202`, see [Publishing](#publishing). `415` answers a body of the wrong
 content type, just before the body is read. A create needs `application/json`
-and a patch needs `application/json-patch+json`.
+and a patch needs `application/json-patch+json`. *(Planned for M11.)* A text write
+and an expression check need `application/json`. A text write answers `400` for a bad body, and also
+`503` when it cannot take the write lock. An expression check answers `400` for a bad body or a path with no
+expression place.
 
 ## References
 
@@ -222,6 +274,94 @@ agrees.
 - **The list's `usedBy`.** The resource list gives each resource's `usedBy`
   count, so Studio can warn before a delete. The warning never blocks the
   delete. The next compile reports what broke.
+
+## Names
+
+*(Planned for M11.)* `GET .../names` answers every name the application
+defines, so Studio's [reference pickers](frontend.md#studio) load them once.
+[D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
+agrees it. The answer is:
+
+```
+{ locales: ["en", "vi"],
+  entities: [{ id, name, module, fields: [{ name, type, target, values }] }],
+  dataSources: [{ id, name, module, parameters: [{ name, type }], columns: [{ name, type }] }],
+  processes: [{ id, name, steps: [{ name, type, outcomes: [...] }] }],
+  rules: [{ id, name, module, parameters: [{ name, type }], resultType }],
+  connectors: [{ id, name, operations: [{ name }] }],
+  events: [{ id, name, fields: [{ name, type }] }],
+  roles, sequences, forms, pages: [{ id, name }],
+  texts: [{ key, texts: { <locale>: <text> }, usedBy }] }
+```
+
+- **`name`.** It is written as a reference writes it. A module entity is
+  `<module id>/<name>`, and a module rule is `<module id>:<name>`. `module` is
+  the module id, or null for an entity or rule of the application.
+- **`locales`.** The locales of the folder's text resources.
+- **`texts`.** Each key comes with its text in every locale, and `usedBy`, the
+  number of `label text` edges in the [reference index](configuration.md#reference-index).
+- **Compiled in memory.** The folder is compiled in memory, as for
+  [diagnostics](#diagnostics), and no database is touched. A folder with errors
+  still answers with what resolved. A file that was left out for its own errors is
+  absent.
+- **Size.** The answer holds every name and every text. At the typical
+  application size it is a few hundred kilobytes.
+
+## Text writes
+
+*(Planned for M11.)* `PUT .../texts/{key}` writes one text key in every locale
+at once, so a key is never in one locale only. The body is
+`{ texts: { <locale>: <text> } }`.
+
+- **Every locale.** The body must hold exactly the locales of the folder's
+  `text` resources, matched ignoring letter case. With duplicate locales
+  (`AXC0026`), the first file in path order counts. A missing locale, an extra
+  locale, a value that is not a string, or another top-level key is `400`. A
+  value may be any string, as the text schema allows.
+- **The key.** `{key}` is matched ordinally and cannot contain `/`, as in the
+  [text key references](#references) route. A new key is added at the end of
+  `texts`. An existing key keeps its position.
+- **The lock.** The write takes the folder [write lock](#versions). Under it,
+  the server reads each text file and writes every temporary file. Then it renames
+  each one over its target. It changes only that key, and leaves the other
+  keys as they are.
+- **No `If-Match`.** A text write takes no version, and the last write to a
+  key wins. One version per file does not fit a write that spans files. Only
+  that key can be lost.
+- **Not atomic across files.** Each rename is atomic, but all of them are not. A
+  crash between two renames can leave the key in some locales only. The next
+  compile reports it as `AXC0027`.
+- **Stale versions.** A text resource that Studio has open has a new version
+  after the write, so its next save is `409`. The answer lists each text
+  resource's new `version`, as `{ resources: [{ id, locale, version }] }`.
+- **Answer.** `200` with the new versions and the folder's
+  [diagnostics](#diagnostics). `503` answers when the lock cannot be taken, and
+  nothing is written.
+
+## Expression check
+
+*(Planned for M11.)* `POST .../expressions/check` type-checks one expression
+without saving it, so Studio's expression editor can show errors as the author
+types. The body is `{ resourceId, path, expression }`.
+
+- **The place.** The server resolves the expression's place from the saved
+  resource at `path`: the names in scope, the expected type, whether it is a
+  filter in the [SQL subset](expressions.md#sql-subset), and the policy-filter
+  rules. The body carries no draft content, so a place that the author has just
+  added and not saved is not found. A `path` with no expression place in the
+  saved resource is `400`.
+- **The rules.** The scope, types, limits and codes are those of
+  [expression diagnostics](expressions.md#diagnostics). An expression of more than
+  2,000 characters answers `AXC0036` as a diagnostic, not `400`.
+- **The answer.** `{ type, diagnostics }`. `type` is the result type in the
+  notation of [Types](expressions.md#types), or null when it cannot be found.
+- **Diagnostics.** There is at most one, because the compile stops at the first
+  problem. It is `{ code, message, start, end }`. `start` and `end` are offsets
+  into the expression text after JSON decoding, in UTF-16 code units, and `end`
+  is exclusive. The compile reports only a character position today, so the
+  build issue adds the range.
+- **Nothing is written.** It compiles in memory, takes no lock and touches no
+  database.
 
 ## Writes
 
@@ -279,6 +419,39 @@ Writes are built for patches, creates and deletes.
   stores a release and never activates one. Only a [publish request](#publishing)
   leads to an activation, and the
   [publisher](administration.md#publisher) runs it, never the server.
+
+## Changes
+
+*(Planned for M11.)* The entity designer saves an entity and its migration in
+one call, so the two files never split. See
+[D54](../decisions.md#d54-the-entity-designer-and-the-policy-matrix--agreed).
+
+```json
+{ "changes": [
+  { "create": { "id": "…", "kind": "migration", … } },
+  { "patch": [ { "op": "replace", … } ], "id": "…", "version": "<hex>" }
+] }
+```
+
+- A call holds 1 to 20 changes.
+- Each change has exactly one of `create` or `patch`. A `create` is a full
+  resource, as for [Writes](#writes). A `patch` is an RFC 6902 list and goes
+  with the `id` it patches.
+- There are no deletes.
+- A patch change carries its `version`, the bare hex of [Versions](#versions).
+  It has no `If-Match` header.
+- The same `id` twice is `400`. That includes a create of an `id` that
+  another change patches.
+- One lock covers the folder. Every change is checked against the folder
+  first. Then the files are written in list order, each one atomic as in
+  [Writes](#writes).
+- The `items` of the answer follow the request order. Each holds the `id` and
+  the new `version` of its file. `diagnostics` are the folder's diagnostics
+  after the last write.
+- A refused call writes nothing.
+- A server that dies during the writes can leave the first files written. The
+  next diagnostics show the mismatch, such as `AXC0015` or `AXC0171`.
+- It never activates a release, as for the other writes.
 
 ## Diagnostics
 
