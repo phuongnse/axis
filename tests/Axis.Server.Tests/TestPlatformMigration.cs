@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using Axis.Server.Authentication;
+using Axis.Server.Studio;
 using Axis.Server.Tenancy;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
@@ -19,7 +20,8 @@ internal static class TestPlatformMigration
     /// <summary>
     /// Removes the hosted service that applies the platform migrations under <c>Tenancy:Source=configuration</c>.
     /// It also removes the hosted service that decrypts the stored data protection keys, and replaces the key store
-    /// with an in-memory one. It runs after the server's own registrations.
+    /// with an in-memory one. It also replaces the Studio write lock, which needs the platform database, with a lock
+    /// of this process. It runs after the server's own registrations.
     /// </summary>
     public static IWebHostBuilder WithoutPlatformMigration(this IWebHostBuilder builder) =>
         builder.ConfigureTestServices(services =>
@@ -33,7 +35,31 @@ internal static class TestPlatformMigration
             }
 
             services.Configure<KeyManagementOptions>(options => options.XmlRepository = new TestKeyRing());
+            services.AddSingleton<IStudioWriteLock, InProcessStudioWriteLock>();
         });
+
+    // One lock for every folder of the instance, as the server held before the platform lock.
+    private sealed class InProcessStudioWriteLock : IStudioWriteLock, IDisposable
+    {
+        private readonly SemaphoreSlim _semaphore = new(1, 1);
+
+        public async Task<IAsyncDisposable> TakeAsync(string folder, CancellationToken cancellationToken)
+        {
+            await _semaphore.WaitAsync(cancellationToken);
+            return new Held(_semaphore);
+        }
+
+        public void Dispose() => _semaphore.Dispose();
+
+        private sealed class Held(SemaphoreSlim semaphore) : IAsyncDisposable
+        {
+            public ValueTask DisposeAsync()
+            {
+                semaphore.Release();
+                return ValueTask.CompletedTask;
+            }
+        }
+    }
 
     private sealed class TestKeyRing : IXmlRepository
     {

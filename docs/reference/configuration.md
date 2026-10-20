@@ -987,11 +987,11 @@ and a JSON view, and shows the diagnostics.
   development realm gives `hoa` that role. It plays no part in application
   policies, as `Studio:AuthorRole` does not.
 - **Where Studio reads and writes.** Studio's edit routes read and write only
-  `*.json` files inside the listed folders. Today they touch no database.
-  *(planned for M10)* A write takes an advisory lock in the platform database,
-  over `ConnectionStrings:Platform`, keyed by the folder. It holds across server
-  replicas, so every replica must mount the folder at the same path. A write
-  that cannot take the lock answers `503` and writes nothing. A read and the
+  `*.json` files inside the listed folders. A write takes an advisory lock in
+  the platform database, over `ConnectionStrings:Platform`, keyed by the
+  folder. It holds across server replicas, so every replica must mount the
+  folder at the same path. A write waits up to 10 seconds for the lock. A write
+  that cannot take it answers `503` and writes nothing. A read and the
   diagnostics touch no database. See [authoring API](authoring.md#versions) and
   [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
   The `validate` and `publish` routes store a request in the database of the
