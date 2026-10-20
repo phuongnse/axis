@@ -916,10 +916,11 @@ reconnect message are built.
     `oneOf`, `anyOf` or a map like a text resource's `texts`, points to the JSON
     view. An `allOf` whose items hold only `if`, `then` and `else` shows its
     properties, and the form does not show the conditions.
-    *(Planned for M11.)* A text resource's `texts` map stays in the JSON view.
-    Label texts have their own editor, see Label texts below. Until then, a
-    `textKey` shows as a reference picker over the application's text keys, and
-    a key that the application does not define is tagged unknown.
+    A text resource's `texts` map stays in the JSON view. A label, an object
+    whose only property is `textKey`, has its own editor, see Label texts
+    below. Until the names load, a label shows as a reference picker over the
+    application's text keys, and a key that the application does not define is
+    tagged unknown.
   - A JSON view shows the draft as text. A valid edit there updates the form.
     Invalid JSON shows an error and turns Save off.
   - Save sends only the changes, as a JSON Patch with the version the editor
@@ -962,7 +963,8 @@ reconnect message are built.
   diagnostics that the delete answered, which report what broke.
 - **Stale counts.** The `usedBy` counts and the lists load with the selected
   resource. A save does not reload them, so a count can be out of date until the
-  page is reloaded.
+  page is reloaded. The names, and so the counts that labels show, load again
+  after a save and after a text write.
 - **Diagnostics panel.** The panel lists the diagnostics of the folder, with
   each one's code, severity, message, file and `path`. It loads them from
   `GET /api/studio/apps/{application}/diagnostics` when an application is
@@ -1045,7 +1047,7 @@ reconnect message are built.
     release, or while the folder has errors, because the server then returns no
     content hash for the folder.
   - The list loads when the application is picked, and again after a request ends,
-    after a save or a delete, and after a reconnect.
+    after a save, a text write or a delete, and after a reconnect.
 - **Reconnect.** Under `scripts/dev.sh` a saved file restarts the server.
   Studio shows a reconnect message at the top of the page when a request gets
   no answer, or answers `502`, `503` or `504`. The Vite dev proxy answers `502`
@@ -1072,17 +1074,27 @@ reconnect message are built.
     listed names. To set a name that is not listed, the author edits the value
     in the JSON view.
   - Until the names load, the property shows a text box.
-  - The names load with the application. They load again after a save, a delete
-    and a reconnect.
-- **Label texts.** *(Planned for M11.)* A label property, a `textKey`, shows one
-  text box for each locale in place of the key. Saving writes every locale
-  through the [text write route](authoring.md#text-writes).
+  - The names load with the application. They load again after a save, a text
+    write, a delete and a reconnect.
+- **Label texts.** A label is an object whose only property is `textKey`. It
+  shows the key and one text box for each locale of the names, in place of the
+  key alone. The **Write texts** button writes every locale in one call through
+  the [text write route](authoring.md#text-writes). The label shows the texts
+  of the key from the names, and the boxes load again when the author types
+  another known key. Until the names load, the label keeps the reference picker.
   - A new label gets the key
     `<kind folder in camelCase>.<name in camelCase>.<path segments without the final textKey, joined with '.'>`,
     such as `pages.myTasks.title`. It adds `2`, `3` and so on when the key is
-    taken. The author can change it.
-  - The text is written at once. The new key goes into the draft and is saved
-    with the next Save. An unused key does no harm.
+    taken. The author can change it. An empty `textKey`, as a new resource's
+    starter leaves it, counts as no key and gets the same suggestion.
+  - The text is written at once, when the author clicks **Write texts**, and
+    not on Save. Then the key goes into the draft and is saved with the next
+    Save. An unused key does no harm. A write that fails shows a message and
+    leaves the draft as it was. The button is off while it writes, while the
+    reconnect message shows, and while the key is empty or holds `/`.
+  - A text write counts as a change of the folder, as a save does. The
+    diagnostics panel shows the diagnostics that it answered, and the names and
+    the Releases list load again.
   - A key that other labels use shows how many, from `usedBy` in the names
     answer, so the author knows the edit changes them too.
 - **Expression editor.** A string property that the schema marks with

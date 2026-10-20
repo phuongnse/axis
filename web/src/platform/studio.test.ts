@@ -7,6 +7,7 @@ import {
   folderDiffers,
   groupByKind,
   previewSiteUrl,
+  putStudioTexts,
   releaseRows,
   ServerUnreachableError,
   type StudioReleaseItem,
@@ -50,6 +51,38 @@ describe('fetchStudioResource', () => {
 function json(body: unknown) {
   return new Response(JSON.stringify(body), { status: 200 })
 }
+
+describe('putStudioTexts', () => {
+  it('puts every locale to the key route and answers the new versions and diagnostics', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json({ resources: [{ id: 'a', locale: 'en', version: 'v2' }], diagnostics: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await putStudioTexts('Shop', 'pages.my tasks.title', { en: 'Tasks', vi: 'Công việc' })
+
+    expect(result.resources).toEqual([{ id: 'a', locale: 'en', version: 'v2' }])
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/studio/apps/Shop/texts/pages.my%20tasks.title')
+    expect(init.method).toBe('PUT')
+    expect(JSON.parse(init.body)).toEqual({ texts: { en: 'Tasks', vi: 'Công việc' } })
+  })
+
+  it('throws on a 400 and reports a 503 as an unreachable server', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(null, { status: 400 }))
+        .mockResolvedValueOnce(new Response(null, { status: 503 })),
+    )
+
+    const error = await putStudioTexts('Shop', 'k', { en: 'a' }).catch((reason: unknown) => reason)
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(ServerUnreachableError)
+    await expect(putStudioTexts('Shop', 'k', { en: 'a' })).rejects.toBeInstanceOf(ServerUnreachableError)
+  })
+})
 
 describe('checkStudioExpression', () => {
   it('answers the type and diagnostics of an expression check', async () => {

@@ -456,6 +456,34 @@ export async function deleteStudioResource(application: string, id: string, vers
   return { status: 'deleted', diagnostics: body.diagnostics }
 }
 
+/** The answer to a text write: the new version of each text resource that was written, and the folder's diagnostics. */
+export interface TextWriteResult {
+  resources: { id: string; locale: string; version: string }[]
+  diagnostics: StudioDiagnostic[]
+}
+
+/**
+ * Writes one text key in every locale at once. `texts` holds exactly the folder's locales. It takes no version, so the
+ * last write to a key wins. Any status other than 200 throws, so the author's input stays. A 401 starts sign-in and
+ * throws, as any other failure does.
+ */
+export async function putStudioTexts(
+  application: string,
+  key: string,
+  texts: Record<string, string>,
+): Promise<TextWriteResult> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/texts/${encodeURIComponent(key)}`
+  const response = await studioFetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texts }),
+  })
+  if (!response.ok) {
+    throw new Error(`Putting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as TextWriteResult
+}
+
 /** The status of a publish request. `succeeded` and `failed` are final. */
 export type StudioRequestStatus = 'queued' | 'running' | 'succeeded' | 'failed'
 

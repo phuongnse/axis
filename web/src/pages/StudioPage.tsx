@@ -53,11 +53,13 @@ type NamesState = { application: string; names: StudioNames | null }
  * only when `GET /api/me` answers `studioCreate: true`. A created application joins the picker and is picked at once.
  * Validate and Publish sit under the application picker, and Publish shows only when `GET /api/me` answers
  * `studioPublisher: true`. Under them, the release list shows the application's releases, with a Roll back button
- * for a publisher. A save or a delete loads the release list again, because the folder may now differ from the
+ * for a publisher. A save, a text write or a delete loads the release list again, because the folder may now differ from the
  * active release. The diagnostics panel shows the diagnostics of a request that ended. When the server does not
  * answer, a reconnect message shows at the top. Studio checks the server with a
  * back-off, then loads its data again, and an unsaved draft stays on screen. The names that the reference pickers
- * and expression completion offer load with the application too, and again after a save, a delete and a reconnect.
+ * and expression completion offer load with the application too, and again after a save, a text write, a delete and a
+ * reconnect. A text write, which a label's Write texts button sends, updates the diagnostics panel and loads the names
+ * and the release list again, as a save does.
  */
 export function StudioPage() {
   const t = useText()
@@ -343,9 +345,12 @@ function StudioWorkspace() {
                       application={application!}
                       item={selected}
                       resources={loaded.resources}
-                      names={names}
                       path={path}
                       onSaved={(diagnostics) => {
+                        setFolder({ ...loaded, diagnostics })
+                        setFolderRevision((value) => value + 1)
+                      }}
+                      onTextsWritten={(diagnostics) => {
                         setFolder({ ...loaded, diagnostics })
                         setFolderRevision((value) => value + 1)
                       }}

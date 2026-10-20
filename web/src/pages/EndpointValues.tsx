@@ -2,6 +2,7 @@ import { Button, Flex, Input, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
+import { expressionScope } from './expressionScope'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -87,6 +88,7 @@ export function EndpointValues({
                       name={t('shell.studio.endpoint.expression')}
                       value={text}
                       required
+                      options={expressionScope(check.kind, check.draft, pointer, check.names)}
                       onChange={onChange}
                     />
                   </Suspense>
