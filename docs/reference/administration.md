@@ -597,9 +597,9 @@ one, see [installation](installation.md). `scripts/dev.sh`, the Docker Compose
 file in the repository root and the E2E script each start one too.
 
 **What is built.** The command runs `publish`, `validate` and `rollback` requests for
-`Tenancy:Source=directory` and for `Tenancy:Source=configuration`. Preview requests
-stay *(planned for M10)*. A request of a kind that is not built is never claimed,
-so it stays `queued`.
+`Tenancy:Source=directory` and for `Tenancy:Source=configuration`. It also runs
+`publish` requests with target `preview`, see [preview requests](#publisher). A request of a
+kind that is not built is never claimed, so it stays `queued`.
 
 **Settings.** It reads these, with the meaning they have for the other commands:
 
@@ -644,6 +644,13 @@ needs a restart of the publisher. The `directory` source writes neither line.
 `queued` `publish`, `validate` or `rollback` request with `FOR UPDATE SKIP LOCKED`. It sets the request
 `running`, `claimed_by` to its own name, `lease_until` and adds 1 to `claims`. A
 `running` request whose lease has run out is claimed the same way.
+
+- **Target.** A request with target `tenant` is claimed as above. A request with
+  target `preview` is claimed only when it is a `publish`, and only when the
+  tenant has no preview tenant, or when the publisher serves that preview
+  tenant. A `validate` or `rollback` with target `preview` is never claimed, and
+  stays `queued`. A preview request that is not claimed does not block the
+  later requests of its application.
 
 - **One at a time.** For one tenant and application it runs one request at a
   time, oldest first, so when two publishes are queued the newer one ends up
@@ -716,16 +723,23 @@ role unless it says otherwise.
    exception rather than diagnostics, such as a lost connection, stores only the
    diagnostics gathered so far, which can be none.
 
-**Preview requests.** *(Planned for M10.)* A request with target `preview` is
-stored in the main tenant's database, see [preview](authoring.md#preview). The
-publisher runs its steps against the main tenant's preview tenant, with that
-tenant's database and schema role. It compiles, activates and seeds there, and
-adds the history row to the preview tenant's release history. It writes no audit
-record. It sets the request `succeeded` or `failed` in the main tenant's
-database. It fails the request with `AXC0216` when the main tenant no longer has
-a preview tenant. Under `directory` it runs the request only while the preview
-tenant is `active` and at this build's schema version. Otherwise the request
-stays `queued`.
+**Preview requests.** A request with target `preview` is stored in the main
+tenant's database, see [preview](authoring.md#preview). Only a `publish` is
+claimed with that target. The publisher runs its steps against the main tenant's
+preview tenant, with that tenant's database, schema role and bindings. It
+compiles, activates and seeds there, and adds the history row to the preview
+tenant's release history with the request id. The step lines name the preview
+tenant, for example `default-preview compile ok`. It writes no audit record. It
+sets the request `succeeded` or `failed` in the main tenant's database, with the
+renewal of the lease, and leaves the main tenant's release, release history and
+audit records as they were. It fails the request with `AXC0216` when the main
+tenant has no preview tenant, and writes `<tenant> preview failed: AXC0216 <message>`.
+A preview tenant that exists but is not served, because it is not `active`, not
+at this build's schema version, or, under `configuration`, not migrated yet,
+leaves its requests `queued` until it is served. A preview request that runs out of
+claims ends `failed` with `AXC0215` and gets no audit record. Preview and main
+tenant requests of one application share the one-at-a-time queue of the main
+tenant's database.
 
 Activating the same content hash twice changes nothing, so a request that runs
 again does no harm. An activation of the release that is

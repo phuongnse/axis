@@ -231,6 +231,9 @@ test('the server and the publisher run on both database roles and the worker onl
   const publisher = services.publisher.environment
   assert.match(publisher.Tenants__default__ConnectionString, /Username=axis_runtime;/)
   assert.match(publisher.Tenants__default__SchemaConnectionString, /Username=axis_schema;/)
+  assert.equal(publisher['Tenants__default-preview__PreviewOf'], 'default')
+  assert.match(publisher['Tenants__default-preview__ConnectionString'], /Database=axis_preview;Username=axis_preview_runtime;/)
+  assert.match(publisher['Tenants__default-preview__SchemaConnectionString'], /Database=axis_preview;Username=axis_preview_schema;/)
   assert.match(worker['Tenants__default-preview__ConnectionString'], /Database=axis_preview;Username=axis_preview_runtime;/)
 })
 

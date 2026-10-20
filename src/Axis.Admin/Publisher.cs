@@ -25,6 +25,11 @@ namespace Axis.Admin;
 /// activation check, so a migration that the release lacks is <c>AXC0174</c>. It never reads a folder and stores no new
 /// release. A request ends <c>succeeded</c> or <c>failed</c>, with its diagnostics. A <c>publish</c> and a <c>rollback</c> write
 /// their audit record in the same transaction, and a <c>validate</c> writes none. A request of another tenant stays queued.
+/// A <c>publish</c> request with target <c>preview</c> runs the same steps on the tenant's preview tenant, with that tenant's
+/// database, schema role and bindings, and writes its history row there. The request itself stays in the tenant's database,
+/// where its final status and diagnostics go, and it writes no audit record. Without a preview tenant it fails with
+/// <c>AXC0216</c>. While the preview tenant exists but is not served, the request stays queued. A <c>validate</c> or
+/// <c>rollback</c> with target <c>preview</c> is never claimed.
 /// The three kinds share one queue for each application, oldest first. While a request runs,
 /// the publisher renews its lease. A running request whose lease has run out is claimed again, and the third such claim to
 /// run out ends it <c>failed</c> with <c>AXC0215</c>. The <c>claims</c> count fences the final update, so a publisher that
@@ -56,7 +61,7 @@ internal sealed class Publisher(
         UPDATE axis.publish_requests
         SET status = 'failed', finished_at = clock_timestamp(), diagnostics = @diagnostics
         WHERE kind IN ('publish', 'validate', 'rollback') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
-        RETURNING id, application_id, requested_by, requested_by_name, kind, release_id
+        RETURNING id, application_id, requested_by, requested_by_name, kind, release_id, target
         """;
 
     // clock_timestamp() and not now(): now() is fixed when the transaction starts, before the wait for the lock.
@@ -67,6 +72,7 @@ internal sealed class Publisher(
           WHERE r.kind IN ('publish', 'validate', 'rollback')
             AND (r.status = 'queued'
                  OR (r.status = 'running' AND r.lease_until < clock_timestamp() AND r.claims < @max))
+            AND (r.target = 'tenant' OR (r.target = 'preview' AND r.kind = 'publish' AND @preview))
             AND NOT EXISTS (SELECT 1 FROM axis.publish_requests o
                             WHERE o.application_id = r.application_id AND o.status = 'running' AND o.id <> r.id)
           ORDER BY r.requested_at, r.id LIMIT 1
@@ -75,7 +81,7 @@ internal sealed class Publisher(
         SET status = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims, p.label, p.note, p.release_id
+        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims, p.label, p.note, p.release_id, p.target
         """;
 
     private const string RenewSql =
@@ -174,7 +180,7 @@ internal sealed class Publisher(
         ClaimedRequest? request;
         try
         {
-            request = await ClaimAsync(connections, id);
+            request = await ClaimAsync(connections, tenant);
         }
         catch (Exception exception)
         {
@@ -200,7 +206,7 @@ internal sealed class Publisher(
         return true;
     }
 
-    private async Task<ClaimedRequest?> ClaimAsync(ITenantConnections connections, string tenant)
+    private async Task<ClaimedRequest?> ClaimAsync(ITenantConnections connections, PublisherTenant tenant)
     {
         var connection = await connections.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
@@ -210,7 +216,7 @@ internal sealed class Publisher(
             await lockCommand.ExecuteNonQueryAsync();
         }
 
-        await FailExhaustedAsync(connection, transaction, tenant);
+        await FailExhaustedAsync(connection, transaction, tenant.Id);
 
         ClaimedRequest? claimed = null;
         await using (var command = new NpgsqlCommand(ClaimSql, connection, transaction))
@@ -218,6 +224,8 @@ internal sealed class Publisher(
             command.Parameters.AddWithValue("me", _claimedBy);
             command.Parameters.AddWithValue("lease", leaseDuration);
             command.Parameters.AddWithValue("max", MaxClaims);
+            // A preview request waits while its preview tenant exists but is not served. Without a preview tenant it is claimed, to fail.
+            command.Parameters.AddWithValue("preview", !tenant.HasPreview || tenant.Preview is not null);
             await using var reader = await command.ExecuteReaderAsync();
             if (await reader.ReadAsync())
             {
@@ -231,7 +239,8 @@ internal sealed class Publisher(
                     reader.GetInt32(6),
                     await reader.IsDBNullAsync(7) ? null : reader.GetString(7),
                     await reader.IsDBNullAsync(8) ? null : reader.GetString(8),
-                    await reader.IsDBNullAsync(9) ? null : reader.GetGuid(9));
+                    await reader.IsDBNullAsync(9) ? null : reader.GetGuid(9),
+                    reader.GetString(10));
             }
         }
 
@@ -239,11 +248,11 @@ internal sealed class Publisher(
         return claimed;
     }
 
-    // A running request that was claimed three times and whose lease ran out again ends failed. A publish and a rollback get their audit record.
+    // A running request that was claimed three times and whose lease ran out again ends failed. A publish and a rollback on the tenant get their audit record.
     private async Task FailExhaustedAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string tenant)
     {
         const string message = "The publisher stopped three times while running the request.";
-        var exhausted = new List<(Guid Id, Guid ApplicationId, string RequestedBy, string? RequestedByName, string Kind, Guid? ReleaseId)>();
+        var exhausted = new List<(Guid Id, Guid ApplicationId, string RequestedBy, string? RequestedByName, string Kind, Guid? ReleaseId, string Target)>();
         await using (var command = new NpgsqlCommand(ExhaustedSql, connection, transaction))
         {
             command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb)
@@ -254,13 +263,13 @@ internal sealed class Publisher(
             await using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                exhausted.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), await reader.IsDBNullAsync(3) ? null : reader.GetString(3), reader.GetString(4), await reader.IsDBNullAsync(5) ? null : reader.GetGuid(5)));
+                exhausted.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), await reader.IsDBNullAsync(3) ? null : reader.GetString(3), reader.GetString(4), await reader.IsDBNullAsync(5) ? null : reader.GetGuid(5), reader.GetString(6)));
             }
         }
 
         foreach (var request in exhausted)
         {
-            if (request.Kind is "publish" or "rollback")
+            if (request.Kind is "publish" or "rollback" && request.Target == "tenant")
             {
                 await AppendAuditAsync(transaction, request.Kind, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, false, request.ReleaseId);
             }
@@ -293,6 +302,17 @@ internal sealed class Publisher(
         var diagnostics = new List<Diagnostic>();
         var files = ParseSnapshot(request.Snapshot);
         var activation = new TenantReleaseActivation(settings.InlineRecomputeLimit, output, error, CancellationToken.None);
+        var preview = request.Target == "preview";
+        if (preview && tenant.Preview is null)
+        {
+            const string missing = "The tenant has no preview tenant.";
+            diagnostics.Add(new Diagnostic(DiagnosticCodes.PreviewTenantMissing, missing, "", ""));
+            output.WriteLine($"{tenant.Id} preview failed: {DiagnosticCodes.PreviewTenantMissing} {missing}");
+            await StopRenewalAsync(renewing, renewal);
+            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(false, null), diagnostics, audit: false);
+            return;
+        }
+
         if (request.Kind == "validate")
         {
             var valid = await activation.ValidateAsync(
@@ -325,19 +345,23 @@ internal sealed class Publisher(
             return;
         }
 
+        // A preview publish runs on the preview tenant's database. The lease, the final status and the diagnostics stay on the
+        // tenant's own connections, where the request lives.
+        var target = preview ? tenant.Preview! : tenant;
+        await using var previewConnections = preview ? target.Connect() : null;
         ReleaseRun run;
         if (files is null)
         {
-            output.WriteLine($"{tenant.Id} compile failed: The snapshot cannot be read.");
+            output.WriteLine($"{target.Id} compile failed: The snapshot cannot be read.");
             run = new ReleaseRun(false, null);
         }
         else
         {
             run = await activation.RunAsync(
-                tenant.Id,
-                tenant.SchemaVersion,
-                connections,
-                tenant.Bindings,
+                target.Id,
+                target.SchemaVersion,
+                previewConnections ?? connections,
+                target.Bindings,
                 configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
                 diagnostics,
                 ActivationActor.User(request.RequestedBy, request.RequestedByName, request.Label, request.Note, request.Id));
@@ -345,7 +369,7 @@ internal sealed class Publisher(
 
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
         await StopRenewalAsync(renewing, renewal);
-        await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: true);
+        await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: !preview);
     }
 
     // The release of a rollback, rebuilt from its stored files as the server does when it serves a release. A release that
@@ -548,5 +572,5 @@ internal sealed class Publisher(
             ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
         })]).ToJsonString();
 
-    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId);
+    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId, string Target);
 }

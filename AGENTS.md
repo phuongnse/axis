@@ -119,7 +119,7 @@ the purchasing system that the sample calls when a request is approved. It needs
 Docker. The images hold the `departments` sample module in `/modules`.
 Compose also starts one publisher, `axis-admin publisher`, which runs the
 publish requests of Studio. See [D47](docs/decisions.md#d47-publishing-from-studio--agreed).
-It has no port and no health check, and writes `default ready` once the server has migrated the tenant database.
+It serves the tenants `default` and `default-preview`, so it runs preview requests too. It has no port and no health check, and writes `default ready` and `default-preview ready` once the server has migrated each tenant database.
 `docker compose logs server` shows the activation diagnostics,
 `docker compose logs worker` shows the worker output and `docker compose logs publisher` shows the publisher output. `docker compose ps` shows the worker
 healthy once its `/health/ready` passes, and `docker compose up --wait` waits for that. The worker's
@@ -179,7 +179,8 @@ works on a fresh clone:
   migrated the tenant databases. It runs from the built `Axis.Admin.dll`, not under
   `dotnet watch`, so a change to its code needs a restart of the script. The script
   sets its tenant settings as environment variables of that process only, because
-  `Axis.Admin` reads no `appsettings` file. See
+  `Axis.Admin` reads no `appsettings` file. They cover `default` and `default-preview`,
+  so it runs preview requests too. See
   [publisher](docs/reference/administration.md#publisher).
 - Development, Compose and E2E configure one preview tenant, `default-preview`, with
   `PreviewOf: default`, where an author tries an application before publishing it. See

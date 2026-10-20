@@ -181,6 +181,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             request.Property(r => r.ApplicationId).HasColumnName("application_id");
             request.Property(r => r.Kind).HasColumnName("kind");
             request.Property(r => r.Status).HasColumnName("status");
+            request.Property(r => r.Target).HasColumnName("target").HasDefaultValue("tenant");
             request.Property(r => r.Snapshot).HasColumnName("snapshot").HasColumnType("jsonb");
             request.Property(r => r.ReleaseId).HasColumnName("release_id");
             request.Property(r => r.Label).HasColumnName("label");

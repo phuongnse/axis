@@ -150,6 +150,13 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("tenant")
+                        .HasColumnName("target");
+
                     b.HasKey("Id")
                         .HasName("pk_publish_requests");
 

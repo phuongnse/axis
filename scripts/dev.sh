@@ -14,8 +14,8 @@
 # and seeds as axis_runtime. Docker Compose creates both roles.
 # The publisher runs from the built Axis.Admin.dll, not under dotnet watch, so a change to its code
 # needs a restart of this script. The admin host reads no appsettings file, so this script sets the
-# publisher's tenant settings as environment variables of its process only. It serves only the
-# tenant default.
+# publisher's tenant settings as environment variables of its process only. It serves the tenant
+# default and the preview tenant default-preview, so it runs preview requests too.
 # The preview tenant default-preview serves at http://preview.localhost:5206 from the server and at
 # http://preview.localhost:5173 through the SPA. It has its own database axis_preview and its own
 # roles, axis_preview_schema and axis_preview_runtime, which Docker Compose creates, and no
@@ -304,7 +304,8 @@ while :; do
   # set in this subshell only: the schema role is for its steps, and the runtime role is for seeding.
   if [ -z "$publisher" ] && [ -e "$state/server-listening" ]; then
     log "The server has migrated the tenant databases. Starting the publisher."
-    (export DOTNET_ENVIRONMENT=Development \
+    # Bash cannot export a name with a hyphen, so the settings go through env.
+    (exec env DOTNET_ENVIRONMENT=Development \
       Extensions__Path="$PWD/artifacts/extensions" \
       Modules__Path="$PWD/artifacts/modules" \
       Tenants__default__Hosts__0=localhost \
@@ -313,8 +314,12 @@ while :; do
       Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
       Tenants__default__Bindings__PurchasingSystemUrl__Value="http://localhost:$purchasing_port" \
       Tenants__default__Bindings__PurchasingSystemToken__Kind=secret \
-      Tenants__default__Bindings__PurchasingSystemToken__Value=axis-development-purchasing-token
-      exec dotnet src/Axis.Admin/bin/Debug/net10.0/Axis.Admin.dll publisher) \
+      Tenants__default__Bindings__PurchasingSystemToken__Value=axis-development-purchasing-token \
+      'Tenants__default-preview__PreviewOf=default' \
+      'Tenants__default-preview__Hosts__0=preview.localhost' \
+      "Tenants__default-preview__ConnectionString=Host=localhost;Port=$postgres_port;Database=axis_preview;Username=axis_preview_runtime;Password=axis" \
+      "Tenants__default-preview__SchemaConnectionString=Host=localhost;Port=$postgres_port;Database=axis_preview;Username=axis_preview_schema;Password=axis" \
+      dotnet src/Axis.Admin/bin/Debug/net10.0/Axis.Admin.dll publisher) \
       </dev/null > >(prefix publisher) 2>&1 &
     publisher=$!
     disown "$publisher"

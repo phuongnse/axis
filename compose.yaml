@@ -14,8 +14,8 @@
 # bootstrap superuser. It also creates the preview tenant's database axis_preview and its two roles,
 # axis_preview_schema and axis_preview_runtime, which the server and the worker use the same way for
 # the tenant default-preview. The server serves that tenant at http://preview.localhost:5206 and
-# activates both samples on it. It has no deployment bindings. The publisher serves only the tenant
-# default. PostgreSQL runs the file only on an empty volume, so a volume from before the roles or
+# activates both samples on it. It has no deployment bindings. The publisher serves both tenants, so it
+# runs preview requests. PostgreSQL runs the file only on an empty volume, so a volume from before the roles or
 # before the preview database needs `docker compose down -v` once. That deletes its data.
 services:
   postgres:
@@ -145,6 +145,11 @@ services:
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
       Tenants__default__Bindings__PurchasingSystemToken__Kind: secret
       Tenants__default__Bindings__PurchasingSystemToken__Value: axis-development-purchasing-token
+      # The preview tenant default-preview, where preview requests run.
+      Tenants__default-preview__PreviewOf: default
+      Tenants__default-preview__Hosts__0: preview.localhost
+      Tenants__default-preview__ConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_runtime;Password=axis
+      Tenants__default-preview__SchemaConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_schema;Password=axis
 
   # The purchasing system stub from tests/Axis.PurchasingStub. It keeps its orders in memory.
   purchasing:

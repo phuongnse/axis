@@ -351,7 +351,7 @@ The publisher, `axis-admin publisher`, runs every publish request. Under
 so it holds the schema role. It waits until the server has migrated the tenant
 database, and seeds over `ConnectionString`. The server still opens that
 connection only during startup activation, and runs no publish request itself.
-The production installs, `scripts/dev.sh`, the root Compose file and the E2E script each start one publisher.
+The production installs, `scripts/dev.sh`, the root Compose file and the E2E script each start one publisher. The last three give it the `default-preview` tenant as well, so it runs preview requests.
 
 ### Under the directory source
 
@@ -381,7 +381,7 @@ host with one database role:
   held one. This stays true when Studio publishes: the
   server only inserts a request over the runtime role, and `axis-admin
 publisher` runs it with the tenant's schema role.
-- **The publisher.** _(Planned for M10.)_ It reads the tenants from the
+- **The publisher.** It reads the tenants from the
   directory as the server does and holds the schema role of every active
   tenant. It becomes the most valuable host to attack, so run it apart from the
   server and give it no inbound network. It has no HTTP endpoint, see
@@ -1184,7 +1184,7 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 | `id`                | `uuid`              | Primary key, a version 7 UUID                                                                                                          |
 | `application_id`    | `uuid`              | The application `id`                                                                                                                   |
 | `kind`              | `text`              | `validate`, `publish` or `rollback`                                                                                                    |
-| `target`            | `text`              | *(Planned for M10.)* `tenant` or `preview`. It defaults to `tenant`. See the preview note below |
+| `target`            | `text`              | `tenant` or `preview`. It defaults to `tenant`. See the preview note below |
 | `status`            | `text`              | `queued`, `running`, `succeeded` or `failed`                                                                                           |
 | `snapshot`          | `jsonb`, null       | For `validate` and `publish`, an array of `{ file, version, content }`, one for every `*.json` file of the folder. Null for `rollback` |
 | `release_id`        | `uuid`, null        | For `rollback`, the release to activate. For `publish`, set when the release is stored                                                 |
@@ -1210,13 +1210,16 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
   adds 1 to `claims`. It skips an application that has a `running` row.
   A `running` row whose `lease_until` has passed is claimed again the same way.
   A row with `claims` of 3 and an expired lease becomes `failed` with `AXC0215`.
-- **Preview target.** *(Planned for M10.)* A row with `target` `preview` is
+- **Preview target.** A row with `target` `preview` is
   stored in the session tenant's database and run against that tenant's preview
   tenant, see [preview](authoring.md#preview). Its history row lives in the
   preview tenant's `release_activations` and keeps this row's `id` as
   `request_id`. That `request_id` points at a request in another database, so no
   foreign key can hold it. The publisher sets the row `failed` with `AXC0216`
-  when the main tenant no longer has a preview tenant.
+  when the main tenant no longer has a preview tenant. The publisher claims only
+  a `publish` row with target `preview`. A `validate` or `rollback` row with that
+  target is never claimed. While the preview tenant exists but the publisher does
+  not serve it, the row stays `queued`.
 - **Final.** A `succeeded` or `failed` row is never changed again.
 - **Size and age.** No limit on the size of a snapshot is set, and nothing
   deletes old requests. Large folders or many requests grow the table. A later
@@ -1286,7 +1289,7 @@ have at activation. See also [rollback](authoring.md#rollback).
 
 Each `publish` writes one record in `axis.audit_records`, in the
 transaction that sets the request's final status. So does each `rollback`. The actor is the requesting
-user, and `application_id` is the application `id`. *(Planned for M10.)* A
+user, and `application_id` is the application `id`. A
 preview request writes no audit record. The preview tenant's release history
 records who published it.
 
