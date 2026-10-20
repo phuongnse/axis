@@ -249,5 +249,15 @@
   "shell.studio.newResource.create": "Tạo",
   "shell.studio.newResource.exists": "Đã có tài nguyên với tên hoặc ngôn ngữ này.",
   "shell.studio.newResource.invalid": "Tên hoặc ngôn ngữ này không được phép. Tên dùng chữ cái và chữ số và bắt đầu bằng chữ cái. Tên vai trò dùng chữ cái thường, chữ số và dấu gạch nối. Ngôn ngữ có dạng en hoặc pt-BR.",
-  "shell.studio.newResource.failed": "Không thể tạo tài nguyên."
+  "shell.studio.newResource.failed": "Không thể tạo tài nguyên.",
+  "shell.studio.newApplication.button": "Ứng dụng mới",
+  "shell.studio.newApplication.title": "Ứng dụng mới",
+  "shell.studio.newApplication.name": "Tên",
+  "shell.studio.newApplication.template": "Bắt đầu từ",
+  "shell.studio.newApplication.blank": "Trống",
+  "shell.studio.newApplication.create": "Tạo",
+  "shell.studio.newApplication.exists": "Đã có ứng dụng với tên này.",
+  "shell.studio.newApplication.invalid": "Tên dùng chữ cái và chữ số, bắt đầu bằng chữ cái, dài tối đa 60 ký tự và không được là api, health, assets hay studio.",
+  "shell.studio.newApplication.failed": "Không thể tạo ứng dụng.",
+  "shell.studio.newApplication.templatesFailed": "Không thể tải các mẫu. Bạn có thể bắt đầu từ Trống."
 }

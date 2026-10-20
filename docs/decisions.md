@@ -2892,8 +2892,8 @@ is that lower severities pass.
 
 Studio creates a new application, blank or from an installed application
 template, and starts a resource of every kind. D46 plans this for M11. The
-`Studio:ApplicationsPath` setting, `POST /api/studio/apps` and `studioCreate`
-are built. The rest is _(planned for M11)_. See the
+`Studio:ApplicationsPath` setting, `POST /api/studio/apps`, `studioCreate` and
+the Studio New application dialog are built. The rest is _(planned for M11)_. See the
 [authoring API](reference/authoring.md#creating-an-application), the
 [application templates](reference/configuration.md#application-templates) and
 the [Studio section of the frontend](reference/frontend.md#studio). The owner

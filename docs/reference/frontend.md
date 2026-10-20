@@ -850,7 +850,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 Studio is where authors edit an application's resources. It uses the
 [authoring API](authoring.md) and writes the same JSON files that git keeps, as
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed)
-agrees. The route, the link, the application picker, New resource, the resource list with its
+agrees. The route, the link, the application picker, New application, New resource, the resource list with its
 search, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
 the request status and the preview links, the Releases list with Roll back, and the
@@ -864,11 +864,13 @@ reconnect message are built.
   address, as `/studio?app=PurchaseRequests&resource=<id>`, so a reload keeps
   them. A Used by entry or a diagnostic that opens a resource at a path adds
   `&path=<path>`.
-- **New application** _(planned for M11)_. A **New application** button shows
-  when `GET /api/me` answers `studioCreate: true`. It asks for a name and
-  offers Blank or a template from `GET /api/studio/templates`, with the title
-  and description in the UI locale and `en` as the fallback. A `409` or a `400`
-  shows next to the name. A success picks the new application and shows its
+- **New application.** A **New application** button shows beside the picker
+  when `GET /api/me` answers `studioCreate: true`. It also shows when Studio
+  lists no application. The dialog asks for a name and checks it with the API's
+  rule before it sends anything. It offers Blank or a template from
+  `GET /api/studio/templates`, with the title and description in the UI locale
+  and `en` as the fallback. A `409` or a `400` shows next to the name. A success
+  adds the application to the picker, picks it, and loads its resources and
   diagnostics. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).

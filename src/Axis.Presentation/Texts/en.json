@@ -249,5 +249,15 @@
   "shell.studio.newResource.create": "Create",
   "shell.studio.newResource.exists": "A resource with this name or locale already exists.",
   "shell.studio.newResource.invalid": "This name or locale is not allowed. A name uses letters and digits and starts with a letter. A role name uses lower-case letters, digits and hyphens. A locale looks like en or pt-BR.",
-  "shell.studio.newResource.failed": "The resource could not be created."
+  "shell.studio.newResource.failed": "The resource could not be created.",
+  "shell.studio.newApplication.button": "New application",
+  "shell.studio.newApplication.title": "New application",
+  "shell.studio.newApplication.name": "Name",
+  "shell.studio.newApplication.template": "Start from",
+  "shell.studio.newApplication.blank": "Blank",
+  "shell.studio.newApplication.create": "Create",
+  "shell.studio.newApplication.exists": "An application with this name already exists.",
+  "shell.studio.newApplication.invalid": "A name uses letters and digits, starts with a letter, has at most 60 characters and is not api, health, assets or studio.",
+  "shell.studio.newApplication.failed": "The application could not be created.",
+  "shell.studio.newApplication.templatesFailed": "The templates could not be loaded. You can start from Blank."
 }
