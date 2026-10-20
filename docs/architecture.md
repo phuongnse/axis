@@ -83,7 +83,9 @@ flowchart LR
 src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
-  Axis.Scenarios/         console host that runs an application's test scenarios
+  Axis.Scenarios.Runner/  library that runs an application's test scenarios, from a folder or from files in memory;
+                          used by Axis.Scenarios and, later, by the publisher
+  Axis.Scenarios/         console host over Axis.Scenarios.Runner that runs an application's test scenarios
   Axis.Admin/             console host for tenant provisioning, migrations, activation, backup and restore
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
@@ -120,7 +122,7 @@ checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
-`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios` (the console host that runs an application's test scenarios), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
+`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
 `PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
 
 ## Module rules
@@ -566,7 +568,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   It adds `studioPreviewHost`, the host of the tenant's served preview tenant. It
   is null for a user who may not use Studio and for a tenant without a preview
   tenant. See [D48](decisions.md#d48-preview-tenants--agreed).
-  It adds a boolean `studioTest` _(planned for M11)_, true when `studio` is true
+  It adds a boolean `studioTest`, true when `studio` is true
   and `Studio:Tests` is true. See
   [D55](decisions.md#d55-running-test-scenarios-from-studio--agreed).
   Without a session it is a `401`, as today. Record writes, process starts and the

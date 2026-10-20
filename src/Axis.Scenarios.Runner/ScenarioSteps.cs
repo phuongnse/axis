@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
-namespace Axis.Scenarios;
+namespace Axis.Scenarios.Runner;
 
 /// <summary>
 /// Runs the steps of one scenario over its tenant database connection. It keeps the records that

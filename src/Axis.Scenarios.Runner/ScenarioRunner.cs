@@ -17,10 +17,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
-namespace Axis.Scenarios;
+namespace Axis.Scenarios.Runner;
 
 /// <summary>
-/// Runs one scenario against its own temporary tenant database. The database is created, migrated,
+/// Runs one scenario of an application held in a folder or in files in memory, against its own
+/// temporary tenant database. The database is created, migrated,
 /// given the compiled and activated application and its seed data, and dropped when the scenario
 /// ends, whether it passed or failed. The scenario runs as the tenant <see cref="TenantId"/> with
 /// placeholder deployment bindings, never a real URL or secret. It reads the manifests of the
@@ -51,7 +52,7 @@ public static class ScenarioRunner
     /// is compiled against, or null for none. <paramref name="modules"/> are the installed modules it is
     /// compiled against, or null for none.
     /// </summary>
-    public static async Task<ScenarioResult> RunAsync(
+    public static Task<ScenarioResult> RunAsync(
         string folder,
         ScenarioResource scenario,
         string serverConnectionString,
@@ -63,9 +64,56 @@ public static class ScenarioRunner
     {
         packages ??= PackageCatalog.Empty;
         modules ??= ModuleCatalog.Empty;
+        return RunAsync(
+            (context, token) => ReleaseCompiler.CompileAsync(folder, context, packages.Versions, modules.Modules, token),
+            scenario,
+            serverConnectionString,
+            loggerFactory,
+            workItemLimit,
+            packages,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="scenario"/> of the application whose resource files are
+    /// <paramref name="files"/>, held in memory, such as a snapshot. Otherwise it behaves as the
+    /// overload that reads a folder.
+    /// </summary>
+    public static Task<ScenarioResult> RunAsync(
+        IReadOnlyList<ResourceContent> files,
+        ScenarioResource scenario,
+        string serverConnectionString,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken,
+        int workItemLimit = WorkItemLimit,
+        PackageCatalog? packages = null,
+        ModuleCatalog? modules = null)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        packages ??= PackageCatalog.Empty;
+        modules ??= ModuleCatalog.Empty;
+        return RunAsync(
+            (context, token) => ReleaseCompiler.CompileAsync(files, context, packages.Versions, modules.Modules, token),
+            scenario,
+            serverConnectionString,
+            loggerFactory,
+            workItemLimit,
+            packages,
+            cancellationToken);
+    }
+
+    private static async Task<ScenarioResult> RunAsync(
+        Func<ConfigurationDbContext, CancellationToken, Task<ReleaseCompilationResult>> compile,
+        ScenarioResource scenario,
+        string serverConnectionString,
+        ILoggerFactory loggerFactory,
+        int workItemLimit,
+        PackageCatalog packages,
+        CancellationToken cancellationToken)
+    {
         var stopwatch = Stopwatch.StartNew();
         var database = $"axis_scenario_{Guid.NewGuid():N}";
-        ScenarioResult Result(string? failure) => new(scenario.Name, scenario.File, database, stopwatch.Elapsed, failure);
+        ScenarioResult Result(ScenarioFailure? failure) => new(scenario.Name, scenario.File, database, stopwatch.Elapsed, failure?.Step, failure?.StepType, failure?.Message);
 
         try
         {
@@ -73,11 +121,11 @@ public static class ScenarioRunner
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            return Result($"The temporary database could not be created: {exception.Message}");
+            return Result(new(null, null, $"The temporary database could not be created: {exception.Message}"));
         }
 
-        string? failure;
-        string? dropFailure = null;
+        ScenarioFailure? failure;
+        ScenarioFailure? dropFailure = null;
         try
         {
             // The connection does not pool, so no idle session keeps the database from being dropped.
@@ -86,11 +134,11 @@ public static class ScenarioRunner
 
             // The setting reaches every connection of the scenario, including the work item runner's.
             var connectionString = now is { } time ? WithNow(builder.ConnectionString, time) : builder.ConnectionString;
-            failure = await RunInDatabaseAsync(folder, scenario, builder.ConnectionString, connectionString, now, loggerFactory, workItemLimit, packages, modules, cancellationToken);
+            failure = await RunInDatabaseAsync(compile, scenario, builder.ConnectionString, connectionString, now, loggerFactory, workItemLimit, packages, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            failure = $"{exception.GetType().Name}: {exception.Message}";
+            failure = new(null, null, $"{exception.GetType().Name}: {exception.Message}");
         }
         finally
         {
@@ -100,7 +148,7 @@ public static class ScenarioRunner
             }
             catch (Exception exception)
             {
-                dropFailure = $"The temporary database could not be dropped: {exception.Message}";
+                dropFailure = new(null, null, $"The temporary database could not be dropped: {exception.Message}");
             }
         }
 
@@ -127,8 +175,10 @@ public static class ScenarioRunner
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private static async Task<string?> RunInDatabaseAsync(
-        string folder,
+    private sealed record ScenarioFailure(int? Step, string? StepType, string Message);
+
+    private static async Task<ScenarioFailure?> RunInDatabaseAsync(
+        Func<ConfigurationDbContext, CancellationToken, Task<ReleaseCompilationResult>> compile,
         ScenarioResource scenario,
         string baseConnectionString,
         string connectionString,
@@ -136,7 +186,6 @@ public static class ScenarioRunner
         ILoggerFactory loggerFactory,
         int workItemLimit,
         PackageCatalog packages,
-        ModuleCatalog modules,
         CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(connectionString);
@@ -148,7 +197,7 @@ public static class ScenarioRunner
         await data.Database.MigrateAsync(cancellationToken);
         await processes.Database.MigrateAsync(cancellationToken);
 
-        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, modules.Modules, cancellationToken);
+        var compiled = await compile(configuration, cancellationToken);
         if (compiled.Release is null || compiled.Model is null)
         {
             return Setup("could not be compiled", compiled.Diagnostics);
@@ -204,7 +253,7 @@ public static class ScenarioRunner
             }
             catch (StepFailedException exception)
             {
-                return $"Step {index + 1} ({step.Type}): {exception.Message}";
+                return new(index, step.Type, exception.Message);
             }
         }
 
@@ -218,9 +267,9 @@ public static class ScenarioRunner
             or ScenarioStepDefinition.StartProcess
             or ScenarioStepDefinition.CompleteTask;
 
-    private static string Setup(string reason, IReadOnlyList<Diagnostic> diagnostics)
+    private static ScenarioFailure Setup(string reason, IReadOnlyList<Diagnostic> diagnostics)
     {
         var first = diagnostics.FirstOrDefault(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error) ?? diagnostics[0];
-        return $"The application {reason}: {first.Code} {first.Message}";
+        return new(null, null, $"The application {reason}: {first.Code} {first.Message}");
     }
 }

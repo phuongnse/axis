@@ -9,7 +9,7 @@ of [architecture.md](../architecture.md) apply: sections marked
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
 in git. The application list, resource list, read, patch, create, delete, text write, diagnostics,
-references and expression check routes are built. It is
+references, names and expression check routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
@@ -24,9 +24,10 @@ its own process, and
 A `changes` route that writes several files in one call is
 *(planned for M11)*, see [Changes](#changes).
 
-The [text write](#text-writes) and [expression check](#expression-check) routes help Studio's
-label texts and expression editor, and are built. *(Planned for M11.)* A [names](#names) route
-helps its pickers. It is agreed, with the other two, in
+The [names](#names) route feeds Studio's reference pickers, the
+[text write](#text-writes) route helps its label texts and the
+[expression check](#expression-check) route helps its expression editor. All
+three are built, and agreed in
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed).
 
 ## Settings
@@ -49,7 +50,7 @@ folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. S
   too, see [Preview](#preview).
 - `Studio:Tests` turns on `studioTest` on `GET /api/me`, which shows the test
   controls in Studio. It is off by default. A `test` request needs the author
-  role only, see [Test](#test). *(planned for M11)*
+  role only, see [Test](#test).
 
 ## Routes
 
@@ -73,7 +74,7 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/resources/{id}/references` | `200` with `{ uses, usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/texts/{key}/references` | `200` with `{ usedBy }`, see [References](#references) |
 | `GET /api/studio/apps/{application}/diagnostics` | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200` |
-| `GET /api/studio/apps/{application}/names` *(planned for M11)* | `200` with the names the application defines, see [Names](#names) |
+| `GET /api/studio/apps/{application}/names` | `200` with the names the application defines, see [Names](#names) |
 | `PUT /api/studio/apps/{application}/texts/{key}` | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes) |
 | `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
 
@@ -153,7 +154,7 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-The text write and the expression check are built. The names route, planned for M11, is not.
+The names route, the text write and the expression check are built.
 The three routes use these checks. None of them has
 check 6 or a later numbered check, except where a line says so:
 
@@ -213,7 +214,7 @@ requests or releases exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics,
+from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Diagnostics, Names,
 Text write, Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -228,7 +229,7 @@ Text write, Resource references, Text key references, Release history, Validate,
 | Text key references | No session | No author role, or no `Studio:Folders` | Unknown application, or a key that no text resource defines and no label uses | Not used |
 | Changes *(planned for M11)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or a patch that names an unknown resource | Any stale version, a patched resource that is gone, or a create whose `id` or target file already exists |
 | Diagnostics | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
-| Names *(planned for M11)* | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
+| Names | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Text write | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | A text resource whose `texts` is not an object |
 | Expression check | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or an unknown `resourceId` | Not used |
 | Validate | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
@@ -289,7 +290,7 @@ agrees.
 
 ## Names
 
-*(Planned for M11.)* `GET .../names` answers every name the application
+`GET .../names` answers every name the application
 defines, so Studio's [reference pickers](frontend.md#studio) load them once.
 [D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
 agrees it. The answer is:
@@ -309,6 +310,18 @@ agrees it. The answer is:
 - **`name`.** It is written as a reference writes it. A module entity is
   `<module id>/<name>`, and a module rule is `<module id>:<name>`. `module` is
   the module id, or null for an entity or rule of the application.
+- **Module names.** A module's events, sequences and forms are listed
+  under their `<module id>/<name>` names too, but only entities, data sources
+  and rules carry `module`. A module resource's `id` is the id written in its
+  module file.
+- **`columns`.** The projected fields of a data source, in order. A column's
+  `type` is the type of the field at the end of its path, or null when the path
+  does not resolve. A grouped data source also lists its measures. A `count`
+  measure is an `integer`, and any other measure has the type of the field it
+  measures.
+- **Order.** Each list holds the module resources first, then the
+  application's own in file path order. A step that is not a task has
+  `outcomes: []`. Text keys are sorted ordinally.
 - **`locales`.** The locales of the folder's text resources.
 - **`texts`.** Each key comes with its text in every locale, and `usedBy`, the
   number of `label text` edges in the [reference index](configuration.md#reference-index).
@@ -572,7 +585,7 @@ saved, and the diagnostics list the broken references.
 ## Publishing
 
 An author validates, publishes and rolls back an
-application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. The server never activates in its own process and
+application from Studio, and previews it on the preview tenant. `validate`, `publish`, `preview`, `rollback` and the request status are built. Storing a `test` request is built too, and running it is _(planned for M11)_. The server never activates in its own process and
 holds no tenant schema connection. It stores a **publish request** in the
 tenant database, and a separate [publisher](administration.md#publisher) runs
 it with the tenant's schema role. See
@@ -588,7 +601,7 @@ host publishes to that tenant only.
 | `POST /api/studio/apps/{application}/validate` | `202` with the request and a `Location` header for `.../requests/{id}`. It needs the author role |
 | `POST /api/studio/apps/{application}/publish` | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role |
 | `POST /api/studio/apps/{application}/preview` | `202` with the request and a `Location` header. It takes no body. It needs the author role only. `409` when the tenant has no preview tenant, see [Preview](#preview) |
-| `POST /api/studio/apps/{application}/test` | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`. None or an empty list means every scenario. It needs the author role only, see [Test](#test) *(planned for M11)* |
+| `POST /api/studio/apps/{application}/test` | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`. None or an empty list means every scenario. It needs the author role only, see [Test](#test) |
 | `GET /api/studio/apps/{application}/requests/{id}` | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes |
 | `GET /api/studio/apps/{application}/releases` | `200` with the activation history, newest first, and which release is active |
 | `POST /api/studio/apps/{application}/releases/{id}/rollback` | `202` with the request and a `Location` header. It takes no body. It needs the author role and the publisher role |
@@ -610,7 +623,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | --- | --- |
 | `id` | The request id, a UUID |
 | `application` | The application `name` |
-| `kind` | `validate`, `publish`, `rollback` or `test` *(planned for M11)* |
+| `kind` | `validate`, `publish`, `rollback` or `test` |
 | `target` | `tenant` or `preview`. `preview` marks a request that runs on the session tenant's preview tenant, see [Preview](#preview). Only the preview route writes `preview`. The request status route reports the stored value |
 | `status` | `queued`, `running`, `succeeded` or `failed` |
 | `label` | The optional label of a `publish`, up to 100 characters, or null |
@@ -621,7 +634,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | `finishedAt` | When it reached `succeeded` or `failed`, or null before |
 | `releaseId` | The release a `publish` activated or a `rollback` named, or null. A `validate` and a `test` have none |
 | `diagnostics` | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings |
-| `scenarios` | *(planned for M11)* Null for every kind but `test`. For `test`, an array with one item for each scenario that ran, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends |
+| `scenarios` | Null for every kind but `test`. For `test`, an array with one item for each scenario that ran *(the publisher fills it in, planned for M11)*, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends |
 
 - **A snapshot.** `validate` and `publish` store the folder as it is when the
   request is made: every `*.json` file that Studio can reach, with its `version`, as for
@@ -644,8 +657,9 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   [`axis-admin activate`](administration.md#activate). A `seed` failure
   happens after activation has committed, so the request ends `failed` with
   `releaseId` set, and the release stays active and stays in the history.
-- **`test`.** *(planned for M11)* The snapshot is taken as for `validate`.
-  The publisher runs the scenarios as the [publisher](administration.md#publisher)
+- **`test`.** The server stores the request with the snapshot, taken as for
+  `validate`. It stays `queued`, because no publisher claims it yet
+  *(planned for M11)*. The publisher is to run the scenarios as the [publisher](administration.md#publisher)
   describes, and stores their outcomes in `scenarios`. The request ends
   `failed` when any scenario fails. Scenario failures go only in `scenarios`.
   Compile errors, the missing `Scenarios:ServerConnectionString` setting, an
@@ -687,8 +701,10 @@ request has the kind `publish` and the target `preview`.
 
 ### Test
 
-*(planned for M11)* `POST .../test` runs the application's
-[test scenarios](configuration.md#test-scenarios) from Studio.
+`POST .../test` stores a request to run the application's
+[test scenarios](configuration.md#test-scenarios) from Studio. The route and the
+stored request are built. Running the request is *(planned for M11)*: no
+publisher claims it yet, so it stays `queued`.
 [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees
 the route. The request has the kind `test` and the target `tenant`.
 
@@ -772,7 +788,7 @@ newest first.
 - `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
   both the author role and the publisher role and `Studio:Folders` is not
   empty. It is built. Studio uses it to hide Publish and the rollback button.
-- `GET /api/me` gains a boolean `studioTest` *(planned for M11)*, true when
+- `GET /api/me` gains a boolean `studioTest`, true when
   `studio` is true and `Studio:Tests` is true. Studio uses it to hide **Run
   tests** and the **Run** action of a scenario.
 - `GET /api/me` also gains `studioPreviewHost`, the first host of the served tenant

@@ -26,6 +26,8 @@ namespace Axis.Server.Studio;
 /// Only real <c>*.json</c> files inside a listed folder are reachable.
 /// <c>GET /api/studio/apps/{application}/diagnostics</c> compiles the folder in memory against the installed
 /// extension packages and modules and answers every compile diagnostic. It touches no database and activates nothing.
+/// <c>GET /api/studio/apps/{application}/names</c> answers every name the application defines, module names
+/// included, from the same compile. It touches no database and answers even when the folder has errors.
 /// <c>GET /api/studio/apps/{application}/resources/{id}/references</c> answers <c>{ uses, usedBy }</c> from the same
 /// compile's reference index, and <c>GET /api/studio/apps/{application}/texts/{key}/references</c> answers
 /// <c>{ usedBy }</c>. A text key that nothing defines or uses answers 404.
@@ -62,6 +64,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/names", NamesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/releases", ReleasesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}/references", ResourceReferencesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
@@ -191,6 +194,22 @@ internal static class StudioEndpoints
         // The compile step of activation, before it touches a database. The folder is read from disk as
         // activation reads it, not through the filtered list of the other routes.
         return Results.Ok(new StudioDiagnosticsResponse(StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
+    private static async Task<IResult> NamesAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        return Results.Ok(ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).Names);
     }
 
     private static async Task<IResult> ReleasesAsync(

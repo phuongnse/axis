@@ -2,6 +2,7 @@ using Axis.Configuration.Compilation;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Scenarios.Runner;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
