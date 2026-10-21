@@ -200,6 +200,13 @@ returns 404, upgrade `gh` and try again.
 - Compare the `when` texts with the concepts that the **From** column of
   [concepts.md](../../../docs/domain/concepts.md) lists for the new
   milestone. Each risky concept must fall under `hard` by its consequence.
+- Check that the new milestone's work that the platform has not done before,
+  such as a new kind of editor, widget or library, is not described by the
+  `standard` text, so it falls under `hard`.
+- For the milestone that is ending, compare the profiles' results: the share
+  of issues whose rounds stopped on an error, ran out of time or failed checks.
+  The plan comment names each issue's profile. When `standard` fails more
+  often than `hard`, narrow the `standard` text.
 - Check whether newer models make a profile's models out of date.
 - Propose any change to the owner as a hand-made pull request.
 

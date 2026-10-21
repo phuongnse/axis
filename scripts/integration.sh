@@ -33,10 +33,18 @@ if [ "$#" -gt 0 ]; then
   finish_report
 fi
 
+# NexKit's runs leave the performance tests, whose classes end in PerformanceTests, to CI on main, where
+# no $NEXKIT_BASE_SHA is set. They take about a third of the suite's time and depend on the runner's load.
+performance=()
+if [ -n "${NEXKIT_BASE_SHA:-}" ]; then
+  echo "NEXKIT_BASE_SHA is set, so the performance tests are left to CI on main."
+  performance=(--filter-not-class '*PerformanceTests')
+fi
+
 if affected integration; then
   for suite in "${scenario_suites[@]}"; do expect_suite "$suite" .; done
   run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
-    --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir"
+    --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" "${performance[@]}"
 else
   for suite in "${scenario_suites[@]}"; do skip_suite "$suite" .; done
   skip_suite Axis.Integration.Tests tests/Axis.Integration.Tests

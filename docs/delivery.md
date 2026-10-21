@@ -82,6 +82,11 @@ models, are not copied here. Look them up where they live.
   - Playwright is skipped when every changed file is under `docs/` or is a `*.md`
     file. It also skips the PostgreSQL, Keycloak, stub, server, worker and
     publisher that it starts.
+  - The integration performance tests never run under that variable. Their class
+    names end in `PerformanceTests`, and a new one must follow that rule. They
+    take about a third of the integration tests' time and depend on the load of
+    the runner. CI on `main` runs them, so a slowdown shows after the merge, and
+    the local agent opens a bug issue for it as for any CI failure on `main`.
 
   The lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs). Any
   doubt runs the suite. A missing base, a git error or an empty change list runs
@@ -115,8 +120,15 @@ profiles, their `when` texts and their models are in NexKit's
 [`profiles` setting][nexkit-profiles]. This section holds the rules behind
 them.
 
-- **Profiles go by risk: `standard` and `hard`.** The more a mistake would
-  cost, the stronger the profile. `standard` is the default.
+- **Profiles go by risk and novelty: `standard` and `hard`.** The more a
+  mistake would cost, or the less the platform has done such work before, the
+  stronger the profile. `hard` is the default, so an issue whose triage fails
+  runs on it.
+- **`standard` is a narrow description and `hard` is the rest.** `standard`
+  names only work that repeats what the platform already does. Anything it
+  does not name goes to `hard`, so the concepts and kinds of work that a new
+  milestone brings land on the stronger profile with no change to the `when`
+  texts. The cost is that more issues run on the stronger, dearer models.
 - **Plan and review are at least as strong as implement.** The plan is the
   contract and the review is the last check before the owner. In every
   profile, review runs on a different model from implement.
@@ -125,9 +137,8 @@ them.
   runs on the wrong profile.
 - **A `when` text says what a mistake would cost, not where the code is.** It
   may name concepts from [concepts.md](domain/concepts.md) as examples, but
-  never files, classes, doc sections or milestones, which go stale. `hard` is
-  broad and `standard` is the rest. When unsure, triage chooses the stronger
-  profile.
+  never files, classes, doc sections or milestones, which go stale. When
+  unsure, triage chooses the stronger profile.
 - **Triage sees only the issue and its discussion.** It does not open links.
   So an issue names the concepts it touches in its own text, even when it
   links to the docs that describe them.

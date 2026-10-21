@@ -93,10 +93,10 @@
       "model": "claude-opus-5-5"
     }
   },
-  "default_profile": "standard",
+  "default_profile": "hard",
   "profiles": {
     "standard": {
-      "when": "Anything that is not hard: a clear request that follows a pattern the platform already has.",
+      "when": "Only work that repeats what the platform already does, in the same way: a change to docs or tests only, a sample or configuration file shaped like an existing one, or a change to an existing screen, endpoint or command that adds no new kind of component, library or pattern. A mistake could not reach stored data, access, security or running work. Anything else is hard.",
       "stages": {
         "plan": {
           "model": "claude-opus-5-5"
@@ -111,7 +111,7 @@
       }
     },
     "hard": {
-      "when": "A mistake could leak data across tenants or users, lose or corrupt stored data, change how running work or an active release behaves, or weaken security. For example tenants, roles and policies, rules used for authorization, entity storage and schema changes, releases and activation, processes, connectors and secrets. Also hard: the request depends on a decision that is still Proposed. When unsure between standard and hard, choose hard.",
+      "when": "Everything that is not standard. That covers a mistake that could leak data across tenants or users, lose or corrupt stored data, change how running work or an active release behaves, or weaken security, for example around tenants, roles and policies, rules used for authorization, entity storage and schema changes, releases and activation, processes, connectors and secrets. It also covers work that brings a kind of component, editor, library or pattern the platform does not have yet, and a request that depends on a decision that is still Proposed. When unsure between standard and hard, choose hard.",
       "stages": {
         "plan": {
           "model": "claude-opus-5-5"
