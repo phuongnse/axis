@@ -15,6 +15,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   templates. Those components and a single token-based theme with light and
   dark modes live in `web/src/platform/`. Feature code assembles them and
   adds no styling of its own.
+- **Design tokens and previews** *(planned for M12)*. An Axis token file in
+  `web/src/platform/` holds the colours for light and dark mode, type, spacing
+  and radius, and the theme reads it. It replaces `sharedTokens` in
+  `web/src/platform/theme.tsx`. Preview pages show the tokens and each widget,
+  named in Axis terms. The local agent session publishes them as the Design
+  System artifact. See
+  [D57](../decisions/d57-a-design-system-published-from-the-repository.md)
+  and [Design changes](../delivery.md#design-changes).
 - **How pages and widgets grow.** A page has one widget. A form binds an entity
   or a `form` resource, which lays the entity's fields out in sections, and a
   table binds an entity or a data source. Container widgets such as tabs, sections and columns will hold

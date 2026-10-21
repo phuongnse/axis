@@ -14,9 +14,12 @@ Three roles take part:
   run needs a person.
 - **The local agent session** works for the owner. It writes issues and their
   order, watches the work, reviews plans and merged pull requests, and steps
-  in where autopilot stops and a person is needed.
+  in where autopilot stops and a person is needed. It also publishes the
+  Design System artifact in Claude from the repository, as
+  [Design changes](#design-changes) describes.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit
-  pipeline. They read [AGENTS.md](../AGENTS.md).
+  pipeline. They read [AGENTS.md](../AGENTS.md). They do not read or write
+  Claude Design.
 
 The rules here put [D13](decisions/d13-delivery-workflow.md) into
 practice. Values that NexKit or the repository settings own, such as protected
@@ -139,7 +142,9 @@ models, are not copied here. Look them up where they live.
   change.** Those paths are set by NexKit's
   [`protected_paths` setting][nexkit-config].
   Such changes are hand-made pull requests on any branch name, for example a
-  NexKit version bump. The owner opens them from their own account. NexKit's
+  NexKit version bump. Hand-made pull requests are only for those paths, so a
+  design change is never one; see [Design changes](#design-changes). The owner
+  opens them from their own account. NexKit's
   checks do not run on them, so the owner merges them with an admin bypass of
   the rules on `main`, after the CI workflow passes.
 
@@ -191,7 +196,8 @@ them.
    implements and is in the current milestone. Its text names the concepts it
    touches, so triage can choose the [profile](#profiles). The owner or the
    local agent opens it, because autopilot takes only issues opened by someone
-   with write access.
+   with write access. It may link a Design artifact as a picture, while the
+   docs stay the source of behaviour.
 
    It gets every repository label that fits its content, and at least one.
    Read the current labels with `gh label list`, and choose by each label's
@@ -300,6 +306,29 @@ them.
 4. **Close.** When the last issue of the milestone closes, NexKit mentions
    the owner once. The owner closes the milestone on GitHub once the docs
    sweep is merged, and the next sweep takes the next milestone.
+
+## Design changes
+
+The repository is the source of truth for the Axis design system, as
+[D57](decisions/d57-a-design-system-published-from-the-repository.md) agrees.
+It holds the token file, with the colours for light and dark mode, type,
+spacing and radius, and the widgets. See the
+[frontend reference](reference/frontend.md).
+
+- **Publishing.** The local agent session publishes a Design System artifact in
+  Claude from the repository. It shows the tokens and a preview of each
+  widget, named in Axis terms.
+- **Who edits.** Only the owner and Claude edit the design in Claude Design.
+  NexKit's agents do not read or write it.
+- **A design change is a NexKit issue.** It links the artifact and follows the
+  [life of an issue](#the-life-of-an-issue). It is never a hand-made pull
+  request, because the token file and the widgets are not paths NexKit may
+  not change.
+- **New screens.** They may be drawn as Design artifacts that use the design
+  system. An issue may link one as a picture. The docs stay the source of
+  behaviour.
+- **After a merge.** When a merged change touches the tokens or a widget, the
+  local session publishes the design system again.
 
 ## Keeping the docs current
 
