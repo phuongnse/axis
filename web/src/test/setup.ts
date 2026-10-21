@@ -39,3 +39,44 @@ if (!Range.prototype.getBoundingClientRect) {
   Range.prototype.getBoundingClientRect = () =>
     ({ x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0, toJSON: () => ({}) }) as DOMRect
 }
+
+// jsdom has no ResizeObserver, which React Flow uses. The callback never fires, so nothing re-measures.
+if (!('ResizeObserver' in globalThis)) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+}
+
+// jsdom has no DOMMatrixReadOnly, which React Flow reads the zoom from. Parse scale(n) and default to 1.
+if (!('DOMMatrixReadOnly' in globalThis)) {
+  globalThis.DOMMatrixReadOnly = class {
+    m22: number
+    constructor(transform?: string) {
+      const scale = transform?.match(/scale\(([\d.]+)\)/)?.[1]
+      this.m22 = scale === undefined ? 1 : Number(scale)
+    }
+  } as unknown as typeof DOMMatrixReadOnly
+}
+
+// React Flow needs a size for its container and nodes. jsdom reports 0, so give one inside .react-flow only.
+for (const [property, style] of [
+  ['offsetWidth', 'width'],
+  ['offsetHeight', 'height'],
+] as const) {
+  const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, property)
+  Object.defineProperty(HTMLElement.prototype, property, {
+    configurable: true,
+    get(this: HTMLElement) {
+      if (!this.closest('.react-flow')) return original?.get?.call(this) ?? 0
+      return parseFloat(this.style[style]) || 1
+    },
+  })
+}
+
+// React Flow calls getBBox to measure edge labels. jsdom does not implement it.
+const svgPrototype = SVGElement.prototype as SVGElement & { getBBox?: () => DOMRect }
+if (!svgPrototype.getBBox) {
+  svgPrototype.getBBox = () => ({ x: 0, y: 0, width: 0, height: 0 }) as DOMRect
+}
