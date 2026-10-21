@@ -819,7 +819,10 @@ migration in Studio, because the sample has no migration and the application is 
 application are not in the sample. So the journey deletes the starter `en` text resource and creates it again.
 The journey then builds the `MyTicketList` and `AllTicketList` data sources, the `TicketTriage`, `TicketResolution` and
 `TicketConfirmation` forms, and the `TicketHandling` process in the process editor. Every expression is typed in the
-expression editor.
+expression editor. It then builds the four pages in the page editor and finishes the site that the blank application
+already has: the `vi` locale and three navigation entries. It deletes the starter `Home` page, because the sample has
+none. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
+the requester from editing `resolution`. At the end the whole folder must have no error diagnostic.
 
 The E2E run also starts the purchasing system stub from the build output, and
 fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its
