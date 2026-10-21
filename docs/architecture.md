@@ -817,6 +817,9 @@ because the starter field `name` is renamed to `number`. The journey answers Dro
 migration in Studio, because the sample has no migration and the application is never published. The built
 `migrations` folder must be empty at the end. Studio cannot remove a text key yet, and the starter keys of a blank
 application are not in the sample. So the journey deletes the starter `en` text resource and creates it again.
+The journey then builds the `MyTicketList` and `AllTicketList` data sources, the `TicketTriage`, `TicketResolution` and
+`TicketConfirmation` forms, and the `TicketHandling` process in the process editor. Every expression is typed in the
+expression editor.
 
 The E2E run also starts the purchasing system stub from the build output, and
 fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its

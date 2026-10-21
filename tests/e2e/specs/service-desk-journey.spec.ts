@@ -10,6 +10,16 @@ test.setTimeout(300_000)
 
 const built = path.join(journeyApplications, 'service-desk')
 
+interface SampleDataSource {
+  entity: string
+  fields: { name: string; path: string }[]
+}
+
+interface SampleForm {
+  entity: string
+  sections: { title: { textKey: string }; fields: { field: string; readOnly?: boolean }[] }[]
+}
+
 test.describe('the author builds the service desk with Studio only', () => {
   // CI retries once, but a retry would meet the ServiceDesk folder from the first attempt and get 409, and removing
   // that folder would be a file write. So retries are off.
@@ -26,11 +36,14 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   async function pick(page: Page, testId: string, option: string, filter?: string) {
     const field = page.getByTestId(testId)
+    const combobox = field.getByRole('combobox')
     await field.locator('.ant-select-selector').click()
     if (filter !== undefined) {
-      await field.getByRole('combobox').fill(filter)
+      await combobox.fill(filter)
     }
-    await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: option, exact: true }).click()
+    // An earlier select's dropdown can stay in the DOM while it leaves, so the option is looked up in this select's list.
+    const list = page.locator(`[id="${await combobox.getAttribute('aria-controls')}"]`)
+    await list.getByRole('option', { name: option, exact: true }).click()
   }
 
   async function save(page: Page, answers: [field: string, choice: string][] = []) {
@@ -70,6 +83,10 @@ test.describe('the author builds the service desk with Studio only', () => {
       texts: Record<string, string>
     }
     return texts
+  }
+
+  async function sample<T>(file: string): Promise<T> {
+    return JSON.parse(await readFile(path.join(serviceDesk, file), 'utf8')) as T
   }
 
   async function checkBuilt(page: Page, files: string[]) {
@@ -290,14 +307,215 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(migrations).toHaveCount(0)
   })
 
+  test('the author builds the two ticket lists as data sources', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    for (const [name, file] of [
+      ['MyTicketList', 'data-sources/my-ticket-list.json'],
+      ['AllTicketList', 'data-sources/all-ticket-list.json'],
+    ]) {
+      const list = await sample<SampleDataSource>(file)
+      await create(page, 'dataSource', 'Name', name)
+      await expectForm(page)
+      await pick(page, 'studio-field-/entity', list.entity)
+      // The starter has the first row, so only the later rows are added.
+      for (const [index, field] of list.fields.entries()) {
+        if (index > 0) {
+          await page.getByTestId('studio-field-/fields').getByRole('button', { name: 'Add', exact: true }).click()
+        }
+        await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(field.name)
+        await page.getByTestId(`studio-field-/fields/${index}/path`).getByRole('textbox').fill(field.path)
+      }
+      await save(page)
+      await expectForm(page)
+    }
+  })
+
+  test('the author builds the three task forms', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    for (const [name, file] of [
+      ['TicketTriage', 'forms/ticket-triage.json'],
+      ['TicketResolution', 'forms/ticket-resolution.json'],
+      ['TicketConfirmation', 'forms/ticket-confirmation.json'],
+    ]) {
+      const form = await sample<SampleForm>(file)
+      await create(page, 'form', 'Name', name)
+      await expectForm(page)
+      await pick(page, 'studio-field-/entity', form.entity)
+      for (const [sectionIndex, section] of form.sections.entries()) {
+        if (sectionIndex > 0) {
+          await page
+            .getByTestId('studio-field-/sections')
+            .getByRole('button', { name: 'Add', exact: true })
+            .last()
+            .click()
+        }
+        const titleKey = section.title.textKey
+        await writeLabel(page, `studio-field-/sections/${sectionIndex}/title`, titleKey, en[titleKey])
+        for (const [fieldIndex, field] of section.fields.entries()) {
+          // A new section starts with no fields. The starter section has its first field already.
+          if (sectionIndex > 0 || fieldIndex > 0) {
+            await page
+              .getByTestId(`studio-field-/sections/${sectionIndex}/fields`)
+              .getByRole('button', { name: 'Add', exact: true })
+              .click()
+          }
+          await pick(page, `studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/field`, field.field)
+          if (field.readOnly) {
+            await page
+              .getByTestId(`studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/readOnly`)
+              .getByRole('checkbox')
+              .check()
+          }
+        }
+      }
+      await save(page)
+      await expectForm(page)
+    }
+  })
+
+  test('the author builds the TicketHandling process in the process editor', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    await create(page, 'process', 'Name', 'TicketHandling')
+    await expectForm(page)
+    await pick(page, 'studio-field-/entity', 'Ticket')
+    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Remove step' }).click()
+
+    const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
+    const steps: [name: string, type: string][] = [
+      ['submit', 'operation'],
+      ['triage', 'task'],
+      ['markAssigned', 'operation'],
+      ['resolve', 'task'],
+      ['markResolved', 'operation'],
+      ['confirm', 'task'],
+      ['markClosed', 'operation'],
+      ['markRejected', 'operation'],
+      ['markReopened', 'operation'],
+      ['done', 'end'],
+    ]
+    // Every name exists before any transition is picked, because the pickers offer only named steps.
+    for (const [index, [name, type]] of steps.entries()) {
+      await page.getByRole('combobox', { name: 'Add step' }).click()
+      await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: type, exact: true }).click()
+      await stepCard(index).getByRole('textbox', { name: 'Step name' }).fill(name)
+    }
+
+    async function operation(index: number, sets: [field: string, expression: string][], next: string) {
+      await pick(page, `studio-field-/steps/${index}/operation`, 'updateRecord')
+      for (const [field, expression] of sets) {
+        await stepCard(index).getByRole('combobox', { name: 'Add mapping Set' }).click()
+        await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: field, exact: true }).click()
+        const row = page.getByTestId(`studio-field-/steps/${index}/set/${field}`)
+        await expect(row.locator('.cm-editor')).toBeVisible()
+        await row.getByRole('textbox', { name: 'Expression' }).fill(expression)
+      }
+      await pick(page, `studio-field-/steps/${index}/next`, next)
+    }
+
+    async function task(
+      index: number,
+      spec: {
+        label: string
+        assignee: { role: string } | { user: string }
+        form: string
+        dueIn: string
+        outcomes: { name: string; label: string; next: string }[]
+      },
+    ) {
+      await pick(page, `studio-field-/steps/${index}/label/textKey`, spec.label, spec.label)
+      if ('role' in spec.assignee) {
+        await page.getByTestId(`studio-field-/steps/${index}/assignee`).getByText('Role', { exact: true }).click()
+        await pick(page, `studio-field-/steps/${index}/assignee/role`, spec.assignee.role)
+      } else {
+        const user = page.getByTestId(`studio-field-/steps/${index}/assignee/user`)
+        await expect(user.locator('.cm-editor')).toBeVisible()
+        await user.getByRole('textbox').fill(spec.assignee.user)
+      }
+      await pick(page, `studio-field-/steps/${index}/form`, spec.form)
+      await page.getByTestId(`studio-field-/steps/${index}/dueIn`).getByRole('textbox').fill(spec.dueIn)
+      for (const [position, outcome] of spec.outcomes.entries()) {
+        await stepCard(index).getByRole('button', { name: 'Add outcome', exact: true }).click()
+        await page
+          .getByTestId(`studio-field-/steps/${index}/outcomes/${position}/name`)
+          .getByRole('textbox')
+          .fill(outcome.name)
+        await pick(page, `studio-field-/steps/${index}/outcomes/${position}/label/textKey`, outcome.label, outcome.label)
+        await pick(page, `studio-field-/steps/${index}/outcomes/${position}/next`, outcome.next)
+      }
+    }
+
+    await operation(0, [['status', "'submitted'"]], 'triage')
+    await task(1, {
+      label: 'ticket.triage',
+      assignee: { role: 'service-desk-lead' },
+      form: 'TicketTriage',
+      dueIn: 'P1D',
+      outcomes: [
+        { name: 'assign', label: 'task.assign', next: 'markAssigned' },
+        { name: 'reject', label: 'task.reject', next: 'markRejected' },
+      ],
+    })
+    await operation(
+      2,
+      [
+        ['status', "'assigned'"],
+        ['assignedAgent', 'coalesce(assignedAgent, category.defaultAgent)'],
+      ],
+      'resolve',
+    )
+    await task(3, {
+      label: 'ticket.resolve',
+      assignee: { user: 'assignedAgent' },
+      form: 'TicketResolution',
+      dueIn: 'P3D',
+      outcomes: [{ name: 'resolve', label: 'task.resolve', next: 'markResolved' }],
+    })
+    await operation(4, [['status', "'resolved'"]], 'confirm')
+    await task(5, {
+      label: 'ticket.confirm',
+      assignee: { user: 'requester' },
+      form: 'TicketConfirmation',
+      dueIn: 'P3D',
+      outcomes: [
+        { name: 'confirm', label: 'task.confirm', next: 'markClosed' },
+        { name: 'reopen', label: 'task.reopen', next: 'markReopened' },
+      ],
+    })
+    await operation(6, [['status', "'closed'"]], 'done')
+    await operation(7, [['status', "'rejected'"]], 'done')
+    await operation(8, [['status', "'reopened'"]], 'done')
+
+    await pick(page, 'studio-field-/start', 'submit')
+    const condition = page.getByTestId('studio-field-/startCondition/expression')
+    await expect(condition.locator('.cm-editor')).toBeVisible()
+    await condition.getByRole('textbox').fill("status in ('draft', 'reopened')")
+    await writeLabel(page, 'studio-field-/startCondition/message', 'ticket.cannotSubmit', en['ticket.cannotSubmit'])
+    await save(page)
+    await expectForm(page)
+  })
+
   test('the built files match the sample', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await checkBuilt(page, [
       'application.json',
+      'data-sources/all-ticket-list.json',
+      'data-sources/my-ticket-list.json',
       'entities/category.json',
       'entities/ticket.json',
+      'forms/ticket-confirmation.json',
+      'forms/ticket-resolution.json',
+      'forms/ticket-triage.json',
+      'processes/ticket-handling.json',
       'roles/agent.json',
       'roles/requester.json',
       'roles/service-desk-lead.json',
