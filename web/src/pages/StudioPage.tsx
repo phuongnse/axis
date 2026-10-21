@@ -440,8 +440,12 @@ function StudioWorkspace() {
                         item={selected}
                         resources={loaded.resources}
                         path={path}
-                        onSaved={(diagnostics) => {
-                          setFolder({ ...loaded, diagnostics })
+                        onSaved={(diagnostics, created) => {
+                          setFolder({
+                            ...loaded,
+                            resources: created ? [...loaded.resources, ...created] : loaded.resources,
+                            diagnostics,
+                          })
                           setFolderRevision((value) => value + 1)
                         }}
                         onTextsWritten={(diagnostics) => {
