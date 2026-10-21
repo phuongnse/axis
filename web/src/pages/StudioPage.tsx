@@ -22,6 +22,7 @@ import { StudioConnectionContext, useStudioConnection } from '../platform/studio
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
+import { StudioModuleEntity } from './StudioModuleEntity'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
@@ -66,6 +67,9 @@ type NamesState = { application: string; names: StudioNames | null }
  * Run tests sits beside Validate and shows only when `GET /api/me` answers `studioTest: true`. A selected scenario
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
+ * A Module entities group under the kinds lists the entities of the modules the application uses, from the names, by their
+ * `<module>/<name>`. One opens read-only in the entity designer, with no editor, no Uses and no Used by lists. Its address is
+ * the same `&resource=<id>`, so a reload, a shared link and a Uses entry open it too, when the id is not one of the folder's.
  */
 export function StudioPage() {
   const t = useText()
@@ -212,7 +216,21 @@ function StudioWorkspace() {
   const names = namesState?.application === application ? namesState.names : null
   const resources = useMemo(() => (loaded && 'resources' in loaded ? loaded.resources : []), [loaded])
   const groups = useMemo(() => groupByKind(filterResources(resources, search)), [resources, search])
+  const moduleEntities = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    return (names?.entities ?? []).filter(
+      (entity) =>
+        entity.module !== null &&
+        (needle === '' || entity.name.toLowerCase().includes(needle) || entity.id.toLowerCase().includes(needle)),
+    )
+  }, [names, search])
   const selected = resourceId === null ? undefined : resources.find((item) => item.id === resourceId.toLowerCase())
+  const selectedModuleEntity =
+    resourceId === null || selected !== undefined
+      ? undefined
+      : (names?.entities ?? []).find(
+          (entity) => entity.module !== null && entity.id.toLowerCase() === resourceId.toLowerCase(),
+        )
 
   function pickApplication(name: string) {
     setSearch('')
@@ -351,7 +369,7 @@ function StudioWorkspace() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
-                {groups.length === 0 && (
+                {groups.length === 0 && moduleEntities.length === 0 && (
                   <Typography.Text type="secondary">{t('shell.studio.noResources')}</Typography.Text>
                 )}
                 {groups.map((group) => (
@@ -372,6 +390,24 @@ function StudioWorkspace() {
                     </Flex>
                   </section>
                 ))}
+                {moduleEntities.length > 0 && (
+                  <section data-testid="studio-group-module-entities">
+                    <Typography.Title level={5}>{t('shell.studio.moduleEntities')}</Typography.Title>
+                    <Flex vertical align="flex-start">
+                      {moduleEntities.map((entity) => (
+                        <Button
+                          key={entity.id}
+                          type={entity.id === selectedModuleEntity?.id ? 'primary' : 'text'}
+                          data-testid={`studio-module-resource-${entity.id}`}
+                          aria-current={entity.id === selectedModuleEntity?.id ? 'true' : undefined}
+                          onClick={() => selectResource(entity.id)}
+                        >
+                          {entity.name}
+                        </Button>
+                      ))}
+                    </Flex>
+                  </section>
+                )}
               </Flex>
               <div data-testid="studio-resource-details" style={{ flex: 1 }}>
                 {selected ? (
@@ -429,6 +465,26 @@ function StudioWorkspace() {
                       resourceId={selected.id}
                       onOpen={openReference}
                     />
+                  </Flex>
+                ) : selectedModuleEntity ? (
+                  <Flex vertical gap="middle">
+                    <Descriptions
+                      title={selectedModuleEntity.name}
+                      column={1}
+                      items={[
+                        { key: 'kind', label: t('shell.studio.kind'), children: 'entity' },
+                        { key: 'id', label: t('shell.studio.id'), children: selectedModuleEntity.id },
+                        { key: 'module', label: t('shell.studio.module'), children: selectedModuleEntity.module },
+                      ]}
+                    />
+                    <StudioNamesContext.Provider value={names ?? undefined}>
+                      <StudioModuleEntity
+                        key={`module-entity-${selectedModuleEntity.id}`}
+                        application={application!}
+                        module={selectedModuleEntity.module!}
+                        id={selectedModuleEntity.id}
+                      />
+                    </StudioNamesContext.Provider>
                   </Flex>
                 ) : (
                   <Typography.Text type="secondary">{t('shell.studio.selectResource')}</Typography.Text>

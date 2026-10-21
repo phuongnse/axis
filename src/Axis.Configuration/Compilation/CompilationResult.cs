@@ -20,6 +20,9 @@ public sealed record CompilationResult(ApplicationModel? Model, IReadOnlyList<Di
     /// <summary>The policy matrix of the loaded roles and policies, even when the compile has errors. A file left out for its own errors is absent.</summary>
     public PolicyMatrix PolicyMatrix { get; init; } = PolicyMatrix.Empty;
 
+    /// <summary>The modules the application pins, each with the installed version the compile picked, even when it has errors.</summary>
+    public IReadOnlyList<PinnedModuleModel> ModulePins { get; init; } = [];
+
     /// <summary>The application's content hash; see <see cref="Releases.ContentHash"/>.</summary>
     public string? ContentHash { get; init; }
 

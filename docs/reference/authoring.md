@@ -9,7 +9,7 @@ of [architecture.md](../architecture.md) apply: sections marked
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
 in git. The application list, application create, resource list, read, patch, create, delete, changes, text write, diagnostics,
-references, names, policy matrix and expression check routes are built. It is
+references, names, policy matrix, module resource and expression check routes are built. It is
 agreed in
 [D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
 Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
@@ -66,6 +66,7 @@ in the application. File names and names can change.
 | `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template, sorted by `id`. See [application templates](configuration.md#application-templates) |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
+| `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` for one file of the module version that the application pins, other than `module.json`. The pinned version is the highest installed version in the application's range. `file` is `modules/<id>/<path>`, and there is no `ETag`, because the file cannot be patched |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
 | `POST /api/studio/apps/{application}/changes` | `200` with `{ items: [{ id, version }], diagnostics }`. The body is `application/json`, see [Changes](#changes) |
@@ -154,11 +155,13 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-The names route, the text write and the expression check are built.
-The three routes use these checks. None of them has
+The names route, the module resource route, the text write and the expression check are built.
+The four routes use these checks. None of them has
 check 6 or a later numbered check, except where a line says so:
 
 - **Names.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body.
+- **Module resource.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body. Then `404` for a
+  module that the application does not pin, and then `404` for a resource that the pinned module version has no file for.
 - **Text write.** Checks 1, 2, 3 and 5, then `415` for a body that is not
   `application/json`, then `400` for a bad body, then `503` when the
   [write lock](#versions) cannot be taken. Under the lock, it answers `400` when a
@@ -215,7 +218,7 @@ requests or releases exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List applications, List resources, Read, Create, Patch, Delete, Changes, Diagnostics, Names,
+from the request. The rows for List applications, List resources, Read, Module resource, Create, Patch, Delete, Changes, Diagnostics, Names,
 Text write, Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -223,6 +226,7 @@ Text write, Resource references, Text key references, Release history, Validate,
 | List applications | No session | No author role, or no `Studio:Folders` | Not used | Not used |
 | List resources | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Read | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
+| Module resource | No session | No author role, or no `Studio:Folders` | Unknown application, module or resource | Not used |
 | Create | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The `id` or the target file already exists |
 | Patch | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
 | Delete | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |

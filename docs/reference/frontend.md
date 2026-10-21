@@ -854,7 +854,7 @@ agrees. The route, the link, the application picker, New application, New resour
 search, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
 the request status and the preview links, the Releases list with Roll back, Run tests,
-Run and the Test results list, and the reconnect message are built.
+Run and the Test results list, the read-only view of a module entity, and the reconnect message are built.
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
@@ -863,7 +863,8 @@ Run and the Test results list, and the reconnect message are built.
 - **Address.** The picked application and the selected resource are in the
   address, as `/studio?app=PurchaseRequests&resource=<id>`, so a reload keeps
   them. A Used by entry or a diagnostic that opens a resource at a path adds
-  `&path=<path>`.
+  `&path=<path>`. The id of a module entity opens it too, as `&resource=<id>`,
+  when the id is not one of the folder's own resources.
 - **New application.** A **New application** button shows beside the picker
   when `GET /api/me` answers `studioCreate: true`. It also shows when Studio
   lists no application. The dialog asks for a name and checks it with the API's
@@ -904,7 +905,10 @@ Run and the Test results list, and the reconnect message are built.
 - **Resource list.** The list groups the resources by kind. The kind shows as
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows
-  its name, kind, `id` and file, and opens it in the editor below.
+  its name, kind, `id` and file, and opens it in the editor below. A **Module
+  entities** group below the kinds lists each entity of the modules the application
+  uses, by its `<module>/<name>` name. It is built from the application's names,
+  and the search box filters it too.
 - **Editor.** The editor shows one resource in two views of the same draft.
   - A form is built from the JSON Schema of the resource's kind. The SPA
     bundles the schemas in `src/Axis.Configuration/Schemas`, the files the
@@ -1165,7 +1169,10 @@ Run and the Test results list, and the reconnect message are built.
   - Every input keeps its `studio-field-<pointer>` id, and each row has the id
     of its field, so a diagnostic opens at its input, or at the row when the
     row does not show the setting.
-  - A module entity is read-only, as it is in the generic form.
+  - A module entity, such as `departments/Department`, opens in the designer
+    read-only, from the [module resource route](authoring.md#routes). Every input is
+    off, and it has no Add field, Remove, Move, Add validation, Save or Delete
+    button, no JSON tab and no Uses or Used by lists. A label shows its text key.
 - **Migrations from the designer** *(planned for M11)*. The designer compares
   with the entity as Studio loaded it. "Loaded" means as Studio read the
   entity, not the active release. It asks a question for a change to a loaded
