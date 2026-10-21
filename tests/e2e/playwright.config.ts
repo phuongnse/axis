@@ -27,8 +27,6 @@ const command = hyphenated.length
 export default defineConfig({
   testDir: './specs',
   fullyParallel: true,
-  // A hosted runner has 4 CPUs, and Playwright's default uses half of them.
-  workers: process.env.CI ? 4 : undefined,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [
