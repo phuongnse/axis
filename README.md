@@ -16,8 +16,8 @@ too. A Playwright journey builds, tests and publishes it with Studio only. See
 
 ## Status
 
-Milestone **M10, Publishing from Studio**, is complete. The current milestones are
-**M11, Authoring without JSON**, and **M12, Pages, layouts and more widgets**, which run in parallel.
+Milestone **M11, Authoring without JSON**, is complete. The current milestone is
+**M12, Pages, layouts and more widgets**.
 The [roadmap](docs/roadmap.md) says what each milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 

@@ -5,7 +5,9 @@ Status: **Agreed**
 Studio creates a new application, blank or from an installed application
 template, and starts a resource of every kind. D46 plans this for M11. The
 `Studio:ApplicationsPath` setting, `POST /api/studio/apps`, `studioCreate` and
-the Studio New application dialog are built. The rest is _(planned for M11)_. See the
+the Studio New application dialog are built. Application templates and `GET /api/studio/templates`,
+New resource with its starters, and the `request-approval` sample template are built too.
+Development and Compose setting the folder is _(planned for M13)_. See the
 [authoring API](../reference/authoring.md#creating-an-application), the
 [application templates](../reference/modules-and-templates.md#application-templates) and
 the [Studio section of the frontend](../reference/studio.md). The owner
@@ -23,8 +25,8 @@ confirmed these points on issue #778 on 2026-10-20.
   - A missing folder is created at start. The server stops if it cannot.
   - Under several server replicas, the folder is on the shared Studio folder
     ([D49](d49-several-server-replicas-behind-a-tls-proxy.md)).
-  - Development, Compose and E2E set it to `artifacts/studio-apps`, which git
-    ignores _(planned for M11)_.
+  - E2E's journey server sets it to a temporary folder, and Development and Compose set it to
+    `artifacts/studio-apps`, which git ignores _(planned for M13)_.
 - **Creating an application:**
   - `POST /api/studio/apps` takes `{ name, template? }`. It needs the author
     role and the CSRF header.

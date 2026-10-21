@@ -166,8 +166,7 @@ The server activates this sample next to purchase requests under
 ## Third application: service desk
 
 A third application, of a different shape from the first
-two, is the sample that M11 builds only through Studio. It runs as a sample
-today. It lives as
+two, is a sample that a Playwright journey builds only through Studio. It lives as
 configuration in `samples/apps/service-desk/`. It is not platform code. It is
 thin on purpose: SLAs, escalation, loops that hold a task and notifications
 wait for M14. See
@@ -234,5 +233,5 @@ Studio, publishes it and takes one ticket through the process on the site.
 - Then the journey runs the scenarios from Studio and publishes. Then the
   requester, the service desk lead and the agent take one ticket through the
   process on the site.
-- _(planned for M11)_ A second, smaller journey starts from the
+- _(planned for M13)_ A second, smaller journey starts from the
   `request-approval` template.

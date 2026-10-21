@@ -253,8 +253,8 @@ agrees. The schemas stay the single source of what the form shows.
   The kind `text` marks a `textKey`.
 - **Part form.** `"x-axis-reference": { "part": "<part>", "of": "<pointer>" }`
   marks a property that holds a part of another resource.
-  - `part` is `field` or `step`. The schemas mark no other part yet. Planned
-    for M11: `parameter`, `column`, `outcome` and `operation`.
+  - `part` is `field` or `step`. The schemas mark no other part yet. _(Planned
+    for M13.)_ `parameter`, `column`, `outcome` and `operation`.
   - `of` is a JSON Pointer from the resource root, or a Relative JSON Pointer
     `N/<pointer>`, to the property that names the resource the part belongs
     to. A relative pointer goes up `N` segments from the marked property.
