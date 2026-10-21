@@ -201,7 +201,7 @@ The server builds none from the directory.
 `appsettings.Development.json` maps `localhost` to tenant `default` on the
 compose database, and `preview.localhost` to its preview tenant `default-preview`
 on the `axis_preview` database. The E2E server maps `127.0.0.1` to a tenant on the E2E
-database, and `localhost` to its preview tenant. See
+database, and `localhost` to its preview tenant. The E2E run maps `127.0.0.2` to the journey tenant on its own server. See
 [preview tenants](reference/configuration.md#preview-tenants). The `Platform` connection string is separate and still serves the
 readiness check.
 
@@ -1221,6 +1221,22 @@ lease. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart
 the worker: it writes the restart file that `scripts/e2e.sh` names, then stops
 the worker process, and the script starts a new one. A worker that stops with
 no restart request fails the run.
+
+The E2E run also serves a third tenant, `journey`, for Studio journeys. `scripts/e2e.sh` creates its
+database `axis_journey` and its roles `axis_journey_schema` and `axis_journey_runtime` through `psql`, so Docker
+Compose, `scripts/dev.sh` and `init-roles.sql` stay as they are. A second server serves it on the loopback
+address `127.0.0.2`, because the worker and the publisher reject two tenants that share a host. Playwright
+starts that server after the main one, so the platform migrations of the two never race, and the two share the
+platform database. The journey server runs in the `Testing` environment, because
+`appsettings.Development.json` would add the `default` tenant, the startup activation and the Studio folders.
+It sets `Studio:ApplicationsPath` to a temporary folder and has no preview tenant or bindings. Only startup
+activation migrates a tenant database, so it activates one application at start,
+`tests/e2e/fixtures/journey-base`, which holds only a manifest. It clashes with no sample. A journey therefore builds a whole application in Studio and publishes it, with no clash with
+the committed samples on the main tenant. The setup step signs the author, the requester, the service desk lead
+and the agent in on the journey host and saves those sessions apart from the sessions of the main host. The
+worker and the publisher serve the journey tenant too, and the run fails when the worker log lacks
+`Tenant journey is ready for work` or the publisher log lacks `journey ready`. The server output goes to
+`artifacts/logs/e2e-journey-server.log`.
 
 The E2E run also starts the purchasing system stub from the build output, and
 fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its
