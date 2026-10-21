@@ -11,6 +11,7 @@ test.setTimeout(180_000)
 
 // The journeys create files, and the other Studio specs compare the diagnostics of the shared copy. So these run on
 // a second server whose Studio edits a copy of its own, without texts/vi.json. The copy is not the E2E server's.
+// The entity journeys also build an entity in the designer, and the expression journey reopens that entity.
 test.describe('Studio creates a resource from a starter', () => {
   test.describe.configure({ mode: 'serial' })
 
@@ -40,6 +41,28 @@ test.describe('Studio creates a resource from a starter', () => {
     await page.getByTitle(kind, { exact: true }).click()
     await dialog.getByRole('textbox', { name: label }).fill(value)
     await dialog.getByRole('button', { name: 'Create' }).click()
+  }
+
+  async function pick(page: Page, field: string, option: string) {
+    await page.getByTestId(field).locator('.ant-select-selector').click()
+    await page.getByRole('option', { name: option, exact: true }).click()
+  }
+
+  async function save(page: Page) {
+    const answer = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' && response.url().includes('/api/studio/apps/PurchaseRequests/resources/'),
+    )
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+    const { diagnostics } = (await (await answer).json()) as { diagnostics: { file: string }[] }
+    return diagnostics
+  }
+
+  async function addField(page: Page, index: number, name: string, type: string) {
+    await page.getByRole('button', { name: 'Add field' }).click()
+    await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(name)
+    await pick(page, `studio-field-/fields/${index}/type`, type)
   }
 
   test('an author creates an entity and a page, and each opens in the editor', async ({ page }) => {
@@ -75,5 +98,74 @@ test.describe('Studio creates a resource from a starter', () => {
     const english = await keys('en')
     expect(english.length).toBeGreaterThan(0)
     expect(await keys('vi')).toEqual(english)
+  })
+
+  test('an author builds an entity with enum, reference and child-collection fields in the designer', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+    const entityName = page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name' })
+
+    await create(page, 'entity', 'Name', 'ProjectTask')
+    await expect(entityName).toHaveValue('ProjectTask')
+    await create(page, 'entity', 'Name', 'Project')
+    await expect(entityName).toHaveValue('Project')
+    await expect(page.getByTestId('studio-resource-details')).toContainText('entities/project.json')
+
+    await addField(page, 1, 'stage', 'enum')
+    const values = page.getByTestId('studio-field-/fields/1/values').getByRole('combobox')
+    await values.fill('open')
+    await values.press('Enter')
+    await values.fill('closed')
+    await values.press('Enter')
+    await values.press('Escape')
+
+    await addField(page, 2, 'department', 'reference')
+    await pick(page, 'studio-field-/fields/2/target', 'Department')
+    await addField(page, 3, 'tasks', 'child-collection')
+    await pick(page, 'studio-field-/fields/3/target', 'ProjectTask')
+
+    const diagnostics = await save(page)
+    expect(diagnostics.filter((diagnostic) => diagnostic.file === 'entities/project.json')).toEqual([])
+    const project = JSON.parse(await readFile(path.join(copy, 'entities', 'project.json'), 'utf8')) as {
+      fields: unknown[]
+    }
+    expect(project.fields).toEqual([
+      { name: 'name', type: 'text' },
+      { name: 'stage', type: 'enum', values: ['open', 'closed'] },
+      { name: 'department', type: 'reference', target: 'Department' },
+      { name: 'tasks', type: 'child-collection', target: 'ProjectTask' },
+    ])
+  })
+
+  test('an author adds a computed field and the expression editor flags and then clears a type error', async ({
+    page,
+  }) => {
+    const { id } = JSON.parse(await readFile(path.join(copy, 'entities', 'project.json'), 'utf8')) as { id: string }
+
+    await useSession(page, 'hoa')
+    await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+    await expect(page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name' })).toHaveValue(
+      'Project',
+    )
+
+    await addField(page, 4, 'nameLength', 'integer')
+    const field = page.getByTestId('studio-field-/fields/4/expression')
+    // The read-only fallback is replaced once CodeMirror loads, so wait for the editor before typing.
+    await expect(field.locator('.cm-editor')).toBeVisible()
+    await field.getByRole('textbox').fill('length(name)')
+
+    const diagnostics = await save(page)
+    expect(diagnostics.filter((diagnostic) => diagnostic.file === 'entities/project.json')).toEqual([])
+
+    await field.getByRole('textbox').fill('name > 5')
+    await expect(field.locator('.cm-lintRange-error')).toBeVisible()
+    await expect(field.getByTestId('studio-expression-error')).toBeVisible()
+
+    await field.getByRole('textbox').fill('length(name)')
+    await expect(field.locator('.cm-lintRange-error')).toHaveCount(0)
+    await expect(field.getByTestId('studio-expression-error')).toHaveCount(0)
+    await expect(field.getByTestId('studio-expression-type')).toContainText('integer')
   })
 })
