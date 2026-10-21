@@ -143,9 +143,8 @@ Later samples of different shapes follow from M11: a service desk, see
 
 ### Security
 
-- The roles are `employee` and `department-manager`. The sample uses the same
-  development users as purchase requests: `anna` and `lan` are employees, and
-  `binh` and `chau` are managers.
+- The roles are `employee` and `department-manager`. The sample reuses the
+  development users that hold these roles.
 - An employee sees only their own requests. A manager sees the requests of
   their departments. Everything else is denied by default.
 
@@ -158,8 +157,8 @@ My leave requests, the request form and My tasks, in a site at path `leave`.
 - Approve, return then resubmit, and reject.
 - Denied access: an employee cannot see another employee's request, and a
   user cannot act on a task that is not theirs.
-- One Playwright journey: `anna` submits, `chau` approves, and `anna` sees the
-  request approved.
+- One Playwright journey: an employee submits, a department manager approves,
+  and the employee sees the request approved.
 
 The server activates this sample next to purchase requests under
 `scripts/dev.sh`, Compose and E2E.
@@ -195,9 +194,10 @@ wait for M14. See
 ### Security
 
 - The roles are `requester`, `agent` and `service-desk-lead`.
-- The development users are `anna` as a requester, `khoa` as an agent and
-  `linh` as the service desk lead. `khoa` and `linh` are new, and `anna` gets
-  the `requester` role. The roles of the existing users stay as they are.
+- The realm adds one user with `agent` and one with `service-desk-lead`, and
+  gives an existing employee the `requester` role. See the
+  [development users](architecture.md#development-users) table.
+- The roles of the existing users stay as they are.
 - A requester reads and edits only their own tickets. An agent reads the
   tickets assigned to them. The lead reads every ticket.
 - The requester cannot edit the resolution.
@@ -229,6 +229,7 @@ E2E, and CI runs its scenarios. Building it only through Studio is planned.
 - At the end, the journey compares the folder it built with the committed
   sample. The comparison ignores resource ids and key order. Any other
   difference fails the journey.
-- Then the journey runs the scenarios from Studio and publishes. Then `anna`,
-  `linh` and `khoa` take one ticket through the process on the site.
+- Then the journey runs the scenarios from Studio and publishes. Then the
+  requester, the service desk lead and the agent take one ticket through the
+  process on the site.
 - A second, smaller journey starts from the `request-approval` template.

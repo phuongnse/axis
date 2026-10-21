@@ -634,12 +634,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   at the address the browser uses. So under Compose the site endpoints, the
   record API and the data source endpoint answer `401`, and an application
   page starts a sign-in that cannot complete.
-  - It holds the purchase request users with fixed ids: `anna` and `lan`
-    the employees, `binh` and `chau` the department managers, `dung` the
-    finance reviewer, `giang` the operator, and `hoa` the author. Seed data and E2E journeys already name these ids.
-    `hoa` also holds the `publisher` role. The realm grants it at `samples/keycloak/axis-realm.json:287`.
-  - It also holds the service desk users: `khoa` the agent and `linh` the
-    service desk lead. `anna` holds the `requester` role as well as `employee`.
+  - It holds the development users listed in
+    [development users](#development-users), with fixed ids that seed data
+    and E2E journeys name.
   - Every user has the same development-only password.
   - The roles are client roles of the confidential client `axis`. A
     client-role mapper writes them to the `roles` claim, so the claim holds
@@ -647,6 +644,23 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - The confidential client `purchasing-system` stands in for the
     purchasing system as a [machine caller](#machine-callers). Its service
     account gets tokens through the client credentials grant.
+
+#### Development users
+
+These are test fixtures. Docs and GitHub text name roles instead. A new
+sample reuses a user that holds the role it needs before it adds a user.
+
+| User    | Roles                   | Used by                                                                  |
+| ------- | ----------------------- | ------------------------------------------------------------------------ |
+| `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys   |
+| `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                 |
+| `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                 |
+| `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                 |
+| `dung`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                              |
+| `giang` | `operator`              | Purchase request sample's Approvals inspector; E2E journeys              |
+| `hoa`   | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys |
+| `khoa`  | `agent`                 | Service desk sample; E2E journeys                                        |
+| `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                        |
 
 ### Machine callers
 

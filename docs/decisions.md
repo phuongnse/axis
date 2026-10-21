@@ -1328,7 +1328,7 @@ The owner confirmed the points on advancing time for issue #481 on 2026-10-17.
     and ordered `steps`.
 - **Users:**
   - `users` maps each user id to the role names it holds, such as
-    `{ "anna": ["requester"] }`. A role name must be a declared `role`.
+    `{ "requester-1": ["requester"] }`. A role name must be a declared `role`.
   - No identity provider takes part. The runner gives each step the user's
     id and roles, as a session would.
 - **Steps:**
@@ -2052,8 +2052,7 @@ owner confirmed these points on issue #572 on 2026-10-18.
   - The roles are `employee` and `department-manager`. They are the Keycloak
     realm roles that the purchase request sample already uses, so the realm
     needs no change.
-  - The sample reuses the development users: `anna` and `lan` are employees,
-    `binh` and `chau` are managers.
+  - The sample reuses the development users that hold these roles.
   - An employee sees only their own requests. A manager sees the requests of
     their departments. Everything else is denied by default.
 - **Pages:** My leave requests, the request form and My tasks, in a site at
@@ -2061,8 +2060,8 @@ owner confirmed these points on issue #572 on 2026-10-18.
 - **Tests:**
   - Test scenarios cover approve, return then resubmit, reject and denied
     access.
-  - One Playwright journey: `anna` submits, `chau` approves, and `anna` sees
-    the request approved.
+  - One Playwright journey: an employee submits, a department manager approves,
+    and the employee sees the request approved.
   - The server activates the sample next to purchase requests under
     `scripts/dev.sh`, Compose and E2E.
 
@@ -3427,7 +3426,8 @@ owner confirmed these points on issue #783 on 2026-10-20.
     committed sample. The comparison ignores resource ids and key order. Any
     other difference fails the journey.
   - Then the main journey runs the scenarios from Studio and publishes. Then
-    `anna`, `linh` and `khoa` take one ticket through the process on the site.
+    the requester, the service desk lead and the agent take one ticket through
+    the process on the site.
 
 _Why:_ the thin shape waits for the timers, loops and notifications of M14
 ([D46](#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed)).

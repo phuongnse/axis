@@ -59,14 +59,26 @@ models, are not copied here. Look them up where they live.
   can still break `main` together. When CI on `main` fails, the local agent
   runs it once more if the failure looks flaky. Otherwise it tells the owner
   and opens a bug issue with the failure, which goes before other issues.
-- **NexKit's checks skip smoke tests that a change cannot affect.** The
-  `scripts/dev.sh`, Docker Compose and production image smoke tests take about
-  4 of the 9 minutes of checks, before the image tests. NexKit sets `NEXKIT_BASE_SHA`, the commit the pull request started
-  from. A smoke test is skipped only when that variable is set, git can list the
-  changed and untracked files, and none of them is on the test's path list. The
-  lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs). Any
-  doubt runs the test. CI sets no base, so CI on `main` always runs all three. The
-  test summary lists a skipped suite as skipped.
+- **NexKit's checks skip suites that a change cannot affect.** A check round takes
+  about 16 minutes. The .NET integration tests, with the scenarios of every sample,
+  take about 6, and Playwright about 4.5. NexKit sets `NEXKIT_BASE_SHA`, the commit
+  the pull request started from. Under that variable, git must list the changed and
+  untracked files before any skip happens.
+  - A smoke test is skipped when none of the changed files is on its path list.
+    The smoke tests are `scripts/dev.sh`, Docker Compose, the production images
+    and the on-premises install.
+  - The integration tests and their scenarios are skipped when every changed file
+    is on a safe list: `docs/`, `tests/e2e/`, any `*.md` file, and `web/` except
+    `web/package.json` and `web/package-lock.json`.
+  - Playwright is skipped when every changed file is under `docs/` or is a `*.md`
+    file. It also skips the PostgreSQL, Keycloak, stub, server, worker and
+    publisher that it starts.
+
+  The lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs). Any
+  doubt runs the suite. A missing base, a git error or an empty change list runs
+  both suites. CI sets no base, so CI on `main` runs every suite. The test summary
+  lists a skipped suite as skipped.
+
 - **NexKit restores the dependency caches that CI on `main` saves.** Before
   `scripts/setup.sh`, NexKit's implement, fix and check runs restore the
   NuGet, npm and Playwright browser caches, so setup installs only what
@@ -169,7 +181,12 @@ them.
    reuse the parent's title, whole or as a `<parent>: <part>` prefix, because
    the sub-issue link already shows the parent. Add each part as a GitHub
    sub-issue of the parent, in order and in the parent's milestone. NexKit
-   closes the parent when all parts are done.
+   closes the parent when all parts are done. If the parent has an open NexKit
+   pull request, for example one that stalled after repeated time-outs, the
+   split has superseded it. The local agent comments that it is superseded by
+   the sub-issues, naming each one, and closes it. It keeps the branch. This is
+   the only pull request the local agent closes. It never approves or merges
+   one.
 4. **Implement.** The local agent posts `/nexkit go` on the latest plan, as
    described under Decisions. NexKit implements that plan and opens a pull
    request.
@@ -235,13 +252,17 @@ them.
 
 ## Writing on GitHub
 
-These rules apply to issues, plans, pull request descriptions and reviews.
+These rules apply to issues, plans, pull request descriptions and reviews, and to the titles of
+issues, pull requests and sub-issues.
 
 - Lead with the point. Use short sentences and one idea per bullet.
 - Say what changes in behaviour, and why, before naming classes or files.
 - Put decisions and risks the owner must judge in their own short section.
 - Keep implementation detail (signatures, SQL, file-by-file steps) out of the
   main text, or put it in a collapsed `<details>` block.
+- Name the role that acts, in the terms of [concepts.md](domain/concepts.md), never a development
+  user. This covers doc text that describes behaviour, and titles too. User names appear only in test
+  code, test scenarios, the realm file and the [development users table](architecture.md#development-users).
 
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
 [nexkit-profiles]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#profiles
