@@ -1,11 +1,11 @@
-import { readdir, readFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { compareApplicationFolders } from '../folder-comparison'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
 
-// Typing the sample's 37 keys one by one is slow, and the journey server is shared with other specs.
+// Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
 
 const built = path.join(journeyApplications, 'service-desk')
@@ -19,6 +19,22 @@ interface SampleForm {
   entity: string
   sections: { title: { textKey: string }; fields: { field: string; readOnly?: boolean }[] }[]
 }
+
+interface SampleScenario {
+  name: string
+  now: string
+  users: Record<string, string[]>
+  steps: Record<string, unknown>[]
+}
+
+const scenarios = [
+  ['TicketIsClosed', 'scenarios/ticket-is-closed.json'],
+  ['TicketIsRejected', 'scenarios/ticket-is-rejected.json'],
+  ['ReopenedTicketIsResubmitted', 'scenarios/reopened-ticket-is-resubmitted.json'],
+  ['AgentCannotActOnAnotherAgentsTicket', 'scenarios/agent-cannot-act-on-another-agents-ticket.json'],
+  ['LeadCannotActForTheRequester', 'scenarios/lead-cannot-act-for-the-requester.json'],
+  ['RequesterCannotReachAnotherTicket', 'scenarios/requester-cannot-reach-another-ticket.json'],
+] as const
 
 test.describe('the author builds the service desk with Studio only', () => {
   // CI retries once, but a retry would meet the ServiceDesk folder from the first attempt and get 409, and removing
@@ -40,16 +56,30 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name' })).toHaveValue(name)
   }
 
+  // A virtual list keeps a hidden copy of its options in the dropdown, so only the visible option is clicked.
+  async function openDropdown(page: Page, opener: Locator) {
+    await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
+    await opener.click()
+    return page.locator('.ant-select-dropdown:visible')
+  }
+
   async function pick(page: Page, testId: string, option: string, filter?: string) {
     const field = page.getByTestId(testId)
-    const combobox = field.getByRole('combobox')
-    await field.locator('.ant-select-selector').click()
+    const dropdown = await openDropdown(page, field.locator('.ant-select-selector'))
     if (filter !== undefined) {
-      await combobox.fill(filter)
+      await field.getByRole('combobox').fill(filter)
     }
-    // An earlier select's dropdown can stay in the DOM while it leaves, so the option is looked up in this select's list.
-    const list = page.locator(`[id="${await combobox.getAttribute('aria-controls')}"]`)
-    await list.getByRole('option', { name: option, exact: true }).click()
+    await dropdown.getByText(option, { exact: true }).filter({ visible: true }).click()
+  }
+
+  // A row with more than one select names the one to pick, since pick() would match them all.
+  async function pickNamed(page: Page, testId: string, name: string, option: string) {
+    const select = page
+      .getByTestId(testId)
+      .locator('.ant-select')
+      .filter({ has: page.getByRole('combobox', { name, exact: true }) })
+    const dropdown = await openDropdown(page, select.locator('.ant-select-selector'))
+    await dropdown.getByText(option, { exact: true }).filter({ visible: true }).click()
   }
 
   async function save(page: Page, answers: [field: string, choice: string][] = []) {
@@ -68,7 +98,9 @@ test.describe('the author builds the service desk with Studio only', () => {
       await page.getByRole('button', { name: choice, exact: true }).click()
     }
     await expect(page.getByTestId('studio-saved')).toBeVisible()
-    const { diagnostics } = (await (await answer).json()) as { diagnostics: { file: string }[] }
+    const { diagnostics } = (await (await answer).json()) as {
+      diagnostics: { file: string; severity: string }[]
+    }
     return diagnostics
   }
 
@@ -133,8 +165,59 @@ test.describe('the author builds the service desk with Studio only', () => {
     return JSON.parse(await readFile(path.join(serviceDesk, file), 'utf8')) as T
   }
 
-  async function checkBuilt(page: Page, files: string[]) {
-    compareApplicationFolders(serviceDesk, built, { files })
+  // The Categories seed gets new record ids in the journey, so each sample id maps to the id the grid shows.
+  async function shownCategoryIds(page: Page): Promise<Map<string, string>> {
+    await page.getByTestId('studio-group-seed').getByRole('button', { name: 'Categories', exact: true }).click()
+    await expectForm(page)
+    const rows = page.getByTestId('studio-seed-row')
+    await expect(rows).toHaveCount(3)
+    const shown = await rows.locator('code').allTextContents()
+    const sampleSeed = await sample<{ records: { id: string }[] }>('seeds/categories.json')
+    return new Map(sampleSeed.records.map((record, index): [string, string] => [record.id, shown[index]]))
+  }
+
+  async function writeScenarioStep(
+    page: Page,
+    index: number,
+    step: Record<string, unknown>,
+    ids: Map<string, string>,
+    enumFields: Set<string>,
+  ) {
+    const at = `studio-field-/steps/${index}`
+    await pick(page, `${at}/type`, String(step.type))
+    for (const key of ['entity', 'record', 'as', 'process', 'step', 'outcome', 'state'] as const) {
+      if (key in step) {
+        await pick(page, `${at}/${key}`, String(step[key]))
+      }
+    }
+    if ('save' in step) {
+      await page.getByTestId(`${at}/save`).getByRole('textbox').fill(String(step.save))
+    }
+    if ('assignee' in step) {
+      const { user } = step.assignee as { user: string }
+      await pickNamed(page, `${at}/assignee`, 'assignee kind', 'User')
+      await pickNamed(page, `${at}/assignee`, 'user', user)
+    }
+    if ('values' in step) {
+      for (const [key, value] of Object.entries(step.values as Record<string, unknown>)) {
+        await pickNamed(page, `${at}/values`, 'Add value', key)
+        if (enumFields.has(key)) {
+          await pick(page, `${at}/values/${key}`, String(value))
+        } else {
+          await page
+            .getByTestId(`${at}/values/${key}`)
+            .getByRole('textbox')
+            .fill(String(ids.get(String(value)) ?? value))
+        }
+      }
+    }
+    if ('expect' in step) {
+      await pick(page, `${at}/expect`, String(step.expect))
+    }
+  }
+
+  async function checkBuilt(page: Page) {
+    compareApplicationFolders(serviceDesk, built)
     const response = await page.request.get(`${journeyURL}/api/studio/apps/ServiceDesk/diagnostics`)
     expect(response.status()).toBe(200)
     const { diagnostics } = (await response.json()) as { diagnostics: { severity: string }[] }
@@ -648,46 +731,63 @@ test.describe('the author builds the service desk with Studio only', () => {
     await grantIn(page, 'service-desk-lead', 'dataSource', 'AllTicketList', [{ actions: ['read'] }])
   })
 
-  test('the built files match the sample', async ({ page }) => {
+  for (const [name, file] of scenarios) {
+    test(`the author writes the ${name} scenario in the scenario editor`, async ({ page }) => {
+      await useJourneySession(page, 'hoa')
+      await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+      const ids = await shownCategoryIds(page)
+
+      await create(page, 'scenario', 'Name', name)
+      await expect(page.getByTestId('studio-resource-details')).toContainText(file)
+      await expectForm(page)
+
+      const scenario = await sample<SampleScenario>(file)
+      const ticket = await sample<{ fields: { name: string; type: string }[] }>('entities/ticket.json')
+      const enumFields = new Set(ticket.fields.filter((field) => field.type === 'enum').map((field) => field.name))
+
+      await page.getByTestId('studio-field-/now').getByRole('textbox').fill(scenario.now)
+      for (const [index, [user, roles]] of Object.entries(scenario.users).entries()) {
+        if (index > 0) {
+          await page.getByRole('button', { name: 'Add user', exact: true }).click()
+        }
+        const newRow = page.getByTestId(`studio-field-/users/${index === 0 ? 'author' : 'user1'}`)
+        const userId = newRow.getByRole('textbox', { name: 'User id', exact: true })
+        await userId.fill(user)
+        // The rename detaches this input, so Tab goes through the page keyboard rather than the locator.
+        await page.keyboard.press('Tab')
+        const row = page.getByTestId(`studio-field-/users/${user}`)
+        await expect(row).toBeVisible()
+        await row.locator('.ant-select-selector').click()
+        const roleList = page.locator(
+          `[id="${await row.getByRole('combobox', { name: 'Roles', exact: true }).getAttribute('aria-controls')}"]`,
+        )
+        for (const role of roles) {
+          await roleList.getByRole('option', { name: role, exact: true }).click()
+        }
+        await page.keyboard.press('Escape')
+        for (const role of roles) {
+          await expect(row).toContainText(role)
+        }
+      }
+
+      for (const [index, step] of scenario.steps.entries()) {
+        if (index > 0) {
+          await page.getByRole('button', { name: 'Add step', exact: true }).click()
+        }
+        await writeScenarioStep(page, index, step, ids, enumFields)
+      }
+
+      const diagnostics = await save(page)
+      const errors = diagnostics.filter((diagnostic) => diagnostic.file === file && diagnostic.severity === 'error')
+      expect(errors).toEqual([])
+      await expectForm(page)
+    })
+  }
+
+  test('the whole built folder matches the sample', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    await checkBuilt(page, [
-      'application.json',
-      'data-sources/all-ticket-list.json',
-      'data-sources/my-ticket-list.json',
-      'entities/category.json',
-      'entities/ticket.json',
-      'forms/ticket-confirmation.json',
-      'forms/ticket-resolution.json',
-      'forms/ticket-triage.json',
-      'pages/all-tickets.json',
-      'pages/my-tasks.json',
-      'pages/my-tickets.json',
-      'pages/ticket-form.json',
-      'policies/agent-access.json',
-      'policies/requester-access.json',
-      'policies/service-desk-lead-access.json',
-      'processes/ticket-handling.json',
-      'roles/agent.json',
-      'roles/requester.json',
-      'roles/service-desk-lead.json',
-      'seeds/categories.json',
-      'sequences/ticket-number.json',
-      'sites/service-desk.json',
-      'texts/en.json',
-      'texts/vi.json',
-    ])
-    const migrations = await readdir(path.join(built, 'migrations')).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return []
-      throw error
-    })
-    expect(migrations).toEqual([])
-    expect((await readdir(path.join(built, 'pages'))).sort()).toEqual([
-      'all-tickets.json',
-      'my-tasks.json',
-      'my-tickets.json',
-      'ticket-form.json',
-    ])
+    await checkBuilt(page)
   })
 })
