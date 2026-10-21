@@ -197,6 +197,8 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['service-desk-lead', 'role.serviceDeskLead'],
     ]) {
       await create(page, 'role', 'Name', name)
+      // The editor of the previous role stays on screen until the new role replaces it, so wait for the file.
+      await expect(page.getByTestId('studio-resource-details')).toContainText(`roles/${name}.json`)
       await expectForm(page)
       await writeLabel(page, 'studio-field-/label', key, en[key])
       await save(page)
