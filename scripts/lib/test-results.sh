@@ -3,7 +3,7 @@
 # artifacts/test-results/NAME.xml, and scripts/test-report.mjs reports on them.
 
 root="$(pwd)"
-results_dir="$root/artifacts/test-results"
+results_dir="${AXIS_TEST_RESULTS_DIR:-$root/artifacts/test-results}"
 mkdir -p "$results_dir"
 status=0
 suites=()
@@ -28,18 +28,30 @@ expect_suite() {
   suites+=("$1:$2")
 }
 
-# run_suite_if_affected NAME CWD COMMAND...
-# Like run_suite, but skips the suite when scripts/lib/affected.mjs shows that no path it
-# covers changed since $NEXKIT_BASE_SHA. Any other outcome runs it.
-run_suite_if_affected() {
+# affected NAME
+# Succeeds unless scripts/lib/affected.mjs shows that the suite NAME cannot be affected by the
+# change since $NEXKIT_BASE_SHA. Any other outcome runs it.
+affected() {
   local decision
   decision="$(node "$root/scripts/lib/affected.mjs" "$1")" || decision=run
-  if [ "$decision" = skip ]; then
-    rm -f "$results_dir/$1.xml"
-    suites+=("$1:$2")
-    skipped+=(--skipped "$1")
-  else
+  [ "$decision" != skip ]
+}
+
+# skip_suite NAME CWD
+# Registers a suite that does not run, so the summary lists it as skipped.
+skip_suite() {
+  rm -f "$results_dir/$1.xml"
+  suites+=("$1:$2")
+  skipped+=(--skipped "$1")
+}
+
+# run_suite_if_affected NAME CWD COMMAND...
+# Like run_suite, but skips the suite when affected NAME says it cannot be affected.
+run_suite_if_affected() {
+  if affected "$1"; then
     run_suite "$@"
+  else
+    skip_suite "$1" "$2"
   fi
 }
 
