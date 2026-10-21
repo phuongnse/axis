@@ -1,5 +1,5 @@
 import { EditorView } from '@codemirror/view'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -67,6 +67,7 @@ function renderEditor() {
         item={resources[0]}
         resources={resources}
         path={null}
+        onOpenPath={vi.fn()}
         onSaved={vi.fn()}
         onTextsWritten={vi.fn()}
         onDeleted={vi.fn()}
@@ -96,6 +97,14 @@ afterEach(() => {
 })
 
 describe('StudioEditor for a seed', () => {
+  it('shows no process graph', async () => {
+    stub(seedContent('order', []))
+    renderEditor()
+
+    await screen.findByTestId('studio-editor', {}, slow)
+    expect(screen.queryByTestId('studio-process-graph')).not.toBeInTheDocument()
+  })
+
   it('turns Save off while an integer cell holds a wrong value and on again once it is fixed', async () => {
     stub(seedContent('order', [{ id: 'a', values: { code: 'X1', size: 3 } }]))
     renderEditor()
@@ -248,6 +257,7 @@ describe('StudioEditor for a scenario', () => {
           item={scenarioItem}
           resources={[scenarioItem]}
           path={null}
+          onOpenPath={vi.fn()}
           onSaved={vi.fn()}
           onTextsWritten={vi.fn()}
           onDeleted={vi.fn()}
@@ -377,6 +387,7 @@ function renderResource(
   names?: StudioNames,
   onTextsWritten = vi.fn(),
   path: string | null = null,
+  onOpenPath = vi.fn(),
 ) {
   render(
     <ThemeModeProvider>
@@ -387,6 +398,7 @@ function renderResource(
             item={item}
             resources={[item]}
             path={path}
+            onOpenPath={onOpenPath}
             onSaved={vi.fn()}
             onTextsWritten={onTextsWritten}
             onDeleted={vi.fn()}
@@ -395,6 +407,7 @@ function renderResource(
       </TextProvider>
     </ThemeModeProvider>,
   )
+  return onOpenPath
 }
 
 type PatchOperation = { op: string; path: string; value?: unknown }
@@ -764,6 +777,57 @@ describe('StudioEditor for a process', () => {
     ])
     expect(operations.slice(4).map((operation) => operation.value)).toEqual([{ textKey: '' }, {}, '', []])
   })
+
+  it('shows a node for a step added in the JSON view, without saving it', async () => {
+    const { fetchMock } = stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'JSON' }, slow))
+    const json = screen.getByRole('textbox', { name: 'JSON' })
+    const withExtraStep = { ...processContent, steps: [...processContent.steps, { name: 'notify', type: 'end' }] }
+    await userEvent.clear(json)
+    await userEvent.click(json)
+    await userEvent.paste(JSON.stringify(withExtraStep, null, 2))
+
+    expect(await screen.findByTestId('studio-graph-node-10', {}, slow)).toHaveAccessibleName('notify · end')
+    expect(requests(fetchMock, 'PATCH')).toBe(0)
+  })
+
+  it.each(['light', 'dark'] as const)(
+    'reaches the nodes with Tab in step order and opens a step with Enter in %s mode',
+    async (mode) => {
+      localStorage.setItem('axis.themeMode', mode)
+      stubResource(processItem, processContent)
+      const onOpenPath = renderResource(processItem)
+      await screen.findByTestId('studio-graph-node-0', {}, slow)
+      expect(document.querySelector('.react-flow')).toHaveClass(mode)
+
+      for (const [index, step] of processContent.steps.entries()) {
+        await userEvent.tab()
+        const node = screen.getByTestId(`studio-graph-node-${index}`)
+        expect(node).toHaveFocus()
+        expect(node).toHaveAccessibleName(`${step.name} · ${step.type}`)
+        await userEvent.keyboard('{Enter}')
+        expect(onOpenPath).toHaveBeenLastCalledWith(`/steps/${index}`)
+      }
+    },
+  )
+
+  it('marks the node of the open path as current', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem, undefined, vi.fn(), '/steps/1/next')
+
+    expect(await screen.findByTestId('studio-graph-node-1', {}, slow)).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('studio-graph-node-0')).not.toHaveAttribute('aria-current')
+  })
+
+  it('opens the transition of an edge when the edge is clicked', async () => {
+    stubResource(processItem, processContent)
+    const onOpenPath = renderResource(processItem)
+
+    fireEvent.click(await screen.findByTestId('rf__edge-/steps/2/otherwise', {}, slow))
+    expect(onOpenPath).toHaveBeenCalledWith('/steps/2/otherwise')
+  })
 })
 
 describe('StudioEditor for a text resource', () => {
@@ -820,6 +884,7 @@ describe('StudioEditor for a text resource', () => {
             item={enItem}
             resources={[enItem, viItem]}
             path={null}
+            onOpenPath={vi.fn()}
             onSaved={vi.fn()}
             onTextsWritten={vi.fn()}
             onDeleted={vi.fn()}

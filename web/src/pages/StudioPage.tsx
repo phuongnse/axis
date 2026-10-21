@@ -440,6 +440,7 @@ function StudioWorkspace() {
                         item={selected}
                         resources={loaded.resources}
                         path={path}
+                        onOpenPath={(next) => openReference(selected.id, next)}
                         onSaved={(diagnostics, created) => {
                           setFolder({
                             ...loaded,

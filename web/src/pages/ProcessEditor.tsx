@@ -212,61 +212,63 @@ function Step({
   const type = typeof step.type === 'string' ? step.type : undefined
 
   return (
-    <Card
-      size="small"
-      data-testid={`studio-step-${index}`}
-      title={`${text(step.name)} · ${type ?? ''}`}
-      extra={
-        <Flex gap="small">
-          <Button disabled={index === 0} onClick={() => onMove(-1)}>
-            {t('shell.studio.process.moveUp')}
-          </Button>
-          <Button disabled={last} onClick={() => onMove(1)}>
-            {t('shell.studio.process.moveDown')}
-          </Button>
-          <Button danger onClick={onRemove}>
-            {t('shell.studio.process.removeStep')}
-          </Button>
-        </Flex>
-      }
-    >
-      <Flex vertical gap="small">
-        <div data-testid={`studio-field-${pointer}/name`}>
-          <div>{t('shell.studio.process.stepName')}</div>
-          <Input
-            aria-label={t('shell.studio.process.stepName')}
-            value={text(step.name)}
-            onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
-          />
-        </div>
-        <div data-testid={`studio-field-${pointer}/type`}>
-          <div>{t('shell.studio.process.stepType')}</div>
-          <Select
-            aria-label={t('shell.studio.process.stepType')}
-            style={{ minWidth: 240 }}
-            virtual={false}
-            value={type}
-            options={stepTypes.map((option) => ({ value: option, label: option }))}
-            onChange={(next: string) => onChange(pointer, withType(step, next))}
-          />
-        </div>
-        {type === 'decision' && <Decision pointer={pointer} step={step} names={names} onChange={onChange} />}
-        {type === 'operation' && (
-          <>
-            <OperationPanel pointer={pointer} step={step} entity={entity} onChange={onChange} />
-            <Transition
-              pointer={`${pointer}/next`}
-              label={t('shell.studio.process.next')}
-              value={step.next}
-              names={names}
-              onChange={onChange}
+    <div data-testid={`studio-field-${pointer}`}>
+      <Card
+        size="small"
+        data-testid={`studio-step-${index}`}
+        title={`${text(step.name)} · ${type ?? ''}`}
+        extra={
+          <Flex gap="small">
+            <Button disabled={index === 0} onClick={() => onMove(-1)}>
+              {t('shell.studio.process.moveUp')}
+            </Button>
+            <Button disabled={last} onClick={() => onMove(1)}>
+              {t('shell.studio.process.moveDown')}
+            </Button>
+            <Button danger onClick={onRemove}>
+              {t('shell.studio.process.removeStep')}
+            </Button>
+          </Flex>
+        }
+      >
+        <Flex vertical gap="small">
+          <div data-testid={`studio-field-${pointer}/name`}>
+            <div>{t('shell.studio.process.stepName')}</div>
+            <Input
+              aria-label={t('shell.studio.process.stepName')}
+              value={text(step.name)}
+              onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
             />
-            <JsonOnlyKeys pointer={pointer} keys={operationJsonOnlyKeys(step)} />
-          </>
-        )}
-        {type === 'task' && <Task pointer={pointer} step={step} names={names} onChange={onChange} />}
-      </Flex>
-    </Card>
+          </div>
+          <div data-testid={`studio-field-${pointer}/type`}>
+            <div>{t('shell.studio.process.stepType')}</div>
+            <Select
+              aria-label={t('shell.studio.process.stepType')}
+              style={{ minWidth: 240 }}
+              virtual={false}
+              value={type}
+              options={stepTypes.map((option) => ({ value: option, label: option }))}
+              onChange={(next: string) => onChange(pointer, withType(step, next))}
+            />
+          </div>
+          {type === 'decision' && <Decision pointer={pointer} step={step} names={names} onChange={onChange} />}
+          {type === 'operation' && (
+            <>
+              <OperationPanel pointer={pointer} step={step} entity={entity} onChange={onChange} />
+              <Transition
+                pointer={`${pointer}/next`}
+                label={t('shell.studio.process.next')}
+                value={step.next}
+                names={names}
+                onChange={onChange}
+              />
+              <JsonOnlyKeys pointer={pointer} keys={operationJsonOnlyKeys(step)} />
+            </>
+          )}
+          {type === 'task' && <Task pointer={pointer} step={step} names={names} onChange={onChange} />}
+        </Flex>
+      </Card>
+    </div>
   )
 }
 
