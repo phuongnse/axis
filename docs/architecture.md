@@ -810,9 +810,12 @@ worker and the publisher serve the journey tenant too, and the run fails when th
 `artifacts/logs/e2e-journey-server.log`.
 
 `tests/e2e/specs/service-desk-journey.spec.ts` builds the service desk on the journey tenant with Studio only, and
-never opens the JSON view. It compares the built files with `samples/apps/service-desk`. So far it builds the
-application, its `en` and `vi` texts, the three roles, the `TicketNumber` sequence, the `Category` entity and its
-`Categories` seed. Studio cannot remove a text key yet, and the starter keys of a blank
+never opens the JSON view. It compares the built files with `samples/apps/service-desk`. It builds the whole data
+model: the application, its `en` and `vi` texts, the three roles, the `TicketNumber` sequence, the `Category` and
+`Ticket` entities and the `Categories` seed. The entity designer asks a migration question even for a new entity,
+because the starter field `name` is renamed to `number`. The journey answers Drop data, then deletes the `Ticket`
+migration in Studio, because the sample has no migration and the application is never published. The built
+`migrations` folder must be empty at the end. Studio cannot remove a text key yet, and the starter keys of a blank
 application are not in the sample. So the journey deletes the starter `en` text resource and creates it again.
 
 The E2E run also starts the purchasing system stub from the build output, and
