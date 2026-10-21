@@ -1,0 +1,453 @@
+# Authentication and authorization
+
+Detailed reference for sign-in and the session, machine callers, authorization and the
+development users. The summary is in
+[architecture.md](../architecture.md#authentication-and-authorization).
+The conventions of [architecture.md](../architecture.md) apply: sections marked
+_(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
+
+## Sign-in and the session
+
+It follows
+[D23](../decisions/d23-sign-in-through-oidc-and-the-bff-session.md).
+Sign-in, the session, `GET /api/me` and sign-in needed are in place.
+
+- **Flow.** Sign-in uses the OIDC authorization code flow with PKCE. The
+  server is the confidential client: it exchanges the code for tokens, reads
+  the claims from the ID token and keeps no token after that (D9). The
+  identity provider returns the code in the query string. Pushed
+  authorization requests stay off until FAPI 2.0 work (D9).
+  - The server registers one OIDC client per tenant. All of them share the
+    callback path, and each one ignores a callback that arrives on another
+    tenant's host.
+- **Tenant settings.** Each tenant in the [`Tenants` section](../architecture.md#tenant-configuration)
+  has an `Oidc` block. `Claims` names the claims that give the user id, the
+  display name and the roles. Each claim name is optional, and the defaults
+  are `sub`, `name` and `roles`. The optional `EndpointAudience` is for
+  [machine callers](#machine-callers).
+
+  ```json
+  "default": {
+    "Hosts": [ "localhost" ],
+    "ConnectionString": "Host=...",
+    "Oidc": {
+      "Authority": "http://localhost:8080/realms/axis",
+      "ClientId": "axis",
+      "ClientSecret": "...",
+      "Claims": { "UserId": "sub", "DisplayName": "name", "Roles": "roles" }
+    }
+  }
+  ```
+
+- **Startup checks.** The server's startup fails, naming every problem as
+  for the tenant configuration, when a tenant has no `Oidc` block, or when
+  its `Authority`, `ClientId` or `ClientSecret` is missing or blank.
+  A preview tenant has no `Oidc` block, and takes its
+  main tenant's, see [preview tenants](../architecture.md#preview-tenants). Only the
+  server reads and checks the block. The worker reads the same `Tenants`
+  section but signs nobody in, so it ignores `Oidc`. Under
+  `Tenancy:Source=directory`, the `Oidc` settings of a tenant come from the
+  [tenant directory](../architecture.md#tenant-directory), not from `Tenants`. Under `directory`,
+  each refresh registers the OIDC client and the endpoint caller scheme of a new
+  tenant, builds them again for a tenant whose `Oidc` settings changed, and
+  removes both for a tenant that is no longer served. The identity provider's
+  metadata is fetched again only for the tenants that changed.
+- **Secret.** The client secret comes from the environment, such as
+  `Tenants__default__Oidc__ClientSecret`. It is never in a committed file,
+  except the development fixtures, which are never valid outside
+  `Development` and tests. `appsettings.Development.json` and the E2E server
+  use the development realm's secret. Under
+  `Tenancy:Source=directory`, the client secret is stored encrypted in the
+  tenant directory and decrypted only when the sign-in client is set up, see
+  [platform database](storage.md#platform-database).
+- **Endpoints.**
+  - `GET /api/auth/sign-in?returnUrl=` redirects to the tenant's identity
+    provider. `returnUrl` must start with a single `/`. A value that does
+    not, or that starts with `//` or `/\`, is a `400` problem details
+    response. A missing `returnUrl` means `/`.
+  - `GET /api/auth/callback` is where the identity provider returns. It
+    creates the session and redirects to `returnUrl`. A callback that fails
+    creates no session. For now it answers a `500` problem details response,
+    for example when the person cancels at the identity provider.
+  - `POST /api/auth/sign-out` ends the session and returns `200` with
+    `{ "signOutUrl" }`. The SPA then sends the browser to that URL, and the
+    identity provider returns it to `/`. The SPA calls sign-out with `fetch`
+    so it can send the CSRF header, and a `fetch` call cannot follow a
+    redirect to the identity provider as a page. The shell header's
+    [account button](frontend.md) offers sign-in and
+    sign-out.
+- **Audit.** Sign-in writes
+  [audit records](storage.md#audit-records-and-sequence-counters)
+  in the database of the tenant that the host resolves to, see
+  [D50](../decisions/d50-sign-in-audit-records-and-security-scanning-in-ci.md).
+  - The callback writes `session.signedIn` when it creates a session. It writes
+    `session.signInRefused`, with a reason code, when it refuses. A refused
+    callback still answers the `500` above.
+  - `POST /api/auth/sign-out` writes `session.signedOut` only when a session
+    existed.
+  - An expired session writes nothing. A host that resolves to no tenant writes
+    nothing, because there is no tenant database.
+  - Each record holds the client address, and never a token, a cookie or the
+    user agent. The address follows the
+    [forwarded headers](host-settings.md#forwarded-headers) rules of
+    [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
+- **Session.** One HttpOnly, Secure, SameSite=Lax cookie, `Axis.Session`.
+  - It holds the user id, the display name, the roles and the tenant id.
+  - It holds no access, refresh or ID token, and no token reaches the
+    browser.
+  - It ends 8 hours after sign-in, or after 1 hour without requests,
+    whichever comes first. Every request with a session renews the cookie,
+    so the hour counts from the last request.
+  - In `Development` and `Testing`, which run over plain http, the session
+    cookie and the OIDC helper cookies are Secure only on https requests.
+  - Behind a named proxy, the callback and sign-out addresses and the cookie's
+    Secure flag use the forwarded scheme and host. See
+    [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md) and the
+    [forwarded headers settings](host-settings.md#forwarded-headers).
+  - The cookie is protected with a key ring that every server replica shares.
+    The keys are in `platform.data_protection_keys`, encrypted with
+    `Platform:SecretKey`, so a session survives a restart and works on every
+    replica. The server fixes the data protection application name to `Axis`,
+    so replicas at different paths read the same keys. A key that does not
+    decrypt stops the start.
+- **Tenant binding.** A session whose tenant id differs from the tenant
+  [resolved from the host](../architecture.md#request-resolution) counts as no session. So a
+  cookie taken to another tenant's host signs nobody in there.
+- **Roles.** The roles come from the roles claim at sign-in and are kept in
+  the session. A role change at the identity provider applies at the next
+  sign-in.
+- **Current user.** `GET /api/me` keeps its shape,
+  `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean
+  `studio`, true when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set, and the user holds
+  `Studio:AuthorRole`. See [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md).
+  It adds a boolean `studioPublisher`, true when
+  Studio is on and the user holds both `Studio:AuthorRole` and
+  `Studio:PublisherRole`. See [D47](../decisions/d47-publishing-from-studio.md).
+  It adds `studioPreviewHost`, the host of the tenant's served preview tenant. It
+  is null for a user who may not use Studio and for a tenant without a preview
+  tenant. See [D48](../decisions/d48-preview-tenants.md).
+  It adds a boolean `studioTest`, true when `studio` is true
+  and `Studio:Tests` is true. See
+  [D55](../decisions/d55-running-test-scenarios-from-studio.md).
+  It adds a boolean `studioCreate`, true when `studio` is true and `Studio:ApplicationsPath` is set. See
+  [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
+  Without a session it is a `401`, as today. Record writes, process starts and the
+  task API read the current user the same way, and their audit records store
+  the user's id and display name.
+- **Sign-in needed.** Without a session, these answer a `401` problem
+  details response:
+  - every route under `/api/apps/{app}/`: records, record history, data
+    source rows, process start and tasks. The session is checked before any
+    `404`, so a caller without a session cannot learn which applications or
+    records exist;
+  - `GET /api/sites`, `GET /api/sites/{path}`,
+    `GET /api/sites/{path}/texts/{locale}` and
+    `GET /api/sites/{path}/pages/{page}`. Site texts belong to an
+    application, so they count as application content. The session is checked
+    before any `404`, so a caller without a session cannot learn which sites
+    or pages exist;
+  - `GET /api/me`.
+
+  Inbound endpoints under `/api/apps/{app}/endpoints/` are the exception.
+  They take a bearer token and no session, see
+  [Machine callers](#machine-callers).
+
+  These stay open, because the shell needs them before anyone signs in:
+  `GET /api/site`, `GET /api/texts/{locale}`, `GET /api/auth/sign-in`,
+  `GET /api/auth/callback`, every path under `/health` and the SPA's static
+  files. `POST /api/auth/sign-out` needs the CSRF header but no
+  session.
+
+- **CSRF.** Every `POST`, `PUT`, `PATCH` and `DELETE` under `/api` must
+  carry `X-Axis-Csrf: 1`, otherwise `403`. The server checks the header
+  right after it resolves the tenant and before authentication, so a refused
+  write does no work and does not renew the session cookie. On the record
+  API, the data source endpoint, the process start endpoint and the task
+  API, the session check follows it. `POST /api/auth/sign-out` needs no
+  session, so no session check follows it. The SPA sends every `/api`
+  call through one wrapper around `fetch`, which adds the header to its
+  writes. See the record API's
+  [CSRF header rule](record-api.md#create-update-and-delete).
+  Paths under `/api/apps/{app}/endpoints/` are exempt from the header,
+  because they take a bearer token and no session cookie. See
+  [Machine callers](#machine-callers).
+- **Tests.** Tests of sign-in itself start the development realm in Keycloak
+  through Testcontainers, and drive its login page. Tests of the session
+  lifetime create the session through a test-only hook and use a test clock.
+  Tests of [machine callers](#machine-callers) get client credentials tokens
+  from the same container, and expire them with a test clock.
+  Integration tests of other endpoints sign in through a test authentication
+  scheme that only test hosts register. A request names its user in a
+  header, and the scheme builds the same principal as a session of that user.
+  The E2E sign-in journey drives the Keycloak login page. For the other E2E
+  journeys, a Playwright setup step signs each realm user in on the login page
+  once and saves the browser session. Journeys that act as a user load or swap
+  those saved sessions.
+- **Keycloak realm.** Docker Compose, `scripts/dev.sh` and the E2E run start
+  Keycloak with an imported development realm, `axis`. This part is in place:
+  the realm is `samples/keycloak/axis-realm.json`, and one shared
+  Testcontainers container serves the whole integration run. Under `scripts/dev.sh` and in
+  the E2E run, the server signs people in through it. Under Docker Compose
+  it does not yet, because the server in its container cannot reach Keycloak
+  at the address the browser uses. So under Compose the site endpoints, the
+  record API and the data source endpoint answer `401`, and an application
+  page starts a sign-in that cannot complete.
+  - It holds the development users listed in
+    [development users](#development-users), with fixed ids that seed data
+    and E2E journeys name.
+  - Every user has the same development-only password.
+  - The roles are client roles of the confidential client `axis`. A
+    client-role mapper writes them to the `roles` claim, so the claim holds
+    only the sample roles.
+  - The confidential client `purchasing-system` stands in for the
+    purchasing system as a [machine caller](#machine-callers). Its service
+    account gets tokens through the client credentials grant.
+
+### Development users
+
+These are test fixtures. Docs and GitHub text name roles instead. A new
+sample reuses a user that holds the role it needs before it adds a user.
+
+| User    | Roles                   | Used by                                                                  |
+| ------- | ----------------------- | ------------------------------------------------------------------------ |
+| `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys   |
+| `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                 |
+| `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                 |
+| `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                 |
+| `dung`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                              |
+| `giang` | `operator`              | Purchase request sample's Approvals inspector; E2E journeys              |
+| `hoa`   | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys |
+| `khoa`  | `agent`                 | Service desk sample; E2E journeys                                        |
+| `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                        |
+
+## Machine callers
+
+It follows [D27](../decisions/d27-inbound-endpoints.md). The token
+checks, the tenant binding, the endpoint-only acceptance, the CSRF exemption
+and the development realm's client are built. The `endpoint` resource and its
+compile checks are built too, and so are the endpoint call with its `output`
+and `wait`, its `Idempotency-Key`, and the status location. Other systems call [inbound endpoints](inbound-endpoints.md)
+with a bearer token. This sits next to the browser session: the session
+stays the only way in for people, and a bearer token is the only way in for
+systems.
+
+- **Client credentials.** A caller is a system, not a browser. It gets an
+  OAuth 2.0 access token from the tenant's `Oidc` authority through the
+  client credentials grant, and sends it as `Authorization: Bearer <token>`.
+- **Tenant setting.** The expected audience is a new tenant setting,
+  `Oidc:EndpointAudience`. In the development tenant its value is
+  `axis-endpoints`:
+
+  ```json
+  "Oidc": {
+    "Authority": "http://localhost:8080/realms/axis",
+    "EndpointAudience": "axis-endpoints"
+  }
+  ```
+
+  The setting is optional. A tenant without it accepts no bearer token, so
+  every endpoint call there is a `401`. The server's
+  [startup checks](#sign-in-and-the-session) do not change. The worker
+  ignores it, as it ignores the rest of `Oidc`.
+
+- **Token checks.** The server checks each token against the tenant
+  [resolved from the host](../architecture.md#request-resolution). Any failure is a `401`
+  with `WWW-Authenticate: Bearer`, which never says which check failed.
+  - The signature, with the keys the authority publishes (its JWKS).
+  - The issuer, which must equal the tenant's `Authority`. So another
+    tenant's token is a `401`.
+  - The audience, which must contain the tenant's `Oidc:EndpointAudience`.
+  - The expiry.
+- **Roles.** The caller's roles come from the configured roles claim
+  (`Claims:Roles`), matched against the declared roles as for users.
+- **Caller id.** The caller's id comes from the configured user id claim
+  (`Claims:UserId`, default `sub`). It is the audit actor and the new
+  record's creator.
+- **Display name.** The audit display name comes from the configured display
+  name claim. When the token has none, it is the token's client id (`azp`).
+  Keycloak service-account tokens have no `name` claim, and a bare id would
+  be hard to read in a record's history.
+- **Endpoint routes only.** The server accepts a bearer token only on
+  `POST /api/apps/{app}/endpoints/{name}` and its status location. Everywhere
+  else a bearer token is ignored, so it never reaches the record API, the
+  data source endpoint or the task API. The request's default
+  authentication is the bearer token on paths under
+  `/api/apps/{app}/endpoints/`, and the session everywhere else.
+- **Clock.** The expiry is checked against the server's clock service, with
+  the usual 5 minutes of clock skew, so tests can replace the clock.
+- **No session.** On endpoint routes the session cookie is ignored and not
+  renewed, so the CSRF header does not apply. A browser cannot attach a bearer token on its
+  own, so a cross-site page cannot call an endpoint for a signed-in user.
+- **Not bound to the sender.** A leaked token works until it expires.
+  Sender-constrained tokens (DPoP) stay a later FAPI 2.0 step under D9.
+- **Keycloak.** The development realm gets what the purchase request sample
+  needs:
+  - a confidential client `purchasing-system` with a service account, for
+    the client credentials grant;
+  - the password grant on the `purchasing-system` client, so tests can get a
+    realm user's token with the endpoint audience;
+  - the `axis` client role `purchasing-system`, held by that service account;
+  - a roles mapper on the `purchasing-system` client that writes the `axis`
+    client roles to the `roles` claim;
+  - an audience mapper on the `purchasing-system` client that adds
+    `axis-endpoints` to the token's audience;
+  - the service account user with the fixed id `purchasing-system`, which is
+    the token's `sub` and so the caller id.
+
+  The client secret is `purchasing-system-development-secret`, for
+  development only. `appsettings.Development.json` and the E2E server set
+  `Oidc:EndpointAudience`. The Compose settings do not, so endpoint calls
+  under Compose are a `401`.
+
+## Authorization
+
+The `role` and `policy` resources and their compile checks are built. For
+the record API and the data source endpoint, so are the session `401`, the
+matching of roles, grants by action and the `403` without a grant. The record
+API also enforces record filters and field lists: reads, writes and their
+failures as described below. The data source endpoint adds the root entity's
+read filters to its SQL and checks every projected field. A process start
+checks the session, the `start` grant and read access to the subject record.
+The task API keeps the assignee check and leaves out the fields the user may
+not read. Navigation and page metadata follow the user's grants, and page
+metadata leaves out the fields the user may not read. Everything in this
+section is built. It follows
+[D24](../decisions/d24-roles-and-policies.md) and
+[D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).
+The `role` and `policy` resource files are described in
+[configuration](roles-and-policies.md).
+
+- **Roles.** A user's roles are the roles claim values kept in the
+  [session](#sign-in-and-the-session). A value matches a declared `role` of
+  the application by its exact name. A value that names no declared role is
+  ignored. A user matches a policy when they hold any of its roles.
+- **Grants.** A policy holds grants. Each grant gives actions on one target:
+  `read`, `create`, `update` and `delete` on an entity, `read` on a data
+  source, or `start`, `inspect`, `cancel`, `retry` and `resolve` on a process. `inspect` lists a process's
+  instances, see [process inspection](process-inspection.md#process-inspection).
+  `cancel` stops a running or waiting instance, see
+  [Cancel](process-inspection.md#cancel). `retry` runs a failed instance
+  again, see [Retry](process-inspection.md#retry). `resolve`
+  settles an unknown connector call, see
+  [Resolve](process-inspection.md#resolve). Each is checked on its own. An entity grant may also have a record
+  `filter` and a `fields` list. A user's grants are the grants of every
+  policy they match.
+- **Default-deny.**
+  - A request without a session is a `401`.
+  - A signed-in user with no grant for the action on the resource gets a
+    `403`.
+  - A record outside every read filter does not exist for the user, so it is
+    a `404`, as for an unknown record.
+  - A policy that cannot be evaluated denies.
+- **Reads.** A record is readable when it matches the filter of at least one
+  of the user's `read` grants on its entity. A grant without a `filter`
+  matches every record. Record lists and data sources add the read filters
+  to their SQL. A single record is checked in SQL too, with one statement
+  per filtered grant, so reads and writes give the same answer and a filter
+  that fails denies through its own grant only. The user id is a parameter,
+  never part of the SQL text. A read filter that reads a pending computed
+  field fails closed with a `409`, in the record API, the process endpoints and
+  the data sources.
+- **Writes.**
+  - A create needs the new record to match the filter of a `create` grant.
+  - An update needs the stored record to be readable, otherwise `404`. It
+    then needs the stored record to match an `update` filter, otherwise
+    `403`. The new record must match an `update` filter too, otherwise
+    `403`.
+  - A delete needs the stored record to be readable, otherwise `404`, and to
+    match a `delete` filter, otherwise `403`.
+  - The new record is the record as it will be stored: the stored values
+    with the body on top, after the creator, sequence and computed fields
+    are set. So a user cannot move a record out of their reach.
+- **Fields on reads.** The user may read the union of the `fields` of their
+  `read` grants on the entity. A `read` grant without `fields` covers every
+  field. The readable fields belong to the entity, not to the record, so
+  they never depend on which grant matched a record. Other fields are left
+  out of records, data source rows, history details, task forms and page
+  metadata. A record's `id` and `version` are always shown.
+- **Fields on writes.** A create may write the union of the `fields` of the
+  user's `create` grants on the entity, and an update the union of their
+  `update` grants. Writing any other field is a `403` keyed at the field's
+  path, such as `/values/decisionComments`.
+- **Child entities.** Grants name only entities that are not child
+  entities. Child rows are read and written through their owner's grants. An
+  owner's `fields` entry for a `child-collection` field covers its rows as a
+  whole. A grant on a child entity is a compile error.
+- **Labels and lookups.** The label of a referenced record shows when the
+  user may read the target entity's display field. The target's record
+  filters do not hide it. Lookups list target records through the record
+  API, so through the user's read filters.
+- **Data sources.** A data source needs a `read` grant on it and a `read`
+  grant on its root entity. The root entity's read filters are added to the
+  data source's own filter in SQL. A data source that projects or aggregates
+  a field the user may not read is a `403` as a whole. For a path through
+  `reference` fields, every field along the path must be readable. See
+  [data sources](data-sources.md#authorization).
+- **Processes and tasks.** A process start needs a `start` grant on the
+  process and read access to the subject record. An operator cancel needs
+  the `cancel` grant and the same read access, and so does an operator retry
+  with the `retry` grant, and so does an operator resolve with the
+  `resolve` grant. The task assignee check
+  stays, and it is enough to list, read and complete a task. A role assignee
+  counts only when the active release declares the role. The task form
+  leaves out fields the user may not read, and the subject label uses the
+  display field of the task's release. See
+  [processes](task-api.md). Listing the instances of a
+  process needs an `inspect` grant on the process, and an instance is listed
+  only when its subject record is readable. The instance detail needs the
+  same. It also shows a call's input only when the user may read every field
+  its mapping reads or writes. A `sensitive` field is never shown. See
+  [process inspection](process-inspection.md#process-inspection).
+- **System work.** The worker, seed data and `updateRecord` steps run as
+  `system`. Policies do not check them.
+- **Failures.** A filter that fails at run time adds no records through its
+  grant. The server logs the policy name and the grant's index, never a
+  record value. A single record is checked one grant at a time, so another
+  grant can still match it. In a list, PostgreSQL cannot fail one branch of
+  an `or`, so the whole query fails with a `400` and returns no rows.
+- **Module.** `Axis.Policy` holds the evaluation of the compiled policies of
+  each release. Every endpoint and engine command calls it with a resource
+  and an action. It answers allow or deny, the read filters to add, and the
+  readable and writable field sets. Today it answers allow or deny for an
+  entity, a data source or a process start, and the record filters and the
+  field set of an entity and an action. The record API, the data source
+  endpoint and the process start endpoint call it, and apply the record
+  filters it answers. The record command in `Axis.Processes` applies the
+  record filters and field sets for record API writes. The record API, the
+  data source endpoint and the task API apply the field sets. The site endpoints call it to leave unreadable
+  pages out of navigation, to answer `403` for them, and to list a widget's
+  readable fields, allowed actions and writable fields in page metadata.
+- **Only the server decides.** Page metadata and navigation follow the
+  policies, but they only shape the UI. The server checks every request.
+
+### Combining grants
+
+The grants of all the user's policies combine with OR. A record is readable
+when any `read` grant's filter is `true` for it. A filter that is `false`,
+`null` or fails adds no records through its grant. So a mistake in one
+policy can never widen access.
+
+Take the purchase request policies in
+[configuration](roles-and-policies.md), and a user
+who holds both `employee` and `finance-reviewer`. The user's read filters on
+`PurchaseRequest` are `requester == currentUser()` and
+`status in ('submitted', 'approved', 'returned', 'rejected')`:
+
+| Request                          | `requester == currentUser()` | `status in ('submitted', 'approved', 'returned', 'rejected')` | Result   |
+| -------------------------------- | ---------------------------- | ------------------------------------------------------------- | -------- |
+| Their own draft                  | `true`                       | `false`                                                       | Readable |
+| Someone else's submitted request | `false`                      | `true`                                                        | Readable |
+| Someone else's draft             | `false`                      | `false`                                                       | `404`    |
+
+The `false` filters add nothing. Someone else's draft matches neither
+filter, so it does not exist for them.
+
+Equality is [null-safe](expressions.md#null-semantics), so a
+department manager's filter `department.manager == currentUser()` is
+`false`, not `null`, for a request whose department has no manager. That
+grant adds nothing for the request.
+
+A `null` filter adds nothing either. Suppose a policy granted `read` with the
+filter `submittedAt >= dateTime('2026-01-01T00:00:00Z')`. A draft has no
+`submittedAt`, so the filter is `null` for it, and that grant gives no access
+to the draft. Only another grant can make it readable.

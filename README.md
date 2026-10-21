@@ -12,7 +12,7 @@ amount, and an approved request is sent to a purchasing system.
 
 Leave requests is the second sample. A third, a service desk, runs as a sample
 too. Building it only through Studio is planned for M11. See
-[D56](docs/decisions.md#d56-a-service-desk-as-the-third-sample-application--agreed).
+[D56](docs/decisions/d56-a-service-desk-as-the-third-sample-application.md).
 
 ## Status
 
@@ -33,28 +33,19 @@ Compose volume has no preview database, so run `docker compose down -v` once. Th
 The SPA signs people in through Keycloak at `/api/auth/sign-in`, but sign-in through
 Compose is not wired yet. Every application page needs a session, so under Compose
 opening a sample page starts a sign-in that cannot complete yet. See
-[AGENTS.md](AGENTS.md#commands) for the port variables. This setup is for local
+[development](docs/development.md#docker-compose) for the port variables. This setup is for local
 use. Production installs follow the [installation guide](docs/reference/installation.md),
 for Docker Compose on one machine and for Kubernetes.
 
 For development with hot reload, run `scripts/dev.sh`. It needs Docker, .NET and
 Node. It runs the server, the worker and the SPA with hot reload. See
-[AGENTS.md](AGENTS.md#commands) for details.
+[development](docs/development.md#hot-reload-with-scriptsdevsh) for details.
 
 ## Documentation
 
-| Document | Purpose |
-| --- | --- |
-| [Product brief](docs/product-brief.md) | What Axis is, who uses it, the proving samples |
-| [Decisions](docs/decisions.md) | Decisions that have been agreed, with reasons |
-| [Architecture](docs/architecture.md) | Modules, hosts, tenancy, security, execution and testing |
-| [Reference](docs/reference/) | Detailed behaviour: configuration, administration, installation, storage, record API, authoring API, frontend, expressions, data sources, processes and extension packages |
-| [Concepts](docs/domain/concepts.md) | The Axis vocabulary and what each resource does |
-| [Design knowledge](docs/domain/knowledge.md) | What business applications need and the pitfalls to avoid |
-| [Roadmap](docs/roadmap.md) | Milestones, what each delivers and its status |
-| [Delivery](docs/delivery.md) | How work flows through NexKit, from issue to merged pull request |
-
-Contributors and agents start with [AGENTS.md](AGENTS.md).
+The [docs map](docs/README.md) lists every doc and what it holds: the product brief, the roadmap,
+the decisions, the vocabulary, the architecture and the detailed reference. Contributors and agents
+start with [AGENTS.md](AGENTS.md).
 
 ## Technology
 

@@ -11,7 +11,7 @@ application folder on the server's disk. They are the same files that are kept
 in git. The application list, application create, resource list, read, patch, create, delete, changes, text write, diagnostics,
 references, names, policy matrix, module resource and expression check routes are built. It is
 agreed in
-[D38](../decisions.md#d38-studio-edits-application-folders-through-an-authoring-api--agreed).
+[D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md).
 Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
 restarts the server, which activates the folder, as a hand edit does today.
 A write takes a lock in the platform database, see [Versions](#versions). Reads
@@ -20,19 +20,19 @@ and diagnostics touch no database. Going live from Studio is
 server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
 its own process, and
-[D47](../decisions.md#d47-publishing-from-studio--agreed) agrees this.
+[D47](../decisions/d47-publishing-from-studio.md) agrees this.
 The `changes` route writes several files in one call, see [Changes](#changes).
 
 The [names](#names) route feeds Studio's reference pickers, the
 [text write](#text-writes) route helps its label texts and the
 [expression check](#expression-check) route helps its expression editor. All
 three are built, and agreed in
-[D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed).
+[D52](../decisions/d52-reference-pickers-label-texts-and-the-expression-editor.md).
 
 ## Settings
 
 Two server settings decide who may use the API and which
-folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. See [Studio](configuration.md#studio) for their defaults.
+folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. See [Studio](host-settings.md#studio-settings) for their defaults.
 
 - `Studio:Folders` lists the application folders. With no folder, the API
   has nothing to edit, and every route answers `403`. `studio: false` on
@@ -63,7 +63,7 @@ in the application. File names and names can change.
 | --- | --- |
 | `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.`, and a link, is skipped |
 | `POST /api/studio/apps` | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application) |
-| `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template, sorted by `id`. See [application templates](configuration.md#application-templates) |
+| `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template, sorted by `id`. See [application templates](modules-and-templates.md#application-templates) |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` for one file of the module version that the application pins, other than `module.json`. The pinned version is the highest installed version in the application's range. `file` is `modules/<id>/<path>`, and there is no `ETag`, because the file cannot be patched |
@@ -116,7 +116,7 @@ bytes, in lower-case hex.
   answers `409`, not `404`. Another write removed it after the request was
   checked, so the version the client holds is stale.
 - Every replica must mount the folder at the same path, because the lock is
-  keyed by the full path. See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+  keyed by the full path. See [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
 - A patch or a delete without `If-Match` is `428`.
 - A create sends the new version as an `ETag`, so the client can patch next
   without reading the resource again.
@@ -263,7 +263,7 @@ and a patch needs `application/json-patch+json`. An expression check needs `appl
 
 The two references routes answer where a resource or a text key is used. They read the [reference index](configuration.md#reference-index)
 that every compile builds, as
-[D39](../decisions.md#d39-reference-index-and-where-a-resource-is-used--agreed)
+[D39](../decisions/d39-reference-index-and-where-a-resource-is-used.md)
 agrees.
 
 - **Resource route.** `GET .../resources/{id}/references` answers
@@ -296,9 +296,9 @@ agrees.
 ## Names
 
 `GET .../names` answers every name the application
-defines. Studio loads them with the application for its [expression completion](frontend.md#studio)
-and its [reference pickers](frontend.md#studio), and again after a save, a delete and a reconnect.
-[D52](../decisions.md#d52-reference-pickers-label-texts-and-the-expression-editor--agreed)
+defines. Studio loads them with the application for its [expression completion](studio.md)
+and its [reference pickers](studio.md), and again after a save, a delete and a reconnect.
+[D52](../decisions/d52-reference-pickers-label-texts-and-the-expression-editor.md)
 agrees it. The answer is:
 
 ```
@@ -342,8 +342,8 @@ agrees it. The answer is:
 
 `GET .../policy-matrix` answers what each role may do on each root entity,
 data source, process and endpoint, and which grants give that access.
-Studio's [policy matrix](frontend.md#studio) is built on it, and
-[D54](../decisions.md#d54-the-entity-designer-and-the-policy-matrix--agreed)
+Studio's [policy matrix](studio.md) is built on it, and
+[D54](../decisions/d54-the-entity-designer-and-the-policy-matrix.md)
 agrees it. The answer is:
 
 ```
@@ -360,7 +360,7 @@ agrees it. The answer is:
   the module id, or null. `entity` is a data source's root entity, and null for
   the other kinds. A column is identified by `kind` and `name`, not by `id`.
 - **`actions`.** On a target, they are the actions it accepts, in the order
-  [roles and policies](configuration.md#roles-and-policies) lists them. An
+  [roles and policies](roles-and-policies.md) lists them. An
   entity takes `read`, `create`, `update` and `delete`. A data source takes
   `read`. A process takes `start`, `inspect`, `cancel`, `retry` and `resolve`.
   An endpoint takes `invoke`.
@@ -368,7 +368,7 @@ agrees it. The answer is:
   `roles` resources. Each row has one cell per column, in column order, empty
   ones included. A cell's `actions` are the role's actions there from all its
   policies, combined with OR as in
-  [combining grants](../architecture.md#combining-grants). An action that the
+  [combining grants](security.md#combining-grants). An action that the
   column does not accept is left out. The grant still lists its actions as
   written.
 - **Data source `read`.** A data source cell has `read` only when the role can
@@ -537,8 +537,8 @@ Writes are built for patches, creates, deletes, changes and text writes.
 
 `POST /api/studio/apps` creates a new application folder in
 `Studio:ApplicationsPath`, blank or from an installed
-[application template](configuration.md#application-templates). It follows
-[D51](../decisions.md#d51-creating-applications-and-resources-from-studio--agreed).
+[application template](modules-and-templates.md#application-templates). It follows
+[D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
 The body is `{ "name": "...", "template": "<template id>" }`, and `template` is
 optional. Without it the application is blank.
 
@@ -576,10 +576,10 @@ This route has its own order of checks. The first failure is the response:
   the folder's, compiled in memory as for [Diagnostics](#diagnostics).
 - **Blank.** Without a `template`, the folder holds the smallest application
   that compiles with no error. See
-  [blank application](configuration.md#blank-application).
+  [blank application](modules-and-templates.md#blank-application).
 - **From a template.** With a `template`, the server uses the newest installed
   version, copies its files and changes the ids, the name and the site path. See
-  [application templates](configuration.md#application-templates). The answer
+  [application templates](modules-and-templates.md#application-templates). The answer
   has the template's diagnostics, so a template that does not compile gives a
   copy that does not compile.
 - **Listing templates.** `GET /api/studio/templates` checks the session, the
@@ -592,7 +592,7 @@ This route has its own order of checks. The first failure is the response:
 
 The entity designer saves an entity and its migration in
 one call, so the two files never split. See
-[D54](../decisions.md#d54-the-entity-designer-and-the-policy-matrix--agreed).
+[D54](../decisions/d54-the-entity-designer-and-the-policy-matrix.md).
 
 ```json
 { "changes": [
@@ -631,10 +631,10 @@ saved, and the diagnostics list the broken references.
 
 - The folder is compiled in memory against the extension packages installed
   under `Extensions:Path` and the modules installed under `Modules:Path`, see
-  [extension packages](configuration.md#extension-packages) and
-  [modules](configuration.md#modules). No database is touched.
+  [extension packages](extension-packages.md#declaring-packages-in-an-application) and
+  [modules](modules-and-templates.md#modules). No database is touched.
 - The codes, severities and fields are those of
-  [startup activation](configuration.md#startup-activation). Each diagnostic
+  [startup activation](host-settings.md#startup-activation). Each diagnostic
   is `{ code, severity, message, file, path, resourceId }`. `severity` is
   `error` or `warning`. `resourceId` is the lower-case id of the resource,
   or `null` when the problem concerns a whole file or the whole folder.
@@ -654,7 +654,7 @@ application from Studio, and previews it on the preview tenant. `validate`, `pub
 holds no tenant schema connection. It stores a **publish request** in the
 tenant database, and a separate [publisher](administration.md#publisher) runs
 it with the tenant's schema role. See
-[D47](../decisions.md#d47-publishing-from-studio--agreed), and
+[D47](../decisions/d47-publishing-from-studio.md), and
 [publish requests and release history](storage.md#publish-requests-and-release-history)
 for the tables.
 
@@ -713,7 +713,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   the author sent.
 - **`validate`.** The publisher runs every activation check against the
   tenant inside a transaction that it rolls back. It returns the codes of
-  [startup activation](configuration.md#startup-activation), including the
+  [startup activation](host-settings.md#startup-activation), including the
   checks that the in-memory diagnostics skip: bindings, name and site path
   conflicts, and storage changes. It stores no release and changes nothing.
   It ends `succeeded` when there is no error.
@@ -738,7 +738,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 
 `POST .../preview` tries an application on the session
 tenant's [preview tenant](../architecture.md#preview-tenants) before it goes
-live. [D48](../decisions.md#d48-preview-tenants--agreed) agrees the route. The
+live. [D48](../decisions/d48-preview-tenants.md) agrees the route. The
 request has the kind `publish` and the target `preview`.
 
 - **Who may.** The author role is enough. It needs no publisher role, because
@@ -761,18 +761,18 @@ request has the kind `publish` and the target `preview`.
   it.
 - **Bindings.** A preview has its own bindings, empty by default. A missing
   binding is a warning at activation, and the call fails at run time. See
-  [preview tenants](configuration.md#preview-tenants).
+  [preview tenants](host-settings.md#preview-tenants).
 
 ### Test
 
 `POST .../test` stores a request to run the application's
-[test scenarios](configuration.md#test-scenarios) from Studio. The route and the
+[test scenarios](test-scenarios.md) from Studio. The route and the
 stored request are built, and so is the publisher's run, with its 10-minute limit
 and its immediate stop on `SIGTERM`.
-[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees
+[D55](../decisions/d55-running-test-scenarios-from-studio.md) agrees
 the route. The request has the kind `test` and the target `tenant`. Studio's
 **Run tests** and **Run** controls send it, and its **Test results** list shows
-the outcome, see [Studio](frontend.md#studio).
+the outcome, see [Studio](studio.md).
 
 - **Who may.** The author role is enough. It needs no publisher role, because
   a test changes no tenant. It costs database time, so the limits below apply.
@@ -798,7 +798,7 @@ the outcome, see [Studio](frontend.md#studio).
   at once, with `AXC0220`. The scenarios that finished keep their outcomes in
   `scenarios`, and the one that was cut is stored as `failed` with no `step` and no
   `path`. The work item limit of
-  [D32](../decisions.md#d32-test-scenarios--agreed) applies to each scenario.
+  [D32](../decisions/d32-test-scenarios.md) applies to each scenario.
 - **Order.** At most one `test` request per application runs at a time,
   oldest first. The queue is separate from the one of `validate`, `publish` and
   `rollback`, so a `test` does not wait behind a `publish`.
@@ -889,7 +889,7 @@ It is refused, and the request ends `failed`, in these cases:
 
 | Case | Code |
 | --- | --- |
-| A migration that was applied after that release is missing from it, see [applied migrations](storage.md#applied-migrations) | `AXC0174` |
+| A migration that was applied after that release is missing from it, see [applied migrations](migrations.md#applied-migrations) | `AXC0174` |
 | An extension package version that the release pins is no longer installed | `AXC0146` |
 
 These are the codes that activation already gives for the same causes. A

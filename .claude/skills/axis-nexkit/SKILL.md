@@ -155,7 +155,7 @@ returns 404, upgrade `gh` and try again.
   [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue).
 - Behaviour is named by role, in the terms of concepts.md, never by a development user, in the title
   as well as the body. See the
-  [development users table](../../../docs/architecture.md#development-users).
+  [development users table](../../../docs/reference/security.md#development-users).
 
 ## Checklist: reviewing a plan
 

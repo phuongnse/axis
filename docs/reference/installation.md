@@ -1,12 +1,12 @@
 # Installation
 
 How to install and upgrade Axis on premises and in the cloud. It follows
-[D44](../decisions.md#d44-packaging-for-on-premises-and-cloud-installation--agreed).
+[D44](../decisions/d44-packaging-for-on-premises-and-cloud-installation.md).
 The three production images, the Compose example and the Helm chart are built.
 The default target of the `Dockerfile` and `compose.yaml` at the repository
 root build the development images instead. Those hold the samples and
 development credentials, and they are not for production. See
-[AGENTS.md](../../AGENTS.md#commands) for them.
+[development](../development.md#docker-compose) for them.
 
 The conventions of [architecture.md](../architecture.md) apply, and Dn refers
 to [decisions.md](../decisions.md). In this page, "database role" always means
@@ -79,14 +79,14 @@ file.
 | `Studio:Tests` | `Studio__Tests` | server | no | Optional. `true` turns on `studioTest`, which shows the test controls in Studio. Off by default. Turn it on together with the publisher's `Scenarios:ServerConnectionString`. |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
 | `Modules:Path` | `Modules__Path` | server, worker, admin | no | Set to `/modules`. |
-| `Templates:Path` | `Templates__Path` | server | no | Optional. Unset in production, so Studio lists no application templates. The folder holds `<id>/<version>/` template folders, and a folder that does not exist stops the server. See [application templates](configuration.md#application-templates). |
+| `Templates:Path` | `Templates__Path` | server | no | Optional. Unset in production, so Studio lists no application templates. The folder holds `<id>/<version>/` template folders, and a folder that does not exist stops the server. See [application templates](modules-and-templates.md#application-templates). |
 | `Health:Urls` | `Health__Urls` | worker | no | The image keeps `http://127.0.0.1:5208`. The Helm chart sets it to all interfaces so the kubelet can probe it. |
 | `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | server | no | The image default is 8080. |
-| `OTEL_*` | `OTEL_*` | server, worker | maybe | Optional. See [telemetry export](configuration.md#telemetry-export). A collector token in the headers is secret. |
+| `OTEL_*` | `OTEL_*` | server, worker | maybe | Optional. See [telemetry export](host-settings.md#telemetry-export). A collector token in the headers is secret. |
 
 Read the rules of each setting in
-[tenancy settings](configuration.md#tenancy-settings) and
-[admin settings](configuration.md#admin-settings). They are not repeated here.
+[tenancy settings](host-settings.md#tenancy-settings) and
+[admin settings](host-settings.md#admin-settings). They are not repeated here.
 
 - **`ActivateOnStartup` must be empty** under `directory`, or the server stops
   at start. The admin host activates releases, see
@@ -147,7 +147,7 @@ no scenario secret and Studio shows no test controls. `compose.yaml` does not
 declare the secret itself, because Compose fails to start a service whose secret
 file is missing, and that would force every operator to create it. The role owns
 no database, so its connection string names the `postgres` database. See
-[D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed).
+[D55](../decisions/d55-running-test-scenarios-from-studio.md).
 
 ```sql
 CREATE ROLE axis_scenario LOGIN PASSWORD '<password>' CREATEDB;
@@ -271,7 +271,7 @@ proxy that ends TLS. The `replicas` profile starts `server-2`, configured like
   `Studio__Folders__1` and so on. Create the folder before the first start,
   because Docker creates a missing one owned by root. It must be writable by
   UID 1654, the user of the image, and it must be the same folder for every
-  replica. See [Studio](configuration.md#studio).
+  replica. See [Studio](host-settings.md#studio-settings).
 
 **The smoke test.** `scripts/onprem.test.mjs` installs the example as the five
 steps say, and `scripts/e2e.sh` runs it. It builds the three production images
@@ -439,7 +439,7 @@ against a live cluster.
 ## Several server replicas
 
 The server can run as several replicas behind a reverse proxy that ends TLS.
-See [D49](../decisions.md#d49-several-server-replicas-behind-a-tls-proxy--agreed).
+See [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
 The shared key ring, the forwarded headers and the platform settings under both
 tenant sources, the Studio write lock, the Helm chart's `studio.persistence`
 and the Compose example with two replicas behind a TLS proxy and a shared
@@ -468,25 +468,25 @@ Studio folder, with its smoke test, are built.
   client sent. The server reads these headers only from a named address, one
   hop, and never reads `X-Forwarded-Prefix`. With both settings empty, it
   reads none. Loopback is not trusted by default. The rules are in
-  [forwarded headers](configuration.md#forwarded-headers).
+  [forwarded headers](host-settings.md#forwarded-headers).
 - **Studio folders.** Put them on a shared volume. Mount it at the same path on
   every replica, because the write lock is keyed by the folder path. The lock
   is built. It lives in the platform database. In
   Kubernetes that needs a `ReadWriteMany` storage class, set with
   `studio.persistence`. In Compose, set `AXIS_STUDIO_DIR`. Both servers mount
   it. The volume must be writable by the non-root user of the image, UID 1654,
-  and the chart sets no `fsGroup`. See [Studio](configuration.md#studio).
+  and the chart sets no `fsGroup`. See [Studio](host-settings.md#studio-settings).
 - **On premises.** The Compose example runs two server replicas behind a TLS
   proxy. See "TLS proxy and a second replica" in [on premises](#on-premises).
 - **Platform settings under both tenant sources.** The server needs
   `ConnectionStrings:PlatformSchema` and `Platform:SecretKey` also under
   `Tenancy:Source=configuration`, because it creates the platform tables there
-  too. A missing one stops the start. See [tenancy settings](configuration.md#tenancy-settings).
+  too. A missing one stops the start. See [tenancy settings](host-settings.md#tenancy-settings).
 
 ## Upgrade
 
 An upgrade has a fixed order. A host serves only tenants on its own schema
-version, as [D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
+version, as [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md)
 says. So migrate first and roll out the hosts second.
 
 1. Back up the platform database and every tenant database. For example, run
@@ -518,7 +518,7 @@ These are not decided yet.
   installation cannot set the purchasing system binding of the purchase request
   sample through the admin tool alone.
 - **Rotating the installation key.** Axis has no rotation, see
-  [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed).
+  [D42](../decisions/d42-tenant-directory-in-the-platform-database.md).
   After a leaked `Platform:SecretKey`, every stored secret must be set again by
   hand. Changing `Platform:SecretKey` also means deleting the rows of
   `platform.data_protection_keys`, which signs everyone out. See

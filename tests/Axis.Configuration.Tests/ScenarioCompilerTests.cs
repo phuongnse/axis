@@ -364,12 +364,19 @@ public sealed class ScenarioCompilerTests
         return folder;
     }
 
-    /// <summary>The first JSON block after the "Test scenarios" heading of the configuration reference.</summary>
+    /// <summary>
+    /// The first JSON block after the "Test scenarios" heading in the docs. The heading is found in any
+    /// file under docs/, so the section may move between files.
+    /// </summary>
     private static string DocsScenario()
     {
-        var text = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Docs", "reference", "configuration.md"));
-        var heading = Regex.Match(text, @"^## Test scenarios\s*$", RegexOptions.Multiline);
-        Assert.True(heading.Success, "The configuration reference has no 'Test scenarios' heading.");
+        var headings = Directory.EnumerateFiles(Path.Combine(AppContext.BaseDirectory, "Docs"), "*.md", SearchOption.AllDirectories)
+            .Select(File.ReadAllText)
+            .Select(text => (Text: text, Heading: Regex.Match(text, @"^#{1,6} Test scenarios\s*$", RegexOptions.Multiline)))
+            .Where(found => found.Heading.Success)
+            .ToList();
+        Assert.True(headings.Count == 1, $"Expected exactly one 'Test scenarios' heading under docs/, found {headings.Count}.");
+        var (text, heading) = headings[0];
         var block = Regex.Match(text[heading.Index..], @"```json\r?\n(.*?)\r?\n```", RegexOptions.Singleline);
         Assert.True(block.Success, "The 'Test scenarios' section has no JSON block.");
         return block.Groups[1].Value;

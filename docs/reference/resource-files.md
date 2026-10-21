@@ -1,0 +1,511 @@
+# Resource files
+
+Detailed reference for the shape of resource files: the common file shape, the JSON Schema
+keywords, entity field types and constraints, entity logic and sequences. How the pipeline loads
+and checks them is in [configuration.md](configuration.md).
+The conventions of [architecture.md](../architecture.md) apply: sections marked
+_(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
+
+## Resource file shape
+
+```json
+{
+  "id": "4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a01",
+  "kind": "entity",
+  "name": "PurchaseRequest",
+  "formatVersion": 1,
+  "label": { "textKey": "purchaseRequest.label" },
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 200 },
+    { "name": "department", "type": "reference", "target": "Department", "required": true },
+    { "name": "total", "type": "decimal", "precision": 18, "scale": 2 }
+  ]
+}
+```
+
+- `id` is permanent.
+- `name` is the stable technical name used in references and storage. It
+  starts with a letter, contains only ASCII letters and digits, and is at most
+  60 characters long (`AXC0004`). The same rule applies to field names.
+- Labels always come from text resources.
+- `displayField` names the required `text` field that gives a record its
+  name, for example in lookups. An entity that is the target of a reference
+  must have one.
+
+A `text` resource holds the texts of one locale, as a map from text key to
+text:
+
+```json
+{
+  "id": "8c3a6b4d-5e6f-4a7b-8c9d-0e1f2a3b4c04",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "purchaseRequest.label": "Purchase request"
+  }
+}
+```
+
+- `locale` is a language tag such as `en`, `vi` or `pt-BR`: two or three
+  letters, then any number of `-` parts of two to eight letters or digits
+  (`AXC0004`). Locales are compared ignoring letter case.
+- Each locale has one `text` resource, and every locale has the same keys.
+- Texts are never shared across applications.
+
+A `site` is an entry point of the application. A `page` is a route in a
+site, and its widgets are its content:
+
+```json
+{
+  "id": "c5e8d2a1-7b3f-4c9e-9d1a-2f3b4c5d6e06",
+  "kind": "site",
+  "name": "Purchasing",
+  "formatVersion": 1,
+  "path": "purchasing",
+  "title": { "textKey": "purchasing.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
+  "navigation": [{ "page": "PurchaseRequests", "label": { "textKey": "purchasing.nav.requests" } }]
+}
+```
+
+```json
+{
+  "id": "d6f9e3b2-8c4a-4d0f-8e2b-3a4c5d6e7f07",
+  "kind": "page",
+  "name": "PurchaseRequests",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.requests.title" },
+  "widgets": [{ "type": "table", "entity": "PurchaseRequest", "formPage": "PurchaseRequestForm" }]
+}
+```
+
+- A page holds exactly one widget. The widget `type` is `table` or
+  `form`. A `form` names a `form` resource, which lays out the fields of
+  one entity in sections (see [frontend.md](frontend.md)), or an `entity`, as
+  shorthand for all its fields in one section. A `table` names an `entity`, as
+  shorthand for all records of that entity, or a `dataSource`.
+- A `table` widget may name a `formPage`: the page with the `form` widget
+  that opens one of its records.
+- A `form` widget may list `actions`. Each is
+  `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
+  a button that starts the process for the form's record. See
+  [frontend.md](frontend.md).
+- The page has no entity or template of its own, so more widgets and a
+  layout can be added later without a format change.
+- A `table` widget may name a `dataSource` instead of an `entity`, such as
+  `{ "type": "table", "dataSource": "PurchaseRequestList", "formPage": "PurchaseRequestForm" }`.
+  Its columns are the data source's projected fields. See
+  [widget binding](data-sources.md#widget-binding).
+
+A `seed` holds records with fixed ids for one entity:
+
+```json
+{
+  "id": "e7a0f4c3-9d5b-4e1f-8f3c-4b5d6e7f8a08",
+  "kind": "seed",
+  "name": "Departments",
+  "formatVersion": 1,
+  "entity": "Department",
+  "sync": true,
+  "records": [
+    { "id": "0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b", "values": { "name": "Finance" } }
+  ]
+}
+```
+
+- Each record's `id` is the record id, fixed so that the startup step
+  inserts the record once. It is unique across every seed file of the
+  application (`AXC0034`).
+- `sync` is optional and defaults to `false`. When `true`, the startup step
+  keeps existing records in step with the file. It writes only the fields
+  the seed declares and never deletes a record (see
+  [Startup activation](host-settings.md#startup-activation)).
+- `values` has the shape of the `values` of a record API create body (see
+  [Request bodies and values](record-api.md#request-bodies-and-values)).
+- Seed files are inserted in path order, so a seed whose records reference
+  another seed's records sorts after it.
+
+A `rule` resource holds a named expression with typed parameters and a
+result type. A validation, a data source filter or a process condition can
+call it (see
+[Expression language](expressions.md#names-and-references)). Calls from
+computed fields come later:
+
+```json
+{
+  "id": "8e16aa07-44d2-435b-8260-557ea9f3c1b2",
+  "kind": "rule",
+  "name": "IsPositive",
+  "formatVersion": 1,
+  "parameters": [{ "name": "value", "type": "integer" }],
+  "resultType": "boolean",
+  "expression": "value > 0"
+}
+```
+
+- `parameters` is a list of `name` and `type`, and may be empty. Parameter
+  and result types are `text`, `integer`, `decimal`, `boolean`, `date` and
+  `date-time`. Any other type, `enum` included, is `AXC0004`. An `enum`
+  parameter would need its own `values` to be compared with an enum field,
+  so it comes later. A parameter is never a record.
+- Parameter names are unique within the rule, ignoring letter case
+  (`AXC0056`). A rule name may not be a built-in function name (`AXC0057`).
+- A rule is called by name, ignoring letter case, such as `IsPositive(quantity)`.
+  An integer argument fits a `decimal` parameter, and `null` fits any
+  parameter.
+- The `expression` must give the `resultType`, and sees only its parameters.
+  It may call other rules, but not in a cycle (`AXC0055`) or more than 8 deep
+  (`AXC0065`).
+- The server runs the rule's expression when it evaluates the calling
+  validation. Every argument is evaluated, even when one is `null`, and the
+  rule's steps count against the caller's
+  [step budget](expressions.md#cost-bounds).
+- A data source filter's SQL inlines the rule's expression in place of the
+  call, instead of running it. The expression must then be in the
+  [SQL subset](expressions.md#sql-subset).
+
+A `migration` resource changes one entity's storage before additive provisioning.
+The resource, its compile checks and the once-per-tenant apply of `renameField`,
+`dropField`, `dropEntity`, `fill` and `convert` at activation are built. See
+[D30](../decisions/d30-schema-migrations.md) and
+[migrations](migrations.md#migrations) for activation and old-release work.
+
+```json
+{
+  "id": "7b3096e8-c14a-48f2-9a56-30bbd774e102",
+  "kind": "migration",
+  "name": "RenameDecisionComments",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "changes": [
+    { "type": "renameField", "from": "decisionComments", "to": "reviewComments" },
+    { "type": "fill", "field": "priority", "value": "'normal'" }
+  ]
+}
+```
+
+The entity file in the same release renames `decisionComments` to
+`reviewComments` and adds this required field:
+
+```json
+{ "name": "priority", "type": "enum", "values": ["low", "normal", "high"], "required": true }
+```
+
+- `id` is permanent. `kind` is `migration`, `name` names the migration and
+  `formatVersion` is `1`. `entity` names the entity it changes. It cannot name a
+  module entity such as `departments/Department`, which is `AXC0214`.
+- `changes` is ordered. Each change has a `type` and the properties below.
+
+  | Type | Properties | Effect |
+  | --- | --- | --- |
+  | `renameField` | `from`, `to` | Rename the column, keeping its values. |
+  | `dropField` | `field` | Drop the column and its values. |
+  | `dropEntity` | None | Drop the entity table, its child tables and provisioning records. |
+  | `fill` | `field`, `value` | Fill every null with an expression over the record. |
+  | `convert` | `field`, `value` | Convert stored values to the field's new type, or map removed enum values to kept ones. |
+
+- Each migration has its own file. Files run in ordinal order of their
+  relative path, such as `migrations/0001-rename-decision-comments.json`.
+  Changes within a file run in list order.
+- Migration files are part of the release and its content hash. Applied
+  files must stay unchanged in later releases. Migrations run forward only.
+- A `fill` or `convert` value must translate to the
+  [SQL subset](expressions.md#sql-subset). An expression outside that subset
+  is a compile diagnostic. The value is an expression, never raw SQL.
+- A release holds only the entity as it is after its migrations. The compiler
+  undoes the changes of all migrations of one entity, last change first, to
+  rebuild the entity as it was before them. It then replays them forward in
+  path order, so what an earlier migration leaves behind is what a later one
+  starts from. A `from` or `field` that the entity lacks at that point is
+  `AXC0171`, and a `to` that is already a field is `AXC0172`. A `fill` or
+  `convert` `field` that the entity lacks in the release is `AXC0173`. A child
+  collection is not a field for these checks. A migration of an entity that
+  no loaded entity names is `AXC0170`, unless a migration of that name drops
+  the entity. Changes after a `dropEntity` are not checked against fields.
+  These checks only find contradictions inside the release. A name that never
+  existed in the stored table is found when migrations are applied.
+- A `fill` or `convert` value sees the record's own fields only. It cannot
+  call rules, follow reference paths or use aggregates. `now()` is allowed and
+  `currentUser()` is not.
+- A value is type-checked against its field's type, and the problem is
+  reported at `/changes/{i}/value` with its usual code, such as `AXC0048`. It
+  is not type-checked when the type at that point is unknown: a later change
+  drops or converts the field, the value comes after a `dropEntity`, or a
+  `convert` reads its own field. The stored type is known only when the
+  migration is applied. Every value is still parsed and checked against the
+  SQL subset, so `upper(title)` is `AXC0053` in a `fill` and in a `convert`.
+  A value that is not type-checked can name an unknown field or call
+  `currentUser()` without a compile diagnostic.
+
+## Schema keywords
+
+Two custom keywords in the resource schemas tell [Studio](studio.md)
+where to show a picker and where to show the expression editor, as
+[D52](../decisions/d52-reference-pickers-label-texts-and-the-expression-editor.md)
+agrees. The schemas stay the single source of what the form shows.
+
+- **Kind form.** `"x-axis-reference": "<kind>"` marks a property that holds
+  the name of a resource. The kind is one of `entity`, `dataSource`, `process`,
+  `role`, `rule`, `connector`, `event`, `sequence`, `form`, `page` or `text`.
+  The kind `text` marks a `textKey`.
+- **Part form.** `"x-axis-reference": { "part": "<part>", "of": "<pointer>" }`
+  marks a property that holds a part of another resource.
+  - `part` is `field` or `step`. The schemas mark no other part yet. Planned
+    for M11: `parameter`, `column`, `outcome` and `operation`.
+  - `of` is a JSON Pointer from the resource root, or a Relative JSON Pointer
+    `N/<pointer>`, to the property that names the resource the part belongs
+    to. A relative pointer goes up `N` segments from the marked property.
+- **Examples.** A form field's `field` is `{ "part": "field", "of": "/entity" }`,
+  because the form's `entity` names the entity whose fields it lists. A grant's
+  `fields` item is `{ "part": "field", "of": "2/entity" }`, because the entity
+  sits two levels above the item. A process step's `next` is
+  `{ "part": "step", "of": "/name" }`, because the process's `name` names the
+  process whose steps it lists.
+- *(Planned.)* **Set keys.** The keys of a process `updateRecord` step's `set`
+  map are fields of the process's `/entity` in the same way.
+- **Exempt relations.** Text entries, packages, modules, rule calls and field
+  paths name no single property, so they have no mark. Stub packages and
+  package operations name a package, and a grant's `endpoint` has no kind, so
+  they have none either. Two entity marks, a data source parameter's `target`
+  and an endpoint input's `target`, have no edge in the reference index yet.
+  They offer entities, and the schema test checks them apart from the index.
+- A test keeps the marks and the [reference index](configuration.md#reference-index) in step:
+  each indexed relation has a mark or is listed as exempt.
+- **Expressions.** `"x-axis-expression": true` marks a string property that
+  holds an [expression](expressions.md). The form then shows the expression
+  editor there.
+- **Annotations only.** JsonSchema.Net ignores unknown keywords when it
+  validates, so neither keyword changes what a resource may hold, and no
+  resource file changes. The [reference index](configuration.md#reference-index) stays the
+  list of reference paths.
+
+## Entity field types and constraints
+
+A field property is allowed only on the types that have an entry for it below.
+Properties are optional unless marked *needed*. A property on another type is
+`AXC0013`; a missing *needed* property is `AXC0014`.
+Value ranges follow what PostgreSQL accepts, so an invalid value fails at
+compile time rather than when the table is created; a value outside the range
+is `AXC0013`.
+
+| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` | `creator` | `sensitive` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `text` | yes | yes | 1..10485760 | | | | | yes | yes | yes | yes |
+| `integer` | yes | yes | | | | | | yes | | | yes |
+| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | | yes | | | yes |
+| `boolean` | yes | yes | | | | | | yes | | | yes |
+| `date` | yes | yes | | | | | | yes | | | yes |
+| `date-time` | yes | yes | | | | | | yes | | | yes |
+| `enum` | yes | yes | | | | | needed | yes | | | yes |
+| `reference` | yes | yes | | | | needed | | | | | yes |
+| `child-collection` | | | | | | needed | | | | | |
+- `required` and `unique` default to `false`.
+- `maxLength` is capped at 10485760, the largest `varchar` length.
+- `values` is a non-empty list of distinct strings; the JSON Schema checks
+  this (`AXC0004`).
+- `target` names an entity in the same application, ignoring letter case.
+- `child-collection` owns the rows of the entity that `target` names. It
+  allows no other type-specific property. It has no `required`, because a
+  missing collection means no rows, and no `unique`. Setting either, even to
+  `false`, is `AXC0013`.
+- `expression` makes the field a computed field. `required` on a computed
+  field is `AXC0013` at `/fields/{i}/required`, and an `expression` on a
+  `reference` or `child-collection` field is `AXC0013` at
+  `/fields/{i}/expression`. See [Entity logic](#entity-logic).
+- `sequence` names a [sequence](#sequences), ignoring letter case. It cannot
+  be combined with `required: true` or `expression`, and a child entity's
+  field cannot have it. Each is `AXC0013` at `/fields/{i}/sequence`.
+- `creator` is allowed only on a `text` field. It cannot be combined with
+  `required: true`, `expression` or `sequence`, and a child entity's field
+  cannot have it. Each is `AXC0013` at `/fields/{i}/creator`. See
+  [Record creator](roles-and-policies.md#record-creator).
+- `sensitive` is allowed on every type except
+  `child-collection`. It defaults to `false`. On a `child-collection` field it
+  is `AXC0013` at `/fields/{i}/sensitive`. See
+  [Sensitive fields](roles-and-policies.md#sensitive-fields).
+
+## Entity logic
+
+This section adds validations, computed fields and child collections to an
+entity (D17). Child collection fields, their child tables, validations and
+computed fields are built, including
+[aggregates](expressions.md#aggregates) over child rows.
+Expressions use the syntax of the [expression language](expressions.md), and
+diagnostic codes come with the issues that build each check. A validation
+can call a named [rule](#resource-file-shape), such as `IsPositive(quantity)`
+below. Both examples below compile, given that rule. A module entity's
+validation calls the rules of its own module, see [modules](modules-and-templates.md#modules).
+
+```json
+{
+  "id": "0ec02f4a-bf31-4409-8eb9-bfb9c39b6756",
+  "kind": "entity",
+  "name": "PurchaseRequest",
+  "formatVersion": 1,
+  "label": { "textKey": "purchaseRequest.label" },
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 200 },
+    { "name": "lineItems", "type": "child-collection", "target": "LineItem" },
+    {
+      "name": "total",
+      "type": "decimal",
+      "precision": 18,
+      "scale": 2,
+      "expression": "sum(lineItems, amount)"
+    }
+  ],
+  "validations": [
+    {
+      "expression": "count(lineItems) >= 1",
+      "message": { "textKey": "purchaseRequest.needsLineItem" },
+      "field": "lineItems"
+    }
+  ]
+}
+```
+
+```json
+{
+  "id": "b6c15e88-82e5-43e7-a589-c48ba8a56bc3",
+  "kind": "entity",
+  "name": "LineItem",
+  "formatVersion": 1,
+  "label": { "textKey": "lineItem.label" },
+  "fields": [
+    { "name": "description", "type": "text", "maxLength": 200 },
+    { "name": "quantity", "type": "integer" },
+    { "name": "unitPrice", "type": "decimal", "precision": 18, "scale": 2 },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "precision": 18,
+      "scale": 2,
+      "expression": "quantity * unitPrice"
+    }
+  ],
+  "validations": [
+    {
+      "expression": "IsPositive(quantity)",
+      "message": { "textKey": "lineItem.quantityPositive" },
+      "field": "quantity"
+    }
+  ]
+}
+```
+
+- **Validations.** `validations` is a list on the entity. Each entry has:
+  - `expression`, which must be boolean.
+  - `message`, a label that is checked like other labels (`AXC0028`). Its text
+    key is the message of a failure.
+  - `field`, which names a field of the same entity.
+
+  The expression reads the entity's own fields by name, and can call named
+  rules. It can also aggregate over the entity's child collections, such as
+  `count(lineItems) >= 1`. An aggregate reads the rows as they will be
+  stored, so `count(lineItems) >= 1` refuses a create without rows and an
+  update that removes the last row. The server runs the
+  validations on create and update, on the record as it will be stored and
+  after computed fields are calculated. A validation fails when its condition
+  is `false` or `null`, or stops with a run-time error. The validations of a
+  child entity run on each row the body sends. See
+  [the record API](record-api.md#child-rows-computed-fields-and-validations).
+- **Computed fields.** A field with an `expression` is a computed field.
+  - The expression type must match the field's type, under the
+    [result type rule](expressions.md#types).
+  - The type must be a scalar type. A `reference` or a `child-collection`
+    cannot be computed.
+  - `required` is not allowed. `unique`, `maxLength`, `precision`, `scale` and
+    `values` keep their usual meaning, because they describe the column that
+    stores the value.
+  - It reads only the record's own fields and its child rows, never a
+    reference path. It reads the entity's own fields that are not computed.
+    Naming a computed field, itself included, is `AXC0046`.
+  - It cannot call `now()`, because its stored value would go stale. A call,
+    also inside an aggregate's item expression, is `AXC0086`.
+  - It reads child rows only through an
+    [aggregate](expressions.md#aggregates), such as `sum(lineItems, amount)`.
+    Inside the item expression, names are the child row's fields, computed
+    ones included, and nothing else.
+  - The rows of a child collection are computed before the owner, so the
+    owner's aggregates read the rows' computed values. An update that leaves
+    a collection out aggregates its stored rows.
+  - Clients cannot write it. A body that sets it, even to `null`, is a `400`
+    at its pointer with the message "Cannot be set.". A run-time error is a
+    `400` at its pointer with "Could not be computed.". A value that does not
+    fit the column gets the message a body value would get. See
+    [the record API](record-api.md#child-rows-computed-fields-and-validations)
+    and
+    [Child tables and computed columns](storage.md#child-tables-and-computed-columns).
+- **Child collections.** The field type `child-collection` needs a `target`
+  that names the child entity. Its rows are read and written only through the
+  owner record, as
+  [the record API](record-api.md#child-rows-computed-fields-and-validations)
+  describes.
+- **M2 limits on a child entity.** These are limits of M2, not permanent
+  rules. Real line items often point to a product, so a later milestone is
+  expected to lift the last one. A child entity:
+  - is owned by exactly one `child-collection` field (`AXC0039`);
+  - is never the `target` of a `reference` (`AXC0040`);
+  - is never the `entity` of a data source (`AXC0064`) or of a process
+    (`AXC0068`);
+  - has no record routes of its own;
+  - has no `reference` or `child-collection` fields (`AXC0041`).
+
+## Sequences
+
+A `sequence` resource hands out business numbers, such as `PR-2026-00042`
+(D21). The compiler checks sequences and the fields that name them. The
+record create fills a field that names a sequence with the next number.
+
+```json
+{
+  "id": "5d2f8a61-3c4b-4e7d-9a0f-6b1c2d3e4f09",
+  "kind": "sequence",
+  "name": "PurchaseRequestNumber",
+  "formatVersion": 1,
+  "format": "PR-{yyyy}-{n:5}"
+}
+```
+
+- **Tokens.** `{yyyy}` is the four-digit UTC year of the create's transaction
+  time. The local year waits for
+  the [time zone rule](../decisions/d22-current-time-and-time-zones.md). `{n}` is the number, and
+  `{n:k}` is the number zero-padded to `k` digits, with `k` from 1 to 18.
+  Every other character is literal.
+- **One number.** The format holds exactly one `{n}` or `{n:k}` token. It
+  may hold `{yyyy}`, even more than once, and no other braces. Any other
+  format is `AXC0004` at `/format`.
+- **Yearly restart.** The counter restarts each UTC year, but only when the
+  format holds `{yyyy}`. Without a year, a restart would hand out the same
+  number twice. Application time zones wait for the
+  [time zone rule](../decisions/d22-current-time-and-time-zones.md).
+
+An entity `text` field names the sequence in its `sequence` property:
+
+```json
+{
+  "id": "0ec02f4a-bf31-4409-8eb9-bfb9c39b6756",
+  "kind": "entity",
+  "name": "PurchaseRequest",
+  "formatVersion": 1,
+  "label": { "textKey": "purchaseRequest.label" },
+  "displayField": "title",
+  "fields": [
+    { "name": "number", "type": "text", "maxLength": 20, "unique": true, "sequence": "PurchaseRequestNumber" },
+    { "name": "title", "type": "text", "required": true, "maxLength": 200 }
+  ]
+}
+```
+
+- `sequence` names a loaded `sequence` resource, ignoring letter case.
+- The field gets its number on create, in the create's transaction, and
+  clients cannot write it. See
+  [the record API](record-api.md#create-update-and-delete) and
+  [storage](storage.md#audit-records-and-sequence-counters).
+- A field with `sequence` cannot be `required` or have an `expression`,
+  because the server always assigns its value. A child entity's field cannot
+  have a `sequence` either. Each of these is `AXC0013`.
