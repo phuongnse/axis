@@ -181,7 +181,12 @@ them.
    reuse the parent's title, whole or as a `<parent>: <part>` prefix, because
    the sub-issue link already shows the parent. Add each part as a GitHub
    sub-issue of the parent, in order and in the parent's milestone. NexKit
-   closes the parent when all parts are done.
+   closes the parent when all parts are done. If the parent has an open NexKit
+   pull request, for example one that stalled after repeated time-outs, the
+   split has superseded it. The local agent comments that it is superseded by
+   the sub-issues, naming each one, and closes it. It keeps the branch. This is
+   the only pull request the local agent closes. It never approves or merges
+   one.
 4. **Implement.** The local agent posts `/nexkit go` on the latest plan, as
    described under Decisions. NexKit implements that plan and opens a pull
    request.
