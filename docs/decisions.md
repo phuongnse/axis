@@ -3174,7 +3174,7 @@ in M12, which D46 accepts.
 
 ## D54. The entity designer and the policy matrix — Agreed
 
-M11 gives Studio an entity designer _(planned for M11)_ and a policy matrix _(built)_.
+M11 gives Studio an entity designer _(built)_ and a policy matrix _(built)_.
 The designer edits the fields of an entity and adds the migrations that keep
 stored data. The matrix shows who may do what in one place. A new `changes`
 route writes an entity and its migration in one call. See

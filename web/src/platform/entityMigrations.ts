@@ -1,3 +1,4 @@
+import { fieldSettings } from './entityFields'
 import { kebabName } from './studioStarters'
 import { newUuid } from './uuid'
 
@@ -6,15 +7,30 @@ type Content = Record<string, unknown>
 /** The loaded name of a row of the fields table, or `null` for a row the author added in this session. */
 export type FieldOrigin = string | null
 
-/** A question for one loaded field that the author renamed or removed. */
+/**
+ * A question for one field that the author renamed, removed, retyped or made required. A `convert` question is for a
+ * loaded field whose column cannot follow its new type, `maxLength` or enum values. A `fill` question is for a field
+ * that is now required. `origin` is the loaded name of the field, or `null` for a field added in this session.
+ * `whenDropped` marks a `fill` for a loaded field that was already required and was renamed: it only counts when the
+ * rename drops the data, because the column is then added again.
+ */
 export type FieldQuestion =
-  { type: 'rename'; from: string; to: string } | { type: 'remove'; field: string; loadedIndex: number }
+  | { type: 'rename'; from: string; to: string }
+  | { type: 'remove'; field: string; loadedIndex: number }
+  | { type: 'convert'; origin: string; field: string; reason: 'type' | 'maxLength' | 'values' }
+  | { type: 'fill'; origin: string | null; field: string; whenDropped: boolean }
 
-/** The answer to a question. A rename keeps or drops its data. A removal drops its data, or keeps the field. */
-export type FieldAnswer = 'keep' | 'drop'
+/**
+ * The answer to a question. A rename keeps or drops its data. A removal drops its data, or keeps the field. A
+ * `convert` or `fill` question is answered with its expression, or skipped.
+ */
+export type FieldAnswer = 'keep' | 'drop' | 'skip' | { value: string }
 
 /** One change of a migration that the designer writes. */
-export type MigrationChange = { type: 'renameField'; from: string; to: string } | { type: 'dropField'; field: string }
+export type MigrationChange =
+  | { type: 'renameField'; from: string; to: string }
+  | { type: 'dropField'; field: string }
+  | { type: 'convert' | 'fill'; field: string; value: string }
 
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -50,10 +66,12 @@ export function matchOrigins(loaded: Content, draft: Content): FieldOrigin[] {
 }
 
 /**
- * The questions that a save must ask: one for each loaded field that was renamed or removed. A `child-collection`
- * field has no column and asks nothing. A row without an origin whose name is that of a loaded field that no other
- * row claims counts as that loaded field. `touched` lists the loaded names in the order the author first renamed or
- * removed them. The questions follow that order, then the other fields in loaded order.
+ * The questions that a save must ask. For each loaded field: a rename or a removal, then a `convert` when its column
+ * cannot follow a new type, a smaller `maxLength` or a removed enum value, then a `fill` when it became required.
+ * A new required field asks a `fill` too. A `child-collection` field has no column and asks nothing. A row without
+ * an origin whose name is that of a loaded field that no other row claims counts as that loaded field. `touched`
+ * lists the loaded names in the order the author first edited them. The questions follow that order, then the other
+ * loaded fields in loaded order, then the new fields in row order.
  */
 export function fieldQuestions(
   loaded: Content,
@@ -80,28 +98,143 @@ export function fieldQuestions(
     }
   })
 
-  const questions = new Map<string, FieldQuestion>()
+  const questions = new Map<string, FieldQuestion[]>()
   loadedFields.forEach((field, loadedIndex) => {
     const name = loadedNames[loadedIndex]
-    if (name === null || (isContent(field) && field.type === 'child-collection')) {
+    if (name === null || !isContent(field) || field.type === 'child-collection') {
       return
     }
     const row = claims.get(name)
     if (row === undefined) {
-      questions.set(name, { type: 'remove', field: name, loadedIndex })
+      questions.set(name, [{ type: 'remove', field: name, loadedIndex }])
       return
     }
-    const to = nameOf(draftFields[row])
+    const now = draftFields[row]
+    const to = nameOf(now)
+    const asked: FieldQuestion[] = []
     if (to !== null && to !== '' && to !== name) {
-      questions.set(name, { type: 'rename', from: name, to })
+      asked.push({ type: 'rename', from: name, to })
+    }
+    if (to !== null && to !== '' && isContent(now) && now.type !== 'child-collection') {
+      const reason = convertReason(field, now)
+      if (reason) {
+        asked.push({ type: 'convert', origin: name, field: to, reason })
+      }
+      if (now.required === true && field.required !== true) {
+        asked.push({ type: 'fill', origin: name, field: to, whenDropped: false })
+      } else if (now.required === true && to !== name) {
+        asked.push({ type: 'fill', origin: name, field: to, whenDropped: true })
+      }
+    }
+    if (asked.length > 0) {
+      questions.set(name, asked)
     }
   })
 
-  const order = [...touched, ...loadedNames.filter((name): name is string => name !== null && !touched.includes(name))]
-  return order.flatMap((name) => {
-    const question = questions.get(name)
-    return question ? [question] : []
+  const order = new Set([
+    ...touched,
+    ...loadedNames.filter((name): name is string => name !== null && !touched.includes(name)),
+  ])
+  const loadedAsked = [...order].flatMap((name) => questions.get(name) ?? [])
+
+  const claimed = new Set(claims.values())
+  const added = draftFields.flatMap((field, row): FieldQuestion[] => {
+    const name = nameOf(field)
+    if (
+      (origins[row] ?? null) !== null ||
+      claimed.has(row) ||
+      name === null ||
+      name === '' ||
+      !isContent(field) ||
+      field.required !== true ||
+      field.type === 'child-collection'
+    ) {
+      return []
+    }
+    return [{ type: 'fill', origin: null, field: name, whenDropped: false }]
   })
+  return [...loadedAsked, ...added]
+}
+
+/** Why the column of a loaded field cannot follow the field as the draft has it, or `null` when it can. */
+function convertReason(loaded: Content, draft: Content): 'type' | 'maxLength' | 'values' | null {
+  if (loaded.type !== draft.type) {
+    // A change to or from `enum` has no migration type.
+    return loaded.type === 'enum' || draft.type === 'enum' ? null : 'type'
+  }
+  const type = String(draft.type)
+  if (fieldSettings(type).includes('maxLength')) {
+    const next = draft.maxLength
+    const before = loaded.maxLength
+    if (typeof next === 'number' && (typeof before !== 'number' || next < before)) {
+      return 'maxLength'
+    }
+  }
+  if (type === 'enum' && Array.isArray(loaded.values)) {
+    const values = Array.isArray(draft.values) ? draft.values : []
+    if (loaded.values.some((value) => !values.includes(value))) {
+      return 'values'
+    }
+  }
+  return null
+}
+
+/**
+ * Whether a save asks the question at `index`, given the answers before it. A `convert` or a `fill` for a loaded
+ * field that was renamed with Drop data is not asked, except a `fill` for a required field, which counts as new
+ * because the column is added again. A `fill` that only counts when the rename drops the data is not asked when the
+ * rename keeps it.
+ */
+export function asked(questions: readonly FieldQuestion[], answers: readonly FieldAnswer[], index: number): boolean {
+  const question = questions[index]
+  if (question.type !== 'convert' && question.type !== 'fill') {
+    return true
+  }
+  const rename = questions.findIndex(
+    (other, position) => position < index && other.type === 'rename' && other.from === question.origin,
+  )
+  if (rename < 0) {
+    return !(question.type === 'fill' && question.whenDropped)
+  }
+  const dropped = answers[rename] === 'drop'
+  return question.type === 'fill' ? dropped || !question.whenDropped : !dropped
+}
+
+/** The change of a loaded field that no migration type follows. */
+export type FieldWarning = 'enum' | 'unique'
+
+/**
+ * The warnings of the fields table, by draft row. A loaded field whose type changes to or from `enum`, or that was
+ * not `unique` and is now, has no migration type that follows it. Validate reports it as `AXC0016`.
+ */
+export function fieldWarnings(
+  loaded: Content,
+  draft: Content,
+  origins: readonly FieldOrigin[],
+): Map<number, FieldWarning> {
+  const before = new Map<string, unknown>()
+  for (const field of fieldsOf(loaded)) {
+    const name = nameOf(field)
+    if (name !== null && isContent(field)) {
+      before.set(name, field)
+    }
+  }
+  const warnings = new Map<number, FieldWarning>()
+  const seen = new Set<string>()
+  fieldsOf(draft).forEach((field, row) => {
+    const origin = origins[row] ?? null
+    const was = origin === null ? undefined : before.get(origin)
+    if (origin === null || seen.has(origin) || !isContent(was) || !isContent(field)) {
+      return
+    }
+    seen.add(origin)
+    if (was.type !== field.type && (was.type === 'enum' || field.type === 'enum')) {
+      warnings.set(row, 'enum')
+    } else if (was.unique !== true && field.unique === true) {
+      warnings.set(row, 'unique')
+    }
+  })
+  return warnings
 }
 
 /**
@@ -118,7 +251,12 @@ export function applyAnswers(
   const changes: MigrationChange[] = []
   const kept: { field: unknown; name: string; loadedIndex: number }[] = []
   questions.forEach((question, index) => {
-    if (question.type === 'rename') {
+    if (question.type === 'convert' || question.type === 'fill') {
+      const answer = answers[index]
+      if (typeof answer === 'object' && asked(questions, answers, index)) {
+        changes.push({ type: question.type, field: question.field, value: answer.value })
+      }
+    } else if (question.type === 'rename') {
       changes.push(
         answers[index] === 'keep'
           ? { type: 'renameField', from: question.from, to: question.to }

@@ -3,6 +3,7 @@ import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyAnswers,
   fieldQuestions,
+  fieldWarnings,
   loadedOrigins,
   matchOrigins,
   migrationFile,
@@ -153,7 +154,7 @@ export function StudioEditor({
   const [seedEntity, setSeedEntity] = useState<SeedEntity>()
   // The other locales of a text resource, read from their files, for the text table to show beside the open one.
   const [otherTexts, setOtherTexts] = useState<TextColumn[]>()
-  // The loaded name of each row of an entity's fields, and the loaded names the author renamed or removed, in order.
+  // The loaded name of each row of an entity's fields, and the loaded names the author edited or removed, in order.
   const [origins, setOrigins] = useState<FieldOrigin[]>([])
   const [touched, setTouched] = useState<string[]>([])
   const [questions, setQuestions] = useState<FieldQuestion[]>()
@@ -355,8 +356,8 @@ export function StudioEditor({
   }
 
   function change(pointer: string, next: unknown) {
-    const renamed = /^\/fields\/(\d+)\/name$/.exec(pointer)
-    const origin = renamed ? origins[Number(renamed[1])] : null
+    const edited = /^\/fields\/(\d+)(\/|$)/.exec(pointer)
+    const origin = edited ? origins[Number(edited[1])] : null
     if (origin) {
       touch(origin)
     }
@@ -402,7 +403,7 @@ export function StudioEditor({
     }
   }
 
-  /** Asks about the renamed and removed fields of an entity first, and writes when there are none. */
+  /** Asks about the changed fields of an entity first, and writes when there are none. */
   async function save() {
     if (item.kind === 'entity') {
       const asked = fieldQuestions(loaded!.content, draft, origins, touched)
@@ -601,6 +602,7 @@ export function StudioEditor({
                     value={draft}
                     onChange={change}
                     origins={origins}
+                    warnings={fieldWarnings(loaded.content, draft, origins)}
                     onOriginsChange={(next, removed) => {
                       setOrigins(next)
                       if (removed) {

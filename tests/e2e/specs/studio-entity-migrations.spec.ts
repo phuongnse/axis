@@ -82,8 +82,8 @@ async function savedMigration(folder: string) {
   return migration.changes;
 }
 
-test.describe("Studio adds a migration for a renamed or removed field", () => {
-  // Both journeys publish to the one test database, so they run one after the other.
+test.describe("Studio adds a migration for a renamed, removed or converted field", () => {
+  // The journeys publish to the one test database, so they run one after the other.
   test.describe.configure({ mode: "serial" });
 
   test("an author renames a published field, keeps its data and validates without AXC0015", async ({
@@ -148,6 +148,47 @@ test.describe("Studio adds a migration for a renamed or removed field", () => {
       expect(await savedMigration(folder)).toEqual([
         { type: "dropField", field: "note" },
       ]);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("an author narrows a published maxLength, adds a convert expression and validates without AXC0016", async ({
+    page,
+  }, testInfo) => {
+    const { server, folder } = await publishedOrder(
+      page,
+      testInfo,
+      "ConvertField",
+    );
+    try {
+      await page
+        .getByTestId("studio-field-/fields/0/maxLength")
+        .getByRole("spinbutton")
+        .fill("10");
+      await page.getByRole("button", { name: "Save" }).click();
+      await expect(page.getByTestId("studio-migration-question")).toContainText(
+        "number",
+      );
+      await page.getByRole("textbox", { name: "Convert expression" }).fill("number");
+      await page.getByRole("button", { name: "Add convert" }).click();
+
+      await expect(page.getByTestId("studio-saved")).toBeVisible();
+      expect(await savedMigration(folder)).toEqual([
+        { type: "convert", field: "number", value: "number" },
+      ]);
+
+      await page.getByRole("button", { name: "Validate" }).click();
+      await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
+        "data-status",
+        "succeeded",
+        {
+          timeout: 60_000,
+        },
+      );
+      await expect(page.getByTestId("studio-diagnostics")).not.toContainText(
+        "AXC0016",
+      );
     } finally {
       await server.stop();
     }
