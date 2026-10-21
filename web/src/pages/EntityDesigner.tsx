@@ -1,4 +1,4 @@
-import { Button, Checkbox, Flex, Input, InputNumber, Select, Table, Typography } from 'antd'
+import { Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Select, Table, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
 import { changeFieldType, fieldSettings, fieldTypes, type FieldSetting } from '../platform/entityFields'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
@@ -47,17 +47,19 @@ function Expression({
   name,
   value,
   required,
+  readOnly,
   onChange,
 }: {
   pointer: string
   name: string
   value: string
   required: boolean
+  readOnly: boolean
   onChange: ChangeHandler
 }) {
   const check = useContext(ExpressionCheckContext)
 
-  return check ? (
+  return check && !readOnly ? (
     <Suspense fallback={<Input aria-label={name} value={value} readOnly />}>
       <LazyExpressionEditor
         application={check.application}
@@ -135,9 +137,19 @@ function Picker({
  * validation's expression use the expression editor. The designer edits the draft through `onChange`, so a key it
  * does not show, such as `id`, `kind` or an unknown key on a field, stays as it is. Every input has the id
  * `studio-field-<pointer>`, and each row of the table has the id of its field, so a diagnostic opens at its input or
- * at the row of a setting that the row does not show. Clearing an optional value removes its key.
+ * at the row of a setting that the row does not show. Clearing an optional value removes its key. With `readOnly`,
+ * as for an entity of a module, every input is off, the label is its plain text key, and there are no buttons that
+ * add, remove or move a field or a validation.
  */
-export function EntityDesigner({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
+export function EntityDesigner({
+  value,
+  onChange,
+  readOnly = false,
+}: {
+  value: Content
+  onChange: ChangeHandler
+  readOnly?: boolean
+}) {
   const t = useText()
   const names = useContext(StudioNamesContext)
   const label = useContext(LabelTextsContext)
@@ -146,7 +158,7 @@ export function EntityDesigner({ value, onChange }: { value: Content; onChange: 
     isContent(field) && typeof field.name === 'string' && field.name !== '' ? [field.name] : [],
   )
 
-  return (
+  const designer = (
     <Flex vertical gap="middle" data-testid="studio-entity-designer">
       <div data-testid="studio-field-/name">
         <div>{t('shell.studio.entity.name')}</div>
@@ -158,7 +170,7 @@ export function EntityDesigner({ value, onChange }: { value: Content; onChange: 
       </div>
       <div data-testid="studio-field-/label">
         <div>{t('shell.studio.entity.label')}</div>
-        {names !== undefined && label !== null ? (
+        {names !== undefined && label !== null && !readOnly ? (
           <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
         ) : (
           <div data-testid="studio-field-/label/textKey">
@@ -178,14 +190,24 @@ export function EntityDesigner({ value, onChange }: { value: Content; onChange: 
         required={false}
         onPick={(next) => onChange('/displayField', next)}
       />
-      <Fields fields={fields} onChange={onChange} />
-      <Validations validations={value.validations} fieldNames={fieldNames} onChange={onChange} />
+      <Fields fields={fields} readOnly={readOnly} onChange={onChange} />
+      <Validations validations={value.validations} fieldNames={fieldNames} readOnly={readOnly} onChange={onChange} />
     </Flex>
   )
+
+  return readOnly ? <ConfigProvider componentDisabled>{designer}</ConfigProvider> : designer
 }
 
 /** The fields of the entity as a table, with Add field below it. */
-function Fields({ fields, onChange }: { fields: unknown[] | undefined; onChange: ChangeHandler }) {
+function Fields({
+  fields,
+  readOnly,
+  onChange,
+}: {
+  fields: unknown[] | undefined
+  readOnly: boolean
+  onChange: ChangeHandler
+}) {
   const t = useText()
 
   if (fields === undefined) {
@@ -271,39 +293,45 @@ function Fields({ fields, onChange }: { fields: unknown[] | undefined; onChange:
             {
               title: t('shell.studio.entity.settings'),
               render: (_, field, index) => (
-                <Settings index={index} field={isContent(field) ? field : {}} onChange={onChange} />
+                <Settings index={index} field={isContent(field) ? field : {}} readOnly={readOnly} onChange={onChange} />
               ),
             },
-            {
-              render: (_, __, index) => (
-                <Flex gap="small">
-                  <Button disabled={index === 0} onClick={() => move(index, -1)}>
-                    {t('shell.studio.entity.moveUp')}
-                  </Button>
-                  <Button disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
-                    {t('shell.studio.entity.moveDown')}
-                  </Button>
-                  <Button
-                    danger
-                    onClick={() =>
-                      onChange(
-                        '/fields',
-                        fields.filter((_, position) => position !== index),
-                      )
-                    }
-                  >
-                    {t('shell.studio.entity.removeField')}
-                  </Button>
-                </Flex>
-              ),
-            },
+            ...(readOnly
+              ? []
+              : [
+                  {
+                    render: (_: unknown, __: unknown, index: number) => (
+                      <Flex gap="small">
+                        <Button disabled={index === 0} onClick={() => move(index, -1)}>
+                          {t('shell.studio.entity.moveUp')}
+                        </Button>
+                        <Button disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
+                          {t('shell.studio.entity.moveDown')}
+                        </Button>
+                        <Button
+                          danger
+                          onClick={() =>
+                            onChange(
+                              '/fields',
+                              fields.filter((_, position) => position !== index),
+                            )
+                          }
+                        >
+                          {t('shell.studio.entity.removeField')}
+                        </Button>
+                      </Flex>
+                    ),
+                  },
+                ]),
           ]}
         />
-        <div>
-          <Button onClick={() => onChange('/fields', [...fields, { name: '', type: 'text' }])}>
-            {t('shell.studio.entity.addField')}
-          </Button>
-        </div>
+        {readOnly ? null : (
+          <div>
+            <Button onClick={() => onChange('/fields', [...fields, { name: '', type: 'text' }])}>
+              {t('shell.studio.entity.addField')}
+            </Button>
+          </div>
+        )}
       </Flex>
     </div>
   )
@@ -372,7 +400,17 @@ function Flag({
 }
 
 /** The settings of one field that its type takes, each with its own input and id. */
-function Settings({ index, field, onChange }: { index: number; field: Content; onChange: ChangeHandler }) {
+function Settings({
+  index,
+  field,
+  readOnly,
+  onChange,
+}: {
+  index: number
+  field: Content
+  readOnly: boolean
+  onChange: ChangeHandler
+}) {
   const t = useText()
   const pointer = `/fields/${index}`
   const taken = fieldSettings(text(field.type))
@@ -429,6 +467,7 @@ function Settings({ index, field, onChange }: { index: number; field: Content; o
             name={labelOf(setting)}
             value={text(field.expression)}
             required={false}
+            readOnly={readOnly}
             onChange={onChange}
           />
         )
@@ -465,10 +504,12 @@ function Settings({ index, field, onChange }: { index: number; field: Content; o
 function Validations({
   validations,
   fieldNames,
+  readOnly,
   onChange,
 }: {
   validations: unknown
   fieldNames: string[]
+  readOnly: boolean
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -499,6 +540,7 @@ function Validations({
                   name={name}
                   value={text(content.expression)}
                   required
+                  readOnly={readOnly}
                   onChange={onChange}
                 />
               </div>
@@ -518,19 +560,25 @@ function Validations({
                 required
                 onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
               />
-              <Button danger onClick={() => onChange(pointer, undefined)}>
-                {t('shell.studio.entity.removeValidation')}
-              </Button>
+              {readOnly ? null : (
+                <Button danger onClick={() => onChange(pointer, undefined)}>
+                  {t('shell.studio.entity.removeValidation')}
+                </Button>
+              )}
             </Flex>
           )
         })}
-        <div>
-          <Button
-            onClick={() => onChange('/validations', [...list, { expression: '', message: { textKey: '' }, field: '' }])}
-          >
-            {t('shell.studio.entity.addValidation')}
-          </Button>
-        </div>
+        {readOnly ? null : (
+          <div>
+            <Button
+              onClick={() =>
+                onChange('/validations', [...list, { expression: '', message: { textKey: '' }, field: '' }])
+              }
+            >
+              {t('shell.studio.entity.addValidation')}
+            </Button>
+          </div>
+        )}
       </Flex>
     </div>
   )

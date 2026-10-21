@@ -402,6 +402,24 @@ export async function fetchStudioResource(
 }
 
 /**
+ * Loads one file of the module version that the application pins, with its content. The file is read-only, and its
+ * `file` is `modules/<module>/<path>`. A 401 starts sign-in and throws, as any other failure does.
+ */
+export async function fetchStudioModuleResource(
+  application: string,
+  module: string,
+  id: string,
+  signal?: AbortSignal,
+): Promise<StudioResource> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/modules/${encodeURIComponent(module)}/resources/${encodeURIComponent(id)}`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioResource
+}
+
+/**
  * Patches a resource, with the version the editor loaded in `If-Match`. A 409 means the file changed since,
  * and nothing was written. A 401 starts sign-in and throws, as any other failure does.
  */
