@@ -15,7 +15,7 @@ Three roles take part:
 - **NexKit's agents** plan, implement, fix and review inside the NexKit
   pipeline. They read [AGENTS.md](../AGENTS.md).
 
-The rules here put [D13](decisions.md#d13-delivery-workflow--agreed) into
+The rules here put [D13](decisions/d13-delivery-workflow.md) into
 practice. Values that NexKit or the repository settings own, such as protected
 paths, required checks, the automatic fix limit and the profiles with their
 models, are not copied here. Look them up where they live.
@@ -248,6 +248,8 @@ them.
      concept was not delivered;
    - every *(planned for Mx)* marker for this milestone in any doc, removed
      when the work was built and moved to a later milestone when it was not.
+   - the rows of [docs/README.md](README.md), which still say what each file
+     holds.
 4. **Close.** The owner closes the milestone on GitHub once the docs sweep
    is merged.
 
@@ -270,6 +272,47 @@ them.
   Links to decisions and doc sections stay, and so do links that track work,
   such as the roadmap's link to a GitHub milestone.
 
+### How the docs are structured
+
+Agents read the docs in every plan, implement and review round, so the docs
+are built to be read in parts: small files, one topic each, found from an
+index. The same split keeps two pull requests from editing the same lines.
+
+- **One home per topic.** Each topic lives in one file, and
+  [docs/README.md](README.md) lists every file with what it holds. Other docs
+  link to that home and do not copy it. A new file gets its row in
+  `docs/README.md` in the same change.
+- **One decision per file.** Each decision is a file
+  `docs/decisions/d<n>-<slug>.md`. It starts with `# D<n>. <title>` and a
+  `Status: **Agreed**` or `Status: **Proposed**` line, and the slug is the
+  title's anchor. [decisions.md](decisions.md) is the index: one row per
+  decision, in number order, with the same title and status as its file. A new
+  decision takes the next free number and adds its row at the end. A status
+  change edits the file and its row together.
+- **Small files.** A doc under `docs/` stays at or under 1,000 lines. A
+  change that takes a doc past that moves whole `##` sections, unchanged, to a
+  new file in the same folder, named after its topic, and links them. A new
+  topic that needs more than a few sections starts in a file of its own. A
+  table that many changes add rows to, such as the
+  [diagnostic codes](reference/diagnostic-codes.md), lives in a file of its
+  own.
+- **Short agent instructions.** [AGENTS.md](../AGENTS.md) holds only where to
+  look, the working rules and the commands, in at most 100 lines.
+  `CLAUDE.md` only imports it. Anything longer goes to the doc it belongs to,
+  such as [development.md](development.md), and AGENTS.md links to it.
+- **Stable links.** Link to a file, or to a heading in it, and never to text
+  that changes with status. A link to a decision links its file. Renaming or
+  moving a heading changes its anchor, so the same change fixes every link to
+  it.
+- **Checked on every change.** `scripts/lint.sh` runs two checks.
+  [`scripts/check-links.mjs`](../scripts/check-links.mjs) checks every
+  relative link and anchor in the repository.
+  [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that
+  `docs/README.md` lists every doc, that the decisions index matches the
+  decision files, and the size limits. A doc fact that code can check, such
+  as the diagnostic code table, has a unit test that compares the two and
+  finds the table under `docs/` by its header, wherever it moves.
+
 ## Writing on GitHub
 
 These rules apply to issues, plans, pull request descriptions and reviews, and to the titles of
@@ -282,7 +325,7 @@ issues, pull requests and sub-issues.
   main text, or put it in a collapsed `<details>` block.
 - Name the role that acts, in the terms of [concepts.md](domain/concepts.md), never a development
   user. This covers doc text that describes behaviour, and titles too. User names appear only in test
-  code, test scenarios, the realm file and the [development users table](architecture.md#development-users).
+  code, test scenarios, the realm file and the [development users table](reference/security.md#development-users).
 
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
 [nexkit-profiles]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#profiles

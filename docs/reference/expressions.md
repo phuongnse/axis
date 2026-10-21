@@ -10,10 +10,10 @@ The one exception is [`currentUser()`](#current-user): the type checker and the
 SQL translation take it, and the record API binds its `@currentUser`
 parameter, but the interpreter does not evaluate it. Sections
 marked *(planned for Mx)* are not built yet. Entity
-[validations](configuration.md#entity-logic) and
-[computed fields](configuration.md#entity-logic) are resource file uses: the
+[validations](resource-files.md#entity-logic) and
+[computed fields](resource-files.md#entity-logic) are resource file uses: the
 compiler type-checks them and the record API evaluates them. A validation
-can also call a named [rule](configuration.md#resource-file-shape): the
+can also call a named [rule](resource-files.md#resource-file-shape): the
 compiler checks the call and the rule, and the interpreter runs the rule's
 expression. Data source
 [filters](data-sources.md#resource-shape) are another: the compiler checks
@@ -23,14 +23,14 @@ can also call a named rule: its SQL inlines the rule's expression. A
 are type-checked by the compiler too, can call named rules and can follow
 paths through reference fields. The data module can evaluate them against a
 stored record. The start endpoint runs the start condition, and the worker runs
-each decision `when`. A [policy](configuration.md#roles-and-policies)
+each decision `when`. A [policy](roles-and-policies.md)
 filter is type-checked and translated by the compiler too, and the record API
 runs it as SQL. Other uses come with the issues that build
 them. Dn
 refers to
 [decisions.md](../decisions.md). The language follows
-[D6](../decisions.md#d6-in-configuration-logic-uses-a-typed-expression-language--agreed)
-and [D16](../decisions.md#d16-expression-language--agreed). The reasons are in
+[D6](../decisions/d6-in-configuration-logic-uses-a-typed-expression-language.md)
+and [D16](../decisions/d16-expression-language.md). The reasons are in
 [knowledge](../domain/knowledge.md#logic-in-configuration).
 
 One language holds the logic of validation, named rules, computed fields,
@@ -77,7 +77,7 @@ moduleId       = letter , { letter | digit | "-" } ;
 - **Whitespace.** Space, tab and line break between tokens are ignored.
 - **Names.** A name is ASCII letters and digits that start with a letter, like
   a field name.
-- **Qualified call.** A call to a rule of a [module](configuration.md#modules)
+- **Qualified call.** A call to a rule of a [module](modules-and-templates.md#modules)
   is written `departments:IsManager(x)`, with the module id, a `:` and the rule
   name. No space is allowed around the `:`. The reader takes the letters,
   digits and `-` that run into the `:` as the module id, so `a-b:c(x)` calls
@@ -257,7 +257,7 @@ and in [functions](#functions).
   transaction as a `date-time`. It is an instant, so it never depends on a
   time zone, and every call in one transaction gives the same value. See
   [Functions](#functions). `today()` and taking a date from an instant wait
-  for the [time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed).
+  for the [time zone rule](../decisions/d22-current-time-and-time-zones.md).
 
 ## Names and references
 
@@ -289,13 +289,13 @@ Paths in validations and computed fields are not built. There a path is
   parameters: an integer fits a decimal parameter, and `null` fits any
   parameter. A rule body sees only its declared parameters. Parameter and
   result types are the scalar field types except `enum`, which comes later
-  (see [Resource file shape](configuration.md#resource-file-shape)). A rule
+  (see [Resource file shape](resource-files.md#resource-file-shape)). A rule
   name may not reuse a built-in function or aggregate name. A validation, a
   data source filter, a process condition and a policy filter can call rules,
   but not inside
   an aggregate's item expression. A filter's SQL inlines the rule's body, see
   [SQL subset](#sql-subset). Calls from computed fields come later.
-- **Qualified rule call.** A rule of a [module](configuration.md#modules) the
+- **Qualified rule call.** A rule of a [module](modules-and-templates.md#modules) the
   application declares is called as `departments:IsManager(x)`. It is allowed
   wherever a rule call is: a rule body, a validation, a data source filter, a
   process condition and a policy filter. The module id must match exactly. The
@@ -323,7 +323,7 @@ Paths in validations and computed fields are not built. There a path is
   arguments. Its child collections type-check in aggregates, but no
   aggregate is in the [SQL subset](#sql-subset), so one is `AXC0053`.
 - **Scope in a policy filter.** A
-  [policy](configuration.md#roles-and-policies) filter sees the entity's
+  [policy](roles-and-policies.md) filter sees the entity's
   fields, paths through reference fields of up to 3 hops, the named rules and
   [`currentUser()`](#current-user). The compiler type-checks it as a boolean
   and translates it to SQL. It must stay inside the [SQL subset](#sql-subset),
@@ -380,7 +380,7 @@ argument is `null`.
 
 The date functions work on `date` only, not on `date-time`. Taking a calendar
 day from an instant needs a time zone, so it waits for the
-[time zone rule](../decisions.md#d22-current-time-and-time-zones--agreed).
+[time zone rule](../decisions/d22-current-time-and-time-zones.md).
 
 `now()` gives the same instant for every call in one transaction, and the
 interpreter and the SQL translation agree on it:
@@ -404,19 +404,19 @@ because no conversion is implicit except integer to decimal.
 
 ### Current user
 
-It follows [D24](../decisions.md#d24-roles-and-policies--agreed). The type
+It follows [D24](../decisions/d24-roles-and-policies.md). The type
 check, the SQL translation and binding the `@currentUser` parameter are built:
 the record API binds it when it runs a policy filter. The interpreter does not
 evaluate it, and no milestone plans that, because every policy filter runs as
 SQL.
 
 `currentUser()` gives the signed-in user's id as `text`, as the
-[session](../architecture.md#sign-in-and-the-session) holds it. A policy
+[session](security.md#sign-in-and-the-session) holds it. A policy
 filter uses it to compare a record with the user, such as
 `requester == currentUser()` or `department.manager == currentUser()`.
 
 - **Where.** It is allowed only in a
-  [policy filter](configuration.md#roles-and-policies), including as an
+  [policy filter](roles-and-policies.md), including as an
   argument of a rule call there. Anywhere else, including inside a rule body,
   it is `AXC0095` at the call.
 - **SQL.** It becomes the named parameter `@currentUser`, which the caller
@@ -627,8 +627,8 @@ Rules:
 
 Entity validations, computed fields, rules, data source filters,
 [process](processes.md#resource-shape) conditions and
-[policy](configuration.md#roles-and-policies) filters, and the `fill` and
-`convert` values of [migrations](configuration.md#resource-file-shape), are
+[policy](roles-and-policies.md) filters, and the `fill` and
+`convert` values of [migrations](resource-files.md#resource-file-shape), are
 written this way.
 
 An expression is one JSON string:
@@ -641,7 +641,7 @@ An expression is one JSON string:
 
 The property name above is illustrative. The issue for each feature defines
 the real property names. For `expression` on a field, on a validation and on a
-rule, see [Entity logic](configuration.md#entity-logic). For `filter` on a
+rule, see [Entity logic](resource-files.md#entity-logic). For `filter` on a
 data source, see [data sources](data-sources.md#resource-shape).
 
 - **Quotes.** Text literals use single quotes, so they need no JSON escaping.
@@ -700,7 +700,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
 - **`AXC0207`.** A qualified rule call, such as `payroll:IsManager(x)`, names a
   module that `modules` in `application.json` does not declare, at the call.
   The same code covers a module named in a `target`, `sequence` or `entity`, see
-  [Modules](configuration.md#modules).
+  [Modules](modules-and-templates.md#modules).
 - **`AXC0051`.** A function or rule call with the wrong number of
   arguments, at the call. This includes an aggregate without its item
   expression, such as `sum(lineItems)`. The message names the expected count, such as "needs 2 arguments" or
@@ -709,7 +709,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   [SQL subset](#sql-subset), at the operator, call or path step. This
   includes `/`, `lower`, `upper`, `trim`, every aggregate, a call to a rule
   whose body is outside the subset, and a filter whose rule calls inline to
-  more than 2,000 syntax nodes. The message names what is not translated, or the rule. It is reported only after the filter type-checks. A migration's `fill` or `convert` value is checked against the subset at `/changes/{i}/value`, even when its type check waits for activation. See [migrations](configuration.md#resource-file-shape).
+  more than 2,000 syntax nodes. The message names what is not translated, or the rule. It is reported only after the filter type-checks. A migration's `fill` or `convert` value is checked against the subset at `/changes/{i}/value`, even when its type check waits for activation. See [migrations](resource-files.md#resource-file-shape).
 - **`AXC0058`.** A path takes more than 3 hops, at the `.` that goes past
   the limit.
 - **`AXC0086`.** A computed field calls `now()`, including inside an

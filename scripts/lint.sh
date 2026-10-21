@@ -7,6 +7,7 @@ dotnet format Axis.slnx --verify-no-changes
 npm run lint --prefix web
 npx --prefix tests/e2e tsc -p tests/e2e/tsconfig.json
 node scripts/check-links.mjs
+node scripts/check-docs.mjs
 
 # The Helm chart: lint, then validate the rendered manifests against the Kubernetes schemas that
 # scripts/setup.sh downloads. No schema is missing-ignored, so a new kind needs its schema file.

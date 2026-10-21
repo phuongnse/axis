@@ -7,12 +7,12 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// Each instrument of the <c>Axis</c> meter records only the attribute keys that the
-/// <see href="../../docs/reference/processes.md#worker-metrics">worker metrics</see> table lists for it, or the
+/// <see href="../../docs/reference/process-execution.md#worker-metrics">worker metrics</see> table lists for it, or the
 /// <see href="../../docs/architecture.md#health-checks">health checks</see> section for the server's gauge.
 /// </summary>
 public sealed class AxisMetricsTests
 {
-    // The table in docs/reference/processes.md and the health checks section of docs/architecture.md, as metric name to the attribute keys it may carry.
+    // The table in docs/reference/process-execution.md and the health checks section of docs/architecture.md, as metric name to the attribute keys it may carry.
     private static readonly Dictionary<string, string[]> _allowed = new(StringComparer.Ordinal)
     {
         ["axis.work_items.duration"] = ["axis.tenant", "axis.work_item.kind", "axis.outcome"],

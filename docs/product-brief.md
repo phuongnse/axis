@@ -25,7 +25,7 @@ own, separate from the configuration (see [decisions](decisions.md) D7).
 
 An author creates, configures, tests, publishes and runs an application
 through Studio, without editing JSON or code. Files stay the source of truth
-(D5). No domain gets platform code. See [D46](decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
+(D5). No domain gets platform code. See [D46](decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
 
 ## Who uses it
 
@@ -117,9 +117,9 @@ A second, smaller application is the second proving sample, of the same
 shape. It shows that the platform is reused with no platform code change. It
 lives as configuration in `samples/apps/leave-requests/`. It is not platform
 code. See
-[D41](decisions.md#d41-leave-requests-as-the-second-sample-application--agreed).
+[D41](decisions/d41-leave-requests-as-the-second-sample-application.md).
 Later samples of different shapes follow from M11: a service desk, see
-[Third application](#third-application-service-desk), and asset management. See [D46](decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
+[Third application](#third-application-service-desk), and asset management. See [D46](decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
 
 ### Data
 
@@ -130,7 +130,7 @@ Later samples of different shapes follow from M11: a service desk, see
 - Days are calendar days, counting both ends:
   `daysBetween(firstDay, lastDay) + 1`. Weekends and holidays are not left out.
 - **Department**: comes from the `departments` module, with its seed
-  departments (see [D40](decisions.md#d40-reusable-modules--agreed)).
+  departments (see [D40](decisions/d40-reusable-modules.md)).
 
 ### Flow
 
@@ -171,7 +171,7 @@ today. It lives as
 configuration in `samples/apps/service-desk/`. It is not platform code. It is
 thin on purpose: SLAs, escalation, loops that hold a task and notifications
 wait for M14. See
-[D56](decisions.md#d56-a-service-desk-as-the-third-sample-application--agreed).
+[D56](decisions/d56-a-service-desk-as-the-third-sample-application.md).
 
 ### Data
 
@@ -196,7 +196,7 @@ wait for M14. See
 - The roles are `requester`, `agent` and `service-desk-lead`.
 - The realm adds one user with `agent` and one with `service-desk-lead`, and
   gives an existing employee the `requester` role. See the
-  [development users](architecture.md#development-users) table.
+  [development users](reference/security.md#development-users) table.
 - The roles of the existing users stay as they are.
 - A requester reads and edits only their own tickets. An agent reads the
   tickets assigned to them. The lead reads every ticket.

@@ -19,7 +19,7 @@ the read endpoint, the response and the errors. Parts of this file are built:
 
 Dn refers to
 [decisions.md](../decisions.md). The design follows
-[D18](../decisions.md#d18-data-sources--agreed). The reason to query instead
+[D18](../decisions/d18-data-sources.md). The reason to query instead
 of denormalize is in
 [knowledge](../domain/knowledge.md#authoring-and-packaging).
 
@@ -100,7 +100,7 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   field types plus `enum` and `reference`. An `enum` needs `values`, and a
   `reference` needs `target`. They are checked by the same rules as entity
   fields, see
-  [Entity field types and constraints](configuration.md#entity-field-types-and-constraints).
+  [Entity field types and constraints](resource-files.md#entity-field-types-and-constraints).
 - **Parameter `label`.** Optional, with the `{ "textKey" }` shape of a field
   label. A table shows it on the parameter's filter input.
 - **Missing parameter.** An optional parameter that is not given is `null` in
@@ -110,7 +110,7 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   `reference` fields such as `department.name`, with at most 3 hops. A path
   starts at a field, never at a parameter, because a reference parameter is
   an id and not a row. It can call named
-  [rules](configuration.md#resource-file-shape), and its SQL inlines each
+  [rules](resource-files.md#resource-file-shape), and its SQL inlines each
   rule's expression in place of the call. With every rule inlined, the filter
   may have at most 2,000 syntax nodes. It uses the syntax of
   [expressions.md](expressions.md#grammar) and only the
@@ -230,7 +230,7 @@ source has the same checks as any other.
 
 ### Authorization
 
-It follows [Authorization](../architecture.md#authorization). The session, the
+It follows [Authorization](security.md#authorization). The session, the
 grants, the record filters, the fields and the joined targets are built.
 
 - **Session.** A request without a session is a `401`, before the path.
@@ -242,7 +242,7 @@ grants, the record filters, the fields and the joined targets are built.
   added to the data source's own `filter` with AND, in SQL, before any
   grouping. So rows, groups, measures and `totalCount` cover only the
   records the user may read. A root read filter that reads a
-  [pending field](storage.md#recomputing-computed-fields) is a `409` and no
+  [pending field](migrations.md#recomputing-computed-fields) is a `409` and no
   rows come back. It is checked right after the grants, before the query, so
   a bad `sort` does not hide it. See [Errors](#errors).
 - **Fields.** Every projected field must be one the user may read, otherwise
@@ -280,7 +280,7 @@ grants, the record filters, the fields and the joined targets are built.
 - **Unknown parameters.** They are ignored.
 - **Required parameter.** A required parameter that is not given is invalid.
 - **Pending fields.** A data source has no single read. A
-  projected [pending field](storage.md#recomputing-computed-fields) shows its
+  projected [pending field](migrations.md#recomputing-computed-fields) shows its
   stored value, which may come from an older expression. A query is refused
   with the `409` in [Errors](#errors) when its `sort`, its default `sort`,
   its `filter` or its `groupBy` field or measure reads a pending field. That
@@ -450,7 +450,7 @@ data sources.
   `AXC0022`, because a group is not a record.
 - **Page parameters.** Values that come from navigation wait for the
   navigation bullet of
-  [D15](../decisions.md#d15-presentation-model--agreed), which is still
+  [D15](../decisions/d15-presentation-model.md), which is still
   **Proposed**.
 - **Schema.** The data source's schema reaches the SPA in page metadata, in
   the widget's `dataSource` object. There is no separate schema endpoint.

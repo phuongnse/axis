@@ -9,13 +9,13 @@ against the pinned manifest. Running a package operation from a process is
 built too, and so are its retries under the step's retry policy. So are the
 capability limits of the operation context. How a process calls a package
 operation is in
-[Package operations](processes.md#package-operations), and how an application
+[Package operations](process-execution.md#package-operations), and how an application
 declares its packages is in
-[Extension packages](configuration.md#extension-packages).
+[Extension packages](#declaring-packages-in-an-application).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
-[D7](../decisions.md#d7-custom-code-lives-in-extension-packages--agreed) and
-[D28](../decisions.md#d28-extension-packages--agreed). The reason for keeping
+[D7](../decisions/d7-custom-code-lives-in-extension-packages.md) and
+[D28](../decisions/d28-extension-packages.md). The reason for keeping
 custom code out of configuration is in
 [knowledge](../domain/knowledge.md#logic-in-configuration).
 
@@ -33,7 +33,7 @@ custom code out of configuration is in
 - **No data access.** A package cannot read or write entities. Data access
   comes later.
 - **No UI.** React components in packages come later
-  ([D8](../decisions.md#d8-custom-ui-widgets-are-packaged-react-components--agreed-deferred)).
+  ([D8](../decisions/d8-custom-ui-widgets-are-packaged-react-components.md)).
 
 ## Manifest
 
@@ -76,13 +76,13 @@ package folder. This example uses an illustrative package,
   - `idempotent` says whether running the operation twice with the same
     operation identity has the same effect as running it once. It decides
     whether an unknown outcome is retried, see
-    [Call outcomes](processes.md#package-call-outcomes).
+    [Call outcomes](process-execution.md#package-call-outcomes).
   - `timeout` is an ISO 8601 duration. It defaults to `PT30S` and is at most
-    `PT2M`, as for a [connector](configuration.md#connector-resource).
+    `PT2M`, as for a [connector](integration-resources.md#connector-resource).
     Operation names are unique in the package, and field names are unique in
     each operation's `input` and in its `output`, all ignoring letter case.
   - `input` and `output` list typed fields. Their types are the
-    [rule parameter types](configuration.md#resource-file-shape): `text`,
+    [rule parameter types](resource-files.md#resource-file-shape): `text`,
     `integer`, `decimal`, `boolean`, `date` and `date-time`. A field may be
     `required`.
   - `capabilities` lists what the operation may ask its context for:
@@ -120,7 +120,7 @@ public class RetryableException : Exception { }
   pass it on as an idempotency key.
 - **`RetryableException`.** Thrown by an operation to say that the attempt
   may succeed later. Any other exception fails the call, see
-  [Call outcomes](processes.md#package-call-outcomes).
+  [Call outcomes](process-execution.md#package-call-outcomes).
 - **Value types.** Input and output values use these .NET types:
 
   | Field type | .NET type |
@@ -157,7 +157,7 @@ public class RetryableException : Exception { }
 ## Versions and pinning
 
 - **Ranges.** An application's `packages` entry gives a version range, see
-  [Extension packages](configuration.md#extension-packages). A range is an
+  [Extension packages](#declaring-packages-in-an-application). A range is an
   exact version `1.2.0`, `^1.2.0` for any version of the same major version
   from `1.2.0`, or `~1.2.0` for any version of the same minor version from
   `1.2.0`. Any other form is `AXC0140`.
@@ -172,7 +172,7 @@ public class RetryableException : Exception { }
   `AXC0141`. Its message lists the installed versions.
 - **Steps.** A package operation step is checked against the pinned
   version's manifest, see
-  [Package step shape](processes.md#package-step-shape), and the compiled
+  [Package step shape](process-execution.md#package-step-shape), and the compiled
   step holds that version. A running instance keeps the version its release
   pins, even after a newer version is installed. A host rebuilds a stored
   release against the manifests of its installed packages, so a release with
@@ -188,7 +188,7 @@ public class RetryableException : Exception { }
   running or waiting instance is not checked. The worker checks a tenant once
   its database is migrated, and the server skips a tenant database that is not
   migrated or cannot be reached. See
-  [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
+  [D29](../decisions/d29-release-pinning-and-text-resources.md).
 - **Pinned version missing on the worker.** A call to a version that the
   worker does not hold is a retryable attempt. Nothing ran, as with a missing
   binding on a connector call. The call is retried under the step's retry
@@ -246,7 +246,7 @@ tenant of the call.
   value of the declared `url` binding `name`, with a trailing `/` added when
   it has none, so a relative path extends the base path. The client follows no
   redirects, as a connector call does
-  ([D25](../decisions.md#d25-connectors-deployment-bindings-and-secrets--agreed)).
+  ([D25](../decisions/d25-connectors-deployment-bindings-and-secrets.md)).
   It refuses a request whose scheme, host and port are not those of a `url`
   binding the operation declares. The path on a declared host is not limited.
   The clients share one connection pool for all tenants, which keeps no cookies.
@@ -268,7 +268,7 @@ tenant of the call.
   bindings that package operations declare. A binding that is missing for the
   tenant, or of the wrong kind, fails activation with `AXC0100`, and an `http`
   `url` binding outside Development fails it with `AXC0101`, see
-  [Deployment bindings](configuration.md#deployment-bindings).
+  [Deployment bindings](integration-resources.md#deployment-bindings).
 - **Secret values stay hidden.** A secret value never appears in history,
   audit records or logs. History and audit records hold only the type of an
   exception, never its message, because a message can hold input values or
@@ -280,7 +280,7 @@ A package loads in the host's process, so loading it is not
 isolation. The capability limits stop mistakes. They do not stop a package
 that sets out to get around them. Packages are trusted code that the operator
 installs and reviews. Out-of-process isolation comes with multi-tenant
-hosting ([D7](../decisions.md#d7-custom-code-lives-in-extension-packages--agreed)).
+hosting ([D7](../decisions/d7-custom-code-lives-in-extension-packages.md)).
 
 **Limits that hold:**
 
@@ -320,3 +320,62 @@ all of these:
   in version 1.0.0 covers the capability limits: it uses its declared `url`
   and `secret` bindings, and in the other modes it asks for a host or a secret
   it does not declare.
+
+## Declaring packages in an application
+
+This section follows
+[D28](../decisions/d28-extension-packages.md). An application
+declares the [extension packages](extension-packages.md) it uses in its
+manifest, `application.json`. Each entry names a package id and a version
+range:
+
+```json
+{
+  "id": "219102bc-864f-42ed-874a-c19eaee0d1ba",
+  "kind": "application",
+  "name": "PurchaseRequests",
+  "formatVersion": 1,
+  "packages": [{ "id": "purchasing-tools", "version": "^1.0.0" }]
+}
+```
+
+`purchasing-tools` is an illustrative package. The purchase request sample
+declares the real sample package the same way, with
+`{ "id": "payment-references", "version": "^1.0.0" }`. Without that package
+installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
+
+- `packages` is optional. Each entry has an `id`, lower-case letters, digits
+  and `-`, starting with a letter, and a `version`. The schema checks this
+  shape, so breaking it is `AXC0004`. Each package id appears at most once:
+  `AXC0142`.
+- `version` is a version range in one of three forms. Versions are plain
+  `major.minor.patch` without leading zeros, and pre-release versions come
+  later. Any other form is `AXC0140`.
+  - `1.0.0` is that exact version.
+  - `^1.0.0` is any version from `1.0.0` with the same major version, so
+    `1.4.2` but not `2.0.0`. `^0.2.0` also means the same major version, so
+    `0.9.0` but not `1.0.0`.
+  - `~1.0.0` is any version from `1.0.0` with the same minor version, so
+    `1.0.3` but not `1.1.0`.
+- **Pinning.** Compilation picks the highest installed version in each range
+  and pins that exact version in the release, as step 4, **Release**, of the
+  pipeline describes. The server compiles against the packages installed
+  under `Extensions:Path`. A process step is
+  checked against the pinned version's manifest.
+- **Diagnostics.** A package id with no installed version is `AXC0139`. A
+  range that no installed version meets is `AXC0141`, and its message lists
+  the installed versions. Both are compile errors in `application.json`.
+  Compilation sees only the versions that loaded at host startup. A manifest
+  that does not match its package is reported at startup, as `AXC0132` to
+  `AXC0138`, see [Loading](#loading).
+  At the start of the server and the worker, every active release and every
+  release with a running or waiting instance is rebuilt. A pinned version
+  that is not installed is `AXC0146` and stops the start. The diagnostic names
+  the tenant, application, release and package version. See
+  [Versions and pinning](#versions-and-pinning) and
+  [D29](../decisions/d29-release-pinning-and-text-resources.md).
+- An application uses only the packages it declares, even though every
+  tenant sees the same installed packages. Installation is in
+  [Installation](#installation).
+- How a process calls a package operation is in
+  [Package operations](process-execution.md#package-operations).

@@ -113,7 +113,7 @@ The result is:
 - **Release pinning.** An instance is pinned to its release, including
   process, operation, form and text versions. New starts use the active
   release. Roles and policies use the active release even for older work,
-  so a tightened policy applies at once. See [D29](../decisions.md#d29-release-pinning-and-text-resources--agreed).
+  so a tightened policy applies at once. See [D29](../decisions/d29-release-pinning-and-text-resources.md).
 - **One transaction per step.** Business writes, process progress, the
   idempotency receipt, audit records and the next work items commit together
   in one PostgreSQL transaction.
@@ -141,8 +141,8 @@ The result is:
   key. Inbound requests accepted after the backup are lost, and numbers issued
   after it can be issued again. Schedules that were missed run once, as after a
   worker outage. See
-  [D45](../decisions.md#d45-tenant-backup-and-restore--agreed) and
-  [call outcomes](../reference/processes.md#call-outcomes).
+  [D45](../decisions/d45-tenant-backup-and-restore.md) and
+  [call outcomes](../reference/process-execution.md#call-outcomes).
 
 ## Human work
 
@@ -261,7 +261,7 @@ not run in CI.
 **Axis rule:** test scenarios are a resource kind. They run against a
 temporary tenant database in CI, as specific users, and assert data, task and
 process outcomes, including denied actions.
-See [D32](../decisions.md#d32-test-scenarios--agreed).
+See [D32](../decisions/d32-test-scenarios.md).
 
 ## Operations
 
@@ -270,7 +270,7 @@ See [D32](../decisions.md#d32-test-scenarios--agreed).
 - **Correlation.** Every request, process instance, step attempt and connector
   call carries correlation identifiers. Operators can go from a user-visible
   error to the exact attempt and its logs.
-  See [D36](../decisions.md#d36-correlated-logs-metrics-and-traces--agreed).
+  See [D36](../decisions/d36-correlated-logs-metrics-and-traces.md).
 - **Durable history.** Execution history is stored with the process. Sampled
   telemetry is not the source of truth.
 - **Log protection.** Sensitive fields are masked in logs and inspection

@@ -3,13 +3,13 @@
 Detailed reference for `Axis.Admin`, the command-line host
 that a platform operator runs to create tenants, migrate tenant databases,
 activate releases, and back up and restore tenants. It follows
-[D43](../decisions.md#d43-tenant-provisioning-and-migrations-across-tenant-databases--agreed)
+[D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md)
 and
-[D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
+[D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`,
 `tenant restore`, `migrate`, `activate`, `publisher` and `version`. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
-[startup activation](configuration.md#startup-activation).
+[startup activation](host-settings.md#startup-activation).
 
 The conventions of [architecture.md](../architecture.md) apply, and Dn refers
 to [decisions.md](../decisions.md). In this page, "database role" always means
@@ -29,7 +29,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 
 | Setting | Environment variable | Meaning |
 | --- | --- | --- |
-| `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create` and `tenant restore` read it, so `migrate` needs no admin role. See [admin settings](configuration.md#admin-settings). |
+| `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create` and `tenant restore` read it, so `migrate` needs no admin role. See [admin settings](host-settings.md#admin-settings). |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
@@ -109,7 +109,7 @@ creates a [preview tenant](../architecture.md#preview-tenants) of a main tenant.
 
 **Preview tenant.** With `--preview-of`, the command creates
 a [preview tenant](../architecture.md#preview-tenants) as
-[D48](../decisions.md#d48-preview-tenants--agreed) agrees. The steps below stay
+[D48](../decisions/d48-preview-tenants.md) agrees. The steps below stay
 the same, and the entry also names its main tenant.
 
 - It takes no `--oidc-*` option and does not read `AXIS_OIDC_CLIENT_SECRET`,
@@ -120,7 +120,7 @@ the same, and the entry also names its main tenant.
   a usage error. A binding name that repeats, ignoring letter case, is a usage
   error too. No binding value is printed.
 - Without `--binding` the preview has no bindings. See
-  [preview tenants](configuration.md#preview-tenants).
+  [preview tenants](host-settings.md#preview-tenants).
 - The command exits `2` when `<main>` is not in the directory, is itself a
   preview tenant, already has a preview tenant, or is the tenant itself. The
   directory stays unchanged. Two operators who create a preview of one main
@@ -141,13 +141,13 @@ the same, and the entry also names its main tenant.
    `provisioning`.
 2. `roles`: create `axis_<id>_schema` and `axis_<id>_runtime`. Each gets a
    32-byte random password, stored encrypted in the directory as
-   [D42](../decisions.md#d42-tenant-directory-in-the-platform-database--agreed)
+   [D42](../decisions/d42-tenant-directory-in-the-platform-database.md)
    says.
 3. `database`: create `axis_<id>`, owned by the schema role.
 4. `grants`: run the grant step.
 5. `migrations`: run the configuration, data and processes EF Core migrations.
 6. `grants`: run the grant step again. Steps 4 to 6 run as the schema role, as
-   [D31](../decisions.md#d31-separate-database-roles--agreed) describes.
+   [D31](../decisions/d31-separate-database-roles.md) describes.
 7. `role-check`: run the runtime role check of D31 over the runtime role.
 8. `version`: record the schema version and set the entry `active`.
 
@@ -267,7 +267,7 @@ cannot read the directory.
 ## Tenant backup
 
 `tenant backup <id> --out <file>` writes one
-archive of one tenant. See [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
+archive of one tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md).
 
 | Option | Meaning |
 | --- | --- |
@@ -342,7 +342,7 @@ exists, a missing option, a missing tool or a missing setting.
 ## Tenant restore
 
 `tenant restore <file> --tenant <id> --host <host>...`
-restores an archive into a new tenant. See [D45](../decisions.md#d45-tenant-backup-and-restore--agreed).
+restores an archive into a new tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md).
 
 | Option | Meaning |
 | --- | --- |
@@ -401,7 +401,7 @@ it keeps working without the module installed.
    in the environment of `pg_restore`, never in its arguments. A database that
    already holds tables counts as restored, and the step runs no `pg_restore`.
 6. `grants`: run the grant step. This builds every privilege for the new roles,
-   as [D31](../decisions.md#d31-separate-database-roles--agreed) describes.
+   as [D31](../decisions/d31-separate-database-roles.md) describes.
 7. `migrations`: run the EF Core migrations. This step runs only when the
    archive's schema version is older than this build's.
 8. `grants`: run the grant step again.
@@ -453,7 +453,7 @@ The old tenant stays in the directory, because there is no tenant delete.
   again and stages a new call, with a new operation identity and so a new
   idempotency key. The system may already have acted on the first call, so
   even a system that honours the key can act twice. See
-  [staging and the call](processes.md#staging-and-the-call).
+  [staging and the call](process-execution.md#staging-and-the-call).
 - A connector without `idempotency` sends no key, so the system may act twice
   in either case.
 - Sequence counters, inbound endpoint receipts and schedule state go back too.
@@ -538,7 +538,7 @@ with no restart.
 
 It uses the same compile diagnostics, extension packages, modules, recompute
 limit and seeding as
-[startup activation](configuration.md#startup-activation), and does not repeat
+[startup activation](host-settings.md#startup-activation), and does not repeat
 them here. Packages come from `Extensions:Path` and modules from `Modules:Path`.
 `Activation:InlineRecomputeLimit` applies as it does there, and a value that is
 not a positive whole number is a settings error. An unset `Extensions:Path` or
@@ -548,7 +548,7 @@ A problem of an installed package or module is written to standard error.
 The tool always refuses an `http` URL binding, because `http` is allowed only in
 Development, which uses startup activation. On a [preview tenant](../architecture.md#preview-tenants),
 a missing binding is an `AXC0100` warning and not an error, as
-[preview tenants](configuration.md#preview-tenants) describe.
+[preview tenants](host-settings.md#preview-tenants) describe.
 
 **Steps for each tenant.**
 
@@ -585,7 +585,7 @@ or bad setting.
 ## Publisher
 
 `publisher` runs the [publish requests](authoring.md#publishing)
-that Studio stores, as [D47](../decisions.md#d47-publishing-from-studio--agreed)
+that Studio stores, as [D47](../decisions/d47-publishing-from-studio.md)
 agrees. It is the only host that activates a release on the author's behalf, so
 the server never needs a tenant schema connection. Unlike the other commands, it
 runs until it is stopped.
@@ -602,8 +602,8 @@ file in the repository root and the E2E script each start one too.
 `publish` requests with target `preview`, see [preview requests](#publisher).
 
 **Test requests.** The command also runs `test` requests,
-which run an application's [test scenarios](configuration.md#test-scenarios) from
-Studio, as [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed)
+which run an application's [test scenarios](test-scenarios.md) from
+Studio, as [D55](../decisions/d55-running-test-scenarios-from-studio.md)
 agrees. See [test](authoring.md#test) for the route.
 
 **Settings.** It reads these, with the meaning they have for the other commands:
@@ -749,7 +749,7 @@ role unless it says otherwise.
 
    Every step of a scenario runs as the scenario role. The publisher drops only
    databases it created. The work item limit of D32 applies to each scenario,
-   see [test scenarios](configuration.md#test-scenarios). When the snapshot
+   see [test scenarios](test-scenarios.md). When the snapshot
    cannot be read or compiled, no scenario runs and the request fails with the
    diagnostics. The same happens for a name in the request that no scenario
    has, and when the setting is empty. Every compile diagnostic, warnings
@@ -829,7 +829,7 @@ code, because it is stored on the request.
 ## What else to back up
 
 A tenant archive is not a backup of the
-installation. See [D45](../decisions.md#d45-tenant-backup-and-restore--agreed). The operator also keeps these safe:
+installation. See [D45](../decisions/d45-tenant-backup-and-restore.md). The operator also keeps these safe:
 
 - **The platform database.** It holds the tenant directory. Back it up with
   standard PostgreSQL tools, such as `pg_dump` or continuous archiving. Axis does
