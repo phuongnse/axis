@@ -1189,6 +1189,95 @@ describe('StudioEditor for an entity', () => {
     ])
   })
 
+  function migrationChanges(fetchMock: ReturnType<typeof vi.fn>): unknown {
+    const [, migration] = sentChanges(fetchMock).changes
+    return (migration as { create: { changes: unknown } }).create.changes
+  }
+
+  it('asks for a convert expression for a retyped field and adds convert', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await pick(await screen.findByTestId('studio-field-/fields/2/type', {}, slow), 'integer')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('note')
+    expect(screen.getByRole('button', { name: 'Add convert' })).toBeDisabled()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Convert expression' }), 'length(note)')
+    await userEvent.click(screen.getByRole('button', { name: 'Add convert' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(migrationChanges(fetchMock)).toEqual([{ type: 'convert', field: 'note', value: 'length(note)' }])
+  })
+
+  it('asks for a fill expression for a field made required and adds fill', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const row = await screen.findByTestId('studio-field-/fields/2', {}, slow)
+    await userEvent.click(within(row).getByRole('checkbox', { name: 'Required' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Fill expression' }), "'none'")
+    await userEvent.click(screen.getByRole('button', { name: 'Fill nulls' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(migrationChanges(fetchMock)).toEqual([{ type: 'fill', field: 'note', value: "'none'" }])
+  })
+
+  it('adds nothing for a skipped convert and keeps the draft on Cancel', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await pick(await screen.findByTestId('studio-field-/fields/2/type', {}, slow), 'integer')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByTestId('studio-migration-question')).not.toBeInTheDocument())
+    expect(requests(fetchMock, 'PATCH') + requests(fetchMock, 'POST')).toBe(0)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Skip' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(requests(fetchMock, 'PATCH')).toBe(1)
+    expect(requests(fetchMock, 'POST')).toBe(0)
+  })
+
+  it('warns in the row of a field switched to enum and saves one patch and no changes call', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await pick(await screen.findByTestId('studio-field-/fields/2/type', {}, slow), 'enum')
+    expect(screen.getByTestId('studio-migration-warning-/fields/2')).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-migration-warning-/fields/1')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(screen.queryByTestId('studio-migration-question')).not.toBeInTheDocument()
+    expect(requests(fetchMock, 'PATCH')).toBe(1)
+    expect(requests(fetchMock, 'POST')).toBe(0)
+  })
+
+  it('puts convert after renameField and uses the new name', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const name = within(await screen.findByTestId('studio-field-/fields/2/name', {}, slow)).getByRole('textbox')
+    await userEvent.clear(name)
+    await userEvent.type(name, 'remark')
+    await pick(screen.getByTestId('studio-field-/fields/2/type'), 'integer')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('note → remark')
+    await userEvent.click(screen.getByRole('button', { name: 'Keep data' }))
+    expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('remark')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Convert expression' }), 'length(remark)')
+    await userEvent.click(screen.getByRole('button', { name: 'Add convert' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(migrationChanges(fetchMock)).toEqual([
+      { type: 'renameField', from: 'note', to: 'remark' },
+      { type: 'convert', field: 'remark', value: 'length(remark)' },
+    ])
+  })
+
   it('asks nothing for a child-collection field', async () => {
     const withCollection = {
       ...designed,

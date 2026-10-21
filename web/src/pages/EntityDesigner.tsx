@@ -1,7 +1,7 @@
-import { Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Select, Table, Typography } from 'antd'
+import { Alert, Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Select, Table, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
 import { changeFieldType, fieldSettings, fieldTypes, type FieldSetting } from '../platform/entityFields'
-import type { FieldOrigin } from '../platform/entityMigrations'
+import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -142,19 +142,22 @@ function Picker({
  * as for an entity of a module, every input is off, the label is its plain text key, and there are no buttons that
  * add, remove or move a field or a validation. With `origins`, the loaded name of each row of the fields table or
  * `null` for a row added in this session, Add field, Remove and Move report the origins that follow through
- * `onOriginsChange`, and Remove also reports the origin of the removed row as touched.
+ * `onOriginsChange`, and Remove also reports the origin of the removed row as touched. With `warnings`, the row
+ * numbers of fields whose change no migration follows, a warning shows in the settings column of that row.
  */
 export function EntityDesigner({
   value,
   onChange,
   readOnly = false,
   origins,
+  warnings,
   onOriginsChange,
 }: {
   value: Content
   onChange: ChangeHandler
   readOnly?: boolean
   origins?: FieldOrigin[]
+  warnings?: Map<number, FieldWarning>
   onOriginsChange?: (next: FieldOrigin[], touched?: string) => void
 }) {
   const t = useText()
@@ -201,6 +204,7 @@ export function EntityDesigner({
         fields={fields}
         readOnly={readOnly}
         origins={origins}
+        warnings={warnings}
         onOriginsChange={onOriginsChange}
         onChange={onChange}
       />
@@ -216,12 +220,14 @@ function Fields({
   fields,
   readOnly,
   origins,
+  warnings,
   onOriginsChange,
   onChange,
 }: {
   fields: unknown[] | undefined
   readOnly: boolean
   origins: FieldOrigin[] | undefined
+  warnings: Map<number, FieldWarning> | undefined
   onOriginsChange: ((next: FieldOrigin[], touched?: string) => void) | undefined
   onChange: ChangeHandler
 }) {
@@ -336,7 +342,25 @@ function Fields({
             {
               title: t('shell.studio.entity.settings'),
               render: (_, field, index) => (
-                <Settings index={index} field={isContent(field) ? field : {}} readOnly={readOnly} onChange={onChange} />
+                <Flex vertical gap="small">
+                  <Settings
+                    index={index}
+                    field={isContent(field) ? field : {}}
+                    readOnly={readOnly}
+                    onChange={onChange}
+                  />
+                  {warnings?.get(index) && (
+                    <Alert
+                      type="warning"
+                      data-testid={`studio-migration-warning-/fields/${index}`}
+                      message={t(
+                        warnings.get(index) === 'enum'
+                          ? 'shell.studio.entity.migration.enumWarning'
+                          : 'shell.studio.entity.migration.uniqueWarning',
+                      )}
+                    />
+                  )}
+                </Flex>
               ),
             },
             ...(readOnly

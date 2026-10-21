@@ -78,4 +78,57 @@ public sealed class StudioDesignerMigrationTests : IAsyncLifetime
             $"SELECT count(*) FROM information_schema.columns WHERE table_schema = '{EntityNaming.Schema}' AND table_name = '{EntityNaming.Table(_memoId)}' AND column_name = 'f_note'",
             CancellationToken));
     }
+
+    [Fact]
+    public async Task An_entity_patch_to_integer_and_a_convert_migration_saved_in_one_changes_call_publish_and_store_the_integer_value()
+    {
+        using var folder = NewFolder();
+        await File.WriteAllTextAsync(Path.Combine(folder.Path, "entities", "memo.json"), $$"""
+            {
+              "id": "{{_memoId}}",
+              "kind": "entity",
+              "name": "Memo",
+              "formatVersion": 1,
+              "fields": [
+                { "name": "title", "type": "text" },
+                { "name": "qty", "type": "text" }
+              ]
+            }
+            """, CancellationToken);
+        var connectionString = await _database.CreateDatabaseAsync("studio_designer_convert", CancellationToken);
+        await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
+        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        await using var publisher = RunPublisher("a", HostA, connectionString);
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(_memoId));
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            $"""INSERT INTO {table} ("id", "f_title", "f_qty") VALUES ('{Guid.NewGuid()}', 'first', '42')""",
+            CancellationToken);
+        using var memo = await GetJsonAsync(hoa, $"{ApplicationUrl}/resources/{_memoId:D}", HostA);
+        var version = memo.RootElement.GetProperty("version").GetString();
+
+        var migrationId = Guid.NewGuid();
+        var body = $$"""
+            { "changes": [
+              { "id": "{{_memoId:D}}", "version": "{{version}}", "patch": [ { "op": "replace", "path": "/fields/1/type", "value": "integer" } ] },
+              { "create": { "id": "{{migrationId:D}}", "kind": "migration", "name": "MemoChange20261021030406", "formatVersion": 1, "entity": "Memo",
+                            "changes": [ { "type": "convert", "field": "qty", "value": "qty" } ] } }
+            ] }
+            """;
+        using var saved = await SendAsync(hoa, HttpMethod.Post, $"{ApplicationUrl}/changes", HostA, body);
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        using var answer = await ReadAsync(saved);
+        Assert.DoesNotContain(answer.RootElement.GetProperty("diagnostics").EnumerateArray(), diagnostic => diagnostic.GetProperty("severity").GetString() == "error");
+
+        using var accepted = await SendAsync(hoa, HttpMethod.Post, $"{ApplicationUrl}/publish", HostA);
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        using var finished = await WaitForFinalAsync(hoa, accepted.Headers.Location!.OriginalString, HostA);
+        Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
+        Assert.Equal(42L, await PostgreSqlServer.AdminScalarAsync(connectionString, $"""SELECT "f_qty" FROM {table} WHERE "f_title" = 'first'""", CancellationToken));
+        Assert.Equal("bigint", await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            $"SELECT data_type FROM information_schema.columns WHERE table_schema = '{EntityNaming.Schema}' AND table_name = '{EntityNaming.Table(_memoId)}' AND column_name = 'f_qty'",
+            CancellationToken));
+    }
 }
