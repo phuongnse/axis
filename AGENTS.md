@@ -24,9 +24,6 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
   same change. Follow [keeping the docs current](docs/delivery.md#keeping-the-docs-current).
 - Keep the decision status words exact: **Agreed** means agreed and **Proposed** means still open.
   Never present a proposal as agreed.
-- Autopilot answers a plan's or a blocked round's questions with their recommended options. A
-  question that only the owner can answer, such as one that rests on a **Proposed** decision,
-  recommends no option.
 - One issue is one behaviour that fits one agent session, with 2–5 acceptance criteria that a test
   or command verifies. Its text names the concepts it touches. See
   [the life of an issue](docs/delivery.md#the-life-of-an-issue).

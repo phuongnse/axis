@@ -45,11 +45,10 @@ models, are not copied here. Look them up where they live.
 - **Autopilot answers a question that has a recommended option.** Plans, and
   rounds that stop as `blocked`, give each question its options and the one
   NexKit recommends. With `answer` set to `recommended`, autopilot answers when
-  every question has a recommendation, and nobody is mentioned. A question
-  that only the owner can answer, such as one that rests on a **Proposed**
-  decision, recommends no option, so autopilot leaves it to the owner. The
-  rule is in the [AGENTS.md working rules](../AGENTS.md#working-rules), so
-  NexKit's plan agents follow it.
+  every question has a recommendation, even one that rests on a **Proposed**
+  decision, and nobody is mentioned. The owner sees the answers on the issue
+  and can change one with a comment, before `/nexkit go`, or with
+  `/nexkit fix` on the pull request.
 - **People stay in charge.** A person's command, a plan's question without a
   recommendation, a failed run, a second time-out and a refused merge all stop
   autopilot on that issue until a person acts. Other issues go on. To change
