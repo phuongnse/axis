@@ -11,7 +11,7 @@ drafts a request, a manager approves it, finance reviews it above a configured
 amount, and an approved request is sent to a purchasing system.
 
 Leave requests is the second sample. A third, a service desk, runs as a sample
-too. Building it only through Studio is planned for M11. See
+too. A Playwright journey builds, tests and publishes it with Studio only. See
 [D56](docs/decisions/d56-a-service-desk-as-the-third-sample-application.md).
 
 ## Status
