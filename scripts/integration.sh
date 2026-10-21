@@ -8,6 +8,10 @@
 # The integration tests and the scenarios are skipped when $NEXKIT_BASE_SHA shows that every changed
 # path is on the safe list in scripts/lib/affected.mjs. The smoke test is skipped when nothing it
 # covers changed.
+# Arguments go to dotnet test, for example --filter-class 'Axis.Integration.Tests.Studio*'. With
+# arguments only the matching integration tests run and the summary lists only them: the scenario suites
+# are not expected and the smoke test does not run. A change is checked in minutes, and the full run stays
+# the check.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
@@ -22,6 +26,12 @@ for manifest in samples/templates/*/application.json; do
   name="$(node -p "JSON.parse(require('fs').readFileSync('$manifest','utf8')).name")"
   scenario_suites+=("scenarios-$name")
 done
+
+if [ "$#" -gt 0 ]; then
+  run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
+    --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" "$@"
+  finish_report
+fi
 
 if affected integration; then
   for suite in "${scenario_suites[@]}"; do expect_suite "$suite" .; done

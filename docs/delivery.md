@@ -59,9 +59,18 @@ models, are not copied here. Look them up where they live.
   can still break `main` together. When CI on `main` fails, the local agent
   runs it once more if the failure looks flaky. Otherwise it tells the owner
   and opens a bug issue with the failure, which goes before other issues.
+- **Every merge to `main` gets a CI result.** A run on `main` always finishes.
+  A newer merge replaces only a run that is still waiting to start, so the next
+  run tests both merges. On any other branch a newer push stops the older run.
+  CI runs the lint and unit tests, the integration tests and the E2E tests as
+  three parallel jobs, so a run takes as long as its slowest job.
+- **Each check has room to grow within its time limit.** The limits are in
+  NexKit's [`checks` setting][nexkit-config]. When a check takes more than half
+  its limit, a hand-made pull request raises the limit or makes the suite
+  faster, before rounds start to stop on it.
 - **NexKit's checks skip suites that a change cannot affect.** A check round takes
-  about 16 minutes. The .NET integration tests, with the scenarios of every sample,
-  take about 6, and Playwright about 4.5. NexKit sets `NEXKIT_BASE_SHA`, the commit
+  about 25 minutes. The .NET integration tests, with the scenarios of every sample,
+  take about 7, and Playwright with the services it starts about 10. NexKit sets `NEXKIT_BASE_SHA`, the commit
   the pull request started from. Under that variable, git must list the changed and
   untracked files before any skip happens.
   - A smoke test is skipped when none of the changed files is on its path list.
