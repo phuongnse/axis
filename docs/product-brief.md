@@ -218,7 +218,10 @@ a site at path `service-desk`. Texts are in `en` and `vi`.
 ### Built through Studio
 
 _(planned for M11)_ The sample runs today under `scripts/dev.sh`, Compose and
-E2E, and CI runs its scenarios. Building it only through Studio is planned.
+E2E, and CI runs its scenarios. Studio builds its data model today: the
+application, texts, roles, sequence, entities and seed. Building the rest only
+through Studio is planned: data sources, forms, pages, the process, policies,
+the site, scenarios, publishing and the site run.
 
 - The committed folder `samples/apps/service-desk` records what the journey
   builds. CI activates it and runs its scenarios, as for the other samples.

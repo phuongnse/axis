@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { compareApplicationFolders } from '../folder-comparison'
@@ -33,14 +33,19 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: option, exact: true }).click()
   }
 
-  async function save(page: Page, answers: string[] = []) {
-    const answer = page.waitForResponse(
-      (response) =>
-        response.request().method() === 'PATCH' && response.url().includes('/api/studio/apps/ServiceDesk/resources/'),
-    )
+  async function save(page: Page, answers: [field: string, choice: string][] = []) {
+    // A save with a migration posts one changes call, and a save without one patches the resource.
+    const answer = page.waitForResponse((response) => {
+      const url = response.url()
+      const method = response.request().method()
+      return (
+        (method === 'PATCH' && url.includes('/api/studio/apps/ServiceDesk/resources/')) ||
+        (method === 'POST' && url.endsWith('/api/studio/apps/ServiceDesk/changes'))
+      )
+    })
     await page.getByRole('button', { name: 'Save' }).click()
-    for (const choice of answers) {
-      await expect(page.getByTestId('studio-migration-field')).toHaveText('name')
+    for (const [field, choice] of answers) {
+      await expect(page.getByTestId('studio-migration-field')).toHaveText(field)
       await page.getByRole('button', { name: choice, exact: true }).click()
     }
     await expect(page.getByTestId('studio-saved')).toBeVisible()
@@ -171,7 +176,10 @@ test.describe('the author builds the service desk with Studio only', () => {
     await pick(page, 'studio-field-/fields/1/label', 'category.defaultAgent', 'category.defaultAgent')
 
     await pick(page, 'studio-field-/displayField', 'name')
-    await save(page, ['Skip', 'Leave nulls'])
+    await save(page, [
+      ['name', 'Skip'],
+      ['name', 'Leave nulls'],
+    ])
     await expectForm(page)
   })
 
@@ -205,14 +213,91 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expectForm(page)
   })
 
+  test('the author builds the Ticket entity in the entity designer', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    await create(page, 'entity', 'Name', 'Ticket')
+    await expectForm(page)
+    await writeLabel(page, 'studio-field-/label', 'ticket.label', en['ticket.label'])
+
+    async function addField(index: number, name: string) {
+      await page.getByRole('button', { name: 'Add field', exact: true }).click()
+      await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(name)
+      await pick(page, `studio-field-/fields/${index}/label`, `ticket.${name}`, `ticket.${name}`)
+    }
+
+    async function addValues(index: number, values: string[]) {
+      const input = page.getByTestId(`studio-field-/fields/${index}/values`).getByRole('combobox')
+      for (const value of values) {
+        await input.fill(value)
+        await input.press('Enter')
+      }
+      await input.press('Escape')
+    }
+
+    // Row 0 is the starter `name` field, which becomes `number`.
+    await page.getByTestId('studio-field-/fields/0/name').getByRole('textbox').fill('number')
+    await page.getByTestId('studio-field-/fields/0/unique').getByRole('checkbox').check()
+    await page.getByTestId('studio-field-/fields/0/maxLength').getByRole('spinbutton').fill('20')
+    await pick(page, 'studio-field-/fields/0/sequence', 'TicketNumber')
+    await pick(page, 'studio-field-/fields/0/label', 'ticket.number', 'ticket.number')
+
+    await addField(1, 'title')
+    await page.getByTestId('studio-field-/fields/1/required').getByRole('checkbox').check()
+    await page.getByTestId('studio-field-/fields/1/maxLength').getByRole('spinbutton').fill('200')
+
+    await addField(2, 'description')
+    await page.getByTestId('studio-field-/fields/2/maxLength').getByRole('spinbutton').fill('4000')
+
+    await addField(3, 'category')
+    await pick(page, 'studio-field-/fields/3/type', 'reference')
+    await pick(page, 'studio-field-/fields/3/target', 'Category')
+
+    await addField(4, 'priority')
+    await pick(page, 'studio-field-/fields/4/type', 'enum')
+    await addValues(4, ['low', 'normal', 'high', 'urgent'])
+
+    await addField(5, 'requester')
+    await page.getByTestId('studio-field-/fields/5/maxLength').getByRole('spinbutton').fill('100')
+    await page.getByTestId('studio-field-/fields/5/creator').getByRole('checkbox').check()
+
+    await addField(6, 'assignedAgent')
+    await page.getByTestId('studio-field-/fields/6/maxLength').getByRole('spinbutton').fill('100')
+
+    await addField(7, 'status')
+    await pick(page, 'studio-field-/fields/7/type', 'enum')
+    await addValues(7, ['draft', 'submitted', 'assigned', 'resolved', 'closed', 'rejected', 'reopened'])
+
+    await addField(8, 'resolution')
+    await page.getByTestId('studio-field-/fields/8/maxLength').getByRole('spinbutton').fill('4000')
+
+    await pick(page, 'studio-field-/displayField', 'title')
+    // Drop the starter data on the rename. Leave title null in existing rows, since it is new and required.
+    await save(page, [
+      ['name → number', 'Drop data'],
+      ['title', 'Leave nulls'],
+    ])
+    await expectForm(page)
+
+    // The designer wrote a migration for the starter rename. The sample has none, so the author deletes it.
+    const migrations = page.getByTestId('studio-group-migration')
+    await migrations.getByRole('button').click()
+    await expectForm(page)
+    await page.getByRole('button', { name: 'Delete' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+    await expect(migrations).toHaveCount(0)
+  })
+
   test('the built files match the sample', async ({ page }) => {
-    // Part 3 still puts its tests before this one, and widens the list of files it checks.
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await checkBuilt(page, [
       'application.json',
       'entities/category.json',
+      'entities/ticket.json',
       'roles/agent.json',
       'roles/requester.json',
       'roles/service-desk-lead.json',
@@ -221,5 +306,10 @@ test.describe('the author builds the service desk with Studio only', () => {
       'texts/en.json',
       'texts/vi.json',
     ])
+    const migrations = await readdir(path.join(built, 'migrations')).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return []
+      throw error
+    })
+    expect(migrations).toEqual([])
   })
 })
