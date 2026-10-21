@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
 import { assignLocation } from '../platform/navigation'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
@@ -1306,5 +1307,78 @@ describe('StudioPage publishing', () => {
 
       expect(await screen.findByText(/This name or locale is not allowed/)).toBeInTheDocument()
     })
+  })
+})
+
+describe('StudioPage process graph marks', () => {
+  const slow = { timeout: 5000 }
+  const processItem: StudioResourceItem = {
+    id: purchaseRequestApproval.id,
+    kind: 'process',
+    name: 'PurchaseRequestApproval',
+    file: 'processes/purchase-request-approval.json',
+    version: 'p1',
+    usedBy: 0,
+  }
+  const processPath = `${folder}/resources/${processItem.id}`
+
+  /** Stubs the base server, and adds the process with the given folder diagnostics and its own content and references. */
+  function stubProcess(processDiagnostics: StudioDiagnostic[]) {
+    const base = stubServer()
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${folder}/resources`) {
+        return json({ items: [...resources, processItem] })
+      }
+      if (input === `${folder}/diagnostics`) {
+        return json({ diagnostics: processDiagnostics })
+      }
+      if (input === processPath) {
+        return json({ ...processItem, content: purchaseRequestApproval })
+      }
+      if (input === `${processPath}/references`) {
+        return json({ uses: [], usedBy: [] })
+      }
+      return base(input, init)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('marks the step that a diagnostic of the open process names', async () => {
+    stubProcess([
+      {
+        code: 'AXC0202',
+        severity: 'error',
+        message: 'The next step is unknown.',
+        file: processItem.file,
+        path: '/steps/1/next',
+        resourceId: processItem.id,
+      },
+    ])
+    renderPage(`/studio?app=PurchaseRequests&resource=${processItem.id}`)
+
+    const marked = await screen.findByTestId('studio-graph-node-1', {}, slow)
+    expect(marked).toHaveAccessibleName(/has diagnostics$/)
+    expect(marked).toHaveAttribute('data-marked', 'true')
+    const unmarked = screen.getByTestId('studio-graph-node-0')
+    expect(unmarked).not.toHaveAccessibleName(/has diagnostics/)
+    expect(unmarked).not.toHaveAttribute('data-marked')
+  })
+
+  it('marks no step for a diagnostic of another resource', async () => {
+    stubProcess([
+      {
+        code: 'AXC0101',
+        severity: 'error',
+        message: 'The field type is unknown.',
+        file: 'entities/purchase-request.json',
+        path: '/steps/0',
+        resourceId: entityId,
+      },
+    ])
+    renderPage(`/studio?app=PurchaseRequests&resource=${processItem.id}`)
+
+    await screen.findByTestId('studio-graph-node-0', {}, slow)
+    expect(screen.getByTestId('studio-process-graph').querySelector('[data-marked]')).toBeNull()
   })
 })

@@ -5,7 +5,7 @@ Status: **Agreed**
 M11 gives Studio typed editors for pages, process steps and connectors, and
 for the kinds that need JSON today. It also adds a read-only process graph. The
 seed grid, the scenario editor, the connector editor, the page editor, the endpoint
-mapping rows, the text table, the process graph without its diagnostic marks, and
+mapping rows, the text table, the process graph, and
 the process step list with its decision, end, task and operation panels are built.
 The rest is _(planned for M11)_. See the
 [Studio section](../reference/studio.md) for the detail. The owner

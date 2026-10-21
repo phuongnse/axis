@@ -16,6 +16,7 @@ type StepNodeData = {
   type: string
   start: boolean
   current: boolean
+  marked: boolean
   onOpen: (path: string) => void
 }
 
@@ -39,15 +40,18 @@ function placeSteps(graph: ProcessGraph): (index: number) => { x: number; y: num
 }
 
 function StepNodeView({ data }: NodeProps<StepNode>) {
+  const t = useText()
   const { token } = theme.useToken()
+  const label = `${data.name} · ${data.type}`
   return (
     <>
       <Handle type="target" position={Position.Top} isConnectable={false} />
       <button
         type="button"
         data-testid={`studio-graph-node-${data.index}`}
-        aria-label={`${data.name} · ${data.type}`}
+        aria-label={data.marked ? `${label} · ${t('shell.studio.processGraph.hasDiagnostics')}` : label}
         aria-current={data.current ? 'true' : undefined}
+        data-marked={data.marked ? 'true' : undefined}
         onClick={() => data.onOpen(`/steps/${data.index}`)}
         style={{
           width: '100%',
@@ -60,7 +64,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           font: 'inherit',
           color: token.colorText,
           background: token.colorBgContainer,
-          border: `${data.start ? 3 : 1}px solid ${data.current ? token.colorPrimary : token.colorBorder}`,
+          border: `${data.start ? 3 : 1}px solid ${data.marked ? token.colorError : data.current ? token.colorPrimary : token.colorBorder}`,
           borderRadius: token.borderRadius,
           cursor: 'pointer',
         }}
@@ -74,7 +78,10 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
 
 const nodeTypes = { step: StepNodeView }
 
-/** A read-only graph of the draft's steps and transitions: a node opens its step, an edge opens its transition. */
+/**
+ * A read-only graph of the draft's steps and transitions: a node opens its step, an edge opens its transition.
+ * A step that a diagnostic path names has an error-coloured border and "has diagnostics" in its label.
+ */
 export default function StudioProcessGraph({
   draft,
   path,
@@ -110,6 +117,7 @@ export default function StudioProcessGraph({
           type: step.type ?? '',
           start: graph.start === step.index,
           current: path === `/steps/${step.index}` || (path?.startsWith(`/steps/${step.index}/`) ?? false),
+          marked: step.marked,
           onOpen: onOpenPath,
         },
       })),
