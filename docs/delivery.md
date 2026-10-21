@@ -59,9 +59,18 @@ models, are not copied here. Look them up where they live.
   can still break `main` together. When CI on `main` fails, the local agent
   runs it once more if the failure looks flaky. Otherwise it tells the owner
   and opens a bug issue with the failure, which goes before other issues.
+- **Every merge to `main` gets a CI result.** A run on `main` always finishes.
+  A newer merge replaces only a run that is still waiting to start, so the next
+  run tests both merges. On any other branch a newer push stops the older run.
+  CI runs the lint and unit tests, the integration tests and the E2E tests as
+  three parallel jobs, so a run takes as long as its slowest job.
+- **Each check has room to grow within its time limit.** The limits are in
+  NexKit's [`checks` setting][nexkit-config]. When a check takes more than half
+  its limit, a hand-made pull request raises the limit or makes the suite
+  faster, before rounds start to stop on it.
 - **NexKit's checks skip suites that a change cannot affect.** A check round takes
-  about 16 minutes. The .NET integration tests, with the scenarios of every sample,
-  take about 6, and Playwright about 4.5. NexKit sets `NEXKIT_BASE_SHA`, the commit
+  about 25 minutes. The .NET integration tests, with the scenarios of every sample,
+  take about 7, and Playwright with the services it starts about 10. NexKit sets `NEXKIT_BASE_SHA`, the commit
   the pull request started from. Under that variable, git must list the changed and
   untracked files before any skip happens.
   - A smoke test is skipped when none of the changed files is on its path list.
@@ -73,6 +82,11 @@ models, are not copied here. Look them up where they live.
   - Playwright is skipped when every changed file is under `docs/` or is a `*.md`
     file. It also skips the PostgreSQL, Keycloak, stub, server, worker and
     publisher that it starts.
+  - The integration performance tests never run under that variable. Their class
+    names end in `PerformanceTests`, and a new one must follow that rule. They
+    take about a third of the integration tests' time and depend on the load of
+    the runner. CI on `main` runs them, so a slowdown shows after the merge, and
+    the local agent opens a bug issue for it as for any CI failure on `main`.
 
   The lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs). Any
   doubt runs the suite. A missing base, a git error or an empty change list runs
@@ -106,8 +120,15 @@ profiles, their `when` texts and their models are in NexKit's
 [`profiles` setting][nexkit-profiles]. This section holds the rules behind
 them.
 
-- **Profiles go by risk: `standard` and `hard`.** The more a mistake would
-  cost, the stronger the profile. `standard` is the default.
+- **Profiles go by risk and novelty: `standard` and `hard`.** The more a
+  mistake would cost, or the less the platform has done such work before, the
+  stronger the profile. `hard` is the default, so an issue whose triage fails
+  runs on it.
+- **`standard` is a narrow description and `hard` is the rest.** `standard`
+  names only work that repeats what the platform already does. Anything it
+  does not name goes to `hard`, so the concepts and kinds of work that a new
+  milestone brings land on the stronger profile with no change to the `when`
+  texts. The cost is that more issues run on the stronger, dearer models.
 - **Plan and review are at least as strong as implement.** The plan is the
   contract and the review is the last check before the owner. In every
   profile, review runs on a different model from implement.
@@ -116,9 +137,8 @@ them.
   runs on the wrong profile.
 - **A `when` text says what a mistake would cost, not where the code is.** It
   may name concepts from [concepts.md](domain/concepts.md) as examples, but
-  never files, classes, doc sections or milestones, which go stale. `hard` is
-  broad and `standard` is the rest. When unsure, triage chooses the stronger
-  profile.
+  never files, classes, doc sections or milestones, which go stale. When
+  unsure, triage chooses the stronger profile.
 - **Triage sees only the issue and its discussion.** It does not open links.
   So an issue names the concepts it touches in its own text, even when it
   links to the docs that describe them.

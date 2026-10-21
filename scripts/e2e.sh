@@ -53,9 +53,21 @@
 # nothing it covers changed. Playwright and the services it starts are skipped when every changed path
 # is under docs/ or is a Markdown file. The sample modules are still installed then, for the on-premises
 # smoke test.
+# Arguments go to Playwright, for example tests/e2e/specs/studio.spec.ts or --grep 'publishes'. A spec path
+# is relative to the repository root. With arguments only the matching specs run, after the setup project,
+# and the three smoke tests do not run. A change is checked in minutes, and the full run stays the check.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
+
+# Playwright runs in tests/e2e, so a spec path given from the repository root is made relative to it.
+playwright_args=()
+for argument in "$@"; do
+  case "$argument" in
+    tests/e2e/*) playwright_args+=("${argument#tests/e2e/}") ;;
+    *) playwright_args+=("$argument") ;;
+  esac
+done
 
 image="postgres:18-alpine"
 container="axis-e2e-postgres-$$"
@@ -302,7 +314,7 @@ if affected playwright; then
 
   AXIS_E2E_SCHEMA_DATABASE="$schema_database" AXIS_E2E_PREVIEW_SCHEMA_DATABASE="$preview_schema_database" \
     AXIS_E2E_JOURNEY_SCHEMA_DATABASE="$journey_schema_database" \
-    run_suite playwright tests/e2e npm test --prefix tests/e2e
+    run_suite playwright tests/e2e npm test --prefix tests/e2e -- "${playwright_args[@]}"
   playwright_status=$status
 
   worker_failed=0
@@ -358,6 +370,10 @@ if affected playwright; then
 else
   bash scripts/lib/install-sample-modules.sh
   skip_suite playwright tests/e2e
+fi
+
+if [ "$#" -gt 0 ]; then
+  finish_report
 fi
 
 run_suite_if_affected compose . node --test --test-reporter=spec --test-reporter-destination=stdout \
