@@ -454,6 +454,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     that no locale has is `AXC0028`. See
     [Configuration pipeline](configuration.md#configuration-pipeline).
   - A form over a child entity is not checked yet.
+  - *(Planned for M12.)* Fields get `visibleWhen`, `requiredWhen` and
+    `readOnlyWhen`, sections get `visibleWhen` and a `name`, and a form may
+    have `steps`. See
+    [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 - **Form widget.** A page whose widget is a `form` creates a record at
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
   record API. It adds no rules of its own: the server validates.
@@ -631,6 +635,31 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       text saying the record is already in a running process. Any other
       answer shows a generic platform error.
     - The button is disabled while the save and the start run.
+  - **Conditions and steps** *(planned for M12)*. The widget asks the server
+    which fields to show, require and lock, and which messages to show. It
+    has no evaluator of its own
+    ([D57](../decisions/d57-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+    - **Calls.** It calls the [form state endpoint](record-api.md#form-state)
+      with the draft values and the touched fields. The call goes out at once
+      after a choice: a select, a checkbox, a date or a picked record. It goes
+      out 300 ms after typing stops in a text or number input.
+    - **Pending answers.** While an answer is pending, the widget keeps the
+      last answered states. It drops an answer that a newer call has
+      overtaken.
+    - **States.** Per the answer, a field is hidden, marked required or made
+      read-only. A hidden field is not sent. The messages in `errors` show
+      under the touched fields.
+    - **Touched.** A field becomes touched when it loses focus or changes.
+    - **Save.** The widget always sends `?form=` with the form's name on
+      create and update, so the server enforces `requiredWhen`.
+    - **Steps.** A form with `steps` shows one step at a time, with Back and
+      Next. Next sends every visible field of the step as touched and stays
+      on the step when any key of `errors` names one of them. Back never
+      checks. A step whose sections are all hidden is skipped.
+    - **Last step.** Save and the `startProcess` actions are on the last
+      step. After a failed save, the form opens the first step that has an
+      error. The current step stays out of the URL, because a draft does not
+      survive a reload.
   - **Form metadata**. Page metadata gives the widget's
     `entity` with all its fields, so the SPA knows every field's type. It
     adds:
@@ -642,6 +671,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
       so the SPA never builds it itself.
+    - *(Planned for M12.)* `form` also holds `visibleWhen` on each field and
+      section, as `true` when it has a condition and `false` otherwise.
+      It holds `steps`, each with a `titleKey` and its section names, and each
+      section's `name`. It holds no expressions, because they stay on the
+      server.
 - **Task inbox widget**. A page whose widget is a
   `taskInbox` lists the signed-in user's open tasks in the application,
   through the [task API](task-api.md).
@@ -692,6 +726,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     form's sections over the subject record. The layout and the field types
     come from the task read's `form`, and the values from the subject
     record, read through the record API.
+  - *(Planned for M12.)* The form behaves as the form widget does in
+    its **Conditions and steps**, using the task's
+    [form state route](task-api.md#form-state-of-a-task). Outcome buttons are
+    on the last step.
   - It has one button per outcome, with the outcome's label.
   - A click sends the outcome, the changed editable values and the record's
     `version` to the complete endpoint. On success it returns to the inbox.

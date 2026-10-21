@@ -231,6 +231,18 @@ HTTP also call. The record API maps its outcome to the responses below.
   `400` at its pointer with the message "Cannot be set.", as for a sequence
   field.
 
+- **Form conditions.** *(Planned for M12.)* `POST` and `PATCH` take an optional
+  query `?form=<name>`. The name must be a `form` resource over the entity,
+  or the write is a `400` keyed `form`. With a form, the server enforces its
+  [`requiredWhen`](resource-files.md#form-conditions-and-steps) at the
+  validation step: a visible field whose condition is true and whose value is
+  `null` is a `400` at `/values/<field>` with "Required.". A hidden field is
+  not required. Without `?form=`, form conditions are not applied, so a rule
+  that must always hold belongs in an entity validation. `readOnlyWhen`
+  follows `readOnly`: the record API does not enforce it, and the field write
+  grants decide. The check order is unchanged, because `form` is part of the
+  path and query check.
+
 ## Concurrency
 
 Every record has a `version` that starts at 1 and grows by one on each update.
@@ -579,6 +591,66 @@ answered with `400`:
   }
 }
 ```
+
+## Form state
+
+*(Planned for M12.)* The form state endpoint answers what a form shows for a
+draft record, and which messages the user's input earns so far. It writes
+nothing ([D57](../decisions/d57-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+The conditions are in [Form conditions and steps](resource-files.md#form-conditions-and-steps).
+
+`POST /api/apps/{app}/forms/{form}/state` needs `Content-Type: application/json`
+and the [CSRF header](#create-update-and-delete). `{form}` is a form name in
+the active release, ignoring letter case.
+
+```json
+{
+  "recordId": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
+  "values": { "status": "resolved" },
+  "touched": ["status"]
+}
+```
+
+- `recordId` is `null` for a new record, or the id of the record being edited.
+- `values` has the shape of the `values` of a write, in the
+  [value format](#request-bodies-and-values). Child rows and their keys work
+  as on writes.
+- `touched` lists the fields the user has changed or left. It may be empty.
+
+The draft is the stored record, when there is one, overlaid with `values`.
+Computed fields are calculated on it.
+
+```json
+{
+  "sections": [{ "name": "update", "visible": true }],
+  "fields": {
+    "status": { "visible": true, "required": false, "readOnly": false },
+    "resolution": { "visible": true, "required": true, "readOnly": false }
+  },
+  "errors": { "/values/resolution": ["Required."] }
+}
+```
+
+- `sections` has one entry for each named section of the form.
+- `fields` has one entry for each field of the form that the user may read.
+- `errors` holds the parse errors, the `requiredWhen` messages and the
+  entity's validation messages, keyed as on a write. It holds only keys of
+  touched fields.
+- It writes nothing, adds no audit record and uses no sequence number. It
+  does not run unique or reference-existence checks, because they query
+  storage on every keystroke and could reveal which records exist. A save runs
+  them.
+
+The checks run in this order, and the first failure is the response:
+
+1. `401` when nobody is signed in.
+2. `404` for an unknown application or form.
+3. `403` without a `create` grant on the form's entity when `recordId` is
+   `null`, or without an `update` grant when it is set.
+4. `404` for a record the user's read filters do not reach.
+5. `415` for a wrong content type, then `400` for a malformed body.
+
+The problem details are as in [Errors](#errors).
 
 ## Inbound endpoints
 
