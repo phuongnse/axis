@@ -17,7 +17,6 @@ type StepNodeData = {
   start: boolean
   current: boolean
   marked: boolean
-  onOpen: (path: string) => void
 }
 
 type StepNode = Node<StepNodeData, 'step'>
@@ -52,7 +51,6 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
         aria-label={data.marked ? `${label} · ${t('shell.studio.processGraph.hasDiagnostics')}` : label}
         aria-current={data.current ? 'true' : undefined}
         data-marked={data.marked ? 'true' : undefined}
-        onClick={() => data.onOpen(`/steps/${data.index}`)}
         style={{
           width: '100%',
           height: '100%',
@@ -118,7 +116,6 @@ export default function StudioProcessGraph({
           start: graph.start === step.index,
           current: path === `/steps/${step.index}` || (path?.startsWith(`/steps/${step.index}/`) ?? false),
           marked: step.marked,
-          onOpen: onOpenPath,
         },
       })),
       edges: graph.transitions.map((transition): Edge => ({
@@ -132,7 +129,7 @@ export default function StudioProcessGraph({
         labelBgStyle: { fill: token.colorBgContainer },
       })),
     }
-  }, [draft, diagnosticPaths, path, onOpenPath, token])
+  }, [draft, diagnosticPaths, path, token])
 
   return (
     <section data-testid="studio-process-graph" aria-label={t('shell.studio.processGraph')} style={{ height: 320 }}>
@@ -148,6 +145,7 @@ export default function StudioProcessGraph({
         elementsSelectable={false}
         edgesFocusable={false}
         zoomOnScroll={false}
+        onNodeClick={(_, node) => onOpenPath(`/steps/${node.id}`)}
         onEdgeClick={(_, edge) => onOpenPath(edge.id)}
       />
     </section>
