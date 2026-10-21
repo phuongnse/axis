@@ -811,7 +811,8 @@ worker and the publisher serve the journey tenant too, and the run fails when th
 
 `tests/e2e/specs/service-desk-journey.spec.ts` builds the service desk on the journey tenant with Studio only, and
 never opens the JSON view. It compares the built files with `samples/apps/service-desk`. So far it builds the
-application and its `en` and `vi` texts. Studio cannot remove a text key yet, and the starter keys of a blank
+application, its `en` and `vi` texts, the three roles, the `TicketNumber` sequence, the `Category` entity and its
+`Categories` seed. Studio cannot remove a text key yet, and the starter keys of a blank
 application are not in the sample. So the journey deletes the starter `en` text resource and creates it again.
 
 The E2E run also starts the purchasing system stub from the build output, and
