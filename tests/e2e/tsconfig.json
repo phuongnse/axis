@@ -5,7 +5,17 @@
     "moduleResolution": "bundler",
     "strict": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  "include": ["playwright.config.ts", "server-settings.ts", "activate.ts", "csrf.ts", "sessions.ts", "specs"]
+  "include": [
+    "playwright.config.ts",
+    "server-settings.ts",
+    "activate.ts",
+    "csrf.ts",
+    "sessions.ts",
+    "folder-comparison.ts",
+    "folder-comparison.test.ts",
+    "specs"
+  ]
 }

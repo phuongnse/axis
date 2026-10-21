@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "@playwright/test";
+import { journeyURL } from "./server-settings";
 
 export type SampleUser = "anna" | "lan" | "binh" | "chau" | "dung" | "giang" | "hoa" | "khoa" | "linh";
 
@@ -17,14 +18,29 @@ export const sampleUsers: Record<SampleUser, string[]> = {
   linh: ["service-desk-lead"],
 };
 
+const journeyRoles = ["author", "requester", "service-desk-lead", "agent"];
+
+/** The users who sign in on the journey host: those who hold the author, requester, service desk lead or agent role. */
+export const journeyUsers = (Object.keys(sampleUsers) as SampleUser[]).filter((user) =>
+  sampleUsers[user].some((role) => journeyRoles.includes(role)),
+);
+
 /** The file where the setup step saves `user`'s browser session. */
 export function sessionFile(user: SampleUser) {
   return path.resolve(import.meta.dirname, ".auth", `${user}.json`);
 }
 
-/** Checks that `GET /api/me` answers as `user`, and throws an error naming both users when it does not. */
-export async function expectSessionUser(page: Page, user: SampleUser) {
-  const response = await page.request.get("/api/me");
+/** The file where the setup step saves `user`'s browser session on the journey host. */
+export function journeySessionFile(user: SampleUser) {
+  return path.resolve(import.meta.dirname, ".auth", `journey-${user}.json`);
+}
+
+/**
+ * Checks that `GET /api/me` answers as `user`, and throws an error naming both users when it does not. `origin`
+ * is the server to ask, and empty for the main E2E server.
+ */
+export async function expectSessionUser(page: Page, user: SampleUser, origin = "") {
+  const response = await page.request.get(`${origin}/api/me`);
   if (response.status() !== 200) {
     throw new Error(`Expected the session of ${user}, but GET /api/me answers ${response.status()}.`);
   }
@@ -58,4 +74,13 @@ export async function useSession(page: Page, user: SampleUser) {
   await page.context().clearCookies();
   await page.context().addCookies(cookies);
   await expectSessionUser(page, user);
+}
+
+/** Does what `useSession` does with `user`'s session on the journey host, and checks `/api/me` there. */
+export async function useJourneySession(page: Page, user: SampleUser) {
+  const { cookies } = JSON.parse(await readFile(journeySessionFile(user), "utf8"));
+  await leavePage(page);
+  await page.context().clearCookies();
+  await page.context().addCookies(cookies);
+  await expectSessionUser(page, user, journeyURL);
 }

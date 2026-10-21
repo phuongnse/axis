@@ -7,6 +7,8 @@ const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 export const e2eApp = path.resolve(import.meta.dirname, 'fixtures', 'e2e-app')
 export const purchaseRequests = path.resolve(repoRoot, 'samples', 'apps', 'purchase-requests')
 export const leaveRequests = path.resolve(repoRoot, 'samples', 'apps', 'leave-requests')
+/** A manifest and nothing else. The journey server activates it at start, because only startup activation migrates a tenant database. */
+export const journeyBase = path.resolve(import.meta.dirname, 'fixtures', 'journey-base')
 export const serviceDesk = path.resolve(repoRoot, 'samples', 'apps', 'service-desk')
 export const extensionsPath = path.resolve(repoRoot, 'artifacts', 'extensions')
 export const modulesPath = path.resolve(repoRoot, 'artifacts', 'modules')
@@ -42,6 +44,21 @@ const previewConnectionString = required(
 const previewSchemaConnectionString = required(
   'AXIS_E2E_PREVIEW_SCHEMA_DATABASE',
   'the PostgreSQL connection string of the preview tenant\'s schema role',
+)
+const journeyConnectionString = required(
+  'AXIS_E2E_JOURNEY_DATABASE',
+  'the PostgreSQL connection string of the journey tenant\'s runtime role',
+)
+const journeySchemaConnectionString = required(
+  'AXIS_E2E_JOURNEY_SCHEMA_DATABASE',
+  'the PostgreSQL connection string of the journey tenant\'s schema role',
+)
+/** The address of the journey tenant's own server. Its host is 127.0.0.2, because 127.0.0.1 and localhost are taken. */
+export const journeyURL = required('AXIS_E2E_JOURNEY_URL', 'the address of the journey tenant\'s server')
+/** The folder where Studio creates the journey tenant's applications. The journey server creates it at start. */
+export const journeyApplications = required(
+  'AXIS_E2E_JOURNEY_APPLICATIONS',
+  'the folder where Studio creates the journey tenant\'s applications',
 )
 const keycloakUrl = required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')
 const purchasingUrl = required('AXIS_E2E_PURCHASING_URL', 'the address of the purchasing system stub')
@@ -101,6 +118,39 @@ export function serverEnv(baseURL: string): Record<string, string> {
     Studio__AuthorRole: 'author',
     Studio__PublisherRole: 'publisher',
     // Makes GET /api/me answer studioTest: true for an author, which shows the test controls.
+    Studio__Tests: 'true',
+  }
+}
+
+/**
+ * The environment of the journey server, which serves only the journey tenant. It runs in Testing, because
+ * appsettings.Development.json would add the default tenants, the startup activation and the Studio folders, and an
+ * environment variable cannot remove a list entry. Testing still allows plain-http session cookies. It shares the
+ * platform database with the main server. It activates only the empty application journey-base at start, because only
+ * startup activation migrates a tenant database, so a journey builds its own application in Studio.
+ */
+export function journeyServerEnv(): Record<string, string> {
+  return {
+    ASPNETCORE_URLS: journeyURL,
+    ASPNETCORE_ENVIRONMENT: 'Testing',
+    ConnectionStrings__Platform: connectionString,
+    ConnectionStrings__PlatformSchema: schemaConnectionString,
+    Platform__SecretKey: 'x7lhedPPY+Gx/xkG67W8XRybLeK3gghTBhDhDv9TIVw=',
+    Tenants__journey__Hosts__0: '127.0.0.2',
+    Tenants__journey__ConnectionString: journeyConnectionString,
+    Tenants__journey__SchemaConnectionString: journeySchemaConnectionString,
+    // The same realm and client as the default tenant.
+    Tenants__journey__Oidc__Authority: `${keycloakUrl}/realms/axis`,
+    Tenants__journey__Oidc__ClientId: 'axis',
+    Tenants__journey__Oidc__ClientSecret: 'axis-development-secret',
+    Tenants__journey__Oidc__EndpointAudience: 'axis-endpoints',
+    Extensions__Path: extensionsPath,
+    Modules__Path: modulesPath,
+    Templates__Path: templatesPath,
+    ActivateOnStartup__0: journeyBase,
+    Studio__ApplicationsPath: journeyApplications,
+    Studio__AuthorRole: 'author',
+    Studio__PublisherRole: 'publisher',
     Studio__Tests: 'true',
   }
 }

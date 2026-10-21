@@ -1,11 +1,24 @@
 import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  applyAnswers,
+  fieldQuestions,
+  loadedOrigins,
+  matchOrigins,
+  migrationFile,
+  migrationResource,
+  type FieldAnswer,
+  type FieldOrigin,
+  type FieldQuestion,
+  type MigrationChange,
+} from '../platform/entityMigrations'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
   fetchStudioResource,
   patchStudioResource,
+  saveStudioChanges,
   ServerUnreachableError,
   type StudioDiagnostic,
   type StudioResource,
@@ -19,6 +32,7 @@ import { useText } from '../platform/texts'
 import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointValues } from './EndpointValues'
 import { EntityDesigner } from './EntityDesigner'
+import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
@@ -96,7 +110,8 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * field's type, and its validations. An
  * endpoint keeps the generic form and shows its `values` as rows of a field of its entity and an expression. When the
  * server does not answer, the draft stays, and the resource loads again after the reconnect unless the draft has
- * changes.
+ * changes. When an entity's loaded field was renamed or removed, Save asks one question per field first, and the answers
+ * add a `renameField` or `dropField` migration that is saved with the entity in one changes call.
  */
 export function StudioEditor({
   application,
@@ -111,7 +126,7 @@ export function StudioEditor({
   item: StudioResourceItem
   resources: StudioResourceItem[]
   path: string | null
-  onSaved: (diagnostics: StudioDiagnostic[]) => void
+  onSaved: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem[]) => void
   onTextsWritten: (diagnostics: StudioDiagnostic[]) => void
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
@@ -138,6 +153,10 @@ export function StudioEditor({
   const [seedEntity, setSeedEntity] = useState<SeedEntity>()
   // The other locales of a text resource, read from their files, for the text table to show beside the open one.
   const [otherTexts, setOtherTexts] = useState<TextColumn[]>()
+  // The loaded name of each row of an entity's fields, and the loaded names the author renamed or removed, in order.
+  const [origins, setOrigins] = useState<FieldOrigin[]>([])
+  const [touched, setTouched] = useState<string[]>([])
+  const [questions, setQuestions] = useState<FieldQuestion[]>()
   const handledPath = useRef<string | null>(null)
   // A field to scroll to once the form tab is shown, because a hidden field cannot be scrolled to.
   const pendingField = useRef<HTMLElement | null>(null)
@@ -145,6 +164,8 @@ export function StudioEditor({
   function adopt(resource: StudioResource) {
     setLoaded({ content: resource.content, version: resource.version })
     setDraft(resource.content)
+    setOrigins(loadedOrigins(resource.content))
+    setTouched([])
     setJsonText(null)
     setJsonInvalid(false)
     setConflict(false)
@@ -334,6 +355,11 @@ export function StudioEditor({
   }
 
   function change(pointer: string, next: unknown) {
+    const renamed = /^\/fields\/(\d+)\/name$/.exec(pointer)
+    const origin = renamed ? origins[Number(renamed[1])] : null
+    if (origin) {
+      touch(origin)
+    }
     // Unticking a box that the file never had leaves the key out, so the undo of a tick is no change.
     // An array item always keeps its value, because a missing item would shift the others.
     const parent = getAt(loaded!.content, pointer.slice(0, pointer.lastIndexOf('/')))
@@ -341,6 +367,10 @@ export function StudioEditor({
       pointer,
       next === false && !Array.isArray(parent) && getAt(loaded!.content, pointer) === undefined ? undefined : next,
     )
+  }
+
+  function touch(origin: string) {
+    setTouched((current) => (current.includes(origin) ? current : [...current, origin]))
   }
 
   /** Sets the draft's value at the pointer as it is. A seed cell that picks `false` must keep it. */
@@ -365,24 +395,88 @@ export function StudioEditor({
     }
     if (isContent(parsed)) {
       setDraft(parsed)
+      setOrigins(matchOrigins(loaded!.content, parsed))
       setJsonInvalid(false)
     } else {
       setJsonInvalid(true)
     }
   }
 
+  /** Asks about the renamed and removed fields of an entity first, and writes when there are none. */
   async function save() {
+    if (item.kind === 'entity') {
+      const asked = fieldQuestions(loaded!.content, draft, origins, touched)
+      if (asked.length > 0) {
+        setQuestions(asked)
+        return
+      }
+    }
+    await write(draft, [])
+  }
+
+  function answered(asked: FieldQuestion[], answers: FieldAnswer[]) {
+    setQuestions(undefined)
+    const outcome = applyAnswers(loaded!.content, draft, origins, asked, answers)
+    void write(outcome.draft, outcome.changes, outcome.origins)
+  }
+
+  /**
+   * Writes `final` as the entity or resource. With migration `changes`, the patch and the new migration go in one
+   * changes call. When nothing differs from what was loaded, no request is sent.
+   */
+  async function write(final: Content, changes: MigrationChange[], finalOrigins?: FieldOrigin[]) {
+    const operations = diffPatch(loaded!.content, final)
+    if (changes.length === 0 && operations.length === 0) {
+      setDraft(final)
+      setOrigins(finalOrigins ?? loadedOrigins(final))
+      setTouched([])
+      setJsonText(null)
+      return
+    }
     setSaving(true)
     setSaveFailed(false)
     try {
-      const result = await patchStudioResource(application, item.id, loaded!.version, patch)
-      if (result.status === 'conflict') {
-        setConflict(true)
-        return
+      let version: string
+      let diagnostics: StudioDiagnostic[]
+      let created: StudioResourceItem[] | undefined
+      if (changes.length === 0) {
+        const result = await patchStudioResource(application, item.id, loaded!.version, operations)
+        if (result.status === 'conflict') {
+          setConflict(true)
+          return
+        }
+        version = result.version
+        diagnostics = result.diagnostics
+      } else {
+        const migration = migrationResource(String(final.name), changes, new Date())
+        const result = await saveStudioChanges(application, [
+          { id: item.id, version: loaded!.version, patch: operations },
+          { create: migration },
+        ])
+        if (result.status === 'conflict') {
+          setConflict(true)
+          return
+        }
+        version = result.items[0].version
+        diagnostics = result.diagnostics
+        created = [
+          {
+            id: String(migration.id),
+            kind: 'migration',
+            name: String(migration.name),
+            file: migrationFile(String(migration.name)),
+            version: result.items[1].version,
+            usedBy: 0,
+          },
+        ]
       }
-      setLoaded({ content: draft, version: result.version })
+      setLoaded({ content: final, version })
+      setDraft(final)
+      setOrigins(loadedOrigins(final))
+      setTouched([])
+      setJsonText(null)
       setSaved(true)
-      onSaved(result.diagnostics)
+      onSaved(diagnostics, created)
     } catch (error) {
       if (error instanceof ServerUnreachableError) {
         lost()
@@ -503,7 +597,17 @@ export function StudioEditor({
                     onAdd={addTextKey}
                   />
                 ) : item.kind === 'entity' && schema ? (
-                  <EntityDesigner value={draft} onChange={change} />
+                  <EntityDesigner
+                    value={draft}
+                    onChange={change}
+                    origins={origins}
+                    onOriginsChange={(next, removed) => {
+                      setOrigins(next)
+                      if (removed) {
+                        touch(removed)
+                      }
+                    }}
+                  />
                 ) : item.kind === 'connector' && schema ? (
                   <ConnectorEditor value={draft} onChange={change} />
                 ) : processSchema ? (
@@ -571,6 +675,13 @@ export function StudioEditor({
         )}
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
       </Flex>
+      {questions && (
+        <EntityMigrationQuestions
+          questions={questions}
+          onDone={(answers) => answered(questions, answers)}
+          onCancel={() => setQuestions(undefined)}
+        />
+      )}
       <Modal
         open={deleteOpen}
         title={t('shell.studio.deleteConfirm')}

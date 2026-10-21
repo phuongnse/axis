@@ -201,7 +201,7 @@ The server builds none from the directory.
 `appsettings.Development.json` maps `localhost` to tenant `default` on the
 compose database, and `preview.localhost` to its preview tenant `default-preview`
 on the `axis_preview` database. The E2E server maps `127.0.0.1` to a tenant on the E2E
-database, and `localhost` to its preview tenant. See
+database, and `localhost` to its preview tenant. The E2E run maps `127.0.0.2` to the journey tenant on its own server. See
 [preview tenants](reference/configuration.md#preview-tenants). The `Platform` connection string is separate and still serves the
 readiness check.
 
@@ -634,12 +634,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   at the address the browser uses. So under Compose the site endpoints, the
   record API and the data source endpoint answer `401`, and an application
   page starts a sign-in that cannot complete.
-  - It holds the purchase request users with fixed ids: `anna` and `lan`
-    the employees, `binh` and `chau` the department managers, `dung` the
-    finance reviewer, `giang` the operator, and `hoa` the author. Seed data and E2E journeys already name these ids.
-    `hoa` also holds the `publisher` role. The realm grants it at `samples/keycloak/axis-realm.json:287`.
-  - It also holds the service desk users: `khoa` the agent and `linh` the
-    service desk lead. `anna` holds the `requester` role as well as `employee`.
+  - It holds the development users listed in
+    [development users](#development-users), with fixed ids that seed data
+    and E2E journeys name.
   - Every user has the same development-only password.
   - The roles are client roles of the confidential client `axis`. A
     client-role mapper writes them to the `roles` claim, so the claim holds
@@ -647,6 +644,23 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - The confidential client `purchasing-system` stands in for the
     purchasing system as a [machine caller](#machine-callers). Its service
     account gets tokens through the client credentials grant.
+
+#### Development users
+
+These are test fixtures. Docs and GitHub text name roles instead. A new
+sample reuses a user that holds the role it needs before it adds a user.
+
+| User    | Roles                   | Used by                                                                  |
+| ------- | ----------------------- | ------------------------------------------------------------------------ |
+| `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys   |
+| `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                 |
+| `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                 |
+| `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                 |
+| `dung`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                              |
+| `giang` | `operator`              | Purchase request sample's Approvals inspector; E2E journeys              |
+| `hoa`   | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys |
+| `khoa`  | `agent`                 | Service desk sample; E2E journeys                                        |
+| `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                        |
 
 ### Machine callers
 
@@ -1221,6 +1235,22 @@ lease. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart
 the worker: it writes the restart file that `scripts/e2e.sh` names, then stops
 the worker process, and the script starts a new one. A worker that stops with
 no restart request fails the run.
+
+The E2E run also serves a third tenant, `journey`, for Studio journeys. `scripts/e2e.sh` creates its
+database `axis_journey` and its roles `axis_journey_schema` and `axis_journey_runtime` through `psql`, so Docker
+Compose, `scripts/dev.sh` and `init-roles.sql` stay as they are. A second server serves it on the loopback
+address `127.0.0.2`, because the worker and the publisher reject two tenants that share a host. Playwright
+starts that server after the main one, so the platform migrations of the two never race, and the two share the
+platform database. The journey server runs in the `Testing` environment, because
+`appsettings.Development.json` would add the `default` tenant, the startup activation and the Studio folders.
+It sets `Studio:ApplicationsPath` to a temporary folder and has no preview tenant or bindings. Only startup
+activation migrates a tenant database, so it activates one application at start,
+`tests/e2e/fixtures/journey-base`, which holds only a manifest. It clashes with no sample. A journey therefore builds a whole application in Studio and publishes it, with no clash with
+the committed samples on the main tenant. The setup step signs the author, the requester, the service desk lead
+and the agent in on the journey host and saves those sessions apart from the sessions of the main host. The
+worker and the publisher serve the journey tenant too, and the run fails when the worker log lacks
+`Tenant journey is ready for work` or the publisher log lacks `journey ready`. The server output goes to
+`artifacts/logs/e2e-journey-server.log`.
 
 The E2E run also starts the purchasing system stub from the build output, and
 fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its

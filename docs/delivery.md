@@ -181,7 +181,12 @@ them.
    reuse the parent's title, whole or as a `<parent>: <part>` prefix, because
    the sub-issue link already shows the parent. Add each part as a GitHub
    sub-issue of the parent, in order and in the parent's milestone. NexKit
-   closes the parent when all parts are done.
+   closes the parent when all parts are done. If the parent has an open NexKit
+   pull request, for example one that stalled after repeated time-outs, the
+   split has superseded it. The local agent comments that it is superseded by
+   the sub-issues, naming each one, and closes it. It keeps the branch. This is
+   the only pull request the local agent closes. It never approves or merges
+   one.
 4. **Implement.** The local agent posts `/nexkit go` on the latest plan, as
    described under Decisions. NexKit implements that plan and opens a pull
    request.
@@ -247,13 +252,17 @@ them.
 
 ## Writing on GitHub
 
-These rules apply to issues, plans, pull request descriptions and reviews.
+These rules apply to issues, plans, pull request descriptions and reviews, and to the titles of
+issues, pull requests and sub-issues.
 
 - Lead with the point. Use short sentences and one idea per bullet.
 - Say what changes in behaviour, and why, before naming classes or files.
 - Put decisions and risks the owner must judge in their own short section.
 - Keep implementation detail (signatures, SQL, file-by-file steps) out of the
   main text, or put it in a collapsed `<details>` block.
+- Name the role that acts, in the terms of [concepts.md](domain/concepts.md), never a development
+  user. This covers doc text that describes behaviour, and titles too. User names appear only in test
+  code, test scenarios, the realm file and the [development users table](architecture.md#development-users).
 
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
 [nexkit-profiles]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#profiles

@@ -1173,7 +1173,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     read-only, from the [module resource route](authoring.md#routes). Every input is
     off, and it has no Add field, Remove, Move, Add validation, Save or Delete
     button, no JSON tab and no Uses or Used by lists. A label shows its text key.
-- **Migrations from the designer** *(planned for M11)*. The designer compares
+- **Migrations from the designer** *(rename, remove and the `child-collection` rule are built, the other rows are planned for M11)*. The designer compares
   with the entity as Studio loaded it. "Loaded" means as Studio read the
   entity, not the active release. It asks a question for a change to a loaded
   field and adds the migration change that goes with the answer:
@@ -1198,6 +1198,19 @@ Run and the Test results list, the read-only view of a module entity, and the re
     single save.
   - Validate still runs every activation check, so a missing migration shows
     before a publish.
+  - The questions come when the author clicks Save, one at a time, in the
+    order in which the author first renamed or removed each field. A chain of
+    renames, such as a to b to c, counts as one rename from a to c. A field
+    added in the same session asks nothing. A new row with the name of a
+    removed loaded field counts as that loaded field.
+  - A rename asks Keep data, Drop data or Cancel. Keep data adds
+    `renameField`, and Drop data adds `dropField` for the old name. Cancel
+    stops the whole save and keeps the draft. A removal asks Drop data or Keep
+    field. Keep field puts the field back where it was, and the save goes on
+    with no migration for it.
+  - A rename typed in the JSON view reads as a removal plus a new field,
+    because that view gives no row identity. The removal question still
+    guards the data.
   - See [migrations](storage.md#migrations) and the
     [resource file shape](configuration.md#resource-file-shape).
 - **Policy matrix** *(built)*. One view per application shows who

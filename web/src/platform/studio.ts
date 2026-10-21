@@ -445,6 +445,36 @@ export async function patchStudioResource(
   return { status: 'saved', version: body.version, diagnostics: body.diagnostics }
 }
 
+/** One change of a changes call: a full resource to create, or a patch of a resource with the version it was made from. */
+export type StudioChange =
+  { create: Record<string, unknown> } | { id: string; version: string; patch: JsonPatchOperation[] }
+
+/** The answer of a changes call: the id and new version of each change in request order, or why nothing was written. */
+export type ChangesResult =
+  | { status: 'saved'; items: { id: string; version: string }[]; diagnostics: StudioDiagnostic[] }
+  | { status: 'conflict' }
+
+/**
+ * Writes several changes in one call, in list order. A 409 means a patched version is stale or a created id or file
+ * exists, and nothing was written. A 401 starts sign-in and throws, as any other failure does, including a 400.
+ */
+export async function saveStudioChanges(application: string, changes: StudioChange[]): Promise<ChangesResult> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/changes`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ changes }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as { items: { id: string; version: string }[]; diagnostics: StudioDiagnostic[] }
+  return { status: 'saved', items: body.items, diagnostics: body.diagnostics }
+}
+
 /**
  * Creates a resource from `content`, which holds its `id`, `kind` and `name`. A 409 means the id or the file exists, and
  * a 400 means the name or the locale is refused. Nothing is written for either. A 401 starts sign-in and throws, as any
