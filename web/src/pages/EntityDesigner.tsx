@@ -1,6 +1,7 @@
 import { Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Select, Table, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
 import { changeFieldType, fieldSettings, fieldTypes, type FieldSetting } from '../platform/entityFields'
+import type { FieldOrigin } from '../platform/entityMigrations'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -139,16 +140,22 @@ function Picker({
  * `studio-field-<pointer>`, and each row of the table has the id of its field, so a diagnostic opens at its input or
  * at the row of a setting that the row does not show. Clearing an optional value removes its key. With `readOnly`,
  * as for an entity of a module, every input is off, the label is its plain text key, and there are no buttons that
- * add, remove or move a field or a validation.
+ * add, remove or move a field or a validation. With `origins`, the loaded name of each row of the fields table or
+ * `null` for a row added in this session, Add field, Remove and Move report the origins that follow through
+ * `onOriginsChange`, and Remove also reports the origin of the removed row as touched.
  */
 export function EntityDesigner({
   value,
   onChange,
   readOnly = false,
+  origins,
+  onOriginsChange,
 }: {
   value: Content
   onChange: ChangeHandler
   readOnly?: boolean
+  origins?: FieldOrigin[]
+  onOriginsChange?: (next: FieldOrigin[], touched?: string) => void
 }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
@@ -190,7 +197,13 @@ export function EntityDesigner({
         required={false}
         onPick={(next) => onChange('/displayField', next)}
       />
-      <Fields fields={fields} readOnly={readOnly} onChange={onChange} />
+      <Fields
+        fields={fields}
+        readOnly={readOnly}
+        origins={origins}
+        onOriginsChange={onOriginsChange}
+        onChange={onChange}
+      />
       <Validations validations={value.validations} fieldNames={fieldNames} readOnly={readOnly} onChange={onChange} />
     </Flex>
   )
@@ -202,10 +215,14 @@ export function EntityDesigner({
 function Fields({
   fields,
   readOnly,
+  origins,
+  onOriginsChange,
   onChange,
 }: {
   fields: unknown[] | undefined
   readOnly: boolean
+  origins: FieldOrigin[] | undefined
+  onOriginsChange: ((next: FieldOrigin[], touched?: string) => void) | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -222,6 +239,32 @@ function Fields({
     const next = [...fields!]
     ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
     onChange('/fields', next)
+    if (onOriginsChange) {
+      const moved = rowOrigins()
+      ;[moved[index], moved[index + offset]] = [moved[index + offset], moved[index]]
+      onOriginsChange(moved)
+    }
+  }
+
+  /** The origin of each row, `null` for a row that has none. */
+  function rowOrigins(): FieldOrigin[] {
+    return fields!.map((_, index) => origins?.[index] ?? null)
+  }
+
+  function addField() {
+    onChange('/fields', [...fields!, { name: '', type: 'text' }])
+    onOriginsChange?.([...rowOrigins(), null])
+  }
+
+  function removeField(index: number) {
+    onChange(
+      '/fields',
+      fields!.filter((_, position) => position !== index),
+    )
+    onOriginsChange?.(
+      rowOrigins().filter((_, position) => position !== index),
+      origins?.[index] ?? undefined,
+    )
   }
 
   return (
@@ -308,15 +351,7 @@ function Fields({
                         <Button disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
                           {t('shell.studio.entity.moveDown')}
                         </Button>
-                        <Button
-                          danger
-                          onClick={() =>
-                            onChange(
-                              '/fields',
-                              fields.filter((_, position) => position !== index),
-                            )
-                          }
-                        >
+                        <Button danger onClick={() => removeField(index)}>
                           {t('shell.studio.entity.removeField')}
                         </Button>
                       </Flex>
@@ -327,9 +362,7 @@ function Fields({
         />
         {readOnly ? null : (
           <div>
-            <Button onClick={() => onChange('/fields', [...fields, { name: '', type: 'text' }])}>
-              {t('shell.studio.entity.addField')}
-            </Button>
+            <Button onClick={addField}>{t('shell.studio.entity.addField')}</Button>
           </div>
         )}
       </Flex>
