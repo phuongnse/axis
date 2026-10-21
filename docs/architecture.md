@@ -809,6 +809,11 @@ worker and the publisher serve the journey tenant too, and the run fails when th
 `Tenant journey is ready for work` or the publisher log lacks `journey ready`. The server output goes to
 `artifacts/logs/e2e-journey-server.log`.
 
+`tests/e2e/specs/service-desk-journey.spec.ts` builds the service desk on the journey tenant with Studio only, and
+never opens the JSON view. It compares the built files with `samples/apps/service-desk`. So far it builds the
+application and its `en` and `vi` texts. Studio cannot remove a text key yet, and the starter keys of a blank
+application are not in the sample. So the journey deletes the starter `en` text resource and creates it again.
+
 The E2E run also starts the purchasing system stub from the build output, and
 fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its
 output goes to `artifacts/logs/e2e-purchasing.log`.
