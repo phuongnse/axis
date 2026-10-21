@@ -96,7 +96,7 @@ src/
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory, platform schema
   Axis.Extensions/        contracts for extension packages: operation interface, operation context
-web/                      React + TypeScript SPA (Vite), Ant Design, ProComponents
+web/                      React + TypeScript SPA (Vite), Ant Design
 tests/
   Axis.<Module>.Tests/    unit tests per module (Axis.Server.Tests, Axis.Configuration.Tests, Axis.Data.Tests, Axis.Expressions.Tests, Axis.Tenancy.Tests)
   Axis.Integration.Tests/ PostgreSQL (Testcontainers) and API integration tests
@@ -715,6 +715,10 @@ setting and the upgrade order.
 ## Frontend
 
 Moved to [reference/frontend.md](reference/frontend.md).
+
+Ant Design is a detail of the SPA. It never shows in configuration, page
+metadata, theme tokens or the custom widget API, see
+[D57](decisions/d57-ant-design-is-a-detail-of-the-spa-without-procomponents.md).
 
 ## Testing
 

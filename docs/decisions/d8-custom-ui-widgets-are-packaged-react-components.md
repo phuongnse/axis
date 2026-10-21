@@ -4,8 +4,10 @@ Status: **Agreed, deferred**
 
 A custom widget is a React and TypeScript component in an extension package.
 
-- **What it is built from:** it uses the shared design system, theme and text
-  resources.
+- **What it is built from:** it builds on Axis widgets, Axis theme tokens and
+  the text resources. It never imports Ant Design or another UI library
+  directly
+  ([D57](d57-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
 - **What it declares:** a schema for its properties and data bindings.
 - **What it may call:** the backend only through platform APIs.
 - **Not allowed:** raw HTML or JavaScript in configuration.

@@ -15,6 +15,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   templates. Those components and a single token-based theme with light and
   dark modes live in `web/src/platform/`. Feature code assembles them and
   adds no styling of its own.
+- **The UI library is a detail of the SPA.** The SPA builds on Ant Design for
+  its base components
+  ([D57](../decisions/d57-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
+  Configuration, page metadata, configurable theme tokens and the custom widget
+  API never name an Ant Design component, prop or token. A custom widget builds
+  on Axis widgets and Axis tokens and never imports the UI library directly.
+  Specialised libraries such as React Flow and CodeMirror follow the same rule.
+  No layer renders UI from a schema on top of Ant Design. The shell and the page
+  containers still use ProComponents until it is removed _(planned for M12)_.
 - **How pages and widgets grow.** A page has one widget. A form binds an entity
   or a `form` resource, which lays the entity's fields out in sections, and a
   table binds an entity or a data source. Container widgets such as tabs, sections and columns will hold
