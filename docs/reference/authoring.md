@@ -466,6 +466,11 @@ Studio's expression editor can show errors as the author types. The body is
   `a + 'x'` only the `+` is covered.
 - **Nothing is written.** It compiles in memory, takes no lock and touches no
   database.
+- **Speed.** It answers within 300 ms on a
+  [typical application](../domain/knowledge.md#typical-application-size) of 643
+  files. The compile stops once every check has run, so it builds no reference
+  index, names, policy matrix, model or content hash. Nothing is cached, so the
+  next check sees an edit on disk.
 
 ## Writes
 

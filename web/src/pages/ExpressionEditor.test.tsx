@@ -143,7 +143,7 @@ describe('ExpressionEditor checks', () => {
 
     await waitFor(() => expect(underlined()).toHaveLength(1))
     expect(underlined()[0]).toHaveTextContent('title')
-    expect(screen.getByTestId('studio-expression-error')).toHaveTextContent('AXC0030: Bad name.')
+    await waitFor(() => expect(screen.getByTestId('studio-expression-error')).toHaveTextContent('AXC0030: Bad name.'))
     expect(screen.queryByTestId('studio-expression-type')).not.toBeInTheDocument()
   })
 

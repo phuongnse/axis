@@ -68,7 +68,8 @@ internal static class StudioExpressionEndpoints
             return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid expression check.");
         }
 
-        if (StudioFolder.List(folder).FirstOrDefault(file => file.Id == resourceId) is not { } found)
+        var (resources, folderFiles) = StudioFolder.ListWithContent(folder);
+        if (resources.FirstOrDefault(file => file.Id == resourceId) is not { } found)
         {
             return StudioEndpoints.NotFound(StudioEndpoints.NoResource);
         }
@@ -79,8 +80,8 @@ internal static class StudioExpressionEndpoints
             return NoExpression();
         }
 
-        var files = StudioFolder.Snapshot(folder)
-            .Select(file => new ResourceContent(file.File, string.Equals(file.File, found.File, StringComparison.Ordinal) ? edited : file.Content))
+        var files = folderFiles
+            .Select(file => string.Equals(file.Path, found.File, StringComparison.Ordinal) ? new ResourceContent(file.Path, edited) : file)
             .ToList();
         var probe = new ExpressionProbe(found.File, path);
         var result = ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules, probe);
