@@ -810,7 +810,7 @@ worker and the publisher serve the journey tenant too, and the run fails when th
 `artifacts/logs/e2e-journey-server.log`.
 
 `tests/e2e/specs/service-desk-journey.spec.ts` builds the service desk on the journey tenant with Studio only, and
-never opens the JSON view. It compares the built files with `samples/apps/service-desk`. It builds the whole data
+never opens the JSON view. It builds the whole data
 model: the application, its `en` and `vi` texts, the three roles, the `TicketNumber` sequence, the `Category` and
 `Ticket` entities and the `Categories` seed. The entity designer asks a migration question even for a new entity,
 because the starter field `name` is renamed to `number`. The journey answers Drop data, then deletes the `Ticket`
@@ -822,7 +822,7 @@ The journey then builds the `MyTicketList` and `AllTicketList` data sources, the
 expression editor. It then builds the four pages in the page editor and finishes the site that the blank application
 already has: the `vi` locale and three navigation entries. It deletes the starter `Home` page, because the sample has
 none. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
-the requester from editing `resolution`. At the end the whole folder must have no error diagnostic.
+the requester from editing `resolution`. It then writes the six test scenarios in the scenario editor, each with its users, time and steps. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
 
 The E2E run also starts the purchasing system stub from the build output, and
 fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its
