@@ -34,6 +34,12 @@ test.describe('the author builds the service desk with Studio only', () => {
     await dialog.getByRole('button', { name: 'Create' }).click()
   }
 
+  async function createPage(page: Page, name: string) {
+    await create(page, 'page', 'Name', name)
+    // The editor of the page that was open stays on screen until the new page replaces it, so wait for the name.
+    await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name' })).toHaveValue(name)
+  }
+
   async function pick(page: Page, testId: string, option: string, filter?: string) {
     const field = page.getByTestId(testId)
     const combobox = field.getByRole('combobox')
@@ -78,6 +84,44 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(label.getByTestId('studio-label-written')).toBeVisible()
   }
 
+  async function grantIn(
+    page: Page,
+    role: string,
+    kind: string,
+    target: string,
+    grants: { actions: string[]; filter?: string; fields?: string[] }[],
+  ) {
+    const cell = page.getByTestId(`studio-matrix-cell-${role}-${kind}-${target}`)
+    await cell.click()
+    for (const [index, grant] of grants.entries()) {
+      await page.getByRole('button', { name: 'Add grant' }).click()
+      const own = page.getByTestId('studio-matrix-own-grant').nth(index)
+      for (const action of grant.actions) {
+        // The matrix ticks the box a moment after the click, which check() would report as no change.
+        const box = own.getByTestId('studio-matrix-actions').getByRole('checkbox', { name: action, exact: true })
+        await box.click()
+        await expect(box).toBeChecked()
+      }
+      if (grant.filter !== undefined) {
+        await expect(own.locator('.cm-editor')).toBeVisible()
+        await own.getByRole('textbox', { name: 'Record filter' }).fill(grant.filter)
+      }
+      if (grant.fields !== undefined) {
+        await own.locator('.ant-select-selector').click()
+        for (const field of grant.fields) {
+          await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: field, exact: true }).click()
+        }
+        await page.keyboard.press('Escape')
+      }
+    }
+    await page.getByTestId('studio-matrix-own-grants').getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByTestId('studio-matrix-saved')).toBeVisible()
+    // The matrix loads again after a save. A cell clicked before that could lose its new draft.
+    for (const action of grants.flatMap((grant) => grant.actions)) {
+      await expect(cell).toContainText(action)
+    }
+  }
+
   async function texts(locale: string) {
     const { texts } = JSON.parse(await readFile(path.join(serviceDesk, 'texts', `${locale}.json`), 'utf8')) as {
       texts: Record<string, string>
@@ -93,10 +137,8 @@ test.describe('the author builds the service desk with Studio only', () => {
     compareApplicationFolders(serviceDesk, built, { files })
     const response = await page.request.get(`${journeyURL}/api/studio/apps/ServiceDesk/diagnostics`)
     expect(response.status()).toBe(200)
-    const { diagnostics } = (await response.json()) as { diagnostics: { severity: string; file: string }[] }
-    expect(
-      diagnostics.filter((diagnostic) => diagnostic.severity === 'error' && files.includes(diagnostic.file)),
-    ).toEqual([])
+    const { diagnostics } = (await response.json()) as { diagnostics: { severity: string }[] }
+    expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([])
   }
 
   test('the author creates ServiceDesk as a blank application', async ({ page }) => {
@@ -502,6 +544,108 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expectForm(page)
   })
 
+  test('the author builds the ticket form and the task inbox pages', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    await createPage(page, 'TicketForm')
+    await writeLabel(page, 'studio-field-/title', 'pages.ticketForm.title', en['pages.ticketForm.title'])
+    await pick(page, 'studio-field-/widgets/0/type', 'form')
+    await pick(page, 'studio-field-/widgets/0/entity', 'Ticket')
+    await page.getByRole('button', { name: 'Add action' }).click()
+    await pick(page, 'studio-field-/widgets/0/actions/0/process', 'TicketHandling')
+    await writeLabel(page, 'studio-field-/widgets/0/actions/0/label', 'ticket.submit', en['ticket.submit'])
+    await save(page)
+
+    // The starter widget of a new page is the task inbox, which is what MyTasks needs.
+    await createPage(page, 'MyTasks')
+    await writeLabel(page, 'studio-field-/title', 'pages.myTasks.title', en['pages.myTasks.title'])
+    await save(page)
+  })
+
+  test('the author builds the two ticket table pages', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    // The page names load with the application, so TicketForm is offered below.
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    for (const [name, titleKey, list] of [
+      ['MyTickets', 'pages.myTickets.title', 'MyTicketList'],
+      ['AllTickets', 'pages.allTickets.title', 'AllTicketList'],
+    ]) {
+      await createPage(page, name)
+      await writeLabel(page, 'studio-field-/title', titleKey, en[titleKey])
+      await pick(page, 'studio-field-/widgets/0/type', 'table')
+      await pick(page, 'studio-field-/widgets/0/dataSource', list)
+      await pick(page, 'studio-field-/widgets/0/formPage', 'TicketForm')
+      await save(page)
+    }
+  })
+
+  test('the author finishes the site and deletes the Home page', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    await page.getByTestId('studio-group-site').getByRole('button').click()
+    await expectForm(page)
+
+    await page.getByTestId('studio-field-/locales/available').getByRole('button', { name: 'Add', exact: true }).click()
+    await page.getByTestId('studio-field-/locales/available/1').getByRole('textbox').fill('vi')
+
+    // The starter site has the entry for Home, which the author turns into the first entry.
+    const navigation: [page: string, key: string][] = [
+      ['MyTickets', 'nav.myTickets'],
+      ['MyTasks', 'nav.myTasks'],
+      ['AllTickets', 'nav.allTickets'],
+    ]
+    for (const [index, [target, key]] of navigation.entries()) {
+      if (index > 0) {
+        await page.getByTestId('studio-field-/navigation').getByRole('button', { name: 'Add', exact: true }).click()
+      }
+      await pick(page, `studio-field-/navigation/${index}/page`, target)
+      await writeLabel(page, `studio-field-/navigation/${index}/label`, key, en[key])
+    }
+    await save(page)
+    await expectForm(page)
+
+    // The sample has no Home page, and nothing points to it now.
+    const home = page.getByTestId('studio-group-page').getByRole('button', { name: 'Home', exact: true })
+    await home.click()
+    await expectForm(page)
+    await page.getByRole('button', { name: 'Delete' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+    await expect(home).toHaveCount(0)
+  })
+
+  test('the author builds the three access policies in the policy matrix', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+    await page.getByText('Policy matrix', { exact: true }).click()
+
+    // The matrix appends each grant to the end of the policy, so the order here is the order of the sample.
+    await grantIn(page, 'requester', 'entity', 'Ticket', [
+      { actions: ['read'], filter: 'requester == currentUser()' },
+      {
+        actions: ['create', 'update'],
+        filter: "requester == currentUser() and status in ('draft', 'reopened')",
+        fields: ['title', 'description', 'status'],
+      },
+    ])
+    await grantIn(page, 'requester', 'entity', 'Category', [{ actions: ['read'] }])
+    await grantIn(page, 'requester', 'dataSource', 'MyTicketList', [{ actions: ['read'] }])
+    await grantIn(page, 'requester', 'process', 'TicketHandling', [{ actions: ['start'] }])
+
+    await grantIn(page, 'agent', 'entity', 'Ticket', [{ actions: ['read'], filter: 'assignedAgent == currentUser()' }])
+    await grantIn(page, 'agent', 'entity', 'Category', [{ actions: ['read'] }])
+    await grantIn(page, 'agent', 'dataSource', 'MyTicketList', [{ actions: ['read'] }])
+
+    await grantIn(page, 'service-desk-lead', 'entity', 'Ticket', [{ actions: ['read'] }])
+    await grantIn(page, 'service-desk-lead', 'entity', 'Category', [{ actions: ['read'] }])
+    await grantIn(page, 'service-desk-lead', 'dataSource', 'AllTicketList', [{ actions: ['read'] }])
+  })
+
   test('the built files match the sample', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
@@ -515,12 +659,20 @@ test.describe('the author builds the service desk with Studio only', () => {
       'forms/ticket-confirmation.json',
       'forms/ticket-resolution.json',
       'forms/ticket-triage.json',
+      'pages/all-tickets.json',
+      'pages/my-tasks.json',
+      'pages/my-tickets.json',
+      'pages/ticket-form.json',
+      'policies/agent-access.json',
+      'policies/requester-access.json',
+      'policies/service-desk-lead-access.json',
       'processes/ticket-handling.json',
       'roles/agent.json',
       'roles/requester.json',
       'roles/service-desk-lead.json',
       'seeds/categories.json',
       'sequences/ticket-number.json',
+      'sites/service-desk.json',
       'texts/en.json',
       'texts/vi.json',
     ])
@@ -529,5 +681,11 @@ test.describe('the author builds the service desk with Studio only', () => {
       throw error
     })
     expect(migrations).toEqual([])
+    expect((await readdir(path.join(built, 'pages'))).sort()).toEqual([
+      'all-tickets.json',
+      'my-tasks.json',
+      'my-tickets.json',
+      'ticket-form.json',
+    ])
   })
 })
