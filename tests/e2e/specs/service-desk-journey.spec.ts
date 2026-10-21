@@ -753,8 +753,8 @@ test.describe('the author builds the service desk with Studio only', () => {
         const newRow = page.getByTestId(`studio-field-/users/${index === 0 ? 'author' : 'user1'}`)
         const userId = newRow.getByRole('textbox', { name: 'User id', exact: true })
         await userId.fill(user)
-        // The rename on blur detaches the input, which makes Playwright's blur() retry forever, so blur runs once here.
-        await userId.evaluate((input: { blur(): void }) => input.blur())
+        // The rename detaches this input, so Tab goes through the page keyboard rather than the locator.
+        await page.keyboard.press('Tab')
         const row = page.getByTestId(`studio-field-/users/${user}`)
         await expect(row).toBeVisible()
         await row.locator('.ant-select-selector').click()
