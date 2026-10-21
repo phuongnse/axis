@@ -86,6 +86,7 @@ beforeAll(() =>
     loadKindSchema('endpoint'),
     loadKindSchema('text'),
     loadKindSchema('page'),
+    loadKindSchema('entity'),
   ]),
 )
 
@@ -1020,5 +1021,96 @@ describe('StudioEditor for a page', () => {
       { op: 'remove', path: '/widgets/0/actions' },
     ])
     expect(operations.some((operation) => operation.path.includes('x-note'))).toBe(false)
+  })
+})
+
+describe('StudioEditor for an entity', () => {
+  const designedItem: StudioResourceItem = { ...resources[1], id: 'a4e6d3a1-77a0-4b0d-8b0c-5c1d6f0a9b01' }
+  const designed = {
+    id: designedItem.id,
+    kind: 'entity',
+    name: 'Invoice',
+    formatVersion: 1,
+    label: { textKey: 'entity.invoice' },
+    fields: [
+      { name: 'total', type: 'decimal', unique: true, precision: 18, scale: 2 },
+      { name: 'code', type: 'text', maxLength: 20 },
+      { name: 'note', type: 'text' },
+    ],
+  }
+
+  function sentFields(fetchMock: ReturnType<typeof vi.fn>): unknown {
+    return sentPatch(fetchMock).find((operation) => operation.path === '/fields')!.value
+  }
+
+  it('opens in the designer and keeps the JSON tab with the draft', async () => {
+    stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const designer = await screen.findByTestId('studio-entity-designer', {}, slow)
+    expect(designer).toBeVisible()
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+
+    expect(JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)).toEqual(designed)
+  })
+
+  it('changes a decimal field to enum: the type changes, precision and scale go and unique stays', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await pick(await screen.findByTestId('studio-field-/fields/0/type', {}, slow), 'enum')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([
+      { op: 'replace', path: '/fields/0/type', value: 'enum' },
+      { op: 'remove', path: '/fields/0/precision' },
+      { op: 'remove', path: '/fields/0/scale' },
+    ])
+  })
+
+  it('adds a field', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add field' }, slow))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentFields(fetchMock)).toEqual([...designed.fields, { name: '', type: 'text' }])
+  })
+
+  it('removes a field', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const row = await screen.findByTestId('studio-field-/fields/1', {}, slow)
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove field' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentFields(fetchMock)).toEqual([designed.fields[0], designed.fields[2]])
+  })
+
+  it('moves a field up and down', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const row = await screen.findByTestId('studio-field-/fields/1', {}, slow)
+    expect(within(screen.getByTestId('studio-field-/fields/0')).getByRole('button', { name: 'Move up' })).toBeDisabled()
+    await userEvent.click(within(row).getByRole('button', { name: 'Move up' }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/fields/1')).getByRole('button', { name: 'Move down' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    // Fields that swap places in an array of the same length are patched item by item, so apply the patch.
+    let moved: unknown = designed
+    for (const operation of sentPatch(fetchMock)) {
+      moved = setAt(moved, operation.path, operation.op === 'remove' ? undefined : operation.value)
+    }
+    // The first move puts `code` first, the second moves `total` below `note`.
+    expect((moved as typeof designed).fields).toEqual([designed.fields[1], designed.fields[2], designed.fields[0]])
   })
 })

@@ -18,6 +18,7 @@ import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointValues } from './EndpointValues'
+import { EntityDesigner } from './EntityDesigner'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
@@ -91,6 +92,8 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * binding as a name only. A page opens in the page editor, which lists its widgets and shows a panel for the
  * selected widget's type, and keeps a key it does not show. A process opens in the process editor, which shows its
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition. An
+ * entity opens in the entity designer, which shows its header, a table of its fields with the settings of each
+ * field's type, and its validations. An
  * endpoint keeps the generic form and shows its `values` as rows of a field of its entity and an expression. When the
  * server does not answer, the draft stays, and the resource loads again after the reconnect unless the draft has
  * changes.
@@ -499,6 +502,8 @@ export function StudioEditor({
                     onChange={update}
                     onAdd={addTextKey}
                   />
+                ) : item.kind === 'entity' && schema ? (
+                  <EntityDesigner value={draft} onChange={change} />
                 ) : item.kind === 'connector' && schema ? (
                   <ConnectorEditor value={draft} onChange={change} />
                 ) : processSchema ? (
