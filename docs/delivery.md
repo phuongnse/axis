@@ -247,13 +247,17 @@ them.
 
 ## Writing on GitHub
 
-These rules apply to issues, plans, pull request descriptions and reviews.
+These rules apply to issues, plans, pull request descriptions and reviews, and to the titles of
+issues, pull requests and sub-issues.
 
 - Lead with the point. Use short sentences and one idea per bullet.
 - Say what changes in behaviour, and why, before naming classes or files.
 - Put decisions and risks the owner must judge in their own short section.
 - Keep implementation detail (signatures, SQL, file-by-file steps) out of the
   main text, or put it in a collapsed `<details>` block.
+- Name the role that acts, in the terms of [concepts.md](domain/concepts.md), never a development
+  user. This covers doc text that describes behaviour, and titles too. User names appear only in test
+  code, test scenarios, the realm file and the [development users table](architecture.md#development-users).
 
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
 [nexkit-profiles]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#profiles
