@@ -956,7 +956,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     the same lists.
   - A package or a module entry is plain text. It cannot be opened or expanded.
   - Uses and Used by stay lists. The **Process graph** below is the only
-    drawn graph *(planned for M11)*.
+    drawn graph.
 - **Text keys.** A text resource's **Uses** list holds its keys, each as an
   entry. Expanding a key lists the labels that use it and the locales that
   define it, as its **Used by** list.
@@ -1483,25 +1483,31 @@ Run and the Test results list, the read-only view of a module entity, and the re
     built, see
     [D46](../decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).
     The page editor changes again then.
-- **Process graph** *(planned for M11)*. A process shows a drawn graph of its
-  steps and transitions above its editor, see
+- **Process graph** *(built, except the diagnostic marks)*. A process shows a
+  drawn graph of its steps and transitions above its editor, see
   [D53](../decisions.md#d53-typed-editors-and-the-process-graph-in-studio--agreed).
   It is read-only. The author edits steps in the list.
   - Dagre, `@dagrejs/dagre`, lays out the graph, and React Flow,
     `@xyflow/react`, draws it. Their sizes are about 30 KB and 50 KB min+gzip.
-    Neither is in the SPA yet. M14's process designer builds on both.
+    The SPA loads them in their own chunk when a process opens. M14's process
+    designer builds on both.
   - The graph and the step editor stay in step. Both read the same unsaved
-    draft, so an edit in the list redraws the graph at once.
-  - Selecting a node selects that step in the list. Selecting an edge opens its
-    transition: the outcome, the branch, `otherwise` or `next`. Selecting a step
-    in the list highlights its node.
+    draft, so an edit in the list or the JSON view redraws the graph at once.
+  - A node opens its step at `/steps/{i}`, and the editor scrolls to that step's
+    card. An edge opens its transition: the outcome, the branch, `otherwise` or
+    `next`.
+  - The node of the open path is current, and it has `aria-current`. Its
+    highlight follows the open path, not the focus in the step list.
+  - Nodes are reached with Tab, in step order, and opened with Enter. Each node
+    has a text label with the step's name and type. Edges are reached with the
+    pointer only. A keyboard user reaches each transition through the pickers
+    in the step list.
   - A transition to a step that does not exist draws no edge. The graph never
     invents a node.
-  - A step that a diagnostic in the diagnostics panel names, by a path such as
-    `/steps/{i}`, is marked. The marks come from the panel's last loaded list,
-    so they change on a save or a request, not on every edit.
-  - Nodes are reached with Tab and opened with Enter. Each node has a text label
-    with the step's name and type.
+  - Planned, not built: a step that a diagnostic in the diagnostics panel names,
+    by a path such as `/steps/{i}`, is marked. The marks will come from the
+    panel's last loaded list, so they change on a save or a request, not on
+    every edit.
 - **Designers.** Visual page, form and process designers are not built yet.
   They are planned for M13 and M14, see
   [D46](../decisions.md#d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9--agreed).

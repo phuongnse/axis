@@ -1,5 +1,5 @@
 import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
-import { useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyAnswers,
   fieldQuestions,
@@ -58,6 +58,9 @@ interface SeedEntity {
 }
 
 const noProblems = new Map<string, string>()
+const noPaths: string[] = []
+
+const LazyStudioProcessGraph = lazy(() => import('./StudioProcessGraph'))
 
 function seedFieldsOf(content: Content): SeedField[] | null {
   if (!Array.isArray(content.fields)) {
@@ -106,12 +109,12 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * stubs and steps, and the JSON view edits the same draft. A connector opens in the connector editor, which shows a
  * binding as a name only. A page opens in the page editor, which lists its widgets and shows a panel for the
  * selected widget's type, and keeps a key it does not show. A process opens in the process editor, which shows its
- * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition. An
- * entity opens in the entity designer, which shows its header, a table of its fields with the settings of each
- * field's type, and its validations. An
- * endpoint keeps the generic form and shows its `values` as rows of a field of its entity and an expression. When the
- * server does not answer, the draft stays, and the resource loads again after the reconnect unless the draft has
- * changes. When an entity's loaded field was renamed or removed, Save asks one question per field first, and the answers
+ * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
+ * A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
+ * calls `onOpenPath`. An entity opens in the entity designer, which shows its header, a table of its fields with the
+ * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
+ * of a field of its entity and an expression. When the server does not answer, the draft stays, and the resource loads
+ * again after the reconnect unless the draft has changes. When an entity's loaded field was renamed or removed, Save asks one question per field first, and the answers
  * add a `renameField` or `dropField` migration that is saved with the entity in one changes call.
  */
 export function StudioEditor({
@@ -122,11 +125,13 @@ export function StudioEditor({
   onSaved,
   onTextsWritten,
   onDeleted,
+  onOpenPath,
 }: {
   application: string
   item: StudioResourceItem
   resources: StudioResourceItem[]
   path: string | null
+  onOpenPath: (path: string) => void
   onSaved: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem[]) => void
   onTextsWritten: (diagnostics: StudioDiagnostic[]) => void
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
@@ -565,6 +570,11 @@ export function StudioEditor({
     <Flex vertical gap="small" data-testid="studio-editor" ref={rootRef}>
       <ExpressionCheckContext.Provider value={checkContext}>
         <LabelTextsContext.Provider value={labelContext}>
+          {item.kind === 'process' && (
+            <Suspense fallback={null}>
+              <LazyStudioProcessGraph draft={draft} path={path} diagnosticPaths={noPaths} onOpenPath={onOpenPath} />
+            </Suspense>
+          )}
           <Tabs
             activeKey={tab}
             onChange={(key) => setTab(key as 'form' | 'json')}
