@@ -440,13 +440,11 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - A shared grant, a grant of a read-only row and a grant in any other policy
     stay read-only. Splitting a shared policy is not done here.
   - See [roles and policies](roles-and-policies.md).
-- **Editors by kind.** Studio uses a typed editor for six kinds, the entity
-  designer for `entity`, and the generic form for the rest. The seed editor,
+- **Editors by kind.** Studio uses a typed editor for the kinds listed here, the entity
+  designer for `entity`, and the generic form for every other kind. The seed editor,
   the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the text
   editor, the process editor's step list, with its decision, end, task and operation panels, and the entity designer are
-  built. The other typed editors are *(planned for M11)*, and until they are built those kinds use the generic
-  form. The last
-  column lists what still needs the JSON view, because the form cannot show it.
+  built. The last column lists what still needs the JSON view, because the form cannot show it.
 
   | Kind          | Editor                                | Still needs the JSON view                                             |
   | ------------- | ------------------------------------- | --------------------------------------------------------------------- |

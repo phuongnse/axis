@@ -40,9 +40,9 @@ The owner confirmed these points on issue #570 on 2026-10-18.
   - Each resource shows a **Uses** list and a **Used by** list. A Used by entry
     opens the other resource at the path of the reference. A Uses entry opens
     it at its top. An entry expands one more step on request.
-  - There is no graph drawing library. A drawn graph can come later
-    without changing the index. M11 adds one for the process graph, see
-    [D53](d53-typed-editors-and-the-process-graph-in-studio.md).
+  - Uses and Used by stay lists, with no graph drawing library. The process graph of
+    [D53](d53-typed-editors-and-the-process-graph-in-studio.md) is the only drawn graph, and it
+    does not change the index.
 - **Cost:**
   - The index adds at most 30% of compile time, or 300 ms when that is more.
     A where-used answer for an application of typical size returns within 10

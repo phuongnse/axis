@@ -4,7 +4,8 @@ Status: **Agreed**
 
 Studio lets an author pick references, edit label texts in every locale and
 write expressions with live type checks, in place of typing names, keys and
-expression strings by hand. This is _(planned for M11)_. See
+expression strings by hand. The names route, the reference pickers, label texts with the texts
+route, the expression check route and the expression editor are built. See
 [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
 for M11, the [authoring API](../reference/authoring.md#names) for the routes, the
 [schema keywords](../reference/resource-files.md#schema-keywords) and
@@ -76,7 +77,7 @@ issue #779 on 2026-10-20.
 
 _Why:_ [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
 plans reference pickers and an expression editor with type errors as you type
-in M11. Names, keys and expressions are typed by hand today, and a mistake
+in M11. Names, keys and expressions were typed by hand before it, and a mistake
 shows only after a save, as a folder diagnostic. One names route lets Studio
 load everything once, in place of a call per picker. One shared keyword per
 purpose keeps the schemas the single source of what is a reference or an

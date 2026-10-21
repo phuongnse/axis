@@ -140,9 +140,9 @@ works on a fresh clone:
   `request-approval` sample template. The server reads the template catalog only when it starts, so a template
   edit needs a restart of the script. The production images and `deploy/` set no
   `Templates:Path`, so they list no template.
-- _(planned for M11)_ Development, Compose and E2E set `Studio:ApplicationsPath`
-  to `artifacts/studio-apps`. `artifacts/` is already
-  git-ignored. See
+- E2E's journey server sets `Studio:ApplicationsPath` to a temporary folder. Development and
+  Compose set it to `artifacts/studio-apps` _(planned for M13)_, which `artifacts/` already keeps
+  out of git. See
   [D51](decisions/d51-creating-applications-and-resources-from-studio.md).
 - It runs the server and the worker under `dotnet watch` and the SPA on Vite in
   one terminal. It starts the worker once the server has migrated the tenant
