@@ -1,6 +1,6 @@
 ---
 name: axis-nexkit
-description: Runbook for the local agent session that drives NexKit for the Axis owner (posting commands, reading plans, triaging pull requests, splitting issues). Use when the owner asks to plan, implement, check, fix or split work through NexKit, or asks about the state of a NexKit issue or pull request. Not for agents running inside the NexKit pipeline.
+description: Runbook for the local agent session that works NexKit for the Axis owner (writing issues and their order, reading plans, stepping in where autopilot stops, triaging pull requests). Use when the owner asks to plan, implement, check, fix or split work through NexKit, or asks about the state of a NexKit issue or pull request. Not for agents running inside the NexKit pipeline.
 ---
 
 # Driving NexKit for Axis
@@ -10,12 +10,15 @@ The rules, the roles and the life of an issue are in
 only the practical parts: where values live, the `gh` commands, two review
 checklists and what to do when something fails.
 
-You post every command yourself. Post `/nexkit go` only on the latest plan,
-after the check below that it holds every agreed change, and only when you
-recommend it. Ask the owner first when the plan rests on a **Proposed**
-decision or has a question only the owner can answer. Never approve or merge a
-pull request yourself. The only pull request you close is one a split has
-superseded, as in the table under "When something fails". While `merge.auto` is
+Autopilot posts `/nexkit plan` and `/nexkit go` for the issues of the current
+milestone, answers questions that have a recommended option, and splits plans
+that are too large. Your part is what it cannot do: write each issue and mark
+what it must wait for, read each plan and comment changes, and act where it
+stops and a person is needed. You may still post any command, but never
+`/nexkit plan` or `/nexkit go` on an issue whose autopilot state is `start` or
+`active`. Ask the owner first when a choice rests on a **Proposed** decision or
+only the owner can answer it. Never approve, merge or close a pull request
+yourself: autopilot closes the one a split supersedes. While `merge.auto` is
 on, NexKit merges and closes the issue, and with `close_parent_issues` it closes
 finished parents too. While `merge.auto` is off, merging is the owner's.
 
@@ -45,7 +48,7 @@ change with a NexKit release or a settings change.
   default, from its configuration doc at the pinned ref.
 
   ```bash
-  jq '{protected_paths, fix, merge, conflicts, usage_limit, close_parent_issues, notify}' .nexkit/config.json
+  jq '{protected_paths, fix, merge, conflicts, usage_limit, close_parent_issues, autopilot, notify}' .nexkit/config.json
   ```
 
 - **Profiles, their `when` texts and models:** `.nexkit/config.json`. A
@@ -103,9 +106,10 @@ gh issue view <N> --comments
 
 See all open NexKit work and what needs a person with NexKit's local
 `status` command, at the pinned ref. It lists each issue and pull request with
-its state and last round, the recent merges with their CI runs on `main`, and
-a last section with only what needs a person. `--json` gives the same as JSON.
-Start every session with it, and use it to watch the work:
+its state and last round, the recent merges with their CI runs on `main`, what
+the next autopilot sweep does with each issue in scope and why, and a last
+section with only what needs a person. `--json` gives the same as JSON. Start
+every session with it, and use it to watch the work:
 
 ```bash
 REPO=$(grep -oE 'nexkit_repository: \S+' .github/workflows/nexkit.yml | cut -d' ' -f2)
@@ -115,23 +119,40 @@ KIT="${TMPDIR:-/tmp}/nexkit-$REF"
 python3 "$KIT/bin/nexkit" status
 ```
 
-Split an issue that reports `too_large`. Create each part with
+Mark an issue *blocked by* another, so autopilot starts it only once that one
+is closed. Autopilot reads no "Depends on" text, and the order of sub-issues
+does not count. `issue_id` is the blocking issue's database `id`, not its
+number:
+
+```bash
+BLOCKER_ID=$(gh api repos/{owner}/{repo}/issues/<blocking> --jq .id)
+gh api -X POST repos/{owner}/{repo}/issues/<blocked>/dependencies/blocked_by -F issue_id="$BLOCKER_ID"
+gh api repos/{owner}/{repo}/issues/<blocked>/dependencies/blocked_by --jq '.[].number'
+```
+
+Start a sweep yourself, for example after changing what blocks what:
+
+```bash
+gh workflow run nexkit.yml -f command=autopilot -f number=autopilot
+```
+
+Split an issue by hand only when autopilot cannot, for example when the plan
+reports `too_large` without suggesting parts. Create each part with
 `gh issue create --title "<part's behaviour>" --milestone "<parent's milestone>" --label "<part's labels>"`,
-then add the parts to the parent in order. `--label` takes a comma-separated
-list, for example `--label bug,documentation`. Each part gets its own labels by
-the rule in the writing checklist. It does not copy the parent's labels. Title each part by the behaviour it
-delivers, as for any issue. Name the role in a part's title, never a development user. Never reuse the parent's title, whole or as a
-prefix: write `Connector call steps pass compile checks`, not
+add the parts to the parent, and mark each part *blocked by* the parts it needs.
+`--label` takes a comma-separated list, for example `--label bug,documentation`.
+Title each part by the behaviour it delivers, as for any issue. Name the role in
+a part's title, never a development user. Never reuse the parent's title, whole
+or as a prefix: write `Connector call steps pass compile checks`, not
 `Call connector step: compile checks and model`. The sub-issue link already
-shows the parent. If the issue has an open NexKit pull request, close it as
-superseded, see "When something fails".
+shows the parent.
 
 ```bash
 CHILD_ID=$(gh api repos/{owner}/{repo}/issues/<child> --jq .id)
 gh api -X POST repos/{owner}/{repo}/issues/<parent>/sub_issues -F sub_issue_id="$CHILD_ID"
 ```
 
-`sub_issue_id` is the issue's database `id`, not its number. If the endpoint
+`sub_issue_id` is the issue's database `id`, not its number. If an endpoint
 returns 404, upgrade `gh` and try again.
 
 ## Checklist: writing an issue
@@ -149,10 +170,15 @@ returns 404, upgrade `gh` and try again.
   an issue about an accessibility barrier gets `accessibility`.
 
   The creator, the owner or the local agent, sets the labels in
-  `gh issue create --label`. Each part of a split gets its own labels by the
-  same rule, not the parent's. A bug issue opened for a CI failure on `main`
-  gets `bug`. See
+  `gh issue create --label`. A part that autopilot creates in a split gets the
+  parent's milestone and labels. A bug issue that autopilot opens for a CI
+  failure on `main` gets `bug`. See
   [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue).
+- The issue is in the current milestone and opened by the owner or the local
+  agent, because autopilot takes only issues opened by someone with write
+  access. If it must wait for another issue, mark it *blocked by* that issue
+  before the next sweep, or autopilot plans it at once. The milestone's docs
+  sweep is blocked by every other issue of the milestone.
 - Behaviour is named by role, in the terms of concepts.md, never by a development user, in the title
   as well as the body. See the
   [development users table](../../../docs/reference/security.md#development-users).
@@ -172,12 +198,15 @@ returns 404, upgrade `gh` and try again.
 - No **Proposed** decision in [decisions.md](../../../docs/decisions.md) is
   treated as **Agreed**.
 - The decisions and risks the owner must judge are in their own short sections.
-- A `too_large` result leads to sub-issues of the parent, in order and in the
-  parent's milestone. Each part's title names its own behaviour and does not
-  reuse the parent's title, whole or as a prefix. Each part's title names roles, not development users.
+- A `too_large` plan suggests parts that each name their own behaviour in the
+  title, without the parent's title, whole or as a prefix, and name roles, not
+  development users. Each part names the earlier parts it needs. If not,
+  comment the change before the next sweep splits it.
 - Every change agreed after the plan was posted, from the review or from the
-  owner while approving, however small, is commented in the same issue and
-  `/nexkit plan` is run again. No follow-up issues.
+  owner, however small, is commented in the same issue. The comment makes the
+  next sweep plan again before `/nexkit go`. When `/nexkit go` has already
+  started, post the change as `/nexkit fix <change>` on its pull request. No
+  follow-up issues.
 - A re-plan revises the latest plan, so the comments since that plan state
   only the changes. Choices accepted as they are need no comment.
 - Changes in a comment are terse: one short line each, with the exact values,
@@ -188,8 +217,9 @@ returns 404, upgrade `gh` and try again.
   was asked for, and nothing else changed without a reason.
 - Use `/nexkit plan from scratch` only when the plan has gone wrong, and
   comment every choice to keep before posting it.
-- Before asking the owner for go, or posting `/nexkit go`, the latest plan
-  holds every agreed change. If not, re-plan first. The plan is the contract:
+- Before `/nexkit go` starts, the latest plan holds every agreed change. A
+  comment after the plan holds autopilot back until it has planned again.
+  The plan is the contract:
   it holds the acceptance criteria the pull request is checked against, and it
   is the record a later reader looks at. Re-planning also lets the plan agent
   find other places the change affects, such as another doc that must say the
@@ -197,6 +227,9 @@ returns 404, upgrade `gh` and try again.
 
 ## Checklist: breaking down a milestone
 
+- Create the new milestone's issues, and mark *blocked by* every issue that
+  must wait for another, before the owner closes the current milestone.
+  Autopilot takes the new milestone at the next sweep after that.
 - Compare the `when` texts with the concepts that the **From** column of
   [concepts.md](../../../docs/domain/concepts.md) lists for the new
   milestone. Each risky concept must fall under `hard` by its consequence.
@@ -229,7 +262,9 @@ returns 404, upgrade `gh` and try again.
 | Failure | What the local agent does |
 | --- | --- |
 | Publish fails after `/nexkit go` | Read the run log. If the base branch was force-pushed, the same `/nexkit go` fixes it. Otherwise diagnose first. Ask the owner before posting `/nexkit go` again. |
-| A round ends as `blocked` | Answer the question with `/nexkit fix <decision>`. Ask the owner first when the choice is theirs. |
+| A plan has a question with no recommended option | NexKit has mentioned the owner. Ask the owner, then comment the answer on the issue: the next sweep plans again. |
+| A round ends as `blocked` and a question has no recommended option | Answer the question with `/nexkit fix <decision>`. Ask the owner first when the choice is theirs. |
+| An implement or fix round ran out of time twice | Autopilot already planned once with a note to split. Read the plan and the run logs, then split the issue by hand or comment a smaller plan. |
 | Merge conflict with `main` | Nothing: NexKit starts a conflict round by itself. Answer a `blocked` question with `/nexkit fix <decision>`. After `conflicts.max_rounds` such rounds, comment `/nexkit fix` yourself. |
 | Conflict in a path NexKit may not change, or a merge that brings workflow changes | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
 | The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that profile is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
@@ -239,8 +274,8 @@ returns 404, upgrade `gh` and try again.
 | The review job errored | The round's comment says why. Comment `/nexkit review` to retry, unless it names an authentication error: then tell the owner, because a retry stops the same way. |
 | The review requested changes | NexKit runs automatic fix rounds up to the configured limit. After that, ask the owner and post `/nexkit fix <instructions>`. |
 | NexKit's automatic merge was refused (`merge_refused`) | A conflict starts a conflict round by itself. Otherwise the round's comment says why, usually a rule on `main`. NexKit has mentioned the owner; tell them what you found. |
-| CI on `main` fails after a merge | If the failure looks flaky, run it once more with `gh run rerun <id> --failed`. Otherwise tell the owner and open a bug issue with the `bug` label, the failure and the run link, in the current milestone, and plan it before other issues. |
-| A NexKit pull request's issue was split into sub-issues, so the pull request is superseded | Once the sub-issues exist and are linked to the parent, comment and close it: `gh pr close <N> --comment "Superseded by #a, #b."`, naming every sub-issue. Do not delete the branch. This is the only pull request you close. Never approve or merge one. |
+| CI on `main` fails after a merge | Nothing at first: autopilot runs the failed jobs once more and, when they fail again, opens a `bug` issue in the milestone and plans it first. Read that issue's plan as any other. |
+| Autopilot leaves an issue alone | `nexkit status` gives the reason. A command that never ran is not started again; after six hours it waits for a person, so post the command yourself. An issue opened without write access is never taken; open it again from the owner's account. |
 
 For the mechanics behind each failure, read NexKit's troubleshooting doc at the
 pinned ref, found as described under "Where the values live".

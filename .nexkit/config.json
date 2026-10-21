@@ -141,6 +141,10 @@
     "auto_resolve": true
   },
   "close_parent_issues": true,
+  "autopilot": {
+    "enabled": true,
+    "answer": "recommended"
+  },
   "notify": [
     "phuongnse"
   ]
