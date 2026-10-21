@@ -36,6 +36,14 @@
 # deployment bindings, and the worker gets only its runtime connection string.
 # The same file creates axis_scenario, a role with CREATEDB that owns no database. Only the publisher gets it, as
 # Scenarios__ServerConnectionString, to run test scenarios, and the server sets Studio__Tests=true.
+# A third tenant, journey, is for Studio journeys. This script creates its database axis_journey and its roles
+# axis_journey_schema and axis_journey_runtime through psql, because the init script is shared with Compose. A
+# second server serves it on 127.0.0.2, in the Testing environment, with Studio:ApplicationsPath set to a
+# temporary folder. Only the empty application tests/e2e/fixtures/journey-base is active at start, because only
+# startup activation migrates a tenant database. Playwright starts that server after the main one, which
+# shares the platform database. The worker and the publisher serve the journey tenant too, and the run fails if
+# either log never reports it ready. The setup step signs the author, the requester, the service desk lead and
+# the agent in on its host.
 # A Compose smoke test then builds the image and runs the stack on free ports. An images smoke test
 # then builds the production images axis-server, axis-worker and axis-admin and runs them read-only
 # against a throwaway PostgreSQL. An on-premises smoke test then installs deploy/compose/compose.yaml
@@ -64,6 +72,9 @@ export AXIS_E2E_WORKER_RESTART_FILE="$worker_dir/restart"
 studio_dir="$(mktemp -d)"
 cp -R samples/apps/purchase-requests "$studio_dir/purchase-requests"
 export AXIS_E2E_STUDIO_FOLDER="$studio_dir/purchase-requests"
+# Studio creates the journey tenant's applications folder when its server starts.
+journey_dir="$(mktemp -d)"
+export AXIS_E2E_JOURNEY_APPLICATIONS="$journey_dir/applications"
 
 # stop_worker: stops the restart loop first, so it starts no new worker, then the worker itself.
 stop_worker() {
@@ -82,7 +93,7 @@ cleanup() {
     kill "$publisher_pid" 2>/dev/null || true
     wait "$publisher_pid" 2>/dev/null || true
   fi
-  rm -rf "$studio_dir"
+  rm -rf "$studio_dir" "$journey_dir"
   if [ -n "$purchasing_pid" ]; then
     kill "$purchasing_pid" 2>/dev/null || true
     wait "$purchasing_pid" 2>/dev/null || true
@@ -132,6 +143,13 @@ if affected playwright; then
     } >&2
     exit 1
   fi
+
+  # The journey tenant's database and roles. CREATE DATABASE cannot run in a multi-statement transaction, so each
+  # statement has its own -c.
+  docker exec "$container" psql -U axis -d axis -v ON_ERROR_STOP=1 \
+    -c "CREATE ROLE axis_journey_schema LOGIN PASSWORD 'axis'" \
+    -c "CREATE ROLE axis_journey_runtime LOGIN PASSWORD 'axis'" \
+    -c "CREATE DATABASE axis_journey OWNER axis_journey_schema" >/dev/null
 
   scripts/build.sh
 
@@ -194,9 +212,11 @@ if affected playwright; then
   export AXIS_E2E_SERVER_LOG="$root/artifacts/logs/e2e-server.log"
   export AXIS_E2E_JUNIT="$results_dir/playwright.xml"
   export AXIS_E2E_WORKER_LOG="$root/artifacts/logs/e2e-worker.log"
+  export AXIS_E2E_JOURNEY_SERVER_LOG="$root/artifacts/logs/e2e-journey-server.log"
   publisher_log="$root/artifacts/logs/e2e-publisher.log"
   : >"$AXIS_E2E_SERVER_LOG"
   : >"$AXIS_E2E_WORKER_LOG"
+  : >"$AXIS_E2E_JOURNEY_SERVER_LOG"
   : >"$publisher_log"
 
   # The init script gives both roles the development password axis. The bootstrap superuser axis keeps $password.
@@ -207,6 +227,12 @@ if affected playwright; then
   # The preview tenant has its own database and roles. Only Playwright gets its schema role as well.
   export AXIS_E2E_PREVIEW_DATABASE="Host=127.0.0.1;Port=$port;Database=axis_preview;Username=axis_preview_runtime;Password=axis"
   preview_schema_database="Host=127.0.0.1;Port=$port;Database=axis_preview;Username=axis_preview_schema;Password=axis"
+  # The journey tenant has its own database and roles too. Only Playwright gets its schema role.
+  export AXIS_E2E_JOURNEY_DATABASE="Host=127.0.0.1;Port=$port;Database=axis_journey;Username=axis_journey_runtime;Password=axis"
+  journey_schema_database="Host=127.0.0.1;Port=$port;Database=axis_journey;Username=axis_journey_schema;Password=axis"
+  # The worker and the publisher reject two tenants that share a host, so the journey tenant takes the loopback
+  # address 127.0.0.2, which needs no DNS.
+  export AXIS_E2E_JOURNEY_URL="http://127.0.0.2:${AXIS_E2E_JOURNEY_PORT:-5282}"
   export AXIS_E2E_KEYCLOAK_URL="http://127.0.0.1:$keycloak_port"
   # The role spec asks PostgreSQL for the roles in this container.
   export AXIS_E2E_POSTGRES_CONTAINER="$container"
@@ -225,11 +251,13 @@ if affected playwright; then
   # call the stub over http. It gets the same purchasing system bindings as the server.
   # Its health endpoints listen on a free port, so a worker under scripts/dev.sh does not hold the address.
   # Bash cannot export a name with a hyphen, so the preview tenant's settings go through env.
+  # It serves the journey tenant with only its runtime connection string and no bindings.
   run_worker() {
     local child
     while true; do
       env 'Tenants__default-preview__PreviewOf=default' 'Tenants__default-preview__Hosts__0=localhost' \
         "Tenants__default-preview__ConnectionString=$AXIS_E2E_PREVIEW_DATABASE" \
+        Tenants__journey__Hosts__0=127.0.0.2 Tenants__journey__ConnectionString="$AXIS_E2E_JOURNEY_DATABASE" \
         DOTNET_ENVIRONMENT=Development Health__Urls=http://127.0.0.1:0 Tenants__default__Hosts__0=127.0.0.1 \
         Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 \
         Extensions__Path="$root/artifacts/extensions" Modules__Path="$root/artifacts/modules" \
@@ -251,11 +279,14 @@ if affected playwright; then
   # The publisher waits for the server's migration as the worker does. The admin host reads no appsettings
   # file, so the tenant settings are here. It gets the schema role for its steps and the runtime role for
   # seeding, and runs in Development for the http stub, as the worker does. It runs from the built dll, so
-  # that kill stops it. It serves the preview tenant default-preview too, so it runs preview requests. Bash
+  # that kill stops it. It serves the preview tenant default-preview too, so it runs preview requests, and the
+  # journey tenant. Bash
   # cannot export a name with a hyphen, so the preview tenant's settings go through env.
   env 'Tenants__default-preview__PreviewOf=default' 'Tenants__default-preview__Hosts__0=localhost' \
     "Tenants__default-preview__ConnectionString=$AXIS_E2E_PREVIEW_DATABASE" \
     "Tenants__default-preview__SchemaConnectionString=$preview_schema_database" \
+    Tenants__journey__Hosts__0=127.0.0.2 Tenants__journey__ConnectionString="$AXIS_E2E_JOURNEY_DATABASE" \
+    Tenants__journey__SchemaConnectionString="$journey_schema_database" \
     DOTNET_ENVIRONMENT=Development Tenants__default__Hosts__0=127.0.0.1 \
     Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" \
     Tenants__default__SchemaConnectionString="$schema_database" \
@@ -270,6 +301,7 @@ if affected playwright; then
 
 
   AXIS_E2E_SCHEMA_DATABASE="$schema_database" AXIS_E2E_PREVIEW_SCHEMA_DATABASE="$preview_schema_database" \
+    AXIS_E2E_JOURNEY_SCHEMA_DATABASE="$journey_schema_database" \
     run_suite playwright tests/e2e npm test --prefix tests/e2e
   playwright_status=$status
 
@@ -279,6 +311,9 @@ if affected playwright; then
     worker_failed=1
   elif ! grep -qF 'Tenant default is ready for work' "$AXIS_E2E_WORKER_LOG"; then
     echo "The Axis worker never found the E2E database migrated." >&2
+    worker_failed=1
+  elif ! grep -qF 'Tenant journey is ready for work' "$AXIS_E2E_WORKER_LOG"; then
+    echo "The Axis worker never found the journey tenant database migrated." >&2
     worker_failed=1
   fi
   if [ "$worker_failed" -ne 0 ]; then status=1; fi
@@ -290,6 +325,9 @@ if affected playwright; then
     publisher_failed=1
   elif ! grep -qF 'default ready' "$publisher_log"; then
     echo "The Axis publisher never found the E2E database migrated." >&2
+    publisher_failed=1
+  elif ! grep -qF 'journey ready' "$publisher_log"; then
+    echo "The Axis publisher never found the journey tenant database migrated." >&2
     publisher_failed=1
   fi
   if [ "$publisher_failed" -ne 0 ]; then status=1; fi
@@ -309,6 +347,7 @@ if affected playwright; then
 
   if [ "$playwright_status" -ne 0 ]; then
     print_log "Axis server log" "$AXIS_E2E_SERVER_LOG"
+    print_log "Axis journey server log" "$AXIS_E2E_JOURNEY_SERVER_LOG"
   fi
   if [ "$playwright_status" -ne 0 ] || [ "$worker_failed" -ne 0 ]; then
     print_log "Axis worker log" "$AXIS_E2E_WORKER_LOG"
