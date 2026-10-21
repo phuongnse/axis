@@ -13,9 +13,9 @@
   If every criterion checks the same behaviour, more are fine. A plan is not
   revised only to cut the number of criteria. It must fit in a single NexKit
   agent session.
-  If a NexKit plan reports `too_large`, split the issue into parts and add each
-  as a sub-issue of the parent, in order and in the parent's milestone. See
-  [delivery.md](delivery.md).
+  If a NexKit plan reports `too_large`, the issue is split into parts. Each
+  part is a sub-issue of the parent, in the parent's milestone, and is marked
+  *blocked by* the earlier parts it needs. See [delivery.md](delivery.md).
 - **Docs first.** An issue links to the doc sections it implements. When an
   issue changes agreed behaviour, it updates the docs in the same pull request.
 - **Cross-cutting qualities are built in, not added later.** Every milestone
