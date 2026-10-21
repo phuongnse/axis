@@ -85,14 +85,19 @@ function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
-function renderDesigner(value: Record<string, unknown>, onChange = vi.fn(), loaded: StudioNames | null = names) {
+function renderDesigner(
+  value: Record<string, unknown>,
+  onChange = vi.fn(),
+  loaded: StudioNames | null = names,
+  readOnly = false,
+) {
   render(
     <ThemeModeProvider>
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioNamesContext.Provider value={loaded ?? undefined}>
             <LabelTextsContext.Provider value={labelContext}>
-              <EntityDesigner value={value} onChange={onChange} />
+              <EntityDesigner value={value} onChange={onChange} readOnly={readOnly} />
             </LabelTextsContext.Provider>
           </StudioNamesContext.Provider>
         </TextProvider>
@@ -263,6 +268,48 @@ describe('EntityDesigner', () => {
 
     expect(within(screen.getByTestId('studio-field-/fields')).getByTestId('studio-json-only')).toBeInTheDocument()
     expect(within(screen.getByTestId('studio-field-/validations')).getByTestId('studio-json-only')).toBeInTheDocument()
+  })
+
+  it('turns every input off and offers no edit button when it is read-only', async () => {
+    const onChange = renderDesigner(
+      entity({
+        fields: [
+          {
+            name: 'code',
+            type: 'text',
+            required: true,
+            unique: true,
+            maxLength: 20,
+            label: { textKey: 'field.total' },
+          },
+          { name: 'status', type: 'enum', values: ['open', 'closed'] },
+          { name: 'total', type: 'decimal', precision: 18, scale: 2, expression: 'code' },
+        ],
+        validations: [{ expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' }],
+      }),
+      vi.fn(),
+      names,
+      true,
+    )
+
+    const inputs = [
+      ...screen.getAllByRole('textbox'),
+      ...screen.getAllByRole('combobox'),
+      ...screen.getAllByRole('checkbox'),
+      ...screen.getAllByRole('spinbutton'),
+    ]
+    expect(screen.getAllByRole('spinbutton').length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0)
+    for (const input of inputs) {
+      expect(input).toBeDisabled()
+    }
+    expect(within(screen.getByTestId('studio-field-/label')).getByRole('textbox')).toHaveValue('entity.invoice')
+    for (const name of ['Add field', 'Remove field', 'Move up', 'Move down', 'Remove validation', 'Add validation']) {
+      expect(screen.queryByRole('button', { name })).toBeNull()
+    }
+
+    await userEvent.type(within(screen.getByTestId('studio-field-/fields/0/name')).getByRole('textbox'), 'x')
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('shows plain boxes until the names have loaded', () => {

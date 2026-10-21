@@ -498,6 +498,7 @@ public static class ApplicationCompiler
         {
             References = index,
             Names = DefinedNamesBuilder.Build(loaded, allEntities, allSequences, allEvents, moduleResources.Rules, texts, FindEntity, index),
+            ModulePins = modules,
             PolicyMatrix = PolicyMatrixBuilder.Build(
                 loaded.Roles,
                 loaded.Policies,

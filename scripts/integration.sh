@@ -5,23 +5,32 @@
 # The integration tests also run the test scenarios of every application under samples/apps/ and of
 # every sample template under samples/templates/.
 # Each application's scenarios are a suite named scenarios-NAME, written by that test.
-# The smoke test is skipped when $NEXKIT_BASE_SHA shows that nothing it covers changed.
+# The integration tests and the scenarios are skipped when $NEXKIT_BASE_SHA shows that every changed
+# path is on the safe list in scripts/lib/affected.mjs. The smoke test is skipped when nothing it
+# covers changed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
 
+scenario_suites=()
 for manifest in samples/apps/*/application.json; do
   name="$(node -p "JSON.parse(require('fs').readFileSync('$manifest','utf8')).name")"
-  expect_suite "scenarios-$name" .
+  scenario_suites+=("scenarios-$name")
 done
 
 for manifest in samples/templates/*/application.json; do
   name="$(node -p "JSON.parse(require('fs').readFileSync('$manifest','utf8')).name")"
-  expect_suite "scenarios-$name" .
+  scenario_suites+=("scenarios-$name")
 done
 
-run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
-  --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir"
+if affected integration; then
+  for suite in "${scenario_suites[@]}"; do expect_suite "$suite" .; done
+  run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
+    --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir"
+else
+  for suite in "${scenario_suites[@]}"; do skip_suite "$suite" .; done
+  skip_suite Axis.Integration.Tests tests/Axis.Integration.Tests
+fi
 
 run_suite_if_affected dev-script . node --test --test-reporter=spec --test-reporter-destination=stdout \
   --test-reporter=junit --test-reporter-destination="$results_dir/dev-script.xml" scripts/dev.test.mjs

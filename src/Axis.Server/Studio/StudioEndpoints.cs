@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
@@ -30,6 +32,10 @@ namespace Axis.Server.Studio;
 /// included, from the same compile. It touches no database and answers even when the folder has errors.
 /// <c>GET /api/studio/apps/{application}/policy-matrix</c> answers what each role may do on each root entity, data
 /// source, process and endpoint, from the same compile, and answers even when the folder has errors.
+/// <c>GET /api/studio/apps/{application}/modules/{module}/resources/{id}</c> answers one file of the module version the
+/// application pins, the highest installed version in its range, in the shape of a resource read, with <c>file</c> as
+/// <c>modules/&lt;module&gt;/&lt;path&gt;</c> and no <c>ETag</c>. It answers 404 for an unknown application, a module the
+/// application does not pin and an unknown resource, and never answers <c>module.json</c>.
 /// <c>GET /api/studio/apps/{application}/resources/{id}/references</c> answers <c>{ uses, usedBy }</c> from the same
 /// compile's reference index, and <c>GET /api/studio/apps/{application}/texts/{key}/references</c> answers
 /// <c>{ usedBy }</c>. A text key that nothing defines or uses answers 404.
@@ -66,6 +72,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps", AppsAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceAsync);
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
         endpoints.MapPost("/api/studio/apps/{application}/changes", ChangesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
@@ -184,6 +191,70 @@ internal static class StudioEndpoints
         httpContext.Response.Headers.ETag = $"\"{found.Version}\"";
         return Results.Ok(new StudioResourceResponse(
             found.Id.ToString("D"), found.Kind, found.Name, found.File, found.Version, content.RootElement.Clone()));
+    }
+
+    private static async Task<IResult> ModuleResourceAsync(
+        string application,
+        string module,
+        string id,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var pin = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).ModulePins
+            .FirstOrDefault(pin => string.Equals(pin.Id, module, StringComparison.Ordinal));
+        var installed = pin is null
+            ? null
+            : modules.Modules.FirstOrDefault(item =>
+                item.Manifest.Id == pin.Id && item.Manifest.Version == pin.Version);
+        if (installed is null)
+        {
+            return NotFound("The application uses no module with this id.");
+        }
+
+        if (id is not { Length: 36 } || !Guid.TryParseExact(id, "D", out var guid))
+        {
+            return NotFound(NoModuleResource);
+        }
+
+        foreach (var file in installed.Files.Where(file => file.Path != ModuleCatalog.ManifestFileName))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(file.Content);
+                var root = document.RootElement;
+                if (root.ValueKind != JsonValueKind.Object
+                    || !root.TryGetProperty("kind", out var kind) || kind.ValueKind != JsonValueKind.String
+                    || !root.TryGetProperty("id", out var fileId) || fileId.ValueKind != JsonValueKind.String
+                    || !Guid.TryParseExact(fileId.GetString(), "D", out var fileGuid) || fileGuid != guid)
+                {
+                    continue;
+                }
+
+                var name = root.TryGetProperty("name", out var nameProperty) && nameProperty.ValueKind == JsonValueKind.String
+                    ? nameProperty.GetString()
+                    : null;
+                return Results.Ok(new StudioResourceResponse(
+                    guid.ToString("D"),
+                    kind.GetString()!,
+                    name,
+                    $"modules/{module}/{file.Path}",
+                    Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(file.Content))),
+                    root.Clone()));
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        return NotFound(NoModuleResource);
     }
 
     private static async Task<IResult> DiagnosticsAsync(
@@ -651,6 +722,8 @@ internal static class StudioEndpoints
     internal const string WriteLockUnavailable = "The write lock could not be taken. Try again.";
 
     internal const string NoResource = "The application has no resource with this id.";
+
+    private const string NoModuleResource = "The module has no resource with this id.";
 
     private const string NoTextKey = "The application has no text key with this name.";
 
