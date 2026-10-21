@@ -3,22 +3,23 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames, StudioResourceItem } from '../platform/studio'
+import { setAt } from '../platform/jsonPatch'
+import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
+import { loadKindSchema } from '../platform/studioSchemas'
 import { StudioEditor } from './StudioEditor'
-import {
-  loadStudioSchemas,
-  folder,
-  seedId,
-  entityId,
-  resources,
-  json,
-  slow,
-  stubResource,
-  renderResource,
-  sentPatch,
-} from '../test/studioEditor'
+
+const folder = '/api/studio/apps/Shop'
+const seedId = '46e28f6b-ce3b-4a17-829e-92fb3a5930ad'
+const entityId = 'ebe6bc20-4772-4d6c-839b-65d426ebeeca'
+
+const resources: StudioResourceItem[] = [
+  { id: seedId, kind: 'seed', name: 'Orders', file: 'seeds/orders.json', version: 's1', usedBy: 0 },
+  { id: entityId, kind: 'entity', name: 'Order', file: 'entities/order.json', version: 'e1', usedBy: 1 },
+]
 
 const entityContent = {
   id: entityId,
@@ -35,6 +36,10 @@ const entityContent = {
 
 function seedContent(entity: string, records: unknown[]) {
   return { id: seedId, kind: 'seed', name: 'Orders', formatVersion: 1, entity, sync: true, records }
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
 function stub(seed: unknown) {
@@ -70,8 +75,20 @@ function renderEditor() {
   )
 }
 
+// The first lookup waits for the schema chunk and two fetches, which is slow while other test files run.
+const slow = { timeout: 5000 }
+
 // The schema is a chunk of its own. Loading it here keeps the first test from racing its first lookup.
-beforeAll(loadStudioSchemas)
+beforeAll(() =>
+  Promise.all([
+    loadKindSchema('seed'),
+    loadKindSchema('connector'),
+    loadKindSchema('endpoint'),
+    loadKindSchema('text'),
+    loadKindSchema('page'),
+    loadKindSchema('entity'),
+  ]),
+)
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -249,7 +266,6 @@ describe('StudioEditor for a scenario', () => {
 })
 
 const connectorId = '409bc638-0aec-4084-ada2-e3baed50057d'
-
 const endpointId = 'bc241668-fe85-45a4-b7cf-d36da8d56b71'
 
 const connectorItem: StudioResourceItem = {
@@ -330,6 +346,76 @@ const namesWithEntity = {
     },
   ],
 } as unknown as StudioNames
+
+/** A fetch stub that serves one resource and answers its PATCH, so the test can read what was sent. */
+function stubResource(item: StudioResourceItem, content: unknown) {
+  const url = `${folder}/resources/${item.id}`
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if (input === url && init?.method === 'PATCH') {
+      return json({ version: 'next', diagnostics: [] })
+    }
+    if (input === `${folder}/changes` && init?.method === 'POST') {
+      return json({
+        items: [
+          { id: item.id, version: 'next' },
+          { id: 'created', version: 'created-version' },
+        ],
+        diagnostics: [],
+      })
+    }
+    if (input === url) {
+      return json({ ...item, content })
+    }
+    return new Response(null, { status: 404 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return { fetchMock, url }
+}
+
+function renderResource(
+  item: StudioResourceItem,
+  names?: StudioNames,
+  onTextsWritten = vi.fn(),
+  path: string | null = null,
+) {
+  render(
+    <ThemeModeProvider>
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <StudioNamesContext.Provider value={names}>
+          <StudioEditor
+            application="Shop"
+            item={item}
+            resources={[item]}
+            path={path}
+            onSaved={vi.fn()}
+            onTextsWritten={onTextsWritten}
+            onDeleted={vi.fn()}
+          />
+        </StudioNamesContext.Provider>
+      </TextProvider>
+    </ThemeModeProvider>,
+  )
+}
+
+type PatchOperation = { op: string; path: string; value?: unknown }
+
+type SentChanges = { changes: ({ create: Record<string, unknown> } | { id: string; patch: PatchOperation[] })[] }
+
+function sentChanges(fetchMock: ReturnType<typeof vi.fn>): SentChanges {
+  const [, init] = fetchMock.mock.calls.find(
+    ([input, call]) => input === `${folder}/changes` && call?.method === 'POST',
+  )!
+  return JSON.parse(init!.body as string) as SentChanges
+}
+
+function requests(fetchMock: ReturnType<typeof vi.fn>, method: string): number {
+  return fetchMock.mock.calls.filter(([, call]) => call?.method === method).length
+}
+
+function sentPatch(fetchMock: ReturnType<typeof vi.fn>): PatchOperation[] {
+  const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'PATCH')!
+  return JSON.parse(init!.body as string) as PatchOperation[]
+}
 
 describe('StudioEditor for a connector', () => {
   it('shows the binding names and saves only names, reading only the resource route', async () => {
@@ -432,6 +518,251 @@ describe('StudioEditor for an endpoint', () => {
     expect(await screen.findByTestId('studio-field-/entity', {}, slow)).toBeInTheDocument()
     expect(screen.getAllByTestId('studio-field-/values')).toHaveLength(1)
     expect(screen.getByTestId('studio-field-/values/status')).toBeInTheDocument()
+  })
+})
+
+const processId = purchaseRequestApproval.id
+
+const processItem: StudioResourceItem = {
+  id: processId,
+  kind: 'process',
+  name: 'PurchaseRequestApproval',
+  file: 'processes/purchase-request-approval.json',
+  version: 'r1',
+  usedBy: 0,
+}
+
+/** The purchase request process with an unknown key on the operation `submit` and on the decision's first branch. */
+const processContent = {
+  ...purchaseRequestApproval,
+  steps: purchaseRequestApproval.steps.map((step, index) => {
+    if (index === 0) {
+      return { ...step, 'x-note': 'keep' }
+    }
+    if (index === 2) {
+      return {
+        ...step,
+        'x-note': 'keep',
+        branches: [
+          { when: 'totalAmount >= FinanceThreshold()', next: 'financeApproval', 'x-note': 'keep' },
+          { when: 'totalAmount > 0', next: 'markApproved' },
+        ],
+      }
+    }
+    return step
+  }),
+}
+
+/** The CodeMirror view of the expression editor that shows inside `field`. */
+async function expressionView(field: HTMLElement): Promise<EditorView> {
+  let view: EditorView | null = null
+  // The editor chunk loads after the row shows a read-only box.
+  await waitFor(() => {
+    view = EditorView.findFromDOM(within(field).getByRole('textbox', { name: 'When' }))
+    expect(view).not.toBeNull()
+  }, slow)
+  return view as unknown as EditorView
+}
+
+/** The option of the dropdown opened last. A title also marks a closed select that shows the same value. */
+async function optionOf(name: string): Promise<HTMLElement> {
+  return waitFor(() => {
+    const found = [...document.querySelectorAll<HTMLElement>('.ant-select-item-option')].filter(
+      (element) => element.title === name && !element.closest('.ant-select-dropdown-hidden'),
+    )
+    expect(found.length).toBeGreaterThan(0)
+    return found[found.length - 1]
+  })
+}
+
+async function pick(field: HTMLElement, option: string) {
+  await userEvent.click(within(field).getByRole('combobox'))
+  await userEvent.click(await optionOf(option))
+}
+
+function sentSteps(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown>[] {
+  return sentPatch(fetchMock).find((operation) => operation.path === '/steps')!.value as Record<string, unknown>[]
+}
+
+describe('StudioEditor for a process', () => {
+  it('edits a branch and the otherwise of a decision, keeping the unknown keys', async () => {
+    const { fetchMock } = stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const when = await screen.findByTestId('studio-field-/steps/2/branches/0/when', {}, slow)
+    const view = await expressionView(when)
+    act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'totalAmount > 5' } }))
+    await pick(screen.getByTestId('studio-field-/steps/2/branches/1/next'), 'markRejected')
+    await pick(screen.getByTestId('studio-field-/steps/2/otherwise'), 'markRejected')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([
+      { op: 'replace', path: '/steps/2/branches/0/when', value: 'totalAmount > 5' },
+      { op: 'replace', path: '/steps/2/branches/1/next', value: 'markRejected' },
+      { op: 'replace', path: '/steps/2/otherwise', value: 'markRejected' },
+    ])
+  })
+
+  it('adds a branch, keeping the unknown keys of the others', async () => {
+    const { fetchMock } = stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const branches = await screen.findByTestId('studio-field-/steps/2/branches', {}, slow)
+    await userEvent.click(within(branches).getByRole('button', { name: 'Add branch' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([
+      {
+        op: 'replace',
+        path: '/steps/2/branches',
+        value: [...processContent.steps[2].branches!, { when: '', next: '' }],
+      },
+    ])
+  })
+
+  it('removes a branch, keeping the unknown keys of the others', async () => {
+    const { fetchMock } = stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const second = await screen.findByTestId('studio-field-/steps/2/branches/1', {}, slow)
+    await userEvent.click(within(second).getByRole('button', { name: 'Remove branch' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([
+      { op: 'replace', path: '/steps/2/branches', value: [processContent.steps[2].branches![0]] },
+    ])
+  })
+
+  it('renames the end step with a patch of only its name', async () => {
+    const { fetchMock } = stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const name = within(await screen.findByTestId('studio-step-9', {}, slow)).getByRole('textbox', {
+      name: 'Step name',
+    })
+    await userEvent.type(name, '2')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([{ op: 'replace', path: '/steps/9/name', value: 'done2' }])
+  })
+
+  it('adds a step of the chosen type with its required keys empty', async () => {
+    const { fetchMock } = stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Add step' }, slow))
+    await userEvent.click(await optionOf('decision'))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    const steps = sentSteps(fetchMock)
+    expect(steps).toHaveLength(11)
+    expect(steps.slice(0, 10)).toEqual(processContent.steps)
+    expect(steps[10]).toEqual({ name: '', type: 'decision', branches: [], otherwise: '' })
+  })
+
+  it('removes a step and leaves the transitions that name it', async () => {
+    const { fetchMock } = stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const card = await screen.findByTestId('studio-step-4', {}, slow)
+    expect(card).toHaveTextContent('markApproved')
+    await userEvent.click(within(card).getByRole('button', { name: 'Remove step' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    const steps = sentSteps(fetchMock)
+    expect(steps).toEqual(processContent.steps.filter((step) => step.name !== 'markApproved'))
+    expect(steps[2].otherwise).toBe('markApproved')
+    expect(sentPatch(fetchMock)).toHaveLength(1)
+  })
+
+  it('moves a step up and down in file order', async () => {
+    const { fetchMock } = stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const first = await screen.findByTestId('studio-step-0', {}, slow)
+    expect(within(first).getByRole('button', { name: 'Move up' })).toBeDisabled()
+    expect(within(screen.getByTestId('studio-step-9')).getByRole('button', { name: 'Move down' })).toBeDisabled()
+    await userEvent.click(within(first).getByRole('button', { name: 'Move down' }))
+    await userEvent.click(within(screen.getByTestId('studio-step-9')).getByRole('button', { name: 'Move up' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    // Steps that swap places in an array of the same length are patched item by item, so apply the patch.
+    let moved: unknown = processContent
+    for (const operation of sentPatch(fetchMock)) {
+      moved = setAt(moved, operation.path, operation.op === 'remove' ? undefined : operation.value)
+    }
+    const steps = (moved as typeof processContent).steps
+    const [submit, managerApproval, ...rest] = processContent.steps
+    const [markRejected, done] = [rest[rest.length - 2], rest[rest.length - 1]]
+    expect(steps).toEqual([managerApproval, submit, ...rest.slice(0, -2), done, markRejected])
+  })
+
+  it.each(['/steps/1/outcomes/0/label/textKey', '/steps/1/label/textKey'])(
+    'opens the form at the field for the path %s inside a task',
+    async (path) => {
+      stubResource(processItem, processContent)
+      renderResource(processItem, undefined, vi.fn(), path)
+
+      await screen.findByTestId('studio-step-1', {}, slow)
+      await waitFor(() => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'))
+    },
+  )
+
+  it('opens the form at the transition of an outcome for its path', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem, undefined, vi.fn(), '/steps/1/outcomes/0/next')
+
+    await screen.findByTestId('studio-step-1', {}, slow)
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'))
+  })
+
+  it('changes a step type: forbidden keys go, required keys are added empty, the others stay', async () => {
+    const { fetchMock } = stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const card = await screen.findByTestId('studio-step-0', {}, slow)
+    await pick(within(card).getByTestId('studio-field-/steps/0/type'), 'decision')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([
+      { op: 'replace', path: '/steps/0/type', value: 'decision' },
+      { op: 'remove', path: '/steps/0/operation' },
+      { op: 'remove', path: '/steps/0/set' },
+      { op: 'remove', path: '/steps/0/next' },
+      { op: 'add', path: '/steps/0/branches', value: [] },
+      { op: 'add', path: '/steps/0/otherwise', value: '' },
+    ])
+  })
+
+  it('changes a step to a task with its required keys empty and keeps the unknown key', async () => {
+    const { fetchMock } = stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const card = await screen.findByTestId('studio-step-0', {}, slow)
+    await pick(within(card).getByTestId('studio-field-/steps/0/type'), 'task')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    const operations = sentPatch(fetchMock)
+    expect(operations.map((operation) => operation.path)).toEqual([
+      '/steps/0/type',
+      '/steps/0/operation',
+      '/steps/0/set',
+      '/steps/0/next',
+      '/steps/0/label',
+      '/steps/0/assignee',
+      '/steps/0/form',
+      '/steps/0/outcomes',
+    ])
+    expect(operations.slice(4).map((operation) => operation.value)).toEqual([{ textKey: '' }, {}, '', []])
   })
 })
 
@@ -554,7 +885,6 @@ describe('StudioEditor for a text resource', () => {
 })
 
 const pageId = 'b5a5f1cb-4f0f-4f3d-9a54-9d6e3a1b7f10'
-
 const pageItem: StudioResourceItem = {
   id: pageId,
   kind: 'page',
@@ -563,7 +893,6 @@ const pageItem: StudioResourceItem = {
   version: 'p1',
   usedBy: 0,
 }
-
 const pageContent = { id: pageId, kind: 'page', name: 'MyTasks', formatVersion: 1, widgets: [{ type: 'taskInbox' }] }
 
 const namesWithTexts = {
@@ -714,5 +1043,292 @@ describe('StudioEditor for a page', () => {
       { op: 'remove', path: '/widgets/0/actions' },
     ])
     expect(operations.some((operation) => operation.path.includes('x-note'))).toBe(false)
+  })
+})
+
+describe('StudioEditor for an entity', () => {
+  const designedItem: StudioResourceItem = { ...resources[1], id: 'a4e6d3a1-77a0-4b0d-8b0c-5c1d6f0a9b01' }
+  const designed = {
+    id: designedItem.id,
+    kind: 'entity',
+    name: 'Invoice',
+    formatVersion: 1,
+    label: { textKey: 'entity.invoice' },
+    fields: [
+      { name: 'total', type: 'decimal', unique: true, precision: 18, scale: 2 },
+      { name: 'code', type: 'text', maxLength: 20 },
+      { name: 'note', type: 'text' },
+    ],
+  }
+
+  function sentFields(fetchMock: ReturnType<typeof vi.fn>): unknown {
+    return sentPatch(fetchMock).find((operation) => operation.path === '/fields')!.value
+  }
+
+  it('opens in the designer and keeps the JSON tab with the draft', async () => {
+    stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const designer = await screen.findByTestId('studio-entity-designer', {}, slow)
+    expect(designer).toBeVisible()
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+
+    expect(JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)).toEqual(designed)
+  })
+
+  it('changes a decimal field to enum: the type changes, precision and scale go and unique stays', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await pick(await screen.findByTestId('studio-field-/fields/0/type', {}, slow), 'enum')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([
+      { op: 'replace', path: '/fields/0/type', value: 'enum' },
+      { op: 'remove', path: '/fields/0/precision' },
+      { op: 'remove', path: '/fields/0/scale' },
+    ])
+  })
+
+  it('adds a field', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add field' }, slow))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentFields(fetchMock)).toEqual([...designed.fields, { name: '', type: 'text' }])
+  })
+
+  it('removes a field and, on Drop data, saves the entity and a dropField migration in one changes call', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const row = await screen.findByTestId('studio-field-/fields/1', {}, slow)
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove field' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('code')
+    await userEvent.click(screen.getByRole('button', { name: 'Drop data' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(requests(fetchMock, 'PATCH')).toBe(0)
+    const [entity, migration] = sentChanges(fetchMock).changes
+    expect(entity).toEqual({
+      id: designedItem.id,
+      version: designedItem.version,
+      patch: [{ op: 'replace', path: '/fields', value: [designed.fields[0], designed.fields[2]] }],
+    })
+    expect(migration).toEqual({
+      create: {
+        id: expect.any(String),
+        kind: 'migration',
+        name: expect.stringMatching(/^InvoiceChange\d{14}$/),
+        formatVersion: 1,
+        entity: 'Invoice',
+        changes: [{ type: 'dropField', field: 'code' }],
+      },
+    })
+  })
+
+  it('keeps a removed field when the answer is Keep field and then saves nothing', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const row = await screen.findByTestId('studio-field-/fields/2', {}, slow)
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove field' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Keep field' }))
+
+    await waitFor(() => expect(screen.queryByTestId('studio-migration-question')).not.toBeInTheDocument())
+    expect(requests(fetchMock, 'PATCH') + requests(fetchMock, 'POST')).toBe(0)
+    expect(
+      screen.getAllByRole('textbox', { name: 'Field name' }).map((box) => (box as HTMLInputElement).value),
+    ).toEqual(['total', 'code', 'note'])
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
+  it('saves one patch and no changes call for a field added in the same session and then renamed', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add field' }, slow))
+    await userEvent.type(within(screen.getByTestId('studio-field-/fields/3/name')).getByRole('textbox'), 'ab')
+    await userEvent.clear(within(screen.getByTestId('studio-field-/fields/3/name')).getByRole('textbox'))
+    await userEvent.type(within(screen.getByTestId('studio-field-/fields/3/name')).getByRole('textbox'), 'memo')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(screen.queryByTestId('studio-migration-question')).not.toBeInTheDocument()
+    expect(requests(fetchMock, 'PATCH')).toBe(1)
+    expect(requests(fetchMock, 'POST')).toBe(0)
+    expect((sentFields(fetchMock) as { name: string }[]).map((field) => field.name)).toEqual([
+      'total',
+      'code',
+      'note',
+      'memo',
+    ])
+  })
+
+  it('asks Keep data for a renamed field, counts a chain of renames as one and adds renameField', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const name = within(await screen.findByTestId('studio-field-/fields/1/name', {}, slow)).getByRole('textbox')
+    await userEvent.clear(name)
+    await userEvent.type(name, 'abc')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('code → abc')
+    await userEvent.click(screen.getByRole('button', { name: 'Keep data' }))
+
+    await screen.findByTestId('studio-saved')
+    const [, migration] = sentChanges(fetchMock).changes
+    expect((migration as { create: { changes: unknown } }).create.changes).toEqual([
+      { type: 'renameField', from: 'code', to: 'abc' },
+    ])
+  })
+
+  function migrationChanges(fetchMock: ReturnType<typeof vi.fn>): unknown {
+    const [, migration] = sentChanges(fetchMock).changes
+    return (migration as { create: { changes: unknown } }).create.changes
+  }
+
+  it('asks for a convert expression for a retyped field and adds convert', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await pick(await screen.findByTestId('studio-field-/fields/2/type', {}, slow), 'integer')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('note')
+    expect(screen.getByRole('button', { name: 'Add convert' })).toBeDisabled()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Convert expression' }), 'length(note)')
+    await userEvent.click(screen.getByRole('button', { name: 'Add convert' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(migrationChanges(fetchMock)).toEqual([{ type: 'convert', field: 'note', value: 'length(note)' }])
+  })
+
+  it('asks for a fill expression for a field made required and adds fill', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const row = await screen.findByTestId('studio-field-/fields/2', {}, slow)
+    await userEvent.click(within(row).getByRole('checkbox', { name: 'Required' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Fill expression' }), "'none'")
+    await userEvent.click(screen.getByRole('button', { name: 'Fill nulls' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(migrationChanges(fetchMock)).toEqual([{ type: 'fill', field: 'note', value: "'none'" }])
+  })
+
+  it('adds nothing for a skipped convert and keeps the draft on Cancel', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await pick(await screen.findByTestId('studio-field-/fields/2/type', {}, slow), 'integer')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByTestId('studio-migration-question')).not.toBeInTheDocument())
+    expect(requests(fetchMock, 'PATCH') + requests(fetchMock, 'POST')).toBe(0)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Skip' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(requests(fetchMock, 'PATCH')).toBe(1)
+    expect(requests(fetchMock, 'POST')).toBe(0)
+  })
+
+  it('warns in the row of a field switched to enum and saves one patch and no changes call', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    await pick(await screen.findByTestId('studio-field-/fields/2/type', {}, slow), 'enum')
+    expect(screen.getByTestId('studio-migration-warning-/fields/2')).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-migration-warning-/fields/1')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(screen.queryByTestId('studio-migration-question')).not.toBeInTheDocument()
+    expect(requests(fetchMock, 'PATCH')).toBe(1)
+    expect(requests(fetchMock, 'POST')).toBe(0)
+  })
+
+  it('puts convert after renameField and uses the new name', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const name = within(await screen.findByTestId('studio-field-/fields/2/name', {}, slow)).getByRole('textbox')
+    await userEvent.clear(name)
+    await userEvent.type(name, 'remark')
+    await pick(screen.getByTestId('studio-field-/fields/2/type'), 'integer')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('note → remark')
+    await userEvent.click(screen.getByRole('button', { name: 'Keep data' }))
+    expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('remark')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Convert expression' }), 'length(remark)')
+    await userEvent.click(screen.getByRole('button', { name: 'Add convert' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(migrationChanges(fetchMock)).toEqual([
+      { type: 'renameField', from: 'note', to: 'remark' },
+      { type: 'convert', field: 'remark', value: 'length(remark)' },
+    ])
+  })
+
+  it('asks nothing for a child-collection field', async () => {
+    const withCollection = {
+      ...designed,
+      fields: [...designed.fields, { name: 'lines', type: 'child-collection', target: 'InvoiceLine' }],
+    }
+    const { fetchMock } = stubResource(designedItem, withCollection)
+    renderResource(designedItem)
+
+    const row = await screen.findByTestId('studio-field-/fields/3', {}, slow)
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove field' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(requests(fetchMock, 'PATCH')).toBe(1)
+    expect(requests(fetchMock, 'POST')).toBe(0)
+  })
+
+  it('sends nothing and keeps the draft when the answer to a rename is Cancel', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const name = within(await screen.findByTestId('studio-field-/fields/2/name', {}, slow)).getByRole('textbox')
+    await userEvent.type(name, 's')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(screen.queryByTestId('studio-migration-question')).not.toBeInTheDocument())
+    expect(requests(fetchMock, 'PATCH') + requests(fetchMock, 'POST')).toBe(0)
+    expect(name).toHaveValue('notes')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('moves a field up and down', async () => {
+    const { fetchMock } = stubResource(designedItem, designed)
+    renderResource(designedItem)
+
+    const row = await screen.findByTestId('studio-field-/fields/1', {}, slow)
+    expect(within(screen.getByTestId('studio-field-/fields/0')).getByRole('button', { name: 'Move up' })).toBeDisabled()
+    await userEvent.click(within(row).getByRole('button', { name: 'Move up' }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/fields/1')).getByRole('button', { name: 'Move down' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    // Fields that swap places in an array of the same length are patched item by item, so apply the patch.
+    let moved: unknown = designed
+    for (const operation of sentPatch(fetchMock)) {
+      moved = setAt(moved, operation.path, operation.op === 'remove' ? undefined : operation.value)
+    }
+    // The first move puts `code` first, the second moves `total` below `note`.
+    expect((moved as typeof designed).fields).toEqual([designed.fields[1], designed.fields[2], designed.fields[0]])
   })
 })
