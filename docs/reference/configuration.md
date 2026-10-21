@@ -998,8 +998,9 @@ and a JSON view, and shows the diagnostics.
   needs it on top of the author role, and `validate` needs the author role
   only. `rollback` needs it too. It has no default, and
   with no value nobody may publish or roll back. A blank value counts as no
-  value. The Development settings set it to `publisher`, and the
-  development realm gives `hoa` that role. It plays no part in application
+  value. The Development settings set it to `publisher`, and one development
+  user holds that role, see [development users](../architecture.md#development-users).
+  It plays no part in application
   policies, as `Studio:AuthorRole` does not.
 - **`Studio:Tests`**. A boolean. The environment variable
   is `Studio__Tests`. `true` makes `GET /api/me` answer `studioTest: true` for an

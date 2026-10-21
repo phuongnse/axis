@@ -303,7 +303,7 @@ operator uses it. The test then:
    The publisher's log shows `one claim ok` and `two claim ok`, and the
    `publisher` service is still running.
 8. Starts the second replica and the TLS proxy, with a proxy certificate from
-   the test's authority. Signs `anna` in through the proxy over HTTPS with plain
+   the test's authority. Signs an employee in through the proxy over HTTPS with plain
    HTTP requests, posting Keycloak's login form directly. Checks that the
    redirect carries `redirect_uri=https://one.axis.test/api/auth/callback` even
    when the client sends its own `X-Forwarded-Proto` and `X-Forwarded-Host`,
@@ -311,8 +311,8 @@ operator uses it. The test then:
    answers `200`. Then restarts `server` and checks that `GET /api/me` with the
    same cookie answers `200` through the proxy and on the ports of `server` and
    `server-2`.
-9. Turns Studio on for `hoa` over a copy of the leave request sample in a
-   temporary folder that every user may write. Signs `hoa` in through the proxy
+9. Turns Studio on for the author over a copy of the leave request sample in a
+   temporary folder that every user may write. Signs the author in through the proxy
    and saves a text through `server`. Checks that the read of the same
    resource through `server-2` answers `200` with the new text and the same
    `ETag`. Then checks that a second save through `server-2` with the old

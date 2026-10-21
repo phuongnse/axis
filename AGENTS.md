@@ -65,6 +65,10 @@ Writing on GitHub, for issues, plans, pull request descriptions and reviews:
 - Say what changes in behaviour, and why, before naming classes or files.
 - Put decisions and risks the owner must judge in their own short section.
 - Keep implementation detail out of the main text, or in a `<details>` block.
+- Name the role that acts, in the terms of [concepts.md](docs/domain/concepts.md), never a development
+  user. This covers doc text that describes behaviour, and titles too: issue, pull request and
+  sub-issue titles. User names appear only in test code, test scenarios, the realm file and the
+  [development users table](docs/architecture.md#development-users).
 
 ## Commands
 
@@ -145,8 +149,16 @@ the server stops at start, because it cannot reach `axis_preview`. See
 [database roles](docs/reference/storage.md#database-roles).
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
-realm imported from `samples/keycloak/axis-realm.json`. The realm users are `anna`, `lan`,
-`binh`, `chau`, `dung`, `giang` and `hoa`, and the development password is `axis` for each. `giang` holds the `operator` role, which opens the purchase request sample's Approvals inspector page. The leave request sample, `samples/apps/leave-requests`, reuses `anna`, `lan`, `binh` and `chau` with the same `employee` and `department-manager` roles, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`, adds the realm users `khoa`, with the `agent` role, and `linh`, with the `service-desk-lead` role, and gives `anna` the `requester` role, in a site at `/service-desk`. `hoa` holds the `author` role, which lets the authoring API list and read the purchase request sample's resources under `scripts/dev.sh`. `hoa` also holds the `publisher` role, which lets the authoring API publish and shows **Publish** on the Studio page. `hoa` can also roll back from the release history on the Studio page. The Studio page at http://localhost:5173/studio opens for `hoa`. Under `scripts/dev.sh`,
+realm imported from `samples/keycloak/axis-realm.json`. The development password is `axis`
+for every user. The [development users table](docs/architecture.md#development-users) lists each
+user and the roles they hold. The `operator` role opens the purchase request sample's Approvals
+inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
+`department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,
+adds the `agent` and `service-desk-lead` users and gives an employee the `requester` role, in a site
+at `/service-desk`. The `author` role lets the authoring API list and read the purchase request
+sample's resources under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.
+The `publisher` role lets the authoring API publish, shows **Publish** on the Studio page and allows
+rollback from the release history. Under `scripts/dev.sh`,
 the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
 answers `GET /api/me`. The SPA header offers sign-in and sign-out there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the
