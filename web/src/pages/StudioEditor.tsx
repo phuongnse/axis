@@ -58,7 +58,6 @@ interface SeedEntity {
 }
 
 const noProblems = new Map<string, string>()
-const noPaths: string[] = []
 
 const LazyStudioProcessGraph = lazy(() => import('./StudioProcessGraph'))
 
@@ -111,7 +110,7 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * selected widget's type, and keeps a key it does not show. A process opens in the process editor, which shows its
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
  * A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
- * calls `onOpenPath`. An entity opens in the entity designer, which shows its header, a table of its fields with the
+ * calls `onOpenPath`. A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
  * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
  * of a field of its entity and an expression. When the server does not answer, the draft stays, and the resource loads
  * again after the reconnect unless the draft has changes. When an entity's loaded field was renamed or removed, Save asks one question per field first, and the answers
@@ -122,6 +121,7 @@ export function StudioEditor({
   item,
   resources,
   path,
+  diagnosticPaths,
   onSaved,
   onTextsWritten,
   onDeleted,
@@ -131,6 +131,7 @@ export function StudioEditor({
   item: StudioResourceItem
   resources: StudioResourceItem[]
   path: string | null
+  diagnosticPaths: readonly string[]
   onOpenPath: (path: string) => void
   onSaved: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem[]) => void
   onTextsWritten: (diagnostics: StudioDiagnostic[]) => void
@@ -572,7 +573,12 @@ export function StudioEditor({
         <LabelTextsContext.Provider value={labelContext}>
           {item.kind === 'process' && (
             <Suspense fallback={null}>
-              <LazyStudioProcessGraph draft={draft} path={path} diagnosticPaths={noPaths} onOpenPath={onOpenPath} />
+              <LazyStudioProcessGraph
+                draft={draft}
+                path={path}
+                diagnosticPaths={diagnosticPaths}
+                onOpenPath={onOpenPath}
+              />
             </Suspense>
           )}
           <Tabs

@@ -67,6 +67,7 @@ type NamesState = { application: string; names: StudioNames | null }
  * Run tests sits beside Validate and shows only when `GET /api/me` answers `studioTest: true`. A selected scenario
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
+ * A process step that a diagnostic of the open resource names is marked on its graph.
  * A Module entities group under the kinds lists the entities of the modules the application uses, from the names, by their
  * `<module>/<name>`. One opens read-only in the entity designer, with no editor, no Uses and no Used by lists. Its address is
  * the same `&resource=<id>`, so a reload, a shared link and a Uses entry open it too, when the id is not one of the folder's.
@@ -215,6 +216,15 @@ function StudioWorkspace() {
   const loaded = folder?.application === application ? folder : undefined
   const names = namesState?.application === application ? namesState.names : null
   const resources = useMemo(() => (loaded && 'resources' in loaded ? loaded.resources : []), [loaded])
+  const diagnosticPaths = useMemo(
+    () =>
+      loaded && 'resources' in loaded && resourceId !== null
+        ? loaded.diagnostics
+            .filter((diagnostic) => diagnostic.resourceId?.toLowerCase() === resourceId.toLowerCase())
+            .map((diagnostic) => diagnostic.path)
+        : [],
+    [loaded, resourceId],
+  )
   const groups = useMemo(() => groupByKind(filterResources(resources, search)), [resources, search])
   const moduleEntities = useMemo(() => {
     const needle = search.trim().toLowerCase()
@@ -440,6 +450,7 @@ function StudioWorkspace() {
                         item={selected}
                         resources={loaded.resources}
                         path={path}
+                        diagnosticPaths={diagnosticPaths}
                         onOpenPath={(next) => openReference(selected.id, next)}
                         onSaved={(diagnostics, created) => {
                           setFolder({

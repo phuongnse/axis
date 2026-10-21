@@ -642,7 +642,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     built, see
     [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
     The page editor changes again then.
-- **Process graph** *(built, except the diagnostic marks)*. A process shows a
+- **Process graph** *(built)*. A process shows a
   drawn graph of its steps and transitions above its editor, see
   [D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md).
   It is read-only. The author edits steps in the list.
@@ -663,10 +663,11 @@ Run and the Test results list, the read-only view of a module entity, and the re
     in the step list.
   - A transition to a step that does not exist draws no edge. The graph never
     invents a node.
-  - Planned, not built: a step that a diagnostic in the diagnostics panel names,
-    by a path such as `/steps/{i}`, is marked. The marks will come from the
-    panel's last loaded list, so they change on a save or a request, not on
-    every edit.
+  - A step of the open process is marked when a diagnostic of the open resource
+    names its path, `/steps/{i}` or a path inside it. A marked node has an
+    error-coloured border, "has diagnostics" in its text label, and
+    `data-marked`. The marks come from the panel's last loaded list, so they
+    change on a load, a save or a request, not on every edit.
 - **Designers.** Visual page, form and process designers are not built yet.
   They are planned for M13 and M14, see
   [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).

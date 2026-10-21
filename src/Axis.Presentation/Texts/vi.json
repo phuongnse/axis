@@ -379,6 +379,7 @@
   "shell.studio.process.addOutcome": "Thêm kết quả",
   "shell.studio.process.removeOutcome": "Xóa kết quả",
   "shell.studio.processGraph": "Sơ đồ quy trình",
+  "shell.studio.processGraph.hasDiagnostics": "có chẩn đoán",
   "shell.studio.graphStepHasDiagnostics": "Bước này có chẩn đoán",
   "shell.studio.entity.name": "Tên thực thể",
   "shell.studio.entity.label": "Nhãn thực thể",
