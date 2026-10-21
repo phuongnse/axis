@@ -5,8 +5,9 @@ import { useText } from '../platform/texts'
 /**
  * The status line of a Studio request. A queued or running request shows a spinner, a succeeded one shows its
  * outcome, and a failed one shows an error. A succeeded publish or rollback names its release number once it is
- * known. A preview, which is a publish request with target `preview`, has its own texts and shows no release number. A failed one never shows one, even when the request names a release, so a failure never looks like a
- * success.
+ * known. A preview, which is a publish request with target `preview`, has its own texts and shows no release number.
+ * A test has its own texts too, and shows no release number. A failed one never shows one, even when the request
+ * names a release, so a failure never looks like a success.
  */
 export function StudioRequestStatus({
   request,
@@ -30,6 +31,8 @@ export function StudioRequestStatus({
       message =
         kind === 'validate' ? (
           t('shell.studio.request.validated')
+        ) : kind === 'test' ? (
+          t('shell.studio.request.tested')
         ) : preview ? (
           t('shell.studio.request.previewed')
         ) : (
@@ -52,7 +55,9 @@ export function StudioRequestStatus({
             ? 'shell.studio.request.publishFailed'
             : kind === 'rollback'
               ? 'shell.studio.request.rollbackFailed'
-              : 'shell.studio.request.validateFailed',
+              : kind === 'test'
+                ? 'shell.studio.request.testFailed'
+                : 'shell.studio.request.validateFailed',
       )
       break
   }

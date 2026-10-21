@@ -13,6 +13,8 @@ export interface CurrentUser {
   studioCreate: boolean
   /** The host of the tenant's preview tenant, or `null` when the user may not use Studio or the tenant has none. */
   studioPreviewHost: string | null
+  /** Whether the user sees the test controls in Studio: true for an author when the server's `Studio:Tests` is on. */
+  studioTest: boolean
 }
 
 /**

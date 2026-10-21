@@ -1,5 +1,5 @@
 import { Alert, Button, Descriptions, Flex, Input, Result, Segmented, Select, Tag, Typography } from 'antd'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
@@ -25,7 +25,7 @@ import { StudioEditor } from './StudioEditor'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
-import { StudioPublishing } from './StudioPublishing'
+import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { StudioReferences } from './StudioReferences'
 
 /** The applications Studio may edit, or why they could not be listed. */
@@ -63,6 +63,9 @@ type NamesState = { application: string; names: StudioNames | null }
  * and the release list again, as a save does. A Resources / Policy matrix switch under the application picker picks the view, kept
  * in the address as `&view=policies`. The policy matrix shows in place of the resource list and the details, and
  * its Open policy link opens the policy in the Resources view. The diagnostics panel shows in both views.
+ * Run tests sits beside Validate and shows only when `GET /api/me` answers `studioTest: true`. A selected scenario
+ * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
+ * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
  */
 export function StudioPage() {
   const t = useText()
@@ -96,7 +99,7 @@ export function StudioPage() {
 
 function StudioWorkspace() {
   const t = useText()
-  const { generation, lost } = useStudioConnection()
+  const { generation, reconnecting, lost } = useStudioConnection()
   const [params, setParams] = useSearchParams()
   const application = params.get('app')
   const resourceId = params.get('resource')
@@ -107,9 +110,12 @@ function StudioWorkspace() {
   const [search, setSearch] = useState('')
   const [canPublish, setCanPublish] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
+  const [canTest, setCanTest] = useState(false)
   const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
   const [namesState, setNamesState] = useState<NamesState>()
+  const publishing = useRef<StudioPublishingHandle>(null)
+  const [requestBusy, setRequestBusy] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -117,12 +123,14 @@ function StudioWorkspace() {
       (user) => {
         setCanPublish(user?.studioPublisher === true)
         setCanCreate(user?.studioCreate === true)
+        setCanTest(user?.studioTest === true)
         setPreviewHost(user?.studioPreviewHost ?? null)
       },
       () => {
         if (!controller.signal.aborted) {
           setCanPublish(false)
           setCanCreate(false)
+          setCanTest(false)
           setPreviewHost(null)
         }
       },
@@ -281,6 +289,7 @@ function StudioWorkspace() {
           key={application}
           application={application}
           canPublish={canPublish}
+          canTest={canTest}
           previewHost={previewHost}
           sites={resources.filter((item) => item.kind === 'site')}
           folderRevision={folderRevision}
@@ -291,6 +300,9 @@ function StudioWorkspace() {
                 : current,
             )
           }
+          onOpenScenario={selectDiagnostic}
+          onBusyChange={setRequestBusy}
+          ref={publishing}
         />
       )}
       {application !== null && loaded && 'resources' in loaded && (
@@ -356,6 +368,17 @@ function StudioWorkspace() {
                     <Descriptions
                       title={resourceTitle(selected)}
                       column={1}
+                      extra={
+                        canTest && selected.kind === 'scenario' && selected.name ? (
+                          <Button
+                            data-testid="studio-run-scenario"
+                            disabled={requestBusy || reconnecting}
+                            onClick={() => publishing.current?.runTests([selected.name!])}
+                          >
+                            {t('shell.studio.runScenario')}
+                          </Button>
+                        ) : undefined
+                      }
                       items={[
                         { key: 'kind', label: t('shell.studio.kind'), children: selected.kind },
                         { key: 'id', label: t('shell.studio.id'), children: selected.id },

@@ -853,8 +853,8 @@ Studio is where authors edit an application's resources. It uses the
 agrees. The route, the link, the application picker, New application, New resource, the resource list with its
 search, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
-the request status and the preview links, the Releases list with Roll back, and the
-reconnect message are built.
+the request status and the preview links, the Releases list with Roll back, Run tests,
+Run and the Test results list, and the reconnect message are built.
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   shows a Studio link only when `GET /api/me` answers `studio: true`. A person
@@ -937,8 +937,8 @@ reconnect message are built.
     a value it does not show, so unknown keys stay as they are. See
     **Editors by kind** below. The seed editor, the scenario editor, the
     connector editor, the page editor, the endpoint mapping rows, the text
-    editor, the process editor's step list, with its decision, end and
-    task panels, and the entity designer are built.
+    editor, the process editor's step list, with its decision, end, task and operation
+    panels, and the entity designer are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
@@ -1010,24 +1010,33 @@ reconnect message are built.
   - The buttons are off while a request runs and while the reconnect message
     shows. If the server does not answer during a request, Studio checks it again
     after the reconnect.
-- **Running tests.** *(planned for M11)* Studio runs the application's
+- **Running tests.** Studio runs the application's
   [test scenarios](configuration.md#test-scenarios) through the
   [test route](authoring.md#test), as
   [D55](../decisions.md#d55-running-test-scenarios-from-studio--agreed) agrees.
   - **Run tests** sits next to **Validate**. It sends `POST .../test` with no
     body, so every scenario runs.
-  - A **Run** action in the editor of a selected `scenario` resource sends
+  - **Run** sits in the details of a selected `scenario` resource. It sends
     `{ "scenarios": ["<name>"] }`, so only that scenario runs.
+  - Both run the saved files, not an unsaved draft in the editor, as Validate does.
   - Both show only when `GET /api/me` answers `studioTest: true`. When that
-    answer is `false` or fails, they do not show.
+    answer is `false` or fails, they do not show. They are off while a request
+    runs and while the reconnect message shows.
   - The status line works as for Validate. It shows **queued**, **running** and
     the outcome, and Studio checks `GET .../requests/{id}` every second until the
-    status is `succeeded` or `failed`.
-  - A **Test results** list shows each scenario of the request's `scenarios`
+    status is `succeeded` or `failed`. A test shows **Tests passed** or
+    **Tests failed**, and never a release number.
+  - The **Test results** list shows each scenario of the request's `scenarios`
     field, with **passed** or **failed**, its time and, for a failure, the failing
-    step and its message. Selecting a failure opens the scenario resource at the
-    item's `path`, as a diagnostic does.
-  - The request's diagnostics go in the diagnostics panel, as before.
+    step and its message. Steps count from 1, as the step cards of the editor do.
+    Selecting a failure opens the scenario resource at the item's `path`, as a
+    diagnostic does.
+  - While the request is queued or running, the list shows a note instead of rows,
+    so an empty list never reads as a pass. A failed run with no results says that
+    no scenario ran, and points to the diagnostics. Compile errors, a missing
+    setting and an unknown scenario name fail a run this way.
+  - The list is not kept across a page reload. The request's diagnostics go in the
+    diagnostics panel, as before.
   - The buttons are off while a request runs and while the reconnect message
     shows.
 - **Releases.** A list under the publishing buttons shows the open application's
@@ -1222,7 +1231,7 @@ reconnect message are built.
 - **Editors by kind.** Studio uses a typed editor for six kinds, the entity
   designer for `entity`, and the generic form for the rest. The seed editor,
   the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the text
-  editor, the process editor's step list, with its decision, end and task panels, and the entity designer are
+  editor, the process editor's step list, with its decision, end, task and operation panels, and the entity designer are
   built. The other typed editors are *(planned for M11)*, and until they are built those kinds use the generic
   form. The last
   column lists what still needs the JSON view, because the form cannot show it.
@@ -1234,7 +1243,7 @@ reconnect message are built.
   | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives it a panel          |
   | `form`        | Generic form                          | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
-  | `process`     | Typed editor with the process graph   | The properties of `operation` steps other than `next`, until its panel is built |
+  | `process`     | Typed editor with the process graph   | Nothing                                                               |
   | `rule`        | Generic form                          | Nothing                                                               |
   | `sequence`    | Generic form                          | Nothing                                                               |
   | `role`        | Generic form                          | Nothing                                                               |
@@ -1304,11 +1313,29 @@ reconnect message are built.
       panel does not show stays as it is. A diagnostic path inside a task's
       label, assignee, form, `dueIn` or outcomes opens the Form tab at that
       field.
-    - **Operation panel** *(planned for M11)*. A panel for `operation` steps
-      shows that type's properties. `set`, `input`, `output` and `fields` show
-      as rows of target and expression. Until it is built, an operation card
-      shows its `next` and says to edit its other properties in the JSON view.
-      A diagnostic path inside them opens the JSON view.
+    - **Operation panel** *(built)*. An `operation` step shows an operation
+      choice, `updateRecord`, `callConnector`, `raiseEvent` or **Package
+      operation**, above its transition. Changing the operation removes only
+      the keys the new one forbids. It adds no empty key, so the compiler
+      reports what is still missing. Every other key, including unknown keys,
+      stays.
+      - `updateRecord` shows `set` as rows of a field of the process's entity
+        and an expression. `callConnector` shows the connector and its
+        operation as pickers, `input` as rows of a typed input name and an
+        expression, `output` as rows of a typed connector output name and an
+        entity field, and `retry`. `raiseEvent` shows the event as a picker
+        and `fields` as rows of a payload field of that event and an
+        expression.
+      - A package operation is typed in a text box as
+        `<package>/<operation>`, because no route lists the installed
+        operations. It shows `input`, `output` and `retry` as `callConnector`
+        does. The names route lists no connector input or output names, so
+        those are typed too.
+      - `retry` is attempts and backoff. Clearing both removes `retry`.
+      - While the application's names are not loaded, every picker is a name
+        box. A key the step's operation forbids is not shown as rows. It says
+        to edit it in the JSON view, and a diagnostic path inside it opens the
+        JSON view.
   - **Connector editor** *(built)*. The Form tab shows the base URL binding,
     the auth type with its secret binding, `timeout`, `idempotency`, and the
     operations as a list. The JSON view stays as a second view of the same

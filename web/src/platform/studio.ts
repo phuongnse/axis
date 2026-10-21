@@ -576,17 +576,36 @@ export async function putStudioTexts(
 /** The status of a publish request. `succeeded` and `failed` are final. */
 export type StudioRequestStatus = 'queued' | 'running' | 'succeeded' | 'failed'
 
-/** A request, as `GET /api/studio/apps/{application}/requests/{id}` answers. The diagnostics are empty until it ends. */
+/**
+ * One scenario of a `test` request. `step` is the 0-based index of the failing step and `path` is `/steps/{step}`, both
+ * `null` when the scenario passed or failed before any step.
+ */
+export interface StudioScenarioResult {
+  name: string
+  resourceId: string
+  file: string
+  outcome: 'passed' | 'failed'
+  durationMs: number
+  step: number | null
+  path: string | null
+  message: string | null
+}
+
+/**
+ * A request, as `GET /api/studio/apps/{application}/requests/{id}` answers. The diagnostics are empty until it ends.
+ * `scenarios` is `null` unless the kind is `test`, and then it is empty until the request ends.
+ */
 export interface StudioRequest {
   id: string
   application: string
-  kind: 'validate' | 'publish' | 'rollback'
+  kind: 'validate' | 'publish' | 'rollback' | 'test'
   target: 'tenant' | 'preview'
   status: StudioRequestStatus
   label: string | null
   note: string | null
   releaseId: string | null
   diagnostics: StudioDiagnostic[]
+  scenarios: StudioScenarioResult[] | null
 }
 
 /** One activation in the release history. `actor` is a user id, `startup`, `operator` or `unknown`. */
@@ -625,6 +644,23 @@ export interface PublishDetails {
 export async function validateStudioApp(application: string): Promise<StudioRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/validate`
   const response = await studioFetch(path, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
+/**
+ * Sends a test request, which runs the scenarios named in `scenarios`, or every scenario when it is undefined. It
+ * answers at once with the queued request. A 401 starts sign-in and throws, as any other failure does.
+ */
+export async function testStudioApp(application: string, scenarios?: string[]): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/test`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: scenarios === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: scenarios === undefined ? undefined : JSON.stringify({ scenarios }),
+  })
   if (!response.ok) {
     throw new Error(`Posting '${path}' failed with status ${response.status}.`)
   }

@@ -1,56 +1,101 @@
 import { spawnSync } from 'node:child_process'
-import { cp, mkdtemp, rm } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { expect, test } from '@playwright/test'
 import { startServer } from '../activate'
-import { csrfHeaders } from '../csrf'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 
-test('hoa runs the test scenarios of the purchase request sample, and every scenario passes', async ({ page }) => {
-  // A second server starts, and the request waits behind the publish requests that other specs queue. Each scenario
+const approvalBelowThreshold = '09d75317-fd9e-411e-8322-317778fc1b2b'
+
+test.describe('hoa runs the test scenarios of the purchase request sample from Studio', () => {
+  test.describe.configure({ mode: 'serial' })
+  // A second server starts, and the requests wait behind the publish requests that other specs queue. Each scenario
   // of the sample creates and drops a database.
   test.setTimeout(300_000)
 
-  // The committed sample, copied to a folder of its own. The other Studio specs edit the shared copy while they run,
-  // and a snapshot taken in the middle of an edit could fail for a reason that has nothing to do with this test.
-  const copy = await mkdtemp(path.join(os.tmpdir(), 'axis-studio-tests-'))
-  await cp(purchaseRequests, copy, { recursive: true })
-  // Index 0 of ActivateOnStartup is the purchase request sample, so it stays out of this server.
-  const server = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy })
-  try {
+  let copy: string
+  let server: Awaited<ReturnType<typeof startServer>>
+
+  test.beforeAll(async () => {
+    // The committed sample, copied to a folder of its own. The other Studio specs edit the shared copy while they run,
+    // and a snapshot taken in the middle of an edit could fail for a reason that has nothing to do with this test.
+    copy = await mkdtemp(path.join(os.tmpdir(), 'axis-studio-tests-'))
+    await cp(purchaseRequests, copy, { recursive: true })
+    // Index 0 of ActivateOnStartup is the purchase request sample, so it stays out of this server.
+    server = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy })
+  })
+
+  test.afterAll(async () => {
+    await server?.stop()
+    if (copy) {
+      await rm(copy, { recursive: true, force: true })
+    }
+  })
+
+  test('Run tests runs every scenario, and every scenario passes', async ({ page }) => {
     await useSession(page, 'hoa')
-    const response = await page.request.post(`${server.url}/api/studio/apps/PurchaseRequests/test`, {
-      headers: csrfHeaders,
+    await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+    await page.getByTestId('studio-run-tests').click()
+
+    await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
+      timeout: 240_000,
     })
-    expect(response.status()).toBe(202)
-    const location = response.headers()['location']
-    expect(location).toBeTruthy()
+    await expect(page.getByTestId('studio-test-result')).toHaveCount(5)
+    await expect(page.locator('[data-testid="studio-test-result"][data-outcome="passed"]')).toHaveCount(5)
+  })
 
-    type TestRequest = { status: string; scenarios: { name: string; outcome: string }[] | null }
-    const read = async () => (await (await page.request.get(new URL(location, server.url).href)).json()) as TestRequest
-    await expect
-      .poll(async () => (await read()).status, { timeout: 240_000, intervals: [1_000, 2_000, 5_000] })
-      .toBe('succeeded')
+  test('Run runs one broken scenario, and selecting its failure opens the failing step', async ({ page }) => {
+    const scenarioFile = path.join(copy, 'scenarios', 'approval-below-threshold.json')
+    const scenario = JSON.parse(await readFile(scenarioFile, 'utf8')) as { steps: { values: Record<string, unknown> }[] }
+    // The last step expects the approved status. Rejected breaks that expectation, at step 6.
+    scenario.steps[5].values.status = 'rejected'
+    await writeFile(scenarioFile, JSON.stringify(scenario, null, 2))
 
-    const { scenarios } = await read()
-    expect(scenarios?.length).toBeGreaterThan(0)
-    expect(scenarios?.filter((scenario) => scenario.outcome !== 'passed')).toEqual([])
-  } finally {
-    await server.stop()
-    await rm(copy, { recursive: true, force: true })
-  }
+    await useSession(page, 'hoa')
+    await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${approvalBelowThreshold}`)
+    await page.getByTestId('studio-run-scenario').click()
+
+    await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed', {
+      timeout: 240_000,
+    })
+    const failed = page.locator('[data-testid="studio-test-result"][data-outcome="failed"]')
+    await expect(failed).toHaveCount(1)
+    await expect(failed).toContainText('Step 6')
+
+    await failed.getByRole('button').click()
+    await expect(page).toHaveURL(/path=%2Fsteps%2F5/)
+    await expect(page.getByTestId('studio-field-/steps/5')).toBeInViewport()
+  })
+
+  test('GET /api/me shows the test controls to an author and not to anyone else', async ({ page }) => {
+    await useSession(page, 'hoa')
+    const author = (await (await page.request.get('/api/me')).json()) as { studioTest: boolean }
+    expect(author.studioTest).toBe(true)
+
+    await useSession(page, 'anna')
+    const employee = (await (await page.request.get('/api/me')).json()) as { studioTest: boolean }
+    expect(employee.studioTest).toBe(false)
+  })
 })
 
-test('GET /api/me shows the test controls to an author and not to anyone else', async ({ page }) => {
-  await useSession(page, 'hoa')
-  const author = (await (await page.request.get('/api/me')).json()) as { studioTest: boolean }
-  expect(author.studioTest).toBe(true)
+test('the test controls do not show when the server has Studio:Tests off', async ({ page }) => {
+  const off = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Tests: 'false' })
+  try {
+    await useSession(page, 'hoa')
+    await page.goto(`${off.url}/studio?app=PurchaseRequests`)
+    // Publish shows only once GET /api/me has answered, so the test controls have been decided too.
+    await expect(page.getByTestId('studio-publish')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Validate' })).toBeVisible()
+    await expect(page.getByTestId('studio-run-tests')).toHaveCount(0)
 
-  await useSession(page, 'anna')
-  const employee = (await (await page.request.get('/api/me')).json()) as { studioTest: boolean }
-  expect(employee.studioTest).toBe(false)
+    await page.getByTestId(`studio-resource-${approvalBelowThreshold}`).click()
+    await expect(page.getByTestId('studio-resource-details')).toContainText('scenarios/approval-below-threshold.json')
+    await expect(page.getByTestId('studio-run-scenario')).toHaveCount(0)
+  } finally {
+    await off.stop()
+  }
 })
 
 test('only axis_scenario can create databases, and it is not a superuser', () => {
