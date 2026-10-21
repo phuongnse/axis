@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
@@ -151,5 +151,37 @@ test.describe('Studio edits a process in the process editor', () => {
     const otherwise = page.getByTestId('studio-field-/steps/2/otherwise')
     await expect(otherwise).toBeInViewport()
     await expect(otherwise.getByTestId('studio-reference-unknown')).toBeVisible()
+  })
+
+  test('a step whose transition names a missing step is marked on the graph, and the transition draws no edge', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    const id = await processId(page)
+    const target = path.join(copy, file)
+    const original = await readFile(target, 'utf8')
+
+    try {
+      const content = JSON.parse(original) as { steps: { name: string }[] }
+      const i = content.steps.findIndex((step) => step.name === 'markRejected')
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+      await expect(page.getByTestId(`rf__edge-/steps/${i}/next`)).toHaveCount(1)
+      await expect(page.getByTestId(`studio-graph-node-${i}`)).not.toHaveAttribute('data-marked')
+
+      await page.getByRole('tab', { name: 'JSON' }).click()
+      const textarea = page.getByRole('textbox', { name: 'JSON' })
+      const draft = JSON.parse(await textarea.inputValue()) as { steps: { next?: string }[] }
+      draft.steps[i].next = 'noSuchStep'
+      await textarea.fill(JSON.stringify(draft, null, 2))
+      await page.getByRole('button', { name: 'Save' }).click()
+
+      await expect(page.getByTestId('studio-saved')).toBeVisible()
+      const node = page.getByTestId(`studio-graph-node-${i}`)
+      await expect(node).toHaveAttribute('data-marked', 'true')
+      await expect(node).toHaveAccessibleName('markRejected · operation · has diagnostics')
+      await expect(page.getByTestId(`rf__edge-/steps/${i}/next`)).toHaveCount(0)
+    } finally {
+      await writeFile(target, original)
+    }
   })
 })

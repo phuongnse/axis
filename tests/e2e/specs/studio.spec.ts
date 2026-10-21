@@ -450,6 +450,57 @@ test('an author gives a new page a title in two locales, writes the texts and sa
   }
 })
 
+type ProcessStep = {
+  name: string
+  type: string
+  next?: string
+  otherwise?: string
+  branches?: { next: string }[]
+  outcomes?: { next: string }[]
+}
+
+// A transition draws an edge only when its target step exists, and names match ignoring letter case.
+function drawnEdgePaths(steps: ProcessStep[]): string[] {
+  const names = new Set(steps.map((step) => step.name.toUpperCase()))
+  const transitions = steps.flatMap((step, i) => [
+    ...(step.branches ?? []).map((branch, j) => [`/steps/${i}/branches/${j}`, branch.next] as const),
+    [`/steps/${i}/otherwise`, step.otherwise] as const,
+    [`/steps/${i}/next`, step.next] as const,
+    ...(step.outcomes ?? []).map((outcome, j) => [`/steps/${i}/outcomes/${j}`, outcome.next] as const),
+  ])
+  return transitions
+    .filter(([, target]) => target !== undefined && names.has(target.toUpperCase()))
+    .map(([transitionPath]) => transitionPath)
+}
+
+test('an author opens the steps and transitions of a process from its graph', async ({ page }) => {
+  await useSession(page, 'hoa')
+  const list = await page.request.get('/api/studio/apps/PurchaseRequests/resources')
+  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+  const process = items.find((item) => item.file === 'processes/purchase-request-approval.json')!
+  const file = path.join(studioFolder, 'processes/purchase-request-approval.json')
+  const { steps } = JSON.parse(await readFile(file, 'utf8')) as { steps: ProcessStep[] }
+  const expected = drawnEdgePaths(steps)
+
+  await page.goto(`/studio?app=PurchaseRequests&resource=${process.id}`)
+  const graph = page.getByTestId('studio-process-graph')
+  await expect(graph.locator('[data-testid^="studio-graph-node-"]')).toHaveCount(steps.length)
+  for (const [index, step] of steps.entries()) {
+    await expect(page.getByTestId(`studio-graph-node-${index}`)).toHaveAccessibleName(`${step.name} · ${step.type}`)
+  }
+  const edges = graph.locator('[data-testid^="rf__edge-"]')
+  await expect(edges).toHaveCount(expected.length)
+  const ids = await edges.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-testid')))
+  expect(ids.sort()).toEqual(expected.map((transitionPath) => `rf__edge-${transitionPath}`).sort())
+
+  await page.getByRole('button', { name: 'financeApproval · task', exact: true }).click()
+  await expect(page).toHaveURL(/path=%2Fsteps%2F3(&|$)/)
+  await expect(page.getByTestId('studio-graph-node-3')).toHaveAttribute('aria-current', 'true')
+
+  await page.getByTestId('rf__edge-/steps/3/outcomes/0').click()
+  await expect(page).toHaveURL(/path=%2Fsteps%2F3%2Foutcomes%2F0/)
+})
+
 test('someone without the author role sees no Studio link and a forbidden page', async ({ page }) => {
   await useSession(page, 'anna')
 
