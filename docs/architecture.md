@@ -814,7 +814,7 @@ never opens the JSON view. It builds the whole data
 model: the application, its `en` and `vi` texts, the three roles, the `TicketNumber` sequence, the `Category` and
 `Ticket` entities and the `Categories` seed. The entity designer asks a migration question even for a new entity,
 because the starter field `name` is renamed to `number`. The journey answers Drop data, then deletes the `Ticket`
-migration in Studio, because the sample has no migration and the application is never published. The built
+migration in Studio, because the sample has no migration and release 1 is the first release, so it needs none. The built
 `migrations` folder must be empty at the end. Studio cannot remove a text key yet, and the starter keys of a blank
 application are not in the sample. So the journey deletes the starter `en` text resource and creates it again.
 The journey then builds the `MyTicketList` and `AllTicketList` data sources, the `TicketTriage`, `TicketResolution` and
@@ -823,6 +823,7 @@ expression editor. It then builds the four pages in the page editor and finishes
 already has: the `vi` locale and three navigation entries. It deletes the starter `Home` page, because the sample has
 none. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
 the requester from editing `resolution`. It then writes the six test scenarios in the scenario editor, each with its users, time and steps. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
+The journey then runs the six scenarios with Run tests, and every one must pass. It publishes release 1, and the release history must show that one row, active. On the `service-desk` site of the journey tenant, anna creates and submits a ticket, linh assigns it to khoa, khoa resolves it and anna confirms it, until the ticket's status is `closed`.
 
 The E2E run also starts the purchasing system stub from the build output, and
 fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its

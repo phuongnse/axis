@@ -4,8 +4,9 @@ Status: **Agreed**
 
 A service desk is the third sample application, in the thin shape that M11 can
 run. The sample folder, the realm users and the `request-approval` template
-exist. A Playwright journey builds its data model through Studio only, and
-that part is done. Building the rest through Studio is _(planned for M11)_. See the
+exist. A Playwright journey builds the whole application through Studio only,
+runs its scenarios from Studio, publishes it and runs it on the site. A second,
+smaller journey from the `request-approval` template is _(planned for M11)_. See the
 [Third application section](../product-brief.md#third-application-service-desk)
 of the product brief for the data, flow, security, pages and scenarios. The
 owner confirmed these points on issue #783 on 2026-10-20.

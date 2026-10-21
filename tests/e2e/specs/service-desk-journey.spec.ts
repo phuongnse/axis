@@ -790,4 +790,102 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     await checkBuilt(page)
   })
+
+  test('the author runs the six test scenarios from Studio', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+    await page.getByTestId('studio-run-tests').click()
+
+    // Each scenario creates and drops a database, and the publisher queue is shared with other specs.
+    await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
+      timeout: 240_000,
+    })
+    await expect(page.getByTestId('studio-test-result')).toHaveCount(scenarios.length)
+    await expect(page.locator('[data-testid="studio-test-result"][data-outcome="passed"]')).toHaveCount(
+      scenarios.length,
+    )
+  })
+
+  test('the author publishes ServiceDesk, and release 1 is active', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    await page.getByRole('button', { name: 'Publish' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Publish' }).click()
+    await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
+      timeout: 120_000,
+    })
+    const rows = page.getByTestId('studio-release-row')
+    await expect(rows).toHaveCount(1)
+    await expect(rows).toHaveAttribute('data-number', '1')
+    await expect(rows).toHaveAttribute('data-active', 'true')
+  })
+
+  /** The value the Status select shows. */
+  function statusValue(page: Page) {
+    return page
+      .locator('.ant-form-item')
+      .filter({ has: page.getByText('Status', { exact: true }) })
+      .locator('.ant-select-selection-item')
+  }
+
+  /** Opens the task `label` of the ticket `title` in My tasks. It waits until the worker creates the task. */
+  async function openTask(page: Page, title: string, label: string) {
+    const row = page.getByRole('row', { name: new RegExp(title) })
+    await expect(async () => {
+      await page.goto(`${journeyURL}/service-desk/mytasks?pageSize=100`)
+      await expect(row).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 30_000 })
+    await row.getByRole('link', { name: label }).click()
+  }
+
+  test('anna submits a ticket on the published site, linh triages it to khoa, khoa resolves it, and anna confirms it closed', async ({
+    page,
+  }) => {
+    const title = `Zz Journey ${Date.now()}`
+
+    await useJourneySession(page, 'anna')
+    await page.goto(`${journeyURL}/service-desk/mytickets`)
+    await page.getByRole('link', { name: 'New' }).click()
+    await expect(page).toHaveURL(/\/service-desk\/ticketform\/new$/)
+    await page.getByRole('textbox', { name: 'Title' }).fill(title)
+    await page.getByRole('textbox', { name: 'Description', exact: true }).fill('It shows a black screen.')
+    // The requester's create grant only allows the statuses draft and reopened.
+    await page.getByLabel('Status', { exact: true }).click()
+    await page.locator('.ant-select-item-option[title="draft"]').click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page).toHaveURL(/\/service-desk\/mytickets$/)
+
+    await page.getByRole('row', { name: new RegExp(title) }).getByRole('link', { name: 'Open' }).click()
+    await expect(page).toHaveURL(/\/service-desk\/ticketform\/[^/]+$/)
+    const id = page.url().split('/').pop()
+    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+    await page.getByRole('button', { name: 'Submit' }).click()
+    await expect(page.getByTestId('form-started')).toBeVisible()
+
+    await useJourneySession(page, 'linh')
+    await openTask(page, title, 'Triage ticket')
+    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+    await page.getByLabel('Assigned agent', { exact: true }).fill('khoa')
+    await page.getByRole('button', { name: 'Assign' }).click()
+    await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
+
+    await useJourneySession(page, 'khoa')
+    await openTask(page, title, 'Resolve ticket')
+    await page.getByLabel('Resolution', { exact: true }).fill('Replaced the battery.')
+    await page.getByRole('button', { name: 'Resolve' }).click()
+    await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
+
+    await useJourneySession(page, 'anna')
+    await openTask(page, title, 'Confirm resolution')
+    await expect(page.getByLabel('Resolution', { exact: true })).toHaveValue('Replaced the battery.')
+    await page.getByRole('button', { name: 'Confirm' }).click()
+    await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
+
+    // The worker ends the process some time after the decision.
+    await expect(async () => {
+      await page.goto(`${journeyURL}/service-desk/ticketform/${id}`)
+      await expect(statusValue(page)).toHaveText('closed', { timeout: 1_000 })
+    }).toPass({ timeout: 30_000 })
+  })
 })

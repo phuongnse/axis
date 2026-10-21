@@ -217,11 +217,10 @@ a site at path `service-desk`. Texts are in `en` and `vi`.
 
 ### Built through Studio
 
-_(planned for M11)_ The sample runs today under `scripts/dev.sh`, Compose and
-E2E, and CI runs its scenarios. Studio builds its data model today: the
-application, texts, roles, sequence, entities and seed. Building the rest only
-through Studio is planned: data sources, forms, pages, the process, policies,
-the site, scenarios, publishing and the site run.
+The sample runs under `scripts/dev.sh`, Compose and E2E, and CI runs its
+scenarios. The main Playwright journey builds the whole application with
+Studio only, compares it with the committed folder, runs its scenarios from
+Studio, publishes it and takes one ticket through the process on the site.
 
 - The committed folder `samples/apps/service-desk` records what the journey
   builds. CI activates it and runs its scenarios, as for the other samples.
@@ -235,4 +234,5 @@ the site, scenarios, publishing and the site run.
 - Then the journey runs the scenarios from Studio and publishes. Then the
   requester, the service desk lead and the agent take one ticket through the
   process on the site.
-- A second, smaller journey starts from the `request-approval` template.
+- _(planned for M11)_ A second, smaller journey starts from the
+  `request-approval` template.
