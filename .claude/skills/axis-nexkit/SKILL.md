@@ -14,9 +14,10 @@ You post every command yourself. Post `/nexkit go` only on the latest plan,
 after the check below that it holds every agreed change, and only when you
 recommend it. Ask the owner first when the plan rests on a **Proposed**
 decision or has a question only the owner can answer. Never approve or merge a
-pull request yourself. While `merge.auto` is on, NexKit merges and closes the
-issue, and with `close_parent_issues` it closes finished parents too. While
-`merge.auto` is off, merging is the owner's.
+pull request yourself. The only pull request you close is one a split has
+superseded, as in the table under "When something fails". While `merge.auto` is
+on, NexKit merges and closes the issue, and with `close_parent_issues` it closes
+finished parents too. While `merge.auto` is off, merging is the owner's.
 
 ## Where the values live
 
@@ -122,7 +123,8 @@ the rule in the writing checklist. It does not copy the parent's labels. Title e
 delivers, as for any issue. Name the role in a part's title, never a development user. Never reuse the parent's title, whole or as a
 prefix: write `Connector call steps pass compile checks`, not
 `Call connector step: compile checks and model`. The sub-issue link already
-shows the parent.
+shows the parent. If the issue has an open NexKit pull request, close it as
+superseded, see "When something fails".
 
 ```bash
 CHILD_ID=$(gh api repos/{owner}/{repo}/issues/<child> --jq .id)
@@ -231,6 +233,7 @@ returns 404, upgrade `gh` and try again.
 | The review requested changes | NexKit runs automatic fix rounds up to the configured limit. After that, ask the owner and post `/nexkit fix <instructions>`. |
 | NexKit's automatic merge was refused (`merge_refused`) | A conflict starts a conflict round by itself. Otherwise the round's comment says why, usually a rule on `main`. NexKit has mentioned the owner; tell them what you found. |
 | CI on `main` fails after a merge | If the failure looks flaky, run it once more with `gh run rerun <id> --failed`. Otherwise tell the owner and open a bug issue with the `bug` label, the failure and the run link, in the current milestone, and plan it before other issues. |
+| A NexKit pull request's issue was split into sub-issues, so the pull request is superseded | Once the sub-issues exist and are linked to the parent, comment and close it: `gh pr close <N> --comment "Superseded by #a, #b."`, naming every sub-issue. Do not delete the branch. This is the only pull request you close. Never approve or merge one. |
 
 For the mechanics behind each failure, read NexKit's troubleshooting doc at the
 pinned ref, found as described under "Where the values live".
