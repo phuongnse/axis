@@ -8,7 +8,17 @@
     {
       "type": "columns",
       "columns": [
-        { "width": 8, "widgets": [{ "type": "table", "entity": "Request" }] },
+        {
+          "width": 8,
+          "widgets": [
+            {
+              "type": "table",
+              "entity": "Request",
+              "rowActions": [{ "type": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }],
+              "toolbarActions": [{ "type": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }]
+            }
+          ]
+        },
         {
           "width": 4,
           "widgets": [

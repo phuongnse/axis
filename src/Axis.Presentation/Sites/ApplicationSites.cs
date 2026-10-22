@@ -81,12 +81,21 @@ public static class ApplicationSites
             widget.Type == WidgetType.TaskInbox ? $"/api/apps/{application.Manifest.Name}/tasks" : null,
             widget.Process?.Name,
             widget.Process is { } process ? $"/api/apps/{application.Manifest.Name}/processes/{process.Name}/instances" : null,
-            [.. widget.Actions.Select(action => new ActionMetadata(
-                "startProcess",
-                action.Process.Name,
-                action.Label.TextKey,
-                $"/api/apps/{application.Manifest.Name}/processes/{action.Process.Name}/instances"))],
+            [.. widget.Actions.Select(action => Action(application, action))],
+            [.. widget.RowActions.Select(action => Action(application, action))],
+            [.. widget.ToolbarActions.Select(action => Action(application, action))],
             FullAccess(application, widget));
+
+    private static ActionMetadata Action(ApplicationModel application, WidgetActionModel action) =>
+        action switch
+        {
+            StartProcessActionModel start => new StartProcessActionMetadata(
+                start.Process.Name,
+                start.Label.TextKey,
+                $"/api/apps/{application.Manifest.Name}/processes/{start.Process.Name}/instances"),
+            NavigateActionModel navigate => new NavigateActionMetadata(navigate.Page.Name, navigate.Label.TextKey),
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
+        };
 
     /// <summary>
     /// The entity a table or form widget is about: its own entity, or the root entity of its data

@@ -1,0 +1,17 @@
+{
+  "id": "2f6b9d41-7a3c-4e58-8b10-9c4e5a7d1f05",
+  "kind": "page",
+  "name": "RequestForm",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.requestForm.title" },
+  "widgets": [
+    {
+      "type": "form",
+      "entity": "Request",
+      "actions": [
+        { "type": "startProcess", "process": "Submit", "label": { "textKey": "request.submit" } },
+        { "type": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }
+      ]
+    }
+  ]
+}

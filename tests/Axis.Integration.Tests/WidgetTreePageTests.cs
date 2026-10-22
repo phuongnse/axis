@@ -30,7 +30,7 @@ public sealed class WidgetTreePageTests(ProcessStartFixture fixture) : IClassFix
         Assert.Equal("pages.overview.inspector", section.GetProperty("titleKey").GetString());
         Assert.False(section.GetProperty("collapsed").GetBoolean());
         Assert.Equal(
-            """{"type":"processInspector","formPage":null,"entity":null,"dataSource":null,"form":null,"tasksPath":null,"process":"Submit","instancesPath":"/api/apps/ProcessApp/processes/Submit/instances","actions":[],"access":null}""",
+            """{"type":"processInspector","formPage":null,"entity":null,"dataSource":null,"form":null,"tasksPath":null,"process":"Submit","instancesPath":"/api/apps/ProcessApp/processes/Submit/instances","actions":[],"rowActions":[],"toolbarActions":[],"access":null}""",
             Assert.Single(section.GetProperty("widgets").EnumerateArray()).GetRawText());
     }
 

@@ -6,7 +6,7 @@ import { buildRecordBody } from './recordBody'
 import { RecordHistory } from './RecordHistory'
 import { newIdempotencyKey, startProcess } from './processes'
 import { fetchRecord, saveRecord, type RecordItem, type RecordProblem } from './records'
-import type { EntityWidgetMetadata, WidgetAction } from './site'
+import type { EntityWidgetMetadata, StartProcessAction } from './site'
 import { useText } from './texts'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
@@ -39,8 +39,8 @@ type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
  * and a field the form marks read-only. A field the user's grants do not let them write, as the
  * widget's access says, is read-only too: on a new record the `create` fields, and on a saved one
  * the `update` fields. Without the `create` or `update` grant the form has no save button. A saved
- * record shows its history below the form, and a button for each of the widget's actions, which
- * lists only the processes the user may start. A new record has neither. An action saves the
+ * record shows its history below the form, and a button for each of the widget's `startProcess` actions, which
+ * lists only the processes the user may start. A `navigate` action has no button yet. A new record has neither. An action saves the
  * changed fields, then starts its process for the record.
  */
 export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale }: FormWidgetProps) {
@@ -173,7 +173,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     return false
   }
 
-  const runAction = async (action: WidgetAction) => {
+  const runAction = async (action: StartProcessAction) => {
     if (recordId === null || saving || starting) {
       return
     }
@@ -250,16 +250,18 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
           )}
           <Button onClick={() => navigate(returnTo)}>{t('shell.form.cancel')}</Button>
           {recordId !== null &&
-            widget.actions.map((action) => (
-              <Button
-                key={action.instancesPath}
-                htmlType="button"
-                disabled={saving || starting}
-                onClick={() => void runAction(action)}
-              >
-                {t(action.labelKey)}
-              </Button>
-            ))}
+            widget.actions
+              .filter((action): action is StartProcessAction => action.type === 'startProcess')
+              .map((action) => (
+                <Button
+                  key={action.instancesPath}
+                  htmlType="button"
+                  disabled={saving || starting}
+                  onClick={() => void runAction(action)}
+                >
+                  {t(action.labelKey)}
+                </Button>
+              ))}
         </Flex>
       </Form>
       {recordId !== null && (

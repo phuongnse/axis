@@ -138,12 +138,22 @@ export interface FormMetadata {
  * A `startProcess` action of a form widget: a button that starts `process` for the form's record by
  * posting to `instancesPath`, the start endpoint, so the SPA never builds that URL itself.
  */
-export interface WidgetAction {
+export interface StartProcessAction {
   type: 'startProcess'
   process: string
   labelKey: string
   instancesPath: string
 }
+
+/** A `navigate` action: opens the page `page`, by its declared name. The form widget does not render it yet. */
+export interface NavigateAction {
+  type: 'navigate'
+  page: string
+  labelKey: string
+}
+
+/** One action of a form widget, in page file order. */
+export type WidgetAction = StartProcessAction | NavigateAction
 
 /**
  * What the signed-in user may do with a table or form widget's entity, or with the root entity of

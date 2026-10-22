@@ -1,5 +1,7 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Model;
+using Axis.Configuration.Resources;
 using Axis.Expressions.Diagnostics;
 using static Axis.Configuration.Tests.PresentationCompilerTests;
 
@@ -22,7 +24,7 @@ public sealed class NavigateActionCompilerTests
     private const string OrdersFile = "pages/orders.json";
 
     [Fact]
-    public void Row_action_passing_the_row_id_to_a_reference_parameter_compiles()
+    public void Row_action_passing_the_row_id_to_a_reference_parameter_compiles_to_the_page_and_its_label()
     {
         using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ]"""));
 
@@ -30,11 +32,14 @@ public sealed class NavigateActionCompilerTests
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Empty(Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "Orders").Widgets).Actions);
+        var widget = Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Equal([new NavigateActionModel(new PageReference(Guid.Parse(DetailId), "Detail"), new TextReference("order.open"))], widget.RowActions);
+        Assert.Empty(widget.Actions);
+        Assert.Empty(widget.ToolbarActions);
     }
 
     [Fact]
-    public void Form_action_passing_the_record_id_compiles_and_leaves_the_model_without_actions()
+    public void Form_action_passing_the_record_id_compiles_to_the_page_and_its_label()
     {
         using var folder = Folder(
             """{ "type": "form", "entity": "Order", "actions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ] }""");
@@ -43,11 +48,14 @@ public sealed class NavigateActionCompilerTests
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Empty(Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "Orders").Widgets).Actions);
+        var widget = Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Equal([new NavigateActionModel(new PageReference(Guid.Parse(DetailId), "Detail"), new TextReference("order.open"))], widget.Actions);
+        Assert.Empty(widget.RowActions);
+        Assert.Empty(widget.ToolbarActions);
     }
 
     [Fact]
-    public void Toolbar_action_to_a_page_without_parameters_compiles()
+    public void Toolbar_action_to_a_page_without_parameters_compiles_to_the_page_and_its_label()
     {
         using var folder = Folder(
             """{ "type": "table", "entity": "Order", "toolbarActions": [ { "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" } } ] }""");
@@ -55,6 +63,11 @@ public sealed class NavigateActionCompilerTests
         var result = ApplicationCompiler.Compile(folder.Path);
 
         Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var widget = Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "Orders").Widgets);
+        var customerForm = Assert.Single(result.Model.Pages, page => page.Name == "CustomerForm");
+        Assert.Equal([new NavigateActionModel(new PageReference(customerForm.Id, "CustomerForm"), new TextReference("order.open"))], widget.ToolbarActions);
+        Assert.Empty(widget.RowActions);
     }
 
     [Fact]
