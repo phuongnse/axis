@@ -385,6 +385,10 @@ otherwise the answer is the stale-version `409`. See
   references. Any foreign-key violation on delete maps to it. The title is
   fixed, and the response never names the referencing entity, table or
   constraint.
+- **`409` for a record in a running process** *(planned for M12)*. A delete
+  of a record that is the subject of a running or waiting process instance.
+  The title is fixed, and the response never names the process. See the
+  [start lock](processes.md#releases-and-running-work).
 - **`409` for a schema conflict.** The table has a constraint the active model
   does not declare, such as a `NOT NULL` column left by an activation that
   failed after provisioning committed. The title is fixed, and the response
@@ -596,7 +600,7 @@ answered with `400`:
 
 *(Planned for M12.)* The form state endpoint answers what a form shows for a
 draft record, and which messages the user's input earns so far. It writes
-nothing ([D58](../decisions/d58-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+nothing ([D60](../decisions/d60-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 The conditions are in [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 
 `POST /api/apps/{app}/forms/{form}/state` needs `Content-Type: application/json`
