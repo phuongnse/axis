@@ -161,7 +161,7 @@ Content-Type: application/json
 *(Planned for M12.)* `POST /api/apps/{app}/tasks/{id}/form-state` answers
 what the task's form shows for a draft, as the record API's
 [form state](record-api.md#form-state) does for a record form
-([D61](../decisions/d61-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 It needs `Content-Type: application/json` and the
 [CSRF header](record-api.md#create-update-and-delete).
 
