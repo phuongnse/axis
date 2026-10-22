@@ -1073,7 +1073,7 @@ describe('StudioEditor for a page', () => {
     renderResource(pageItem, pageNames)
 
     expect(await screen.findByTestId('studio-page-editor', {}, slow)).toBeInTheDocument()
-    expect(screen.getByTestId('studio-widget-0')).toHaveTextContent('form · PurchaseRequest')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('form · PurchaseRequest')
     expect(screen.getByTestId('studio-field-/widgets/0/actions/0/process')).toBeInTheDocument()
   })
 
