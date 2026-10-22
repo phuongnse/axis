@@ -105,7 +105,9 @@ export function StudioNewResource({
             <Select
               aria-label={t('shell.studio.newResource.kind')}
               value={kind}
-              // All kinds render, so each one can be reached without scrolling the list.
+              // All kinds render, so each one can be reached without scrolling the list, and the author can type to narrow it.
+              showSearch
+              optionFilterProp="label"
               virtual={false}
               options={starterKinds.map((starterKind) => ({ value: starterKind, label: starterKind }))}
               onChange={(next) => {
