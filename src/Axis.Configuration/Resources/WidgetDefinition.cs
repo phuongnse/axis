@@ -32,6 +32,12 @@ public sealed record WidgetDefinition
     /// <summary>The buttons a <c>form</c> widget shows on a saved record, or null when it has none.</summary>
     public IReadOnlyList<WidgetActionDefinition>? Actions { get; init; }
 
+    /// <summary>The <c>navigate</c> buttons a <c>table</c> widget shows on each row, or null when it has none.</summary>
+    public IReadOnlyList<WidgetActionDefinition>? RowActions { get; init; }
+
+    /// <summary>The <c>navigate</c> buttons a <c>table</c> widget shows above its rows, or null when it has none.</summary>
+    public IReadOnlyList<WidgetActionDefinition>? ToolbarActions { get; init; }
+
     /// <summary>The columns of a <c>columns</c> widget, or null on any other widget.</summary>
     public IReadOnlyList<WidgetColumnDefinition>? Columns { get; init; }
 

@@ -96,13 +96,14 @@ site, and its widgets are its content:
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record. See
   [frontend.md](frontend.md).
-- A `table` widget may list `rowActions` and `toolbarActions` *(planned for
-  M12)*. Each entry has a `type`, such as
+- A `table` widget may list `rowActions` and `toolbarActions`. For now each
+  entry is a `navigate` action, which the compiler checks but no page shows
+  yet. The other entries are *(planned for M12)*. An entry has a `type`, such as
   `{ "type": "delete", "label": { "textKey": "purchaseRequest.delete" } }` or
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`.
   `navigate` may sit in either list. `startProcess` and `delete` sit in
-  `rowActions` only, and the row is their subject. An entry may have a
-  `visibleWhen`, a boolean expression over the row's fields. See
+  `rowActions` only, and the row is their subject. They and `visibleWhen`, a
+  boolean expression over the row's fields, are still planned. See
   [frontend.md](frontend.md) and
   [D59](../decisions/d59-table-row-and-toolbar-actions.md).
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
@@ -133,15 +134,18 @@ site, and its widgets are its content:
   }
   ```
 
-- A `navigate` action opens another page *(planned for M12)*. It sits in a
+- A `navigate` action opens another page. The compiler checks its shape, but
+  the compiled page and the SPA do not show its button yet. It sits in a
   table's `rowActions` or `toolbarActions` ([D59](../decisions/d59-table-row-and-toolbar-actions.md)),
   or in a form's `actions`:
   `{ "type": "navigate", "page": "TicketDetail", "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }`.
   Each value is an expression, see
-  [expressions](expressions.md#names-and-references). A page whose widget is a form
+  [expressions](expressions.md#names-and-references). In `toolbarActions` the
+  expressions see no names, because a toolbar has no row. The checks are in
+  [configuration](configuration.md). A page whose widget is a form
   declares no parameters. An action to it may set `record`, a reference to the
   form's entity, instead of `parameters`: it opens `/{page}/{id}`, and without
-  `record` it opens `/{page}/new`.
+  `record` it opens `/{page}/new` *(planned for M12)*.
 
 A page may hold a tree of widgets. The container
 widgets `columns`, `tabs` and `section` hold other widgets, see

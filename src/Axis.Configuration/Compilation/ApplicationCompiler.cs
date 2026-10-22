@@ -1712,11 +1712,12 @@ public static class ApplicationCompiler
             {
                 // Each action is named as its process declares it. A widget without
                 // actions keeps the shared empty list, so equal widgets stay equal.
-                Actions = widget.Actions is null
+                // A navigate action is only checked so far, so it is not in the model.
+                Actions = widget.Actions is null || widget.Actions.All(action => action.Type != "startProcess")
                     ? []
-                    : [.. widget.Actions.Select(action =>
+                    : [.. widget.Actions.Where(action => action.Type == "startProcess").Select(action =>
                     {
-                        var process = processesByName[action.Process];
+                        var process = processesByName[action.Process!];
                         return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
                     })],
             };
