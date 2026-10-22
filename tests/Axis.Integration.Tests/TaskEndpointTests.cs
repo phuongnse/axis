@@ -108,10 +108,16 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
         var form = root.GetProperty("form");
         Assert.Equal("RequestReview", form.GetProperty("name").GetString());
         var section = Assert.Single(form.GetProperty("sections").EnumerateArray());
+        Assert.Equal("main", section.GetProperty("name").GetString());
         Assert.Equal("requestReview.main", section.GetProperty("titleKey").GetString());
+        Assert.True(section.GetProperty("visibleWhen").GetBoolean());
         var field = Assert.Single(section.GetProperty("fields").EnumerateArray());
         Assert.Equal("title", field.GetProperty("name").GetString());
         Assert.False(field.GetProperty("readOnly").GetBoolean());
+        Assert.False(field.GetProperty("visibleWhen").GetBoolean());
+        Assert.Equal(
+            """[{"titleKey":"requestReview.step","sections":["main"]}]""",
+            form.GetProperty("steps").GetRawText());
         var entity = form.GetProperty("entity");
         Assert.Equal("Request", entity.GetProperty("name").GetString());
         Assert.Contains("title", entity.GetProperty("fields").EnumerateArray().Select(entry => entry.GetProperty("name").GetString()));

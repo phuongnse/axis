@@ -212,4 +212,10 @@ public static class DiagnosticCodes
     public const string InvalidColumnWidths = "AXC0222";
     public const string DuplicatePageTable = "AXC0223";
     public const string DuplicatePageRecordWidget = "AXC0224";
+    public const string UnlistedFormConditionField = "AXC0225";
+    public const string VisibleWhenOnRequiredField = "AXC0226";
+    public const string DuplicateFormSectionName = "AXC0227";
+    public const string UnknownStepSection = "AXC0228";
+    public const string DuplicateStepSection = "AXC0229";
+    public const string SectionInNoStep = "AXC0230";
 }

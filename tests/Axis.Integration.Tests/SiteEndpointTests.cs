@@ -191,7 +191,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
 
         // The total is computed, so it is read-only though the form does not say so.
         Assert.Equal(
-            """{"name":"ItemSections","sections":[{"titleKey":"itemSections.main","fields":[{"name":"name","readOnly":false},{"name":"quantity","readOnly":true}]},{"titleKey":"itemSections.pricing","fields":[{"name":"price","readOnly":false},{"name":"total","readOnly":true}]}]}""",
+            """{"name":"ItemSections","sections":[{"name":"main","titleKey":"itemSections.main","visibleWhen":false,"fields":[{"name":"name","readOnly":false,"visibleWhen":false},{"name":"quantity","readOnly":true,"visibleWhen":false}]},{"name":"pricing","titleKey":"itemSections.pricing","visibleWhen":true,"fields":[{"name":"price","readOnly":false,"visibleWhen":true},{"name":"total","readOnly":true,"visibleWhen":false}]}],"steps":[{"titleKey":"itemSections.stepMain","sections":["main"]},{"titleKey":"itemSections.stepPricing","sections":["pricing"]}]}""",
             widget.GetProperty("form").GetRawText());
 
         // The entity keeps every field, so the SPA knows the type of each field the form shows.
@@ -334,7 +334,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         using var page = await GetJsonAsync(client, "/api/sites/records/pages/itemsections", HostA);
 
         Assert.Equal(
-            """{"name":"ItemSections","sections":[{"titleKey":"itemSections.main","fields":[{"name":"name","readOnly":false}]}]}""",
+            """{"name":"ItemSections","sections":[{"name":"main","titleKey":"itemSections.main","visibleWhen":false,"fields":[{"name":"name","readOnly":false,"visibleWhen":false}]}],"steps":[{"titleKey":"itemSections.stepMain","sections":["main"]}]}""",
             Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("form").GetRawText());
     }
 
@@ -353,7 +353,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal(["name", "code"], parts.GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()));
         Assert.Equal(10, EntityFieldNames(sections).Count);
         Assert.Equal(
-            """{"name":"ItemSections","sections":[{"titleKey":"itemSections.main","fields":[{"name":"name","readOnly":false},{"name":"quantity","readOnly":true}]},{"titleKey":"itemSections.pricing","fields":[{"name":"price","readOnly":false},{"name":"total","readOnly":true}]}]}""",
+            """{"name":"ItemSections","sections":[{"name":"main","titleKey":"itemSections.main","visibleWhen":false,"fields":[{"name":"name","readOnly":false,"visibleWhen":false},{"name":"quantity","readOnly":true,"visibleWhen":false}]},{"name":"pricing","titleKey":"itemSections.pricing","visibleWhen":true,"fields":[{"name":"price","readOnly":false,"visibleWhen":true},{"name":"total","readOnly":true,"visibleWhen":false}]}],"steps":[{"titleKey":"itemSections.stepMain","sections":["main"]},{"titleKey":"itemSections.stepPricing","sections":["pricing"]}]}""",
             Assert.Single(sections.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("form").GetRawText());
     }
 
