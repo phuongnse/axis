@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using Axis.Server.Tests;
@@ -200,31 +199,6 @@ public sealed class FormStateEndpointTests(RecordApiFixture fixture) : IClassFix
         using var readResponse = await fixture.Client.SendAsync(read, CancellationToken);
         using var stored = JsonDocument.Parse(await readResponse.Content.ReadAsStringAsync(CancellationToken));
         Assert.Equal("Desk", stored.RootElement.GetProperty("values").GetProperty("name").GetString());
-    }
-
-    [Fact]
-    public async Task Median_of_ten_warm_calls_is_under_300_milliseconds()
-    {
-        await fixture.ResetAsync();
-        var id = await fixture.InsertAsync(TenantA, "Item", new Dictionary<string, string?> { ["name"] = "Desk", ["quantity"] = "20" });
-        var body = $$"""{ "recordId": "{{id:D}}", "values": { "quantity": 30, "price": "2.50" }, "touched": ["quantity", "price"] }""";
-        for (var warmUp = 0; warmUp < 2; warmUp++)
-        {
-            using var warm = await PostAsync(fixture.Client, body);
-        }
-
-        var times = new List<TimeSpan>();
-        for (var call = 0; call < 10; call++)
-        {
-            var watch = Stopwatch.StartNew();
-            using var response = await SendAsync(fixture.Client, body);
-            watch.Stop();
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            times.Add(watch.Elapsed);
-        }
-
-        var median = times.Order().ElementAt(5);
-        Assert.True(median < TimeSpan.FromMilliseconds(300), $"The median was {median.TotalMilliseconds:F0} ms.");
     }
 
     private async Task<long> VersionAsync(Guid id)

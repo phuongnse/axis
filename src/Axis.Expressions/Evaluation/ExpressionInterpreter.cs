@@ -37,6 +37,18 @@ public static class ExpressionInterpreter
         ExpressionCheckResult checkResult,
         ExpressionValues values,
         ExpressionRecordResolver? records = null,
+        DateTimeOffset? now = null) =>
+        EvaluateCountingSteps(expression, checkResult, values, records, now).Result;
+
+    /// <summary>
+    /// Evaluates like <see cref="Evaluate"/> and also gives the steps used, so a test can show that
+    /// the step budget stops an expression without timing it.
+    /// </summary>
+    internal static (ExpressionEvaluationResult Result, int Steps) EvaluateCountingSteps(
+        ExpressionNode expression,
+        ExpressionCheckResult checkResult,
+        ExpressionValues values,
+        ExpressionRecordResolver? records = null,
         DateTimeOffset? now = null)
     {
         ArgumentNullException.ThrowIfNull(expression);
@@ -47,13 +59,14 @@ public static class ExpressionInterpreter
             throw new ArgumentException("Only an expression that passed the type checker can be evaluated.", nameof(checkResult));
         }
 
+        var budget = new Budget();
         try
         {
-            return new ExpressionEvaluationResult(new Evaluator(values, checkResult, new Budget(), records, now).Eval(expression), null);
+            return (new ExpressionEvaluationResult(new Evaluator(values, checkResult, budget, records, now).Eval(expression), null), budget.Steps);
         }
         catch (EvaluationFailure failure)
         {
-            return new ExpressionEvaluationResult(null, failure.Error);
+            return (new ExpressionEvaluationResult(null, failure.Error), budget.Steps);
         }
     }
 

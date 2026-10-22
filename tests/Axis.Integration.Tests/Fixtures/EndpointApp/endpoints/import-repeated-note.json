@@ -1,0 +1,19 @@
+{
+  "id": "a618666e-68db-4c1f-8560-0802f0ca4c26",
+  "kind": "endpoint",
+  "name": "ImportRepeatedNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "process": "ReviewNote",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "quantity", "type": "integer" }
+  ],
+  "values": {
+    "title": "title",
+    "quantity": "quantity",
+    "status": "'open'"
+  },
+  "output": ["title", "status"],
+  "wait": "PT30S"
+}

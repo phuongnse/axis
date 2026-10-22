@@ -4,4 +4,8 @@
     <ProjectReference Include="..\Axis.Core\Axis.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Expressions.Tests" />
+  </ItemGroup>
+
 </Project>

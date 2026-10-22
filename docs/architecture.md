@@ -737,6 +737,12 @@ Playwright specs find elements by role, accessible name and ARIA state, and neve
 select a class of the UI library. `scripts/lint.sh` fails when a file under
 `tests/` names a class that starts with `ant-`.
 
+Only `*PerformanceTests` classes may assert on elapsed time, because they run alone.
+Other tests prove a bound with a count, such as the steps used or the nodes inlined, and
+show that nothing waited through an outcome. `scripts/lint.sh` fails when a test file
+that is not named `*PerformanceTests.cs` uses `Stopwatch`, `.Elapsed` or `GetElapsedTime`.
+A polling deadline built on `DateTime.UtcNow` only ends a wait and is allowed.
+
 `scripts/integration.sh` runs the scenarios of every application under
 `samples/apps/` and of every sample template under `samples/templates/` from the
 integration tests, on their Testcontainers PostgreSQL. See

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -214,15 +213,17 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var ids = await CreateTenantsAsync(scenario);
         var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null));
-        await SetRunningAsync(scenario, ids[0], request, 1, "now() + interval '3 seconds'");
-        var waited = Stopwatch.StartNew();
+        await SetRunningAsync(scenario, ids[0], request, 1, "now() + interval '10 seconds'");
         var publisher = StartPublisher(scenario, _testLease);
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken);
-            Assert.True(waited.Elapsed < TimeSpan.FromSeconds(3));
-            Assert.Equal("running", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
-            Assert.Equal(1, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+            await Task.Delay(TimeSpan.FromSeconds(2), CancellationToken);
+
+            // One statement reads the status, the claims and whether the lease still holds, by the
+            // database clock. The lease is 10 seconds against the 3-second window this once used, 3.3 times.
+            Assert.Equal(
+                "running/1/true",
+                await ScalarAsync(scenario, ids[0], $"SELECT format('%s/%s/%s', status, claims, (lease_until > now())::text) FROM axis.publish_requests WHERE id = '{request}'"));
 
             await WaitForStatusAsync(scenario, ids[0], request, "succeeded", "failed");
         }

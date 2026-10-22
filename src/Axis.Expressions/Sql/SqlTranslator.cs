@@ -50,6 +50,17 @@ public static class SqlTranslator
         ExpressionNode expression,
         Func<IReadOnlyList<string>, string> column,
         ExpressionCheckResult? check = null,
+        string parameterPrefix = "f") =>
+        TranslateCountingNodes(expression, column, check, parameterPrefix).Result;
+
+    /// <summary>
+    /// Translates like <see cref="Translate"/> and also gives the syntax nodes counted for the
+    /// inlining cap, so a test can show that the cap stops a rule chain without timing it.
+    /// </summary>
+    internal static (SqlTranslationResult Result, int InlinedNodes) TranslateCountingNodes(
+        ExpressionNode expression,
+        Func<IReadOnlyList<string>, string> column,
+        ExpressionCheckResult? check = null,
         string parameterPrefix = "f")
     {
         ArgumentNullException.ThrowIfNull(expression);
@@ -58,15 +69,16 @@ public static class SqlTranslator
 
         var ruleCalls = check?.RuleCalls ?? new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance);
         var parameters = new List<SqlValue>();
+        var size = new InlinedSize();
         try
         {
-            InlinedSize.Check(expression, ruleCalls);
+            size.Check(expression, ruleCalls);
             var sql = new Translation(column, parameters, ruleCalls, parameterPrefix).Render(expression);
-            return new SqlTranslationResult(sql, parameters, null);
+            return (new SqlTranslationResult(sql, parameters, null), size.Nodes);
         }
         catch (TranslationFailure failure)
         {
-            return new SqlTranslationResult(null, [], failure.Diagnostic);
+            return (new SqlTranslationResult(null, [], failure.Diagnostic), size.Nodes);
         }
     }
 
@@ -347,8 +359,11 @@ public static class SqlTranslator
         /// <summary>The last rule call the filter makes itself whose body was counted.</summary>
         private (CallNode Call, ExpressionRule Rule)? _lastOuter;
 
-        public static void Check(ExpressionNode node, IReadOnlyDictionary<CallNode, ExpressionRule> ruleCalls) =>
-            new InlinedSize().Walk(node, ruleCalls, outer: null);
+        /// <summary>The nodes counted so far, one past the cap when the cap stopped the walk.</summary>
+        public int Nodes => _count;
+
+        public void Check(ExpressionNode node, IReadOnlyDictionary<CallNode, ExpressionRule> ruleCalls) =>
+            Walk(node, ruleCalls, outer: null);
 
         /// <summary><paramref name="outer"/> is the call the filter makes, and its rule, while inside a body.</summary>
         private void Walk(
