@@ -8,6 +8,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { chooseOption, optionTexts, shownDropdown } from '../test/antd'
 import { FormSteps } from './FormSteps'
 import { LabelTextsContext } from './labelTextsContext'
 
@@ -58,12 +59,6 @@ function renderSteps(value: unknown, onChange = vi.fn(), available: unknown = se
     </ThemeModeProvider>,
   )
   return onChange
-}
-
-/** The names of the options of the open dropdown. */
-function optionsOf(): string[] {
-  const open = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')!
-  return [...open.querySelectorAll('.ant-select-item-option')].map((option) => option.textContent ?? '')
 }
 
 afterEach(() => localStorage.clear())
@@ -131,9 +126,8 @@ describe('FormSteps', () => {
     const card = screen.getByTestId('studio-field-/steps/0')
 
     await userEvent.click(within(card).getByRole('combobox', { name: 'Sections' }))
-    await waitFor(() => expect(optionsOf()).toEqual(['request', 'decision']))
-    const dropdown = document.querySelector<HTMLElement>('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')!
-    await userEvent.click(within(dropdown).getByTitle('decision'))
+    await waitFor(() => expect(optionTexts(shownDropdown()!)).toEqual(['request', 'decision']))
+    await chooseOption('decision')
 
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/sections', ['request', 'decision'])
   })

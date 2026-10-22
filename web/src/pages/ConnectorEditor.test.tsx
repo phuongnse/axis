@@ -6,6 +6,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { clearSelect, optionTexts, selectRoot } from '../test/antd'
 import { ConnectorEditor } from './ConnectorEditor'
 
 const connector = {
@@ -104,8 +105,7 @@ describe('ConnectorEditor', () => {
     await userEvent.clear(screen.getByRole('textbox', { name: 'Timeout' }))
     expect(onChange).toHaveBeenLastCalledWith('/timeout', undefined)
 
-    await userEvent.hover(screen.getByRole('combobox', { name: 'Auth type' }))
-    await userEvent.click(document.querySelector('.ant-select-clear')!)
+    await clearSelect(selectRoot(screen.getByRole('combobox', { name: 'Auth type' })))
     expect(onChange).toHaveBeenLastCalledWith('/auth', undefined)
   })
 
@@ -182,7 +182,7 @@ describe('ConnectorEditor', () => {
     renderEditor()
 
     await userEvent.click(within(screen.getByTestId('studio-field-/operations/0/lookup')).getByRole('combobox'))
-    const options = [...document.querySelectorAll('.ant-select-item-option')].map((option) => option.textContent)
+    const options = optionTexts()
     expect(options).toEqual(['findPurchaseOrder'])
   })
 

@@ -10,6 +10,7 @@ import type {
   WidgetAccess,
   WidgetMetadata,
 } from './site'
+import { isSortableHeader } from '../test/antd'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
 
@@ -447,8 +448,8 @@ describe('TableWidget', () => {
     renderWidget()
 
     await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.getByRole('columnheader', { name: 'Title' })).toHaveClass('ant-table-column-has-sorters')
-    expect(screen.getByRole('columnheader', { name: 'Category' })).not.toHaveClass('ant-table-column-has-sorters')
+    expect(isSortableHeader(screen.getByRole('columnheader', { name: 'Title' }))).toBe(true)
+    expect(isSortableHeader(screen.getByRole('columnheader', { name: 'Category' }))).toBe(false)
   })
 
   it('shows no column for a child collection and ignores it as a sort', async () => {
