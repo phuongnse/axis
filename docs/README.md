@@ -40,6 +40,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Process events and triggers](reference/process-events.md)             | Raised events, starts from triggers, event delivery, schedules                        |
 | [Process inspection](reference/process-inspection.md)                  | Inspecting instances and the operator commands retry, cancel and resolve              |
 | [Process inspector widget](reference/process-inspector-widget.md)      | The SPA widget that lists and shows the instances of one process                      |
+| [Task inbox widget](reference/task-inbox-widget.md)                    | The SPA widget that lists the user's open tasks, and the task page                    |
 | [Storage](reference/storage.md)                                        | Physical names, column types, database roles, schema planning, audit, release history |
 | [Migrations](reference/migrations.md)                                  | `migration` resources and recomputing stored computed fields                          |
 | [Security](reference/security.md)                                      | Sign-in and the session, machine callers, authorization, development users            |
