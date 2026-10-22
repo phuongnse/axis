@@ -208,4 +208,8 @@ public static class DiagnosticCodes
     public const string UnknownScenario = "AXC0218";
     public const string ScenarioTimeLimit = "AXC0219";
     public const string ScenarioStopped = "AXC0220";
+    public const string TooDeepWidgetTree = "AXC0221";
+    public const string InvalidColumnWidths = "AXC0222";
+    public const string DuplicatePageTable = "AXC0223";
+    public const string DuplicatePageRecordWidget = "AXC0224";
 }

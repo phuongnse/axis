@@ -22,7 +22,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     `process` and an `instancesPath`, such as
     `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances"`,
     the list endpoint. The SPA never builds the path itself. It uses `process` to link the record history to the page, see
-    **History** under the form widget. The widget has `"access": null` and
+    **History** under the [form widget](frontend.md). The widget has `"access": null` and
     `"actions": []`. The page endpoint answers `403` to a user without an
     `inspect` grant on the process, and site navigation leaves the page out.
   - **List.** The page lists the instances with their state, step, subject id,

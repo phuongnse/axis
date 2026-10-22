@@ -17,7 +17,7 @@ values, is built too. The widget is built, and so is the record history link to 
 instance.
 The user is the user of the
 [session](security.md#sign-in-and-the-session). The
-[process inspector widget](frontend.md) shows the same data.
+[process inspector widget](process-inspector-widget.md) shows the same data.
 
 **Grant.** A `process` grant takes the action `inspect`, next to `start`.
 See [Roles and policies](roles-and-policies.md). The grant
@@ -398,7 +398,7 @@ finish alone. **Retry** runs a `failed` instance again. **Cancel** stops a
 call whose outcome is `unknown`. Each is an audited command with its own
 grant, a required reason and one transaction. The
 [instance detail](#instance-detail) lists the commands the user may take. The
-[process inspector widget](frontend.md) shows Cancel, Retry and Resolve.
+[process inspector widget](process-inspector-widget.md) shows Cancel, Retry and Resolve.
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances/{id}/retry
