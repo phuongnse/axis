@@ -4,15 +4,15 @@ import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { startServer } from '../activate'
 import { pickOption } from '../select'
-import { e2eApp, studioFolder } from '../server-settings'
+import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 import { createResource } from '../studio-resources'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
 
-// The journeys create files, and the other Studio specs compare the diagnostics of the shared copy. So these run on
-// a second server whose Studio edits a copy of its own, without texts/vi.json. The copy is not the E2E server's.
+// The journeys create files. They run on a second server over a folder of their own, copied from the committed sample
+// without texts/vi.json, so no other spec's writes reach it.
 // The entity journeys also build an entity in the designer, and the expression journey reopens that entity.
 test.describe('Studio creates a resource from a starter', () => {
   test.describe.configure({ mode: 'serial' })
@@ -22,7 +22,7 @@ test.describe('Studio creates a resource from a starter', () => {
 
   test.beforeAll(async () => {
     copy = await mkdtemp(path.join(os.tmpdir(), 'axis-studio-new-resource-'))
-    await cp(studioFolder, copy, { recursive: true })
+    await cp(purchaseRequests, copy, { recursive: true })
     await rm(path.join(copy, 'texts', 'vi.json'), { force: true })
     // Index 0 of ActivateOnStartup is the purchase request sample, so it stays out of this server and the live
     // release of the main E2E server is not activated again.

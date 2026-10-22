@@ -783,14 +783,31 @@ real metadata and records:
 
 The E2E server's `Studio:Folders` does not list that sample. It lists a copy
 that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on
-exit, and passes in `AXIS_E2E_STUDIO_FOLDER`. A spec that saves a resource in
-Studio therefore never changes a file under `samples/`.
+exit, and passes in `AXIS_E2E_STUDIO_FOLDER`. No spec writes to that copy, so a
+spec that saves a resource in Studio never changes a file under `samples/`.
 
-The new-resource spec creates files, and the other Studio specs compare the
-diagnostics of the shared copy. So it copies that folder once more into a
-temporary folder, removes `texts/vi.json` from the copy, and starts a second
-server over it with `startServer`. It deletes the copy and stops the server
-when it ends.
+A spec that writes a Studio folder gives it a folder of its own. It copies the
+committed sample, or another folder it made, into a temporary folder, starts a
+server over that folder with `startServer`, and deletes the folder and stops the
+server when it ends. Tests in one file that change the same folder run in order,
+in one worker, under `test.describe.configure({ mode: 'default' })` or
+`serial`. No spec opens Studio on the main E2E server or names its folder,
+except `studio-new-application`. That spec only reads the main folder, to check
+that the main server offers no New application button.
+
+The Studio specs use these folders:
+
+- `studio`, `studio-form-editor`, `studio-page-editor`, `studio-process-editor`,
+  `studio-scenario`, `studio-new-resource` (without `texts/vi.json`) and
+  `studio-tests`: a temporary copy of `samples/apps/purchase-requests`.
+  `studio-tests` also copies it again for its server with `Studio:Tests` off.
+- `studio-module-entity`: a temporary copy of `samples/apps/leave-requests`.
+- `studio-new-application`, `studio-page-containers` and
+  `studio-page-parameters`: a temporary `Studio:ApplicationsPath`.
+- `studio-entity-migrations` and `purchase-request-release`: folders under the
+  test's output path.
+- `service-desk-journey` and `journey-tenant`: each its own application under
+  the journey server's applications folder, `AXIS_E2E_JOURNEY_APPLICATIONS`.
 
 A spec can also activate another folder during the run, to test releases. The
 helper `tests/e2e/activate.ts` starts the built server once more on a spare

@@ -4,14 +4,14 @@ import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { startServer } from '../activate'
 import { pickOption } from '../select'
-import { e2eApp, studioFolder } from '../server-settings'
+import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
 
-// The journeys change the process, and the other Studio specs compare the diagnostics of the shared copy. So these run
-// on a second server whose Studio edits a copy of its own. The copy is not the E2E server's.
+// The journeys change the process. They run on a second server over a folder of its own, copied from the committed
+// sample, so no other spec's writes reach it.
 test.describe('Studio edits a process in the process editor', () => {
   test.describe.configure({ mode: 'serial' })
 
@@ -22,7 +22,7 @@ test.describe('Studio edits a process in the process editor', () => {
 
   test.beforeAll(async () => {
     copy = await mkdtemp(path.join(os.tmpdir(), 'axis-studio-process-editor-'))
-    await cp(studioFolder, copy, { recursive: true })
+    await cp(purchaseRequests, copy, { recursive: true })
     // Index 0 of ActivateOnStartup is the purchase request sample, so it stays out of this server and the live
     // release of the main E2E server is not activated again.
     server = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy })

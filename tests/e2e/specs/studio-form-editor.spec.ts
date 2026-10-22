@@ -4,21 +4,21 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { startServer } from "../activate";
 import { pickOptions } from "../select";
-import { e2eApp, studioFolder } from "../server-settings";
+import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
 
-// The journey saves a form. The other Studio specs compare the diagnostics of the shared copy, so a state in the middle
-// of the journey could break them. So this runs on a second server whose Studio edits a copy of its own.
+// The journey saves a form. It runs on a second server over a folder of its own, copied from the committed sample, so
+// no other spec's writes reach it.
 test.describe("Studio edits form conditions and steps", () => {
   let copy: string;
   let server: Awaited<ReturnType<typeof startServer>>;
 
   test.beforeAll(async () => {
     copy = await mkdtemp(path.join(os.tmpdir(), "axis-studio-form-editor-"));
-    await cp(studioFolder, copy, { recursive: true });
+    await cp(purchaseRequests, copy, { recursive: true });
     // Index 0 of ActivateOnStartup is the purchase request sample, so it stays out of this server and the live
     // release of the main E2E server is not activated again.
     server = await startServer({
