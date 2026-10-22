@@ -37,9 +37,9 @@ const names = {
     { id: 'f2', name: 'SupplierForm' },
   ],
   pages: [
-    { id: 'g1', name: 'ReviewList' },
-    { id: 'g2', name: 'ReviewForm' },
-    { id: 'g3', name: 'EditPage' },
+    { id: 'g1', name: 'ReviewList', parameters: [{ name: 'request', type: 'reference', required: true }] },
+    { id: 'g2', name: 'ReviewForm', parameters: [] },
+    { id: 'g3', name: 'EditPage', parameters: [] },
   ],
   texts: [{ key: 'pages.review.title', texts: { en: 'Review', vi: 'Xem xét' }, usedBy: 1 }],
 } as unknown as StudioNames
@@ -378,8 +378,8 @@ describe('PageEditor navigate actions', () => {
     expect('record' in action).toBe(false)
   })
 
-  it('writes the expression of a parameter at its name', async () => {
-    const saved = renderStateful(page({ ...table, rowActions: [navigate] }))
+  it('types the parameter name and writes its expression when the page is not in the names', async () => {
+    const saved = renderStateful(page({ ...table, rowActions: [{ ...navigate, page: 'Unsaved' }] }))
 
     await userEvent.click(
       within(screen.getByTestId(`${rows}/0/parameters`)).getByRole('button', { name: 'Add mapping' }),
@@ -397,11 +397,178 @@ describe('PageEditor navigate actions', () => {
     expect(action.parameters).toEqual({ item: 'id' })
   })
 
+  const toReviewList = { ...navigate, page: 'ReviewList' }
+
+  function firstAction(saved: () => Record<string, unknown>) {
+    return ((saved().widgets as Record<string, unknown>[])[0].rowActions as Record<string, unknown>[])[0]
+  }
+
+  it('shows one expression for each parameter of the chosen page', () => {
+    renderEditor(page({ ...table, rowActions: [toReviewList] }))
+
+    const row = screen.getByTestId(`${rows}/0/parameters/request`)
+    expect(row).toHaveTextContent('request · reference · required')
+    expect(within(row).getByRole('textbox', { name: 'Expression' })).toHaveValue('')
+    expect(screen.queryByRole('button', { name: 'Add mapping' })).not.toBeInTheDocument()
+  })
+
+  it('shows no parameter row for a page that declares none', () => {
+    renderEditor(page({ ...table, rowActions: [navigate] }))
+
+    expect(within(screen.getByTestId(`${rows}/0/parameters`)).queryAllByRole('textbox')).toHaveLength(0)
+  })
+
+  it('writes the expression of a declared parameter and removes the key when it is cleared', async () => {
+    const saved = renderStateful(page({ ...table, rowActions: [toReviewList] }))
+    const box = () => within(screen.getByTestId(`${rows}/0/parameters/request`)).getByRole('textbox')
+
+    await userEvent.type(box(), 'id')
+    expect(firstAction(saved).parameters).toEqual({ request: 'id' })
+
+    await userEvent.clear(box())
+    expect(firstAction(saved).parameters).toEqual({})
+  })
+
+  it('removes the parameter values the new page does not declare when the page changes', async () => {
+    const saved = renderStateful(
+      page({ ...table, rowActions: [{ ...toReviewList, parameters: { request: 'id', Gone: 'id' } }] }),
+    )
+
+    await chooseOption('ReviewForm', screen.getByTestId(`${rows}/0/page`))
+
+    const action = firstAction(saved)
+    expect(action.page).toBe('ReviewForm')
+    expect('parameters' in action).toBe(false)
+  })
+
+  it('keeps the parameter values the new page declares, ignoring letter case', async () => {
+    const saved = renderStateful(
+      page({
+        ...table,
+        rowActions: [{ ...navigate, parameters: { Request: 'id', other: 'id' } }],
+      }),
+    )
+
+    await chooseOption('ReviewList', screen.getByTestId(`${rows}/0/page`))
+
+    expect(firstAction(saved).parameters).toEqual({ Request: 'id' })
+  })
+
+  it('shows a value the page does not declare with a note and removes it on request', async () => {
+    const saved = renderStateful(
+      page({ ...table, rowActions: [{ ...toReviewList, parameters: { request: 'id', extra: 'id' } }] }),
+    )
+
+    const row = screen.getByTestId(`${rows}/0/parameters/extra`)
+    expect(row).toHaveTextContent('Not a parameter of this page')
+    expect(within(row).getByRole('textbox', { name: 'Expression' })).toHaveValue('id')
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove' }))
+
+    expect(firstAction(saved).parameters).toEqual({ request: 'id' })
+  })
+
   it('removes an action by its index', async () => {
     const onChange = renderEditor(page({ ...table, rowActions: [navigate] }))
 
     await userEvent.click(within(screen.getByTestId('studio-action-0')).getByRole('button', { name: 'Remove action' }))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions/0', undefined)
+  })
+})
+
+describe('PageEditor parameters', () => {
+  const parameters = 'studio-field-/parameters'
+
+  it('lists the parameters the page declares', () => {
+    renderEditor(
+      page(table, { parameters: [{ name: 'request', type: 'reference', target: 'Supplier', required: true }] }),
+    )
+
+    const item = screen.getByTestId(`${parameters}/0`)
+    expect(within(item).getByRole('textbox', { name: 'Parameter name' })).toHaveValue('request')
+    expect(within(item).getByRole('combobox', { name: 'Type' })).toBeInTheDocument()
+    expect(within(item).getByRole('switch', { name: 'Required' })).toBeChecked()
+    expect(screen.getByTestId(`${parameters}/0/target`)).toHaveTextContent('Supplier')
+  })
+
+  it('adds a parameter with a name and the text type', async () => {
+    const onChange = renderEditor(page(table))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add parameter' }))
+    expect(onChange).toHaveBeenLastCalledWith('/parameters', [{ name: '', type: 'text' }])
+  })
+
+  it('writes a required reference parameter with its target', async () => {
+    let draft: Record<string, unknown> = page(table)
+    function Harness() {
+      const [value, setValue] = useState(draft)
+      return (
+        <PageEditor
+          value={value}
+          onChange={(pointer, next) => {
+            draft = setAt(draft, pointer, next) as Record<string, unknown>
+            setValue(draft)
+          }}
+        />
+      )
+    }
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioNamesContext.Provider value={names}>
+            <LabelTextsContext.Provider value={labelContext}>
+              <Harness />
+            </LabelTextsContext.Provider>
+          </StudioNamesContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add parameter' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Parameter name' }), 'request')
+    await chooseOption('reference', screen.getByTestId(`${parameters}/0/type`))
+    await chooseOption('Supplier', screen.getByTestId(`${parameters}/0/target`))
+    await userEvent.click(screen.getByRole('switch', { name: 'Required' }))
+
+    expect(draft.parameters).toEqual([{ name: 'request', type: 'reference', target: 'Supplier', required: true }])
+
+    await userEvent.click(screen.getByRole('switch', { name: 'Required' }))
+    expect(draft.parameters).toEqual([{ name: 'request', type: 'reference', target: 'Supplier' }])
+
+    await chooseOption('text', screen.getByTestId(`${parameters}/0/type`))
+    expect(draft.parameters).toEqual([{ name: 'request', type: 'text' }])
+  })
+
+  it('removes the target when the type changes from reference', async () => {
+    const onChange = renderEditor(
+      page(table, { parameters: [{ name: 'request', type: 'reference', target: 'Supplier' }] }),
+    )
+
+    await chooseOption('text', screen.getByTestId(`${parameters}/0/type`))
+    expect(onChange).toHaveBeenCalledWith('/parameters/0/type', 'text')
+    expect(onChange).toHaveBeenLastCalledWith('/parameters/0/target', undefined)
+  })
+
+  it('removes the values when the type changes from enum', async () => {
+    const onChange = renderEditor(
+      page(table, { parameters: [{ name: 'state', type: 'enum', values: ['open', 'closed'] }] }),
+    )
+
+    expect(screen.getByTestId(`${parameters}/0/values`)).toHaveTextContent('open')
+    await chooseOption('integer', screen.getByTestId(`${parameters}/0/type`))
+    expect(onChange).toHaveBeenLastCalledWith('/parameters/0/values', undefined)
+  })
+
+  it('removes a parameter', async () => {
+    const onChange = renderEditor(page(table, { parameters: [{ name: 'request', type: 'text' }] }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove parameter' }))
+    expect(onChange).toHaveBeenLastCalledWith('/parameters/0', undefined)
+  })
+
+  it('points to the JSON view when the parameters are not a list', () => {
+    renderEditor(page(table, { parameters: 'broken' }))
+
+    expect(within(screen.getByTestId(parameters)).getByTestId('studio-json-only')).toBeVisible()
   })
 })
 
