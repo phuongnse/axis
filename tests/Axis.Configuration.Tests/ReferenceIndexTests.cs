@@ -476,6 +476,37 @@ public sealed class ReferenceIndexTests
     }
 
     [Fact]
+    public void A_reference_page_parameter_gives_a_field_target_edge_and_an_unknown_target_none()
+    {
+        const string Parameter = """{ "name": "client", "type": "reference", "target": "Client" }""";
+        using (var folder = PresentationCompilerTests.Folder()
+            .With("entities/client.json", PresentationCompilerTests.Client)
+            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "type": "table", "entity": "Order", "formPage": "OrderForm" }""", parameters: Parameter)))
+        {
+            var result = ApplicationCompiler.Compile(folder.Path);
+
+            Assert.Empty(result.Diagnostics);
+            Assert.Equivalent(
+                new (string, string, string)[]
+                {
+                    (ReferenceRelations.WidgetEntity, "/widgets/0/entity", "Order"),
+                    (ReferenceRelations.WidgetFormPage, "/widgets/0/formPage", "OrderForm"),
+                    (ReferenceRelations.FieldTarget, "/parameters/0/target", "Client"),
+                },
+                EdgesFrom(result, "Orders"));
+        }
+
+        using (var folder = PresentationCompilerTests.Folder()
+            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "type": "table", "entity": "Order", "formPage": "OrderForm" }""", parameters: Parameter.Replace("Client", "Missing", StringComparison.Ordinal))))
+        {
+            var result = ApplicationCompiler.Compile(folder.Path);
+
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownReferenceTarget);
+            Assert.DoesNotContain(EdgesFrom(result, "Orders"), edge => edge.Relation == ReferenceRelations.FieldTarget);
+        }
+    }
+
+    [Fact]
     public void Compiling_the_purchase_request_sample_gives_the_edges_into_its_department_entity()
     {
         var result = ApplicationCompiler.Compile(

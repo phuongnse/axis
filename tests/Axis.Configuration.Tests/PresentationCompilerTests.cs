@@ -20,6 +20,11 @@ public sealed class PresentationCompilerTests
           "fields": [ { "name": "name", "type": "text", "required": true } ] }
         """;
 
+    internal const string Client = """
+        { "id": "22222222-2222-4222-8222-222222222223", "kind": "entity", "name": "Client", "formatVersion": 1, "displayField": "name",
+          "fields": [ { "name": "name", "type": "text", "required": true } ] }
+        """;
+
     private const string TextsEn = """
         { "id": "33333333-3333-4333-8333-333333333333", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
           "texts": { "site.title": "Sales", "nav.orders": "Orders", "orders.title": "Orders", "orderForm.title": "Order", "customerForm.title": "Customer" } }
@@ -375,6 +380,95 @@ public sealed class PresentationCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void Page_parameters_of_every_type_compile_in_file_order()
+    {
+        using var folder = Folder().With("entities/client.json", Client).With(
+            "pages/orders.json",
+            Page(
+                "Orders",
+                OrdersWidget,
+                parameters: """
+                    { "name": "note", "type": "text" },
+                    { "name": "count", "type": "integer", "required": true },
+                    { "name": "amount", "type": "decimal", "required": false },
+                    { "name": "urgent", "type": "boolean" },
+                    { "name": "day", "type": "date" },
+                    { "name": "moment", "type": "date-time" },
+                    { "name": "status", "type": "enum", "values": ["open", "closed"] },
+                    { "name": "client", "type": "reference", "target": "client" }
+                    """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var orders = Assert.Single(result.Model.Pages, page => page.Name == "Orders");
+        var client = new EntityReference(Guid.Parse("22222222-2222-4222-8222-222222222223"), "Client");
+        Assert.Equal(
+            [
+                ("note", FieldType.Text, false),
+                ("count", FieldType.Integer, true),
+                ("amount", FieldType.Decimal, false),
+                ("urgent", FieldType.Boolean, false),
+                ("day", FieldType.Date, false),
+                ("moment", FieldType.DateTime, false),
+                ("status", FieldType.Enum, false),
+                ("client", FieldType.Reference, false),
+            ],
+            orders.Parameters.Select(parameter => (parameter.Name, parameter.Type, parameter.Required)));
+        Assert.Equal(["open", "closed"], orders.Parameters[6].Values);
+        Assert.Equal(client, orders.Parameters[7].Target);
+        Assert.All(orders.Parameters.Where(parameter => parameter.Type != FieldType.Enum), parameter => Assert.Null(parameter.Values));
+        Assert.All(orders.Parameters.Where(parameter => parameter.Type != FieldType.Reference), parameter => Assert.Null(parameter.Target));
+    }
+
+    [Fact]
+    public void A_page_without_parameters_has_none()
+    {
+        using var folder = Folder();
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotNull(result.Model);
+        Assert.All(result.Model.Pages, page => Assert.Empty(page.Parameters));
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "note", "type": "text" }, { "name": "NOTE", "type": "text" }""", 1)]
+    [InlineData("""{ "name": "page", "type": "integer" }""", 0)]
+    [InlineData("""{ "name": "PageSize", "type": "integer" }""", 0)]
+    [InlineData("""{ "name": "SORT", "type": "text" }""", 0)]
+    public void A_duplicate_or_reserved_page_parameter_name_is_reported(string parameters, int index)
+    {
+        using var folder = Folder().With("pages/orders.json", Page("Orders", OrdersWidget, parameters: parameters));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidPageParameterName, "pages/orders.json", $"/parameters/{index}/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "total", "type": "money" }""", DiagnosticCodes.SchemaViolation, "/parameters/0/type")]
+    [InlineData("""{ "name": "status", "type": "enum" }""", DiagnosticCodes.MissingTypeProperty, "/parameters/0")]
+    [InlineData("""{ "name": "client", "type": "reference" }""", DiagnosticCodes.MissingTypeProperty, "/parameters/0")]
+    [InlineData("""{ "name": "client", "type": "reference", "target": "Missing" }""", DiagnosticCodes.UnknownReferenceTarget, "/parameters/0/target")]
+    [InlineData("""{ "name": "note", "type": "text", "values": ["a"] }""", DiagnosticCodes.InvalidConstraint, "/parameters/0/values")]
+    public void A_page_parameter_with_a_bad_type_is_reported_as_a_field_is(string parameters, string code, string path)
+    {
+        using var folder = Folder().With("pages/orders.json", Page("Orders", OrdersWidget, parameters: parameters));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "pages/orders.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
     /// <summary>A folder that compiles: a site whose navigation opens a table page of orders, and form pages for orders and customers.</summary>
     internal static TemporaryFolder Folder() =>
         new TemporaryFolder()
@@ -401,10 +495,11 @@ public sealed class PresentationCompilerTests
           "navigation": [ { "page": "{{navigationPage}}", "label": { "textKey": "{{navigationKey}}" } } ] }
         """;
 
-    internal static string Page(string name, string widget, string id = "55555555-5555-4555-8555-555555555551", string titleKey = "orders.title") =>
+    internal static string Page(
+        string name, string widget, string id = "55555555-5555-4555-8555-555555555551", string titleKey = "orders.title", string? parameters = null) =>
         $$"""
         { "id": "{{id}}", "kind": "page", "name": "{{name}}", "formatVersion": 1,
-          "title": { "textKey": "{{titleKey}}" }, "widgets": [ {{widget}} ] }
+          "title": { "textKey": "{{titleKey}}" },{{(parameters is null ? "" : $" \"parameters\": [ {parameters} ],")}} "widgets": [ {{widget}} ] }
         """;
 
     private static string OrderList(string extra = "") =>
