@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { setAt } from '../platform/jsonPatch'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
@@ -296,6 +297,128 @@ describe('PageEditor form panel', () => {
 
     expect(screen.getByTestId('studio-action-0').querySelector('[data-testid="studio-json-only"]')).not.toBeNull()
     expect(screen.getByTestId('studio-field-/widgets/0/actions/1/process')).toBeVisible()
+  })
+})
+
+describe('PageEditor navigate actions', () => {
+  /** Renders the editor over a draft that applies every change, so a test can read the JSON as it would be saved. */
+  function renderStateful(initial: Record<string, unknown>) {
+    let draft = initial
+    function Harness() {
+      const [value, setValue] = useState(initial)
+      return (
+        <PageEditor
+          value={value}
+          onChange={(pointer, next) => {
+            draft = setAt(draft, pointer, next) as Record<string, unknown>
+            setValue(draft)
+          }}
+        />
+      )
+    }
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioNamesContext.Provider value={names}>
+            <LabelTextsContext.Provider value={labelContext}>
+              <Harness />
+            </LabelTextsContext.Provider>
+          </StudioNamesContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+    return () => draft
+  }
+
+  const rows = 'studio-field-/widgets/0/rowActions'
+  const navigate = { type: 'navigate', page: 'ReviewForm', label: { textKey: 'pages.review.title' } }
+
+  it('shows the row and toolbar actions of a table', () => {
+    renderEditor(page(table))
+
+    expect(screen.getByTestId(rows)).toBeVisible()
+    expect(screen.getByTestId('studio-field-/widgets/0/toolbarActions')).toBeVisible()
+    expect(screen.getAllByRole('button', { name: 'Add navigate action' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Add action' })).not.toBeInTheDocument()
+  })
+
+  it('saves a row navigate with its page and record', async () => {
+    const saved = renderStateful(page(table))
+
+    await userEvent.click(within(screen.getByTestId(rows)).getByRole('button', { name: 'Add navigate action' }))
+    await chooseOption('ReviewForm', screen.getByTestId(`${rows}/0/page`))
+    await userEvent.type(within(screen.getByTestId(`${rows}/0/record`)).getByRole('textbox'), 'id')
+
+    expect((saved().widgets as unknown[])[0]).toEqual({
+      ...table,
+      rowActions: [{ type: 'navigate', page: 'ReviewForm', label: { textKey: '' }, record: 'id' }],
+    })
+  })
+
+  it('adds a navigate action to a form and to a table toolbar', async () => {
+    const onChange = renderEditor(page(form))
+    await userEvent.click(screen.getByRole('button', { name: 'Add navigate action' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/actions', [
+      ...form.actions,
+      { type: 'navigate', page: '', label: { textKey: '' } },
+    ])
+  })
+
+  it('adds a navigate action to the toolbar of a table', async () => {
+    const onChange = renderEditor(page(table))
+
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/widgets/0/toolbarActions')).getByRole('button', {
+        name: 'Add navigate action',
+      }),
+    )
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/toolbarActions', [
+      { type: 'navigate', page: '', label: { textKey: '' } },
+    ])
+  })
+
+  it('lists every page, including the current one, as a target', async () => {
+    renderEditor(page({ ...table, rowActions: [navigate] }))
+
+    await userEvent.click(within(screen.getByTestId(`${rows}/0/page`)).getByRole('combobox'))
+    await waitFor(() => expect(optionTexts(shownDropdown()!)).toEqual(['ReviewList', 'ReviewForm', 'EditPage']))
+  })
+
+  it('removes the record key when the box is cleared', async () => {
+    const saved = renderStateful(page({ ...table, rowActions: [{ ...navigate, record: 'id' }] }))
+
+    expect(within(screen.getByTestId(`${rows}/0/record`)).getByRole('textbox')).toHaveValue('id')
+    await userEvent.clear(within(screen.getByTestId(`${rows}/0/record`)).getByRole('textbox'))
+
+    const action = ((saved().widgets as Record<string, unknown>[])[0].rowActions as Record<string, unknown>[])[0]
+    expect(action).toEqual(navigate)
+    expect('record' in action).toBe(false)
+  })
+
+  it('writes the expression of a parameter at its name', async () => {
+    const saved = renderStateful(page({ ...table, rowActions: [navigate] }))
+
+    await userEvent.click(
+      within(screen.getByTestId(`${rows}/0/parameters`)).getByRole('button', { name: 'Add mapping' }),
+    )
+    await userEvent.type(
+      within(screen.getByTestId(`${rows}/0/parameters/`)).getByRole('textbox', { name: 'Parameter' }),
+      'item',
+    )
+    await userEvent.type(
+      within(screen.getByTestId(`${rows}/0/parameters/item`)).getByRole('textbox', { name: 'Expression' }),
+      'id',
+    )
+
+    const action = ((saved().widgets as Record<string, unknown>[])[0].rowActions as Record<string, unknown>[])[0]
+    expect(action.parameters).toEqual({ item: 'id' })
+  })
+
+  it('removes an action by its index', async () => {
+    const onChange = renderEditor(page({ ...table, rowActions: [navigate] }))
+
+    await userEvent.click(within(screen.getByTestId('studio-action-0')).getByRole('button', { name: 'Remove action' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions/0', undefined)
   })
 })
 
