@@ -56,6 +56,7 @@ const noteWidget: EntityWidgetMetadata = {
   toolbarActions: [],
   parameters: {},
   access: everyAction,
+  kpi: null,
   entity: {
     name: 'Note',
     labelKey: 'note.label',
@@ -93,6 +94,7 @@ const noteListWidget: WidgetMetadata = {
   toolbarActions: [],
   parameters: {},
   access: everyAction,
+  kpi: null,
   dataSource: {
     name: 'NoteList',
     rowsPath,
@@ -342,6 +344,7 @@ describe('TableWidget', () => {
       toolbarActions: [],
       parameters: {},
       access: everyAction,
+      kpi: null,
       dataSource: {
         name: 'NotesByDepartment',
         rowsPath,
@@ -609,6 +612,7 @@ describe('TableWidget', () => {
       toolbarActions: [],
       parameters: {},
       access: everyAction,
+      kpi: null,
     })
 
     const cell = await screen.findByRole('cell', { name: '1250.50' })
