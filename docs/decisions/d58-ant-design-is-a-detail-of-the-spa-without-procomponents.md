@@ -21,9 +21,6 @@ on 2026-10-22.
 - **No schema renderer:** no layer on top of Ant Design renders UI from a
   schema. Rendering from metadata is the presentation runtime that Axis owns
   ([D2](d2-axis-owns-its-engines.md)).
-- **Until it is removed:** the SPA still uses ProComponents for the shell and
-  the page containers (`ProLayout`, `PageContainer` and `ProCard`). Its removal
-  is _(planned for M12)_.
 
 _Why:_ keeping the library out of configuration and out of the widget API means
 that upgrading or replacing it never breaks a published application or a
