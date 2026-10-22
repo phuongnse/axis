@@ -211,6 +211,171 @@ public sealed class PresentationCompilerTests
         Assert.Null(result.Model);
     }
 
+    private const string BoundTable = """{ "type": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "number" } }""";
+
+    private static TemporaryFolder BoundFolder(string dataSourceParameters, string pageParameters, string widget = BoundTable) =>
+        Folder()
+            .With("entities/client.json", Client)
+            .With("data-sources/order-list.json", OrderList($$""", "parameters": [ {{dataSourceParameters}} ] """))
+            .With("pages/orders.json", Page("Orders", widget, parameters: pageParameters));
+
+    [Fact]
+    public void Table_binding_a_required_parameter_to_a_required_page_parameter_compiles_with_the_declared_names()
+    {
+        using var folder = BoundFolder(
+            """{ "name": "numberFilter", "type": "text", "required": true }""",
+            """{ "name": "Number", "type": "text", "required": true }""",
+            """{ "type": "table", "dataSource": "OrderList", "parameters": { "NUMBERFILTER": "number" } }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Equal(new Dictionary<string, string> { ["numberFilter"] = "Number" }, widget.Parameters);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "number", "type": "integer", "required": true }""")]
+    [InlineData("""{ "name": "number", "type": "reference", "target": "Client", "required": true }""")]
+    public void Table_binding_a_page_parameter_of_another_type_is_reported_at_the_binding(string pageParameter)
+    {
+        using var folder = BoundFolder(
+            """{ "name": "numberFilter", "type": "text", "required": true }""",
+            pageParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, "pages/orders.json", "/widgets/0/parameters/numberFilter"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Table_binding_a_reference_parameter_to_a_page_parameter_with_another_target_is_reported()
+    {
+        using var folder = BoundFolder(
+            """{ "name": "numberFilter", "type": "reference", "target": "Client", "required": true }""",
+            """{ "name": "number", "type": "reference", "target": "Vendor", "required": true }""")
+            .With("entities/vendor.json", Client.Replace("22222222-2222-4222-8222-222222222223", "22222222-2222-4222-8222-222222222224", StringComparison.Ordinal).Replace("Client", "Vendor", StringComparison.Ordinal));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, "/widgets/0/parameters/numberFilter"),
+            (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Theory]
+    [InlineData("""["new", "open"]""", true)]
+    [InlineData("""["new", "closed"]""", false)]
+    public void Table_binding_an_enum_page_parameter_needs_its_values_to_be_values_of_the_data_source_parameter(string pageValues, bool compiles)
+    {
+        using var folder = BoundFolder(
+            """{ "name": "numberFilter", "type": "enum", "values": ["new", "open", "done"], "required": true }""",
+            $$"""{ "name": "number", "type": "enum", "values": {{pageValues}}, "required": true }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(compiles, result.Diagnostics.Count == 0);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal("/widgets/0/parameters/numberFilter", diagnostic.Path));
+    }
+
+    [Fact]
+    public void Table_binding_a_required_parameter_to_an_optional_page_parameter_is_reported_at_the_binding()
+    {
+        using var folder = BoundFolder(
+            """{ "name": "numberFilter", "type": "text", "required": true }""",
+            """{ "name": "number", "type": "text" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, "/widgets/0/parameters/numberFilter"),
+            (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("'numberFilter'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Table_leaving_a_required_parameter_unbound_is_reported_at_the_data_source()
+    {
+        using var folder = BoundFolder(
+            """{ "name": "numberFilter", "type": "text", "required": true }, { "name": "other", "type": "text", "required": true }""",
+            """{ "name": "number", "type": "text", "required": true }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, "/widgets/0/dataSource"),
+            (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("'other'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""{ "type": "table", "dataSource": "OrderList", "parameters": { "missing": "number" } }""", "/widgets/0/parameters/missing")]
+    [InlineData("""{ "type": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "missing" } }""", "/widgets/0/parameters/numberFilter")]
+    public void Table_binding_an_unknown_name_is_reported_at_the_binding(string widget, string path)
+    {
+        using var folder = BoundFolder(
+            """{ "name": "numberFilter", "type": "text" }""",
+            """{ "name": "number", "type": "text" }""",
+            widget);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidWidgetBinding, path), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Page_parameter_named_like_an_unbound_parameter_of_its_table_is_reported_at_its_name()
+    {
+        using var folder = BoundFolder(
+            """{ "name": "numberFilter", "type": "text" }, { "name": "other", "type": "text" }""",
+            """{ "name": "number", "type": "text" }, { "name": "OTHER", "type": "text" }""",
+            """{ "type": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "number" } }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidPageParameterName, "pages/orders.json", "/parameters/1/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Page_parameter_named_like_a_bound_parameter_of_its_table_compiles()
+    {
+        using var folder = BoundFolder(
+            """{ "name": "numberFilter", "type": "text" }""",
+            """{ "name": "numberFilter", "type": "text" }""",
+            """{ "type": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "numberFilter" } }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public void Parameters_on_a_table_over_an_entity_are_reported()
+    {
+        using var folder = Folder().With(
+            "pages/orders.json",
+            Page("Orders", """{ "type": "table", "entity": "Order", "parameters": { "a": "b" } }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, "/widgets/0/parameters"),
+            (diagnostic.Code, diagnostic.Path));
+    }
+
     [Fact]
     public void Table_bound_to_a_grouped_data_source_compiles()
     {

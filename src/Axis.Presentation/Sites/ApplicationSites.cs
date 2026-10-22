@@ -92,6 +92,7 @@ public static class ApplicationSites
             [.. widget.Actions.Select(action => Action(application, action))],
             [.. widget.RowActions.Select(action => Action(application, action))],
             [.. widget.ToolbarActions.Select(action => Action(application, action))],
+            widget.Parameters,
             FullAccess(application, widget));
 
     private static ActionMetadata Action(ApplicationModel application, WidgetActionModel action) =>

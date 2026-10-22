@@ -133,6 +133,7 @@ const pages: Record<string, PageMetadata> = {
   notes: {
     name: 'Notes',
     titleKey: 'pages.notes.title',
+    parameters: [],
     widgets: [
       {
         type: 'table',
@@ -147,6 +148,7 @@ const pages: Record<string, PageMetadata> = {
         toolbarActions: [
           { type: 'navigate', page: 'NoteForm', labelKey: 'notes.new', parameters: {}, record: null, opensForm: true },
         ],
+        parameters: {},
         access: noteAccess,
       },
     ],
@@ -154,6 +156,7 @@ const pages: Record<string, PageMetadata> = {
   noteform: {
     name: 'NoteForm',
     titleKey: 'pages.noteForm.title',
+    parameters: [],
     widgets: [
       {
         type: 'form',
@@ -166,6 +169,7 @@ const pages: Record<string, PageMetadata> = {
         actions: [],
         rowActions: [],
         toolbarActions: [],
+        parameters: {},
         access: noteAccess,
       },
     ],
@@ -173,6 +177,7 @@ const pages: Record<string, PageMetadata> = {
   tasks: {
     name: 'Tasks',
     titleKey: 'pages.tasks.title',
+    parameters: [],
     widgets: [
       {
         type: 'taskInbox',
@@ -185,6 +190,7 @@ const pages: Record<string, PageMetadata> = {
         actions: [],
         rowActions: [],
         toolbarActions: [],
+        parameters: {},
         access: null,
       },
     ],
@@ -192,6 +198,7 @@ const pages: Record<string, PageMetadata> = {
   inspector: {
     name: 'Inspector',
     titleKey: 'pages.inspector.title',
+    parameters: [],
     widgets: [
       {
         type: 'processInspector',
@@ -204,6 +211,7 @@ const pages: Record<string, PageMetadata> = {
         actions: [],
         rowActions: [],
         toolbarActions: [],
+        parameters: {},
         access: null,
       },
     ],

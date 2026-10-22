@@ -23,6 +23,7 @@ const inboxWidget: WidgetMetadata = {
   actions: [],
   rowActions: [],
   toolbarActions: [],
+  parameters: {},
   access: null,
 }
 

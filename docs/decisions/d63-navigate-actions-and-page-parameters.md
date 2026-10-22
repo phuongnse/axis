@@ -11,8 +11,10 @@ rule. Page metadata lists them with their `parameters` and `record`, gives each 
 `parameters`, and leaves out the actions to pages the user cannot read. The SPA buttons are
 built on table rows, the table toolbar and saved forms, and put the values in the URL query.
 `formPage` is removed from the schema, the compiler, page metadata, the SPA and Studio, and the
-samples, the template, the scenarios and the test fixtures use navigate actions. Reading
-the URL values on the target page and the table binding are _(planned for M12)_. The owner
+samples, the template, the scenarios and the test fixtures use navigate actions. The
+table binding is built: the compiler checks a table's name map, page metadata gives each table its
+`parameters`, the SPA reads the URL values, and a page whose required parameter is missing or
+malformed shows the not-found page. The owner
 confirmed these points on issue #931 on 2026-10-21.
 
 - **Page parameters:**

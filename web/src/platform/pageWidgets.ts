@@ -50,6 +50,24 @@ export function typeChanges(widget: Record<string, unknown>, next: string): [str
   return changes
 }
 
+/**
+ * A new column for a columns widget. Its width is what is left of 12 after the existing columns, or 1 when nothing
+ * is left. The existing columns keep their widths.
+ */
+export function newColumn(columns: unknown[]): Record<string, unknown> {
+  const used = columns.reduce<number>(
+    (sum, column) => sum + (isContent(column) && typeof column.width === 'number' ? column.width : 0),
+    0,
+  )
+  const left = 12 - used
+  return { width: left >= 1 && left <= 12 ? left : 1, widgets: [] }
+}
+
+/** A new tab with an empty label key and no widgets. */
+export function newTab(): Record<string, unknown> {
+  return { label: { textKey: '' }, widgets: [] }
+}
+
 /** A new widget of a type. A container starts with the shape the page schema requires and empty lists. */
 export function newWidget(type: string): Record<string, unknown> {
   switch (type) {
@@ -62,7 +80,7 @@ export function newWidget(type: string): Record<string, unknown> {
         ],
       }
     case 'tabs':
-      return { type, tabs: [{ label: { textKey: '' }, widgets: [] }] }
+      return { type, tabs: [newTab()] }
     case 'section':
       return { type, title: { textKey: '' }, widgets: [] }
     case 'processInspector':

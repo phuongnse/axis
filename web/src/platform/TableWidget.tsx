@@ -23,6 +23,8 @@ interface TableWidgetProps {
   widget: WidgetMetadata
   /** The UI locale, for formatting values. */
   locale: string
+  /** The values of the page's parameters from its URL, by page parameter name. Absent ones are not sent. */
+  pageValues?: Record<string, string>
 }
 
 /** The outcome of the last finished request. */
@@ -90,9 +92,11 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * a button whose expressions the SPA cannot work out is hidden.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
  * and the back button keep them. A data source table also has a filter bar, whose values live in the
- * URL under the parameter names.
+ * URL under the parameter names. A data source parameter that the widget binds to a page parameter has
+ * no filter input: the table sends the page parameter's value under the data source parameter's name,
+ * and leaves that page parameter in the URL as it is.
  */
-export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
+export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -101,14 +105,37 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const location = useLocation()
   const from = `${location.pathname}${location.search}`
 
-  const { name, path, columns: fields, parameters, defaultPageSize } = useMemo(() => tableSource(widget), [widget])
+  const {
+    name,
+    path,
+    columns: fields,
+    parameters: allParameters,
+    defaultPageSize,
+  } = useMemo(() => tableSource(widget), [widget])
+  // The filter bar, the URL and the server's errors cover only the parameters that no page parameter binds.
+  const parameters = useMemo(
+    () => allParameters.filter((parameter) => !Object.hasOwn(widget.parameters, parameter.name)),
+    [allParameters, widget.parameters],
+  )
   const parameterNames = useMemo(() => parameters.map((parameter) => parameter.name), [parameters])
   const sizes = useMemo(() => tablePageSizes(defaultPageSize), [defaultPageSize])
   const query = useMemo(
     () => parseTableQuery(searchParams, fields, defaultPageSize, parameterNames),
     [searchParams, fields, defaultPageSize, parameterNames],
   )
-  const requestQuery = recordQuery(query, defaultPageSize)
+  // The bound values and the filter values, in declaration order.
+  const requestQuery = useMemo(() => {
+    const values: Record<string, string> = {}
+    for (const parameter of allParameters) {
+      const value = Object.hasOwn(widget.parameters, parameter.name)
+        ? pageValues?.[widget.parameters[parameter.name]]
+        : query.parameters?.[parameter.name]
+      if (value) {
+        values[parameter.name] = value
+      }
+    }
+    return recordQuery({ ...query, parameters: values }, defaultPageSize)
+  }, [allParameters, widget.parameters, pageValues, query, defaultPageSize])
   const requestUrl = `${path}?${requestQuery}`
   const [state, setState] = useState<LoadState>({ failed: false })
   const loading = state.url !== requestUrl

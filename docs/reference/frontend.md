@@ -130,6 +130,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         "toolbarActions": [
           { "type": "navigate", "page": "ItemForm", "labelKey": "items.new", "parameters": {}, "record": null, "opensForm": true }
         ],
+        "parameters": {},
         "access": {
           "actions": ["read", "create", "update", "delete"],
           "createFields": ["name", "department"],
@@ -170,13 +171,17 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `start`, and its `delete` row action without `delete` *(planned for M12)*.
   - Every widget also has `rowActions` and `toolbarActions`, never left out.
     A table lists its `navigate` actions in them. They are `[]` elsewhere.
+  - Every widget also has `parameters`, never left out: on a table over a data
+    source, the name of the page parameter that gives each data source
+    parameter its value, as `{ "<data source parameter>": "<page parameter>" }`,
+    in the declared names. It is `{}` elsewhere and on a table that binds none.
   - A page also has `parameters`, never left out: the typed values it reads
     from its URL, in file order, or `[]`. Each is
     `{ "name", "type", "required", "values", "target" }`. `type` is the type
     name as page files write it. `values` is the list for an `enum` and `null`
     otherwise. `target` is `{ "entity", "displayField", "recordsPath" }` for a
     `reference`, as a data source parameter has it, and `null` otherwise. The
-    SPA does not read them yet *(planned for M12)*.
+    SPA reads them to check the values in the address.
   - Every widget also has `access`, never left out. It is described under
     **Policies** below, and is `null` on a `taskInbox` and on a
     `processInspector`, and on a `chart` and a `kpi` *(planned for M12)*.
@@ -194,7 +199,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         {
           "type": "columns",
           "columns": [
-            { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
+            { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
             {
               "width": 4,
               "widgets": [
@@ -202,7 +207,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
                   "type": "section",
                   "titleKey": "pages.overview.tasks",
                   "collapsed": false,
-                  "widgets": [{ "type": "taskInbox", "entity": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "access": null }]
+                  "widgets": [{ "type": "taskInbox", "entity": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "access": null }]
                 }
               ]
             }
@@ -337,7 +342,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values |
-  | `/{site}/{page}?ticket=<id>` | _(planned for M12)_ a page with parameters: the values sit in the query under the parameter names |
+  | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
   | `/{site}/{inboxpage}/{taskId}` | the task page of the task with that id, under the page of a task inbox |
@@ -354,7 +359,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `{site}` is the site path. `{page}` is the page name in lower case, as
     navigation links write it. The server matches both ignoring letter case.
   - A required page parameter that is missing from the URL, or has the wrong
-    form, shows the not-found page inside the site shell _(planned for M12)_.
+    form, shows the not-found page inside the site shell. The SPA checks this
+    on every page that declares parameters, before any widget renders, so no
+    rows are requested. A value is missing when it is absent or empty, and has
+    the wrong form when it is repeated or not in the plain text form of its type
+    in [data-sources.md](data-sources.md#query-parameters). An optional
+    parameter with a missing or malformed value counts as not given.
   - An unknown site shows the not-found page inside the platform shell. An
     unknown page shows it inside the site shell.
     An address with more than three segments, such as `/e2e/notes/42/edit`,
@@ -435,6 +445,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       states: true, false and not given. A `reference` has a choose button
       that opens the lookup, and a clear button once it has a value. The
       SPA does not check the values: the server does.
+    - **Bound parameters.** A data source parameter that the widget's
+      `parameters` binds to a page parameter has no filter input and is not
+      written to the URL by the table. The table sends the page parameter's
+      value from the URL under the data source parameter's name, and leaves
+      the page parameter in the URL as it is. A page parameter that is not
+      given is not sent.
     - **Applying a value.** A `text`, `integer` or `decimal` value applies on
       Enter or when the input loses focus, so typing does not request rows
       and add a history entry for every key. A date, a choice, a Yes/No and

@@ -26,6 +26,7 @@ const inspectorWidget: WidgetMetadata = {
   actions: [],
   rowActions: [],
   toolbarActions: [],
+  parameters: {},
   access: null,
 }
 

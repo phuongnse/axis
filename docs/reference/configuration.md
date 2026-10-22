@@ -91,8 +91,9 @@ flowchart LR
      one of `form` and `entity`, otherwise it is `AXC0060` at
      `/widgets/{i}`. A widget's `entity` must name a loaded entity
      (`AXC0021`). A `dataSource` is allowed only on a `table` widget, and
-     its data source must have no required parameter (`AXC0060` at
-     `/widgets/{i}/dataSource`). It must name a loaded data source
+     each required parameter of its data source must be bound to a required
+     page parameter with `parameters`, otherwise it is `AXC0060` at
+     `/widgets/{i}/dataSource`. It must name a loaded data source
      (`AXC0059`). It may be `<module id>/<name>`, to name a data source of a
      [module](modules-and-templates.md#modules). A `form` is allowed only on a `form` widget (`AXC0060` at
      `/widgets/{i}/form`), and must name a loaded form (`AXC0077`). A `form` widget
@@ -128,12 +129,15 @@ flowchart LR
      page schema requires `columns` on a `columns` widget, `tabs` on a `tabs`
      widget, and `title` with `widgets` on a `section` widget. It does not allow them on
      any other widget, and no container may name an `entity`, `dataSource`,
-     `form`, `actions`, `rowActions` or `toolbarActions` (`AXC0004`).
+     `form`, `actions`, `rowActions`, `toolbarActions` or `parameters` (`AXC0004`).
 
      A page's `parameters` ([D63](../decisions/d63-navigate-actions-and-page-parameters.md))
      are checked in file order, at `/parameters/{i}`:
      - a name that an earlier parameter already uses, or one of `page`,
        `pageSize` and `sort`, ignoring letter case, is `AXC0231` at `/name`,
+     - a name that an unbound parameter of the page's table data source also
+       has, ignoring letter case, is `AXC0231` at `/name`, because both live in
+       the URL query,
      - the type is checked by the entity field rules, as a data source
        parameter is. An unknown type is `AXC0004`, a missing `values` or
        `target` is `AXC0014`, an unknown `reference` target is `AXC0012` at
@@ -142,6 +146,17 @@ flowchart LR
        `field target` edge in the reference index,
      - a page that holds a `form` widget declares no parameters. Otherwise it
        is `AXC0236` at `/parameters`.
+
+     A table's `parameters`
+     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) bind
+     data source parameters to page parameters. Each entry is checked at
+     `/widgets/{i}/parameters/{key}`, and a problem is `AXC0060`: an unknown
+     data source parameter or page parameter, a repeated key, types that
+     differ, or a required data source parameter bound to an optional page
+     parameter. A required data source parameter that is not bound is
+     `AXC0060` at `/widgets/{i}/dataSource`. `parameters` on any widget that is
+     not a table over a data source is `AXC0060` at `/widgets/{i}/parameters`.
+     See [data sources](data-sources.md#widget-binding).
 
      `navigate` actions
      ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) in a

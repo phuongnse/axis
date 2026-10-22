@@ -9,8 +9,8 @@
 //   Agreed or Proposed.
 // - docs/decisions.md has one row per decision file, numbered from 1 with no gaps, in order, with
 //   the file's title and status.
-// - A doc under docs/ has at most 1,000 lines and AGENTS.md at most 100, so agents can read
-//   what they need without reading whole books.
+// - A doc under docs/ has at most 1,000 lines, AGENTS.md at most 100 and a SKILL.md under
+//   .claude/skills/ at most 250, so agents can read what they need without reading whole books.
 //
 // Prints one line per problem on stderr as file:line and exits 1 when there is any.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
@@ -22,6 +22,7 @@ const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 
 export const maxDocLines = 1000
 export const maxAgentsLines = 100
+export const maxSkillLines = 250
 
 const decisionFilePattern = /^d(\d+)-([a-z0-9-]+)\.md$/
 const decisionTitlePattern = /^# D(\d+)\. (.+)$/
@@ -58,6 +59,15 @@ export function checkDocs(root) {
   const agents = path.join(root, 'AGENTS.md')
   if (existsSync(agents) && lines(agents).length > maxAgentsLines) {
     report(agents, maxAgentsLines + 1, `${lines(agents).length} lines, over the limit of ${maxAgentsLines}: move detail to docs/`)
+  }
+  const skills = path.join(root, '.claude', 'skills')
+  if (existsSync(skills)) {
+    for (const file of markdownFiles(skills).filter((file) => path.basename(file) === 'SKILL.md').sort()) {
+      const count = lines(file).length
+      if (count > maxSkillLines) {
+        report(file, maxSkillLines + 1, `${count} lines, over the limit of ${maxSkillLines}: link the rules in docs/ instead of restating them`)
+      }
+    }
   }
 
   // The docs map.
@@ -139,7 +149,7 @@ function main(args) {
   const problems = checkDocs(root).sort((a, b) => (a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1))
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index and the doc sizes are in order.')
+  console.log('The docs map, the decisions index and the doc and skill sizes are in order.')
   return 0
 }
 

@@ -53,6 +53,7 @@ const noteWidget: EntityWidgetMetadata = {
   actions: [],
   rowActions: [],
   toolbarActions: [],
+  parameters: {},
   access: everyAction,
   entity: {
     name: 'Note',
@@ -88,6 +89,7 @@ const noteListWidget: WidgetMetadata = {
   actions: [],
   rowActions: [],
   toolbarActions: [],
+  parameters: {},
   access: everyAction,
   dataSource: {
     name: 'NoteList',
@@ -196,11 +198,11 @@ function search() {
   return screen.getByTestId('search').textContent
 }
 
-function renderWidget(search = '', widget: WidgetMetadata = noteWidget) {
+function renderWidget(search = '', widget: WidgetMetadata = noteWidget, pageValues?: Record<string, string>) {
   return render(
     <MemoryRouter initialEntries={[`/e2e/notes${search}`]}>
       <TextProvider catalogs={catalogs} development={false}>
-        <TableWidget sitePath="e2e" widget={widget} locale="en" />
+        <TableWidget sitePath="e2e" widget={widget} locale="en" pageValues={pageValues} />
       </TextProvider>
       <CurrentLocation />
     </MemoryRouter>,
@@ -249,6 +251,7 @@ describe('TableWidget', () => {
       actions: [],
       rowActions: [],
       toolbarActions: [],
+      parameters: {},
       access: everyAction,
       dataSource: {
         name: 'NotesByDepartment',
@@ -511,6 +514,7 @@ describe('TableWidget', () => {
       actions: [],
       rowActions: [],
       toolbarActions: [],
+      parameters: {},
       access: everyAction,
     })
 
@@ -586,6 +590,30 @@ describe('TableWidget', () => {
     const bar = screen.getByTestId('filter-bar')
     expect(within(bar).getByRole('button', { name: 'Choose' })).toBeInTheDocument()
     expect(within(bar).queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
+  })
+
+  it('requests the rows with the page value of a bound parameter, which has no filter input', async () => {
+    const requests = stubRecords(emptyRows)
+    const boundWidget: WidgetMetadata = {
+      ...noteListWidget,
+      parameters: { inCategory: 'category' },
+      dataSource: {
+        ...noteListWidget.dataSource!,
+        parameters: [
+          { ...parameter('inCategory', 'reference', null), required: true, target: categoryTarget },
+          parameter('titleFilter', 'text', 'filter.title'),
+        ],
+      },
+    }
+
+    renderWidget('?category=' + categoryId + '&titleFilter=paper', boundWidget, { category: categoryId })
+    await screen.findByText('No records yet.')
+
+    expect(requests()).toContain(`${rowsPath}?inCategory=${categoryId}&titleFilter=paper`)
+    expect(document.getElementById('filter-inCategory')).toBeNull()
+    expect(document.getElementById('filter-titleFilter')).not.toBeNull()
+    // The page parameter stays in the URL as it is.
+    expect(search()).toBe(`?category=${categoryId}&titleFilter=paper`)
   })
 
   it('has no filter bar for an entity or a data source without parameters', async () => {

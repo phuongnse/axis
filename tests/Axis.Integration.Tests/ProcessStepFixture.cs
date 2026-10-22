@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
@@ -375,12 +374,12 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// <summary>Waits until one session of the tenant database waits on a lock, and fails when <paramref name="run"/> ends first.</summary>
     public async Task WaitUntilBlockedOnLockAsync(Task run, CancellationToken cancellationToken)
     {
-        var clock = Stopwatch.StartNew();
+        var deadline = DateTime.UtcNow + _lockWaitTimeout;
         while (await AdminCountAsync(
             "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") != 1)
         {
             Assert.False(run.IsCompleted, "The step ended before it waited on a row lock.");
-            Assert.True(clock.Elapsed < _lockWaitTimeout, "The step never waited on a row lock.");
+            Assert.True(DateTime.UtcNow < deadline, "The step never waited on a row lock.");
             await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken);
         }
     }

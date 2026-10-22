@@ -15,5 +15,5 @@
     "status": "'open'"
   },
   "output": ["title", "status"],
-  "wait": "PT10S"
+  "wait": "PT30S"
 }

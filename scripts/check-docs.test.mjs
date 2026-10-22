@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { checkDocs, maxAgentsLines, maxDocLines } from './check-docs.mjs'
+import { checkDocs, maxAgentsLines, maxDocLines, maxSkillLines } from './check-docs.mjs'
 
 const script = fileURLToPath(new URL('./check-docs.mjs', import.meta.url))
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
@@ -59,6 +59,20 @@ describe('checkDocs', () => {
     assert.equal(found.length, 2)
     assert.match(found[0], /^docs\/reference\/guide\.md:1001: 1001 lines, over the limit of 1000/)
     assert.match(found[1], /^AGENTS\.md:101: 101 lines, over the limit of 100/)
+  })
+
+  test('passes on a skill at its size limit', () => {
+    write('.claude/skills/runbook/SKILL.md', 'line\n'.repeat(maxSkillLines))
+
+    assert.deepEqual(messages(), [])
+  })
+
+  test('reports a skill over its size limit', () => {
+    write('.claude/skills/runbook/SKILL.md', 'line\n'.repeat(maxSkillLines + 1))
+
+    assert.deepEqual(messages(), [
+      '.claude/skills/runbook/SKILL.md:251: 251 lines, over the limit of 250: link the rules in docs/ instead of restating them',
+    ])
   })
 
   test('reports a decision file without a row and a row without a file', () => {

@@ -12,6 +12,8 @@ the read endpoint, the response and the errors. Parts of this file are built:
 - the `table` widget binding, with the data source's schema in page metadata,
   its columns, paging and sorting
 - the filter inputs of a bound table, with their values in the URL
+- the page parameter binding of a table, with the not-found page for a
+  required page parameter that is missing or malformed
 - the table binding of grouped data sources
 - record and field policies: the root entity's read filters in the query,
   the field check on every projected field, and labels limited to readable
@@ -439,10 +441,10 @@ data sources.
   shorthand for all records of an entity. A `dataSource` that names no
   loaded data source is `AXC0059`.
 - **Parameters.** A bound table needs every parameter of its data source to be
-  optional, otherwise it is `AXC0060`, unless it is bound to a required page
-  parameter *(planned for M12)*. It shows one filter input per
-  parameter and sends their values from the URL. See
-  [Table widget](frontend.md) for the details.
+  optional, otherwise it is `AXC0060` at `/widgets/{i}/dataSource`, naming the
+  parameter, unless the parameter is bound to a required page parameter. It
+  shows one filter input per unbound parameter and sends their values from the
+  URL. See [Table widget](frontend.md) for the details.
 - **Grouped data sources.** A table may bind a data source with an
   `aggregate`. Each row is a group. Its columns are the group fields in
   `groupBy` order, then the measures. A group row has `id: null`, so it has
@@ -452,13 +454,30 @@ data sources.
   `navigate` action with `record: id` opens a form over the root entity, and the
   `record` rule of the action checks it (`AXC0235`). A table over a data source
   with an `aggregate` has no row actions, because a group is not a record.
-- **Page parameters** *(planned for M12)*. A table binds a page parameter to a
-  data source parameter with a name map on the widget:
+- **Page parameters.** A table binds a page parameter to a data source
+  parameter with a name map on the widget:
   `"parameters": { "<data source parameter>": "<page parameter>" }`. The two
   types must match. A required data source parameter is allowed only when it
   is bound to a required page parameter. A bound parameter has no filter
   input, and its value comes from the page parameter in the URL. See
-  [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+  [D63](../decisions/d63-navigate-actions-and-page-parameters.md). The compile
+  checks:
+  - Each entry is checked at `/widgets/{i}/parameters/{key}` and every problem
+    is `AXC0060`: the key names no data source parameter, a key repeats
+    ignoring letter case, the value names no page parameter, the types differ,
+    or the data source parameter is required and the page parameter is not.
+    Names match ignoring letter case, and the compiled model keeps the
+    declared names.
+  - The types match when the type names are equal and a `reference` has the
+    same target. For an `enum`, every value of the page parameter must also be
+    a value of the data source parameter.
+  - A required data source parameter that is not bound is `AXC0060` at
+    `/widgets/{i}/dataSource`.
+  - A page parameter with the same name as an unbound parameter of its table,
+    ignoring letter case, is `AXC0231` at `/parameters/{i}/name`, because both
+    live in the same URL query.
+  - `parameters` on any widget that is not a table over a data source is
+    `AXC0060` at `/widgets/{i}/parameters`.
 - **Chart binding** *(planned for M12)*. A `chart` names a `dataSource` and
   reads only grouped data. See
   [D64](../decisions/d64-detail-chart-and-kpi-widgets.md). The compile checks:

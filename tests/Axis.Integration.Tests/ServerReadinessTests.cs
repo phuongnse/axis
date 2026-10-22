@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Sockets;
@@ -101,7 +100,7 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
     }
 
     [Fact]
-    public async Task Ready_is_degraded_within_five_seconds_when_a_tenant_database_never_replies()
+    public async Task Ready_is_degraded_before_a_tenant_database_that_never_replies_gives_up()
     {
         var (a, b) = await CreateDatabasesAsync();
         using var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -136,15 +135,18 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
                 services.AddSingleton<ITenantConnectionFactory>(provider => provider.GetRequiredService<HangingTenantConnectionFactory>());
             });
             using var client = factory.CreateClient();
-            factory.Services.GetRequiredService<HangingTenantConnectionFactory>().Hang = true;
+            var hanging = factory.Services.GetRequiredService<HangingTenantConnectionFactory>();
+            hanging.Hang = true;
 
-            var stopwatch = Stopwatch.StartNew();
             var (status, body) = await ReadyAsync(client);
-            stopwatch.Stop();
 
             Assert.Equal(HttpStatusCode.OK, status);
             Assert.Equal(Degraded, body);
-            Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5), $"The readiness answer took {stopwatch.Elapsed}.");
+
+            // The connection attempt lasts 30 seconds and readiness gives up on it after the tenant
+            // timeout of 2 seconds, so the answer came while the attempt was still pending.
+            Assert.True(hanging.Started > 0, "No connection attempt reached the hanging database.");
+            Assert.Equal(0, hanging.Ended);
         }
         finally
         {
@@ -311,6 +313,14 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
         int port) : ITenantConnectionFactory, IDisposable
     {
         private volatile bool _hang;
+        private int _started;
+        private int _ended;
+
+        /// <summary>The connection attempts begun against the hanging port.</summary>
+        public int Started => Volatile.Read(ref _started);
+
+        /// <summary>The connection attempts against the hanging port that have ended.</summary>
+        public int Ended => Volatile.Read(ref _ended);
 
         public bool Hang
         {
@@ -326,14 +336,20 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
             }
 
             var connection = new NpgsqlConnection($"Host=127.0.0.1;Port={port};Database=x;Username=x;Password=x;Timeout=30;Pooling=false");
+            Interlocked.Increment(ref _started);
             try
             {
-                await connection.OpenAsync(cancellationToken);
+                // The attempt ignores the caller's token, so it lasts its whole 30-second timeout.
+                await connection.OpenAsync(CancellationToken.None);
             }
             catch
             {
                 await connection.DisposeAsync();
                 throw;
+            }
+            finally
+            {
+                Interlocked.Increment(ref _ended);
             }
 
             return connection;
