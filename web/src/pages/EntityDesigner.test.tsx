@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +9,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { chooseOption, clearSelect, openDropdown, optionTexts, removeTag } from '../test/antd'
 import { EntityDesigner } from './EntityDesigner'
 import { LabelTextsContext } from './labelTextsContext'
 
@@ -107,21 +108,6 @@ function renderDesigner(
   return onChange
 }
 
-/** Opens the select in a field and clicks one of its options. */
-async function choose(field: HTMLElement, option: string) {
-  await userEvent.click(within(field).getByRole('combobox'))
-  const dropdown = await waitFor(() => {
-    const open = [
-      ...document.querySelectorAll<HTMLElement>(
-        '.ant-select-dropdown:not(.ant-select-dropdown-hidden):not(.ant-slide-up-leave)',
-      ),
-    ].find((candidate) => within(candidate).queryByTitle(option) !== null)
-    expect(open).toBeDefined()
-    return open!
-  })
-  await userEvent.click(within(dropdown).getByTitle(option))
-}
-
 afterEach(() => localStorage.clear())
 
 describe.each(['light', 'dark'])('EntityDesigner in %s mode', (mode) => {
@@ -165,15 +151,9 @@ describe('EntityDesigner', () => {
     const field = screen.getByTestId('studio-field-/displayField')
 
     await userEvent.click(within(field).getByRole('combobox'))
-    const open = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')!
-    expect([...open.querySelectorAll('.ant-select-item-option')].map((option) => option.textContent)).toEqual([
-      'total',
-      'code',
-      'note',
-    ])
+    expect(optionTexts(await openDropdown())).toEqual(['total', 'code', 'note'])
     await userEvent.keyboard('{Escape}')
-    await userEvent.hover(within(field).getByRole('combobox'))
-    await userEvent.click(field.querySelector('.ant-select-clear')!)
+    await clearSelect(field)
 
     expect(onChange).toHaveBeenCalledWith('/displayField', undefined)
   })
@@ -181,7 +161,7 @@ describe('EntityDesigner', () => {
   it('changes the type of a field without precision and scale and keeps unique', async () => {
     const onChange = renderDesigner(entity())
 
-    await choose(screen.getByTestId('studio-field-/fields/0/type'), 'enum')
+    await chooseOption('enum', screen.getByTestId('studio-field-/fields/0/type'))
 
     expect(onChange).toHaveBeenCalledWith('/fields/0', {
       name: 'total',
@@ -195,11 +175,10 @@ describe('EntityDesigner', () => {
     const onChange = renderDesigner(entity())
     const label = screen.getByTestId('studio-field-/fields/0/label')
 
-    await userEvent.hover(within(label).getByRole('combobox'))
-    await userEvent.click(label.querySelector('.ant-select-clear')!)
+    await clearSelect(label)
     expect(onChange).toHaveBeenCalledWith('/fields/0/label', undefined)
 
-    await choose(screen.getByTestId('studio-field-/fields/1/label'), 'field.total')
+    await chooseOption('field.total', screen.getByTestId('studio-field-/fields/1/label'))
     expect(onChange).toHaveBeenCalledWith('/fields/1/label/textKey', 'field.total')
   })
 
@@ -217,7 +196,7 @@ describe('EntityDesigner', () => {
     const onChange = renderDesigner(entity({ fields: [{ name: 'state', type: 'enum', values: ['open'] }] }))
     const values = screen.getByTestId('studio-field-/fields/0/values')
 
-    await userEvent.click(values.querySelector('.ant-select-selection-item-remove')!)
+    await removeTag(values)
 
     expect(onChange).toHaveBeenCalledWith('/fields/0/values', undefined)
   })
@@ -251,7 +230,7 @@ describe('EntityDesigner', () => {
     expect(
       within(screen.getByTestId('studio-field-/validations/0/message/textKey')).getByText('validation.total'),
     ).toBeInTheDocument()
-    await choose(screen.getByTestId('studio-field-/validations/0/field'), 'code')
+    await chooseOption('code', screen.getByTestId('studio-field-/validations/0/field'))
     expect(onChange).toHaveBeenLastCalledWith('/validations/0/field', 'code')
 
     await userEvent.click(within(row).getByRole('button', { name: 'Remove validation' }))

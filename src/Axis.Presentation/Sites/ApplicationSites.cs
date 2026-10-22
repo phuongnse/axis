@@ -51,13 +51,36 @@ public static class ApplicationSites
         var page = application.Pages.FirstOrDefault(candidate => string.Equals(candidate.Name, pageName, StringComparison.OrdinalIgnoreCase));
         return page is null
             ? null
-            : new PageMetadata(page.Name, page.Title.TextKey, [.. page.Widgets.Select(widget => Widget(application, widget))]);
+            : new PageMetadata(
+                page.Name,
+                page.Title.TextKey,
+                [.. page.Parameters.Select(parameter => new PageParameterMetadata(
+                    parameter.Name,
+                    FieldTypes.Name(parameter.Type),
+                    parameter.Required,
+                    parameter.Values,
+                    parameter.Target is { } target ? Target(application, target.Name) : null))],
+                [.. page.Widgets.Select(widget => Widget(application, widget))]);
     }
 
     private static TextResource? FindText(ApplicationModel application, string locale) =>
         application.Texts.FirstOrDefault(text => string.Equals(text.Locale, locale, StringComparison.OrdinalIgnoreCase));
 
-    private static WidgetMetadata Widget(ApplicationModel application, WidgetModel widget) =>
+    private static PageWidgetMetadata Widget(ApplicationModel application, WidgetModel widget) =>
+        widget.Type switch
+        {
+            WidgetType.Columns => new ColumnsWidgetMetadata(
+                [.. widget.Columns.Select(column => new ColumnMetadata(column.Width, [.. column.Widgets.Select(child => Widget(application, child))]))]),
+            WidgetType.Tabs => new TabsWidgetMetadata(
+                [.. widget.Tabs.Select(tab => new TabMetadata(tab.Label.TextKey, [.. tab.Widgets.Select(child => Widget(application, child))]))]),
+            WidgetType.Section => new SectionWidgetMetadata(
+                widget.Title!.TextKey,
+                widget.Collapsed,
+                [.. widget.Widgets.Select(child => Widget(application, child))]),
+            _ => Leaf(application, widget),
+        };
+
+    private static WidgetMetadata Leaf(ApplicationModel application, WidgetModel widget) =>
         new(
             WidgetTypes.Name(widget.Type),
             widget.FormPage?.Name,
@@ -67,12 +90,28 @@ public static class ApplicationSites
             widget.Type == WidgetType.TaskInbox ? $"/api/apps/{application.Manifest.Name}/tasks" : null,
             widget.Process?.Name,
             widget.Process is { } process ? $"/api/apps/{application.Manifest.Name}/processes/{process.Name}/instances" : null,
-            [.. widget.Actions.Select(action => new ActionMetadata(
-                "startProcess",
-                action.Process.Name,
-                action.Label.TextKey,
-                $"/api/apps/{application.Manifest.Name}/processes/{action.Process.Name}/instances"))],
+            [.. widget.Actions.Select(action => Action(application, action))],
+            [.. widget.RowActions.Select(action => Action(application, action))],
+            [.. widget.ToolbarActions.Select(action => Action(application, action))],
             FullAccess(application, widget));
+
+    private static ActionMetadata Action(ApplicationModel application, WidgetActionModel action) =>
+        action switch
+        {
+            StartProcessActionModel start => new StartProcessActionMetadata(
+                start.Process.Name,
+                start.Label.TextKey,
+                $"/api/apps/{application.Manifest.Name}/processes/{start.Process.Name}/instances"),
+
+            // The compiler resolves every navigate target, so the lookup always succeeds.
+            NavigateActionModel navigate => new NavigateActionMetadata(
+                navigate.Page.Name,
+                navigate.Label.TextKey,
+                navigate.Parameters,
+                navigate.Record,
+                application.Pages.First(page => page.Name == navigate.Page.Name).Leaves().Any(leaf => leaf.Type == WidgetType.Form)),
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
+        };
 
     /// <summary>
     /// The entity a table or form widget is about: its own entity, or the root entity of its data
@@ -126,12 +165,42 @@ public static class ApplicationSites
         return new FormMetadata(
             form.Name,
             [.. form.Sections.Select(section => new FormSectionMetadata(
+                section.Name,
                 section.Title.TextKey,
+                section.VisibleWhen is not null,
                 [.. section.Fields.Select(entry =>
                 {
                     entity.TryGetField(entry.Field, out var field);
-                    return new FormFieldMetadata(field!.Name, entry.ReadOnly || field.IsComputed || field.Sequence is not null || field.Creator);
-                })]))]);
+                    return new FormFieldMetadata(
+                        field!.Name,
+                        entry.ReadOnly || field.IsComputed || field.Sequence is not null || field.Creator,
+                        entry.VisibleWhen is not null);
+                })]))],
+            [.. form.Steps.Select(step => new FormStepMetadata(step.Title.TextKey, step.Sections))]);
+    }
+
+    /// <summary>
+    /// <paramref name="form"/> with only the fields in <paramref name="readable"/>. A section left
+    /// with no field is dropped, and so is its name from each step. A step left with no section is
+    /// dropped.
+    /// </summary>
+    public static FormMetadata Readable(FormMetadata form, IReadOnlySet<string> readable)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+        ArgumentNullException.ThrowIfNull(readable);
+
+        var sections = form.Sections
+            .Select(section => section with { Fields = [.. section.Fields.Where(field => readable.Contains(field.Name))] })
+            .Where(section => section.Fields.Count > 0)
+            .ToList();
+        var names = new HashSet<string>(sections.Select(section => section.Name).OfType<string>(), StringComparer.OrdinalIgnoreCase);
+        return form with
+        {
+            Sections = sections,
+            Steps = [.. form.Steps
+                .Select(step => step with { Sections = [.. step.Sections.Where(names.Contains)] })
+                .Where(step => step.Sections.Count > 0)],
+        };
     }
 
     /// <summary>

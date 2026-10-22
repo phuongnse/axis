@@ -11,6 +11,7 @@ namespace Axis.Integration.Tests;
 /// A thousand started instances of a short process all reach their end step within the time limit
 /// with two worker hosts sharing the work, and no work item runs twice.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class ProcessEnginePerformanceTests(ProcessStepFixture fixture) : IClassFixture<ProcessStepFixture>
 {
     private const int Instances = 1_000;

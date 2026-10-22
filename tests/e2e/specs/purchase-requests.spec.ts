@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { expectChosen, pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 
 // The record API needs a session with a grant, so these journeys start signed in as the employee anna.
@@ -23,10 +24,9 @@ async function departmentId(request: APIRequestContext, name: string) {
   return department!.id
 }
 
-/** Opens the lookup of the reference field labelled `label` and picks the row named `name`. */
-async function choose(page: Page, label: string, name: string) {
-  const field = page.locator('.ant-form-item', { has: page.getByLabel(label, { exact: true }) })
-  await field.getByRole('button', { name: 'Choose' }).click()
+/** Opens the lookup of the reference field `field`, labelled `label`, and picks the row named `name`. */
+async function choose(page: Page, field: string, label: string, name: string) {
+  await page.getByTestId(`reference-${field}`).getByRole('button', { name: 'Choose' }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
   await expect(dialog).toBeHidden()
@@ -35,8 +35,7 @@ async function choose(page: Page, label: string, name: string) {
 
 /** Opens a select and picks the option with the given value. */
 async function select(page: Page, label: string, value: string) {
-  await page.getByLabel(label, { exact: true }).click()
-  await page.locator(`.ant-select-item-option[title="${value}"]`).click()
+  await pickOption(page.getByRole('combobox', { name: label, exact: true }), value)
 }
 
 test('a purchase request is created with line items, shows the computed total, is edited, and is kept after reload, in light and dark mode', async ({
@@ -52,8 +51,8 @@ test('a purchase request is created with line items, shows the computed total, i
   await page.getByRole('textbox', { name: 'Title' }).fill(title)
   // The server sets the requester to the signed-in user, so the form shows it read-only.
   await expect(page.getByLabel('Requester', { exact: true })).toHaveAttribute('readonly')
-  await choose(page, 'Department', 'Finance')
-  await choose(page, 'Supplier', 'Acme Supplies')
+  await choose(page, 'department', 'Department', 'Finance')
+  await choose(page, 'supplier', 'Supplier', 'Acme Supplies')
   await select(page, 'Currency', 'VND')
   await page.getByRole('button', { name: 'Add row' }).click()
   await page.getByRole('button', { name: 'Add row' }).click()
@@ -113,7 +112,7 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   await expect(number).toHaveValue('')
   await expect(number).toHaveAttribute('readonly')
   await page.getByRole('textbox', { name: 'Title' }).fill(title)
-  await choose(page, 'Department', 'Finance')
+  await choose(page, 'department', 'Department', 'Finance')
   await page.getByRole('button', { name: 'Add row' }).click()
   await page.getByLabel('Description 1', { exact: true }).fill('Paper')
   await page.getByLabel('Quantity 1', { exact: true }).fill('1')
@@ -176,7 +175,7 @@ test('the purchase request list reads a data source, shows department names, and
   expect((await rowsLoad).status()).toBe(200)
 
   const listPath = /\/purchasing\/purchaserequests\?page=2&pageSize=10&sort=-title$/
-  const first = page.locator('.ant-table-tbody tr.ant-table-row').first()
+  const first = page.getByRole('row').filter({ has: page.getByRole('cell') }).first()
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
       await page.getByRole('switch', { name: 'Dark mode' }).click()
@@ -185,7 +184,7 @@ test('the purchase request list reads a data source, shows department names, and
 
     await expect(page.locator(`[data-theme-mode="${mode}"]`)).toBeVisible()
     await expect(page).toHaveURL(listPath)
-    await expect(page.locator('.ant-pagination-item-active')).toHaveText('2')
+    await expect(page.getByRole('main').locator('[aria-current="page"]')).toHaveText('2')
     await expect(page.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'descending')
     await expect(page.getByRole('columnheader', { name: 'Department' })).toBeVisible()
     await expect(first).toContainText(`${prefix} 01`)
@@ -221,8 +220,9 @@ test('the purchase request list filters by status, and keeps the filter and its 
   await expect(returned).toBeVisible()
 
   const filters = page.getByTestId('filter-bar')
-  await filters.getByLabel('Status', { exact: true }).click()
-  await page.locator('.ant-select-item-option[title="returned"]').click()
+  // The inline form ends a label with a colon, so the name is matched as text.
+  const statusFilter = filters.getByRole('combobox', { name: 'Status' })
+  await pickOption(statusFilter, 'returned')
 
   const filteredPath = /\/purchasing\/purchaserequests\?statusFilter=returned&pageSize=100&sort=-title$/
   for (const reload of [false, true]) {
@@ -230,7 +230,7 @@ test('the purchase request list filters by status, and keeps the filter and its 
       await page.reload()
     }
     await expect(page).toHaveURL(filteredPath)
-    await expect(filters.locator('.ant-select-selection-item')).toHaveText('returned')
+    await expectChosen(statusFilter, 'returned')
     await expect(returned).toContainText('returned')
     await expect(draft).toHaveCount(0)
   }
@@ -296,7 +296,7 @@ test('the per-department page shows one row per department with its total, sorts
   const engineering = total('Engineering')
 
   await page.goto('/purchasing/requestsbydepartment')
-  const rows = page.locator('.ant-table-tbody tr.ant-table-row')
+  const rows = page.getByRole('row').filter({ has: page.getByRole('cell') })
   await expect(rows).toHaveCount(3)
   const row = (name: string) => page.getByRole('row', { name: new RegExp(`^${name} `) })
   await expect(row('Engineering')).toContainText(engineering)
@@ -331,7 +331,7 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
   await page.getByRole('link', { name: 'New' }).click()
   await page.getByRole('textbox', { name: 'Title' }).fill(title)
-  await choose(page, 'Department', 'Finance')
+  await choose(page, 'department', 'Department', 'Finance')
   await select(page, 'Status', 'draft')
   await page.getByRole('button', { name: 'Add row' }).click()
   await page.getByRole('button', { name: 'Add row' }).click()
@@ -373,8 +373,7 @@ test('searching in the supplier lookup filters the suppliers by name, and pickin
   await page.getByRole('link', { name: 'New' }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
 
-  const field = page.locator('.ant-form-item', { has: page.getByLabel('Supplier', { exact: true }) })
-  await field.getByRole('button', { name: 'Choose' }).click()
+  await page.getByTestId('reference-supplier').getByRole('button', { name: 'Choose' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('row', { name: /Acme Supplies/ })).toBeVisible()
   await dialog.getByLabel('Search').fill('glob')

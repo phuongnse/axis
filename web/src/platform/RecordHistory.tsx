@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { historySummary } from './historySummary'
 import { inspectTarget } from './inspection'
+import { markCurrentPage } from './pagination'
 import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } from './records'
 import { fetchPage, type FieldMetadata } from './site'
 import { useText } from './texts'
@@ -107,7 +108,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   const totalCount = state.result?.totalCount ?? 0
 
   return (
-    <Card data-testid="record-history" title={t('shell.history.title')} size="small">
+    <Card data-testid="record-history" aria-busy={loading} title={t('shell.history.title')} size="small">
       {failed ? (
         <Alert data-testid="record-history-error" type="error" message={t('shell.history.loadFailed')} />
       ) : (
@@ -121,6 +122,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
               pageSize: historyPageSize,
               total: totalCount,
               showSizeChanger: false,
+              itemRender: markCurrentPage(page),
               onChange: setPage,
             }
           }

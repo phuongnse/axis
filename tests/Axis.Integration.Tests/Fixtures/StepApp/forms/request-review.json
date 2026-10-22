@@ -4,5 +4,13 @@
   "name": "RequestReview",
   "formatVersion": 1,
   "entity": "Request",
-  "sections": [{ "title": { "textKey": "requestReview.main" }, "fields": [{ "field": "title" }] }]
+  "sections": [
+    {
+      "name": "main",
+      "title": { "textKey": "requestReview.main" },
+      "visibleWhen": "title is not null",
+      "fields": [{ "field": "title" }]
+    }
+  ],
+  "steps": [{ "title": { "textKey": "requestReview.step" }, "sections": ["main"] }]
 }

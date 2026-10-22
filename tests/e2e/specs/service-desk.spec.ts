@@ -6,6 +6,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
+import { expectChosen } from "../select";
 import { sessionFile, useSession, type SampleUser } from "../sessions";
 
 // The service desk sample runs on the same platform as the other samples, with no platform code of its
@@ -89,13 +90,6 @@ async function taskId(
   });
 }
 
-/** The value the Status select shows. */
-function statusValue(page: Page) {
-  return page
-    .locator(".ant-form-item")
-    .filter({ has: page.getByText("Status", { exact: true }) })
-    .locator(".ant-select-selection-item");
-}
 
 /** Opens the task `label` of the ticket `title` in My tasks. It waits until the worker creates the task. */
 async function openTask(page: Page, title: string, label: string) {
@@ -147,7 +141,7 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
   // The worker ends the process some time after the decision.
   await expect(async () => {
     await page.goto(`/service-desk/ticketform/${id}`);
-    await expect(statusValue(page)).toHaveText("closed", { timeout: 1_000 });
+    await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), "closed", { timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
 });
 

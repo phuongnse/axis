@@ -6,6 +6,7 @@ using Axis.Scenarios.Runner;
 namespace Axis.Integration.Tests;
 
 /// <summary>The scenarios of the purchase request sample pass within the time limit.</summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class ScenarioPerformanceTests
 {
     // Each scenario creates a database, activates the sample and runs its steps and processes. The

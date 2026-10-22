@@ -25,6 +25,7 @@ namespace Axis.Integration.Tests;
 /// through two server instances, and 1,000 session checks against the shared key ring. All tests are in one class, so
 /// xUnit runs them one after another and they do not compete for CPU.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     // The publisher looks for new requests once a second, so a request waits up to a second before it is claimed.

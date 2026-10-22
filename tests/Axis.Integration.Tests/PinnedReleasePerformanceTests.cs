@@ -13,6 +13,7 @@ namespace Axis.Integration.Tests;
 /// those tasks, each within the time limit. The server and the worker each hold one model per
 /// release, and a second pass does not add to them.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class PinnedReleasePerformanceTests(TaskApiFixture fixture) : IClassFixture<TaskApiFixture>
 {
     private const int Releases = 20;

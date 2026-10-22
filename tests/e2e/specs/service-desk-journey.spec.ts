@@ -1,9 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { compareApplicationFolders } from '../folder-comparison'
+import { expectChosen, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
+import { createResource } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -41,57 +43,33 @@ test.describe('the author builds the service desk with Studio only', () => {
   // that folder would be a file write. So retries are off.
   test.describe.configure({ mode: 'serial', retries: 0 })
 
-  async function create(page: Page, kind: string, label: string, value: string) {
-    await page.getByRole('button', { name: 'New resource' }).click()
-    const dialog = page.getByRole('dialog')
-    await dialog.getByRole('combobox', { name: 'Kind' }).click()
-    await page.getByTitle(kind, { exact: true }).click()
-    await dialog.getByRole('textbox', { name: label }).fill(value)
-    await dialog.getByRole('button', { name: 'Create' }).click()
-  }
-
   async function createPage(page: Page, name: string) {
-    await create(page, 'page', 'Name', name)
-    // The editor of the page that was open stays on screen until the new page replaces it, so wait for the name.
+    await createResource(page, 'page', name)
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name' })).toHaveValue(name)
   }
 
-  // A virtual list keeps a hidden copy of its options in the dropdown, so only the visible option is clicked.
-  async function openDropdown(page: Page, opener: Locator) {
-    await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
-    await opener.click()
-    return page.locator('.ant-select-dropdown:visible')
-  }
-
   async function pick(page: Page, testId: string, option: string, filter?: string) {
-    const field = page.getByTestId(testId)
-    const dropdown = await openDropdown(page, field.locator('.ant-select-selector'))
-    if (filter !== undefined) {
-      await field.getByRole('combobox').fill(filter)
-    }
-    await dropdown.getByText(option, { exact: true }).filter({ visible: true }).click()
+    await pickOption(page.getByTestId(testId).getByRole('combobox'), option, filter)
   }
 
   // A row with more than one select names the one to pick, since pick() would match them all.
   async function pickNamed(page: Page, testId: string, name: string, option: string) {
-    const select = page
-      .getByTestId(testId)
-      .locator('.ant-select')
-      .filter({ has: page.getByRole('combobox', { name, exact: true }) })
-    const dropdown = await openDropdown(page, select.locator('.ant-select-selector'))
-    await dropdown.getByText(option, { exact: true }).filter({ visible: true }).click()
+    await pickOption(page.getByTestId(testId).getByRole('combobox', { name, exact: true }), option)
   }
 
   async function save(page: Page, answers: [field: string, choice: string][] = []) {
     // A save with a migration posts one changes call, and a save without one patches the resource.
-    const answer = page.waitForResponse((response) => {
-      const url = response.url()
-      const method = response.request().method()
-      return (
-        (method === 'PATCH' && url.includes('/api/studio/apps/ServiceDesk/resources/')) ||
-        (method === 'POST' && url.endsWith('/api/studio/apps/ServiceDesk/changes'))
-      )
-    })
+    const answer = page.waitForResponse(
+      (response) => {
+        const url = response.url()
+        const method = response.request().method()
+        return (
+          (method === 'PATCH' && url.includes('/api/studio/apps/ServiceDesk/resources/')) ||
+          (method === 'POST' && url.endsWith('/api/studio/apps/ServiceDesk/changes'))
+        )
+      },
+      { timeout: 60_000 },
+    )
     await page.getByRole('button', { name: 'Save' }).click()
     for (const [field, choice] of answers) {
       await expect(page.getByTestId('studio-migration-field')).toHaveText(field)
@@ -110,8 +88,15 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   async function writeLabel(page: Page, field: string, key: string, en: string) {
     const label = page.getByTestId(field).getByTestId('studio-label')
-    await label.getByRole('textbox', { name: 'Text key', exact: true }).fill(key)
-    await expect(label.getByRole('textbox', { name: 'en', exact: true })).toHaveValue(en)
+    const keyBox = label.getByRole('textbox', { name: 'Text key', exact: true })
+    const english = label.getByRole('textbox', { name: 'en', exact: true })
+    // The label editor fills the texts when the key is typed, from the names it has then. An editor that was replaced
+    // or got its names later starts over, so the key is typed again until the text shows.
+    await expect(async () => {
+      await keyBox.fill('')
+      await keyBox.fill(key)
+      await expect(english).toHaveValue(en, { timeout: 2_000 })
+    }).toPass({ timeout: 20_000 })
     await label.getByRole('button', { name: 'Write texts' }).click()
     await expect(label.getByTestId('studio-label-written')).toBeVisible()
   }
@@ -139,11 +124,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await own.getByRole('textbox', { name: 'Record filter' }).fill(grant.filter)
       }
       if (grant.fields !== undefined) {
-        await own.locator('.ant-select-selector').click()
-        for (const field of grant.fields) {
-          await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: field, exact: true }).click()
-        }
-        await page.keyboard.press('Escape')
+        await pickOptions(own.getByRole('combobox'), grant.fields)
       }
     }
     await page.getByTestId('studio-matrix-own-grants').getByRole('button', { name: 'Save', exact: true }).click()
@@ -247,11 +228,11 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
     await expect(starter.getByRole('button')).toHaveCount(0)
 
-    await create(page, 'text', 'Locale', 'en')
+    await createResource(page, 'text', 'en', 'TextsEn')
     await expect(page.getByTestId('studio-resource-details')).toContainText('texts/en.json')
     await expectForm(page)
 
-    await create(page, 'text', 'Locale', 'vi')
+    await createResource(page, 'text', 'vi', 'TextsVi')
     await expect(page.getByTestId('studio-resource-details')).toContainText('texts/vi.json')
     await expectForm(page)
 
@@ -279,7 +260,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['agent', 'role.agent'],
       ['service-desk-lead', 'role.serviceDeskLead'],
     ]) {
-      await create(page, 'role', 'Name', name)
+      await createResource(page, 'role', name)
       // The editor of the previous role stays on screen until the new role replaces it, so wait for the file.
       await expect(page.getByTestId('studio-resource-details')).toContainText(`roles/${name}.json`)
       await expectForm(page)
@@ -293,7 +274,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    await create(page, 'sequence', 'Name', 'TicketNumber')
+    await createResource(page, 'sequence', 'TicketNumber')
     await expectForm(page)
     await page.getByTestId('studio-field-/format').getByRole('textbox').fill('SD-{yyyy}-{n:5}')
     await save(page)
@@ -305,7 +286,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
-    await create(page, 'entity', 'Name', 'Category')
+    await createResource(page, 'entity', 'Category')
     await expectForm(page)
     await writeLabel(page, 'studio-field-/label', 'category.label', en['category.label'])
 
@@ -331,7 +312,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    await create(page, 'seed', 'Name', 'Categories')
+    await createResource(page, 'seed', 'Categories')
     await expectForm(page)
     await pick(page, 'studio-field-/entity', 'Category')
     await page.getByTestId('studio-field-/sync').getByRole('checkbox').check()
@@ -362,7 +343,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
-    await create(page, 'entity', 'Name', 'Ticket')
+    await createResource(page, 'entity', 'Ticket')
     await expectForm(page)
     await writeLabel(page, 'studio-field-/label', 'ticket.label', en['ticket.label'])
 
@@ -443,7 +424,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['AllTicketList', 'data-sources/all-ticket-list.json'],
     ]) {
       const list = await sample<SampleDataSource>(file)
-      await create(page, 'dataSource', 'Name', name)
+      await createResource(page, 'dataSource', name)
       await expectForm(page)
       await pick(page, 'studio-field-/entity', list.entity)
       // The starter has the first row, so only the later rows are added.
@@ -470,7 +451,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['TicketConfirmation', 'forms/ticket-confirmation.json'],
     ]) {
       const form = await sample<SampleForm>(file)
-      await create(page, 'form', 'Name', name)
+      await createResource(page, 'form', name)
       await expectForm(page)
       await pick(page, 'studio-field-/entity', form.entity)
       for (const [sectionIndex, section] of form.sections.entries()) {
@@ -510,7 +491,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
-    await create(page, 'process', 'Name', 'TicketHandling')
+    await createResource(page, 'process', 'TicketHandling')
     await expectForm(page)
     await pick(page, 'studio-field-/entity', 'Ticket')
     await page.getByTestId('studio-step-0').getByRole('button', { name: 'Remove step' }).click()
@@ -530,16 +511,14 @@ test.describe('the author builds the service desk with Studio only', () => {
     ]
     // Every name exists before any transition is picked, because the pickers offer only named steps.
     for (const [index, [name, type]] of steps.entries()) {
-      await page.getByRole('combobox', { name: 'Add step' }).click()
-      await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: type, exact: true }).click()
+      await pickOption(page.getByRole('combobox', { name: 'Add step' }), type)
       await stepCard(index).getByRole('textbox', { name: 'Step name' }).fill(name)
     }
 
     async function operation(index: number, sets: [field: string, expression: string][], next: string) {
       await pick(page, `studio-field-/steps/${index}/operation`, 'updateRecord')
       for (const [field, expression] of sets) {
-        await stepCard(index).getByRole('combobox', { name: 'Add mapping Set' }).click()
-        await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: field, exact: true }).click()
+        await pickOption(stepCard(index).getByRole('combobox', { name: 'Add mapping Set' }), field)
         const row = page.getByTestId(`studio-field-/steps/${index}/set/${field}`)
         await expect(row.locator('.cm-editor')).toBeVisible()
         await row.getByRole('textbox', { name: 'Expression' }).fill(expression)
@@ -737,7 +716,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
       const ids = await shownCategoryIds(page)
 
-      await create(page, 'scenario', 'Name', name)
+      await createResource(page, 'scenario', name)
       await expect(page.getByTestId('studio-resource-details')).toContainText(file)
       await expectForm(page)
 
@@ -757,14 +736,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await page.keyboard.press('Tab')
         const row = page.getByTestId(`studio-field-/users/${user}`)
         await expect(row).toBeVisible()
-        await row.locator('.ant-select-selector').click()
-        const roleList = page.locator(
-          `[id="${await row.getByRole('combobox', { name: 'Roles', exact: true }).getAttribute('aria-controls')}"]`,
-        )
-        for (const role of roles) {
-          await roleList.getByRole('option', { name: role, exact: true }).click()
-        }
-        await page.keyboard.press('Escape')
+        await pickOptions(row.getByRole('combobox', { name: 'Roles', exact: true }), roles)
         for (const role of roles) {
           await expect(row).toContainText(role)
         }
@@ -821,13 +793,6 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(rows).toHaveAttribute('data-active', 'true')
   })
 
-  /** The value the Status select shows. */
-  function statusValue(page: Page) {
-    return page
-      .locator('.ant-form-item')
-      .filter({ has: page.getByText('Status', { exact: true }) })
-      .locator('.ant-select-selection-item')
-  }
 
   /** Opens the task `label` of the ticket `title` in My tasks. It waits until the worker creates the task. */
   async function openTask(page: Page, title: string, label: string) {
@@ -851,8 +816,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('textbox', { name: 'Title' }).fill(title)
     await page.getByRole('textbox', { name: 'Description', exact: true }).fill('It shows a black screen.')
     // The requester's create grant only allows the statuses draft and reopened.
-    await page.getByLabel('Status', { exact: true }).click()
-    await page.locator('.ant-select-item-option[title="draft"]').click()
+    await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'draft')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytickets$/)
 
@@ -885,7 +849,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     // The worker ends the process some time after the decision.
     await expect(async () => {
       await page.goto(`${journeyURL}/service-desk/ticketform/${id}`)
-      await expect(statusValue(page)).toHaveText('closed', { timeout: 1_000 })
+      await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), 'closed', { timeout: 1_000 })
     }).toPass({ timeout: 30_000 })
   })
 })

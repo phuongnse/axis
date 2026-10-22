@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Processes.Instances;
 using Axis.Server.Tests;
+using static Axis.Integration.Tests.Polling;
 using static Axis.Integration.Tests.SampleAppFixture;
 
 namespace Axis.Integration.Tests;
@@ -46,10 +47,10 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         using (var workerB = await fixture.StartWorkerAsync(logs))
         {
             // Worker B counts the stopped attempt as an unknown outcome, and sends the call again.
-            await WaitUntilAsync(async () => await CallAsync(call) == "pending:1");
+            await WaitUntilAsync(async () => await CallAsync(call) == "pending:1", "The call did not turn pending.");
             Assert.Equal(ConnectorCallHandler.UnknownOutcome, await LastErrorAsync(call));
             await MakeDueAsync(call);
-            await WaitUntilAsync(async () => await StateAsync(instance) == "completed:done");
+            await WaitUntilAsync(async () => await StateAsync(instance) == "completed:done", "The instance did not complete.");
             await workerB.StopAsync(CancellationToken);
         }
 
@@ -79,14 +80,14 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         // Worker A still waits for its response when worker B takes the call over and settles it.
         await EndLeaseAsync(call);
         using var workerB = await fixture.StartWorkerAsync(logsB);
-        await WaitUntilAsync(async () => await CallAsync(call) == "pending:1");
+        await WaitUntilAsync(async () => await CallAsync(call) == "pending:1", "The call did not turn pending.");
         await MakeDueAsync(call);
-        await WaitUntilAsync(async () => await CallAsync(call) == "succeeded:2");
+        await WaitUntilAsync(async () => await CallAsync(call) == "succeeded:2", "The call did not succeed.");
 
         // Worker A then gets its answer, and records nothing.
         await StubAsync($"/test/release-request/{number}");
-        await WaitUntilAsync(() => Task.FromResult(logsA.Entries.Any(entry => entry.Contains("was claimed by another worker", StringComparison.Ordinal))));
-        await WaitUntilAsync(async () => await StateAsync(instance) == "completed:done");
+        await WaitUntilAsync(() => Task.FromResult(logsA.Entries.Any(entry => entry.Contains("was claimed by another worker", StringComparison.Ordinal))), "The claim by the other worker was not logged.");
+        await WaitUntilAsync(async () => await StateAsync(instance) == "completed:done", "The instance did not complete.");
         await workerA.StopAsync(CancellationToken);
         await workerB.StopAsync(CancellationToken);
 
@@ -120,12 +121,12 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         using (var worker = await fixture.StartWorkerAsync(logs))
         {
             await ApproveAsync(chau, instance);
-            await WaitUntilAsync(async () => await InstanceCallAsync(instance) == "pending:1");
+            await WaitUntilAsync(async () => await InstanceCallAsync(instance) == "pending:1", "The call did not turn pending.");
             call = await CallIdAsync(instance);
             Assert.NotNull(await LastErrorAsync(call));
             Assert.Single(await fixture.OrdersAsync(number));
             await MakeDueAsync(call);
-            await WaitUntilAsync(async () => await StateAsync(instance) == "completed:done");
+            await WaitUntilAsync(async () => await StateAsync(instance) == "completed:done", "The instance did not complete.");
             await worker.StopAsync(CancellationToken);
         }
 
@@ -181,7 +182,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
     /// <summary>Waits until the running worker has opened chau's task for the instance, and approves it.</summary>
     private async Task ApproveAsync(HttpClient chau, Guid instance)
     {
-        await WaitUntilAsync(async () => await StateAsync(instance) == "waiting:managerApproval");
+        await WaitUntilAsync(async () => await StateAsync(instance) == "waiting:managerApproval", "The instance did not wait for approval.");
         var task = (Guid)(await fixture.ScalarAsync(
             "SELECT id FROM axis.process_tasks WHERE process_instance_id = @instance AND state = 'open'",
             ("instance", instance)))!;
@@ -195,7 +196,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
     /// </summary>
     private async Task<Guid> StoredWhileSendingAsync(Guid instance, string number)
     {
-        await WaitUntilAsync(async () => await InstanceCallAsync(instance) == "sending:1" && (await fixture.OrdersAsync(number)).Count == 1);
+        await WaitUntilAsync(async () => await InstanceCallAsync(instance) == "sending:1" && (await fixture.OrdersAsync(number)).Count == 1, "The call did not store its order.");
         return await CallIdAsync(instance);
     }
 

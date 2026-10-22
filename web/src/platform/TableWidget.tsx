@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useHref, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { FilterBar } from './FilterBar'
 import { formatValue } from './formatValue'
+import { navigatePath } from './navigateAction'
+import { markCurrentPage } from './pagination'
 import { fetchRecords, RecordQueryProblem, type RecordItem, type RecordPage, type RecordValue } from './records'
 import type { DataSourceColumn, DataSourceParameter, FieldMetadata, WidgetMetadata } from './site'
 import {
@@ -39,6 +41,7 @@ type TableRow = Omit<RecordItem, 'id'> & { id: string | null }
 
 // Field names start with a letter, so this key never names a field column.
 const openColumnKey = '$open'
+const actionsColumnKey = '$actions'
 
 function sameSort(a: TableSort | null, b: TableSort | null): boolean {
   return a?.field === b?.field && a?.descending === b?.descending
@@ -81,8 +84,12 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
 /**
  * Shows the records of the widget's entity, or the rows of its data source. A row of a data source
  * carries the id of its root record, so it opens the same form. A row of a grouped data source is a
- * group with no id, and its table has no form page, so it has no open link or create button. The
- * create button also needs the user's `create` grant on the entity, as the widget's access says.
+ * group with no id, and its table has no form page, so it has no open link or create button, and
+ * a group row has no row action buttons either. The create button also needs the user's `create`
+ * grant on the entity, as the widget's access says. Each `navigate` row action is a button on every
+ * row with an id, and each toolbar action a button next to the create button. Both open the target
+ * page with the parameter values in the URL query. A toolbar action to a form page without `record`
+ * needs the `create` grant too, and a button whose expressions the SPA cannot work out is hidden.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
  * and the back button keep them. A data source table also has a filter bar, whose values live in the
  * URL under the parameter names.
@@ -96,6 +103,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   const canCreate = Boolean(formPath && widget.access?.actions.includes('create'))
   const createPath = formPath ? `${formPath}/new` : ''
   const createHref = useHref(createPath)
+  const { rowActions, toolbarActions } = widget
   // The form returns to this address, with its paging and sorting, after save or cancel.
   const location = useLocation()
   const from = `${location.pathname}${location.search}`
@@ -175,21 +183,45 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
       align: field.type === 'integer' || field.type === 'decimal' ? 'right' : undefined,
       render: (value: RecordValue, record: TableRow) => formatValue(field, value, record.labels, { locale, text: t }),
     }))
-    if (!formPath) {
-      return fieldColumns
-    }
-    return [
-      ...fieldColumns,
-      {
+    const result = [...fieldColumns]
+    if (formPath) {
+      result.push({
         key: openColumnKey,
         render: (_value: unknown, record: TableRow) => (
           <Link to={`${formPath}/${record.id}`} state={{ from }}>
             {t('shell.table.open')}
           </Link>
         ),
-      },
-    ]
-  }, [fields, formPath, from, locale, query.sort, t])
+      })
+    }
+    if (rowActions.length > 0) {
+      result.push({
+        key: actionsColumnKey,
+        render: (_value: unknown, record: TableRow) => {
+          // A group row has no id and no buttons.
+          if (record.id === null) {
+            return null
+          }
+          const scope = { id: record.id, values: record.values }
+          return (
+            <Flex gap="small">
+              {rowActions.map((action, index) => {
+                const path = navigatePath(sitePath, action, scope)
+                return (
+                  path && (
+                    <Button key={index} size="small" onClick={() => navigate(path, { state: { from } })}>
+                      {t(action.labelKey)}
+                    </Button>
+                  )
+                )
+              })}
+            </Flex>
+          )
+        },
+      })
+    }
+    return result
+  }, [fields, formPath, from, locale, navigate, query.sort, rowActions, sitePath, t])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
@@ -221,24 +253,39 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
     )
   }
 
+  // A toolbar has no row, so only the literals of its expressions resolve. An action to a form page
+  // without a record creates one, so it needs the same grant as the create button.
+  const toolbarButtons = toolbarActions.flatMap((action, index) => {
+    const path = navigatePath(sitePath, action, null)
+    const creates = action.opensForm && action.record === null
+    return path && (!creates || widget.access?.actions.includes('create')) ? [{ action, path, index }] : []
+  })
+
   return (
-    <Flex vertical gap="middle">
-      {canCreate && (
-        <Flex justify="flex-end">
-          <Button
-            type="primary"
-            href={createHref}
-            onClick={(event) => {
-              // A modified click keeps the link behaviour, such as opening a new tab.
-              if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
-                return
-              }
-              event.preventDefault()
-              navigate(createPath, { state: { from } })
-            }}
-          >
-            {t('shell.table.create')}
-          </Button>
+    <Flex vertical gap="middle" aria-busy={loading}>
+      {(canCreate || toolbarButtons.length > 0) && (
+        <Flex justify="flex-end" gap="small">
+          {toolbarButtons.map(({ action, path, index }) => (
+            <Button key={index} onClick={() => navigate(path, { state: { from } })}>
+              {t(action.labelKey)}
+            </Button>
+          ))}
+          {canCreate && (
+            <Button
+              type="primary"
+              href={createHref}
+              onClick={(event) => {
+                // A modified click keeps the link behaviour, such as opening a new tab.
+                if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+                  return
+                }
+                event.preventDefault()
+                navigate(createPath, { state: { from } })
+              }}
+            >
+              {t('shell.table.create')}
+            </Button>
+          )}
         </Flex>
       )}
       {parameters.length > 0 && (
@@ -265,6 +312,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
             total: parameterErrors ? 0 : (state.page?.totalCount ?? 0),
             pageSizeOptions: sizes,
             showSizeChanger: true,
+            itemRender: markCurrentPage(query.page),
           }}
           onChange={onChange}
         />

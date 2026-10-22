@@ -117,6 +117,67 @@ flowchart LR
      resolve ignoring letter case, and a name whose file was not loaded
      because of its own errors is not reported again. Site titles, navigation labels, page titles and action labels join the
      `AXC0028` check.
+     A page's `widgets` form a tree, see
+     [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+     The checks above apply to every widget at any depth, and a problem is
+     reported at the widget's own pointer, such as
+     `/widgets/0/columns/1/widgets/0/entity`. The widget lists nest at most 4
+     levels deep, and the page's own list is level 1, otherwise the container
+     that would hold a list on level 5 is `AXC0221`. The `width` of the
+     columns of one `columns` widget add up to 12, otherwise it is `AXC0222` at
+     `/widgets/{i}/columns`. A second `table` is `AXC0223`, and a second
+     `form`, `taskInbox` or `processInspector` is `AXC0224`, both at the second
+     widget. A tab label and a section title join the `AXC0028` check. The
+     page schema requires `columns` on a `columns` widget, `tabs` on a `tabs`
+     widget, and `title` with `widgets` on a `section` widget. It does not allow them on
+     any other widget, and no container may name an `entity`, `dataSource`,
+     `form`, `formPage`, `actions`, `rowActions` or `toolbarActions` (`AXC0004`).
+
+     A page's `parameters` ([D63](../decisions/d63-navigate-actions-and-page-parameters.md))
+     are checked in file order, at `/parameters/{i}`:
+     - a name that an earlier parameter already uses, or one of `page`,
+       `pageSize` and `sort`, ignoring letter case, is `AXC0231` at `/name`,
+     - the type is checked by the entity field rules, as a data source
+       parameter is. An unknown type is `AXC0004`, a missing `values` or
+       `target` is `AXC0014`, an unknown `reference` target is `AXC0012` at
+       `/target`, a child entity target is `AXC0040` and a target without a
+       display field is `AXC0030`. A `reference` parameter's `target` is a
+       `field target` edge in the reference index,
+     - a page that holds a `form` widget declares no parameters. Otherwise it
+       is `AXC0236` at `/parameters`.
+
+     `navigate` actions
+     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) in a
+     form widget's `actions` and a table's `rowActions` and `toolbarActions`
+     are checked at the action's pointer. The page does not read its parameters
+     yet:
+     - a target `page` that no loaded page has is `AXC0232` at `/page`. A page
+       that failed to load is not reported again,
+     - a parameter the target page does not declare, or one given twice
+       ignoring letter case, is `AXC0233` at `/parameters/{name}`,
+     - a required parameter of the target that the action leaves out is
+       `AXC0234` at the action,
+     - each parameter value is an expression, checked against the target
+       parameter's type. A parse error, an unknown name or a wrong type is
+       reported with the expression's own code at `/parameters/{name}`,
+     - on a form, or a table over an entity, the expression sees the record's
+       fields plus `id`. On a table over a data source it sees the projected
+       columns plus `id`. `id` is a reference to the root entity. In
+       `toolbarActions` it sees no names, because a toolbar has no row. It
+       resolves bare names only, with no paths, rules or aggregates,
+     - `rowActions` on a table over a grouped data source, and `rowActions` or
+       `toolbarActions` on a `form`, `taskInbox` or `processInspector` widget,
+       are `AXC0060` at that property. Only `navigate` entries are accepted in
+       `rowActions` and `toolbarActions` for now,
+     - each target is a `navigate page` edge in the reference index.
+
+     A `navigate` action may also set `record`, an expression for the id of
+     the record a form page opens. It is checked like a parameter value, against
+     the same names, and its type must be a reference to the entity of the
+     target's form widget. A form widget over a `form` has that form's entity.
+     `record` on a target that holds no form widget, or whose form is over
+     another entity, is `AXC0235` at `/record`. A parse error or an unknown
+     name keeps the expression's own code.
    - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded
@@ -126,7 +187,15 @@ flowchart LR
      entry of the form already lists, in any section and ignoring letter
      case, is `AXC0076` at the later entry's `field`, naming the first one.
      Each section title joins the `AXC0028` check, at
-     `/sections/{i}/title/textKey`.
+     `/sections/{i}/title/textKey`. The conditions and steps have their own
+     checks, see
+     [Form conditions and steps](resource-files.md#form-conditions-and-steps):
+     each condition is a boolean expression over the entity, and it reads only
+     listed fields (`AXC0225`). `visibleWhen` is not allowed on a required
+     field (`AXC0226`). A section name is used once (`AXC0227`). A step names
+     a known section (`AXC0228`) that is in no other step (`AXC0229`), and
+     when there are steps, every section has a name and is in one step
+     (`AXC0230`).
    - **Seeds.** A seed's `entity` must name a loaded entity, ignoring letter
      case, otherwise it is `AXC0032` at `/entity`. A name whose entity file
      was not loaded because of its own errors is not reported again. Seed
@@ -698,7 +767,7 @@ to show where a resource is used and what it uses.
 | `text entry` | Text | `/texts/{key}` | Text key |
 | `package` | Application | `/packages/{i}` | Extension package |
 | `module` | Application | `/modules/{i}` | Module |
-| `field target` | Entity, data source | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
+| `field target` | Entity, data source, page | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
 | `field target` | Endpoint | `/input/{i}/target` | Entity |
 | `field sequence` | Entity | `/fields/{i}/sequence` | Sequence |
 | `rule call` | Entity, data source, rule, process, policy | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter` | Rule |
@@ -707,7 +776,8 @@ to show where a resource is used and what it uses.
 | `widget entity` | Page | `/widgets/{i}/entity` | Entity |
 | `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
 | `widget form` | Page | `/widgets/{i}/form` | Form |
-| `widget form page` | Page | `/widgets/{i}/formPage` | Page |
+| `widget form page` | Page | `/widgets/{i}/formPage` (removed in M12) | Page |
+| `navigate page` | Page | `/widgets/{i}/rowActions/{j}/page`, `/widgets/{i}/toolbarActions/{j}/page`, `/widgets/{i}/actions/{j}/page` | Page |
 | `widget process` | Page | `/widgets/{i}/process` | Process |
 | `action process` | Page | `/widgets/{i}/actions/{j}/process` | Process |
 | `form entity` | Form | `/entity` | Entity |

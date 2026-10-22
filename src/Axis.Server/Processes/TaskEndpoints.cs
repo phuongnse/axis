@@ -1,6 +1,7 @@
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
+using Axis.Data.Forms;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Presentation.Sites;
@@ -32,6 +33,11 @@ namespace Axis.Server.Processes;
 /// that fails writes nothing. A task shows its process, step, outcomes and form as the release
 /// its instance is pinned to declares them, and a completion uses that release too. Its subject
 /// label is the record's display field in the task's release.
+/// The form state route answers what the task's form shows for a draft, without writing anything.
+/// Its checks run in the task order: signed-in user (401), application, task id and task (404),
+/// who may act (403), the task being open (409), then the content type (415) and the body (400).
+/// It answers with the form of the task's release laid over the stored subject record, and a
+/// subject record that no longer exists is a 404.
 /// The assignee check is the only gate: no entity grant is needed and no record filter applies.
 /// A role assignee counts only when the active release declares the role, so a user whose role the
 /// active release drops can no longer list, read or complete the task.
@@ -49,6 +55,7 @@ internal static class TaskEndpoints
         tasks.MapGet("", ListAsync);
         tasks.MapGet("/{id}", GetAsync);
         tasks.MapPost("/{id}/complete", CompleteAsync);
+        tasks.MapPost("/{id}/form-state", FormStateAsync);
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
@@ -217,6 +224,74 @@ internal static class TaskEndpoints
         return ReleaseRetry.Changed();
     }
 
+    // The body is read here rather than bound, so every body problem is reported by JSON Pointer.
+    // Nothing is written, so the route takes no start lock and opens no transaction.
+    private static async Task<IResult> FormStateAsync(
+        string app,
+        string id,
+        HttpRequest request,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
+        {
+            return SignInRequired();
+        }
+
+        if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
+        {
+            return ApplicationNotFound();
+        }
+
+        if (!TryParseId(id, out var taskId))
+        {
+            return TaskNotFound();
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        if (await TaskQueries.FindAsync(connection, taskId, cancellationToken) is not { } task
+            || task.ApplicationId != active.Model.Manifest.Id)
+        {
+            return TaskNotFound();
+        }
+
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        if (!TaskQueries.MayAct(task, user.Id, roles))
+        {
+            return AssignedToSomeoneElse();
+        }
+
+        if (task.State != ProcessTasks.Open)
+        {
+            return AlreadyCompleted();
+        }
+
+        if (!JsonRequest.IsJson(request))
+        {
+            return JsonRequest.UnsupportedMediaType();
+        }
+
+        var (release, _, step) = await TaskStepAsync(resolver, task, cancellationToken);
+        var form = TaskCompletionCommand.FormOf(release, task, step);
+        var entity = release.FindEntity(task.SubjectEntityId)
+            ?? throw new InvalidOperationException($"The subject entity of task '{task.Id}' is not in its release.");
+        var body = FormStateBody.Parse(await RecordEndpoints.ReadBodyAsync(request, cancellationToken), entity, release, allowRecordId: false);
+        if (body.Malformed is { } malformed)
+        {
+            return Results.ValidationProblem(malformed);
+        }
+
+        if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cancellationToken) is not { } stored)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No record has this id.");
+        }
+
+        var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+        var readable = TaskCompletionCommand.Readable(active.Model, roles, task.SubjectEntityId);
+        return Results.Ok(FormStateEvaluator.Evaluate(release, form, entity, stored, body.Draft!, body.Touched!, readable, user.Id, now));
+    }
+
     /// <summary>
     /// Completes the locked <paramref name="task"/> in <paramref name="transaction"/> with
     /// <see cref="TaskCompletionCommand"/>, or returns the failure, after which the caller rolls
@@ -278,12 +353,9 @@ internal static class TaskEndpoints
         var form = ApplicationSites.DescribeForm(release, formModel.Name);
         var entity = ApplicationSites.DescribeEntity(release, formModel.Entity.Name);
         var readable = TaskCompletionCommand.Readable(active, roles, task.SubjectEntityId);
-        var sections = form.Sections;
         if (readable is not null)
         {
-            sections = [.. sections
-                .Select(section => section with { Fields = [.. section.Fields.Where(field => readable.Contains(field.Name))] })
-                .Where(section => section.Fields.Count > 0)];
+            form = ApplicationSites.Readable(form, readable);
             entity = entity with { Fields = [.. entity.Fields.Where(field => readable.Contains(field.Name))] };
         }
 
@@ -299,7 +371,7 @@ internal static class TaskEndpoints
                 task.AssigneeKind == ProcessTasks.UserAssignee ? task.Assignee : null,
                 task.AssigneeKind == ProcessTasks.RoleAssignee ? task.Assignee : null),
             Subject(release, task, labels, readable),
-            new TaskForm(form.Name, sections, entity),
+            new TaskForm(form.Name, form.Sections, form.Steps, entity),
             [.. step.Outcomes.Select(outcome => new TaskOutcome(outcome.Name, outcome.Label.TextKey))],
             task.DueAt?.UtcDateTime,
             task.CreatedAt.UtcDateTime,
@@ -409,7 +481,7 @@ internal sealed record TaskSubject(string Entity, Guid Id, string? Label);
 internal sealed record TaskAssignee(string? User, string? Role);
 
 /// <summary>The form a task is completed on, in the shape of a form widget's metadata, with its entity's metadata.</summary>
-internal sealed record TaskForm(string Name, IReadOnlyList<FormSectionMetadata> Sections, EntityMetadata Entity);
+internal sealed record TaskForm(string Name, IReadOnlyList<FormSectionMetadata> Sections, IReadOnlyList<FormStepMetadata> Steps, EntityMetadata Entity);
 
 /// <summary>An outcome a task can be completed with.</summary>
 internal sealed record TaskOutcome(string Name, string LabelKey);

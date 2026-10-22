@@ -6,6 +6,13 @@ cd "$(dirname "$0")/.."
 dotnet format Axis.slnx --verify-no-changes
 npm run lint --prefix web
 npx --prefix tests/e2e tsc -p tests/e2e/tsconfig.json
+
+# Specs find elements by role, accessible name and ARIA state, never by a class of the UI library (D58).
+if git grep -nE --untracked '(^|[^[:alnum:]_-])ant-[[:alnum:]]' -- tests; then
+  echo 'A test selects an Ant Design class. Use a role, an accessible name or an ARIA state.' >&2
+  exit 1
+fi
+
 node scripts/check-links.mjs
 node scripts/check-docs.mjs
 

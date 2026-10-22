@@ -399,7 +399,19 @@ public static class ApplicationCompiler
                 diagnostics);
         }
 
-        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, moduleReferences, references, diagnostics);
+        PresentationChecker.Check(
+            loaded,
+            FindEntity,
+            FindPage,
+            FindDataSource,
+            FindForm,
+            FindProcess,
+            (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, report),
+            moduleReferences,
+            references,
+            rules,
+            declaredModules,
+            diagnostics);
         CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, references, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, rules, declaredModules, diagnostics);
         ProcessChecker.Check(
@@ -554,7 +566,7 @@ public static class ApplicationCompiler
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(
                 dataSourcesByName[dataSource.Name], entities, IsModuleResource(dataSource) ? [] : rules, IsModuleResource(dataSource) ? null : declaredModules)).ToList(),
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, rules, declaredModules)).ToList(),
-            Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName)).ToList(),
+            Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName, IsModuleResource(form) ? [] : rules, IsModuleResource(form) ? null : declaredModules)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules, declaredModules)).ToList(),
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
@@ -1655,49 +1667,118 @@ public static class ApplicationCompiler
         Dictionary<string, PageResource> pagesByName,
         Dictionary<string, DataSourceResource> dataSourcesByName,
         Dictionary<string, FormResource> formsByName,
-        Dictionary<string, ProcessResource> processesByName) =>
-        new()
+        Dictionary<string, ProcessResource> processesByName)
+    {
+        List<WidgetModel> BuildWidgets(IReadOnlyList<WidgetDefinition> widgets) => [.. widgets.Select(BuildWidget)];
+
+        // The checker has resolved every process and page an action names, so the lookups always succeed.
+        IReadOnlyList<WidgetActionModel> BuildActions(IReadOnlyList<WidgetActionDefinition>? actions) =>
+            actions is null || actions.Count == 0 ? [] : [.. actions.Select(BuildAction)];
+
+        WidgetActionModel BuildAction(WidgetActionDefinition action)
+        {
+            if (action.Type == "startProcess")
+            {
+                var process = processesByName[action.Process!];
+                return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
+            }
+
+            // The checker has matched each key to a parameter of the target, ignoring letter case. The model
+            // keys them by the declared name, so a client never fixes the case itself.
+            var target = pagesByName[action.Page!];
+            var parameters = action.Parameters is not { Count: > 0 }
+                ? NavigateActionModel.NoParameters
+                : action.Parameters.ToDictionary(
+                    pair => target.Parameters.First(parameter => string.Equals(parameter.Name, pair.Key, StringComparison.OrdinalIgnoreCase)).Name,
+                    pair => pair.Value);
+            return new NavigateActionModel(PageReferenceTo(target), action.Label)
+            {
+                Parameters = parameters,
+                Record = action.Record,
+            };
+        }
+
+        WidgetModel BuildWidget(WidgetDefinition widget)
+        {
+            // A container holds widgets and no reference. A leaf keeps the shared empty lists, so equal leaves stay equal.
+            switch (WidgetTypes.Parse(widget.Type))
+            {
+                case WidgetType.Columns:
+                    return new WidgetModel(WidgetType.Columns, null, null)
+                    {
+                        Columns = [.. widget.Columns!.Select(column => new WidgetColumnModel(column.Width, BuildWidgets(column.Widgets)))],
+                    };
+                case WidgetType.Tabs:
+                    return new WidgetModel(WidgetType.Tabs, null, null)
+                    {
+                        Tabs = [.. widget.Tabs!.Select(tab => new WidgetTabModel(tab.Label, BuildWidgets(tab.Widgets)))],
+                    };
+                case WidgetType.Section:
+                    return new WidgetModel(WidgetType.Section, null, null)
+                    {
+                        Title = widget.Title,
+                        Collapsed = widget.Collapsed ?? false,
+                        Widgets = BuildWidgets(widget.Widgets!),
+                    };
+            }
+
+            // A checked widget names exactly one of an entity, a data source and a form. A
+            // form widget over a form shows the form's entity.
+            var form = widget.Form is null ? null : formsByName[widget.Form];
+            var entityName = widget.Entity ?? form?.Entity;
+            var entity = entityName is null ? null : entitiesByName[entityName];
+            var dataSource = widget.DataSource is null ? null : dataSourcesByName[widget.DataSource];
+            var inspected = widget.Process is null ? null : processesByName[widget.Process];
+            return new WidgetModel(
+                WidgetTypes.Parse(widget.Type),
+                entity is null ? null : new EntityReference(entity.Id, entity.Name),
+                widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]),
+                dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name),
+                form is null ? null : new FormReference(form.Id, form.Name),
+                inspected is null ? null : new ProcessReference(inspected.Id, inspected.Name))
+            {
+                // Each action is named as its process or page declares it. A widget without
+                // actions keeps the shared empty list, so equal widgets stay equal.
+                Actions = BuildActions(widget.Actions),
+                RowActions = BuildActions(widget.RowActions),
+                ToolbarActions = BuildActions(widget.ToolbarActions),
+            };
+        }
+
+        return new()
         {
             Id = page.Id,
             Name = page.Name,
             Title = page.Title,
             File = page.File,
-            Widgets = page.Widgets
-                .Select(widget =>
-                {
-                    // A checked widget names exactly one of an entity, a data source and a form. A
-                    // form widget over a form shows the form's entity.
-                    var form = widget.Form is null ? null : formsByName[widget.Form];
-                    var entityName = widget.Entity ?? form?.Entity;
-                    var entity = entityName is null ? null : entitiesByName[entityName];
-                    var dataSource = widget.DataSource is null ? null : dataSourcesByName[widget.DataSource];
-                    var inspected = widget.Process is null ? null : processesByName[widget.Process];
-                    return new WidgetModel(
-                        WidgetTypes.Parse(widget.Type),
-                        entity is null ? null : new EntityReference(entity.Id, entity.Name),
-                        widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]),
-                        dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name),
-                        form is null ? null : new FormReference(form.Id, form.Name),
-                        inspected is null ? null : new ProcessReference(inspected.Id, inspected.Name))
-                    {
-                        // Each action is named as its process declares it. A widget without
-                        // actions keeps the shared empty list, so equal widgets stay equal.
-                        Actions = widget.Actions is null
-                            ? []
-                            : [.. widget.Actions.Select(action =>
-                            {
-                                var process = processesByName[action.Process];
-                                return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
-                            })],
-                    };
-                })
-                .ToList(),
+            Parameters = [.. page.Parameters.Select(parameter => new PageParameterModel(
+                parameter.Name,
+                FieldTypes.Parse(parameter.Type),
+                parameter.Required ?? false,
+                parameter.Values,
+                parameter.Target is not null && entitiesByName.GetValueOrDefault(parameter.Target) is { } target ? new EntityReference(target.Id, target.Name) : null))],
+            Widgets = BuildWidgets(page.Widgets),
         };
+    }
 
-    /// <summary>Builds a checked form, with each field named as its entity declares it.</summary>
-    private static FormModel BuildForm(FormResource form, Dictionary<string, EntityResource> entitiesByName)
+    /// <summary>
+    /// Builds a checked form, with each field named as its entity declares it. Each condition is
+    /// compiled over the entity's fields and the named rules. A step names its sections as the
+    /// sections declare them.
+    /// </summary>
+    private static FormModel BuildForm(
+        FormResource form, Dictionary<string, EntityResource> entitiesByName, IEnumerable<ExpressionRule> rules, IReadOnlySet<string>? modules)
     {
         var entity = entitiesByName[form.Entity];
+        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: name => entitiesByName.GetValueOrDefault(name), modules: modules);
+
+        ExpressionModel? Compile(string? condition) =>
+            condition is null ? null : ExpressionModel.Compile(condition, scope, ExpressionType.Boolean);
+
+        // A checked step names only sections of the form.
+        string SectionName(string name) =>
+            form.Sections.First(section => string.Equals(section.Name, name, StringComparison.OrdinalIgnoreCase)).Name!;
+
         return new FormModel
         {
             Id = form.Id,
@@ -1708,9 +1789,19 @@ public static class ApplicationCompiler
                 .Select(section => new FormSectionModel(
                     section.Title,
                     section.Fields
-                        .Select(field => new FormFieldModel(FindField(entity, field.Field)!.Name, field.ReadOnly ?? false))
-                        .ToList()))
+                        .Select(field => new FormFieldModel(
+                            FindField(entity, field.Field)!.Name,
+                            field.ReadOnly ?? false,
+                            Compile(field.VisibleWhen),
+                            Compile(field.RequiredWhen),
+                            Compile(field.ReadOnlyWhen)))
+                        .ToList(),
+                    section.Name,
+                    Compile(section.VisibleWhen)))
                 .ToList(),
+            Steps = form.Steps is null
+                ? []
+                : [.. form.Steps.Select(step => new FormStepModel(step.Title, [.. step.Sections.Select(SectionName)]))],
         };
     }
 

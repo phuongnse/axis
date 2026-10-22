@@ -32,6 +32,7 @@ import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointValues } from './EndpointValues'
+import { FormSteps } from './FormSteps'
 import { EntityDesigner } from './EntityDesigner'
 import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -106,8 +107,8 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
  * the entity is not in the folder, the seed uses the generic form. A scenario shows a typed editor of its name, users,
  * stubs and steps, and the JSON view edits the same draft. A connector opens in the connector editor, which shows a
- * binding as a name only. A page opens in the page editor, which lists its widgets and shows a panel for the
- * selected widget's type, and keeps a key it does not show. A process opens in the process editor, which shows its
+ * binding as a name only. A page opens in the page editor, which shows its widgets as a tree with add, move and remove
+ * and a panel for the selected widget, and keeps a key it does not show. A process opens in the process editor, which shows its
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
  * A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
  * calls `onOpenPath`. A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
@@ -314,6 +315,14 @@ export function StudioEditor({
     }
     const { values: _values, ...properties } = schema.properties ?? {}
     return { ...schema, properties, required: schema.required?.filter((name) => name !== 'values') }
+  }, [item.kind, schema])
+
+  const formSchema = useMemo(() => {
+    if (item.kind !== 'form' || !schema) {
+      return undefined
+    }
+    const { steps: _steps, ...properties } = schema.properties ?? {}
+    return { ...schema, properties, required: schema.required?.filter((name) => name !== 'steps') }
   }, [item.kind, schema])
   const endpointEntity = item.kind === 'endpoint' ? String(draft.entity).toLowerCase() : undefined
   const endpointFields = names?.entities
@@ -636,6 +645,11 @@ export function StudioEditor({
                   <Flex vertical gap="middle">
                     <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
                     <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
+                  </Flex>
+                ) : formSchema ? (
+                  <Flex vertical gap="middle">
+                    <SchemaForm schema={formSchema} value={draft} onChange={change} />
+                    <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
                   </Flex>
                 ) : schema ? (
                   <SchemaForm schema={schema} value={draft} onChange={change} />

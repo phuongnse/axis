@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 
 // The record API needs a session with a grant, so these journeys start signed in as the employee anna.
@@ -44,8 +45,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
   await pick(page, 'Due at', '2026-10-07 10:30:00')
   // Enter in a picker confirms the value and does not send the form.
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
-  await page.getByLabel('Status', { exact: true }).click()
-  await page.locator('.ant-select-item-option[title="open"]').click()
+  await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'open')
   await page.getByRole('button', { name: 'Save' }).click()
 
   await expect(page).toHaveURL(tablePath)

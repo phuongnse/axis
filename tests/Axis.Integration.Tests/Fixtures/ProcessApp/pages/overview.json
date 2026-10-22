@@ -1,0 +1,43 @@
+{
+  "id": "2f6b9d41-7a3c-4e58-8b10-9c4e5a7d1f04",
+  "kind": "page",
+  "name": "Overview",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.overview.title" },
+  "widgets": [
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "width": 8,
+          "widgets": [
+            {
+              "type": "table",
+              "entity": "Request",
+              "rowActions": [
+                {
+                  "type": "navigate",
+                  "page": "Submissions",
+                  "label": { "textKey": "request.showSubmissions" },
+                  "parameters": { "request": "id" }
+                },
+                { "type": "navigate", "page": "RequestForm", "label": { "textKey": "pages.requestForm.title" }, "record": "id" }
+              ],
+              "toolbarActions": [{ "type": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }]
+            }
+          ]
+        },
+        {
+          "width": 4,
+          "widgets": [
+            {
+              "type": "section",
+              "title": { "textKey": "pages.overview.inspector" },
+              "widgets": [{ "type": "processInspector", "process": "Submit" }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

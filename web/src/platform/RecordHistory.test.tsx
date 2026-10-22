@@ -121,6 +121,8 @@ function pageBody(name: string, process: string | null) {
     process,
     instancesPath: process === null ? null : `/api/apps/StepApp/processes/${process}/instances`,
     actions: [],
+    rowActions: [],
+    toolbarActions: [],
     access: null,
   }
   return JSON.stringify({ name, titleKey: `${name}.title`, widgets: [widget] } as unknown as PageMetadata)
@@ -222,6 +224,25 @@ describe('RecordHistory', () => {
       `${recordsPath}/${recordId}/history?page=1&pageSize=20`,
       `${recordsPath}/${recordId}/history?page=2&pageSize=20`,
     ])
+  })
+
+  it('is busy while a page loads, and marks the current page', async () => {
+    const first = Array.from({ length: 20 }, () => item('record.updated'))
+    stubFetch({ status: 200, body: page(first, 1, 21) }, { status: 200, body: page([item('record.created')], 2, 21) })
+
+    renderHistory()
+    const panel = screen.getByTestId('record-history')
+    expect(panel).toHaveAttribute('aria-busy', 'true')
+
+    await screen.findAllByTestId('history-entry')
+    expect(panel).toHaveAttribute('aria-busy', 'false')
+    expect(panel.querySelector('[aria-current="page"]')).toHaveTextContent('1')
+
+    await userEvent.click(screen.getByTitle('2'))
+
+    await screen.findByText('Created')
+    expect(panel).toHaveAttribute('aria-busy', 'false')
+    expect(panel.querySelector('[aria-current="page"]')).toHaveTextContent('2')
   })
 
   it('shows no paging control for twenty entries or fewer', async () => {

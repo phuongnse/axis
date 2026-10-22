@@ -11,12 +11,8 @@ Status: **Agreed**
 - **Data:** see [D18](d18-data-sources.md).
 - **Forms:** a `form` resource serves both a `form` widget and a process
   task. See [D20](d20-human-tasks-task-inbox-and-forms.md).
-
-Still **Proposed**, because it shows how the M1 shortcut is expected to grow
-but is not settled yet:
-
-- **Navigation:** `formPage` gives way to navigate actions with page
-  parameters.
+- **Navigation:** see
+  [D63](d63-navigate-actions-and-page-parameters.md).
 
 _Why:_ the page and widget split shapes data sources (M2), process task forms
 (M3) and authorization (M4). Keeping the page free of an entity or template

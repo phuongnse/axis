@@ -208,4 +208,20 @@ public static class DiagnosticCodes
     public const string UnknownScenario = "AXC0218";
     public const string ScenarioTimeLimit = "AXC0219";
     public const string ScenarioStopped = "AXC0220";
+    public const string TooDeepWidgetTree = "AXC0221";
+    public const string InvalidColumnWidths = "AXC0222";
+    public const string DuplicatePageTable = "AXC0223";
+    public const string DuplicatePageRecordWidget = "AXC0224";
+    public const string UnlistedFormConditionField = "AXC0225";
+    public const string VisibleWhenOnRequiredField = "AXC0226";
+    public const string DuplicateFormSectionName = "AXC0227";
+    public const string UnknownStepSection = "AXC0228";
+    public const string DuplicateStepSection = "AXC0229";
+    public const string SectionInNoStep = "AXC0230";
+    public const string InvalidPageParameterName = "AXC0231";
+    public const string UnknownNavigatePage = "AXC0232";
+    public const string UnknownNavigateParameter = "AXC0233";
+    public const string MissingNavigateParameter = "AXC0234";
+    public const string InvalidNavigateRecord = "AXC0235";
+    public const string ParametersOnFormPage = "AXC0236";
 }

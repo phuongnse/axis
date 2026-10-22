@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEffect, useState, type ReactNode } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { chooseOption, selectRoot } from '../test/antd'
 import { ProcessEditor } from './ProcessEditor'
 
 const process = {
@@ -109,22 +110,6 @@ function renderEditor(value: Record<string, unknown> = process) {
   return latest
 }
 
-/** Opens the picker in a field and clicks one of its options. */
-async function choose(field: HTMLElement, option: string) {
-  await userEvent.click(within(field).getByRole('combobox'))
-  // A dropdown that closed a moment ago may still be in the page, so take the one that is open and has the option.
-  const dropdown = await waitFor(() => {
-    const open = [
-      ...document.querySelectorAll<HTMLElement>(
-        '.ant-select-dropdown:not(.ant-select-dropdown-hidden):not(.ant-slide-up-leave)',
-      ),
-    ].find((candidate) => within(candidate).queryByTitle(option) !== null)
-    expect(open).toBeDefined()
-    return open!
-  })
-  await userEvent.click(within(dropdown).getByTitle(option))
-}
-
 function stepOf(latest: { value: Record<string, unknown> }, index: number) {
   return (latest.value.steps as Record<string, unknown>[])[index]
 }
@@ -157,12 +142,12 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect(editor.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
     expect(editor).toBeVisible()
     expect(screen.getByRole('textbox', { name: 'name' })).toHaveValue('PurchaseRequestApproval')
-    expect(screen.getByRole('combobox', { name: 'Start step' }).closest('.ant-select')).toBeVisible()
+    expect(selectRoot(screen.getByRole('combobox', { name: 'Start step' }))).toBeVisible()
     for (let index = 0; index < process.steps.length; index++) {
       expect(screen.getByTestId(`studio-step-${index}`)).toBeVisible()
     }
     expect(screen.getByTestId('studio-step-2')).toHaveTextContent('financeCheck · decision')
-    expect(screen.getByRole('combobox', { name: 'Add step' }).closest('.ant-select')).toBeVisible()
+    expect(selectRoot(screen.getByRole('combobox', { name: 'Add step' }))).toBeVisible()
   })
 
   it('tags a transition that names no step as unknown', () => {
@@ -215,12 +200,12 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const latest = renderEditor()
     const field = (pointer: string) => screen.getByTestId(`studio-field-${pointer}`)
 
-    await choose(field('/steps/1/label/textKey'), 'task.return')
-    await choose(field('/steps/1/form'), 'OtherForm')
+    await chooseOption('task.return', field('/steps/1/label/textKey'))
+    await chooseOption('OtherForm', field('/steps/1/form'))
     await userEvent.clear(within(field('/steps/1/outcomes/0/name')).getByRole('textbox'))
     await userEvent.type(within(field('/steps/1/outcomes/0/name')).getByRole('textbox'), 'accept')
-    await choose(field('/steps/1/outcomes/0/label/textKey'), 'task.return')
-    await choose(field('/steps/1/outcomes/0/next'), 'done')
+    await chooseOption('task.return', field('/steps/1/outcomes/0/label/textKey'))
+    await chooseOption('done', field('/steps/1/outcomes/0/next'))
     await userEvent.click(within(screen.getByTestId('studio-step-1')).getByRole('button', { name: 'Add outcome' }))
     expect((stepOf(latest, 1).outcomes as unknown[]).length).toBe(3)
     await userEvent.click(within(field('/steps/1/outcomes/1')).getByRole('button', { name: 'Remove outcome' }))
@@ -253,7 +238,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
 
     await switchTo('Role')
     expect(stepOf(latest, 1).assignee).toEqual({ role: '' })
-    await choose(screen.getByTestId('studio-field-/steps/1/assignee/role'), 'finance-reviewer')
+    await chooseOption('finance-reviewer', screen.getByTestId('studio-field-/steps/1/assignee/role'))
     expect(stepOf(latest, 1).assignee).toEqual({ role: 'finance-reviewer' })
     expect(screen.queryByTestId('studio-field-/steps/1/assignee/user')).toBeNull()
 

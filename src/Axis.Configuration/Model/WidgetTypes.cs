@@ -9,6 +9,9 @@ public static class WidgetTypes
         ["form"] = WidgetType.Form,
         ["taskInbox"] = WidgetType.TaskInbox,
         ["processInspector"] = WidgetType.ProcessInspector,
+        ["columns"] = WidgetType.Columns,
+        ["tabs"] = WidgetType.Tabs,
+        ["section"] = WidgetType.Section,
     };
 
     private static readonly Dictionary<WidgetType, string> _namesByType = _typesByName.ToDictionary(pair => pair.Value, pair => pair.Key);

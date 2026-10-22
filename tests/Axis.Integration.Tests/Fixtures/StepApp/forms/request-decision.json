@@ -7,7 +7,7 @@
   "sections": [
     {
       "title": { "textKey": "requestDecision.main" },
-      "fields": [{ "field": "title", "readOnly": true }, { "field": "comment" }]
+      "fields": [{ "field": "title", "readOnly": true }, { "field": "amount", "readOnly": true }, { "field": "comment", "requiredWhen": "amount > 1000" }]
     }
   ]
 }

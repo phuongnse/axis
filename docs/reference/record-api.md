@@ -231,6 +231,25 @@ HTTP also call. The record API maps its outcome to the responses below.
   `400` at its pointer with the message "Cannot be set.", as for a sequence
   field.
 
+- **Form conditions.** `POST` and `PATCH` take an optional query
+  `?form=<name>`. The name must be a `form` resource over the entity. A name
+  that is not, and an empty or repeated `form`, is a `400` keyed `form` with
+  the message "Must name a form of this entity.". With a form, the server
+  enforces its [`requiredWhen`](resource-files.md#form-conditions-and-steps) at
+  the validation step, on the record as it will be stored: a visible field
+  whose condition is true and whose value is `null` is a `400` at
+  `/values/<field>` with "Required.". A hidden field is not required. A child
+  collection and a sequence field are never checked. The "Required." errors
+  come in the same `400` as the entity's validation messages, and "Required."
+  wins when both fail on one key. An update of a form with `requiredWhen`
+  reads the stored record first, so an unknown record is a `404` there.
+  Without `?form=`, form conditions are not applied, so a rule that must
+  always hold belongs in an entity validation. `readOnlyWhen` follows
+  `readOnly`: the record API does not enforce it, and the field write grants
+  decide. The `form` name is checked after the grant and record checks and
+  before the content type and the body, so a user without the grant still
+  gets `403` or `404`.
+
 ## Concurrency
 
 Every record has a `version` that starts at 1 and grows by one on each update.
@@ -583,6 +602,89 @@ answered with `400`:
   }
 }
 ```
+
+## Form state
+
+The form state endpoint answers what a form shows for a draft record, and which messages the user's input earns so far. It writes
+nothing ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+The conditions are in [Form conditions and steps](resource-files.md#form-conditions-and-steps).
+
+`POST /api/apps/{app}/forms/{form}/state` needs `Content-Type: application/json`
+and the [CSRF header](#create-update-and-delete). `{form}` is a form name in
+the active release, ignoring letter case.
+
+```json
+{
+  "recordId": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
+  "values": { "status": "resolved" },
+  "touched": ["status", "resolution"]
+}
+```
+
+- `recordId` is `null` for a new record, or the id of the record being edited.
+- `values` has the shape of the `values` of a write, in the
+  [value format](#request-bodies-and-values). Child rows and their keys work
+  as on writes.
+- `touched` lists the fields the user has changed or left. It may be empty.
+
+The draft is the stored record, when there is one, overlaid with `values`.
+Computed fields are calculated on it.
+
+```json
+{
+  "sections": [{ "name": "update", "visible": true }],
+  "fields": {
+    "status": { "visible": true, "required": false, "readOnly": false },
+    "resolution": { "visible": true, "required": true, "readOnly": false }
+  },
+  "errors": { "/values/resolution": ["Required."] }
+}
+```
+
+- `sections` has one entry for each named section of the form that holds a
+  field the user may read. A hidden section hides its fields, and an unnamed
+  section has no entry.
+- `fields` has one entry for each field of the form that the user may read.
+  - `visible` is false in a hidden section and for a field whose `visibleWhen`
+    is not true.
+  - `required` is true for a visible field that the entity marks `required` or
+    whose `requiredWhen` is true.
+  - `readOnly` covers only the form's rules: the form's `readOnly`, a computed,
+    sequence or creator field and a true `readOnlyWhen`. It does not cover field
+    write grants, which are in the page metadata's `createFields` and
+    `updateFields`.
+- `errors` holds the parse errors, "Required." for an empty required field, the
+  computed-field errors and the entity's validation messages, keyed as on a
+  write. It holds only keys of fields that the user touched and may read.
+- A value that does not fit its field, or a computed field that cannot be
+  computed, is a message in `errors` of a `200` answer, so that one bad value
+  does not stop the other fields from getting their states. A `400` is only for
+  a body of the wrong shape: it is not an object, `recordId` is not `null` or a
+  UUID, `values` is not an object, `touched` is not an array of text, a property
+  is repeated, unknown or missing (`recordId` may be left out).
+- It writes nothing, adds no audit record and uses no sequence number. It
+  does not run unique or reference-existence checks, because they query
+  storage on every keystroke and could reveal which records exist. A save runs
+  them.
+
+The checks run in this order, and the first failure is the response:
+
+1. `401` when nobody is signed in.
+2. `404` for an unknown application or form.
+3. `403` when the user has neither a `create` nor an `update` grant on the
+   form's entity.
+4. `415` for a wrong content type, then `400` for a malformed body.
+5. `403` without a `create` grant when `recordId` is `null`, or without an
+   `update` grant when it is set.
+6. `404` when the user has no `read` grant, or when the record is not one the
+   user's `read` filters reach. `409` when a `read` filter reads a computed
+   field that is being recomputed.
+
+The grant check is split because `recordId` is in the body, so the server
+cannot tell which grant the call needs before it reads the body. The call does
+not check `update` record filters. A save does.
+
+The problem details are as in [Errors](#errors).
 
 ## Inbound endpoints
 

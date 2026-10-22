@@ -6,6 +6,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { optionTexts } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { EndpointValues } from './EndpointValues'
 
@@ -94,7 +95,7 @@ describe('EndpointValues', () => {
     const onChange = renderValues()
 
     await userEvent.click(screen.getByRole('combobox', { name: 'Add mapping' }))
-    const options = [...document.querySelectorAll('.ant-select-item-option')].map((option) => option.textContent)
+    const options = optionTexts()
     expect(options).toEqual(['currency'])
     await userEvent.click(await screen.findByTitle('currency'))
 

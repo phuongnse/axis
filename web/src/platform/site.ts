@@ -138,12 +138,30 @@ export interface FormMetadata {
  * A `startProcess` action of a form widget: a button that starts `process` for the form's record by
  * posting to `instancesPath`, the start endpoint, so the SPA never builds that URL itself.
  */
-export interface WidgetAction {
+export interface StartProcessAction {
   type: 'startProcess'
   process: string
   labelKey: string
   instancesPath: string
 }
+
+/**
+ * A `navigate` action: opens the page `page`, by its declared name. `parameters` holds the expression
+ * of each target page parameter the action gives, and `record` the expression of the record id a
+ * form page opens, or `null`. `opensForm` says whether the target page holds a form widget, so the
+ * SPA knows to open `/new` when no `record` is given.
+ */
+export interface NavigateAction {
+  type: 'navigate'
+  page: string
+  labelKey: string
+  parameters: Record<string, string>
+  record: string | null
+  opensForm: boolean
+}
+
+/** One action of a form widget, in page file order. */
+export type WidgetAction = StartProcessAction | NavigateAction
 
 /**
  * What the signed-in user may do with a table or form widget's entity, or with the root entity of
@@ -180,6 +198,10 @@ export interface WidgetMetadata {
   instancesPath: string | null
   /** The actions of a form widget the user may take, and `[]` on every other widget. */
   actions: WidgetAction[]
+  /** The navigate actions a table shows on each row, and `[]` on every other widget. */
+  rowActions: NavigateAction[]
+  /** The navigate actions a table shows above its rows, and `[]` on every other widget. */
+  toolbarActions: NavigateAction[]
   /** What the user may do with a table or form widget's entity, and `null` on a task inbox and a process inspector. */
   access: WidgetAccess | null
 }

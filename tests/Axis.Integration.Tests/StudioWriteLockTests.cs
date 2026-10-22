@@ -7,6 +7,7 @@ using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
@@ -205,16 +206,10 @@ public sealed class StudioWriteLockTests(PostgreSqlFixture database) : IClassFix
         return new HeldLock(connection, transaction);
     }
 
-    // Waits until the requests queue on the lock. The deadline is below the 10 second wait of the lock.
-    private static async Task WaitForWaitersAsync(string platform, long expected)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (await AdvisoryLockCountAsync(platform, granted: false) < expected)
-        {
-            Assert.True(DateTime.UtcNow < deadline, "The requests did not queue on the lock in time.");
-            await Task.Delay(50, CancellationToken);
-        }
-    }
+    private static Task WaitForWaitersAsync(string platform, long expected) =>
+        WaitUntilAsync(
+            async () => await AdvisoryLockCountAsync(platform, granted: false) >= expected,
+            "The requests did not queue on the lock in time.");
 
     // The advisory locks of the platform database that are granted or waiting, or only one of the two.
     private static async Task<long> AdvisoryLockCountAsync(string platform, bool? granted)

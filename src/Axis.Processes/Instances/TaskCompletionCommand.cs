@@ -48,7 +48,9 @@ public sealed record TaskCompletionResult(
 /// Completes a locked task in the caller's transaction, as the task API and the test scenario
 /// runner do. It checks, in order, that the task exists in the application (not found), that the
 /// actor may act on it (denied) and that it is open (already completed), then that the request is
-/// JSON and its body is valid. The body gives the <c>outcome</c> and optional <c>values</c> and
+/// JSON and its body is valid. A completion is refused as invalid when a field of the task's form
+/// is visible, has a <c>requiredWhen</c> that holds and is <c>null</c> in the record as it will be
+/// stored, whether or not the body sends values. The body gives the <c>outcome</c> and optional <c>values</c> and
 /// <c>version</c>, and a value is written only for a field the task's form makes editable and the
 /// actor may read. One transaction then writes the values as a record update on the task's release,
 /// closes the task, resumes the instance on the outcome's next step and appends the audit record
@@ -154,7 +156,10 @@ public static class TaskCompletionCommand
             }
 
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            if (RecordValidator.ValidateUpdate(release, entity, stored, computed.Values, computed.Rows, now) is { } failures)
+            var failures = RecordFormRequirements.Merge(
+                RecordFormRequirements.Check(release, entity, form, stored, computed.Values, computed.Rows, now),
+                RecordValidator.ValidateUpdate(release, entity, stored, computed.Values, computed.Rows, now));
+            if (failures is not null)
             {
                 return new TaskCompletionResult(TaskCompletionOutcome.Invalid, failures);
             }
@@ -174,6 +179,21 @@ public static class TaskCompletionCommand
             readVersion = stored.Version;
             writtenVersion = written.Version;
             fields = [.. RecordCommand.SetFields(entity, input)];
+        }
+        else if (form.HasRequiredWhen)
+        {
+            // A completion that sends no values still needs the form's required fields, as stored.
+            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+            if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cancellationToken) is not { } stored)
+            {
+                return new TaskCompletionResult(
+                    TaskCompletionOutcome.WriteFailed, Write: new RecordWriteResult(RecordWriteOutcome.NotFound));
+            }
+
+            if (RecordFormRequirements.Check(release, entity, form, stored, [], [], now) is { } missing)
+            {
+                return new TaskCompletionResult(TaskCompletionOutcome.Invalid, missing);
+            }
         }
 
         var outcome = body.Outcome!;

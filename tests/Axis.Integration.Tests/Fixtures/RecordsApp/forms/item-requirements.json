@@ -1,0 +1,26 @@
+{
+  "id": "5e1d7a20-8c4b-4f3e-9b2a-3d6c1e0f4a2d",
+  "kind": "form",
+  "name": "ItemRequirements",
+  "formatVersion": 1,
+  "entity": "Item",
+  "sections": [
+    {
+      "name": "main",
+      "title": { "textKey": "itemRequirements.main" },
+      "fields": [
+        { "field": "name" },
+        { "field": "quantity" },
+        { "field": "status" },
+        { "field": "price", "requiredWhen": "status == 'closed'" },
+        { "field": "orderedAt", "visibleWhen": "quantity > 10", "requiredWhen": "status == 'closed'" }
+      ]
+    },
+    {
+      "name": "dates",
+      "title": { "textKey": "itemRequirements.dates" },
+      "visibleWhen": "quantity > 0",
+      "fields": [{ "field": "neededBy", "requiredWhen": "status == 'closed'" }]
+    }
+  ]
+}

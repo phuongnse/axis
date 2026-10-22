@@ -7,9 +7,14 @@
   "texts": {
     "nav.requests": "Requests",
     "nav.submissions": "Submissions",
+    "pages.overview.inspector": "Submissions",
+    "pages.overview.title": "Overview",
+    "pages.requestForm.title": "Request",
     "pages.requests.title": "Requests",
     "pages.submissions.title": "Submissions",
     "request.cannotSubmit": "This request cannot be submitted.",
+    "request.showSubmissions": "Show submissions",
+    "request.submit": "Submit",
     "role.reader": "Reader",
     "role.requester": "Requester",
     "site.title": "Processes"

@@ -6,12 +6,19 @@
   "entity": "Item",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "itemSections.main" },
       "fields": [{ "field": "name" }, { "field": "quantity", "readOnly": true }]
     },
     {
+      "name": "pricing",
       "title": { "textKey": "itemSections.pricing" },
-      "fields": [{ "field": "price" }, { "field": "total" }]
+      "visibleWhen": "quantity > 0",
+      "fields": [{ "field": "price", "visibleWhen": "quantity > 0", "requiredWhen": "quantity > 10" }, { "field": "total" }]
     }
+  ],
+  "steps": [
+    { "title": { "textKey": "itemSections.stepMain" }, "sections": ["main"] },
+    { "title": { "textKey": "itemSections.stepPricing" }, "sections": ["pricing"] }
   ]
 }

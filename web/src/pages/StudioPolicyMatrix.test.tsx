@@ -5,6 +5,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioMatrixCell, StudioMatrixRole, StudioNames, StudioPolicyMatrix } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
+import { removeTag } from '../test/antd'
 import { StudioPolicyMatrixTable } from './StudioPolicyMatrix'
 
 const sharedPolicyId = '3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f'
@@ -309,8 +310,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
     await screen.findAllByTestId('studio-matrix-actions')
     const own = screen.getAllByTestId('studio-matrix-own-grant')
-    const tag = within(own[1]).getByText('title').closest('.ant-select-selection-item')!
-    await userEvent.click(tag.querySelector('.ant-select-selection-item-remove')!)
+    await removeTag(own[1], 'title')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(patches(fetchMock)).toHaveLength(1))

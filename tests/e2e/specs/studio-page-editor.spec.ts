@@ -3,8 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { startServer } from "../activate";
+import { pickOption } from "../select";
 import { e2eApp, studioFolder } from "../server-settings";
 import { useSession } from "../sessions";
+import { createResource } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -36,12 +38,7 @@ test.describe("Studio builds pages in the page editor", () => {
   });
 
   async function createPage(page: Page, name: string) {
-    await page.getByRole("button", { name: "New resource" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("combobox", { name: "Kind" }).click();
-    await page.getByTitle("page", { exact: true }).click();
-    await dialog.getByRole("textbox", { name: "Name" }).fill(name);
-    await dialog.getByRole("button", { name: "Create" }).click();
+    await createResource(page, "page", name);
     // The editor of the page that was open stays on screen until the new page replaces it, so wait for the name.
     await expect(
       page
@@ -60,8 +57,7 @@ test.describe("Studio builds pages in the page editor", () => {
   }
 
   async function pick(page: Page, field: string, option: string) {
-    await page.getByTestId(field).locator(".ant-select-selector").click();
-    await page.getByRole("option", { name: option, exact: true }).click();
+    await pickOption(page.getByTestId(field).getByRole("combobox"), option);
   }
 
   async function save(page: Page) {

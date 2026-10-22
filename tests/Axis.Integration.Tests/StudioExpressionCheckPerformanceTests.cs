@@ -14,7 +14,7 @@ namespace Axis.Integration.Tests;
 /// call, so a rule edited on disk shows in the next check. The class runs alone, so no other test competes for CPU
 /// with the timed checks.
 /// </summary>
-[Collection("Expression check timing")]
+[Collection(PerformanceTiming.Name)]
 public sealed class StudioExpressionCheckPerformanceTests
 {
     // Each check compiles the typical application in memory. The limit is the one the author sees while typing.
@@ -163,9 +163,4 @@ public sealed class StudioExpressionCheckPerformanceTests
         using var file = JsonDocument.Parse(File.ReadAllBytes(path));
         return file.RootElement.GetProperty("id").GetString()!;
     }
-}
-
-[CollectionDefinition("Expression check timing", DisableParallelization = true)]
-public sealed class ExpressionCheckTiming
-{
 }

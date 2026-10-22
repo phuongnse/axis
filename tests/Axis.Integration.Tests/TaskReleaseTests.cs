@@ -128,7 +128,7 @@ public sealed class TaskReleaseTests(TaskApiFixture fixture) : IClassFixture<Tas
 
         var form = read.RootElement.GetProperty("form");
         var section = Assert.Single(form.GetProperty("sections").EnumerateArray());
-        Assert.Equal(["title"], section.GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()));
+        Assert.Equal(["title", "amount"], section.GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()));
         Assert.DoesNotContain(
             "comment",
             form.GetProperty("entity").GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()));
