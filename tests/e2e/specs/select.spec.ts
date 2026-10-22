@@ -18,7 +18,7 @@ test('pickOption fails at once, naming the select and the option, when the pick 
       })
     </script>
   `)
-  await expect(pickOption(page.getByRole('combobox', { name: 'Colour' }), 'red')).rejects.toThrow(
+  await expect(pickOption(page.getByRole('combobox', { name: 'Colour', exact: true }), 'red')).rejects.toThrow(
     /Picking 'red' in the select Colour/,
   )
 })
