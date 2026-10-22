@@ -34,6 +34,9 @@ custom code out of configuration is in
   comes later.
 - **No UI.** React components in packages come later
   ([D8](../decisions/d8-custom-ui-widgets-are-packaged-react-components.md)).
+  When they come, a custom widget builds on Axis widgets and Axis tokens, never
+  on Ant Design directly
+  ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
 
 ## Manifest
 
