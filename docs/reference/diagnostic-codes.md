@@ -233,3 +233,5 @@ sorted by file and then path.
 | `AXC0232` | A `navigate` action names a `page` that no loaded page has. A page that failed to load is not reported again. Reported at the action's `page`. |
 | `AXC0233` | A `navigate` action gives a parameter that its target page does not declare, or gives one twice, ignoring letter case. Reported at `/parameters/{name}` of the action. |
 | `AXC0234` | A `navigate` action leaves out a required parameter of its target page. Reported at the action. |
+| `AXC0235` | A `navigate` action sets `record`, but its target page holds no form widget, or the form is over another entity than `record` refers to. Reported at `/record` of the action. |
+| `AXC0236` | A page whose widget is a form declares `parameters`. A navigate action opens the form's record with `record`. Reported at `/parameters`. |

@@ -4,5 +4,6 @@
   "name": "Submissions",
   "formatVersion": 1,
   "title": { "textKey": "pages.submissions.title" },
+  "parameters": [{ "name": "request", "type": "reference", "target": "Request" }],
   "widgets": [{ "type": "processInspector", "process": "Submit" }]
 }

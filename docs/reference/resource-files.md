@@ -135,7 +135,7 @@ site, and its widgets are its content:
   ```
 
 - A `navigate` action opens another page. The compiler checks its shape, but
-  the compiled page and the SPA do not show its button yet. It sits in a
+  the SPA does not show its button yet. It sits in a
   table's `rowActions` or `toolbarActions` ([D59](../decisions/d59-table-row-and-toolbar-actions.md)),
   or in a form's `actions`:
   `{ "type": "navigate", "page": "TicketDetail", "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }`.
@@ -143,9 +143,10 @@ site, and its widgets are its content:
   [expressions](expressions.md#names-and-references). In `toolbarActions` the
   expressions see no names, because a toolbar has no row. The checks are in
   [configuration](configuration.md). A page whose widget is a form
-  declares no parameters. An action to it may set `record`, a reference to the
-  form's entity, instead of `parameters`: it opens `/{page}/{id}`, and without
-  `record` it opens `/{page}/new` *(planned for M12)*.
+  declares no parameters, otherwise it is `AXC0236`. An action to it may set
+  `record`, a reference to the form's entity, instead of `parameters`, and the
+  compiler checks it (`AXC0235`). Opening `/{page}/{id}` with `record`, and
+  `/{page}/new` without it, is *(planned for M12)*.
 
 A page may hold a tree of widgets. The container
 widgets `columns`, `tabs` and `section` hold other widgets, see

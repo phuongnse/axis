@@ -14,7 +14,15 @@
             {
               "type": "table",
               "entity": "Request",
-              "rowActions": [{ "type": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }],
+              "rowActions": [
+                {
+                  "type": "navigate",
+                  "page": "Submissions",
+                  "label": { "textKey": "request.showSubmissions" },
+                  "parameters": { "request": "id" }
+                },
+                { "type": "navigate", "page": "RequestForm", "label": { "textKey": "pages.requestForm.title" }, "record": "id" }
+              ],
               "toolbarActions": [{ "type": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }]
             }
           ]

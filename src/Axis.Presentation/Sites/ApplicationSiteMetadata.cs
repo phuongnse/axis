@@ -18,11 +18,23 @@ public sealed record ApplicationSite(string Path, string TitleKey, SiteLocales L
 public sealed record SiteNavigationItem(string Page, string LabelKey);
 
 /// <summary>
-/// What the SPA needs to render a page: its title and its widgets. The widgets are the top level of a tree: a
+/// What the SPA needs to render a page: its title, its parameters and its widgets. The widgets are the top level of a tree: a
 /// <see cref="ColumnsWidgetMetadata"/>, <see cref="TabsWidgetMetadata"/> or <see cref="SectionWidgetMetadata"/> holds
 /// the others.
 /// </summary>
-public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<PageWidgetMetadata> Widgets);
+/// <param name="Parameters">The typed values the page reads from its URL, in file order. Empty when the page declares none.</param>
+public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<PageParameterMetadata> Parameters, IReadOnlyList<PageWidgetMetadata> Widgets);
+
+/// <summary>
+/// One parameter of a page. <see cref="Values"/> is set for enum and <see cref="Target"/> for reference.
+/// </summary>
+/// <param name="Type">The type name as written in page files, such as <c>date-time</c>.</param>
+public sealed record PageParameterMetadata(
+    string Name,
+    string Type,
+    bool Required,
+    IReadOnlyList<string>? Values,
+    ReferenceTarget? Target);
 
 /// <summary>
 /// One widget of a page: a <see cref="WidgetMetadata"/> that shows something, or a container around other widgets.
@@ -150,7 +162,13 @@ public sealed record StartProcessActionMetadata(string Process, string LabelKey,
 /// <summary>A <c>navigate</c> action, which opens another page.</summary>
 /// <param name="Page">The target page, by its declared name.</param>
 /// <param name="LabelKey">The text key of the button's label.</param>
-public sealed record NavigateActionMetadata(string Page, string LabelKey) : ActionMetadata
+/// <param name="Parameters">The expression of each target page parameter the action gives, by the name the target declares. Empty when it gives none.</param>
+/// <param name="Record">The expression of the record id a form page opens, or null.</param>
+public sealed record NavigateActionMetadata(
+    string Page,
+    string LabelKey,
+    IReadOnlyDictionary<string, string> Parameters,
+    string? Record) : ActionMetadata
 {
     [JsonPropertyOrder(-1)]
     public override string Type { get; init; } = "navigate";
