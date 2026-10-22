@@ -491,7 +491,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
     - **Pickers.** The form page picker lists every page except the current
       one. The action's process picker lists every process. Neither checks
       what the choice holds, so a wrong choice shows as a diagnostic after the
-      save.
+      save. The form page picker goes when M12 removes `formPage`. Until a
+      panel exists, navigate actions and page parameters are edited in the JSON
+      view ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md))
+      *(planned for M12)*.
     - **Widgets.** A page holds one widget today, so the list has no add,
       remove or reorder.
     - **Widget tree** *(planned for M12)*. The editor shows the page's widgets

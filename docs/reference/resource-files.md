@@ -88,7 +88,8 @@ site, and its widgets are its content:
   shorthand for all its fields in one section. A `table` names an `entity`, as
   shorthand for all records of that entity, or a `dataSource`.
 - A `table` widget may name a `formPage`: the page with the `form` widget
-  that opens one of its records.
+  that opens one of its records. M12 removes `formPage` *(planned for M12)*,
+  see the navigate action below.
 - A `form` widget may list `actions`. Each is
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record. See
@@ -106,6 +107,32 @@ site, and its widgets are its content:
   `{ "type": "table", "dataSource": "PurchaseRequestList", "formPage": "PurchaseRequestForm" }`.
   Its columns are the data source's projected fields. See
   [widget binding](data-sources.md#widget-binding).
+- A page may declare typed `parameters` *(planned for M12)*. Each has a
+  `name`, a `type` (an entity field type) and `required`. A `reference`
+  parameter also names its `target` entity. A value lives in the URL query
+  under the parameter name. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+
+  ```json
+  {
+    "id": "a1c2e3f4-5b6d-4789-8abc-0d1e2f3a4b5c",
+    "kind": "page",
+    "name": "TicketDetail",
+    "formatVersion": 1,
+    "title": { "textKey": "pages.ticketDetail.title" },
+    "parameters": [{ "name": "ticket", "type": "reference", "target": "Ticket", "required": true }],
+    "widgets": []
+  }
+  ```
+
+- A `navigate` action opens another page *(planned for M12)*. It sits in a
+  table's `rowActions` or `toolbarActions` ([D59](../decisions/d59-table-row-and-toolbar-actions.md)),
+  or in a form's `actions`:
+  `{ "type": "navigate", "page": "TicketDetail", "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }`.
+  Each value is an expression, see
+  [expressions](expressions.md#names-and-references). A page whose widget is a form
+  declares no parameters. An action to it may set `record`, a reference to the
+  form's entity, instead of `parameters`: it opens `/{page}/{id}`, and without
+  `record` it opens `/{page}/new`.
 
 A page may hold a tree of widgets. The container
 widgets `columns`, `tabs` and `section` hold other widgets, see
