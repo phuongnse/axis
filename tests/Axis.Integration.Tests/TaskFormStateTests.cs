@@ -113,7 +113,7 @@ public sealed class TaskFormStateTests(TaskApiFixture fixture) : IClassFixture<T
     [Fact]
     public async Task A_completed_task_is_a_conflict_for_its_assignee()
     {
-        var task = await CreateTaskAsync(amount: 2000m);
+        var task = await CreateTaskAsync(amount: 1000m);
         using var maria = fixture.CreateClient().SignedInAs("maria");
         using (var complete = RecordApiFixture.Request(HttpMethod.Post, $"{Tasks}/{task:D}/complete", Host(TenantA), """{ "outcome": "reject" }"""))
         {

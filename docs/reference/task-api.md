@@ -252,11 +252,14 @@ is a `403` before any of these checks.
   - A value for a field the form does not make editable, or the user may
     not read, is keyed `/values/<field>` with the message "Cannot be set.".
   - A missing `version` when `values` is not empty is keyed `/version`.
+  - A visible field of the task's form whose `requiredWhen` is true and that
+    is left `null` is keyed `/values/<field>` with "Required.". It is
+    evaluated on the record as it will be stored, whether or not the body
+    sends `values`: without `values` it reads the stored record. Nothing is
+    written and the task stays open. A hidden field is not required.
   - *(Planned for M12.)* A value for a field whose `readOnlyWhen` is true, or
-    that is hidden, is keyed `/values/<field>` with "Cannot be set.". A
-    visible field whose `requiredWhen` is true and that is left `null` is
-    keyed `/values/<field>` with "Required.". Both are evaluated on the record
-    as it will be stored.
+    that is hidden, is keyed `/values/<field>` with "Cannot be set.". It is
+    evaluated on the record as it will be stored.
   - Any other property, a repeated property and a body that is not a JSON
     object get the record API's keys and messages, such as "Unknown
     property.".
