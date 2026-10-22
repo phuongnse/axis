@@ -5,7 +5,14 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { buildReport, formatAnnotations, formatFailedTests, formatSummary, parseJunit } from './test-report.mjs'
+import {
+  buildReport,
+  formatAnnotations,
+  formatFailedTests,
+  formatSummary,
+  parseJunit,
+  parseRetried,
+} from './test-report.mjs'
 
 const script = fileURLToPath(new URL('./test-report.mjs', import.meta.url))
 const fixtures = fileURLToPath(new URL('./fixtures/test-report/', import.meta.url))
@@ -18,8 +25,16 @@ before(() => {
   // .NET stack traces hold absolute paths, so the failing fixture names the fixture tree.
   resultsDir = mkdtempSync(path.join(tmpdir(), 'test-report-'))
   copyFileSync(path.join(fixtures, 'results/passing.xml'), path.join(resultsDir, 'passing.xml'))
+  copyFileSync(path.join(fixtures, 'results/passing.json'), path.join(resultsDir, 'passing.json'))
+  copyFileSync(path.join(fixtures, 'results/retried.xml'), path.join(resultsDir, 'retried.xml'))
   const failing = readFileSync(path.join(fixtures, 'results/failing.xml'), 'utf8')
   writeFileSync(path.join(resultsDir, 'failing.xml'), failing.replaceAll('__ROOT__', root))
+  // The JSON report holds the tree path as a string, so the path is escaped for JSON.
+  const retried = readFileSync(path.join(fixtures, 'results/retried.json'), 'utf8')
+  writeFileSync(
+    path.join(resultsDir, 'retried.json'),
+    retried.replaceAll('__ROOT__', JSON.stringify(root).slice(1, -1)),
+  )
 })
 
 after(() => rmSync(resultsDir, { recursive: true, force: true }))
@@ -57,6 +72,27 @@ describe('parseJunit', () => {
   })
 })
 
+describe('parseRetried', () => {
+  test('lists the flaky tests of a Playwright JSON report with their first failure message', () => {
+    const report = JSON.parse(readFileSync(path.join(resultsDir, 'retried.json'), 'utf8'))
+
+    assert.deepEqual(parseRetried(report), [
+      {
+        name: 'Sample › retries once',
+        file: path.join(root, 'tests/e2e/specs/sample.spec.ts'),
+        line: 3,
+        message: 'Expected: 2\nReceived: 1',
+      },
+    ])
+  })
+
+  test('lists nothing when no test is flaky', () => {
+    const report = JSON.parse(readFileSync(path.join(resultsDir, 'passing.json'), 'utf8'))
+
+    assert.deepEqual(parseRetried(report), [])
+  })
+})
+
 describe('buildReport', () => {
   test('counts a passing suite and its duration', () => {
     const report = buildReport({ suites: ['passing:tests/Sample.Tests'], resultsDir, root })
@@ -70,6 +106,7 @@ describe('buildReport', () => {
       skipped: 0,
       duration: 1.5,
       failures: [],
+      retried: [],
     })
     assert.match(formatSummary(report), /^\| passing \| 2 \| 0 \| 0 \| 1\.5s \|$/m)
     assert.deepEqual(formatAnnotations(report), [])
@@ -142,6 +179,50 @@ describe('buildReport', () => {
     assert.equal(report.ok, false)
     assert.equal(report.suites[0].missing, true)
     assert.match(formatSummary(report), /^\| absent \(missing: no results file\) \| - \| - \| - \| - \|$/m)
+  })
+
+  test('lists a test that failed and then passed on its retry, and does not fail the run', () => {
+    const report = buildReport({ suites: ['retried:tests/e2e'], resultsDir, root })
+
+    assert.equal(report.ok, true)
+    const [suite] = report.suites
+    assert.deepEqual([suite.passed, suite.failed, suite.skipped], [2, 0, 0])
+    assert.deepEqual(suite.retried, [
+      {
+        suite: 'retried',
+        name: 'Sample › retries once',
+        message: 'Expected: 2\nReceived: 1',
+        file: 'tests/e2e/specs/sample.spec.ts',
+        line: 3,
+      },
+    ])
+
+    const summary = formatSummary(report)
+    assert.match(summary, /^\| retried \| 2 \(1 on retry\) \| 0 \| 0 \| 2\.0s \|$/m)
+    assert.match(summary, /^### Passed on a retry$/m)
+    assert.match(summary, /^- \*\*retried\*\*: `Sample › retries once` \(`tests\/e2e\/specs\/sample\.spec\.ts:3`\)$/m)
+    assert.match(summary, /^ {2}Expected: 2$/m)
+    assert.doesNotMatch(summary, /\u001b/)
+    assert.deepEqual(formatAnnotations(report), [])
+  })
+
+  test('keeps the Passed cell plain and omits the retry heading when no test was retried', () => {
+    const summary = formatSummary(
+      buildReport({ suites: ['passing:tests/Sample.Tests', 'failing:web'], resultsDir, root }),
+    )
+
+    assert.match(summary, /^\| passing \| 2 \| 0 \| 0 \| 1\.5s \|$/m)
+    assert.doesNotMatch(summary, /on a retry/)
+  })
+
+  test('reports a suite whose JSON report cannot be read as having no retried tests', () => {
+    copyFileSync(path.join(fixtures, 'results/passing.xml'), path.join(resultsDir, 'broken.xml'))
+    writeFileSync(path.join(resultsDir, 'broken.json'), '{ not json')
+
+    const report = buildReport({ suites: ['broken:tests/Sample.Tests'], resultsDir, root })
+
+    assert.equal(report.ok, true)
+    assert.deepEqual(report.suites[0].retried, [])
   })
 })
 
@@ -216,5 +297,30 @@ describe('command line', () => {
     assert.equal(result.status, 0, result.stderr)
     assert.doesNotMatch(result.stdout, /Failed tests/)
     assert.equal(result.stdout.trim(), '')
+  })
+
+  test('lists a retried test in the job log and exits 0 when no other problem remains', () => {
+    const summaryFile = path.join(resultsDir, 'retried-summary.md')
+
+    const result = runCli(['retried:tests/e2e'], { GITHUB_ACTIONS: 'true', GITHUB_STEP_SUMMARY: summaryFile })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(result.stdout.trimEnd().split('\n'), [
+      'Passed on a retry:',
+      '- retried: Sample › retries once (tests/e2e/specs/sample.spec.ts:3)',
+      '    Expected: 2',
+      '    Received: 1',
+    ])
+    assert.match(readFileSync(summaryFile, 'utf8'), /^### Passed on a retry$/m)
+  })
+
+  test('prints no retried list for a suite without flaky tests', () => {
+    const summaryFile = path.join(resultsDir, 'no-retry-summary.md')
+
+    const result = runCli(['passing:tests/Sample.Tests'], { GITHUB_ACTIONS: 'true', GITHUB_STEP_SUMMARY: summaryFile })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.doesNotMatch(result.stdout, /Passed on a retry/)
+    assert.doesNotMatch(readFileSync(summaryFile, 'utf8'), /Passed on a retry/)
   })
 })

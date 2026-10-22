@@ -1,0 +1,57 @@
+{
+  "config": { "rootDir": "__ROOT__/tests/e2e/specs" },
+  "suites": [
+    {
+      "title": "sample.spec.ts",
+      "file": "sample.spec.ts",
+      "line": 0,
+      "column": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Sample",
+          "file": "sample.spec.ts",
+          "line": 2,
+          "column": 0,
+          "specs": [
+            {
+              "title": "retries once",
+              "ok": true,
+              "file": "sample.spec.ts",
+              "line": 3,
+              "column": 7,
+              "tests": [
+                {
+                  "projectName": "chromium",
+                  "status": "flaky",
+                  "results": [
+                    {
+                      "status": "failed",
+                      "error": { "message": "\u001b[31mExpected: 2\u001b[39m\nReceived: 1" },
+                      "errors": [{ "message": "\u001b[31mExpected: 2\u001b[39m\nReceived: 1" }]
+                    },
+                    { "status": "passed", "errors": [] }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "stays green",
+              "ok": true,
+              "file": "sample.spec.ts",
+              "line": 4,
+              "column": 7,
+              "tests": [
+                {
+                  "projectName": "chromium",
+                  "status": "expected",
+                  "results": [{ "status": "passed", "errors": [] }]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
