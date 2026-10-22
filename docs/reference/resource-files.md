@@ -468,7 +468,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
 
 *(Planned for M12.)* A `form` resource (see [frontend](frontend.md)) can show, require and lock
 fields depending on the record, and can split its sections into wizard steps
-([D60](../decisions/d60-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+([D61](../decisions/d61-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 Diagnostic codes come with the issues that build each check.
 
 - **Conditions.** A field entry may have `visibleWhen`, `requiredWhen` and

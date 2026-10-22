@@ -685,7 +685,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Conditions and steps** *(planned for M12)*. The widget asks the server
     which fields to show, require and lock, and which messages to show. It
     has no evaluator of its own
-    ([D60](../decisions/d60-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+    ([D61](../decisions/d61-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
     - **Calls.** It calls the [form state endpoint](record-api.md#form-state)
       with the draft values and the touched fields. The call goes out at once
       after a choice: a select, a checkbox, a date or a picked record. It goes

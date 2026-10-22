@@ -600,7 +600,7 @@ answered with `400`:
 
 *(Planned for M12.)* The form state endpoint answers what a form shows for a
 draft record, and which messages the user's input earns so far. It writes
-nothing ([D60](../decisions/d60-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+nothing ([D61](../decisions/d61-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 The conditions are in [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 
 `POST /api/apps/{app}/forms/{form}/state` needs `Content-Type: application/json`
