@@ -29,7 +29,7 @@ internal static class PageAccess
     /// <paramref name="metadata"/>, the metadata of <paramref name="page"/>, without the widgets
     /// <paramref name="roles"/> may not read, and without the columns, tabs and containers that leave empty. The widgets
     /// that remain have only the fields the roles may read, the <c>startProcess</c> actions they may start, the
-    /// <c>navigate</c> actions to pages they may read and the access they hold.
+    /// <c>navigate</c> actions, and the <c>navigate</c> of a kpi, to pages they may read and the access they hold.
     /// </summary>
     public static PageMetadata Shape(ApplicationModel application, IReadOnlyList<string> roles, PageModel page, PageMetadata metadata) =>
         metadata with { Widgets = ShapeAll(application, roles, page.Widgets, metadata.Widgets) };
@@ -91,7 +91,8 @@ internal static class PageAccess
             Actions = [.. described.Actions.Where(action => Allows(application, roles, action))],
             RowActions = [.. described.RowActions.Where(action => Allows(application, roles, action))],
             ToolbarActions = [.. described.ToolbarActions.Where(action => Allows(application, roles, action))],
-            Access = entity is null ? null : Access(application, roles, entity),
+            Access = widget.Type == WidgetType.Kpi || entity is null ? null : Access(application, roles, entity),
+            Kpi = described.Kpi is { Navigate: { } navigate } kpi && !Allows(application, roles, navigate) ? kpi with { Navigate = null } : described.Kpi,
         };
     }
 

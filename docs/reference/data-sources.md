@@ -434,8 +434,8 @@ The `errors` keys repeat the request's parameter names by design.
 The table binding and its filter inputs are built, for plain and grouped
 data sources.
 
-- **Widgets.** The `table` widget binds to a data source, and so do the
-  `chart` and `kpi` widgets *(planned for M12)*. A `form` that
+- **Widgets.** The `table` widget binds to a data source, and so does the
+  `kpi` widget. The `chart` widget will *(planned for M12)*. A `form` that
   names a `dataSource` is `AXC0060`. A table names an `entity` or a
   `dataSource`, never both and never neither (`AXC0060`). `entity` stays as
   shorthand for all records of an entity. A `dataSource` that names no
@@ -492,12 +492,18 @@ data sources.
   - Every data source parameter that is not bound must be optional
     (`AXC0060`, as for a table), because a chart has no filter bar.
   - The `title` and the measure labels join `AXC0028`.
-- **KPI binding** *(planned for M12)*. A `kpi` names a `dataSource` and reads
+- **KPI binding.** A `kpi` names a `dataSource` and reads
   its one total row. The compile checks:
   - A `dataSource` that names no loaded data source is `AXC0059`.
-  - The data source has an `aggregate` with an empty `groupBy`.
-  - `measure` and `comparison.measure` each name a measure of the data source.
-  - `parameters` and unbound parameters follow the chart's rules.
+  - The data source has an `aggregate` with an empty `groupBy`, otherwise it
+    is `AXC0237` at `/widgets/{i}/dataSource`.
+  - `measure` and `comparison.measure` each name a measure of the data source,
+    ignoring letter case, otherwise it is `AXC0238` at that property.
+  - Every parameter of the data source must be optional (`AXC0060` at
+    `/widgets/{i}/dataSource`, naming the parameter), because a KPI has no
+    filter bar. A KPI cannot bind page parameters with `parameters` yet
+    *(planned for M12)*, and the page schema does not allow it on a `kpi`
+    (`AXC0004`).
   - The `label` and the `comparison` label join `AXC0028`. A `navigate`
     follows the checks of
     [D63](../decisions/d63-navigate-actions-and-page-parameters.md).

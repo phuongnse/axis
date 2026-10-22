@@ -83,11 +83,15 @@ site, and its widgets are its content:
 ```
 
 - A page holds one or more widgets. A leaf widget `type` is `table`, `form`,
-  `taskInbox` or `processInspector`. A `form` names a `form` resource, which lays out the fields of
+  `taskInbox`, `processInspector` or `kpi`. A `form` names a `form` resource, which lays out the fields of
   one entity in sections (see [frontend.md](frontend.md)), or an `entity`, as
   shorthand for all its fields in one section. A `table` names an `entity`, as
-  shorthand for all records of that entity, or a `dataSource`. M12 adds the
-  leaf widgets `detail`, `chart` and `kpi` *(planned for M12)*, see
+  shorthand for all records of that entity, or a `dataSource`. A `kpi` names a
+  `dataSource` with one total row, one of its `measure`s and a `label`, and
+  may add a `comparison` with a second `measure` and a `label`, and a `navigate`
+  action, see
+  [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md). M12 adds the
+  leaf widgets `detail` and `chart` *(planned for M12)*, see
   [frontend.md](frontend.md).
 - A `table` widget may name a `formPage`: the page with the `form` widget
   that opens one of its records. M12 removes `formPage` *(planned for M12)*,

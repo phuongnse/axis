@@ -78,8 +78,9 @@ rest of the frontend is in [frontend.md](frontend.md).
   - **Accessibility.** The title is the chart's accessible name. Screen readers
     get the data as a table, with the category and each measure as columns.
     Loading, empty and error states use platform texts.
-- **KPI widget** *(planned for M12)*. A page whose widget is a `kpi` shows one
-  measure of a data source as a tile, with its label. See
+- **KPI widget**. A page whose widget is a `kpi` shows one
+  measure of a data source as a tile, with its label. The compile checks and
+  the page metadata are built. The tile in the SPA is *(planned for M12)*. See
   [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
 
   ```json
@@ -90,7 +91,9 @@ rest of the frontend is in [frontend.md](frontend.md).
     [data-sources.md](data-sources.md#widget-binding). `comparison` and
     `navigate` are optional. A navigate action follows D63's checks, and its
     expressions see only the page's parameters. The labels join `AXC0028`. A
-    KPI has no `entity`, `form` or `actions` (`AXC0060`).
+    KPI has no `entity`, `form` or `actions` (`AXC0060`). The page schema
+    requires `dataSource`, `measure` and `label`, and `comparison` has both a
+    `measure` and a `label`.
   - **Metadata.** The widget has the `dataSource` object, `"entity": null`,
     `"form": null`, `"actions": []` and `"access": null`, and adds `kpi`:
 
@@ -99,17 +102,21 @@ rest of the frontend is in [frontend.md](frontend.md).
       "measure": "openCount",
       "labelKey": "dashboard.open.label",
       "comparison": { "measure": "urgentCount", "labelKey": "dashboard.urgent.label" },
-      "navigate": { "type": "navigate", "page": "AllTickets", "labelKey": "dashboard.open.show", "parameters": {} }
+      "navigate": { "type": "navigate", "page": "AllTickets", "labelKey": "dashboard.open.show", "parameters": {}, "record": null, "opensForm": false }
     }
     ```
 
-    `comparison` and `navigate` are `null` when the widget has none. The
-    `navigate` is `null` too when the user cannot read its page.
-  - **Value.** The SPA reads the one total row of the data source. The value
+    `measure` and the comparison's `measure` are the names the data source
+    declares. `comparison` and `navigate` are `null` when the widget has none.
+    The `navigate` is `null` too when the user cannot read its page. It has
+    the keys of every `navigate` action, see
+    [frontend.md](frontend.md). A user who cannot run the data source gets no
+    widget, as with a table.
+  - **Value** *(planned for M12)*. The SPA reads the one total row of the data source. The value
     is formatted as a table cell shows it, and a `null` measure shows a
     platform text for an empty value. The comparison is a second labelled
     value. The SPA computes no difference and no percentage.
-  - **Click and reading.** With a `navigate`, the tile is a link to the target
+  - **Click and reading** *(planned for M12)*. With a `navigate`, the tile is a link to the target
     page. The tile reads as `<label>: <value>`, and a comparison adds
     `<comparison label>: <comparison value>`. Loading and error states use
     platform texts.
