@@ -69,3 +69,4 @@ files agree, title and status included.
 | [D56](decisions/d56-a-service-desk-as-the-third-sample-application.md) | A service desk as the third sample application | **Agreed** |
 | [D57](decisions/d57-a-design-system-published-from-the-repository.md) | A design system published from the repository | **Agreed** |
 | [D58](decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md) | Ant Design is a detail of the SPA, without ProComponents | **Agreed** |
+| [D59](decisions/d59-table-row-and-toolbar-actions.md) | Table row and toolbar actions | **Agreed** |

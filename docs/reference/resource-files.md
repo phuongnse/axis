@@ -93,6 +93,15 @@ site, and its widgets are its content:
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record. See
   [frontend.md](frontend.md).
+- A `table` widget may list `rowActions` and `toolbarActions` *(planned for
+  M12)*. Each entry has a `type`, such as
+  `{ "type": "delete", "label": { "textKey": "purchaseRequest.delete" } }` or
+  `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`.
+  `navigate` may sit in either list. `startProcess` and `delete` sit in
+  `rowActions` only, and the row is their subject. An entry may have a
+  `visibleWhen`, a boolean expression over the row's fields. See
+  [frontend.md](frontend.md) and
+  [D59](../decisions/d59-table-row-and-toolbar-actions.md).
 - The page has no entity or template of its own, so more widgets and a
   layout can be added later without a format change.
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
