@@ -220,6 +220,7 @@ app.MapHealthEndpoints();
 app.MapPresentationEndpoints();
 app.MapSiteEndpoints();
 app.MapRecordEndpoints();
+app.MapFormStateEndpoints();
 app.MapProcessEndpoints();
 app.MapProcessInspectionEndpoints();
 app.MapProcessOperatorEndpoints();

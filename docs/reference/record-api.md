@@ -598,8 +598,7 @@ answered with `400`:
 
 ## Form state
 
-*(Planned for M12.)* The form state endpoint answers what a form shows for a
-draft record, and which messages the user's input earns so far. It writes
+The form state endpoint answers what a form shows for a draft record, and which messages the user's input earns so far. It writes
 nothing ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 The conditions are in [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 
@@ -635,11 +634,27 @@ Computed fields are calculated on it.
 }
 ```
 
-- `sections` has one entry for each named section of the form.
+- `sections` has one entry for each named section of the form that holds a
+  field the user may read. A hidden section hides its fields, and an unnamed
+  section has no entry.
 - `fields` has one entry for each field of the form that the user may read.
-- `errors` holds the parse errors, the `requiredWhen` messages and the
-  entity's validation messages, keyed as on a write. It holds only keys of
-  touched fields.
+  - `visible` is false in a hidden section and for a field whose `visibleWhen`
+    is not true.
+  - `required` is true for a visible field that the entity marks `required` or
+    whose `requiredWhen` is true.
+  - `readOnly` covers only the form's rules: the form's `readOnly`, a computed,
+    sequence or creator field and a true `readOnlyWhen`. It does not cover field
+    write grants, which are in the page metadata's `createFields` and
+    `updateFields`.
+- `errors` holds the parse errors, "Required." for an empty required field, the
+  computed-field errors and the entity's validation messages, keyed as on a
+  write. It holds only keys of fields that the user touched and may read.
+- A value that does not fit its field, or a computed field that cannot be
+  computed, is a message in `errors` of a `200` answer, so that one bad value
+  does not stop the other fields from getting their states. A `400` is only for
+  a body of the wrong shape: it is not an object, `recordId` is not `null` or a
+  UUID, `values` is not an object, `touched` is not an array of text, a property
+  is repeated, unknown or missing (`recordId` may be left out).
 - It writes nothing, adds no audit record and uses no sequence number. It
   does not run unique or reference-existence checks, because they query
   storage on every keystroke and could reveal which records exist. A save runs
@@ -649,10 +664,18 @@ The checks run in this order, and the first failure is the response:
 
 1. `401` when nobody is signed in.
 2. `404` for an unknown application or form.
-3. `403` without a `create` grant on the form's entity when `recordId` is
-   `null`, or without an `update` grant when it is set.
-4. `404` for a record the user's read filters do not reach.
-5. `415` for a wrong content type, then `400` for a malformed body.
+3. `403` when the user has neither a `create` nor an `update` grant on the
+   form's entity.
+4. `415` for a wrong content type, then `400` for a malformed body.
+5. `403` without a `create` grant when `recordId` is `null`, or without an
+   `update` grant when it is set.
+6. `404` when the user has no `read` grant, or when the record is not one the
+   user's `read` filters reach. `409` when a `read` filter reads a computed
+   field that is being recomputed.
+
+The grant check is split because `recordId` is in the body, so the server
+cannot tell which grant the call needs before it reads the body. The call does
+not check `update` record filters. A save does.
 
 The problem details are as in [Errors](#errors).
 
