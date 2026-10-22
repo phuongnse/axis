@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { startServer } from '../activate'
-import { pickOption } from '../select'
+import { pickAction, pickOption } from '../select'
 import { e2eApp } from '../server-settings'
 import { useSession } from '../sessions'
 
@@ -73,8 +73,7 @@ test.describe('Studio builds a page with two columns', () => {
     await expect(dialog).toBeHidden()
 
     await page.getByRole('button', { name: 'New resource', exact: true }).click()
-    await dialog.getByRole('combobox', { name: 'Kind', exact: true }).click()
-    await page.getByTitle('page', { exact: true }).click()
+    await pickOption(dialog.getByRole('combobox', { name: 'Kind', exact: true }), 'page')
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Overview')
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     // The dialog gives the focus back to the New resource button when its close animation ends, and the pick helpers
@@ -93,17 +92,21 @@ test.describe('Studio builds a page with two columns', () => {
     await title.getByRole('button', { name: 'Write texts', exact: true }).click()
     await expect(title.getByTestId('studio-label-written')).toBeVisible()
 
-    await pickOption(addWidgetPicker(page), 'columns')
-    await expect(page.getByTestId('studio-widget-/widgets/1')).toBeVisible()
+    await pickAction(addWidgetPicker(page), 'columns', page.getByTestId('studio-widget-/widgets/1'))
     const firstColumn = page.getByTestId('studio-widget-list-/widgets/1/columns/0/widgets')
-    await pickOption(firstColumn.locator('xpath=..').locator('xpath=./div[not(@data-testid)]').getByRole('combobox'), 'table')
+    await pickAction(
+      firstColumn.locator('xpath=..').locator('xpath=./div[not(@data-testid)]').getByRole('combobox'),
+      'table',
+      page.getByTestId('studio-widget-/widgets/1/columns/0/widgets/0'),
+    )
     await page.getByTestId('studio-widget-/widgets/1/columns/0/widgets/0').click()
     await pick(page, 'studio-field-/widgets/1/columns/0/widgets/0/entity', 'Request')
 
     // The starter task inbox goes into the second column. The columns widget is then the first widget.
-    await pickOption(
+    await pickAction(
       page.getByTestId('studio-widget-row-/widgets/0').getByRole('combobox', { name: 'Move to', exact: true }),
       'Page › columns 2 › Column 2',
+      page.getByTestId('studio-widget-/widgets/0/columns/1/widgets/0'),
     )
     await page.getByTestId('studio-widget-/widgets/0').click()
     const first = page.getByTestId('studio-field-/widgets/0/columns/0/width').getByRole('spinbutton')
