@@ -32,6 +32,7 @@ import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointValues } from './EndpointValues'
+import { FormSteps } from './FormSteps'
 import { EntityDesigner } from './EntityDesigner'
 import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -314,6 +315,14 @@ export function StudioEditor({
     }
     const { values: _values, ...properties } = schema.properties ?? {}
     return { ...schema, properties, required: schema.required?.filter((name) => name !== 'values') }
+  }, [item.kind, schema])
+
+  const formSchema = useMemo(() => {
+    if (item.kind !== 'form' || !schema) {
+      return undefined
+    }
+    const { steps: _steps, ...properties } = schema.properties ?? {}
+    return { ...schema, properties, required: schema.required?.filter((name) => name !== 'steps') }
   }, [item.kind, schema])
   const endpointEntity = item.kind === 'endpoint' ? String(draft.entity).toLowerCase() : undefined
   const endpointFields = names?.entities
@@ -636,6 +645,11 @@ export function StudioEditor({
                   <Flex vertical gap="middle">
                     <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
                     <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
+                  </Flex>
+                ) : formSchema ? (
+                  <Flex vertical gap="middle">
+                    <SchemaForm schema={formSchema} value={draft} onChange={change} />
+                    <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
                   </Flex>
                 ) : schema ? (
                   <SchemaForm schema={schema} value={draft} onChange={change} />
