@@ -8,5 +8,7 @@ public sealed record PageResource : Resource
 {
     public required TextReference Title { get; init; }
 
+    public IReadOnlyList<PageParameterDefinition> Parameters { get; init; } = [];
+
     public required IReadOnlyList<WidgetDefinition> Widgets { get; init; }
 }

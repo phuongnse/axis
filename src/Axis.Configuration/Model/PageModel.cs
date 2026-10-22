@@ -17,6 +17,9 @@ public sealed record PageModel
     /// <summary>The page's file, relative to the application folder with <c>/</c> separators.</summary>
     public required string File { get; init; }
 
+    /// <summary>The typed values the page reads from its URL, in file order. A page without parameters keeps the shared empty list.</summary>
+    public IReadOnlyList<PageParameterModel> Parameters { get; init; } = [];
+
     public required IReadOnlyList<WidgetModel> Widgets { get; init; }
 
     /// <summary>The widgets that show something, not the containers around them, depth first in page file order.</summary>
@@ -56,3 +59,6 @@ public sealed record PageModel
         }
     }
 }
+
+/// <summary>A compiled page parameter. <paramref name="Values"/> is set for an enum and <paramref name="Target"/> for a reference.</summary>
+public sealed record PageParameterModel(string Name, FieldType Type, bool Required, IReadOnlyList<string>? Values, EntityReference? Target);

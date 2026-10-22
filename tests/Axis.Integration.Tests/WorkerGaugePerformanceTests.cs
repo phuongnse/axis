@@ -14,6 +14,7 @@ namespace Axis.Integration.Tests;
 /// The worker's gauge refresh over a hundred thousand work items, most of them due in the future, answers
 /// within the time limit and reports the due items. The query that reads the due items uses the due-time index.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class WorkerGaugePerformanceTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string Kind = "test.gauge-performance";

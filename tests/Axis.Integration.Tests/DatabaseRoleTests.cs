@@ -1,4 +1,5 @@
 using Axis.Server.Tests;
+using static Axis.Integration.Tests.Polling;
 using static Axis.Integration.Tests.SampleAppFixture;
 
 namespace Axis.Integration.Tests;
@@ -29,6 +30,6 @@ public sealed class DatabaseRoleTests(SampleAppFixture fixture) : IClassFixture<
             SELECT string_agg(DISTINCT usename, ',') FROM pg_stat_activity
             WHERE datname = current_database() AND pid <> pg_backend_pid() AND backend_type = 'client backend'
             """,
-            CancellationToken));
+            CancellationToken), "The client sessions did not all use the runtime role.");
     }
 }

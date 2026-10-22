@@ -109,10 +109,17 @@ site, and its widgets are its content:
   `{ "type": "table", "dataSource": "PurchaseRequestList", "formPage": "PurchaseRequestForm" }`.
   Its columns are the data source's projected fields. See
   [widget binding](data-sources.md#widget-binding).
-- A page may declare typed `parameters` *(planned for M12)*. Each has a
-  `name`, a `type` (an entity field type) and `required`. A `reference`
-  parameter also names its `target` entity. A value lives in the URL query
-  under the parameter name. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+- A page may declare typed `parameters`. Each has a `name`, a `type` (text,
+  integer, decimal, boolean, date, date-time, enum or reference) and
+  `required`, which defaults to false. An `enum` parameter also lists its
+  `values` and a `reference` parameter names its `target` entity. The type is
+  checked by the same rules as an entity field, so a bad type, missing
+  `values` or `target`, or an unknown `target` gives `AXC0004`, `AXC0014`,
+  `AXC0012`, `AXC0040` or `AXC0030`. A name that an earlier parameter already
+  uses, or that is `page`, `pageSize` or `sort`, ignoring letter case, is
+  `AXC0231`. The compiled page lists its parameters in file order. A value
+  living in the URL query under the parameter name is *(planned for M12)*. See
+  [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 
   ```json
   {
@@ -560,7 +567,8 @@ A `form` resource (see [frontend](frontend.md)) can show, require and lock
 fields depending on the record, and can split its sections into wizard steps
 ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 The schema, the compile checks, the compiled model, the page and task metadata and the
-evaluation through the [form state endpoint](record-api.md#form-state) are built.
+evaluation through the [form state endpoint](record-api.md#form-state) and the
+[task form state route](task-api.md#form-state-of-a-task) are built.
 The server enforces `requiredWhen` on write. Refusing a value for a hidden or `readOnlyWhen`
 field stays *(planned for M12)*.
 

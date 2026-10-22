@@ -8,6 +8,7 @@ namespace Axis.Integration.Tests;
 /// An application at the top of the typical size compiles and is stored as a release within the
 /// time limit, and one with planted errors reports all of them in a single compile.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class CompilePerformanceTests(ConfigurationDatabaseFixture database) : IClassFixture<ConfigurationDatabaseFixture>
 {
     // Well above the expected time, so shared CI runners do not make the test flaky, and still low

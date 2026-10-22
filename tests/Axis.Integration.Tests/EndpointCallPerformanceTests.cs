@@ -9,6 +9,7 @@ namespace Axis.Integration.Tests;
 /// Two hundred endpoint calls made one after another, each with its own <c>Idempotency-Key</c>,
 /// all answer 201 within the time limit and leave a receipt each.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class EndpointCallPerformanceTests(EndpointCallFixture fixture) : IClassFixture<EndpointCallFixture>
 {
     private const int Calls = 200;

@@ -14,6 +14,7 @@ namespace Axis.Integration.Tests;
 /// A pending <c>renameField</c>, <c>fill</c> and <c>convert</c> migration each activate within the
 /// time limit over a table of a hundred thousand rows, and the rows hold the expected values.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class MigrationPerformanceTests(DataDatabaseFixture database) : IClassFixture<DataDatabaseFixture>
 {
     private const int Rows = 100_000;

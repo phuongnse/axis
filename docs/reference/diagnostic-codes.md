@@ -229,3 +229,4 @@ sorted by file and then path.
 | `AXC0228` | A form step lists a section name that no section of the form has. Reported at the name in the step's `sections`. |
 | `AXC0229` | A form step lists a section that is already in a step. Reported at the repeated name in the step's `sections`. |
 | `AXC0230` | A form has `steps` and a section has no name or is in no step. Reported at the section. |
+| `AXC0231` | A page parameter `name` is reserved or already used by an earlier parameter, ignoring letter case. `page`, `pageSize` and `sort` are reserved. Reported at the parameter's `name`. |

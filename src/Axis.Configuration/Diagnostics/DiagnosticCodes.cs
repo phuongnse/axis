@@ -218,4 +218,5 @@ public static class DiagnosticCodes
     public const string UnknownStepSection = "AXC0228";
     public const string DuplicateStepSection = "AXC0229";
     public const string SectionInNoStep = "AXC0230";
+    public const string InvalidPageParameterName = "AXC0231";
 }

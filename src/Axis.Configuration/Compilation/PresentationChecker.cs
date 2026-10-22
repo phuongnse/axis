@@ -30,6 +30,7 @@ internal static class PresentationChecker
         Func<string, DataSourceResource?> findDataSource,
         Func<string, FormResource?> findForm,
         Func<string, ProcessResource?> findProcess,
+        Action<FieldDefinition, string, Action<string, string, string>> checkParameterField,
         ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         IReadOnlyList<ExpressionRule> rules,
@@ -52,7 +53,7 @@ internal static class PresentationChecker
 
         foreach (var page in loaded.Pages)
         {
-            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, moduleReferences, references, diagnostics);
+            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, checkParameterField, moduleReferences, references, diagnostics);
         }
 
         // Locales are compared ignoring letter case, as the text check does.
@@ -379,6 +380,7 @@ internal static class PresentationChecker
         Func<string, DataSourceResource?> findDataSource,
         Func<string, FormResource?> findForm,
         Func<string, ProcessResource?> findProcess,
+        Action<FieldDefinition, string, Action<string, string, string>> checkParameterField,
         ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
@@ -387,6 +389,31 @@ internal static class PresentationChecker
             diagnostics.Add(new Diagnostic(code, message, page.File, path, page.Id));
 
         ApplicationCompiler.CheckTextKey(page.Title, page, "/title", references, diagnostics);
+
+        var parameterNames = new HashSet<string>(["page", "pageSize", "sort"], StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < page.Parameters.Count; index++)
+        {
+            var parameter = page.Parameters[index];
+            var path = $"/parameters/{index}";
+            if (!parameterNames.Add(parameter.Name))
+            {
+                Report(
+                    DiagnosticCodes.InvalidPageParameterName,
+                    $"The parameter name '{parameter.Name}' is reserved or already used by an earlier parameter. 'page', 'pageSize' and 'sort' are reserved, ignoring letter case, because they share the URL query with the table.",
+                    $"{path}/name");
+            }
+
+            var definition = new FieldDefinition
+            {
+                Name = parameter.Name,
+                Type = parameter.Type,
+                Required = parameter.Required,
+                Values = parameter.Values,
+                Target = parameter.Target,
+            };
+            checkParameterField(definition, path, Report);
+            ApplicationCompiler.AddFieldTarget(page, definition, path, findEntity, references);
+        }
 
         var leaves = new List<(WidgetDefinition Widget, string Path)>();
         CheckWidgets(page.Widgets, "/widgets", 1, leaves, page, references, diagnostics);

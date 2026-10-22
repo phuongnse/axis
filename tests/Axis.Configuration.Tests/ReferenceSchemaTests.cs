@@ -35,6 +35,7 @@ public sealed class ReferenceSchemaTests
         (ReferenceRelations.FieldTarget, "entity", "properties/fields/items/properties/target", "entity"),
         (ReferenceRelations.FieldSequence, "entity", "properties/fields/items/properties/sequence", "sequence"),
         (ReferenceRelations.NavigationPage, "site", "properties/navigation/items/properties/page", "page"),
+        (ReferenceRelations.FieldTarget, "page", "properties/parameters/items/properties/target", "entity"),
         (ReferenceRelations.WidgetEntity, "page", "properties/widgets/items/properties/entity", "entity"),
         (ReferenceRelations.WidgetDataSource, "page", "properties/widgets/items/properties/dataSource", "dataSource"),
         (ReferenceRelations.WidgetForm, "page", "properties/widgets/items/properties/form", "form"),

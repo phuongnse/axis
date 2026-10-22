@@ -8,6 +8,7 @@ using Axis.Data.Records;
 using Axis.Data.Schema;
 using Axis.Processes.Instances;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
@@ -593,7 +594,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         // The newer release must wait for the lock. Without it, it commits the rename now and the older
         // release overwrites it with tables it does not match.
         var newer = ActivateAsync(second);
-        await WaitUntilAsync(async () => newer.IsCompleted || await CountWaitingAdvisoryLocksAsync() > 0);
+        await WaitUntilAsync(async () => newer.IsCompleted || await CountWaitingAdvisoryLocksAsync() > 0, "The activation did not finish or wait on a lock.");
         release.SetResult();
 
         Assert.Empty((await older).Diagnostics);
@@ -629,7 +630,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         // The third release waits for the lock. It must read the stored entity ids after the wait, or it
         // looks for Client in the first release, finds nothing, skips the table and gives AXC0017.
         var dropping = ActivateAsync(third);
-        await WaitUntilAsync(async () => dropping.IsCompleted || await CountWaitingAdvisoryLocksAsync() > 0);
+        await WaitUntilAsync(async () => dropping.IsCompleted || await CountWaitingAdvisoryLocksAsync() > 0, "The drop did not finish or wait on a lock.");
         release.SetResult();
 
         Assert.Empty((await renaming).Diagnostics);
@@ -671,7 +672,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
 
         await using var start = await OpenStartAsync();
         var activating = ActivateAsync(second);
-        await WaitUntilAsync(async () => activating.IsCompleted || await CountWaitingAdvisoryLocksAsync() > 0);
+        await WaitUntilAsync(async () => activating.IsCompleted || await CountWaitingAdvisoryLocksAsync() > 0, "The activation did not finish or wait on a lock.");
 
         // The open start has not ended, so the migration cannot have run or the release changed.
         Assert.False(activating.IsCompleted);
@@ -1018,16 +1019,6 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
         }
 
         return rows;
-    }
-
-    private static async Task WaitUntilAsync(Func<Task<bool>> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (!await condition())
-        {
-            Assert.True(DateTime.UtcNow < deadline, "The condition did not hold in time.");
-            await Task.Delay(50, CancellationToken);
-        }
     }
 
     private async Task<long> CountWaitingAdvisoryLocksAsync()

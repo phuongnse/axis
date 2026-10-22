@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { buildReport, formatAnnotations, formatSummary, parseJunit } from './test-report.mjs'
+import { buildReport, formatAnnotations, formatFailedTests, formatSummary, parseJunit } from './test-report.mjs'
 
 const script = fileURLToPath(new URL('./test-report.mjs', import.meta.url))
 const fixtures = fileURLToPath(new URL('./fixtures/test-report/', import.meta.url))
@@ -113,6 +113,29 @@ describe('buildReport', () => {
     ])
   })
 
+  test('lists each failed test as plain text and cuts a long message to 20 lines', () => {
+    const report = {
+      suites: [
+        {
+          name: 's',
+          failures: [
+            {
+              suite: 's',
+              name: 't',
+              message: Array.from({ length: 25 }, (_, i) => `line ${i + 1}`).join('\n'),
+            },
+          ],
+        },
+      ],
+    }
+
+    const lines = formatFailedTests(report)
+    assert.ok(lines.includes('    line 20'))
+    assert.ok(!lines.includes('    line 21'))
+    assert.equal(lines.at(-1), '    ... 5 more lines, see the job summary')
+    assert.deepEqual(formatFailedTests(buildReport({ suites: ['passing:tests/Sample.Tests'], resultsDir, root })), [])
+  })
+
   test('marks a suite without a results file as missing', () => {
     const report = buildReport({ suites: ['absent:web'], resultsDir, root })
 
@@ -173,6 +196,25 @@ describe('command line', () => {
         'Assert.Equal() Failure: Strings differ%0AExpected: "a<b&c"%0AActual:   "x"',
       '::error title=Sample.Tests.SampleTests.Throws::Boom, 100%25 broken',
       '::error title=absent::absent wrote no test results.',
+      'Failed tests:',
+      '- failing: Sample > subtracts numbers (web/src/sample.test.ts:3)',
+      '    expected 1 to be 2 // Object.is equality',
+      '- failing: Sample.Tests.SampleTests.Compares_text (tests/Sample.Tests/SampleTests.cs:12)',
+      '    Assert.Equal() Failure: Strings differ',
+      '    Expected: "a<b&c"',
+      '    Actual:   "x"',
+      '- failing: Sample.Tests.SampleTests.Throws',
+      '    Boom, 100% broken',
     ])
+  })
+
+  test('prints no failed tests list when every test passed on GitHub Actions', () => {
+    const summaryFile = path.join(resultsDir, 'passing-summary.md')
+
+    const result = runCli(['passing:tests/Sample.Tests'], { GITHUB_ACTIONS: 'true', GITHUB_STEP_SUMMARY: summaryFile })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.doesNotMatch(result.stdout, /Failed tests/)
+    assert.equal(result.stdout.trim(), '')
   })
 })
