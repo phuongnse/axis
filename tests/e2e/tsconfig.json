@@ -13,6 +13,7 @@
     "server-settings.ts",
     "activate.ts",
     "csrf.ts",
+    "select.ts",
     "sessions.ts",
     "folder-comparison.ts",
     "folder-comparison.test.ts",

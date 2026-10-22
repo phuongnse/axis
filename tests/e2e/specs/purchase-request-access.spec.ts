@@ -243,9 +243,7 @@ test("an employee who opens a manager's task cannot see or complete it, and the 
   await page.goto("/purchasing/mytasks?pageSize=100");
   expect((await inboxLoad).status()).toBe(200);
   // The inbox has rendered its answer once the table stops loading.
-  await expect(
-    page.locator(".ant-table-wrapper .ant-spin-spinning"),
-  ).toHaveCount(0);
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   await expect(page.getByText(title)).toHaveCount(0);
 
   expect((await page.request.get(`${tasksPath}/${taskId}`)).status()).toBe(403);

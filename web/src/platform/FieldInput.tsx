@@ -99,6 +99,8 @@ export function FieldInput({ field, value, onChange, id, ariaLabel, style }: Fie
           aria-label={ariaLabel}
           style={style}
           allowClear
+          // Without a virtual list, each shown option is an `option` with `aria-selected`.
+          virtual={false}
           value={value === null ? null : String(value)}
           options={(field.values ?? []).map((option) => ({ value: option, label: option }))}
           onChange={(option: string | undefined) => onChange(option ?? null)}

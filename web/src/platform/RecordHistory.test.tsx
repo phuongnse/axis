@@ -224,6 +224,25 @@ describe('RecordHistory', () => {
     ])
   })
 
+  it('is busy while a page loads, and marks the current page', async () => {
+    const first = Array.from({ length: 20 }, () => item('record.updated'))
+    stubFetch({ status: 200, body: page(first, 1, 21) }, { status: 200, body: page([item('record.created')], 2, 21) })
+
+    renderHistory()
+    const panel = screen.getByTestId('record-history')
+    expect(panel).toHaveAttribute('aria-busy', 'true')
+
+    await screen.findAllByTestId('history-entry')
+    expect(panel).toHaveAttribute('aria-busy', 'false')
+    expect(panel.querySelector('[aria-current="page"]')).toHaveTextContent('1')
+
+    await userEvent.click(screen.getByTitle('2'))
+
+    await screen.findByText('Created')
+    expect(panel).toHaveAttribute('aria-busy', 'false')
+    expect(panel.querySelector('[aria-current="page"]')).toHaveTextContent('2')
+  })
+
   it('shows no paging control for twenty entries or fewer', async () => {
     stubFetch({ status: 200, body: page([item('record.created')]) })
 

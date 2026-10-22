@@ -222,7 +222,7 @@ export function useRecordForm(entity: EntityMetadata, sections: readonly Section
       case 'reference':
         // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
         return (
-          <Space.Compact block>
+          <Space.Compact block data-testid={`reference-${field.name}`}>
             <Input id={id} readOnly value={labels[field.name] ?? ''} />
             <Button onClick={() => setLookup(field.name)}>{t('shell.form.choose')}</Button>
             {!field.required && value !== null && <Button onClick={() => clear(field)}>{t('shell.form.clear')}</Button>}
