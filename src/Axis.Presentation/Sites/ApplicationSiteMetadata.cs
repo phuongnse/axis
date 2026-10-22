@@ -152,13 +152,13 @@ public sealed record KpiComparisonMetadata(string Measure, string LabelKey);
 public sealed record WidgetAccess(IReadOnlyList<string> Actions, IReadOnlyList<string> CreateFields, IReadOnlyList<string> UpdateFields);
 
 /// <summary>
-/// One action of a widget: a <see cref="StartProcessActionMetadata"/> or a <see cref="NavigateActionMetadata"/>.
+/// One action of a widget: a <see cref="StartProcessActionMetadata"/>, a <see cref="NavigateActionMetadata"/> or a <see cref="DeleteActionMetadata"/>.
 /// Its JSON is that of the runtime type, and every kind writes <c>type</c> first.
 /// </summary>
 [JsonConverter(typeof(ActionMetadataConverter))]
 public abstract record ActionMetadata
 {
-    /// <summary>The kind of action as written in page files: <c>startProcess</c> or <c>navigate</c>.</summary>
+    /// <summary>The kind of action as written in page files: <c>startProcess</c>, <c>navigate</c> or <c>delete</c>.</summary>
     public abstract string Type { get; init; }
 
     /// <summary>
@@ -205,6 +205,15 @@ public sealed record NavigateActionMetadata(
 {
     [JsonPropertyOrder(-1)]
     public override string Type { get; init; } = "navigate";
+}
+
+/// <summary>A <c>delete</c> row action of a table, which deletes the row's record after a confirmation.</summary>
+/// <param name="LabelKey">The text key of the button's label.</param>
+/// <param name="RecordsPath">The path of the record API of the table's entity, or of its data source's root entity, so a client never builds it.</param>
+public sealed record DeleteActionMetadata(string LabelKey, string RecordsPath) : ActionMetadata
+{
+    [JsonPropertyOrder(-1)]
+    public override string Type { get; init; } = "delete";
 }
 
 /// <summary>The form a form widget lays its entity's fields out with: its sections and its wizard steps in display order.</summary>

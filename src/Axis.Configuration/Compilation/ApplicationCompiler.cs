@@ -1677,6 +1677,11 @@ public static class ApplicationCompiler
 
         WidgetActionModel BuildAction(WidgetActionDefinition action)
         {
+            if (action.Type == "delete")
+            {
+                return new DeleteActionModel(action.Label) { VisibleWhen = action.VisibleWhen };
+            }
+
             if (action.Type == "startProcess")
             {
                 var process = processesByName[action.Process!];

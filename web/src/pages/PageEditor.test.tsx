@@ -283,6 +283,24 @@ describe('PageEditor form panel', () => {
   })
 })
 
+describe('PageEditor delete actions', () => {
+  const deleteAction = { type: 'delete', label: { textKey: 'notes.delete' } }
+
+  it('shows a delete row action as JSON only and still removes it', async () => {
+    const onChange = renderEditor(page({ ...table, rowActions: [deleteAction] }))
+
+    const action = within(screen.getByTestId('studio-action-0'))
+    expect(action.getByText('delete')).toBeVisible()
+    expect(
+      screen.getByTestId('studio-field-/widgets/0/rowActions/0').querySelector('[data-testid="studio-json-only"]'),
+    ).not.toBeNull()
+    expect(screen.queryByTestId('studio-field-/widgets/0/rowActions/0/process')).not.toBeInTheDocument()
+
+    await userEvent.click(action.getByRole('button', { name: 'Remove action' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions/0', undefined)
+  })
+})
+
 describe('PageEditor navigate actions', () => {
   /** Renders the editor over a draft that applies every change, so a test can read the JSON as it would be saved. */
   function renderStateful(initial: Record<string, unknown>) {

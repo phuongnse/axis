@@ -168,7 +168,7 @@ outcomes. Operators inspect the approvals and change nothing:
   of their `read` grants, creates those of their `create` grants and updates
   those of their `update` grants. A delete removes the whole record, so
   `fields` on a `delete` grant limits nothing. The `delete` grant is what
-  shows a table's delete action *(planned for M12)*. Only the server checks
+  shows a table's delete action. Only the server checks
   the record filter, on `DELETE`, so a shown button can still meet a `403`.
 - **Combining.** The grants of all the user's policies combine with OR. A
   filter that is `false`, `null` or fails gives nothing through its grant.
