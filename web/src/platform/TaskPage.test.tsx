@@ -40,7 +40,6 @@ const dueAt = '2026-10-13T02:05:00Z'
 
 const inboxWidget: WidgetMetadata = {
   type: 'taskInbox',
-  formPage: null,
   entity: null,
   dataSource: null,
   form: null,

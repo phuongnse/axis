@@ -9,7 +9,9 @@ type checks and their `field target` edge in the reference index. The navigate a
 checked by the compiler, with their `navigate page` edge, their `record` and the form page
 rule. Page metadata lists them with their `parameters` and `record`, gives each page its
 `parameters`, and leaves out the actions to pages the user cannot read. The SPA buttons are
-built on table rows, the table toolbar and saved forms, and put the values in the URL query. The
+built on table rows, the table toolbar and saved forms, and put the values in the URL query.
+`formPage` is removed from the schema, the compiler, page metadata, the SPA and Studio, and the
+samples, the template, the scenarios and the test fixtures use navigate actions. The
 table binding is built: the compiler checks a table's name map, page metadata gives each table its
 `parameters`, the SPA reads the URL values, and a page whose required parameter is missing or
 malformed shows the not-found page. The owner

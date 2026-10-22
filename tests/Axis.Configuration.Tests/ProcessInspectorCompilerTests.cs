@@ -21,7 +21,7 @@ public sealed class ProcessInspectorCompilerTests
         Assert.NotNull(result.Model);
         var orders = Assert.Single(result.Model.Pages, page => page.Name == "Orders");
         Assert.Equal(
-            new WidgetModel(WidgetType.ProcessInspector, null, null, Process: new ProcessReference(Guid.Parse(ProcessId), "OrderReview")),
+            new WidgetModel(WidgetType.ProcessInspector, null, Process: new ProcessReference(Guid.Parse(ProcessId), "OrderReview")),
             Assert.Single(orders.Widgets));
     }
 
@@ -57,8 +57,7 @@ public sealed class ProcessInspectorCompilerTests
     [InlineData("dataSource", "\"OrderList\"", DiagnosticCodes.InvalidWidgetBinding)]
     [InlineData("form", "\"OrderEdit\"", DiagnosticCodes.InvalidWidgetBinding)]
     [InlineData("actions", "[]", DiagnosticCodes.InvalidWidgetBinding)]
-    [InlineData("formPage", "\"OrderForm\"", DiagnosticCodes.InvalidFormPage)]
-    public void Process_inspector_naming_a_binding_a_form_page_or_actions_is_reported_at_that_property(string property, string value, string code)
+    public void Process_inspector_naming_a_binding_or_actions_is_reported_at_that_property(string property, string value, string code)
     {
         using var folder = Folder(Inspector("OrderReview", $$""", "{{property}}": {{value}}"""));
 

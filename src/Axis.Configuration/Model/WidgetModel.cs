@@ -7,8 +7,7 @@ namespace Axis.Configuration.Model;
 /// <see cref="DataSource"/> is set: the widget shows all records of an entity, or the rows of a data
 /// source. A task inbox lists the signed-in user's tasks, so every reference on it is null. <see cref="Form"/> is set
 /// only on a form widget that names a form, and <see cref="Entity"/> is then the form's entity.
-/// <see cref="FormPage"/> is set only on a table widget that names the page holding the form for
-/// its records. <see cref="Actions"/> is empty on every widget but a form widget that declares
+/// <see cref="Actions"/> is empty on every widget but a form widget that declares
 /// actions, and <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table
 /// that declares them. <see cref="Parameters"/> is empty on every widget but a table over a data source that binds
 /// page parameters. <see cref="Process"/> is set only on a process inspector, which has no other reference.
@@ -20,7 +19,6 @@ namespace Axis.Configuration.Model;
 public sealed record WidgetModel(
     WidgetType Type,
     EntityReference? Entity,
-    PageReference? FormPage,
     DataSourceReference? DataSource = null,
     FormReference? Form = null,
     ProcessReference? Process = null)

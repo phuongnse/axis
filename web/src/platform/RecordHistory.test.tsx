@@ -113,7 +113,6 @@ function inspectPath(process: string) {
 function pageBody(name: string, process: string | null) {
   const widget = {
     type: process === null ? 'table' : 'processInspector',
-    formPage: null,
     entity: null,
     dataSource: null,
     form: null,

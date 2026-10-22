@@ -96,18 +96,15 @@ flowchart LR
      `/widgets/{i}/dataSource`. It must name a loaded data source
      (`AXC0059`). It may be `<module id>/<name>`, to name a data source of a
      [module](modules-and-templates.md#modules). A `form` is allowed only on a `form` widget (`AXC0060` at
-     `/widgets/{i}/form`), and must name a loaded form (`AXC0077`). A
-     `formPage` is allowed only on a `table` widget and must
-     name a page whose widget is a `form` over the same entity, or over the
-     root entity of the table's data source (`AXC0022`). A `form` widget
-     that names a form is over the form's entity. A `formPage` is not
-     allowed when the table's data source has an `aggregate`, because a group
-     is not a record (`AXC0022`). A `taskInbox` widget names none of
-     `entity`, `dataSource` and `form` (`AXC0060` at that property), and no
-     `formPage` (`AXC0022`). A `processInspector` widget
+     `/widgets/{i}/form`), and must name a loaded form (`AXC0077`). A `form` widget
+     that names a form is over the form's entity. A table has no link to a form
+     page: it opens and creates records through `navigate` actions, and the
+     property `formPage` of earlier formats is a schema violation (`AXC0004`).
+     A `taskInbox` widget names none of
+     `entity`, `dataSource` and `form` (`AXC0060` at that property). A `processInspector` widget
      needs a `process` that names a loaded process, otherwise it is `AXC0192`
      at `/widgets/{i}/process`. It names none of `entity`, `dataSource` and
-     `form` (`AXC0060` at that property), and no `formPage` (`AXC0022`).
+     `form` (`AXC0060` at that property).
      The page schema requires `process` on a `processInspector` and does not
      allow it on any other widget (`AXC0004`).
      A `kpi` widget needs a `dataSource` that names a loaded data source
@@ -116,7 +113,7 @@ flowchart LR
      `measure` and a `label`. A measure that the aggregate does not declare is
      `AXC0238` at `/widgets/{i}/measure` or `/widgets/{i}/comparison/measure`.
      A `kpi` names no `entity`, `form` or `actions` (`AXC0060` at that
-     property) and no `formPage` (`AXC0022`), and its data source has no
+     property), and its data source has no
      required parameter (`AXC0060` at `/widgets/{i}/dataSource`). Its optional
      `navigate` is checked as any `navigate` action is, with page parameters
      as the only names in its expressions. The page schema requires `measure` and
@@ -144,7 +141,7 @@ flowchart LR
      page schema requires `columns` on a `columns` widget, `tabs` on a `tabs`
      widget, and `title` with `widgets` on a `section` widget. It does not allow them on
      any other widget, and no container may name an `entity`, `dataSource`,
-     `form`, `formPage`, `actions`, `rowActions`, `toolbarActions` or `parameters` (`AXC0004`).
+     `form`, `actions`, `rowActions`, `toolbarActions` or `parameters` (`AXC0004`).
 
      A page's `parameters` ([D63](../decisions/d63-navigate-actions-and-page-parameters.md))
      are checked in file order, at `/parameters/{i}`:
@@ -803,7 +800,6 @@ to show where a resource is used and what it uses.
 | `widget entity` | Page | `/widgets/{i}/entity` | Entity |
 | `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
 | `widget form` | Page | `/widgets/{i}/form` | Form |
-| `widget form page` | Page | `/widgets/{i}/formPage` (removed in M12) | Page |
 | `navigate page` | Page | `/widgets/{i}/rowActions/{j}/page`, `/widgets/{i}/toolbarActions/{j}/page`, `/widgets/{i}/actions/{j}/page` | Page |
 | `widget process` | Page | `/widgets/{i}/process` | Process |
 | `action process` | Page | `/widgets/{i}/actions/{j}/process` | Process |

@@ -44,7 +44,7 @@ test('a user without a create grant sees no New button, and one without a start 
   const { title, id } = await createRequest(page)
 
   await page.goto('/purchasing/purchaserequests')
-  await expect(page.getByRole('link', { name: 'New' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'New', exact: true })).toBeVisible()
   await page.goto(`/purchasing/purchaserequestform/${id}`)
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
   await expect(page.getByRole('button', { name: 'Submit' })).toBeVisible()
@@ -52,8 +52,8 @@ test('a user without a create grant sees no New button, and one without a start 
   await useSession(page, 'chau')
   await page.goto('/purchasing/purchaserequests')
   // The rows show once the page has loaded, so the missing button is not just not rendered yet.
-  await expect(page.getByRole('link', { name: 'Open' }).first()).toBeVisible()
-  await expect(page.getByRole('link', { name: 'New' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Open', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'New', exact: true })).toHaveCount(0)
   await page.goto(`/purchasing/purchaserequestform/${id}`)
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
   await expect(page.getByRole('button', { name: 'Submit' })).toHaveCount(0)

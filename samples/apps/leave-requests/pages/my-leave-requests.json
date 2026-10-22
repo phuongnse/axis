@@ -4,5 +4,12 @@
   "name": "MyLeaveRequests",
   "formatVersion": 1,
   "title": { "textKey": "pages.myLeaveRequests.title" },
-  "widgets": [{ "type": "table", "dataSource": "LeaveRequestList", "formPage": "LeaveRequestForm" }]
+  "widgets": [
+    {
+      "type": "table",
+      "dataSource": "LeaveRequestList",
+      "rowActions": [{ "type": "navigate", "page": "LeaveRequestForm", "label": { "textKey": "actions.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "page": "LeaveRequestForm", "label": { "textKey": "actions.new" } }]
+    }
+  ]
 }

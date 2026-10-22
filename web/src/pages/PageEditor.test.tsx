@@ -9,7 +9,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, clearButton, clearSelect, optionTexts, selectRoot, shownDropdown } from '../test/antd'
+import { chooseOption, clearButton, optionTexts, selectRoot, shownDropdown } from '../test/antd'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
 
@@ -97,7 +97,7 @@ async function pressEnter(target: HTMLElement) {
   })
 }
 
-const table = { type: 'table', dataSource: 'PurchaseRequestList', formPage: 'ReviewForm' }
+const table = { type: 'table', dataSource: 'PurchaseRequestList' }
 const form = {
   type: 'form',
   entity: 'PurchaseRequest',
@@ -176,37 +176,20 @@ describe('PageEditor page', () => {
 })
 
 describe('PageEditor table panel', () => {
-  it('shows the entity, data source and form page', () => {
+  it('shows the entity and the data source', () => {
     renderEditor(page({ ...table, entity: undefined }))
 
     expect(screen.getByTestId('studio-field-/widgets/0/entity')).toBeVisible()
     expect(screen.getByTestId('studio-field-/widgets/0/dataSource')).toHaveTextContent('PurchaseRequestList')
-    expect(screen.getByTestId('studio-field-/widgets/0/formPage')).toHaveTextContent('ReviewForm')
     expect(screen.queryByTestId('studio-field-/widgets/0/form')).not.toBeInTheDocument()
     expect(screen.queryByTestId('studio-field-/widgets/0/process')).not.toBeInTheDocument()
   })
 
-  it('edits the data source and the form page at their pointers', async () => {
+  it('edits the data source at its pointer', async () => {
     const onChange = renderEditor(page(table))
 
     await chooseOption('SupplierList', screen.getByTestId('studio-field-/widgets/0/dataSource'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/dataSource', 'SupplierList')
-    await chooseOption('EditPage', screen.getByTestId('studio-field-/widgets/0/formPage'))
-    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/formPage', 'EditPage')
-  })
-
-  it('clears an optional picker by removing its key', async () => {
-    const onChange = renderEditor(page(table))
-
-    await clearSelect(screen.getByTestId('studio-field-/widgets/0/formPage'))
-    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/formPage', undefined)
-  })
-
-  it('leaves the page itself out of the form pages', async () => {
-    renderEditor(page(table))
-
-    await userEvent.click(within(screen.getByTestId('studio-field-/widgets/0/formPage')).getByRole('combobox'))
-    await waitFor(() => expect(optionTexts(shownDropdown()!)).toEqual(['ReviewForm', 'EditPage']))
   })
 
   it('picking an entity clears the data source, and picking a data source clears the entity', async () => {
@@ -427,7 +410,7 @@ describe('PageEditor taskInbox panel', () => {
     renderEditor(page({ type: 'taskInbox' }))
 
     expect(screen.getByRole('combobox', { name: 'Widget type' })).toBeInTheDocument()
-    for (const key of ['entity', 'dataSource', 'form', 'formPage', 'process', 'actions']) {
+    for (const key of ['entity', 'dataSource', 'form', 'process', 'actions']) {
       expect(screen.queryByTestId(`studio-field-/widgets/0/${key}`)).not.toBeInTheDocument()
     }
   })

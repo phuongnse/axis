@@ -4,5 +4,12 @@
   "name": "ItemsByDepartment",
   "formatVersion": 1,
   "title": { "textKey": "itemsByDepartment.title" },
-  "widgets": [{ "type": "table", "dataSource": "ItemsByDepartment", "formPage": "ItemForm" }]
+  "widgets": [
+    {
+      "type": "table",
+      "dataSource": "ItemsByDepartment",
+      "rowActions": [{ "type": "navigate", "page": "ItemForm", "label": { "textKey": "items.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "page": "ItemForm", "label": { "textKey": "items.new" } }]
+    }
+  ]
 }

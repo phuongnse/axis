@@ -27,7 +27,6 @@ const withComparison: KpiMetadata = {
 function kpiWidget(kpi: KpiMetadata): WidgetMetadata {
   return {
     type: 'kpi',
-    formPage: null,
     entity: null,
     form: null,
     tasksPath: null,

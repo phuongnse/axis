@@ -10,7 +10,25 @@
     {
       "type": "table",
       "dataSource": "AllTicketList",
-      "formPage": "TicketForm"
+      "rowActions": [
+        {
+          "type": "navigate",
+          "page": "TicketForm",
+          "label": {
+            "textKey": "actions.open"
+          },
+          "record": "id"
+        }
+      ],
+      "toolbarActions": [
+        {
+          "type": "navigate",
+          "page": "TicketForm",
+          "label": {
+            "textKey": "actions.new"
+          }
+        }
+      ]
     }
   ]
 }

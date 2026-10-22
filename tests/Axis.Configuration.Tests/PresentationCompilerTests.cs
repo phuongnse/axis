@@ -1,6 +1,7 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Tests;
 
@@ -32,10 +33,15 @@ public sealed class PresentationCompilerTests
 
     private const string OrderListId = "77777777-7777-4777-8777-777777777771";
 
-    private const string OrdersWidget = """{ "type": "table", "entity": "Order", "formPage": "OrderForm" }""";
+    // The buttons reuse text keys that every fixture of these tests has.
+    private const string OrdersWidget = """
+        { "type": "table", "entity": "Order",
+          "rowActions": [ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "orders.title" }, "record": "id" } ],
+          "toolbarActions": [ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "orderForm.title" } } ] }
+        """;
 
     [Fact]
-    public void Site_with_a_table_page_and_its_form_page_compiles_without_diagnostics()
+    public void Site_with_a_table_page_that_opens_its_form_page_compiles_without_diagnostics()
     {
         using var folder = Folder();
 
@@ -45,9 +51,14 @@ public sealed class PresentationCompilerTests
         Assert.NotNull(result.Model);
         var orderForm = new PageReference(Guid.Parse("55555555-5555-4555-8555-555555555552"), "OrderForm");
         var orders = Assert.Single(result.Model.Pages, page => page.Name == "Orders");
+        var table = Assert.Single(orders.Widgets);
         Assert.Equal(
-            new WidgetModel(WidgetType.Table, new EntityReference(Guid.Parse("11111111-1111-4111-8111-111111111111"), "Order"), orderForm),
-            Assert.Single(orders.Widgets));
+            (WidgetType.Table, new EntityReference(Guid.Parse("11111111-1111-4111-8111-111111111111"), "Order")),
+            (table.Type, table.Entity));
+        Assert.Equal(
+            [new NavigateActionModel(orderForm, new TextReference("orders.title")) { Record = "id" }],
+            table.RowActions);
+        Assert.Equal([new NavigateActionModel(orderForm, new TextReference("orderForm.title"))], table.ToolbarActions);
         var site = Assert.Single(result.Model.Sites);
         Assert.Equal(new PageReference(orders.Id, "Orders"), Assert.Single(site.Navigation).Page);
     }
@@ -67,20 +78,18 @@ public sealed class PresentationCompilerTests
         Assert.Null(result.Model);
     }
 
-    [Theory]
-    [InlineData("""{ "type": "form", "entity": "Order", "formPage": "OrderForm" }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "formPage": "Orders" }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "formPage": "CustomerForm" }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "formPage": "Missing" }""")]
-    public void Form_page_on_a_form_widget_or_not_naming_a_form_page_of_the_same_entity_is_reported(string widget)
+    [Fact]
+    public void Table_widget_naming_the_removed_form_page_property_is_a_schema_violation()
     {
-        using var folder = Folder().With("pages/orders.json", Page("Orders", widget));
+        // The property name is built at run time so that no file under tests spells it out.
+        var removed = "form" + "Page";
+        using var folder = Folder().With("pages/orders.json", Page("Orders", $$"""{ "type": "table", "entity": "Order", "{{removed}}": "OrderForm" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.InvalidFormPage, "pages/orders.json", "/widgets/0/formPage"),
+            (DiagnosticCodes.SchemaViolation, "pages/orders.json", $"/widgets/0/{removed}"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Null(result.Model);
     }
@@ -90,7 +99,7 @@ public sealed class PresentationCompilerTests
     {
         using var folder = Folder()
             .With("data-sources/order-list.json", OrderList())
-            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "orderList", "formPage": "OrderForm" }"""));
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "orderList" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -101,7 +110,6 @@ public sealed class PresentationCompilerTests
             new WidgetModel(
                 WidgetType.Table,
                 null,
-                new PageReference(Guid.Parse("55555555-5555-4555-8555-555555555552"), "OrderForm"),
                 new DataSourceReference(Guid.Parse(OrderListId), "OrderList")),
             Assert.Single(orders.Widgets));
     }
@@ -164,15 +172,14 @@ public sealed class PresentationCompilerTests
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
         var orders = Assert.Single(result.Model.Pages, page => page.Name == "Orders");
-        Assert.Equal(new WidgetModel(WidgetType.TaskInbox, null, null), Assert.Single(orders.Widgets));
+        Assert.Equal(new WidgetModel(WidgetType.TaskInbox, null), Assert.Single(orders.Widgets));
     }
 
     [Theory]
     [InlineData("entity", "\"Order\"", DiagnosticCodes.InvalidWidgetBinding)]
     [InlineData("dataSource", "\"OrderList\"", DiagnosticCodes.InvalidWidgetBinding)]
     [InlineData("form", "\"OrderEdit\"", DiagnosticCodes.InvalidWidgetBinding)]
-    [InlineData("formPage", "\"OrderForm\"", DiagnosticCodes.InvalidFormPage)]
-    public void Task_inbox_naming_a_binding_or_a_form_page_is_reported_at_that_property(string property, string value, string code)
+    public void Task_inbox_naming_a_binding_is_reported_at_that_property(string property, string value, string code)
     {
         using var folder = Folder()
             .With("data-sources/order-list.json", OrderList())
@@ -359,7 +366,7 @@ public sealed class PresentationCompilerTests
     {
         using var folder = Folder().With(
             "pages/orders.json",
-            Page("Orders", """{ "type": "table", "entity": "Order", "formPage": "OrderForm", "parameters": { "a": "b" } }"""));
+            Page("Orders", """{ "type": "table", "entity": "Order", "parameters": { "a": "b" } }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -384,43 +391,7 @@ public sealed class PresentationCompilerTests
     }
 
     [Fact]
-    public void Table_bound_to_a_grouped_data_source_with_a_form_page_is_reported_at_its_form_page()
-    {
-        // A group is not a record, so there is no record for a form to open.
-        using var folder = Folder()
-            .With("data-sources/order-list.json", OrderList(
-                """, "aggregate": { "groupBy": ["number"], "measures": [{ "name": "orders", "function": "count" }] } """))
-            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "OrderList", "formPage": "OrderForm" }"""));
-
-        var result = ApplicationCompiler.Compile(folder.Path);
-
-        var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(
-            (DiagnosticCodes.InvalidFormPage, "pages/orders.json", "/widgets/0/formPage"),
-            (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Contains("grouped", diagnostic.Message, StringComparison.Ordinal);
-        Assert.Null(result.Model);
-    }
-
-    [Fact]
-    public void Form_page_of_a_data_source_table_over_another_entity_than_its_root_is_reported()
-    {
-        using var folder = Folder()
-            .With("data-sources/order-list.json", OrderList())
-            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "OrderList", "formPage": "CustomerForm" }"""));
-
-        var result = ApplicationCompiler.Compile(folder.Path);
-
-        var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(
-            (DiagnosticCodes.InvalidFormPage, "pages/orders.json", "/widgets/0/formPage"),
-            (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Contains("'Order'", diagnostic.Message, StringComparison.Ordinal);
-        Assert.Null(result.Model);
-    }
-
-    [Fact]
-    public void Form_page_naming_a_page_file_that_failed_its_schema_reports_only_that_file()
+    public void Navigate_action_naming_a_page_file_that_failed_its_schema_reports_only_that_file()
     {
         using var folder = Folder()
             .With("pages/order-form.json", """

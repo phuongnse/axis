@@ -19,6 +19,8 @@
     "pages.suppliers.title": "Nhà cung cấp",
     "pages.myTasks.title": "Nhiệm vụ của tôi",
     "pages.approvals.title": "Theo dõi quy trình phê duyệt",
+    "actions.open": "Mở",
+    "actions.new": "Tạo mới",
     "department.label": "Phòng ban",
     "department.code": "Mã",
     "department.name": "Tên",

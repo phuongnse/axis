@@ -46,7 +46,11 @@ internal static class ModelAssert
             Assert.Equal(
                 (expectedPage.Id, expectedPage.Name, expectedPage.Title, expectedPage.File),
                 (actualPage.Id, actualPage.Name, actualPage.Title, actualPage.File));
-            Assert.Equal(expectedPage.Widgets, actualPage.Widgets);
+            Assert.Equal(expectedPage.Widgets.Count, actualPage.Widgets.Count);
+            foreach (var (expectedWidget, actualWidget) in expectedPage.Widgets.Zip(actualPage.Widgets))
+            {
+                Equal(expectedWidget, actualWidget);
+            }
         }
 
         Assert.Equal(expected.Texts.Count, actual.Texts.Count);
@@ -87,6 +91,35 @@ internal static class ModelAssert
                 (expectedProcess.StartCondition?.Expression.Expression, expectedProcess.StartCondition?.Message),
                 (actualProcess.StartCondition?.Expression.Expression, actualProcess.StartCondition?.Message));
             Assert.Equal(expectedProcess.Steps.Select(Describe), actualProcess.Steps.Select(Describe));
+        }
+    }
+
+    /// <summary>A widget with its actions: each action holds a parameter map, which compares by reference, so the actions are compared here one by one.</summary>
+    private static void Equal(WidgetModel expected, WidgetModel actual)
+    {
+        WidgetModel WithoutActions(WidgetModel widget) => widget with { Actions = [], RowActions = [], ToolbarActions = [] };
+
+        Assert.Equal(WithoutActions(expected), WithoutActions(actual));
+        foreach (var (expectedActions, actualActions) in new[]
+        {
+            (expected.Actions, actual.Actions), (expected.RowActions, actual.RowActions), (expected.ToolbarActions, actual.ToolbarActions),
+        })
+        {
+            Assert.Equal(expectedActions.Count, actualActions.Count);
+            foreach (var (expectedAction, actualAction) in expectedActions.Zip(actualActions))
+            {
+                if (expectedAction is NavigateActionModel expectedNavigate && actualAction is NavigateActionModel actualNavigate)
+                {
+                    Assert.Equal(expectedNavigate.Parameters, actualNavigate.Parameters);
+                    Assert.Equal(
+                        expectedNavigate with { Parameters = NavigateActionModel.NoParameters },
+                        actualNavigate with { Parameters = NavigateActionModel.NoParameters });
+                }
+                else
+                {
+                    Assert.Equal(expectedAction, actualAction);
+                }
+            }
         }
     }
 

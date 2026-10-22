@@ -11,6 +11,8 @@
     "pages.myRequests.title": "Yêu cầu của tôi",
     "pages.requestForm.title": "Yêu cầu",
     "pages.myTasks.title": "Công việc của tôi",
+    "actions.open": "Mở",
+    "actions.new": "Tạo mới",
     "request.label": "Yêu cầu",
     "request.number": "Số",
     "request.requester": "Người yêu cầu",

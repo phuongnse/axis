@@ -557,11 +557,6 @@ internal static class PresentationChecker
                 }
             }
 
-            if (widget.FormPage is not null)
-            {
-                Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
-            }
-
             if (widget.Actions is not null)
             {
                 Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
@@ -582,11 +577,6 @@ internal static class PresentationChecker
                 {
                     Report(DiagnosticCodes.InvalidWidgetBinding, $"'{property}' does not apply to process inspector widgets.", $"{path}/{property}");
                 }
-            }
-
-            if (widget.FormPage is not null)
-            {
-                Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
             }
 
             if (widget.Actions is not null)
@@ -758,51 +748,6 @@ internal static class PresentationChecker
                 NavigateChecker.Check(toolbarActions[index], $"{path}/toolbarActions/{index}", toolbarScope, page, loaded, findPage, findForm, references, diagnostics);
             }
         }
-
-        if (widget.FormPage is not { } formPage)
-        {
-            return;
-        }
-
-        if (isForm)
-        {
-            Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
-        }
-        else if (grouped)
-        {
-            Report(
-                DiagnosticCodes.InvalidFormPage,
-                $"The data source '{widget.DataSource}' is grouped. A group is not a record, so the table cannot name a form page.",
-                $"{path}/formPage");
-        }
-        else if (findPage(formPage) is { } target)
-        {
-            references.Add(page, $"{path}/formPage", ReferenceRelations.WidgetFormPage, ResourceNode.Of(target));
-
-            // Rows of a data source carry the id of their root record, so the form must be over
-            // that root entity. A form widget that names a form is over the form's entity, and a
-            // form that is unknown is already reported on the target page.
-            var targetLeaves = Leaves(target.Widgets).ToList();
-            var targetWidget = targetLeaves.FirstOrDefault(leaf => WidgetTypes.Parse(leaf.Type) == WidgetType.Form) ?? targetLeaves[0];
-            var targetEntity = targetWidget.Entity ?? (targetWidget.Form is { } targetForm ? findForm(targetForm)?.Entity : null);
-            if (WidgetTypes.Parse(targetWidget.Type) != WidgetType.Form
-                || (recordEntity is not null && targetEntity is not null && !string.Equals(targetEntity, recordEntity, StringComparison.OrdinalIgnoreCase)))
-            {
-                var expected = recordEntity is null ? "a form widget" : $"a form widget over '{recordEntity}'";
-                Report(
-                    DiagnosticCodes.InvalidFormPage,
-                    $"The page '{target.Name}' must hold {expected}, but holds a {targetWidget.Type} widget over '{targetEntity ?? targetWidget.DataSource}'.",
-                    $"{path}/formPage");
-            }
-        }
-        else if (!loaded.UnloadedPageNames.Contains(formPage))
-        {
-            Report(
-                DiagnosticCodes.InvalidFormPage,
-                $"The page '{formPage}' was not found. No loaded page has that name.",
-                $"{path}/formPage");
-        }
-
     }
 
     /// <summary>
@@ -837,11 +782,6 @@ internal static class PresentationChecker
         if (widget.Actions is not null)
         {
             Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
-        }
-
-        if (widget.FormPage is not null)
-        {
-            Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
         }
 
         ReportTableActions(widget, path, Report);

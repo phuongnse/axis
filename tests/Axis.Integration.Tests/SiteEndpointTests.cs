@@ -70,7 +70,12 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("items.title", root.GetProperty("titleKey").GetString());
         var widget = Assert.Single(root.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal("table", widget.GetProperty("type").GetString());
-        Assert.Equal("ItemForm", widget.GetProperty("formPage").GetString());
+        Assert.Equal(
+            [("navigate", "ItemForm", "items.open", "id")],
+            widget.GetProperty("rowActions").EnumerateArray().Select(action => (action.GetProperty("type").GetString(), action.GetProperty("page").GetString(), action.GetProperty("labelKey").GetString(), action.GetProperty("record").GetString())));
+        Assert.Equal(
+            [("navigate", "ItemForm", "items.new", (string?)null)],
+            widget.GetProperty("toolbarActions").EnumerateArray().Select(action => (action.GetProperty("type").GetString(), action.GetProperty("page").GetString(), action.GetProperty("labelKey").GetString(), action.GetProperty("record").GetString())));
 
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("dataSource").ValueKind);
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("form").ValueKind);
@@ -133,7 +138,6 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("ItemsByDepartment", root.GetProperty("name").GetString());
         var widget = Assert.Single(root.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal("table", widget.GetProperty("type").GetString());
-        Assert.Equal("ItemForm", widget.GetProperty("formPage").GetString());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("entity").ValueKind);
 
         var dataSource = widget.GetProperty("dataSource");
@@ -159,14 +163,13 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     }
 
     [Fact]
-    public async Task Form_page_has_a_form_widget_without_a_form_page()
+    public async Task Form_page_has_a_form_widget()
     {
         using var page = await GetJsonAsync("/api/sites/records/pages/itemform", HostA);
 
         Assert.Equal("ItemForm", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal("form", widget.GetProperty("type").GetString());
-        Assert.Equal(JsonValueKind.Null, widget.GetProperty("formPage").ValueKind);
         Assert.Equal("Item", widget.GetProperty("entity").GetProperty("name").GetString());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("form").ValueKind);
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("tasksPath").ValueKind);
@@ -182,10 +185,9 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("ItemSections", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(
-            ["type", "formPage", "entity", "dataSource", "form", "tasksPath", "process", "instancesPath", "actions", "rowActions", "toolbarActions", "parameters", "access", "kpi"],
+            ["type", "entity", "dataSource", "form", "tasksPath", "process", "instancesPath", "actions", "rowActions", "toolbarActions", "parameters", "access", "kpi"],
             widget.EnumerateObject().Select(property => property.Name));
         Assert.Equal("form", widget.GetProperty("type").GetString());
-        Assert.Equal(JsonValueKind.Null, widget.GetProperty("formPage").ValueKind);
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("dataSource").ValueKind);
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("tasksPath").ValueKind);
 
@@ -208,7 +210,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("MyTasks", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(
-            """{"type":"taskInbox","formPage":null,"entity":null,"dataSource":null,"form":null,"tasksPath":"/api/apps/RecordsApp/tasks","process":null,"instancesPath":null,"actions":[],"rowActions":[],"toolbarActions":[],"parameters":{},"access":null,"kpi":null}""",
+            """{"type":"taskInbox","entity":null,"dataSource":null,"form":null,"tasksPath":"/api/apps/RecordsApp/tasks","process":null,"instancesPath":null,"actions":[],"rowActions":[],"toolbarActions":[],"parameters":{},"access":null,"kpi":null}""",
             widget.GetRawText());
     }
 

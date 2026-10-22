@@ -72,7 +72,6 @@
         "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
         "dataSource": { "$ref": "#/$defs/dataSourceName", "x-axis-reference": "dataSource" },
         "form": { "$ref": "#/$defs/name", "x-axis-reference": "form" },
-        "formPage": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
         "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" },
         "actions": {
           "type": "array",
@@ -146,7 +145,7 @@
         {
           "if": { "required": ["type"], "properties": { "type": { "enum": ["columns", "tabs", "section"] } } },
           "then": {
-            "properties": { "entity": false, "dataSource": false, "form": false, "formPage": false, "actions": false, "rowActions": false, "toolbarActions": false, "parameters": false, "measure": false, "label": false, "comparison": false, "navigate": false }
+            "properties": { "entity": false, "dataSource": false, "form": false, "actions": false, "rowActions": false, "toolbarActions": false, "parameters": false, "measure": false, "label": false, "comparison": false, "navigate": false }
           }
         }
       ]

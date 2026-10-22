@@ -8,7 +8,7 @@ namespace Axis.Configuration.Tests;
 public sealed class WidgetTreeCompilerTests
 {
     private const string PageFile = "pages/overview.json";
-    private const string Table = """{ "type": "table", "entity": "Order", "formPage": "OrderForm" }""";
+    private const string Table = """{ "type": "table", "entity": "Order" }""";
     private const string Inbox = """{ "type": "taskInbox" }""";
     private const string OrderFormWidget = """{ "type": "form", "entity": "Order" }""";
 
@@ -27,7 +27,7 @@ public sealed class WidgetTreeCompilerTests
         Assert.Equal(WidgetType.Columns, columns.Type);
         Assert.Equal([8, 4], columns.Columns.Select(column => column.Width));
         var table = Assert.Single(columns.Columns[0].Widgets);
-        Assert.Equal((WidgetType.Table, "Order", "OrderForm"), (table.Type, table.Entity!.Name, table.FormPage!.Name));
+        Assert.Equal((WidgetType.Table, "Order"), (table.Type, table.Entity!.Name));
         var tabs = Assert.Single(columns.Columns[1].Widgets);
         var tab = Assert.Single(tabs.Tabs);
         Assert.Equal("orders.title", tab.Label.TextKey);
@@ -146,9 +146,12 @@ public sealed class WidgetTreeCompilerTests
     }
 
     [Fact]
-    public void Form_page_finds_the_form_in_containers_and_checks_its_entity()
+    public void Record_navigate_finds_the_form_in_containers_and_checks_its_entity()
     {
-        using var folder = Folder(Table)
+        const string openOrder = """
+            "rowActions": [ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "orders.title" }, "record": "id" } ]
+            """;
+        using var folder = Folder($$"""{ "type": "table", "entity": "Order", {{openOrder}} }""")
             .With("pages/order-form.json", Page(
                 "OrderForm",
                 Columns((12, Section("orders.title", false, OrderFormWidget))),
@@ -156,19 +159,18 @@ public sealed class WidgetTreeCompilerTests
                 "orderForm.title"))
             .With("pages/customer-widget.json", Page(
                 "CustomerWidget",
-                Section("orders.title", false, """{ "type": "table", "entity": "Customer", "formPage": "OrderForm" }"""),
+                Section("orders.title", false, $$"""{ "type": "table", "entity": "Customer", {{openOrder}} }"""),
                 "55555555-5555-4555-8555-555555555554",
                 "orders.title"));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
-        // The orders table's form page holds its form in containers and is fine. The form is over Order, so the
-        // customer table's form page is reported where it is written.
+        // The orders table opens a form page that holds its form in containers and is fine. The form is over Order, so the
+        // customer table's record is reported where it is written.
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.InvalidFormPage, "pages/customer-widget.json", "/widgets/0/widgets/0/formPage"),
+            (DiagnosticCodes.InvalidNavigateRecord, "pages/customer-widget.json", "/widgets/0/widgets/0/rowActions/0/record"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Contains("form widget over 'Customer'", diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -199,7 +201,7 @@ public sealed class WidgetTreeCompilerTests
     [InlineData("""{ "type": "section", "widgets": [ { "type": "taskInbox" } ] }""")]
     [InlineData("""{ "type": "section", "title": { "textKey": "orders.title" }, "widgets": [] }""")]
     [InlineData("""{ "type": "section", "title": { "textKey": "orders.title" } }""")]
-    [InlineData("""{ "type": "section", "title": { "textKey": "orders.title" }, "formPage": "OrderForm", "widgets": [ { "type": "taskInbox" } ] }""")]
+    [InlineData("""{ "type": "section", "title": { "textKey": "orders.title" }, "entity": "Order", "widgets": [ { "type": "taskInbox" } ] }""")]
     [InlineData("""{ "type": "taskInbox", "widgets": [ { "type": "taskInbox" } ] }""")]
     [InlineData("""{ "type": "taskInbox", "collapsed": true }""")]
     [InlineData("""{ "type": "table", "entity": "Order", "columns": [ { "width": 12, "widgets": [ { "type": "taskInbox" } ] } ] }""")]

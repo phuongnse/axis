@@ -46,7 +46,6 @@ public sealed class KpiCompilerTests
         Assert.Equal(new DataSourceReference(Guid.Parse("77777777-7777-4777-8777-777777777773"), "OrderTotals"), widget.DataSource);
         Assert.Null(widget.Entity);
         Assert.Null(widget.Form);
-        Assert.Null(widget.FormPage);
         Assert.Empty(widget.Actions);
         Assert.Equal(
             new KpiModel(
@@ -139,8 +138,7 @@ public sealed class KpiCompilerTests
     [InlineData("actions", "[]", DiagnosticCodes.InvalidWidgetBinding)]
     [InlineData("rowActions", "[]", DiagnosticCodes.InvalidWidgetBinding)]
     [InlineData("toolbarActions", "[]", DiagnosticCodes.InvalidWidgetBinding)]
-    [InlineData("formPage", "\"OrderForm\"", DiagnosticCodes.InvalidFormPage)]
-    public void Kpi_naming_an_entity_a_form_actions_or_a_form_page_is_reported_at_that_property(string property, string value, string code)
+    public void Kpi_naming_an_entity_a_form_or_actions_is_reported_at_that_property(string property, string value, string code)
     {
         using var folder = Folder($$"""{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "{{property}}": {{value}} }""");
 

@@ -100,13 +100,7 @@ export function PageEditor({ value, onChange }: { value: Content; onChange: Chan
                 tree={{ widgets, selected, onSelect: setPicked, onChange }}
               />
               {widgets.length > 0 && (
-                <WidgetPanel
-                  key={selected}
-                  base={selected}
-                  widget={getAt(value, selected)}
-                  pageName={text(value.name)}
-                  onChange={onChange}
-                />
+                <WidgetPanel key={selected} base={selected} widget={getAt(value, selected)} onChange={onChange} />
               )}
             </>
           )}
@@ -339,13 +333,11 @@ function NameField({
 function WidgetPanel({
   base,
   widget,
-  pageName,
   onChange,
 }: {
   /** The pointer of the selected widget. */
   base: string
   widget: unknown
-  pageName: string
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -417,15 +409,6 @@ function WidgetPanel({
             current={widget.dataSource}
             required={false}
             onPick={(next) => pick('dataSource', next, 'entity')}
-          />
-          <NameField
-            pointer={`${base}/formPage`}
-            label={t('shell.studio.page.formPage')}
-            kind="page"
-            current={widget.formPage}
-            required={false}
-            without={pageName}
-            onPick={(next) => pick('formPage', next)}
           />
           <Actions
             pointer={`${base}/rowActions`}

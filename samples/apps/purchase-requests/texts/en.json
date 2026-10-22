@@ -19,6 +19,8 @@
     "pages.suppliers.title": "Suppliers",
     "pages.myTasks.title": "My tasks",
     "pages.approvals.title": "Purchase request approvals",
+    "actions.open": "Open",
+    "actions.new": "New",
     "department.label": "Department",
     "department.code": "Code",
     "department.name": "Name",

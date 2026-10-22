@@ -21,10 +21,9 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   ```
 
   - **Compile.** A `taskInbox` names no `entity`, `dataSource` or `form`,
-    otherwise it is `AXC0060` at that property. It names no `formPage`,
-    otherwise it is `AXC0022` at `/widgets/{i}/formPage`.
+    otherwise it is `AXC0060` at that property.
   - **Metadata.** The widget has `"entity": null`, `"dataSource": null`,
-    `"form": null`, `"formPage": null` and a `tasksPath`, such as
+    `"form": null` and a `tasksPath`, such as
     `"/api/apps/PurchasingApp/tasks"`. `tasksPath` is `null` on every other
     widget and never left out.
   - **Order.** Rows keep the task API's order: the earliest due date first,

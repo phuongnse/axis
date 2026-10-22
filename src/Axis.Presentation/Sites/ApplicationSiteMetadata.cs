@@ -87,8 +87,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <summary>
 /// One widget. On a table or form widget, exactly one of <see cref="Entity"/> and
 /// <see cref="DataSource"/> is set: the widget shows all records of an entity, or the rows of a data
-/// source. <see cref="FormPage"/> is set only on a table widget that names the page holding the form
-/// for its records. <see cref="Form"/> is set only on a form widget that names a form; <see cref="Entity"/>
+/// source. <see cref="Form"/> is set only on a form widget that names a form; <see cref="Entity"/>
 /// is then the form's entity, with every field the user may read, so a client knows the type of each
 /// field the form shows. <see cref="TasksPath"/> is set only on a task inbox, which has no entity or data source.
 /// <see cref="Process"/> and <see cref="InstancesPath"/> are set only on a process inspector, which has no entity or data source either.
@@ -111,7 +110,6 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <param name="Kpi">What a kpi widget shows, or null on any other widget.</param>
 public sealed record WidgetMetadata(
     string Type,
-    string? FormPage,
     EntityMetadata? Entity,
     DataSourceMetadata? DataSource,
     FormMetadata? Form,

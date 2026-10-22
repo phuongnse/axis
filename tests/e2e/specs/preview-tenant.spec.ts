@@ -31,7 +31,7 @@ test('anna signs in on the preview host and sees the purchase request site witho
     await expectSessionUser(preview, 'anna')
 
     await preview.goto('/purchasing/purchaserequests?pageSize=100')
-    await expect(preview.getByRole('link', { name: 'New' })).toBeVisible()
+    await expect(preview.getByRole('button', { name: 'New', exact: true })).toBeVisible()
     await expect(preview.getByRole('row', { name: new RegExp(title) })).toHaveCount(0)
 
     const records = await preview.request.get(`${recordsPath}?pageSize=100`)

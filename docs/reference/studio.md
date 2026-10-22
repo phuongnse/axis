@@ -480,8 +480,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     with a text box for each locale, and a list of its widgets, each with its
     type and a summary such as `table · PurchaseRequestList`. A panel per
     widget type, `table`, `form`, `taskInbox` and `processInspector`, shows the
-    properties the widget has today. A `table` panel has entity, data source
-    and form page pickers, then `rowActions` and `toolbarActions` lists of
+    properties the widget has today. A `table` panel has entity and data source
+    pickers, then `rowActions` and `toolbarActions` lists of
     navigate actions. A `form` panel has entity and form pickers and its
     `actions`, each a `startProcess` action with a process picker and a label,
     or a navigate action. A
@@ -503,10 +503,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
       navigate action. An empty Record box removes the `record` key. Parameter
       names are typed, not picked, and a wrong name shows as a diagnostic after
       the save.
-    - **Pickers.** The form page picker lists every page except the current
-      one. The action's process picker lists every process. Neither checks
-      what the choice holds, so a wrong choice shows as a diagnostic after the
-      save. The form page picker goes when M12 removes `formPage`. Page
+    - **Pickers.** The action's process picker lists every process. It does
+      not check what the choice holds, so a wrong choice shows as a diagnostic
+      after the save. Page
       parameters are edited in the JSON view
       ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md))
       *(planned for M12)*.

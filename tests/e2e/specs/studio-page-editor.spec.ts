@@ -121,7 +121,6 @@ test.describe("Studio builds pages in the page editor", () => {
       "studio-field-/widgets/0/dataSource",
       "PurchaseRequestList",
     );
-    await pick(page, "studio-field-/widgets/0/formPage", "ReviewForm");
     await page
       .getByTestId("studio-field-/widgets/0/rowActions")
       .getByRole("button", { name: "Add navigate action" })
@@ -167,7 +166,6 @@ test.describe("Studio builds pages in the page editor", () => {
       {
         type: "table",
         dataSource: "PurchaseRequestList",
-        formPage: "ReviewForm",
         rowActions: [
           {
             type: "navigate",
