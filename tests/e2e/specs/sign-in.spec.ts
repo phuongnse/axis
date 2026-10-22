@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 /** Signs in as Anna on the Keycloak login page from the header's sign-in button on the home page. */
 async function signInAsAnna(page: Page) {
   await page.goto('/')
-  await page.getByRole('banner').getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('banner').getByRole('button', { name: 'Sign in', exact: true }).click()
   await page.locator('#username').fill('anna')
   await page.locator('#password').fill('axis')
   await page.locator('#kc-login').click()
@@ -22,10 +22,10 @@ test('a person signs in on the Keycloak login page, returns to the home page, an
   await expect(page).toHaveURL(`${baseURL}/`)
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode' }).click()
+      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
-    await expect(shell.getByRole('banner').getByRole('button', { name: 'Anna Employee' })).toBeVisible()
+    await expect(shell.getByRole('banner').getByRole('button', { name: 'Anna Employee', exact: true })).toBeVisible()
   }
 })
 
@@ -35,12 +35,12 @@ test('after signing out from the header menu, the current user endpoint answers 
 }) => {
   await signInAsAnna(page)
   const banner = page.getByRole('banner')
-  await banner.getByRole('button', { name: 'Anna Employee' }).click()
-  await page.getByRole('menuitem', { name: 'Sign out' }).click()
+  await banner.getByRole('button', { name: 'Anna Employee', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click()
 
   // The server keeps no ID token, so Keycloak may ask to confirm the sign-out.
   const confirm = page.locator('#kc-logout')
-  const signIn = banner.getByRole('button', { name: 'Sign in' })
+  const signIn = banner.getByRole('button', { name: 'Sign in', exact: true })
   await expect(confirm.or(signIn)).toBeVisible()
   if (await confirm.isVisible()) {
     await confirm.click()

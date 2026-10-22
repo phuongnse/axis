@@ -44,7 +44,7 @@ test.describe('Studio edits a scenario in the typed editor', () => {
   }
 
   async function save(page: Page) {
-    await page.getByRole('button', { name: 'Save' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()
   }
 

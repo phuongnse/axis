@@ -127,7 +127,7 @@ test('line items are added, edited and removed in the form, in light and dark mo
   const dark = page.locator('[data-theme-mode="dark"]')
   await dark.getByLabel('Quantity 1', { exact: true }).fill('5')
   await dark.getByRole('button', { name: 'Remove', exact: true }).nth(1).click()
-  await expect(cell('Description 2')).toHaveCount(0)
+  await expect(page.getByLabel(/Description 2/i)).toHaveCount(0)
   await dark.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
@@ -136,7 +136,7 @@ test('line items are added, edited and removed in the form, in light and dark mo
   await page.reload()
   await expect(dark.getByLabel('Description 1', { exact: true })).toHaveValue('Pens')
   await expect(dark.getByLabel('Quantity 1', { exact: true })).toHaveValue('5')
-  await expect(cell('Description 2')).toHaveCount(0)
+  await expect(page.getByLabel(/Description 2/i)).toHaveCount(0)
 
   const read = await request.get(`${notesPath}/${id}`)
   const record = await read.json()
@@ -225,7 +225,7 @@ test('a stale version shows a conflict, and a duplicate code an error under Code
   expect(patched.status()).toBe(200)
 
   await titleInput.fill('Changed here')
-  await page.getByRole('button', { name: /^(loading )?Save$/ }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page.getByTestId('form-conflict')).toBeVisible()
   await page.getByRole('button', { name: 'Reload', exact: true }).click()
@@ -233,6 +233,7 @@ test('a stale version shows a conflict, and a duplicate code an error under Code
   await expect(page.getByTestId('form-conflict')).toBeHidden()
 
   await page.getByLabel('Code', { exact: true }).fill(`B-${run}`)
+  // Ant Design adds "loading" to the name while the button is busy.
   await page.getByRole('button', { name: /^(loading )?Save$/ }).click()
 
   await expect(page.getByTestId('field-error-code')).toHaveText('Must be unique.')

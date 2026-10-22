@@ -43,7 +43,7 @@ test.describe("Studio builds pages in the page editor", () => {
     await expect(
       page
         .getByTestId("studio-page-editor")
-        .getByRole("textbox", { name: "Name" }),
+        .getByRole("textbox", { name: "Name", exact: true }),
     ).toHaveValue(name);
   }
 
@@ -52,7 +52,7 @@ test.describe("Studio builds pages in the page editor", () => {
     const field = page.getByTestId(label);
     await field.getByRole("textbox", { name: "en", exact: true }).fill(en);
     await field.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
-    await field.getByRole("button", { name: "Write texts" }).click();
+    await field.getByRole("button", { name: "Write texts", exact: true }).click();
     await expect(field.getByTestId("studio-label-written")).toBeVisible();
   }
 
@@ -61,7 +61,7 @@ test.describe("Studio builds pages in the page editor", () => {
   }
 
   async function save(page: Page) {
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByTestId("studio-saved")).toBeVisible();
   }
 
@@ -87,7 +87,7 @@ test.describe("Studio builds pages in the page editor", () => {
     );
     await pick(page, "studio-field-/widgets/0/type", "form");
     await pick(page, "studio-field-/widgets/0/entity", "PurchaseRequest");
-    await page.getByRole("button", { name: "Add action" }).click();
+    await page.getByRole("button", { name: "Add action", exact: true }).click();
     await pick(
       page,
       "studio-field-/widgets/0/actions/0/process",
@@ -107,7 +107,7 @@ test.describe("Studio builds pages in the page editor", () => {
     await expect(
       page
         .getByTestId("studio-page-editor")
-        .getByRole("textbox", { name: "Name" }),
+        .getByRole("textbox", { name: "Name", exact: true }),
     ).toHaveValue("ReviewList");
     await writeTexts(
       page,
@@ -123,7 +123,7 @@ test.describe("Studio builds pages in the page editor", () => {
     );
     await page
       .getByTestId("studio-field-/widgets/0/rowActions")
-      .getByRole("button", { name: "Add navigate action" })
+      .getByRole("button", { name: "Add navigate action", exact: true })
       .click();
     await pick(page, "studio-field-/widgets/0/rowActions/0/page", "ReviewForm");
     await writeTexts(

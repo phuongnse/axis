@@ -59,17 +59,17 @@ test('the manager opens a task from the inbox, fills in a field, approves and re
 
   await page.goto('/e2e/tasks')
   const row = page.getByRole('row', { name: new RegExp(title) })
-  await row.getByRole('link', { name: 'Review the note' }).click()
+  await row.getByRole('link', { name: 'Review the note', exact: true }).click()
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title)
   await page.getByLabel('Priority', { exact: true }).fill('5')
   const inboxLoad = page.waitForResponse((response) => new URL(response.url()).pathname === tasksPath)
-  await page.getByRole('button', { name: 'Approve' }).click()
+  await page.getByRole('button', { name: 'Approve', exact: true }).click()
 
   await expect(page).toHaveURL(/\/e2e\/tasks$/)
   expect((await inboxLoad).ok()).toBe(true)
   // The inbox has rendered its answer once the table stops loading.
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
-  await expect(page.getByText(title)).toHaveCount(0)
+  await expect(page.getByText(new RegExp(title, 'i'))).toHaveCount(0)
   const note = await (await request.get(`${notesPath}/${noteId}`)).json()
   expect(note.values.priority).toBe(5)
 })
@@ -85,8 +85,8 @@ test('a user who is not the assignee sees that the task is assigned to someone e
 
   await page.goto(`/e2e/tasks/${taskId}`)
 
-  await expect(page.getByText('This task is assigned to someone else.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Approve' })).toHaveCount(0)
+  await expect(page.getByText('This task is assigned to someone else.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Approve/i })).toHaveCount(0)
 })
 
 test('choosing an outcome after the task was decided shows that it is already completed', async ({
@@ -99,7 +99,7 @@ test('choosing an outcome after the task was decided shows that it is already co
   await useSession(page, 'binh')
 
   await page.goto(`/e2e/tasks/${taskId}`)
-  const approve = page.getByRole('button', { name: 'Approve' })
+  const approve = page.getByRole('button', { name: 'Approve', exact: true })
   await expect(approve).toBeVisible()
   const completed = await page.request.post(`${tasksPath}/${taskId}/complete`, {
     data: { outcome: 'approve' },
@@ -108,6 +108,6 @@ test('choosing an outcome after the task was decided shows that it is already co
   expect(completed.status()).toBe(200)
   await approve.click()
 
-  await expect(page.getByText('This task is already completed.')).toBeVisible()
-  await expect(approve).toHaveCount(0)
+  await expect(page.getByText('This task is already completed.', { exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: /Approve/i })).toHaveCount(0)
 })

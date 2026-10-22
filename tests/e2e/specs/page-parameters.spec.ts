@@ -31,7 +31,7 @@ test("a page without its required parameter, or with a malformed one, shows not-
     await page.goto(address);
 
     await expect(page.getByTestId("not-found")).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Notes" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Notes", exact: true })).toBeVisible();
   }
 });
 

@@ -24,10 +24,10 @@ test('a user with the delete grant deletes a note after confirming', async ({ pa
 
   await page.goto(deletesPage)
   const row = page.getByRole('row', { name: new RegExp(title) })
-  await row.getByRole('button', { name: 'Delete' }).click()
+  await row.getByRole('button', { name: 'Delete', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('Delete this record? This cannot be undone.')
-  await dialog.getByRole('button', { name: 'Delete' }).click()
+  await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
 
   await expect(page.getByTestId('table-action-done')).toHaveText('The record was deleted.')
   await expect(row).toHaveCount(0)
@@ -47,7 +47,7 @@ test('a user without the delete grant sees no Delete button, and the server refu
   await page.goto(deletesPage)
   const row = page.getByRole('row', { name: new RegExp(title) })
   await expect(row).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Delete/i })).toHaveCount(0)
 
   const denied = await page.request.delete(`${notesPath}/${note.id}`, { headers: csrfHeaders })
   expect(denied.status()).toBe(403)
