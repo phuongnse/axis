@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   DataSourceParameter,
+  DeleteAction,
   EntityWidgetMetadata,
   FieldMetadata,
   FieldType,
@@ -149,6 +150,15 @@ const texts = {
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.table.rowActions': 'Actions',
+  'shell.table.delete': 'Delete',
+  'shell.table.deleteConfirm': 'Delete this record? This cannot be undone.',
+  'shell.table.deleted': 'The record was deleted.',
+  'shell.table.deleteDenied': 'You may not delete this record.',
+  'shell.table.deleteMissing': 'This record no longer exists.',
+  'shell.table.deleteInUse': 'This record is in use and cannot be deleted.',
+  'shell.table.deleteFailed': 'The record could not be deleted.',
+  'shell.form.cancel': 'Cancel',
+  'note.delete': 'Delete note',
   'note.title': 'Title',
   'note.done': 'Done',
   'note.dueAt': 'Due at',
@@ -909,6 +919,128 @@ describe('TableWidget', () => {
         .filter(([, init]) => init?.method === 'POST')
         .map(([, init]) => new Headers(init?.headers).get('Idempotency-Key'))
       expect(keys[0]).toBe(keys[1])
+    })
+  })
+
+  describe('delete row action', () => {
+    const deleteNote: DeleteAction = {
+      type: 'delete',
+      labelKey: 'note.delete',
+      recordsPath,
+      visibleWhen: null,
+    }
+    const deletableWidget = { ...noteWidget, rowActions: [deleteNote] }
+
+    /** Stubs `fetch`: GET answers the notes, DELETE answers `deleteStatus`. Returns the calls made. */
+    function stubDelete(deleteStatus: number) {
+      const fetchMock = vi.fn(
+        async (_input: string, init?: RequestInit) =>
+          new Response(init?.method === 'DELETE' ? null : notePage, {
+            status: init?.method === 'DELETE' ? deleteStatus : 200,
+          }),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      return {
+        gets: () => fetchMock.mock.calls.filter(([, init]) => init?.method !== 'DELETE'),
+        deletes: () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE'),
+      }
+    }
+
+    async function clickDelete() {
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+      await userEvent.click(within(row).getByRole('button', { name: 'Delete note' }))
+      return screen.findByRole('dialog')
+    }
+
+    it('asks for confirmation, sends the delete and then requests the rows again', async () => {
+      const { gets, deletes } = stubDelete(204)
+      renderWidget('', deletableWidget)
+
+      const dialog = await clickDelete()
+      expect(dialog).toHaveTextContent('Delete this record? This cannot be undone.')
+      expect(deletes()).toHaveLength(0)
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+      expect(await screen.findByTestId('table-action-done')).toHaveTextContent('The record was deleted.')
+      await waitFor(() => expect(gets()).toHaveLength(2))
+      expect(gets()[1][0]).toBe(gets()[0][0])
+      expect(deletes()).toHaveLength(1)
+      const [url, init] = deletes()[0]
+      expect(url).toBe(`${recordsPath}/${noteId}`)
+      expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+      expect(screen.queryByTestId('table-action-error')).not.toBeInTheDocument()
+    })
+
+    it('sends nothing when the user cancels the dialog', async () => {
+      const { gets, deletes } = stubDelete(204)
+      renderWidget('', deletableWidget)
+
+      const dialog = await clickDelete()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(deletes()).toHaveLength(0)
+      expect(gets()).toHaveLength(1)
+      expect(screen.queryByTestId('table-action-done')).not.toBeInTheDocument()
+    })
+
+    it.each([
+      [403, 'You may not delete this record.'],
+      [404, 'This record no longer exists.'],
+      [409, 'This record is in use and cannot be deleted.'],
+    ])('shows its own message for a %i and keeps the rows', async (status, message) => {
+      const { gets, deletes } = stubDelete(status)
+      renderWidget('', deletableWidget)
+
+      const dialog = await clickDelete()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+      expect(await screen.findByTestId('table-action-error')).toHaveTextContent(message)
+      expect(deletes()).toHaveLength(1)
+      expect(gets()).toHaveLength(1)
+      expect(screen.getByRole('row', { name: /Buy paper/ })).toBeInTheDocument()
+      expect(screen.queryByTestId('table-action-done')).not.toBeInTheDocument()
+    })
+
+    it('shows the failed text for any other answer', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const { gets } = stubDelete(500)
+      renderWidget('', deletableWidget)
+
+      const dialog = await clickDelete()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+      expect(await screen.findByTestId('table-action-error')).toHaveTextContent('The record could not be deleted.')
+      expect(gets()).toHaveLength(1)
+    })
+
+    it('shows the failed text when the request throws', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (_input: string, init?: RequestInit) => {
+          if (init?.method === 'DELETE') {
+            throw new TypeError('Failed to fetch')
+          }
+          return new Response(notePage)
+        }),
+      )
+      renderWidget('', deletableWidget)
+
+      const dialog = await clickDelete()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+      expect(await screen.findByTestId('table-action-error')).toHaveTextContent('The record could not be deleted.')
+      expect(warn).toHaveBeenCalled()
+    })
+
+    it('hides the button on a row where its visibleWhen is false', async () => {
+      stubDelete(204)
+      renderWidget('', { ...noteWidget, rowActions: [{ ...deleteNote, visibleWhen: 'done == true' }] })
+
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      expect(within(row).queryByRole('button', { name: 'Delete note' })).not.toBeInTheDocument()
     })
   })
 })

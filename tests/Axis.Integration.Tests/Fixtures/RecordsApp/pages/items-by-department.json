@@ -8,7 +8,10 @@
     {
       "type": "table",
       "dataSource": "ItemsByDepartment",
-      "rowActions": [{ "type": "navigate", "page": "ItemForm", "label": { "textKey": "items.open" }, "record": "id" }],
+      "rowActions": [
+        { "type": "navigate", "page": "ItemForm", "label": { "textKey": "items.open" }, "record": "id" },
+        { "type": "delete", "label": { "textKey": "items.delete" } }
+      ],
       "toolbarActions": [{ "type": "navigate", "page": "ItemForm", "label": { "textKey": "items.new" } }]
     }
   ]

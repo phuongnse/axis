@@ -1,4 +1,4 @@
-import { Alert, Button, Dropdown, Flex, Table, type TableColumnsType, type TableProps } from 'antd'
+import { Alert, Button, Dropdown, Flex, Modal, Table, type TableColumnsType, type TableProps } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { FilterBar } from './FilterBar'
@@ -6,13 +6,21 @@ import { formatValue } from './formatValue'
 import { navigatePath } from './navigateAction'
 import { markCurrentPage } from './pagination'
 import { newIdempotencyKey, startProcess } from './processes'
-import { fetchRecords, RecordQueryProblem, type RecordItem, type RecordPage, type RecordValue } from './records'
+import {
+  deleteRecord,
+  fetchRecords,
+  RecordQueryProblem,
+  type RecordItem,
+  type RecordPage,
+  type RecordValue,
+} from './records'
 import type {
   DataSourceColumn,
   DataSourceParameter,
+  DeleteAction,
   FieldMetadata,
+  RowAction,
   StartProcessAction,
-  WidgetAction,
   WidgetMetadata,
 } from './site'
 import {
@@ -100,7 +108,10 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * the target page with the parameter values in the URL query. Each `startProcess` row action is a
  * button on every row with an id that starts the process with that row's record as subject, with an
  * `Idempotency-Key` kept until the start has a final answer. A `201` loads the current page of rows
- * again, and a failure shows above the table. A toolbar action to a form page
+ * again, and a failure shows above the table. Each `delete` row action is a button on every row with an
+ * id that opens a confirmation dialog, then sends `DELETE` to the record API. A `204` shows a success
+ * message above the table and loads the current page of rows again. A `403`, `404` or `409` shows its own
+ * message above the table and keeps the rows, and any other answer shows a generic failure. A toolbar action to a form page
  * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
  * a button whose expressions the SPA cannot work out is hidden. Below 768 px, a row's actions fold
  * into one "Actions" menu.
@@ -159,6 +170,10 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   const startKeys = useRef<Record<string, string>>({})
   const [starting, setStarting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionDone, setActionDone] = useState<string | null>(null)
+  // The delete waiting for the user's confirmation.
+  const [confirming, setConfirming] = useState<{ action: DeleteAction; rowId: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const loading = state.url !== requestUrl
   const failed = state.failed && !loading
   const parameterErrors = loading ? undefined : state.parameterErrors
@@ -218,6 +233,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       }
       setStarting(true)
       setActionError(null)
+      setActionDone(null)
       const keyName = `${action.instancesPath} ${rowId}`
       try {
         const key = (startKeys.current[keyName] ??= newIdempotencyKey())
@@ -251,6 +267,42 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     [starting, t],
   )
 
+  // A 403, 404 and 409 each have their own message. Only a 204 deletes the record.
+  const runDelete = useCallback(async () => {
+    if (!confirming || deleting) {
+      return
+    }
+    const { action, rowId } = confirming
+    setDeleting(true)
+    setActionError(null)
+    setActionDone(null)
+    try {
+      let status
+      try {
+        status = await deleteRecord(action.recordsPath, rowId)
+      } catch (error) {
+        console.warn(`Deleting the record '${rowId}' of '${action.recordsPath}' failed`, error)
+        setActionError(t('shell.table.deleteFailed'))
+        return
+      }
+      if (status === 204) {
+        setActionDone(t('shell.table.deleted'))
+        setReloads((count) => count + 1)
+      } else if (status === 403) {
+        setActionError(t('shell.table.deleteDenied'))
+      } else if (status === 404) {
+        setActionError(t('shell.table.deleteMissing'))
+      } else if (status === 409) {
+        setActionError(t('shell.table.deleteInUse'))
+      } else {
+        setActionError(t('shell.table.deleteFailed'))
+      }
+    } finally {
+      setDeleting(false)
+      setConfirming(null)
+    }
+  }, [confirming, deleting, t])
+
   const columns = useMemo<TableColumnsType<TableRow>>(() => {
     const sortOrder = (field: string) =>
       query.sort?.field === field ? (query.sort.descending ? 'descend' : 'ascend') : null
@@ -274,20 +326,21 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
             return null
           }
           const scope = { id: record.id, values: record.values }
-          // A start action runs for the row. A navigate action opens its page, or is dropped when its path is unknown.
+          // A start action runs for the row. A delete action asks for confirmation first. A navigate action opens its page, or is dropped when its path is unknown.
           // An action whose visibleWhen is not plainly true is dropped.
-          const list = rowActions.flatMap(
-            (action, index): { action: WidgetAction; index: number; run: () => void }[] => {
-              if (!isVisible(action.visibleWhen, scope)) {
-                return []
-              }
-              if (action.type === 'startProcess') {
-                return [{ action, index, run: () => void runStart(action, record.id!) }]
-              }
-              const path = navigatePath(sitePath, action, scope)
-              return path ? [{ action, index, run: () => navigate(path, { state: { from } }) }] : []
-            },
-          )
+          const list = rowActions.flatMap((action, index): { action: RowAction; index: number; run: () => void }[] => {
+            if (!isVisible(action.visibleWhen, scope)) {
+              return []
+            }
+            if (action.type === 'startProcess') {
+              return [{ action, index, run: () => void runStart(action, record.id!) }]
+            }
+            if (action.type === 'delete') {
+              return [{ action, index, run: () => setConfirming({ action, rowId: record.id! }) }]
+            }
+            const path = navigatePath(sitePath, action, scope)
+            return path ? [{ action, index, run: () => navigate(path, { state: { from } }) }] : []
+          })
           if (list.length === 0) {
             return null
           }
@@ -300,7 +353,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
                   items: list.map(({ action, index, run }) => ({
                     key: String(index),
                     label: t(action.labelKey),
-                    disabled: action.type === 'startProcess' && starting,
+                    disabled: action.type !== 'navigate' && (starting || deleting),
                     onClick: run,
                   })),
                   'aria-label': t('shell.table.rowActions'),
@@ -313,7 +366,12 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           return (
             <Flex gap="small">
               {list.map(({ action, index, run }) => (
-                <Button key={index} size="small" disabled={action.type === 'startProcess' && starting} onClick={run}>
+                <Button
+                  key={index}
+                  size="small"
+                  disabled={action.type !== 'navigate' && (starting || deleting)}
+                  onClick={run}
+                >
                   {t(action.labelKey)}
                 </Button>
               ))}
@@ -323,7 +381,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       })
     }
     return result
-  }, [fields, from, locale, navigate, phone, query.sort, rowActions, runStart, sitePath, starting, t])
+  }, [fields, from, locale, navigate, phone, query.sort, rowActions, runStart, sitePath, starting, deleting, t])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
@@ -383,6 +441,19 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         />
       )}
       {actionError !== null && <Alert data-testid="table-action-error" type="error" message={actionError} />}
+      {actionDone !== null && <Alert data-testid="table-action-done" type="success" message={actionDone} />}
+      {confirming !== null && (
+        <Modal
+          open
+          title={t('shell.table.deleteConfirm')}
+          okText={t('shell.table.delete')}
+          okButtonProps={{ danger: true }}
+          cancelText={t('shell.form.cancel')}
+          confirmLoading={deleting}
+          onOk={() => void runDelete()}
+          onCancel={() => setConfirming(null)}
+        />
+      )}
       {failed ? (
         <Alert data-testid="records-error" type="error" message={t('shell.table.loadFailed')} />
       ) : (

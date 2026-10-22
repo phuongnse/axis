@@ -18,6 +18,8 @@
     "pages.noteDetail.title": "Chi tiết ghi chú",
     "noteDetail.edit": "Sửa ghi chú",
     "notes.open": "Mở",
+    "notes.delete": "Xóa",
+    "pages.noteDeletes.title": "Xóa ghi chú",
     "notes.new": "Tạo mới",
     "pages.noteTotals.title": "Tổng ghi chú",
     "pages.noteCount.title": "Số ghi chú",

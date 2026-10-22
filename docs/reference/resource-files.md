@@ -109,17 +109,18 @@ site, and its widgets are its content:
   a button that starts the process for the form's record. See
   [frontend.md](frontend.md).
 - A `table` widget may list `rowActions` and `toolbarActions`. For now each
-  entry is a `navigate` action or, in `rowActions`, a `startProcess` action.
-  The compiler checks them and the SPA shows each as a button. The other entries
-  are *(planned for M12)*. An entry has a `type`, such as
+  entry is a `navigate` action or, in `rowActions`, a `startProcess` or `delete`
+  action. The compiler checks them and the SPA shows each as a button. A `delete`
+  asks for confirmation, then deletes the row's record. An entry has a `type`, such as
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }` or
   `{ "type": "delete", "label": { "textKey": "purchaseRequest.delete" } }`.
   `navigate` may sit in either list. `startProcess` and `delete` sit in
-  `rowActions` only, and the row is their subject. A `navigate` or
-  `startProcess` entry in `rowActions` may have `visibleWhen`, a boolean
+  `rowActions` only, and the row is their subject. A `navigate`,
+  `startProcess` or `delete` entry in `rowActions` may have `visibleWhen`, a boolean
   expression over the row, such as `"visibleWhen": "status == 'open'"`. The
   schema refuses it in `toolbarActions`, in a form's `actions` and on a kpi's
-  `navigate`. `delete` is still planned. See [frontend.md](frontend.md) and
+  `navigate`. It refuses a `delete` with a `process`, `page`, `parameters` or
+  `record`, and a `delete` in `toolbarActions` or a form's `actions`. See [frontend.md](frontend.md) and
   [D59](../decisions/d59-table-row-and-toolbar-actions.md).
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
   `{ "type": "table", "dataSource": "PurchaseRequestList" }`.
