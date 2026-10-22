@@ -1,0 +1,19 @@
+{
+  "id": "2aa6285b-7b22-4f15-80e7-b19daa8b8799",
+  "kind": "form",
+  "name": "OrderSummary",
+  "formatVersion": 1,
+  "entity": "Order",
+  "sections": [
+    {
+      "name": "main",
+      "title": { "textKey": "orderSummary.main" },
+      "fields": [{ "field": "title" }, { "field": "lineCount" }]
+    },
+    {
+      "name": "lines",
+      "title": { "textKey": "orderSummary.lines" },
+      "fields": [{ "field": "lines" }]
+    }
+  ]
+}

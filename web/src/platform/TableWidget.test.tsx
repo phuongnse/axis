@@ -57,6 +57,7 @@ const noteWidget: EntityWidgetMetadata = {
   toolbarActions: [],
   parameters: {},
   access: everyAction,
+  detail: null,
   kpi: null,
   entity: {
     name: 'Note',
@@ -94,6 +95,7 @@ const noteListWidget: WidgetMetadata = {
   toolbarActions: [],
   parameters: {},
   access: everyAction,
+  detail: null,
   kpi: null,
   dataSource: {
     name: 'NoteList',
@@ -261,6 +263,7 @@ describe('TableWidget', () => {
       toolbarActions: [],
       parameters: {},
       access: everyAction,
+      detail: null,
       kpi: null,
       dataSource: {
         name: 'NotesByDepartment',
@@ -579,6 +582,7 @@ describe('TableWidget', () => {
       toolbarActions: [],
       parameters: {},
       access: everyAction,
+      detail: null,
       kpi: null,
     })
 

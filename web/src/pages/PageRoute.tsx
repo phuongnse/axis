@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
+import { DetailWidget } from '../platform/DetailWidget'
 import { FormWidget } from '../platform/FormWidget'
 import { KpiWidget } from '../platform/KpiWidget'
 import { PageLayout } from '../platform/PageLayout'
@@ -21,7 +22,7 @@ type FormMode = 'new' | 'edit'
 // A record id in the hyphenated 8-4-4-4-12 hex form, as the record API accepts it.
 const recordIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// The compiler binds a form widget to an entity, never to a data source.
+// The compiler binds a form or detail widget to an entity, never to a data source.
 function hasEntity(widget: WidgetMetadata): widget is EntityWidgetMetadata {
   return widget.entity !== null
 }
@@ -136,6 +137,11 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       </PageLayout>
     )
   }
+  // A detail shows the record its page parameter names. A value that is no record id names no record, so none is requested.
+  const detailId = widget?.type === 'detail' && widget.detail ? pageValues[widget.detail.record] : undefined
+  if (widget?.type === 'detail' && (detailId === undefined || !recordIdPattern.test(detailId))) {
+    return <NotFoundPage />
+  }
   // A table page has no record segment, and a form page always has one.
   const isForm = widget?.type === 'form'
   if (isForm !== (form !== undefined) || (recordId !== null && !recordIdPattern.test(recordId))) {
@@ -155,6 +161,9 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
           returnTo={returnTo}
           locale={locale}
         />
+      )}
+      {widget?.type === 'detail' && hasEntity(widget) && detailId !== undefined && (
+        <DetailWidget key={detailId} widget={widget} sitePath={sitePath} recordId={detailId} locale={locale} />
       )}
       {widget?.type === 'taskInbox' && (
         <TaskInboxWidget

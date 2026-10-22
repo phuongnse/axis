@@ -68,11 +68,12 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["table", "form", "taskInbox", "processInspector", "kpi", "columns", "tabs", "section"] },
+        "type": { "enum": ["table", "form", "taskInbox", "processInspector", "kpi", "detail", "columns", "tabs", "section"] },
         "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
         "dataSource": { "$ref": "#/$defs/dataSourceName", "x-axis-reference": "dataSource" },
         "form": { "$ref": "#/$defs/name", "x-axis-reference": "form" },
         "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" },
+        "record": { "$ref": "#/$defs/name" },
         "actions": {
           "type": "array",
           "items": { "$ref": "#/$defs/action" }
@@ -128,6 +129,11 @@
           "else": { "properties": { "measure": false, "label": false, "comparison": false, "navigate": false } }
         },
         {
+          "if": { "required": ["type"], "properties": { "type": { "const": "detail" } } },
+          "then": { "required": ["record"], "properties": { "parameters": false } },
+          "else": { "properties": { "record": false } }
+        },
+        {
           "if": { "required": ["type"], "properties": { "type": { "const": "columns" } } },
           "then": { "required": ["columns"] },
           "else": { "properties": { "columns": false } }
@@ -145,7 +151,7 @@
         {
           "if": { "required": ["type"], "properties": { "type": { "enum": ["columns", "tabs", "section"] } } },
           "then": {
-            "properties": { "entity": false, "dataSource": false, "form": false, "actions": false, "rowActions": false, "toolbarActions": false, "parameters": false, "measure": false, "label": false, "comparison": false, "navigate": false }
+            "properties": { "entity": false, "dataSource": false, "form": false, "actions": false, "rowActions": false, "toolbarActions": false, "parameters": false, "record": false, "measure": false, "label": false, "comparison": false, "navigate": false }
           }
         }
       ]

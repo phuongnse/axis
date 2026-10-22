@@ -227,4 +227,5 @@ public static class DiagnosticCodes
     public const string ParametersOnFormPage = "AXC0236";
     public const string KpiDataSourceNotTotal = "AXC0237";
     public const string UnknownKpiMeasure = "AXC0238";
+    public const string InvalidDetailRecord = "AXC0239";
 }

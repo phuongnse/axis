@@ -90,19 +90,21 @@ site, and its widgets are its content:
 ```
 
 - A page holds one or more widgets. A leaf widget `type` is `table`, `form`,
-  `taskInbox`, `processInspector` or `kpi`. A `form` names a `form` resource, which lays out the fields of
+  `taskInbox`, `processInspector`, `kpi` or `detail`. A `form` names a `form` resource, which lays out the fields of
   one entity in sections (see [frontend.md](frontend.md)), or an `entity`, as
   shorthand for all its fields in one section. A `table` names an `entity`, as
   shorthand for all records of that entity, or a `dataSource`. A `kpi` names a
   `dataSource` with one total row, one of its `measure`s and a `label`, and
   may add a `comparison` with a second `measure` and a `label`, and a `navigate`
   action, see
-  [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md). M12 adds the
-  leaf widgets `detail` and `chart` *(planned for M12)*, see
+  [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md). A `detail` names
+  an `entity` or a `form`, as a form does, and a `record`, the required
+  `reference` page parameter that picks the record it shows. It may list
+  `actions`. M12 adds the leaf widget `chart` *(planned for M12)*, see
   [frontend.md](frontend.md).
 - A `table` widget opens and creates records through `navigate` actions, see
   below. It has no link to a form page of its own.
-- A `form` widget may list `actions`. Each is
+- A `form` or `detail` widget may list `actions`. Each is
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record. See
   [frontend.md](frontend.md).

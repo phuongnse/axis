@@ -94,6 +94,7 @@ public static class ApplicationSites
             [.. widget.ToolbarActions.Select(action => Action(application, action))],
             widget.Parameters,
             FullAccess(application, widget),
+            widget.Detail is { } detail ? new DetailMetadata(detail.Record) : null,
             widget.Kpi is { } kpi
                 ? new KpiMetadata(
                     kpi.Measure,
