@@ -121,6 +121,8 @@ function pageBody(name: string, process: string | null) {
     process,
     instancesPath: process === null ? null : `/api/apps/StepApp/processes/${process}/instances`,
     actions: [],
+    rowActions: [],
+    toolbarActions: [],
     access: null,
   }
   return JSON.stringify({ name, titleKey: `${name}.title`, widgets: [widget] } as unknown as PageMetadata)

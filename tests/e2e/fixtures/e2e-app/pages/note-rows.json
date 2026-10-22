@@ -4,5 +4,18 @@
   "name": "NoteRows",
   "formatVersion": 1,
   "title": { "textKey": "pages.noteRows.title" },
-  "widgets": [{ "type": "table", "dataSource": "NoteRows" }]
+  "widgets": [
+    {
+      "type": "table",
+      "dataSource": "NoteRows",
+      "rowActions": [
+        {
+          "type": "navigate",
+          "page": "NoteForm",
+          "label": { "textKey": "noteRows.open" },
+          "record": "id"
+        }
+      ]
+    }
+  ]
 }
