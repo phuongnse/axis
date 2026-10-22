@@ -94,6 +94,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <see cref="Process"/> and <see cref="InstancesPath"/> are set only on a process inspector, which has no entity or data source either.
 /// <see cref="Actions"/> is empty on every widget but a form widget that declares actions.
 /// <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table that declares them.
+/// <see cref="Parameters"/> is empty on every widget but a table over a data source that binds page parameters.
 /// <see cref="Access"/> is set on a table or form widget and null on a task inbox and a process inspector.
 /// </summary>
 /// <param name="TasksPath">The path of the application's task API, which lists the signed-in user's open tasks.</param>
@@ -102,6 +103,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <param name="Actions">The <c>startProcess</c> and <c>navigate</c> actions of a form widget, in page file order.</param>
 /// <param name="RowActions">The <c>navigate</c> actions of a table widget on each row, in page file order.</param>
 /// <param name="ToolbarActions">The <c>navigate</c> actions of a table widget above its rows, in page file order.</param>
+/// <param name="Parameters">The name of the page parameter that gives each data source parameter its value, by the data source parameter's name.</param>
 /// <param name="Access">
 /// What the user may do with the widget's entity, or with the root entity of its data source.
 /// </param>
@@ -117,6 +119,7 @@ public sealed record WidgetMetadata(
     IReadOnlyList<ActionMetadata> Actions,
     IReadOnlyList<ActionMetadata> RowActions,
     IReadOnlyList<ActionMetadata> ToolbarActions,
+    IReadOnlyDictionary<string, string> Parameters,
     WidgetAccess? Access) : PageWidgetMetadata;
 
 /// <summary>

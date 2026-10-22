@@ -1,0 +1,9 @@
+{
+  "id": "aee9c1e6-5a2d-4d87-b46b-cfa095092f88",
+  "kind": "page",
+  "name": "CategoryNotes",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.categoryNotes.title" },
+  "parameters": [{ "name": "category", "type": "reference", "target": "Category", "required": true }],
+  "widgets": [{ "type": "table", "dataSource": "CategoryNotes", "parameters": { "inCategory": "category" } }]
+}

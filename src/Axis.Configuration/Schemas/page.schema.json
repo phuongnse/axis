@@ -86,6 +86,11 @@
           "type": "array",
           "items": { "$ref": "#/$defs/navigateAction" }
         },
+        "parameters": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "$ref": "#/$defs/name" }
+        },
         "columns": {
           "type": "array",
           "minItems": 1,
@@ -124,7 +129,7 @@
         {
           "if": { "required": ["type"], "properties": { "type": { "enum": ["columns", "tabs", "section"] } } },
           "then": {
-            "properties": { "entity": false, "dataSource": false, "form": false, "formPage": false, "actions": false, "rowActions": false, "toolbarActions": false }
+            "properties": { "entity": false, "dataSource": false, "form": false, "formPage": false, "actions": false, "rowActions": false, "toolbarActions": false, "parameters": false }
           }
         }
       ]

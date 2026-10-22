@@ -568,6 +568,7 @@ internal static class PresentationChecker
             }
 
             ReportTableActions(widget, path, Report);
+            ReportParameters(widget, path, "task inbox", Report);
 
             return;
         }
@@ -594,6 +595,7 @@ internal static class PresentationChecker
             }
 
             ReportTableActions(widget, path, Report);
+            ReportParameters(widget, path, "process inspector", Report);
 
             // The page schema requires the process on an inspector.
             var processName = widget.Process!;
@@ -622,6 +624,7 @@ internal static class PresentationChecker
         {
             // A form has one record and no rows or toolbar.
             ReportTableActions(widget, path, Report);
+            ReportParameters(widget, path, "form", Report);
         }
 
         if (isForm && widget.DataSource is not null)
@@ -678,6 +681,12 @@ internal static class PresentationChecker
         }
         else if (widget.Entity is { } entityName)
         {
+            if (!isForm)
+            {
+                // An entity has no parameters, so there is nothing to bind.
+                ReportParameters(widget, path, "table over an entity", Report);
+            }
+
             if (findEntity(entityName) is { } entity)
             {
                 references.Add(page, $"{path}/entity", ReferenceRelations.WidgetEntity, ResourceNode.Of(entity));
@@ -697,15 +706,7 @@ internal static class PresentationChecker
             grouped = dataSource.Aggregate is not null;
             source = dataSource;
 
-            // A table has no inputs for parameter values yet, so a required one would make
-            // every request for its rows fail.
-            foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true))
-            {
-                Report(
-                    DiagnosticCodes.InvalidWidgetBinding,
-                    $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A table can only show a data source whose parameters are all optional.",
-                    $"{path}/dataSource");
-            }
+            CheckParameterBinding(widget, path, page, dataSource, Report);
         }
         else if (!loaded.UnloadedDataSourceNames.Contains(widget.DataSource!)
             && !moduleReferences.ReportUndeclared(widget.DataSource!, $"{path}/dataSource", Report))
@@ -796,6 +797,125 @@ internal static class PresentationChecker
                 $"{path}/formPage");
         }
 
+    }
+
+    /// <summary>Reports <c>parameters</c> on a widget that has no data source parameter to bind.</summary>
+    private static void ReportParameters(WidgetDefinition widget, string path, string kind, Action<string, string, string> report)
+    {
+        if (widget.Parameters is not null)
+        {
+            report(DiagnosticCodes.InvalidWidgetBinding, $"'parameters' applies only to table widgets over a data source, not to a {kind}.", $"{path}/parameters");
+        }
+    }
+
+    /// <summary>
+    /// Checks how a table gives the parameters of its data source their values from the parameters of its page. Each
+    /// entry names a parameter of each, with the same type. A required parameter is bound to a required page
+    /// parameter. A page parameter does not share its name with a parameter the table leaves unbound, because both
+    /// are in the URL query as filter inputs.
+    /// </summary>
+    private static void CheckParameterBinding(
+        WidgetDefinition widget,
+        string path,
+        PageResource page,
+        DataSourceResource dataSource,
+        Action<string, string, string> report)
+    {
+        var binding = widget.Parameters ?? new Dictionary<string, string>();
+        var bound = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (key, value) in binding)
+        {
+            var entryPath = $"{path}/parameters/{key}";
+            var parameter = dataSource.Parameters.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+            if (parameter is null)
+            {
+                report(
+                    DiagnosticCodes.InvalidWidgetBinding,
+                    $"The data source '{dataSource.Name}' has no parameter '{key}'.",
+                    entryPath);
+            }
+            else if (!bound.Add(parameter.Name))
+            {
+                report(
+                    DiagnosticCodes.InvalidWidgetBinding,
+                    $"The parameter '{parameter.Name}' of the data source '{dataSource.Name}' is bound more than once, ignoring letter case.",
+                    entryPath);
+            }
+
+            var pageParameter = page.Parameters.FirstOrDefault(candidate => string.Equals(candidate.Name, value, StringComparison.OrdinalIgnoreCase));
+            if (pageParameter is null)
+            {
+                report(
+                    DiagnosticCodes.InvalidWidgetBinding,
+                    $"The page '{page.Name}' has no parameter '{value}'.",
+                    entryPath);
+            }
+
+            if (parameter is null || pageParameter is null)
+            {
+                continue;
+            }
+
+            if (!SameParameterType(pageParameter, parameter))
+            {
+                report(
+                    DiagnosticCodes.InvalidWidgetBinding,
+                    $"The page parameter '{pageParameter.Name}' cannot give the data source parameter '{parameter.Name}' its value. Their types differ, and an enum page parameter must list only values of the data source parameter.",
+                    entryPath);
+            }
+
+            if (parameter.Required == true && pageParameter.Required != true)
+            {
+                report(
+                    DiagnosticCodes.InvalidWidgetBinding,
+                    $"The data source parameter '{parameter.Name}' is required, so the page parameter '{pageParameter.Name}' that gives its value must be required too.",
+                    entryPath);
+            }
+        }
+
+        // A table has an input for each parameter it leaves unbound, so a required one would make every request
+        // for its rows fail unless a page parameter gives it a value.
+        foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true && !bound.Contains(parameter.Name)))
+        {
+            report(
+                DiagnosticCodes.InvalidWidgetBinding,
+                $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A table can only show it when the parameter is bound to a required page parameter with 'parameters'.",
+                $"{path}/dataSource");
+        }
+
+        var unbound = new HashSet<string>(
+            dataSource.Parameters.Select(parameter => parameter.Name).Where(name => !bound.Contains(name)),
+            StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < page.Parameters.Count; index++)
+        {
+            if (unbound.Contains(page.Parameters[index].Name))
+            {
+                report(
+                    DiagnosticCodes.InvalidPageParameterName,
+                    $"The parameter name '{page.Parameters[index].Name}' is used by a parameter of the data source '{dataSource.Name}' that its table leaves unbound. Both share the URL query, ignoring letter case. Bind the parameter or rename one of them.",
+                    $"/parameters/{index}/name");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether every value the page parameter accepts is one the data source parameter accepts: equal types, the
+    /// same target for a reference, and for an enum a subset of its values.
+    /// </summary>
+    private static bool SameParameterType(PageParameterDefinition pageParameter, DataSourceParameterDefinition parameter)
+    {
+        if (pageParameter.Type != parameter.Type)
+        {
+            return false;
+        }
+
+        return pageParameter.Type switch
+        {
+            "reference" => string.Equals(pageParameter.Target, parameter.Target, StringComparison.OrdinalIgnoreCase),
+            "enum" => (pageParameter.Values ?? []).All(value => (parameter.Values ?? []).Contains(value)),
+            _ => true,
+        };
     }
 
     /// <summary>Reports <c>rowActions</c> and <c>toolbarActions</c> on a widget that is not a table.</summary>

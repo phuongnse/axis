@@ -46,6 +46,7 @@ const noteWidget: EntityWidgetMetadata = {
   actions: [],
   rowActions: [],
   toolbarActions: [],
+  parameters: {},
   access: null,
   entity: {
     name: 'Note',
