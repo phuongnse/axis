@@ -131,7 +131,7 @@ flowchart LR
      page schema requires `columns` on a `columns` widget, `tabs` on a `tabs`
      widget, and `title` with `widgets` on a `section` widget. It does not allow them on
      any other widget, and no container may name an `entity`, `dataSource`,
-     `form`, `formPage` or `actions` (`AXC0004`).
+     `form`, `formPage`, `actions`, `rowActions` or `toolbarActions` (`AXC0004`).
 
      A page's `parameters` ([D63](../decisions/d63-navigate-actions-and-page-parameters.md))
      are checked in file order, at `/parameters/{i}`:
@@ -144,14 +144,34 @@ flowchart LR
        display field is `AXC0030`. A `reference` parameter's `target` is a
        `field target` edge in the reference index.
 
-     *(Planned for M12.)* `navigate` actions
-     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) add
-     these checks. Each code is assigned when the check is built:
-     - an unknown target `page`,
-     - an unknown parameter,
-     - a missing required parameter,
-     - an expression of the wrong type,
-     - `record` on a page that is not a form page, or over another entity.
+     `navigate` actions
+     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) in a
+     form widget's `actions` and a table's `rowActions` and `toolbarActions`
+     are checked at the action's pointer. The page and the buttons do not use
+     them yet:
+     - a target `page` that no loaded page has is `AXC0232` at `/page`. A page
+       that failed to load is not reported again,
+     - a parameter the target page does not declare, or one given twice
+       ignoring letter case, is `AXC0233` at `/parameters/{name}`,
+     - a required parameter of the target that the action leaves out is
+       `AXC0234` at the action,
+     - each parameter value is an expression, checked against the target
+       parameter's type. A parse error, an unknown name or a wrong type is
+       reported with the expression's own code at `/parameters/{name}`,
+     - on a form, or a table over an entity, the expression sees the record's
+       fields plus `id`. On a table over a data source it sees the projected
+       columns plus `id`. `id` is a reference to the root entity. In
+       `toolbarActions` it sees no names, because a toolbar has no row. It
+       resolves bare names only, with no paths, rules or aggregates,
+     - `rowActions` on a table over a grouped data source, and `rowActions` or
+       `toolbarActions` on a `form`, `taskInbox` or `processInspector` widget,
+       are `AXC0060` at that property. Only `navigate` entries are accepted in
+       `rowActions` and `toolbarActions` for now,
+     - each target is a `navigate page` edge in the reference index.
+
+     *(Planned for M12.)* `record` on a page that is not a form page, or over
+     another entity, adds a check of its own. Its code is assigned when the
+     check is built.
    - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded
@@ -751,7 +771,7 @@ to show where a resource is used and what it uses.
 | `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
 | `widget form` | Page | `/widgets/{i}/form` | Form |
 | `widget form page` | Page | `/widgets/{i}/formPage` (removed in M12) | Page |
-| `navigate page` *(planned for M12)* | Page | `/widgets/{i}/rowActions/{j}/page`, `/widgets/{i}/toolbarActions/{j}/page`, `/widgets/{i}/actions/{j}/page` | Page |
+| `navigate page` | Page | `/widgets/{i}/rowActions/{j}/page`, `/widgets/{i}/toolbarActions/{j}/page`, `/widgets/{i}/actions/{j}/page` | Page |
 | `widget process` | Page | `/widgets/{i}/process` | Process |
 | `action process` | Page | `/widgets/{i}/actions/{j}/process` | Process |
 | `form entity` | Form | `/entity` | Entity |

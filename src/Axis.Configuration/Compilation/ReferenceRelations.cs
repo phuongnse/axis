@@ -15,6 +15,7 @@ public static class ReferenceRelations
     public const string WidgetDataSource = "widget data source";
     public const string WidgetForm = "widget form";
     public const string WidgetFormPage = "widget form page";
+    public const string NavigatePage = "navigate page";
     public const string WidgetProcess = "widget process";
     public const string ActionProcess = "action process";
     public const string FormEntity = "form entity";

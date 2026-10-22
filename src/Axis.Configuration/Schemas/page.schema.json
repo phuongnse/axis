@@ -78,6 +78,14 @@
           "type": "array",
           "items": { "$ref": "#/$defs/action" }
         },
+        "rowActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/navigateAction" }
+        },
+        "toolbarActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/navigateAction" }
+        },
         "columns": {
           "type": "array",
           "minItems": 1,
@@ -116,7 +124,7 @@
         {
           "if": { "required": ["type"], "properties": { "type": { "enum": ["columns", "tabs", "section"] } } },
           "then": {
-            "properties": { "entity": false, "dataSource": false, "form": false, "formPage": false, "actions": false }
+            "properties": { "entity": false, "dataSource": false, "form": false, "formPage": false, "actions": false, "rowActions": false, "toolbarActions": false }
           }
         }
       ]
@@ -139,14 +147,39 @@
         "widgets": { "$ref": "#/$defs/widgets" }
       }
     },
+    "navigateParameters": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/name" },
+      "additionalProperties": { "type": "string", "minLength": 1, "x-axis-expression": true }
+    },
     "action": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "process", "label"],
+      "required": ["type", "label"],
       "properties": {
-        "type": { "enum": ["startProcess"] },
+        "type": { "enum": ["startProcess", "navigate"] },
         "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" },
-        "label": { "$ref": "#/$defs/textReference" }
+        "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
+        "label": { "$ref": "#/$defs/textReference" },
+        "parameters": { "$ref": "#/$defs/navigateParameters" }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "navigate" } } },
+          "then": { "required": ["page"], "properties": { "process": false } },
+          "else": { "required": ["process"], "properties": { "page": false, "parameters": false } }
+        }
+      ]
+    },
+    "navigateAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "page", "label"],
+      "properties": {
+        "type": { "const": "navigate" },
+        "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
+        "label": { "$ref": "#/$defs/textReference" },
+        "parameters": { "$ref": "#/$defs/navigateParameters" }
       }
     }
   }

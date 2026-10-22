@@ -507,6 +507,42 @@ public sealed class ReferenceIndexTests
     }
 
     [Fact]
+    public void A_navigate_action_gives_a_navigate_page_edge_to_its_target_and_an_unknown_target_none()
+    {
+        const string Detail = """{ "type": "table", "entity": "Order" }""";
+        const string Parameter = """{ "name": "client", "type": "reference", "target": "Client", "required": true }""";
+        const string Action = """{ "type": "navigate", "page": "TARGET", "label": { "textKey": "orders.title" }, "parameters": { "client": "id" } }""";
+        const string Orders = """{ "type": "table", "entity": "Client", "rowActions": [ ACTION ] }""";
+
+        using (var folder = PresentationCompilerTests.Folder()
+            .With("entities/client.json", PresentationCompilerTests.Client)
+            .With("pages/detail.json", PresentationCompilerTests.Page("Detail", Detail, "55555555-5555-4555-8555-555555555554", "orderForm.title", Parameter))
+            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", Orders.Replace("ACTION", Action.Replace("TARGET", "Detail", StringComparison.Ordinal), StringComparison.Ordinal))))
+        {
+            var result = ApplicationCompiler.Compile(folder.Path);
+
+            Assert.Empty(result.Diagnostics);
+            Assert.Equivalent(
+                new (string, string, string)[]
+                {
+                    (ReferenceRelations.WidgetEntity, "/widgets/0/entity", "Client"),
+                    (ReferenceRelations.NavigatePage, "/widgets/0/rowActions/0/page", "Detail"),
+                },
+                EdgesFrom(result, "Orders"));
+        }
+
+        using (var folder = PresentationCompilerTests.Folder()
+            .With("entities/client.json", PresentationCompilerTests.Client)
+            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", Orders.Replace("ACTION", Action.Replace("TARGET", "Missing", StringComparison.Ordinal), StringComparison.Ordinal))))
+        {
+            var result = ApplicationCompiler.Compile(folder.Path);
+
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownNavigatePage);
+            Assert.DoesNotContain(EdgesFrom(result, "Orders"), edge => edge.Relation == ReferenceRelations.NavigatePage);
+        }
+    }
+
+    [Fact]
     public void Compiling_the_purchase_request_sample_gives_the_edges_into_its_department_entity()
     {
         var result = ApplicationCompiler.Compile(
@@ -541,7 +577,7 @@ public sealed class ReferenceIndexTests
             .Where(field => field.IsLiteral)
             .Select(field => (string)field.GetRawConstantValue()!)
             .ToList();
-        Assert.Equal(39, expected.Count);
+        Assert.Equal(40, expected.Count);
 
         var relations = new HashSet<string>();
         using (var packages = new TemporaryFolder().Install("1.0.0"))
@@ -611,7 +647,7 @@ public sealed class ReferenceIndexTests
             "55555555-5555-4555-8555-555555555554"))
         .With("pages/order-form.json", PresentationCompilerTests.Page(
             "OrderForm",
-            """{ "type": "form", "form": "OrderEntry", "actions": [ { "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } } ] }""",
+            """{ "type": "form", "form": "OrderEntry", "actions": [ { "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } }, { "type": "navigate", "page": "Orders", "label": { "textKey": "order.submit" } } ] }""",
             "55555555-5555-4555-8555-555555555552",
             "orderForm.title"))
         .With("sites/sales.json", """

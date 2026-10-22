@@ -280,11 +280,12 @@ Paths in validations and computed fields are not built. There a path is
   reference along the path makes the result `null`. The first name of a path
   is a field, never a data source parameter, because a reference parameter
   holds an id and not a record.
-- **Scope in a navigate action** *(planned for M12)*. On a table row, bare
-  names are the row's columns, or the record's fields for a table over an
-  entity. On a form they are the record's fields. `id` is the id of the root
-  record, typed as a reference to the root entity. A path takes at most 3
-  hops, as elsewhere. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+- **Scope in a navigate action.** On a table row, bare names are the row's
+  columns, or the record's fields for a table over an entity. On a form they
+  are the record's fields. `id` is the id of the root record, typed as a
+  reference to the root entity. In a table's toolbar there are no names. The
+  scope has no rules and no aggregates, and paths *(planned for M12)* are not
+  resolved yet. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Child collection.** A child collection field gives a `list<Entity>`,
   which only aggregates accept. Inside an aggregate's item expression, names
   are the child row's fields, computed ones included, and nothing else: no

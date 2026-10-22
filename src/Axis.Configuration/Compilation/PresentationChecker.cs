@@ -558,6 +558,8 @@ internal static class PresentationChecker
                 Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
             }
 
+            ReportTableActions(widget, path, Report);
+
             return;
         }
 
@@ -582,6 +584,8 @@ internal static class PresentationChecker
                 Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
             }
 
+            ReportTableActions(widget, path, Report);
+
             // The page schema requires the process on an inspector.
             var processName = widget.Process!;
             if (findProcess(processName) is { } process)
@@ -603,6 +607,12 @@ internal static class PresentationChecker
         {
             // An action starts a process for one record, which only a form shows.
             Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+        }
+
+        if (isForm)
+        {
+            // A form has one record and no rows or toolbar.
+            ReportTableActions(widget, path, Report);
         }
 
         if (isForm && widget.DataSource is not null)
@@ -641,6 +651,7 @@ internal static class PresentationChecker
 
         // Whether the widget shows the groups of a data source rather than records.
         var grouped = false;
+        DataSourceResource? source = null;
         if (widget.Form is { } formName)
         {
             if (findForm(formName) is { } form)
@@ -675,6 +686,7 @@ internal static class PresentationChecker
             references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
             recordEntity = dataSource.Entity;
             grouped = dataSource.Aggregate is not null;
+            source = dataSource;
 
             // A table has no inputs for parameter values yet, so a required one would make
             // every request for its rows fail.
@@ -695,9 +707,40 @@ internal static class PresentationChecker
                 $"{path}/dataSource");
         }
 
+        // What a navigate action's parameter sees on a row or record: the root entity's fields, or
+        // the columns of the data source, plus the id. It is null when the entity or data source is
+        // unknown, which has a diagnostic of its own.
+        var rowScope = NavigateScope(recordEntity is null ? null : findEntity(recordEntity), source, findEntity);
+
         if (isForm)
         {
-            CheckActions(widget, page, path, recordEntity, loaded, findProcess, references, diagnostics);
+            CheckActions(widget, page, path, recordEntity, rowScope, loaded, findPage, findProcess, references, diagnostics);
+        }
+        else
+        {
+            if (grouped && widget.RowActions is not null)
+            {
+                Report(
+                    DiagnosticCodes.InvalidWidgetBinding,
+                    $"The data source '{widget.DataSource}' is grouped. A group row has no actions, so the table cannot name 'rowActions'.",
+                    $"{path}/rowActions");
+            }
+            else
+            {
+                var rowActions = widget.RowActions ?? [];
+                for (var index = 0; index < rowActions.Count; index++)
+                {
+                    NavigateChecker.Check(rowActions[index], $"{path}/rowActions/{index}", rowScope, page, loaded, findPage, references, diagnostics);
+                }
+            }
+
+            // A toolbar has no row, so its expressions see no names.
+            var toolbarScope = ExpressionScopes.ForNavigate(null, []);
+            var toolbarActions = widget.ToolbarActions ?? [];
+            for (var index = 0; index < toolbarActions.Count; index++)
+            {
+                NavigateChecker.Check(toolbarActions[index], $"{path}/toolbarActions/{index}", toolbarScope, page, loaded, findPage, references, diagnostics);
+            }
         }
 
         if (widget.FormPage is not { } formPage)
@@ -746,6 +789,50 @@ internal static class PresentationChecker
 
     }
 
+    /// <summary>Reports <c>rowActions</c> and <c>toolbarActions</c> on a widget that is not a table.</summary>
+    private static void ReportTableActions(WidgetDefinition widget, string path, Action<string, string, string> report)
+    {
+        foreach (var (property, value) in new[] { ("rowActions", widget.RowActions), ("toolbarActions", widget.ToolbarActions) })
+        {
+            if (value is not null)
+            {
+                report(DiagnosticCodes.InvalidWidgetBinding, $"'{property}' applies only to table widgets.", $"{path}/{property}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The scope of a navigate action on a row or record: <c>id</c> and the fields of the root
+    /// entity, or, for a data source, the projected columns whose path resolves. Null when the
+    /// root entity is not known.
+    /// </summary>
+    private static ExpressionScope? NavigateScope(
+        EntityResource? root, DataSourceResource? source, Func<string, EntityResource?> findEntity)
+    {
+        if (root is null)
+        {
+            return null;
+        }
+
+        if (source is null)
+        {
+            return ExpressionScopes.ForNavigate(root.Name, root.Fields.Select(field => (field.Name, ExpressionScopes.TypeOf(field))));
+        }
+
+        // A path that does not resolve has a diagnostic on the data source. One that reaches an
+        // entity that was not loaded has no type, so its column is not in the scope.
+        var columns = new List<(string Name, ExpressionType? Type)>();
+        foreach (var field in source.Fields)
+        {
+            if (ApplicationCompiler.ResolvePath(root, field.Path, findEntity, _ => { }, out var hops) is null && hops.Count > 0)
+            {
+                columns.Add((field.Name, ExpressionScopes.TypeOf(hops[^1])));
+            }
+        }
+
+        return ExpressionScopes.ForNavigate(root.Name, columns);
+    }
+
     /// <summary>The widgets that show something, not the containers around them, depth first in file order.</summary>
     private static IEnumerable<WidgetDefinition> Leaves(IEnumerable<WidgetDefinition> widgets) =>
         widgets.SelectMany(widget => WidgetTypes.Parse(widget.Type) switch
@@ -757,15 +844,19 @@ internal static class PresentationChecker
         });
 
     /// <summary>
-    /// Checks the actions of a form widget: each label has a text key, and each process exists and
-    /// is over the entity of the form's records, ignoring letter case.
+    /// Checks the actions of a form widget: each label has a text key. A <c>startProcess</c> action
+    /// names a process that exists and is over the entity of the form's records, ignoring letter
+    /// case. A <c>navigate</c> action is checked by <see cref="NavigateChecker"/> against
+    /// <paramref name="scope"/>, the names of the form's record.
     /// </summary>
     private static void CheckActions(
         WidgetDefinition widget,
         PageResource page,
         string path,
         string? recordEntity,
+        ExpressionScope? scope,
         ApplicationLoadResult loaded,
+        Func<string, PageResource?> findPage,
         Func<string, ProcessResource?> findProcess,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
@@ -775,15 +866,23 @@ internal static class PresentationChecker
         {
             var action = actions[index];
             var actionPath = $"{path}/actions/{index}";
+            if (action.Type == "navigate")
+            {
+                NavigateChecker.Check(action, actionPath, scope, page, loaded, findPage, references, diagnostics);
+                continue;
+            }
+
             ApplicationCompiler.CheckTextKey(action.Label, page, $"{actionPath}/label", references, diagnostics);
 
-            if (findProcess(action.Process) is not { } process)
+            // The schema requires the process of a startProcess action.
+            var processName = action.Process!;
+            if (findProcess(processName) is not { } process)
             {
-                if (!loaded.UnloadedProcessNames.Contains(action.Process))
+                if (!loaded.UnloadedProcessNames.Contains(processName))
                 {
                     diagnostics.Add(new Diagnostic(
                         DiagnosticCodes.UnknownActionProcess,
-                        $"The process '{action.Process}' was not found. No loaded process has that name.",
+                        $"The process '{processName}' was not found. No loaded process has that name.",
                         page.File,
                         $"{actionPath}/process",
                         page.Id));
