@@ -250,9 +250,11 @@ them.
      concept listed for this milestone, moved to a later milestone when the
      concept was not delivered;
    - every *(planned for Mx)* marker for this milestone in any doc, removed
-     when the work was built and moved to a later milestone when it was not.
+     when the work was built and moved to a later milestone when it was not;
    - the rows of [docs/README.md](README.md), which still say what each file
-     holds.
+     holds;
+   - every skill under `.claude/skills/`: its links still resolve and its
+     statements still hold.
 4. **Close.** When the last issue of the milestone closes, NexKit mentions
    the owner once. The owner closes the milestone on GitHub once the docs
    sweep is merged, and the next sweep takes the next milestone.
@@ -305,6 +307,13 @@ index. The same split keeps two pull requests from editing the same lines.
   [docs/README.md](README.md) lists every file with what it holds. Other docs
   link to that home and do not copy it. A new file gets its row in
   `docs/README.md` in the same change.
+- **One home per kind of content.** A rule and its reason live in `docs/`. How
+  to apply a rule lives in a skill under `.claude/skills/`, which links to the
+  rule and does not restate it. A value that a tool or a setting owns lives
+  only there, and the doc or skill says where to look it up. History lives in
+  issues, pull requests and git. A skill does not describe an external tool's
+  behaviour that the tool's own docs, at the version the repository pins,
+  already cover, because the next release of the tool makes that copy stale.
 - **One decision per file.** Each decision is a file
   `docs/decisions/d<n>-<slug>.md`. It starts with `# D<n>. <title>` and a
   `Status: **Agreed**` or `Status: **Proposed**` line, and the slug is the
@@ -322,7 +331,9 @@ index. The same split keeps two pull requests from editing the same lines.
 - **Short agent instructions.** [AGENTS.md](../AGENTS.md) holds only where to
   look, the working rules and the commands, in at most 100 lines.
   `CLAUDE.md` only imports it. Anything longer goes to the doc it belongs to,
-  such as [development.md](development.md), and AGENTS.md links to it.
+  such as [development.md](development.md), and AGENTS.md links to it. A
+  skill's `SKILL.md` stays at or under 250 lines and holds only how to apply
+  the rules it links.
 - **Stable links.** Link to a file, or to a heading in it, and never to text
   that changes with status. A link to a decision links its file. Renaming or
   moving a heading changes its anchor, so the same change fixes every link to
@@ -332,9 +343,11 @@ index. The same split keeps two pull requests from editing the same lines.
   relative link and anchor in the repository.
   [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that
   `docs/README.md` lists every doc, that the decisions index matches the
-  decision files, and the size limits. A doc fact that code can check, such
-  as the diagnostic code table, has a unit test that compares the two and
-  finds the table under `docs/` by its header, wherever it moves.
+  decision files, and the size limits: 1,000 lines for a doc, 100 for
+  AGENTS.md and 250 for a `SKILL.md` under `.claude/skills/`. A doc fact that
+  code can check, such as the diagnostic code table, has a unit test that
+  compares the two and finds the table under `docs/` by its header, wherever
+  it moves.
 
 ## Writing on GitHub
 
