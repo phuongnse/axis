@@ -168,6 +168,22 @@ export interface NavigateAction {
 export type WidgetAction = StartProcessAction | NavigateAction
 
 /**
+ * A `delete` row action of a table: a button that deletes the row's record after a confirmation by
+ * sending `DELETE {recordsPath}/{id}`. `recordsPath` is the record API path of the table's entity, or
+ * of its data source's root entity, so the SPA never builds that URL itself. `visibleWhen` is as on a
+ * `startProcess` action.
+ */
+export interface DeleteAction {
+  type: 'delete'
+  labelKey: string
+  recordsPath: string
+  visibleWhen: string | null
+}
+
+/** One action of a table row, in page file order. Only a row can hold a `delete`. */
+export type RowAction = WidgetAction | DeleteAction
+
+/**
  * What the signed-in user may do with a table or form widget's entity, or with the root entity of
  * its data source. `actions` lists the granted entity actions in the order `read`, `create`,
  * `update`, `delete`. `createFields` and `updateFields` list the fields a create and an update may
@@ -200,8 +216,8 @@ export interface WidgetMetadata {
   instancesPath: string | null
   /** The actions of a form or detail widget the user may take, and `[]` on every other widget. */
   actions: WidgetAction[]
-  /** The `startProcess` and navigate actions a table shows on each row, and `[]` on every other widget. */
-  rowActions: WidgetAction[]
+  /** The `startProcess`, navigate and `delete` actions a table shows on each row, and `[]` on every other widget. */
+  rowActions: RowAction[]
   /** The navigate actions a table shows above its rows, and `[]` on every other widget. */
   toolbarActions: NavigateAction[]
   /**

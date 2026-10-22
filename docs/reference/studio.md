@@ -484,7 +484,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
     pickers, then `rowActions` and `toolbarActions` lists of
     navigate actions. A `form` panel has entity and form pickers and its
     `actions`, each a `startProcess` action with a process picker and a label,
-    or a navigate action. A
+    or a navigate action. The editor does not edit a `delete` row action yet.
+    It shows the action as JSON only, which the JSON view edits, and Remove
+    action removes it. A
     `taskInbox` panel has no properties. A `processInspector` panel has a
     process picker. The JSON view stays as a second view of the same draft.
     - **Type change.** Choosing another type removes the known properties the

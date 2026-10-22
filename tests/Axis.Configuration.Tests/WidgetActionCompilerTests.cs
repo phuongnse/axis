@@ -175,6 +175,75 @@ public sealed class WidgetActionCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void Table_delete_row_action_compiles_to_a_delete_action_with_its_label_and_visible_when()
+    {
+        using var folder = Folder("Order")
+            .With(OrdersFile, OrdersPage(DeleteJson(visibleWhen: "id is not null")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var widget = Assert.Single(Assert.Single(result.Model.Pages, page => page.File == OrdersFile).Widgets);
+        Assert.Equal(
+            new WidgetActionModel[] { new DeleteActionModel(new TextReference("order.submit")) { VisibleWhen = "id is not null" } },
+            widget.RowActions);
+        Assert.Empty(widget.Actions);
+        Assert.Empty(widget.ToolbarActions);
+    }
+
+    [Fact]
+    public void Delete_action_in_toolbar_actions_is_a_schema_violation()
+    {
+        using var folder = Folder("Order")
+            .With(OrdersFile, Page("Orders", $$"""{ "type": "table", "entity": "Order", "toolbarActions": [ {{DeleteJson()}} ] }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.SchemaViolation && diagnostic.File == OrdersFile);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Delete_action_in_a_form_widgets_actions_is_a_schema_violation()
+    {
+        using var folder = Folder("Order")
+            .With(PageFile, FormPage($$"""{ "type": "form", "entity": "Order", "actions": [ {{DeleteJson()}} ] }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.SchemaViolation && diagnostic.File == PageFile);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Delete_action_naming_a_process_is_a_schema_violation()
+    {
+        using var folder = Folder("Order")
+            .With(OrdersFile, OrdersPage("""{ "type": "delete", "process": "OrderReview", "label": { "textKey": "order.submit" } }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.SchemaViolation && diagnostic.File == OrdersFile);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Delete_action_with_a_label_key_no_locale_has_is_reported_at_its_label()
+    {
+        using var folder = Folder("Order")
+            .With(OrdersFile, OrdersPage(DeleteJson("order.missing")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingTextKey, OrdersFile, "/widgets/0/rowActions/0/label/textKey"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
     /// <summary>The presentation folder with texts for the action label and the process <c>OrderReview</c> over <paramref name="processEntity"/>.</summary>
     private static TemporaryFolder Folder(string processEntity) =>
         PresentationCompilerTests.Folder()
@@ -186,6 +255,12 @@ public sealed class WidgetActionCompilerTests
 
     private static string ActionJson(string process, string labelKey = "order.submit") =>
         $$"""{ "type": "startProcess", "process": "{{process}}", "label": { "textKey": "{{labelKey}}" } }""";
+
+    private static string DeleteJson(string labelKey = "order.submit", string? visibleWhen = null)
+    {
+        var condition = visibleWhen is null ? "" : $", \"visibleWhen\": \"{visibleWhen}\"";
+        return $$"""{ "type": "delete", "label": { "textKey": "{{labelKey}}" }{{condition}} }""";
+    }
 
     private static string Action(string process, string labelKey = "order.submit") =>
         $$"""{ "type": "form", "entity": "Order", "actions": [ {{ActionJson(process, labelKey)}} ] }""";

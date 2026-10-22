@@ -110,6 +110,15 @@ export async function fetchRecord(recordsPath: string, id: string, signal?: Abor
 }
 
 /**
+ * Deletes one record and returns the response status: 204 when it is deleted, and for example 403,
+ * 404 or 409 when it is refused. A network error throws.
+ */
+export async function deleteRecord(recordsPath: string, id: string, signal?: AbortSignal): Promise<number> {
+  const response = await apiFetch(`${recordsPath}/${id}`, { method: 'DELETE', signal })
+  return response.status
+}
+
+/**
  * Creates a record when `id` is `null`, and updates the record otherwise. `body` is the prepared
  * body text, so number text reaches the server unchanged. A 400 or 409 comes back as the problem;
  * any other failure throws.

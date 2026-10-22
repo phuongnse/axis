@@ -80,8 +80,11 @@ public static class ApplicationSites
             _ => Leaf(application, widget),
         };
 
-    private static WidgetMetadata Leaf(ApplicationModel application, WidgetModel widget) =>
-        new(
+    private static WidgetMetadata Leaf(ApplicationModel application, WidgetModel widget)
+    {
+        // A delete row action carries the records path of the table's entity, or of its data source's root entity.
+        var rowEntity = WidgetEntity(application, widget);
+        return new(
             WidgetTypes.Name(widget.Type),
             widget.Entity is { } entity ? DescribeEntity(application, entity.Name) : null,
             widget.DataSource is { } dataSource ? DataSource(application, dataSource.Name) : null,
@@ -89,9 +92,9 @@ public static class ApplicationSites
             widget.Type == WidgetType.TaskInbox ? $"/api/apps/{application.Manifest.Name}/tasks" : null,
             widget.Process?.Name,
             widget.Process is { } process ? $"/api/apps/{application.Manifest.Name}/processes/{process.Name}/instances" : null,
-            [.. widget.Actions.Select(action => Action(application, action))],
-            [.. widget.RowActions.Select(action => Action(application, action))],
-            [.. widget.ToolbarActions.Select(action => Action(application, action))],
+            [.. widget.Actions.Select(action => Action(application, action, null))],
+            [.. widget.RowActions.Select(action => Action(application, action, rowEntity))],
+            [.. widget.ToolbarActions.Select(action => Action(application, action, null))],
             widget.Parameters,
             FullAccess(application, widget),
             widget.Detail is { } detail ? new DetailMetadata(detail.Record) : null,
@@ -100,12 +103,19 @@ public static class ApplicationSites
                     kpi.Measure,
                     kpi.Label.TextKey,
                     kpi.Comparison is { } comparison ? new KpiComparisonMetadata(comparison.Measure, comparison.Label.TextKey) : null,
-                    kpi.Navigate is { } navigate ? (NavigateActionMetadata)Action(application, navigate) : null)
+                    kpi.Navigate is { } navigate ? (NavigateActionMetadata)Action(application, navigate, null) : null)
                 : null);
+    }
 
-    private static ActionMetadata Action(ApplicationModel application, WidgetActionModel action) =>
+    private static ActionMetadata Action(ApplicationModel application, WidgetActionModel action, EntityModel? entity) =>
         action switch
         {
+            // The compiler allows a delete only in a table's row actions, and a table has an entity or a data source.
+            DeleteActionModel delete => new DeleteActionMetadata(delete.Label.TextKey, RecordsPath(application, entity!.Name))
+            {
+                VisibleWhen = delete.VisibleWhen,
+            },
+
             StartProcessActionModel start => new StartProcessActionMetadata(
                 start.Process.Name,
                 start.Label.TextKey,

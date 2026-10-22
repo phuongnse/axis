@@ -29,7 +29,7 @@ internal static class PageAccess
     /// <paramref name="metadata"/>, the metadata of <paramref name="page"/>, without the widgets
     /// <paramref name="roles"/> may not read, and without the columns, tabs and containers that leave empty. The widgets
     /// that remain have only the fields the roles may read, the <c>startProcess</c> actions they may start, the
-    /// <c>navigate</c> actions, and the <c>navigate</c> of a kpi, to pages they may read and the access they hold.
+    /// <c>delete</c> actions they hold a <c>delete</c> grant for, the <c>navigate</c> actions, and the <c>navigate</c> of a kpi, to pages they may read and the access they hold.
     /// </summary>
     public static PageMetadata Shape(ApplicationModel application, IReadOnlyList<string> roles, PageModel page, PageMetadata metadata) =>
         metadata with { Widgets = ShapeAll(application, roles, page.Widgets, metadata.Widgets) };
@@ -88,17 +88,20 @@ internal static class PageAccess
         {
             Entity = readable is null ? described.Entity : Readable(described.Entity, readable),
             Form = readable is null || described.Form is null ? described.Form : ApplicationSites.Readable(described.Form, readable),
-            Actions = [.. described.Actions.Where(action => Allows(application, roles, action))],
-            RowActions = [.. described.RowActions.Where(action => Allows(application, roles, action))],
-            ToolbarActions = [.. described.ToolbarActions.Where(action => Allows(application, roles, action))],
+            Actions = [.. described.Actions.Where(action => Allows(application, roles, entity, action))],
+            RowActions = [.. described.RowActions.Where(action => Allows(application, roles, entity, action))],
+            ToolbarActions = [.. described.ToolbarActions.Where(action => Allows(application, roles, entity, action))],
             Access = widget.Type == WidgetType.Kpi || entity is null ? null : Access(application, roles, entity),
-            Kpi = described.Kpi is { Navigate: { } navigate } kpi && !Allows(application, roles, navigate) ? kpi with { Navigate = null } : described.Kpi,
+            Kpi = described.Kpi is { Navigate: { } navigate } kpi && !Allows(application, roles, null, navigate) ? kpi with { Navigate = null } : described.Kpi,
         };
     }
 
-    private static bool Allows(ApplicationModel application, IReadOnlyList<string> roles, ActionMetadata action) =>
+    private static bool Allows(ApplicationModel application, IReadOnlyList<string> roles, EntityModel? entity, ActionMetadata action) =>
         action switch
         {
+            // The entity is the table's own, or its data source's root. Only a table has a delete action.
+            DeleteActionMetadata => entity is not null && PolicyEvaluator.Access(application, roles, entity, PolicyAction.Delete).Granted,
+
             StartProcessActionMetadata start =>
                 application.TryGetProcess(start.Process, out var process) && PolicyEvaluator.AllowsStart(application, roles, process),
 
