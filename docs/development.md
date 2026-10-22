@@ -29,8 +29,12 @@ critical alert. It is not a NexKit check and does not run on NexKit's branches. 
 The test, integration and E2E scripts run every suite even when one fails. The exceptions are
 the suites that NexKit's `NEXKIT_BASE_SHA` shows no change can affect: the integration tests and
 their scenarios under the safe list, Playwright under its smaller list, and the smoke tests under
-their path lists. A skipped suite is listed as skipped. Without `NEXKIT_BASE_SHA`, as in CI and local
-runs, every suite runs. Each suite writes a JUnit file to `artifacts/test-results/`. The E2E server output
+their path lists. The lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs), and any
+doubt runs the suite: a missing base, a git error or an empty change list. A performance test
+class name ends in `PerformanceTests`, so it stays out of NexKit's checks, and the class joins its
+project's performance collection, which runs alone after the other tests. A guard test fails when
+a `*PerformanceTests` class is outside that collection. A skipped suite is listed
+as skipped. Without `NEXKIT_BASE_SHA`, as in CI and local runs, every suite runs. Each suite writes a JUnit file to `artifacts/test-results/`. The E2E server output
 goes to `artifacts/logs/e2e-server.log`, the E2E worker output to
 `artifacts/logs/e2e-worker.log`, the E2E journey server output to `artifacts/logs/e2e-journey-server.log`, the E2E publisher output to `artifacts/logs/e2e-publisher.log`, and the
 purchasing system stub output to `artifacts/logs/e2e-purchasing.log`. `scripts/test-report.mjs` then prints a

@@ -6,21 +6,19 @@ description: Runbook for the local agent session that works NexKit for the Axis 
 # Driving NexKit for Axis
 
 The rules, the roles and the life of an issue are in
-[docs/delivery.md](../../../docs/delivery.md). Read it first. This file holds
-only the practical parts: where values live, the `gh` commands, two review
-checklists and what to do when something fails.
+[docs/delivery.md](../../../docs/delivery.md). Read the sections your task
+touches. This runbook says how to apply them: where values live, the commands,
+the checklists and what to do when something fails. It does not repeat the
+rules, so follow its links.
 
-Autopilot posts `/nexkit plan` and `/nexkit go` for the issues of the current
-milestone, answers questions that have a recommended option, and splits plans
-that are too large. Your part is what it cannot do: write each issue and mark
-what it must wait for, read each plan and comment changes, and act where it
-stops and a person is needed. You may still post any command, but never
-`/nexkit plan` or `/nexkit go` on an issue whose autopilot state is `start` or
-`active`. Ask the owner first when a choice rests on a **Proposed** decision or
-only the owner can answer it. Never approve, merge or close a pull request
-yourself: autopilot closes the one a split supersedes. While `merge.auto` is
-on, NexKit merges and closes the issue, and with `close_parent_issues` it closes
-finished parents too. While `merge.auto` is off, merging is the owner's.
+Autopilot plans and starts the issues of the current milestone, answers
+questions that have a recommended option, and splits plans that are too large.
+Your part is what it cannot do: write each issue and mark what it must wait
+for, read each plan and comment changes, and act where it stops and a person is
+needed. You may post any command, but never `/nexkit plan` or `/nexkit go` on
+an issue whose autopilot state is `start` or `active`. Ask the owner first when
+a choice rests on a **Proposed** decision or only the owner can answer it.
+Never approve, merge or close a pull request yourself.
 
 ## Where the values live
 
@@ -43,29 +41,15 @@ change with a NexKit release or a settings change.
     -H 'Accept: application/vnd.github.raw'
   ```
 
-- **Protected paths, the automatic fix limit and automatic merge:**
-  `.nexkit/config.json`. When a key is `null` or missing, the value is NexKit's
-  default, from its configuration doc at the pinned ref.
+- **Settings:** `.nexkit/config.json`. A key that is `null` or missing takes
+  NexKit's default, from its configuration doc at the pinned ref. A profile's
+  stage settings override `stages`, which override the top-level `model` and
+  `effort`. The `cache` entries must match the `actions/cache` steps in
+  `.github/workflows/ci.yml`.
 
   ```bash
   jq '{protected_paths, fix, merge, conflicts, usage_limit, close_parent_issues, autopilot, notify}' .nexkit/config.json
-  ```
-
-- **Profiles, their `when` texts and models:** `.nexkit/config.json`. A
-  profile's stage settings override `stages`, which override the top-level
-  `model` and `effort`. The rules behind the profiles are in
-  [delivery.md](../../../docs/delivery.md#profiles).
-
-  ```bash
   jq '{default_profile, triage: .stages.triage, profiles}' .nexkit/config.json
-  ```
-
-- **Caches NexKit restores before setup:** the `cache` key of
-  `.nexkit/config.json`. The `actions/cache` steps in `.github/workflows/ci.yml`
-  save them on `main` and must match them. The rule is in
-  [delivery.md](../../../docs/delivery.md#decisions).
-
-  ```bash
   jq '.cache' .nexkit/config.json
   ```
 
@@ -83,33 +67,11 @@ change with a NexKit release or a settings change.
 
 ## Commands
 
-Post a command:
-
-```bash
-gh issue comment <N> --body "/nexkit plan"
-gh pr comment <N> --body "/nexkit fix <instructions>"
-```
-
-Change the profile of an issue. A request written in the issue text does not
-count; it must be a comment:
-
-```bash
-gh issue comment <N> --body "/nexkit plan Use the hard profile"
-```
-
-Read the latest plan. It is the newest NexKit comment on the issue. It shows
-the profile, its models and why triage chose it:
-
-```bash
-gh issue view <N> --comments
-```
-
-See all open NexKit work and what needs a person with NexKit's local
-`status` command, at the pinned ref. It lists each issue and pull request with
+Start every session with NexKit's local `status` command, at the pinned ref,
+and use it to watch the work. It lists each open issue and pull request with
 its state and last round, the recent merges with their CI runs on `main`, what
-the next autopilot sweep does with each issue in scope and why, and a last
-section with only what needs a person. `--json` gives the same as JSON. Start
-every session with it, and use it to watch the work:
+the next autopilot sweep does with each issue and why, and a last section with
+only what needs a person. `--json` gives the same as JSON.
 
 ```bash
 REPO=$(grep -oE 'nexkit_repository: \S+' .github/workflows/nexkit.yml | cut -d' ' -f2)
@@ -119,163 +81,143 @@ KIT="${TMPDIR:-/tmp}/nexkit-$REF"
 python3 "$KIT/bin/nexkit" status
 ```
 
-Mark an issue *blocked by* another, so autopilot starts it only once that one
-is closed. Autopilot reads no "Depends on" text, and the order of sub-issues
-does not count. `issue_id` is the blocking issue's database `id`, not its
-number:
+Post a command, read the latest plan (the newest NexKit comment, with its
+profile, models and why triage chose it), or start a sweep yourself, for
+example after changing what blocks what. A profile change must be a comment;
+a request in the issue text does not count.
+
+```bash
+gh issue comment <N> --body "/nexkit plan"
+gh issue comment <N> --body "/nexkit plan Use the hard profile"
+gh pr comment <N> --body "/nexkit fix <instructions>"
+gh issue view <N> --comments
+gh workflow run nexkit.yml -f command=autopilot -f number=autopilot
+```
+
+Mark an issue *blocked by* another, and make an issue a sub-issue of a parent.
+Autopilot reads no "Depends on" text, and the order of sub-issues does not
+count. Both endpoints take the database `id`, not the number. If one returns
+404, upgrade `gh`.
 
 ```bash
 BLOCKER_ID=$(gh api repos/{owner}/{repo}/issues/<blocking> --jq .id)
 gh api -X POST repos/{owner}/{repo}/issues/<blocked>/dependencies/blocked_by -F issue_id="$BLOCKER_ID"
 gh api repos/{owner}/{repo}/issues/<blocked>/dependencies/blocked_by --jq '.[].number'
-```
 
-Start a sweep yourself, for example after changing what blocks what:
-
-```bash
-gh workflow run nexkit.yml -f command=autopilot -f number=autopilot
-```
-
-Split an issue by hand only when autopilot cannot, for example when the plan
-reports `too_large` without suggesting parts. Create each part with
-`gh issue create --title "<part's behaviour>" --milestone "<parent's milestone>" --label "<part's labels>"`,
-add the parts to the parent, and mark each part *blocked by* the parts it needs.
-`--label` takes a comma-separated list, for example `--label bug,documentation`.
-Title each part by the behaviour it delivers, as for any issue. Name the role in
-a part's title, never a development user. Never reuse the parent's title, whole
-or as a prefix: write `Connector call steps pass compile checks`, not
-`Call connector step: compile checks and model`. The sub-issue link already
-shows the parent.
-
-```bash
 CHILD_ID=$(gh api repos/{owner}/{repo}/issues/<child> --jq .id)
 gh api -X POST repos/{owner}/{repo}/issues/<parent>/sub_issues -F sub_issue_id="$CHILD_ID"
 ```
 
-`sub_issue_id` is the issue's database `id`, not its number. If an endpoint
-returns 404, upgrade `gh` and try again.
+Split an issue by hand only when autopilot cannot, for example when the plan
+reports `too_large` without suggesting parts. Write each part as a new issue
+with the parent's milestone and labels, titled as
+[step 3 of the life of an issue](../../../docs/delivery.md#the-life-of-an-issue)
+says, for example `Connector call steps pass compile checks`, not
+`Call connector step: compile checks and model`. Then add the parts to the
+parent and mark each *blocked by* the parts it needs.
 
-## Checklist: writing an issue
+## Writing an issue
 
-- One behaviour, aiming for 2–5 acceptance criteria, each checkable by a test
-  or command. More than five: check whether the issue holds more than one
-  behaviour, and split it if so. If every criterion checks the same behaviour,
-  more are fine.
-- The text names the concepts the issue touches, in the terms of
-  [concepts.md](../../../docs/domain/concepts.md), even when it links to the
-  docs. Triage reads only the issue and its discussion, not the links.
-- The issue gets at least one label. It gets every repository label that
-  fits its content. Read the current labels with `gh label list`, and choose
-  by each label's description on GitHub. There is no fixed list. For example,
-  an issue about an accessibility barrier gets `accessibility`.
+The rules are in step 1 of
+[the life of an issue](../../../docs/delivery.md#the-life-of-an-issue) and in
+[writing on GitHub](../../../docs/delivery.md#writing-on-github).
 
-  The creator, the owner or the local agent, sets the labels in
-  `gh issue create --label`. A part that autopilot creates in a split gets the
-  parent's milestone and labels. A bug issue that autopilot opens for a CI
-  failure on `main` gets `bug`. See
-  [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue).
-- The issue is in the current milestone and opened by the owner or the local
-  agent, because autopilot takes only issues opened by someone with write
-  access. If it must wait for another issue, mark it *blocked by* that issue
-  before the next sweep, or autopilot plans it at once. The milestone's docs
-  sweep is blocked by every other issue of the milestone.
-- Behaviour is named by role, in the terms of concepts.md, never by a development user, in the title
-  as well as the body. See the
-  [development users table](../../../docs/reference/security.md#development-users).
+1. Read the doc sections the issue implements. Write the behaviour, by role,
+   with 2–5 acceptance criteria, and name the concepts it touches in the
+   terms of [concepts.md](../../../docs/domain/concepts.md). Triage reads only
+   the issue and its discussion, not the links.
+2. Read the labels with `gh label list` and pick every one whose description
+   fits.
+3. Create it in the current milestone:
+   `gh issue create --title "<behaviour>" --milestone "<milestone>" --label "<a>,<b>" --body-file <file>`.
+4. Before the next sweep, mark it *blocked by* every issue it must wait for,
+   or autopilot plans it at once. The milestone's docs sweep is blocked by
+   every other issue of the milestone.
 
-## Checklist: reviewing a plan
+## Reviewing a plan
 
-- The issue is one behaviour, aiming for 2–5 acceptance criteria, each
-  checkable by a test or command. More than five: split only if the issue holds
-  more than one behaviour. Do not re-plan only to cut the number of criteria.
-- The profile in the plan comment fits the issue, judged against the `when`
-  texts. If not, re-plan with `/nexkit plan Use the <profile> profile`. If a
-  `when` text caused the wrong choice, tell the owner and propose a fix to
-  that text as a hand-made pull request.
-- Every doc link in the issue and the plan resolves.
-- The plan names roles, not development users. A plan that names one gets a change comment and a
-  re-plan.
-- No **Proposed** decision in [decisions.md](../../../docs/decisions.md) is
-  treated as **Agreed**.
-- The decisions and risks the owner must judge are in their own short sections.
-- A `too_large` plan suggests parts that each name their own behaviour in the
-  title, without the parent's title, whole or as a prefix, and name roles, not
-  development users. Each part names the earlier parts it needs. If not,
-  comment the change before the next sweep splits it.
-- Every change agreed after the plan was posted, from the review or from the
-  owner, however small, is commented in the same issue. The comment makes the
-  next sweep plan again before `/nexkit go`. When `/nexkit go` has already
-  started, post the change as `/nexkit fix <change>` on its pull request. No
-  follow-up issues.
-- A re-plan revises the latest plan, so the comments since that plan state
-  only the changes. Choices accepted as they are need no comment.
-- Changes in a comment are terse: one short line each, with the exact values,
-  names and rules, and no reasons or prose. Nothing the issue or the docs
-  already say. See
-  [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue).
+Check:
+
+- The issue is one behaviour. More than five criteria: split only if it holds
+  more than one behaviour, never re-plan only to cut the number.
+- The profile fits the `when` texts. If not, re-plan with
+  `/nexkit plan Use the <profile> profile`. If a `when` text caused the wrong
+  choice, propose a fix to the owner as a hand-made pull request.
+- Every doc link resolves, and no **Proposed** decision in
+  [decisions.md](../../../docs/decisions.md) is treated as **Agreed**.
+- The plan names roles, not development users, and puts the decisions and
+  risks the owner must judge in their own short sections.
+- A `too_large` plan suggests parts titled by their own behaviour, each naming
+  the earlier parts it needs.
 - After a re-plan, its *Since the last plan* section lists every change that
   was asked for, and nothing else changed without a reason.
+
+Comment every change, however small, on the issue before `/nexkit go`. Once
+`/nexkit go` has started, post it as `/nexkit fix <change>` on the pull
+request instead. A re-plan keeps what no newer comment changes, so:
+
+- State only the changes. Choices accepted as they are need no comment.
+- One short line per change, with the exact values, names and rules. No
+  reasons or prose, and nothing the issue or the docs already say: link
+  instead. For example:
+  `Change: limits 2,000 chars / depth 32 / 500 nodes; == null-safe; trim not in SQL.`
 - Use `/nexkit plan from scratch` only when the plan has gone wrong, and
-  comment every choice to keep before posting it.
-- Before `/nexkit go` starts, the latest plan holds every agreed change. A
-  comment after the plan holds autopilot back until it has planned again.
-  The plan is the contract:
-  it holds the acceptance criteria the pull request is checked against, and it
-  is the record a later reader looks at. Re-planning also lets the plan agent
-  find other places the change affects, such as another doc that must say the
-  same.
+  comment every choice to keep before you post it.
 
-## Checklist: breaking down a milestone
+## Breaking down a milestone
 
-- Create the new milestone's issues, and mark *blocked by* every issue that
-  must wait for another, before the owner closes the current milestone.
-  Autopilot takes the new milestone at the next sweep after that.
-- Compare the `when` texts with the concepts that the **From** column of
-  [concepts.md](../../../docs/domain/concepts.md) lists for the new
-  milestone. Each risky concept must fall under `hard` by its consequence.
-- Check that the new milestone's work that the platform has not done before,
-  such as a new kind of editor, widget or library, is not described by the
-  `standard` text, so it falls under `hard`.
-- For the milestone that is ending, compare the profiles' results: the share
-  of issues whose rounds stopped on an error, ran out of time or failed checks.
-  The plan comment names each issue's profile. When `standard` fails more
-  often than `hard`, narrow the `standard` text.
+Before the owner closes the current milestone:
+
+- Create the next milestone's issues and their *blocked by* marks. Autopilot
+  takes them at the first sweep after the close.
+- Check each risky concept that the **From** column of
+  [concepts.md](../../../docs/domain/concepts.md) lists for the new milestone
+  falls under `hard` by its consequence, and that work the platform has not
+  done before, such as a new kind of editor, widget or library, is not
+  described by the `standard` text.
+- Compare the profiles' results in the ending milestone: the share of issues
+  whose rounds stopped on an error, ran out of time or failed checks. When
+  `standard` fails more often than `hard`, narrow the `standard` text.
 - Check whether newer models make a profile's models out of date.
 - Propose any change to the owner as a hand-made pull request.
 
-## Checklist: reviewing a pull request
+## Reviewing a pull request
+
+While `merge.auto` is on, NexKit has merged by the time you look: review the
+merged pull request and raise problems with the owner. While it is off, NexKit
+mentions the owner when a pull request is ready.
 
 - The behaviour change matches the issue and the approved plan.
-- When agreed behaviour changes, the docs are updated in the same pull request.
+- When agreed behaviour changes, the docs change in the same pull request.
 - Tests cover the change, including denied access where it applies.
 - The required checks on `main` are green.
-- No edits in paths NexKit may not change, unless the pull request is hand-made.
-- If the pull request changes what `scripts/setup.sh` downloads, such as a new
-  toolchain or a lock file in a new place, the `cache` entries and the CI cache
-  steps must follow. Tell the owner and propose that hand-made pull request.
-- While `merge.auto` is on, NexKit has merged by the time you look: review the
-  merged pull request the same way, and raise problems with the owner. While it
-  is off, NexKit mentions the owner when a pull request is ready.
+- No edits in paths NexKit may not change, unless the pull request is
+  hand-made.
+- A change to what `scripts/setup.sh` downloads, such as a new toolchain or a
+  lock file in a new place, needs matching `cache` entries and CI cache steps.
+  Those are in paths NexKit may not change, so tell the owner and propose that
+  hand-made pull request.
 
 ## When something fails
 
-| Failure | What the local agent does |
-| --- | --- |
-| Publish fails after `/nexkit go` | Read the run log. If the base branch was force-pushed, the same `/nexkit go` fixes it. Otherwise diagnose first. Ask the owner before posting `/nexkit go` again. |
-| A plan has a question with no recommended option | NexKit has mentioned the owner. Ask the owner, then comment the answer on the issue: the next sweep plans again. |
-| A round ends as `blocked` and a question has no recommended option | Answer the question with `/nexkit fix <decision>`. Ask the owner first when the choice is theirs. |
-| An implement or fix round ran out of time twice | Autopilot already planned once with a note to split. Read the plan and the run logs, then split the issue by hand or comment a smaller plan. |
-| Merge conflict with `main` | Nothing: NexKit starts a conflict round by itself. Answer a `blocked` question with `/nexkit fix <decision>`. After `conflicts.max_rounds` such rounds, comment `/nexkit fix` yourself. |
-| Conflict in a path NexKit may not change, or a merge that brings workflow changes | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
-| The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that profile is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
-| A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
-| A run is paused at the Claude usage limit (⏸️) | Nothing: NexKit runs the same command again after the reset. If it stops a second time with an unknown reset time, repeat the command. |
-| The *Restore caches* step reports a missed cache | Nothing for one run: setup installs from scratch, and the next successful CI run on `main` saves the cache. An older cache restored after a lock file changed is normal too. If every run misses, compare the `cache` entries with the CI cache steps and check that CI on `main` succeeds, because `actions/cache` saves only after a successful job. |
-| The review job errored | The round's comment says why. Comment `/nexkit review` to retry, unless it names an authentication error: then tell the owner, because a retry stops the same way. |
-| The review requested changes | NexKit runs automatic fix rounds up to the configured limit. After that, ask the owner and post `/nexkit fix <instructions>`. |
-| NexKit's automatic merge was refused (`merge_refused`) | A conflict starts a conflict round by itself. Otherwise the round's comment says why, usually a rule on `main`. NexKit has mentioned the owner; tell them what you found. |
-| CI on `main` fails after a merge | Nothing at first: autopilot runs the failed jobs once more and, when they fail again, opens a `bug` issue in the milestone and plans it first. Read that issue's plan as any other. |
-| Autopilot leaves an issue alone | `nexkit status` gives the reason. A command that never ran is not started again; after six hours it waits for a person, so post the command yourself. An issue opened without write access is never taken; open it again from the owner's account. |
+NexKit handles these by itself, so do nothing until it mentions the owner: a
+conflict with `main`, the Claude usage limit, failing checks and requested
+changes within the automatic fix limit, a CI failure on `main`, which it runs
+again and then turns into a `bug` issue that it plans first, and a missed
+dependency cache. Its troubleshooting doc at the pinned ref has the mechanics.
 
-For the mechanics behind each failure, read NexKit's troubleshooting doc at the
-pinned ref, found as described under "Where the values live".
+| Failure | What you do |
+| --- | --- |
+| Publish fails after `/nexkit go` | Read the run log. If the base branch was force-pushed, the same `/nexkit go` fixes it. Otherwise diagnose first, and ask the owner before posting `/nexkit go` again. |
+| A plan or a `blocked` round has a question with no recommended option | Ask the owner when the choice is theirs. Answer a plan's question in a comment on the issue, so the next sweep plans again, and a round's question with `/nexkit fix <decision>`. |
+| No automatic fix rounds left, for failing checks or requested changes | Read the failing check's log or the review, ask the owner, then post `/nexkit fix <instructions>`. |
+| `conflicts.max_rounds` conflict rounds ran | Comment `/nexkit fix` yourself. |
+| A conflict in a path NexKit may not change, or a merge that brings workflow changes | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
+| An implement or fix round ran out of time twice | Autopilot has already planned once with a note to split. Read the plan and the run logs, then split the issue by hand or comment a smaller plan. |
+| The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
+| A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
+| A run paused at the usage limit stops again with an unknown reset time | Repeat the command. |
+| Every run misses a dependency cache | Compare the `cache` entries with the CI cache steps, and check that CI on `main` succeeds, because `actions/cache` saves only after a successful job. |
+| The review job errored | The round's comment says why. Comment `/nexkit review` to retry, unless it names an authentication error: then tell the owner, because a retry stops the same way. |
+| NexKit's automatic merge was refused (`merge_refused`) for a reason other than a conflict | The round's comment says why, usually a rule on `main`. NexKit has mentioned the owner; tell them what you found. |
+| Autopilot leaves an issue alone | `nexkit status` gives the reason. A command that never ran is not started again; after six hours it waits for a person, so post the command yourself. An issue opened without write access is never taken; open it again from the owner's account. |

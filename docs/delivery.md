@@ -16,7 +16,9 @@ Three roles take part:
   order, watches the work, reviews plans and merged pull requests, and steps
   in where autopilot stops and a person is needed. It also publishes the
   Design System artifact in Claude from the repository, as
-  [Design changes](#design-changes) describes.
+  [Design changes](#design-changes) describes. How it does each of these,
+  with the commands and checklists, is in its runbook, the
+  [`axis-nexkit` skill](../.claude/skills/axis-nexkit/SKILL.md).
 - **NexKit's agents** plan, implement, fix and review inside the NexKit
   pipeline. They read [AGENTS.md](../AGENTS.md). They do not read or write
   Claude Design.
@@ -54,9 +56,7 @@ models, are not copied here. Look them up where they live.
   `/nexkit fix` on the pull request.
 - **People stay in charge.** A person's command, a plan's question without a
   recommendation, a failed run, a second time-out and a refused merge all stop
-  autopilot on that issue until a person acts. Other issues go on. To change
-  a plan before `/nexkit go`, comment the change on the issue: the next sweep
-  plans again before it starts `/nexkit go`.
+  autopilot on that issue until a person acts. Other issues go on.
 - **NexKit merges a pull request once it passes, while `merge.auto` is on.**
   With NexKit's [`merge.auto` setting][nexkit-auto-merge] on, NexKit
   squash-merges a pull request as soon as every check passes and the AI review
@@ -103,33 +103,15 @@ models, are not copied here. Look them up where they live.
   NexKit's [`checks` setting][nexkit-config]. When a check takes more than half
   its limit, a hand-made pull request raises the limit or makes the suite
   faster, before rounds start to stop on it.
-- **NexKit's checks skip suites that a change cannot affect.** A check round takes
-  about 25 minutes. The .NET integration tests, with the scenarios of every sample,
-  take about 7, and Playwright with the services it starts about 10. NexKit sets `NEXKIT_BASE_SHA`, the commit
-  the pull request started from. Under that variable, git must list the changed and
-  untracked files before any skip happens.
-  - A smoke test is skipped when none of the changed files is on its path list.
-    The smoke tests are `scripts/dev.sh`, Docker Compose, the production images
-    and the on-premises install.
-  - The integration tests and their scenarios are skipped when every changed file
-    is on a safe list: `docs/`, `tests/e2e/`, any `*.md` file, and `web/` except
-    `web/package.json` and `web/package-lock.json`.
-  - Playwright is skipped when every changed file is under `docs/` or is a `*.md`
-    file. It also skips the PostgreSQL, Keycloak, stub, server, worker and
-    publisher that it starts.
-  - The integration performance tests never run under that variable. Their class
-    names end in `PerformanceTests`, and a new one must follow that rule. They
-    take about a third of the integration tests' time and depend on the load of
-    the runner. Each test project keeps them in one collection that does not run
-    in parallel, so xUnit runs them one class at a time, after the other tests. A
-    guard test fails when a `*PerformanceTests` class is outside that collection.
-    CI on `main` runs them, so a slowdown shows after the merge, and autopilot
-    opens a bug issue for it as for any CI failure on `main`.
-
-  The lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs). Any
-  doubt runs the suite. A missing base, a git error or an empty change list runs
-  both suites. CI sets no base, so CI on `main` runs every suite. The test summary
-  lists a skipped suite as skipped.
+- **NexKit's checks skip suites that a change cannot affect.** A check round
+  takes about 25 minutes, of which the integration tests take about 7 and
+  Playwright about 10. So under NexKit's `NEXKIT_BASE_SHA`, a suite that no
+  changed file can affect is skipped, and any doubt runs it. The integration
+  performance tests, whose class names end in `PerformanceTests`, never run
+  there, because they depend on the runner's load. CI on `main` sets no base
+  and runs every suite, so a slowdown shows after the merge and autopilot opens
+  a bug issue for it. Which suite skips when is in
+  [test runs and reports](development.md#test-runs-and-reports).
 
 - **NexKit restores the dependency caches that CI on `main` saves.** Before
   `scripts/setup.sh`, NexKit's implement, fix and check runs restore the
@@ -195,24 +177,15 @@ them.
    criteria that a test or command can check. More than five is a signal to
    check whether the issue holds more than one behaviour. If it does, split it.
    If every criterion checks the same behaviour, more are fine. A plan is not
-   revised only to cut the number of criteria. It links to the doc sections it
-   implements and is in the current milestone. Its text names the concepts it
-   touches, so triage can choose the [profile](#profiles). The owner or the
-   local agent opens it, because autopilot takes only issues opened by someone
-   with write access. It may link a Design artifact as a picture, while the
-   docs stay the source of behaviour.
-
-   It gets every repository label that fits its content, and at least one.
-   Read the current labels with `gh label list`, and choose by each label's
-   description on GitHub. This doc keeps no fixed list of labels, because the
-   owner adds and removes them. For example, a bug issue opened for a CI
-   failure on `main` gets `bug`, and an issue about an accessibility barrier
-   gets `accessibility`. The creator sets the labels in
-   `gh issue create --label`.
-
-   When the issue must wait for another, the creator marks it *blocked by*
-   that issue before the next sweep, as described under Decisions. Otherwise
-   autopilot plans it at once.
+   revised only to cut the number of criteria. The issue links to the doc
+   sections it implements, is in the current milestone, and names the concepts
+   it touches in its own text, so triage can choose the [profile](#profiles).
+   It gets at least one label, and every repository label whose description
+   on GitHub fits its content. There is no fixed list, because the owner adds
+   and removes labels. The owner or the local agent opens it, because
+   autopilot takes only issues opened by someone with write access, and marks
+   it *blocked by* every issue it must wait for. It may link a Design artifact
+   as a picture, while the docs stay the source of behaviour.
 2. **Plan.** Autopilot starts `/nexkit plan` once the issue is ready. NexKit's
    plan agent posts a plan as a comment. A person may comment `/nexkit plan`
    to start it sooner or with a note.
@@ -220,44 +193,23 @@ them.
    recommended option, autopilot answers with those options and plans again.
    Otherwise NexKit mentions the owner, who answers in a comment on the
    issue, and the next sweep plans again. When the plan reports `too_large`,
-   autopilot creates the parts the plan suggests as sub-issues of the issue,
-   with its milestone and labels, marks each part *blocked by* the earlier
-   parts it needs, and plans the parts that need no other part. If the issue
-   has an open NexKit pull request, for example one that stalled after repeated
-   time-outs, autopilot closes it as superseded and keeps the branch. NexKit
-   closes the parent when all parts are done. A part is written like any
-   issue, so the plan's suggested parts each have a title that names the
-   behaviour that part delivers. A part's title does not reuse the parent's
-   title, whole or as a `<parent>: <part>` prefix, because the sub-issue link
-   already shows the parent.
-4. **Review the plan.** The local agent reads each plan as it is posted.
-   Check it against [decisions.md](decisions.md), and never treat a
-   **Proposed** decision as **Agreed**. Check the profile and the reason shown
-   in the plan comment. If the profile is wrong, comment
-   `/nexkit plan Use the <profile> profile`. If a `when` text caused the wrong
-   choice, fix that text in a hand-made pull request. Any change agreed after
-   the plan is posted, whether the review finds a gap or the owner decides
-   something, however small, is commented in the same issue. A comment after
-   the latest plan makes the next sweep plan again before it starts
-   `/nexkit go`. When `/nexkit go` has already started, the change goes to the
-   pull request as `/nexkit fix <change>` instead. A re-plan revises the latest
-   plan. It keeps what no newer comment asks to change, and its *Since the
-   last plan* section lists what changed. So a review comment states only the
-   changes. Write each one tersely, on one short line, with the exact values,
-   names and rules, and drop reasons and prose. The reasons are in the plan and
-   the docs. Do not repeat what the issue or the merged docs already say. Link
-   to the doc instead. For example:
-   `Change: limits 2,000 chars / depth 32 / 500 nodes; == null-safe; trim not in SQL.`
-   Check the *Since the last plan* section against those comments. A note such
-   as `/nexkit plan from scratch` plans again without the latest plan's
-   choices. Use it only when the plan has gone wrong, and then comment every
-   choice to keep first. `/nexkit go` only runs on the latest plan, and that
-   plan holds every agreed change. The reason: the plan is the contract. It
-   holds the acceptance criteria the pull request is checked against, and it
-   is the record a later reader looks at. A change that lives only in a
-   comment is missing from both. Re-planning also lets the plan agent find
-   other places the change affects, such as another doc that must say the
-   same. Do not open follow-up issues.
+   autopilot creates the parts the plan suggests as sub-issues, with the
+   issue's milestone and labels, marks each part *blocked by* the earlier
+   parts it needs, and closes an open NexKit pull request of the issue as
+   superseded, keeping its branch. NexKit closes the parent when all parts are
+   done. A part is written like any issue: its title names the behaviour that
+   part delivers and does not reuse the parent's title, whole or as a
+   `<parent>: <part>` prefix, because the sub-issue link already shows the
+   parent.
+4. **Review the plan.** The local agent reads each plan as it is posted and
+   checks it against the docs, [decisions.md](decisions.md) and the profiles.
+   Every change agreed after a plan, from the review or from the owner,
+   however small, is commented on the issue, and the next sweep plans again
+   before it starts `/nexkit go`. Once `/nexkit go` has started, the change
+   goes to the pull request as `/nexkit fix <change>`. No follow-up issues.
+   The reason: the plan is the contract. It holds the acceptance criteria the
+   pull request is checked against, and it is the record a later reader looks
+   at. A change that lives only in a comment is missing from both.
 5. **Implement.** Autopilot starts `/nexkit go` on the latest plan once it has
    no open question, is not too large and no comment came after it. NexKit
    implements that plan and opens a pull request. When an implement or fix
@@ -265,33 +217,28 @@ them.
    issue. A second time-out waits for a person.
 6. **Pull request.** Every round runs NexKit's checks and the AI review on the
    new commit. Merging needs both to pass.
-7. **Fix.** Comment `/nexkit fix <instructions>` for another round. NexKit
-   starts the rounds for merge conflicts by itself: it merges `main` into the
-   branch, it does not rebase. When a conflict needs a choice, the round stops
-   as `blocked` with a question. Answer it with `/nexkit fix <decision>`.
-   After a manual push, comment `/nexkit review`. If the review job itself
-   fails with an error, `/nexkit review` retries it. If the review requests
-   changes, NexKit starts automatic fix rounds up to the limit in its
-   configuration. After that, a person decides on `/nexkit fix`.
+7. **Fix.** NexKit starts fix rounds by itself for a conflict with `main`,
+   which it merges and never rebases, and for failing checks or a review that
+   requests changes, up to the automatic fix limit in its configuration. A
+   conflict that needs a choice stops the round as `blocked`, with a
+   question. Beyond that, a person comments `/nexkit fix <instructions>`.
 8. **Merge.** NexKit squash-merges, starts CI on `main` and closes the issue.
    With `merge.auto` off, the owner squash-merges instead, and GitHub closes
    the issue.
 9. **Exceptions.** Changes whose purpose is to edit paths NexKit may not change
    are hand-made pull requests, as described under Decisions. A conflict in
-   those paths, or a merge that brings workflow changes, is different: merge
-   `origin/main` into the NexKit pull request branch by hand, in a separate
-   worktree. Run build, lint and tests, ask the owner before pushing, then
-   comment `/nexkit review`.
+   those paths, or a merge that brings workflow changes, is one that NexKit
+   cannot push: the local agent merges `main` into the NexKit branch by hand,
+   and asks the owner before it pushes.
 
 ## The life of a milestone
 
-1. **Break it down.** When the current milestone is nearly done, break the
-   next one into issues, as the [roadmap](roadmap.md#how-work-is-planned)
-   describes. Then check the [profiles](#profiles) against the concepts that
-   the **From** column of [concepts.md](domain/concepts.md) lists for the new
-   milestone, and against the models now available. Fix them in a hand-made
-   pull request. Autopilot does not touch the next milestone's issues while
-   an earlier milestone is open.
+1. **Break it down.** When the current milestone is nearly done, the local
+   agent breaks the next one into issues, as the
+   [roadmap](roadmap.md#how-work-is-planned) describes, and checks the
+   [profiles](#profiles) against the new milestone's concepts and the models
+   now available. Profile fixes are hand-made pull requests. Autopilot does not
+   touch the next milestone's issues while an earlier milestone is open.
 2. **Deliver the issues.** Each one follows the life of an issue above.
    Autopilot runs every ready issue of the milestone at once.
 3. **Docs sweep.** Before the owner closes the milestone, one issue in it
@@ -312,26 +259,22 @@ them.
 
 ## Design changes
 
-The repository is the source of truth for the Axis design system, as
+The repository is the source of truth for the Axis design system, and the
+local agent session publishes it to Claude as a Design System artifact, as
 [D57](decisions/d57-a-design-system-published-from-the-repository.md) agrees.
-It holds the token file, with the colours for light and dark mode, type,
-spacing and radius, and the widgets. See the
+The token file and the preview pages are in the
 [frontend reference](reference/frontend.md).
 
-- **Publishing.** The local agent session publishes a Design System artifact in
-  Claude from the repository. It shows the tokens and a preview of each
-  widget, named in Axis terms.
-- **Who edits.** Only the owner and Claude edit the design in Claude Design.
-  NexKit's agents do not read or write it.
 - **A design change is a NexKit issue.** It links the artifact and follows the
   [life of an issue](#the-life-of-an-issue). It is never a hand-made pull
   request, because the token file and the widgets are not paths NexKit may
   not change.
-- **New screens.** They may be drawn as Design artifacts that use the design
-  system. An issue may link one as a picture. The docs stay the source of
+- **The published design follows the repository.** After a merged change to
+  the tokens or a widget, the local session publishes the design system again.
+- **Only the owner and Claude edit in Claude Design.** NexKit's agents neither
+  read nor write it. New screens may be drawn as Design artifacts, and an
+  issue may link one as a picture, while the docs stay the source of
   behaviour.
-- **After a merge.** When a merged change touches the tokens or a widget, the
-  local session publishes the design system again.
 
 ## Keeping the docs current
 
