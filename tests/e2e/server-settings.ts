@@ -26,9 +26,9 @@ function required(name: string, meaning: string): string {
   return value
 }
 
-// Studio edits a copy of the purchase request sample that scripts/e2e.sh makes for each run, so a saved
-// resource never changes a file under samples/.
-export const studioFolder = required(
+// The main server's Studio edits a copy of the purchase request sample that scripts/e2e.sh makes for each run, so a
+// saved resource never changes a file under samples/. No spec writes to this copy.
+const studioFolder = required(
   'AXIS_E2E_STUDIO_FOLDER',
   'the copy of the purchase request sample that Studio edits',
 )

@@ -12,8 +12,9 @@
 # stops it. The main server then serves the new release. The release-pinning spec activates
 # tests/e2e/fixtures/release-app that way. The purchase request release spec activates a changed copy
 # of the purchase request sample, and activates the committed sample again when it ends.
-# Studio edits a copy of the purchase request sample, which this script makes in a temporary folder for
-# each run and deletes on exit, so a spec that saves a resource never changes a file under samples/.
+# The main E2E server's Studio edits a copy of the purchase request sample, which this script makes in a temporary
+# folder for each run and deletes on exit, so a saved resource never changes a file under samples/. No spec writes to
+# that copy.
 # The worker runs against the same database while Playwright runs, with a 5 second lease. A spec
 # can restart it: it writes the restart file, then stops the worker process. The run fails if the
 # worker exits without a restart request, or never finds the tenant database migrated.

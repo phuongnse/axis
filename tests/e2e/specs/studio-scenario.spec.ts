@@ -4,15 +4,15 @@ import path from 'node:path'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { startServer } from '../activate'
 import { pickOption } from '../select'
-import { e2eApp, studioFolder } from '../server-settings'
+import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 import { createResource } from '../studio-resources'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
 
-// The journeys save a scenario into a copy of the sample folder, so they run on the same second server as the
-// other Studio creation specs and never change the shared copy of the E2E server.
+// The journeys save a scenario. They run on a second server over a folder of their own, copied from the committed
+// sample, so no other spec's writes reach it.
 test.describe('Studio edits a scenario in the typed editor', () => {
   test.describe.configure({ mode: 'serial' })
 
@@ -22,7 +22,7 @@ test.describe('Studio edits a scenario in the typed editor', () => {
 
   test.beforeAll(async () => {
     copy = await mkdtemp(path.join(os.tmpdir(), 'axis-studio-scenario-'))
-    await cp(studioFolder, copy, { recursive: true })
+    await cp(purchaseRequests, copy, { recursive: true })
     await rm(path.join(copy, 'texts', 'vi.json'), { force: true })
     server = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy })
   })

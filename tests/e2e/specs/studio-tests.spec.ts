@@ -19,8 +19,7 @@ test.describe('hoa runs the test scenarios of the purchase request sample from S
   let server: Awaited<ReturnType<typeof startServer>>
 
   test.beforeAll(async () => {
-    // The committed sample, copied to a folder of its own. The other Studio specs edit the shared copy while they run,
-    // and a snapshot taken in the middle of an edit could fail for a reason that has nothing to do with this test.
+    // The committed sample, copied to a folder of its own, so no other spec's writes reach it.
     copy = await mkdtemp(path.join(os.tmpdir(), 'axis-studio-tests-'))
     await cp(purchaseRequests, copy, { recursive: true })
     // Index 0 of ActivateOnStartup is the purchase request sample, so it stays out of this server.
@@ -81,7 +80,9 @@ test.describe('hoa runs the test scenarios of the purchase request sample from S
 })
 
 test('the test controls do not show when the server has Studio:Tests off', async ({ page }) => {
-  const off = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Tests: 'false' })
+  const copy = await mkdtemp(path.join(os.tmpdir(), 'axis-studio-tests-off-'))
+  await cp(purchaseRequests, copy, { recursive: true })
+  const off = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Tests: 'false', Studio__Folders__0: copy })
   try {
     await useSession(page, 'hoa')
     await page.goto(`${off.url}/studio?app=PurchaseRequests`)
@@ -95,6 +96,7 @@ test('the test controls do not show when the server has Studio:Tests off', async
     await expect(page.getByTestId('studio-run-scenario')).toHaveCount(0)
   } finally {
     await off.stop()
+    await rm(copy, { recursive: true, force: true })
   }
 })
 
