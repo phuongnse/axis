@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,7 +8,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, clearButton, clearSelect, optionTexts, shownDropdown } from '../test/antd'
+import { chooseOption, clearButton, clearSelect, optionTexts, selectRoot, shownDropdown } from '../test/antd'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
 
@@ -85,6 +85,17 @@ function renderEditor(value: Record<string, unknown>, onChange = vi.fn(), loaded
   return onChange
 }
 
+/**
+ * Presses Enter the way a browser does. The Select reads `which`, which user-event leaves at 0, so
+ * `userEvent.keyboard('{Enter}')` would not pick the active option.
+ */
+async function pressEnter(target: HTMLElement) {
+  await act(async () => {
+    fireEvent.keyDown(target, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 })
+    fireEvent.keyUp(target, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 })
+  })
+}
+
 const table = { type: 'table', dataSource: 'PurchaseRequestList', formPage: 'ReviewForm' }
 const form = {
   type: 'form',
@@ -107,8 +118,8 @@ describe.each(['light', 'dark'])('PageEditor in %s mode', (mode) => {
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('ReviewList')
     expect(screen.getByTestId('studio-field-/title')).toBeVisible()
     expect(screen.getAllByRole('textbox', { name: 'Text key' })[0]).toBeVisible()
-    expect(screen.getByTestId('studio-widget-0')).toBeVisible()
-    expect(screen.getByTestId('studio-widget-0')).toHaveTextContent('form · PurchaseRequest')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toBeVisible()
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('form · PurchaseRequest')
     expect(screen.getByTestId('studio-field-/widgets/0/type')).toBeVisible()
     expect(screen.getByRole('combobox', { name: 'Widget type' })).toBeInTheDocument()
     expect(screen.getByTestId('studio-field-/widgets/0/entity')).toBeVisible()
@@ -150,13 +161,13 @@ describe('PageEditor page', () => {
     expect(
       screen.getByTestId('studio-field-/widgets').querySelector(':scope > * > [data-testid="studio-json-only"]'),
     ).not.toBeNull()
-    expect(screen.queryByTestId('studio-widget-0')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('studio-widget-/widgets/0')).not.toBeInTheDocument()
   })
 
   it('shows the type of an unknown widget and points to the JSON view', () => {
     renderEditor(page({ type: 'chart', series: [] }))
 
-    expect(screen.getByTestId('studio-widget-0')).toHaveTextContent('chart')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('chart')
     const panel = screen.getByTestId('studio-field-/widgets/0')
     expect(panel.querySelector(':scope > [data-testid="studio-json-only"]')).not.toBeNull()
     expect(screen.queryByRole('combobox', { name: 'Widget type' })).not.toBeInTheDocument()
@@ -337,5 +348,215 @@ describe('PageEditor widget type', () => {
       ['/widgets/0/type', 'processInspector'],
       ['/widgets/0/process', ''],
     ])
+  })
+})
+
+describe('PageEditor widget tree', () => {
+  const noted = { ...form, 'x-note': 'keep' }
+  const columns = {
+    type: 'columns',
+    columns: [
+      { width: 6, widgets: [table] },
+      { width: 6, widgets: [noted] },
+    ],
+  }
+  const inbox = { type: 'taskInbox' }
+  const tree = () => page(columns, { widgets: [columns, inbox] })
+
+  /** The buttons of one row, without those of the rows nested in it. */
+  function row(pointer: string) {
+    return within(screen.getByTestId(`studio-widget-row-${pointer}`))
+  }
+
+  it('shows a nested row for each widget in a container and opens its panel at its pointer', async () => {
+    renderEditor(tree())
+
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('columns')
+    expect(screen.getByTestId('studio-widget-/widgets/0/columns/0/widgets/0')).toHaveTextContent(
+      'table · PurchaseRequestList',
+    )
+    expect(screen.getByTestId('studio-widget-/widgets/1')).toHaveTextContent('taskInbox')
+    const nested = screen.getByTestId('studio-widget-/widgets/0/columns/1/widgets/0')
+    expect(nested).toHaveTextContent('form · PurchaseRequest')
+    expect(screen.queryByTestId('studio-field-/widgets/0/columns/1/widgets/0')).not.toBeInTheDocument()
+
+    await userEvent.click(nested)
+    expect(nested).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('studio-field-/widgets/0/columns/1/widgets/0')).toBeVisible()
+    expect(screen.getByTestId('studio-field-/widgets/0/columns/1/widgets/0/entity')).toHaveTextContent(
+      'PurchaseRequest',
+    )
+  })
+
+  it('names the columns with their width and the tabs, and shows a section body', () => {
+    renderEditor(
+      page(columns, {
+        widgets: [
+          columns,
+          { type: 'tabs', tabs: [{ label: { textKey: 'a' }, widgets: [inbox] }] },
+          { type: 'section', title: { textKey: 't' }, widgets: [inbox] },
+        ],
+      }),
+    )
+
+    expect(screen.getByText('Column 2 · 6')).toBeVisible()
+    expect(screen.getByText('Tab 1')).toBeVisible()
+    expect(screen.getByTestId('studio-widget-/widgets/1/tabs/0/widgets/0')).toBeVisible()
+    expect(screen.getByTestId('studio-widget-/widgets/2/widgets/0')).toBeVisible()
+  })
+
+  it('points to the JSON view when a container has parts the editor cannot show', () => {
+    renderEditor(page(columns, { widgets: [{ type: 'columns', columns: 'oops' }, { type: 'section' }] }))
+
+    expect(within(screen.getByTestId('studio-widget-list-/widgets')).getAllByTestId('studio-json-only')).toHaveLength(2)
+  })
+
+  it('moves up, moves down and removes in the list that holds the widget', async () => {
+    const onChange = renderEditor(tree())
+
+    expect(row('/widgets/0').getByRole('button', { name: 'Move up' })).toBeDisabled()
+    expect(row('/widgets/1').getByRole('button', { name: 'Move down' })).toBeDisabled()
+    expect(row('/widgets/0/columns/0/widgets/0').getByRole('button', { name: 'Move up' })).toBeDisabled()
+    expect(row('/widgets/0/columns/0/widgets/0').getByRole('button', { name: 'Move down' })).toBeDisabled()
+
+    await userEvent.click(row('/widgets/0').getByRole('button', { name: 'Move down' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [inbox, columns])
+    await userEvent.click(row('/widgets/1').getByRole('button', { name: 'Move up' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [inbox, columns])
+    await userEvent.click(row('/widgets/1').getByRole('button', { name: 'Remove widget' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [columns])
+    await userEvent.click(row('/widgets/0/columns/1/widgets/0').getByRole('button', { name: 'Remove widget' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns/1/widgets', [])
+  })
+
+  it('reorders the widgets of a list inside a container', async () => {
+    const onChange = renderEditor(
+      page(columns, { widgets: [{ type: 'section', title: { textKey: '' }, widgets: [table, noted] }] }),
+    )
+
+    await userEvent.click(row('/widgets/0/widgets/0').getByRole('button', { name: 'Move down' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/widgets', [noted, table])
+  })
+
+  it('moves a widget to another list as one change and keeps the keys it does not know', async () => {
+    const onChange = renderEditor(tree())
+
+    const target = 'Page › columns 1 › Column 1'
+    await chooseOption(target, selectRoot(row('/widgets/0/columns/1/widgets/0').getByRole('combobox')))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [
+      {
+        type: 'columns',
+        columns: [
+          { width: 6, widgets: [table, noted] },
+          { width: 6, widgets: [] },
+        ],
+      },
+      inbox,
+    ])
+  })
+
+  async function moveToOptions(pointer: string) {
+    await userEvent.click(row(pointer).getByRole('combobox', { name: 'Move to' }))
+    return waitFor(() => {
+      expect(shownDropdown()).not.toBeNull()
+      return optionTexts(shownDropdown()!)
+    })
+  }
+
+  it('offers the other lists of the tree and not the list of the widget', async () => {
+    renderEditor(tree())
+
+    expect(await moveToOptions('/widgets/1')).toEqual(['Page › columns 1 › Column 1', 'Page › columns 1 › Column 2'])
+  })
+
+  it('leaves out the lists inside the widget it moves', async () => {
+    renderEditor(tree())
+
+    expect(await moveToOptions('/widgets/0/columns/0/widgets/0')).toEqual(['Page', 'Page › columns 1 › Column 2'])
+  })
+
+  it('offers a container no list when the other lists are inside it', async () => {
+    renderEditor(page(columns, { widgets: [columns] }))
+
+    expect(await moveToOptions('/widgets/0')).toEqual([])
+  })
+
+  it('adds the default shape of each container at the end of the list', async () => {
+    const onChange = renderEditor(page(inbox, { widgets: [inbox] }))
+    const adder = () => selectRoot(screen.getAllByRole('combobox', { name: 'Add widget' })[0])
+
+    await chooseOption('columns', adder())
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [
+      inbox,
+      {
+        type: 'columns',
+        columns: [
+          { width: 6, widgets: [] },
+          { width: 6, widgets: [] },
+        ],
+      },
+    ])
+    await chooseOption('tabs', adder())
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [
+      inbox,
+      { type: 'tabs', tabs: [{ label: { textKey: '' }, widgets: [] }] },
+    ])
+    await chooseOption('section', adder())
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [
+      inbox,
+      { type: 'section', title: { textKey: '' }, widgets: [] },
+    ])
+    await chooseOption('processInspector', adder())
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [inbox, { type: 'processInspector', process: '' }])
+  })
+
+  it('adds a widget to the list inside a container', async () => {
+    const onChange = renderEditor(tree())
+    const list = screen.getByTestId('studio-widget-list-/widgets/0/columns/0/widgets')
+    const adder = within(list.parentElement!).getByRole('combobox', { name: 'Add widget' })
+
+    await chooseOption('table', selectRoot(adder))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns/0/widgets', [table, { type: 'table' }])
+  })
+
+  it('moves a top-level widget into a column with the keyboard alone', async () => {
+    const onChange = renderEditor(tree())
+    const picker = within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('combobox', { name: 'Move to' })
+
+    for (let presses = 0; presses < 60 && document.activeElement !== picker; presses++) {
+      await userEvent.tab()
+    }
+    expect(picker).toHaveFocus()
+    await userEvent.keyboard('Column 1')
+    await pressEnter(picker)
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [
+      {
+        type: 'columns',
+        columns: [
+          { width: 6, widgets: [table, inbox] },
+          { width: 6, widgets: [noted] },
+        ],
+      },
+    ])
+  })
+
+  it('shows the type of a container as fixed text and points to the JSON view', async () => {
+    renderEditor(tree())
+
+    await userEvent.click(screen.getByTestId('studio-widget-/widgets/0'))
+    const panel = screen.getByTestId('studio-field-/widgets/0')
+    expect(within(panel).getByTestId('studio-field-/widgets/0/type')).toHaveTextContent('columns')
+    expect(within(panel).queryByRole('combobox', { name: 'Widget type' })).not.toBeInTheDocument()
+    expect(panel.querySelector(':scope > [data-testid="studio-json-only"]')).not.toBeNull()
+  })
+
+  it('keeps the type picker of a leaf widget to the four types with a panel', async () => {
+    renderEditor(tree())
+
+    await userEvent.click(screen.getByTestId('studio-widget-/widgets/1'))
+    await userEvent.click(screen.getByRole('combobox', { name: 'Widget type' }))
+    await waitFor(() =>
+      expect(optionTexts(shownDropdown()!)).toEqual(['table', 'form', 'taskInbox', 'processInspector']),
+    )
   })
 })

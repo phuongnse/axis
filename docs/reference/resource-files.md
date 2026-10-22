@@ -86,7 +86,9 @@ site, and its widgets are its content:
   `taskInbox` or `processInspector`. A `form` names a `form` resource, which lays out the fields of
   one entity in sections (see [frontend.md](frontend.md)), or an `entity`, as
   shorthand for all its fields in one section. A `table` names an `entity`, as
-  shorthand for all records of that entity, or a `dataSource`.
+  shorthand for all records of that entity, or a `dataSource`. M12 adds the
+  leaf widgets `detail`, `chart` and `kpi` *(planned for M12)*, see
+  [frontend.md](frontend.md).
 - A `table` widget may name a `formPage`: the page with the `form` widget
   that opens one of its records. M12 removes `formPage` *(planned for M12)*,
   see the navigate action below.
