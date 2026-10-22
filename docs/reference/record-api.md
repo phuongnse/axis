@@ -373,6 +373,10 @@ otherwise the answer is the stale-version `409`. See
   references. Any foreign-key violation on delete maps to it. The title is
   fixed, and the response never names the referencing entity, table or
   constraint.
+- **`409` for a record in a running process** *(planned for M12)*. A delete
+  of a record that is the subject of a running or waiting process instance.
+  The title is fixed, and the response never names the process. See the
+  [start lock](processes.md#releases-and-running-work).
 - **`409` for a schema conflict.** The table has a constraint the active model
   does not declare, such as a `NOT NULL` column left by an activation that
   failed after provisioning committed. The title is fixed, and the response

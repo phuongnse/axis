@@ -172,7 +172,7 @@ thin on purpose: SLAs, escalation, loops that hold a task and notifications
 wait for M14. See
 [D56](decisions/d56-a-service-desk-as-the-third-sample-application.md) and, for
 the parts planned for M12,
-[D59](decisions/d59-the-service-desk-dashboard-ticket-detail-page-and-guided-form.md).
+[D60](decisions/d60-the-service-desk-dashboard-ticket-detail-page-and-guided-form.md).
 
 ### Data
 
