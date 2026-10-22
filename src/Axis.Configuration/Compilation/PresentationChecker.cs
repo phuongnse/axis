@@ -418,6 +418,15 @@ internal static class PresentationChecker
         var leaves = new List<(WidgetDefinition Widget, string Path)>();
         CheckWidgets(page.Widgets, "/widgets", 1, leaves, page, references, diagnostics);
 
+        // A form page opens a record, which a navigate action names with 'record'.
+        if (page.Parameters.Count > 0 && leaves.Any(leaf => leaf.Widget.Type == "form"))
+        {
+            Report(
+                DiagnosticCodes.ParametersOnFormPage,
+                "A page whose widget is a form declares no parameters. A navigate action opens its record with 'record'.",
+                "/parameters");
+        }
+
         foreach (var (widget, path) in leaves)
         {
             CheckLeaf(widget, path, page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, moduleReferences, references, diagnostics);
@@ -714,7 +723,7 @@ internal static class PresentationChecker
 
         if (isForm)
         {
-            CheckActions(widget, page, path, recordEntity, rowScope, loaded, findPage, findProcess, references, diagnostics);
+            CheckActions(widget, page, path, recordEntity, rowScope, loaded, findPage, findForm, findProcess, references, diagnostics);
         }
         else
         {
@@ -730,7 +739,7 @@ internal static class PresentationChecker
                 var rowActions = widget.RowActions ?? [];
                 for (var index = 0; index < rowActions.Count; index++)
                 {
-                    NavigateChecker.Check(rowActions[index], $"{path}/rowActions/{index}", rowScope, page, loaded, findPage, references, diagnostics);
+                    NavigateChecker.Check(rowActions[index], $"{path}/rowActions/{index}", rowScope, page, loaded, findPage, findForm, references, diagnostics);
                 }
             }
 
@@ -739,7 +748,7 @@ internal static class PresentationChecker
             var toolbarActions = widget.ToolbarActions ?? [];
             for (var index = 0; index < toolbarActions.Count; index++)
             {
-                NavigateChecker.Check(toolbarActions[index], $"{path}/toolbarActions/{index}", toolbarScope, page, loaded, findPage, references, diagnostics);
+                NavigateChecker.Check(toolbarActions[index], $"{path}/toolbarActions/{index}", toolbarScope, page, loaded, findPage, findForm, references, diagnostics);
             }
         }
 
@@ -834,7 +843,7 @@ internal static class PresentationChecker
     }
 
     /// <summary>The widgets that show something, not the containers around them, depth first in file order.</summary>
-    private static IEnumerable<WidgetDefinition> Leaves(IEnumerable<WidgetDefinition> widgets) =>
+    internal static IEnumerable<WidgetDefinition> Leaves(IEnumerable<WidgetDefinition> widgets) =>
         widgets.SelectMany(widget => WidgetTypes.Parse(widget.Type) switch
         {
             WidgetType.Columns => Leaves(widget.Columns!.SelectMany(column => column.Widgets)),
@@ -857,6 +866,7 @@ internal static class PresentationChecker
         ExpressionScope? scope,
         ApplicationLoadResult loaded,
         Func<string, PageResource?> findPage,
+        Func<string, FormResource?> findForm,
         Func<string, ProcessResource?> findProcess,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
@@ -868,7 +878,7 @@ internal static class PresentationChecker
             var actionPath = $"{path}/actions/{index}";
             if (action.Type == "navigate")
             {
-                NavigateChecker.Check(action, actionPath, scope, page, loaded, findPage, references, diagnostics);
+                NavigateChecker.Check(action, actionPath, scope, page, loaded, findPage, findForm, references, diagnostics);
                 continue;
             }
 

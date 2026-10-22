@@ -142,7 +142,9 @@ flowchart LR
        `target` is `AXC0014`, an unknown `reference` target is `AXC0012` at
        `/target`, a child entity target is `AXC0040` and a target without a
        display field is `AXC0030`. A `reference` parameter's `target` is a
-       `field target` edge in the reference index.
+       `field target` edge in the reference index,
+     - a page that holds a `form` widget declares no parameters. Otherwise it
+       is `AXC0236` at `/parameters`.
 
      `navigate` actions
      ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) in a
@@ -169,9 +171,13 @@ flowchart LR
        `rowActions` and `toolbarActions` for now,
      - each target is a `navigate page` edge in the reference index.
 
-     *(Planned for M12.)* `record` on a page that is not a form page, or over
-     another entity, adds a check of its own. Its code is assigned when the
-     check is built.
+     A `navigate` action may also set `record`, an expression for the id of
+     the record a form page opens. It is checked like a parameter value, against
+     the same names, and its type must be a reference to the entity of the
+     target's form widget. A form widget over a `form` has that form's entity.
+     `record` on a target that holds no form widget, or whose form is over
+     another entity, is `AXC0235` at `/record`. A parse error or an unknown
+     name keeps the expression's own code.
    - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded

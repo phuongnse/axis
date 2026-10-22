@@ -6,9 +6,10 @@ Navigate actions with typed page parameters replace the table's `formPage`
 link. This settles the navigation point of
 [D15](d15-presentation-model.md). Page parameters are built, with their name and
 type checks and their `field target` edge in the reference index. The navigate actions are
-checked by the compiler, with their `navigate page` edge. Page metadata lists them and leaves
-out those to pages the user cannot read. The URL values, the SPA buttons, the
-table binding, `record` and the form page rule are _(planned for M12)_. The owner
+checked by the compiler, with their `navigate page` edge, their `record` and the form page
+rule. Page metadata lists them with their `parameters` and `record`, gives each page its
+`parameters`, and leaves out the actions to pages the user cannot read. The URL values, the
+SPA buttons and the table binding are _(planned for M12)_. The owner
 confirmed these points on issue #931 on 2026-10-21.
 
 - **Page parameters:**
@@ -38,8 +39,7 @@ confirmed these points on issue #931 on 2026-10-21.
   change, as the one-format rule of
   [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
   requires.
-- **Compile checks:** each of these is a diagnostic, and its code is assigned
-  when the check is built:
+- **Compile checks:** each of these is a diagnostic:
   - an unknown target page,
   - an unknown parameter,
   - a missing required parameter,

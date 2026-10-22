@@ -24,4 +24,7 @@ public sealed record WidgetActionDefinition
 
     /// <summary>The expression of each page parameter a <c>navigate</c> action gives, by parameter name, or null when it gives none.</summary>
     public IReadOnlyDictionary<string, string>? Parameters { get; init; }
+
+    /// <summary>The expression of the id of the record a <c>navigate</c> action opens in a form page, or null when it names none. The schema refuses it on a <c>startProcess</c> action.</summary>
+    public string? Record { get; init; }
 }

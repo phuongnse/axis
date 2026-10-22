@@ -51,7 +51,16 @@ public static class ApplicationSites
         var page = application.Pages.FirstOrDefault(candidate => string.Equals(candidate.Name, pageName, StringComparison.OrdinalIgnoreCase));
         return page is null
             ? null
-            : new PageMetadata(page.Name, page.Title.TextKey, [.. page.Widgets.Select(widget => Widget(application, widget))]);
+            : new PageMetadata(
+                page.Name,
+                page.Title.TextKey,
+                [.. page.Parameters.Select(parameter => new PageParameterMetadata(
+                    parameter.Name,
+                    FieldTypes.Name(parameter.Type),
+                    parameter.Required,
+                    parameter.Values,
+                    parameter.Target is { } target ? Target(application, target.Name) : null))],
+                [.. page.Widgets.Select(widget => Widget(application, widget))]);
     }
 
     private static TextResource? FindText(ApplicationModel application, string locale) =>
@@ -93,7 +102,7 @@ public static class ApplicationSites
                 start.Process.Name,
                 start.Label.TextKey,
                 $"/api/apps/{application.Manifest.Name}/processes/{start.Process.Name}/instances"),
-            NavigateActionModel navigate => new NavigateActionMetadata(navigate.Page.Name, navigate.Label.TextKey),
+            NavigateActionModel navigate => new NavigateActionMetadata(navigate.Page.Name, navigate.Label.TextKey, navigate.Parameters, navigate.Record),
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
         };
 

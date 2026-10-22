@@ -29,6 +29,8 @@ const expressionNodes: [kind: string, pointer: string][] = [
   ['process', '/$defs/step/properties/fields/additionalProperties'],
   ['endpoint', '/properties/values/additionalProperties'],
   ['page', '/$defs/navigateParameters/additionalProperties'],
+  ['page', '/$defs/action/properties/record'],
+  ['page', '/$defs/navigateAction/properties/record'],
 ]
 
 describe('the x-axis-expression keyword', () => {

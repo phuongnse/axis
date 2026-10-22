@@ -26,6 +26,7 @@ internal static class NavigateChecker
         PageResource page,
         ApplicationLoadResult loaded,
         Func<string, PageResource?> findPage,
+        Func<string, FormResource?> findForm,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
@@ -106,6 +107,75 @@ internal static class NavigateChecker
                 DiagnosticCodes.MissingNavigateParameter,
                 $"The parameter '{parameter.Name}' is required by the page '{target.Name}', but the action does not give it.",
                 actionPath);
+        }
+
+        if (action.Record is not null)
+        {
+            CheckRecord(action.Record, actionPath, scope, target, page, findForm, references, diagnostics);
+        }
+    }
+
+    /// <summary>
+    /// Checks the <c>record</c> of an action: the target page holds a form widget, and the
+    /// expression is a reference to the entity of that form.
+    /// </summary>
+    private static void CheckRecord(
+        string record,
+        string actionPath,
+        ExpressionScope? scope,
+        PageResource target,
+        PageResource page,
+        Func<string, FormResource?> findForm,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics)
+    {
+        void Report(string code, string message) =>
+            diagnostics.Add(new Diagnostic(code, message, page.File, $"{actionPath}/record", page.Id));
+
+        var formWidget = PresentationChecker.Leaves(target.Widgets).FirstOrDefault(leaf => leaf.Type == "form");
+        if (formWidget is null)
+        {
+            Report(
+                DiagnosticCodes.InvalidNavigateRecord,
+                $"The page '{target.Name}' holds no form widget, so the action cannot set 'record'.");
+            return;
+        }
+
+        // A form that is unknown is already reported on the target page.
+        var entity = formWidget.Entity ?? (formWidget.Form is { } formName ? findForm(formName)?.Entity : null);
+        var parsed = ExpressionParser.Parse(record);
+        ExpressionType? type = null;
+        ExpressionDiagnostic? problem;
+        if (!parsed.Succeeded)
+        {
+            problem = parsed.Diagnostic;
+        }
+        else if (scope is null || entity is null)
+        {
+            problem = null;
+        }
+        else
+        {
+            var check = ExpressionTypeChecker.Check(parsed.Expression!, scope, ExpressionType.Reference(entity));
+            type = check.Type;
+            problem = check.Diagnostic;
+        }
+
+        references.RecordExpression(page, $"{actionPath}/record", type, problem);
+        if (problem is null)
+        {
+            return;
+        }
+
+        if (problem.Code == ExpressionDiagnosticCodes.ResultTypeMismatch)
+        {
+            Report(
+                DiagnosticCodes.InvalidNavigateRecord,
+                $"The page '{target.Name}' opens a record of '{entity}', so 'record' must be a reference to it. {problem.Message}");
+        }
+        else
+        {
+            Report(problem.Code, problem.Message);
         }
     }
 

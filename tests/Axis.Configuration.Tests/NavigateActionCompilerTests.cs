@@ -33,7 +33,10 @@ public sealed class NavigateActionCompilerTests
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
         var widget = Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "Orders").Widgets);
-        Assert.Equal([new NavigateActionModel(new PageReference(Guid.Parse(DetailId), "Detail"), new TextReference("order.open"))], widget.RowActions);
+        var action = Assert.IsType<NavigateActionModel>(Assert.Single(widget.RowActions));
+        Assert.Equal((new PageReference(Guid.Parse(DetailId), "Detail"), new TextReference("order.open")), (action.Page, action.Label));
+        Assert.Equal(new Dictionary<string, string> { ["order"] = "id" }, action.Parameters);
+        Assert.Null(action.Record);
         Assert.Empty(widget.Actions);
         Assert.Empty(widget.ToolbarActions);
     }
@@ -49,7 +52,9 @@ public sealed class NavigateActionCompilerTests
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
         var widget = Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "Orders").Widgets);
-        Assert.Equal([new NavigateActionModel(new PageReference(Guid.Parse(DetailId), "Detail"), new TextReference("order.open"))], widget.Actions);
+        var action = Assert.IsType<NavigateActionModel>(Assert.Single(widget.Actions));
+        Assert.Equal((new PageReference(Guid.Parse(DetailId), "Detail"), new TextReference("order.open")), (action.Page, action.Label));
+        Assert.Equal(new Dictionary<string, string> { ["order"] = "id" }, action.Parameters);
         Assert.Empty(widget.RowActions);
         Assert.Empty(widget.ToolbarActions);
     }
@@ -68,6 +73,87 @@ public sealed class NavigateActionCompilerTests
         var customerForm = Assert.Single(result.Model.Pages, page => page.Name == "CustomerForm");
         Assert.Equal([new NavigateActionModel(new PageReference(customerForm.Id, "CustomerForm"), new TextReference("order.open"))], widget.ToolbarActions);
         Assert.Empty(widget.RowActions);
+    }
+
+    [Fact]
+    public void Parameters_of_a_compiled_action_are_keyed_by_the_name_the_target_declares()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "ORDER": "id" } } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets);
+        var action = Assert.IsType<NavigateActionModel>(Assert.Single(widget.RowActions));
+        Assert.Equal(new Dictionary<string, string> { ["order"] = "id" }, action.Parameters);
+    }
+
+    [Fact]
+    public void Row_action_passing_the_row_id_as_record_to_a_form_over_the_same_entity_compiles()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "order.open" }, "record": "id" } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets);
+        var action = Assert.IsType<NavigateActionModel>(Assert.Single(widget.RowActions));
+        Assert.Equal("id", action.Record);
+        Assert.Empty(action.Parameters);
+    }
+
+    [Fact]
+    public void Record_on_an_action_to_a_page_without_a_form_is_reported_at_the_record()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "record": "id" } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidNavigateRecord, OrdersFile, "/widgets/0/rowActions/0/record"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'Detail'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Record_of_another_entity_than_the_form_is_reported_at_the_record()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" }, "record": "id" } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidNavigateRecord, OrdersFile, "/widgets/0/rowActions/0/record"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'Customer'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Record_expression_that_does_not_parse_is_reported_with_the_parse_error()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "order.open" }, "record": "number +" } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((OrdersFile, "/widgets/0/rowActions/0/record"), (diagnostic.File, diagnostic.Path));
+        Assert.NotEqual(DiagnosticCodes.InvalidNavigateRecord, diagnostic.Code);
+    }
+
+    [Fact]
+    public void Form_page_that_declares_a_parameter_is_reported_at_its_parameters()
+    {
+        using var folder = Folder(Table("""[]"""))
+            .With("pages/order-form.json", Page("OrderForm", """{ "type": "form", "entity": "Order" }""", "55555555-5555-4555-8555-555555555552", "orderForm.title", CodeParameter));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ParametersOnFormPage, "pages/order-form.json", "/parameters"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
     }
 
     [Fact]

@@ -161,13 +161,14 @@
         "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" },
         "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
         "label": { "$ref": "#/$defs/textReference" },
-        "parameters": { "$ref": "#/$defs/navigateParameters" }
+        "parameters": { "$ref": "#/$defs/navigateParameters" },
+        "record": { "type": "string", "minLength": 1, "x-axis-expression": true }
       },
       "allOf": [
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "navigate" } } },
           "then": { "required": ["page"], "properties": { "process": false } },
-          "else": { "required": ["process"], "properties": { "page": false, "parameters": false } }
+          "else": { "required": ["process"], "properties": { "page": false, "parameters": false, "record": false } }
         }
       ]
     },
@@ -179,7 +180,8 @@
         "type": { "const": "navigate" },
         "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
         "label": { "$ref": "#/$defs/textReference" },
-        "parameters": { "$ref": "#/$defs/navigateParameters" }
+        "parameters": { "$ref": "#/$defs/navigateParameters" },
+        "record": { "type": "string", "minLength": 1, "x-axis-expression": true }
       }
     }
   }

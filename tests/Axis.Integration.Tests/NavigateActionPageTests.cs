@@ -7,7 +7,11 @@ namespace Axis.Integration.Tests;
 
 public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClassFixture<ProcessStartFixture>
 {
-    private const string ShowSubmissions = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions"}""";
+    private const string ShowSubmissions = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions","parameters":{},"record":null}""";
+
+    private const string ShowSubmissionsOfRow = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions","parameters":{"request":"id"},"record":null}""";
+
+    private const string OpenRequestForm = """{"type":"navigate","page":"RequestForm","labelKey":"pages.requestForm.title","parameters":{},"record":"id"}""";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -16,7 +20,7 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
     {
         var table = await TableOfOverviewAsync("anna");
 
-        Assert.Equal([ShowSubmissions], RawItems(table.GetProperty("rowActions")));
+        Assert.Equal([ShowSubmissionsOfRow, OpenRequestForm], RawItems(table.GetProperty("rowActions")));
         Assert.Equal([ShowSubmissions], RawItems(table.GetProperty("toolbarActions")));
         Assert.Equal(0, table.GetProperty("actions").GetArrayLength());
     }
@@ -26,7 +30,8 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
     {
         var table = await TableOfOverviewAsync("olga");
 
-        Assert.Equal(0, table.GetProperty("rowActions").GetArrayLength());
+        // Olga reads requests, so the form page stays. She cannot read the submissions page.
+        Assert.Equal([OpenRequestForm], RawItems(table.GetProperty("rowActions")));
         Assert.Equal(0, table.GetProperty("toolbarActions").GetArrayLength());
     }
 
@@ -52,6 +57,22 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
 
         // Olga holds no start grant either, so no action is left.
         Assert.Equal(0, form.GetProperty("actions").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Page_metadata_lists_the_parameters_of_the_page()
+    {
+        using var submissions = await GetAsync("anna", "/api/sites/processes/pages/submissions");
+        using var overview = await GetAsync("anna", "/api/sites/processes/pages/overview");
+
+        Assert.Equal(HttpStatusCode.OK, submissions.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, overview.StatusCode);
+        var submissionsPage = JsonDocument.Parse(await submissions.Content.ReadAsStringAsync(CancellationToken)).RootElement;
+        var overviewPage = JsonDocument.Parse(await overview.Content.ReadAsStringAsync(CancellationToken)).RootElement;
+        Assert.Equal(
+            ["""{"name":"request","type":"reference","required":false,"values":null,"target":{"entity":"Request","displayField":"title","recordsPath":"/api/apps/ProcessApp/entities/Request/records"}}"""],
+            RawItems(submissionsPage.GetProperty("parameters")));
+        Assert.Equal("[]", overviewPage.GetProperty("parameters").GetRawText());
     }
 
     private async Task<JsonElement> TableOfOverviewAsync(string user)

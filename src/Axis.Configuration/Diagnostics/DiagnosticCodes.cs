@@ -222,4 +222,6 @@ public static class DiagnosticCodes
     public const string UnknownNavigatePage = "AXC0232";
     public const string UnknownNavigateParameter = "AXC0233";
     public const string MissingNavigateParameter = "AXC0234";
+    public const string InvalidNavigateRecord = "AXC0235";
+    public const string ParametersOnFormPage = "AXC0236";
 }

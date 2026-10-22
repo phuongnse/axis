@@ -1683,7 +1683,19 @@ public static class ApplicationCompiler
                 return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
             }
 
-            return new NavigateActionModel(PageReferenceTo(pagesByName[action.Page!]), action.Label);
+            // The checker has matched each key to a parameter of the target, ignoring letter case. The model
+            // keys them by the declared name, so a client never fixes the case itself.
+            var target = pagesByName[action.Page!];
+            var parameters = action.Parameters is not { Count: > 0 }
+                ? NavigateActionModel.NoParameters
+                : action.Parameters.ToDictionary(
+                    pair => target.Parameters.First(parameter => string.Equals(parameter.Name, pair.Key, StringComparison.OrdinalIgnoreCase)).Name,
+                    pair => pair.Value);
+            return new NavigateActionModel(PageReferenceTo(target), action.Label)
+            {
+                Parameters = parameters,
+                Record = action.Record,
+            };
         }
 
         WidgetModel BuildWidget(WidgetDefinition widget)
