@@ -139,7 +139,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     are `null` on every other widget.
   - Every widget also has `actions`, never left out. It
     is described under the form widget, and is `[]` on a widget it does not
-    apply to.
+    apply to. A table's `startProcess` row actions are left out without
+    `start`, and its `delete` row action without `delete` *(planned for M12)*.
   - Every widget also has `access`, never left out. It is described under
     **Policies** below, and is `null` on a `taskInbox` and on a
     `processInspector`.
@@ -215,7 +216,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       affected. The task API's form does the same, see
       [policies on tasks](task-api.md).
     - **Actions.** A `startProcess` action is left out of `actions` when the
-      user has no `start` grant on its process.
+      user has no `start` grant on its process. The same holds for a `table`
+      row action *(planned for M12)*, and its `delete` row action is left out
+      when `access.actions` lacks `delete`.
     - **Access.** Every `table` and `form` widget gets an `access` object.
       It says which entity actions the user may take, and which fields each
       write action covers:
@@ -409,6 +412,33 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     the form in a new tab or window. Both pass the table's address, with
     its paging and sorting, to the form in history state. Without a form
     page there is no create button and no open column.
+  - **Row and toolbar actions** *(planned for M12)*. See
+    [D58](../decisions/d58-table-row-and-toolbar-actions.md).
+    - **Where.** Toolbar actions sit next to the create button. Row actions
+      are buttons in the row, and fold into a menu at phone width. A
+      `navigate` action may sit in either list. `startProcess` and `delete`
+      are row actions only. A row of a data source acts on its root record,
+      and a group row has no actions.
+    - **`visibleWhen`.** An action hides when its expression over the row is
+      `false`, `null` or fails. It only shapes the UI. The server decides, as
+      in [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).
+    - **Delete.** A row has a delete button only when the widget's
+      `access.actions` holds `delete`. Without it there is no button. A click
+      opens a confirmation dialog. On confirm the SPA sends
+      `DELETE {recordsPath}/{id}` with `X-Axis-Csrf: 1`.
+    - **After a delete.** On `204` it shows a success message and loads the
+      current page of rows again. A page past the last page becomes the last
+      page, as for an invalid `page`. A `403` shows a permission message,
+      such as when the record filter denies the row. A `404` shows a message
+      that the record no longer exists. A `409` shows one 'in use' text, for
+      a record that another record references and for a record held by a
+      running process. In each case the row stays. Any other answer shows
+      the generic platform error.
+    - **Start process.** A row `startProcess` follows the rules of the form
+      widget's **Start process action**, with the row as the subject and
+      the same `Idempotency-Key` and `409` text. On `201` it loads the
+      current page of rows again.
+    - **Later.** Actions on selected rows come after M12.
   - **States.** Loading, empty and error states use the shared table and
     alert with platform texts. While the next page loads, the current rows
     stay under the loading overlay.
