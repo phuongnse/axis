@@ -127,7 +127,12 @@ state:
   earlier release keeps its own layout. It has the shape of a form widget's
   `form` metadata, plus `entity` in the shape of a widget's `entity`
   metadata, so the task page knows each field's type. See
-  [frontend](frontend.md). The example shortens both.
+  [frontend](frontend.md). The example shortens both. *(Planned for M12.)*
+  The `form` carries the same additions as the form metadata in
+  [frontend](frontend.md): `visibleWhen` as a yes or no flag on each field
+  and section, each section's `name`, and `steps`. The condition expressions
+  stay on the server. See
+  [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 - `completedAt`, `completedBy` and `outcome` are `null` while the task is
   `open`.
 
@@ -150,6 +155,28 @@ Content-Type: application/json
   is required when `values` is not empty.
 - The response is `200` with the completed task, in the shape of a single
   read.
+
+## Form state of a task
+
+*(Planned for M12.)* `POST /api/apps/{app}/tasks/{id}/form-state` answers
+what the task's form shows for a draft, as the record API's
+[form state](record-api.md#form-state) does for a record form
+([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+It needs `Content-Type: application/json` and the
+[CSRF header](record-api.md#create-update-and-delete).
+
+```json
+{ "values": { "decisionComments": "Fine for Q4." }, "touched": ["decisionComments"] }
+```
+
+- The body has `values` and `touched`, with the shapes of the record API.
+  There is no `recordId`, because the subject record is the task's.
+- The response has `sections`, `fields` and `errors`, as in the record API.
+- It uses the form from the task's release and the subject record. Fields the
+  user may not read are left out of `fields`.
+- It writes nothing, and runs no unique or reference-existence check.
+- The checks follow the task check order below: `401`, `404`, `403`, then
+  `409` when the task is not `open`.
 
 ## Task API errors
 
@@ -218,6 +245,11 @@ of these checks.
   - A value for a field the form does not make editable, or the user may
     not read, is keyed `/values/<field>` with the message "Cannot be set.".
   - A missing `version` when `values` is not empty is keyed `/version`.
+  - *(Planned for M12.)* A value for a field whose `readOnlyWhen` is true, or
+    that is hidden, is keyed `/values/<field>` with "Cannot be set.". A
+    visible field whose `requiredWhen` is true and that is left `null` is
+    keyed `/values/<field>` with "Required.". Both are evaluated on the record
+    as it will be stored.
   - Any other property, a repeated property and a body that is not a JSON
     object get the record API's keys and messages, such as "Unknown
     property.".
