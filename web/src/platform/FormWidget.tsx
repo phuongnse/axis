@@ -1,7 +1,8 @@
-import { Alert, Button, Flex, Form } from 'antd'
+import { Alert, Button, ConfigProvider, Flex, Form } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { antLocaleFor } from './antLocale'
 import { navigatePath } from './navigateAction'
 import { buildRecordBody } from './recordBody'
 import { RecordHistory } from './RecordHistory'
@@ -234,73 +235,75 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   }
 
   return (
-    <Flex vertical gap="middle">
-      {conflict && (
-        <Alert
-          data-testid="form-conflict"
-          type="warning"
-          message={t('shell.form.conflict')}
-          action={<Button onClick={reload}>{t('shell.form.reload')}</Button>}
-        />
-      )}
-      {started && <Alert data-testid="form-started" type="success" message={t('shell.form.processStarted')} />}
-      {form.formErrors.length > 0 && (
-        <Alert data-testid="form-error" type="error" message={form.formErrors.join(' ')} />
-      )}
-      <Form layout="vertical" onFinish={save}>
-        {form.fields}
-        <Flex gap="small">
-          {canSave && (
-            <Button htmlType="submit" type="primary" loading={saving} disabled={starting}>
-              {t('shell.form.save')}
-            </Button>
-          )}
-          <Button onClick={() => navigate(returnTo)}>{t('shell.form.cancel')}</Button>
-          {recordId !== null &&
-            widget.actions
-              .filter((action): action is StartProcessAction => action.type === 'startProcess')
-              .map((action) => (
-                <Button
-                  key={action.instancesPath}
-                  htmlType="button"
-                  disabled={saving || starting}
-                  onClick={() => void runAction(action)}
-                >
-                  {t(action.labelKey)}
-                </Button>
-              ))}
-          {recordId !== null &&
-            record?.id === recordId &&
-            widget.actions
-              .filter((action): action is NavigateAction => action.type === 'navigate')
-              .map((action, index) => {
-                const path = navigatePath(sitePath, action, { id: recordId, values: record.values })
-                return (
-                  path && (
-                    <Button
-                      key={index}
-                      htmlType="button"
-                      disabled={saving || starting}
-                      onClick={() => navigate(path, { state: { from: `${location.pathname}${location.search}` } })}
-                    >
-                      {t(action.labelKey)}
-                    </Button>
+    <ConfigProvider locale={antLocaleFor(locale)}>
+      <Flex vertical gap="middle">
+        {conflict && (
+          <Alert
+            data-testid="form-conflict"
+            type="warning"
+            message={t('shell.form.conflict')}
+            action={<Button onClick={reload}>{t('shell.form.reload')}</Button>}
+          />
+        )}
+        {started && <Alert data-testid="form-started" type="success" message={t('shell.form.processStarted')} />}
+        {form.formErrors.length > 0 && (
+          <Alert data-testid="form-error" type="error" message={form.formErrors.join(' ')} />
+        )}
+        <Form layout="vertical" onFinish={save}>
+          {form.fields}
+          <Flex gap="small">
+            {canSave && (
+              <Button htmlType="submit" type="primary" loading={saving} disabled={starting}>
+                {t('shell.form.save')}
+              </Button>
+            )}
+            <Button onClick={() => navigate(returnTo)}>{t('shell.form.cancel')}</Button>
+            {recordId !== null &&
+              widget.actions
+                .filter((action): action is StartProcessAction => action.type === 'startProcess')
+                .map((action) => (
+                  <Button
+                    key={action.instancesPath}
+                    htmlType="button"
+                    disabled={saving || starting}
+                    onClick={() => void runAction(action)}
+                  >
+                    {t(action.labelKey)}
+                  </Button>
+                ))}
+            {recordId !== null &&
+              record?.id === recordId &&
+              widget.actions
+                .filter((action): action is NavigateAction => action.type === 'navigate')
+                .map((action, index) => {
+                  const path = navigatePath(sitePath, action, { id: recordId, values: record.values })
+                  return (
+                    path && (
+                      <Button
+                        key={index}
+                        htmlType="button"
+                        disabled={saving || starting}
+                        onClick={() => navigate(path, { state: { from: `${location.pathname}${location.search}` } })}
+                      >
+                        {t(action.labelKey)}
+                      </Button>
+                    )
                   )
-                )
-              })}
-        </Flex>
-      </Form>
-      {recordId !== null && (
-        <RecordHistory
-          key={recordId}
-          sitePath={sitePath}
-          pages={pages}
-          recordsPath={entity.recordsPath}
-          recordId={recordId}
-          fields={entity.fields}
-          locale={locale}
-        />
-      )}
-    </Flex>
+                })}
+          </Flex>
+        </Form>
+        {recordId !== null && (
+          <RecordHistory
+            key={recordId}
+            sitePath={sitePath}
+            pages={pages}
+            recordsPath={entity.recordsPath}
+            recordId={recordId}
+            fields={entity.fields}
+            locale={locale}
+          />
+        )}
+      </Flex>
+    </ConfigProvider>
   )
 }
