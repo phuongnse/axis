@@ -4,8 +4,10 @@ Status: **Agreed**
 
 A form can show, require and lock fields depending on the record, can check the draft as the
 user types, and can split its sections into wizard steps. The schema, the compile checks, the
-compiled model and the page and task metadata are built. Evaluating the conditions, the form
-state endpoints, enforcement on write, validation as you type and the SPA are _(planned for M12)_. The
+compiled model and the page and task metadata are built. Enforcing `requiredWhen` on write is
+built, in the record API and the task API. The form state endpoints, refusing a value for a
+hidden or `readOnlyWhen` field in the task API, validation as you type and the SPA are
+_(planned for M12)_. The
 server evaluates every condition. NexKit autopilot confirmed these points for the owner on
 issue #934 on 2026-10-21. The reference text is in
 [Form conditions and steps](../reference/resource-files.md#form-conditions-and-steps), the

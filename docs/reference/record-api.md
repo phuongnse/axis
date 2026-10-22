@@ -231,17 +231,24 @@ HTTP also call. The record API maps its outcome to the responses below.
   `400` at its pointer with the message "Cannot be set.", as for a sequence
   field.
 
-- **Form conditions.** *(Planned for M12.)* `POST` and `PATCH` take an optional
-  query `?form=<name>`. The name must be a `form` resource over the entity,
-  or the write is a `400` keyed `form`. With a form, the server enforces its
-  [`requiredWhen`](resource-files.md#form-conditions-and-steps) at the
-  validation step: a visible field whose condition is true and whose value is
-  `null` is a `400` at `/values/<field>` with "Required.". A hidden field is
-  not required. Without `?form=`, form conditions are not applied, so a rule
-  that must always hold belongs in an entity validation. `readOnlyWhen`
-  follows `readOnly`: the record API does not enforce it, and the field write
-  grants decide. The check order is unchanged, because `form` is part of the
-  path and query check.
+- **Form conditions.** `POST` and `PATCH` take an optional query
+  `?form=<name>`. The name must be a `form` resource over the entity. A name
+  that is not, and an empty or repeated `form`, is a `400` keyed `form` with
+  the message "Must name a form of this entity.". With a form, the server
+  enforces its [`requiredWhen`](resource-files.md#form-conditions-and-steps) at
+  the validation step, on the record as it will be stored: a visible field
+  whose condition is true and whose value is `null` is a `400` at
+  `/values/<field>` with "Required.". A hidden field is not required. A child
+  collection and a sequence field are never checked. The "Required." errors
+  come in the same `400` as the entity's validation messages, and "Required."
+  wins when both fail on one key. An update of a form with `requiredWhen`
+  reads the stored record first, so an unknown record is a `404` there.
+  Without `?form=`, form conditions are not applied, so a rule that must
+  always hold belongs in an entity validation. `readOnlyWhen` follows
+  `readOnly`: the record API does not enforce it, and the field write grants
+  decide. The `form` name is checked after the grant and record checks and
+  before the content type and the body, so a user without the grant still
+  gets `403` or `404`.
 
 ## Concurrency
 

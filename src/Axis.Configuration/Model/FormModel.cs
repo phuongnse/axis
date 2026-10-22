@@ -19,6 +19,9 @@ public sealed record FormModel
 
     /// <summary>The wizard steps in order. Empty when the form is not a wizard.</summary>
     public IReadOnlyList<FormStepModel> Steps { get; init; } = [];
+
+    /// <summary>Whether any field of the form declares a <c>requiredWhen</c> condition.</summary>
+    public bool HasRequiredWhen => Sections.Any(section => section.Fields.Any(formField => formField.RequiredWhen is not null));
 }
 
 /// <summary>

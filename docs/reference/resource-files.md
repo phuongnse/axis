@@ -531,7 +531,8 @@ A `form` resource (see [frontend](frontend.md)) can show, require and lock
 fields depending on the record, and can split its sections into wizard steps
 ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 The schema, the compile checks, the compiled model and the page and task metadata are built.
-Evaluating the conditions and enforcing them on write stay *(planned for M12)*.
+The server enforces `requiredWhen` on write. The form state endpoints and refusing a value for a
+hidden or `readOnlyWhen` field stay *(planned for M12)*.
 
 - **Conditions.** A field entry may have `visibleWhen`, `requiredWhen` and
   `readOnlyWhen`. A section may have `visibleWhen`. Each is a boolean
@@ -557,8 +558,10 @@ Evaluating the conditions and enforcing them on write stay *(planned for M12)*.
   own.
 - **On write.** The record API enforces `requiredWhen` only when the write
   names the form in `?form=`. It never enforces `readOnlyWhen`. The task API
-  enforces both. See [the record API](record-api.md#create-update-and-delete)
-  and [the task API](task-api.md#task-api-errors).
+  enforces `requiredWhen` on every completion, and *(planned for M12)* it
+  enforces `readOnlyWhen` and hidden fields too. See
+  [the record API](record-api.md#create-update-and-delete) and
+  [the task API](task-api.md#task-api-errors).
 - **Steps.** `steps` is an optional list on the form. Each step has a `title`
   label and `sections`, a list of section names. When `steps` is present,
   every section has a `name` and is in exactly one step. The steps show in

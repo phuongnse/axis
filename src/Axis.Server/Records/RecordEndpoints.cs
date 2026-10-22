@@ -41,11 +41,16 @@ namespace Axis.Server.Records;
 /// display name. A write that fails leaves none.
 /// A create or update also starts the processes of the data change triggers that match it, in the
 /// same transaction, as <c>system</c>. A write that fails starts none.
+/// A create or update may name a form of the entity in <c>?form=</c>. The name is checked after the
+/// grant and record checks and before the content type: a name that is no form of the entity, and
+/// an empty or repeated one, is a 400 at <c>form</c>.
 /// A body is checked in order: content type (415), then body (400), then a field that no grant for
 /// the action covers (403, at the path of each such field), then the computed fields of
-/// the record as it will be stored and of its rows (400), then the entity's validations on that
-/// record (400), then storage (404, 409). An update of an entity with computed fields or
-/// validations reads the stored record first, so an unknown record is a 404 there.
+/// the record as it will be stored and of its rows (400), then the form's <c>requiredWhen</c>
+/// conditions and the entity's validations on that record (400, in one response, where
+/// "Required." wins over a validation message on the same field), then storage (404, 409). An
+/// update of an entity with computed fields or validations, or with a form that has
+/// <c>requiredWhen</c> conditions, reads the stored record first, so an unknown record is a 404 there.
 /// A create or update that finds a different active release under the start lock runs again from
 /// the path check on the new release, and answers 503 after three attempts. Nothing is written by
 /// an attempt that finds a change.
@@ -359,6 +364,7 @@ internal static class RecordEndpoints
     private static async Task<IResult> CreateAsync(
         string app,
         string entity,
+        string? form,
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
@@ -389,6 +395,7 @@ internal static class RecordEndpoints
                 model,
                 Actor(user),
                 BodyReader(request),
+                form,
                 loggerFactory,
                 cancellationToken);
             if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
@@ -411,6 +418,7 @@ internal static class RecordEndpoints
         string app,
         string entity,
         string id,
+        string? form,
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
@@ -449,6 +457,7 @@ internal static class RecordEndpoints
                 recordId,
                 Actor(user),
                 BodyReader(request),
+                form,
                 loggerFactory,
                 cancellationToken);
             if (result.Outcome == RecordCommandOutcome.ReleaseChanged)

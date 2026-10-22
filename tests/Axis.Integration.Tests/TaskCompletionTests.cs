@@ -117,6 +117,84 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
         Assert.Equal(waiting.SubjectVersion, ended.SubjectVersion);
     }
 
+    // The RequestSettlement form of the Settle process requires a comment and a divisor when the
+    // amount is above 100, and shows the divisor only when the amount is above 1000.
+    [Fact]
+    public async Task A_completion_that_leaves_a_required_field_empty_is_400_and_the_task_stays_open()
+    {
+        var (task, _, instance) = await CreateTaskAsync(TenantA, "Settle", amount: 500m);
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        // No values are sent, and the divisor is hidden at this amount, so only the comment is required.
+        using var response = await CompleteAsync(maria, task, TenantA, """{ "outcome": "settle" }""");
+
+        using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        var errors = problem.RootElement.GetProperty("errors");
+        Assert.Equal(["/values/comment"], errors.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["Required."], errors.GetProperty("/values/comment").EnumerateArray().Select(message => message.GetString()));
+        Assert.Equal(waiting, await fixture.SnapshotAsync(TenantA, instance));
+        Assert.Empty(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
+    }
+
+    [Fact]
+    public async Task A_completion_that_sends_values_but_leaves_a_required_field_empty_writes_nothing()
+    {
+        var (task, _, instance) = await CreateTaskAsync(TenantA, "Settle", amount: 2000m);
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        // The divisor shows at this amount, so it is required too.
+        using var response = await CompleteAsync(
+            maria, task, TenantA, $$"""{ "outcome": "settle", "values": { "comment": "Fine" }, "version": {{waiting.SubjectVersion}} }""");
+
+        using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        Assert.Equal(["/values/divisor"], problem.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+        Assert.Equal(waiting, await fixture.SnapshotAsync(TenantA, instance));
+    }
+
+    [Fact]
+    public async Task A_completion_with_the_required_field_filled_is_200()
+    {
+        var (task, subject, instance) = await CreateTaskAsync(TenantA, "Settle", amount: 500m);
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var response = await CompleteAsync(
+            maria, task, TenantA, $$"""{ "outcome": "settle", "values": { "comment": "Settled" }, "version": {{waiting.SubjectVersion}} }""");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var record = await ReadRecordAsync(maria, subject, TenantA);
+        Assert.Equal("Settled", record.RootElement.GetProperty("values").GetProperty("comment").GetString());
+        Assert.Equal(ProcessTasks.Completed, (await fixture.SnapshotAsync(TenantA, instance)).TaskState);
+    }
+
+    [Fact]
+    public async Task A_completion_whose_condition_does_not_hold_needs_no_values()
+    {
+        var (task, _, instance) = await CreateTaskAsync(TenantA, "Settle", amount: 50m);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var response = await CompleteAsync(maria, task, TenantA, """{ "outcome": "settle" }""");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(ProcessTasks.Completed, (await fixture.SnapshotAsync(TenantA, instance)).TaskState);
+    }
+
+    [Fact]
+    public async Task A_user_who_is_not_the_assignee_gets_403_before_the_required_fields_are_checked()
+    {
+        var (task, _, instance) = await CreateTaskAsync(TenantA, "Settle", amount: 500m);
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        using var otto = fixture.CreateClient().SignedInAs("otto");
+
+        using var response = await CompleteAsync(otto, task, TenantA, """{ "outcome": "settle" }""");
+
+        using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        Assert.Equal("This task is assigned to someone else.", problem.RootElement.GetProperty("title").GetString());
+        Assert.Equal(waiting, await fixture.SnapshotAsync(TenantA, instance));
+    }
+
     [Fact]
     public async Task A_role_holder_completes_the_role_task()
     {
@@ -338,10 +416,11 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     /// <paramref name="process"/> for it and runs the tenant's work items, so the instance waits on
     /// its task. Returns the task's id, the request's id and the instance's id.
     /// </summary>
-    private async Task<(Guid Task, Guid Subject, Guid Instance)> CreateTaskAsync(string tenant, string process, string manager = "maria")
+    private async Task<(Guid Task, Guid Subject, Guid Instance)> CreateTaskAsync(
+        string tenant, string process, string manager = "maria", decimal? amount = null)
     {
         var department = await fixture.InsertDepartmentAsync(tenant, manager);
-        var subject = await fixture.InsertRequestAsync(tenant, department);
+        var subject = await fixture.InsertRequestAsync(tenant, department, amount: amount);
         var instance = await fixture.StartAsync(tenant, process, subject);
         await fixture.RunUntilIdleAsync(tenant, CancellationToken);
         return (await fixture.TaskIdAsync(tenant, instance), subject, instance);

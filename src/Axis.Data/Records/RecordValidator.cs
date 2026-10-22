@@ -73,26 +73,7 @@ public static class RecordValidator
 
         if (entity.Validations.Count > 0)
         {
-            // Every column field starts as null, then takes its stored value and then the body's.
-            var record = new Dictionary<string, (object? Value, bool Exact)>(StringComparer.OrdinalIgnoreCase);
-            foreach (var field in entity.Fields.Where(field => field.HasColumn))
-            {
-                record[field.Name] = (null, true);
-            }
-
-            if (stored is not null)
-            {
-                foreach (var field in entity.Fields.Where(field => field.HasColumn))
-                {
-                    var exact = RecordClrValues.TryFromStored(field, stored.Values.GetValueOrDefault(field.Name), out var value);
-                    record[field.Name] = (value, exact);
-                }
-            }
-
-            foreach (var value in values)
-            {
-                record[value.Field.Name] = (RecordClrValues.FromInput(value, out var exact), exact);
-            }
+            var record = BuildRecord(entity, stored, values);
 
             // A row value that cannot be held exactly stops every validation of the owner.
             if (RecordCollections.TryAdd(application, entity, stored, rows, record, errors))
@@ -121,6 +102,39 @@ public static class RecordValidator
         }
 
         return errors.Count == 0 ? null : errors;
+    }
+
+    /// <summary>
+    /// The record as it will be stored: every column field starts as <c>null</c>, then takes its
+    /// stored value and then the body's. The child collections are added by
+    /// <see cref="RecordCollections.TryAdd"/>.
+    /// </summary>
+    internal static Dictionary<string, (object? Value, bool Exact)> BuildRecord(
+        EntityModel entity,
+        Record? stored,
+        IReadOnlyList<RecordValue> values)
+    {
+        var record = new Dictionary<string, (object? Value, bool Exact)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var field in entity.Fields.Where(field => field.HasColumn))
+        {
+            record[field.Name] = (null, true);
+        }
+
+        if (stored is not null)
+        {
+            foreach (var field in entity.Fields.Where(field => field.HasColumn))
+            {
+                var exact = RecordClrValues.TryFromStored(field, stored.Values.GetValueOrDefault(field.Name), out var value);
+                record[field.Name] = (value, exact);
+            }
+        }
+
+        foreach (var value in values)
+        {
+            record[value.Field.Name] = (RecordClrValues.FromInput(value, out var exact), exact);
+        }
+
+        return record;
     }
 
     /// <summary>
