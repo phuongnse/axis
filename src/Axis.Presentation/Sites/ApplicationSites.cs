@@ -126,12 +126,42 @@ public static class ApplicationSites
         return new FormMetadata(
             form.Name,
             [.. form.Sections.Select(section => new FormSectionMetadata(
+                section.Name,
                 section.Title.TextKey,
+                section.VisibleWhen is not null,
                 [.. section.Fields.Select(entry =>
                 {
                     entity.TryGetField(entry.Field, out var field);
-                    return new FormFieldMetadata(field!.Name, entry.ReadOnly || field.IsComputed || field.Sequence is not null || field.Creator);
-                })]))]);
+                    return new FormFieldMetadata(
+                        field!.Name,
+                        entry.ReadOnly || field.IsComputed || field.Sequence is not null || field.Creator,
+                        entry.VisibleWhen is not null);
+                })]))],
+            [.. form.Steps.Select(step => new FormStepMetadata(step.Title.TextKey, step.Sections))]);
+    }
+
+    /// <summary>
+    /// <paramref name="form"/> with only the fields in <paramref name="readable"/>. A section left
+    /// with no field is dropped, and so is its name from each step. A step left with no section is
+    /// dropped.
+    /// </summary>
+    public static FormMetadata Readable(FormMetadata form, IReadOnlySet<string> readable)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+        ArgumentNullException.ThrowIfNull(readable);
+
+        var sections = form.Sections
+            .Select(section => section with { Fields = [.. section.Fields.Where(field => readable.Contains(field.Name))] })
+            .Where(section => section.Fields.Count > 0)
+            .ToList();
+        var names = new HashSet<string>(sections.Select(section => section.Name).OfType<string>(), StringComparer.OrdinalIgnoreCase);
+        return form with
+        {
+            Sections = sections,
+            Steps = [.. form.Steps
+                .Select(step => step with { Sections = [.. step.Sections.Where(names.Contains)] })
+                .Where(step => step.Sections.Count > 0)],
+        };
     }
 
     /// <summary>

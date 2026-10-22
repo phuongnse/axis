@@ -550,9 +550,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     that no locale has is `AXC0028`. See
     [Configuration pipeline](configuration.md#configuration-pipeline).
   - A form over a child entity is not checked yet.
-  - *(Planned for M12.)* Fields get `visibleWhen`, `requiredWhen` and
-    `readOnlyWhen`, sections get `visibleWhen` and a `name`, and a form may
-    have `steps`. See
+  - Fields get `visibleWhen`, `requiredWhen` and `readOnlyWhen`, sections get
+    `visibleWhen` and a `name`, and a form may have `steps`. The compiler
+    checks them. The SPA does not use them yet *(planned for M12)*. See
     [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 - **Form widget.** A page whose widget is a `form` creates a record at
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
@@ -759,7 +759,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Form metadata**. Page metadata gives the widget's
     `entity` with all its fields, so the SPA knows every field's type. It
     adds:
-    - `form`: `{ "name", "sections": [ { "titleKey", "fields": [ { "name", "readOnly" } ] } ] }`,
+    - `form`: `{ "name", "sections": [ { "name", "titleKey", "visibleWhen", "fields": [ { "name", "readOnly", "visibleWhen" } ] } ], "steps": [ { "titleKey", "sections" } ] }`,
       or `null` when the widget names an `entity`. `readOnly` already
       includes computed, sequence and creator fields. Field names are as the entity
       declares them.
@@ -767,11 +767,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
       so the SPA never builds it itself.
-    - *(Planned for M12.)* `form` also holds `visibleWhen` on each field and
-      section, as `true` when it has a condition and `false` otherwise.
-      It holds `steps`, each with a `titleKey` and its section names, and each
-      section's `name`. It holds no expressions, because they stay on the
-      server.
+    - `form` also holds `visibleWhen` on each field and section, as `true`
+      when it has a condition and `false` otherwise. It holds `steps`, each
+      with a `titleKey` and its section names, and `[]` when the form has
+      none. Each section has a `name`, which is `null` when it has none. It
+      holds no expressions, because they stay on the server. A user who may
+      not read any field of a section gets no such section, and its name is
+      left out of the steps. A step left with no section is left out.
 - **Task inbox widget**. A page whose widget is a
   `taskInbox` lists the signed-in user's open tasks in the application,
   through the [task API](task-api.md).

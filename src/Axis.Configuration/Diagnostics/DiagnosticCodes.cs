@@ -208,4 +208,10 @@ public static class DiagnosticCodes
     public const string UnknownScenario = "AXC0218";
     public const string ScenarioTimeLimit = "AXC0219";
     public const string ScenarioStopped = "AXC0220";
+    public const string UnlistedFormConditionField = "AXC0221";
+    public const string VisibleWhenOnRequiredField = "AXC0222";
+    public const string DuplicateFormSectionName = "AXC0223";
+    public const string UnknownStepSection = "AXC0224";
+    public const string DuplicateStepSection = "AXC0225";
+    public const string SectionInNoStep = "AXC0226";
 }

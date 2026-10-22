@@ -46,7 +46,7 @@ internal static class PageAccess
         return described with
         {
             Entity = readable is null ? described.Entity : Readable(described.Entity, readable),
-            Form = readable is null ? described.Form : Readable(described.Form, readable),
+            Form = readable is null || described.Form is null ? described.Form : ApplicationSites.Readable(described.Form, readable),
             Actions = [.. described.Actions.Where(action =>
                 application.TryGetProcess(action.Process, out var process) && PolicyEvaluator.AllowsStart(application, roles, process))],
             Access = entity is null ? null : Access(application, roles, entity),
@@ -57,17 +57,6 @@ internal static class PageAccess
     // left out.
     private static EntityMetadata? Readable(EntityMetadata? entity, IReadOnlySet<string> readable) =>
         entity is null ? null : entity with { Fields = [.. entity.Fields.Where(field => readable.Contains(field.Name))] };
-
-    // A section with no readable field is left out.
-    private static FormMetadata? Readable(FormMetadata? form, IReadOnlySet<string> readable) =>
-        form is null
-            ? null
-            : form with
-            {
-                Sections = [.. form.Sections
-                    .Select(section => section with { Fields = [.. section.Fields.Where(field => readable.Contains(field.Name))] })
-                    .Where(section => section.Fields.Count > 0)],
-            };
 
     private static bool CanRead(ApplicationModel application, IReadOnlyList<string> roles, WidgetModel widget)
     {

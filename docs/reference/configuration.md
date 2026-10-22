@@ -126,7 +126,15 @@ flowchart LR
      entry of the form already lists, in any section and ignoring letter
      case, is `AXC0076` at the later entry's `field`, naming the first one.
      Each section title joins the `AXC0028` check, at
-     `/sections/{i}/title/textKey`.
+     `/sections/{i}/title/textKey`. The conditions and steps have their own
+     checks, see
+     [Form conditions and steps](resource-files.md#form-conditions-and-steps):
+     each condition is a boolean expression over the entity, and it reads only
+     listed fields (`AXC0221`). `visibleWhen` is not allowed on a required
+     field (`AXC0222`). A section name is used once (`AXC0223`). A step names
+     a known section (`AXC0224`) that is in no other step (`AXC0225`), and
+     when there are steps, every section has a name and is in one step
+     (`AXC0226`).
    - **Seeds.** A seed's `entity` must name a loaded entity, ignoring letter
      case, otherwise it is `AXC0032` at `/entity`. A name whose entity file
      was not loaded because of its own errors is not reported again. Seed

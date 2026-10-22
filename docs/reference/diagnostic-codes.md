@@ -219,3 +219,9 @@ sorted by file and then path.
 | `AXC0218` | A `test` request names a scenario that the application does not have. The message names the scenario. Reported on the request, with an empty file and path, once for each unknown name. |
 | `AXC0219` | A `test` request ran for more than 10 minutes, see [test](authoring.md#test). The message names the limit. Reported on the request, with an empty file and path. |
 | `AXC0220` | The publisher stopped while a `test` request ran, see [test](authoring.md#test). Reported on the request, with an empty file and path. |
+| `AXC0221` | A form condition reads a field the form does not list, see [form conditions and steps](resource-files.md#form-conditions-and-steps). Reported at the condition. |
+| `AXC0222` | A form field has `visibleWhen` and its entity field is `required`, see [form conditions and steps](resource-files.md#form-conditions-and-steps). Reported at the field's `visibleWhen`. |
+| `AXC0223` | A form section `name` is already used by an earlier section, ignoring letter case. Reported at the repeated `name`. |
+| `AXC0224` | A form step lists a section name that no section of the form has. Reported at the name in the step's `sections`. |
+| `AXC0225` | A form step lists a section that is already in a step. Reported at the repeated name in the step's `sections`. |
+| `AXC0226` | A form has `steps` and a section has no name or is in no step. Reported at the section. |

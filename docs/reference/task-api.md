@@ -98,10 +98,13 @@ state:
     "name": "PurchaseRequestReview",
     "sections": [
       {
+        "name": null,
         "titleKey": "purchaseRequest.sections.decision",
-        "fields": [{ "name": "decisionComments", "readOnly": false }]
+        "visibleWhen": false,
+        "fields": [{ "name": "decisionComments", "readOnly": false, "visibleWhen": false }]
       }
     ],
+    "steps": [],
     "entity": { "name": "PurchaseRequest", "fields": [] }
   },
   "outcomes": [
@@ -127,11 +130,13 @@ state:
   earlier release keeps its own layout. It has the shape of a form widget's
   `form` metadata, plus `entity` in the shape of a widget's `entity`
   metadata, so the task page knows each field's type. See
-  [frontend](frontend.md). The example shortens both. *(Planned for M12.)*
+  [frontend](frontend.md). The example shortens both.
   The `form` carries the same additions as the form metadata in
   [frontend](frontend.md): `visibleWhen` as a yes or no flag on each field
-  and section, each section's `name`, and `steps`. The condition expressions
-  stay on the server. See
+  and section, each section's `name` (`null` when it has none), and `steps`
+  (`[]` when the form has none). Sections the user cannot read, and the steps
+  left empty by that, are left out. The condition expressions stay on the
+  server. See
   [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 - `completedAt`, `completedBy` and `outcome` are `null` while the task is
   `open`.
