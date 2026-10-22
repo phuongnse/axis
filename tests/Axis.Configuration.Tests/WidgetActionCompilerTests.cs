@@ -10,6 +10,7 @@ public sealed class WidgetActionCompilerTests
 {
     private const string ProcessId = "99999999-9999-4999-8999-999999999991";
     private const string PageFile = "pages/order-form.json";
+    private const string OrdersFile = "pages/orders.json";
 
     private const string TextsEn = """
         { "id": "33333333-3333-4333-8333-333333333333", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
@@ -113,6 +114,67 @@ public sealed class WidgetActionCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void Table_row_action_compiles_to_the_process_as_declared_and_its_label()
+    {
+        using var folder = Folder("Order")
+            .With(OrdersFile, OrdersPage(ActionJson("orderREVIEW")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var widget = Assert.Single(Assert.Single(result.Model.Pages, page => page.File == OrdersFile).Widgets);
+        Assert.Equal(
+            new WidgetActionModel[] { new StartProcessActionModel(new ProcessReference(Guid.Parse(ProcessId), "OrderReview"), new TextReference("order.submit")) },
+            widget.RowActions);
+        Assert.Empty(widget.Actions);
+    }
+
+    [Fact]
+    public void Row_action_naming_no_loaded_process_is_reported_at_its_process()
+    {
+        using var folder = Folder("Order")
+            .With(OrdersFile, OrdersPage(ActionJson("Missing")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownActionProcess, OrdersFile, "/widgets/0/rowActions/0/process"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Row_action_naming_a_process_over_another_entity_is_reported_at_its_process()
+    {
+        using var folder = Folder("Customer")
+            .With(OrdersFile, OrdersPage(ActionJson("OrderReview")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ActionProcessOverOtherEntity, OrdersFile, "/widgets/0/rowActions/0/process"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'Customer'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("'Order'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Start_process_action_in_toolbar_actions_is_a_schema_violation()
+    {
+        using var folder = Folder("Order")
+            .With(OrdersFile, Page("Orders", $$"""{ "type": "table", "entity": "Order", "toolbarActions": [ {{ActionJson("OrderReview")}} ] }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.SchemaViolation && diagnostic.File == OrdersFile);
+        Assert.Null(result.Model);
+    }
+
     /// <summary>The presentation folder with texts for the action label and the process <c>OrderReview</c> over <paramref name="processEntity"/>.</summary>
     private static TemporaryFolder Folder(string processEntity) =>
         PresentationCompilerTests.Folder()
@@ -127,6 +189,9 @@ public sealed class WidgetActionCompilerTests
 
     private static string Action(string process, string labelKey = "order.submit") =>
         $$"""{ "type": "form", "entity": "Order", "actions": [ {{ActionJson(process, labelKey)}} ] }""";
+
+    private static string OrdersPage(string rowAction) =>
+        Page("Orders", $$"""{ "type": "table", "entity": "Order", "rowActions": [ {{rowAction}} ] }""");
 
     private static string FormPage(string widget) =>
         Page("OrderForm", widget, "55555555-5555-4555-8555-555555555552", "orderForm.title");

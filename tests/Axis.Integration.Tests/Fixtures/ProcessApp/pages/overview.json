@@ -21,7 +21,8 @@
                   "label": { "textKey": "request.showSubmissions" },
                   "parameters": { "request": "id" }
                 },
-                { "type": "navigate", "page": "RequestForm", "label": { "textKey": "pages.requestForm.title" }, "record": "id" }
+                { "type": "navigate", "page": "RequestForm", "label": { "textKey": "pages.requestForm.title" }, "record": "id" },
+                { "type": "startProcess", "process": "Submit", "label": { "textKey": "request.submit" } }
               ],
               "toolbarActions": [{ "type": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }]
             }

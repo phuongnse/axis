@@ -8,6 +8,7 @@ import type {
   FieldMetadata,
   FieldType,
   NavigateAction,
+  StartProcessAction,
   WidgetAccess,
   WidgetMetadata,
 } from './site'
@@ -152,6 +153,9 @@ const texts = {
   'note.details': 'Details',
   'note.edit': 'Edit',
   'note.add': 'Add note',
+  'note.close': 'Close note',
+  'shell.form.processRunning': 'This record is already in a running process.',
+  'shell.form.startFailed': 'The process could not be started.',
   'shell.form.choose': 'Choose',
   'shell.form.clear': 'Clear',
   'filter.title': 'Title contains',
@@ -744,5 +748,86 @@ describe('TableWidget', () => {
 
     expect(await screen.findByTestId('records-error')).toBeInTheDocument()
     expect(screen.queryByTestId('filter-error-statusFilter')).not.toBeInTheDocument()
+  })
+
+  describe('startProcess row action', () => {
+    const closeNote: StartProcessAction = {
+      type: 'startProcess',
+      process: 'NoteClose',
+      labelKey: 'note.close',
+      instancesPath: '/api/apps/E2eApp/processes/NoteClose/instances',
+    }
+    const closableWidget = { ...noteWidget, rowActions: [closeNote] }
+
+    /** Stubs `fetch`: GET answers the notes, POST answers `startStatus`. Returns the calls made. */
+    function stubStart(startStatus: number, startBody = '') {
+      const fetchMock = vi.fn(
+        async (_input: string, init?: RequestInit) =>
+          new Response(init?.method === 'POST' ? startBody : notePage, {
+            status: init?.method === 'POST' ? startStatus : 200,
+          }),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      return fetchMock.mock.calls
+    }
+
+    it('posts the row id with an idempotency key, then requests the rows again', async () => {
+      const calls = stubStart(201)
+      renderWidget('', closableWidget)
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Close note' }))
+
+      await waitFor(() => expect(calls.filter(([, init]) => init?.method !== 'POST')).toHaveLength(2))
+      const [first, second] = calls.filter(([, init]) => init?.method !== 'POST')
+      expect(second[0]).toBe(first[0])
+      const posts = calls.filter(([, init]) => init?.method === 'POST')
+      expect(posts).toHaveLength(1)
+      const [url, init] = posts[0]
+      expect(url).toBe(closeNote.instancesPath)
+      expect(init?.body).toBe(JSON.stringify({ subjectId: noteId }))
+      expect(new Headers(init?.headers).get('Idempotency-Key')).toBeTruthy()
+      expect(screen.queryByTestId('table-action-error')).not.toBeInTheDocument()
+    })
+
+    it('shows the running process text for a 409', async () => {
+      const calls = stubStart(409, '{"title":"Conflict"}')
+      renderWidget('', closableWidget)
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Close note' }))
+
+      expect(await screen.findByTestId('table-action-error')).toHaveTextContent(
+        'This record is already in a running process.',
+      )
+      expect(calls.filter(([, init]) => init?.method !== 'POST')).toHaveLength(1)
+    })
+
+    it('shows a start condition message as text', async () => {
+      stubStart(422, '{"title":"Invalid","errors":{"start":["Only open notes can be closed."]}}')
+      renderWidget('', closableWidget)
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Close note' }))
+
+      expect(await screen.findByTestId('table-action-error')).toHaveTextContent('Only open notes can be closed.')
+    })
+
+    it('shows the start failed text for a server error and keeps the key for the retry', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const calls = stubStart(500)
+      renderWidget('', closableWidget)
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Close note' }))
+      expect(await screen.findByTestId('table-action-error')).toHaveTextContent('The process could not be started.')
+      await userEvent.click(within(row).getByRole('button', { name: 'Close note' }))
+
+      await waitFor(() => expect(calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(2))
+      const keys = calls
+        .filter(([, init]) => init?.method === 'POST')
+        .map(([, init]) => new Headers(init?.headers).get('Idempotency-Key'))
+      expect(keys[0]).toBe(keys[1])
+    })
   })
 })
