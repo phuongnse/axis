@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
@@ -206,7 +207,9 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
             CancellationToken);
 
         await WaitUntilAsync(async () => await GetAsync(client, "/health/ready") == (HttpStatusCode.OK, "Degraded"), "The worker did not become Degraded.");
-        Assert.Contains(logs.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal) && entry.Contains(RefreshFailedLog, StringComparison.Ordinal));
+        await WaitUntilAsync(
+            () => logs.Entries.Any(entry => entry.StartsWith("Error:", StringComparison.Ordinal) && entry.Contains(RefreshFailedLog, StringComparison.Ordinal)),
+            "The failed refresh was not logged.");
         Assert.Equal((HttpStatusCode.OK, "Healthy"), await GetAsync(client, "/health/live"));
 
         // The last good read stays in use.
@@ -406,16 +409,6 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
         using var response = await client.GetAsync(path, CancellationToken);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         return (response.StatusCode, body.RootElement.GetProperty("status").GetString());
-    }
-
-    private static async Task WaitUntilAsync(Func<Task<bool>> condition, string failure)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (!await condition())
-        {
-            Assert.True(DateTime.UtcNow < deadline, failure);
-            await Task.Delay(TimeSpan.FromMilliseconds(50), CancellationToken);
-        }
     }
 
     private sealed record Role(string Name, string Password);

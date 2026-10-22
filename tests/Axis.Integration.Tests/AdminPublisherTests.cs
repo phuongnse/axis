@@ -14,6 +14,7 @@ using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
@@ -287,7 +288,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
                 ids[0],
                 $"UPDATE axis.publish_requests SET claims = 2, lease_until = now() + interval '1 hour' WHERE id = '{request}'");
             await hold.ReleaseAfterAsync(TimeSpan.Zero);
-            await WaitForAsync(() => PublisherOutput(output, text).Contains("claim failed", StringComparison.Ordinal));
+            await WaitUntilAsync(() => PublisherOutput(output, text).Contains("claim failed", StringComparison.Ordinal), "The publisher did not log the claim failure.", TimeSpan.FromSeconds(60));
         }
         finally
         {
@@ -598,23 +599,14 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
             $"UPDATE axis.publish_requests SET status = 'running', claimed_by = 'dead-publisher', claims = {claims}, started_at = now(), lease_until = {leaseSql} WHERE id = '{request}'");
 
     private static async Task WaitForStatusAsync(AdminScenario scenario, string tenant, Guid request, params string[] statuses) =>
-        await WaitForAsync(async () =>
-        {
-            var status = (string?)await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
-            return Array.IndexOf(statuses, status) >= 0;
-        });
-
-    private static async Task WaitForAsync(Func<bool> condition) => await WaitForAsync(() => Task.FromResult(condition()));
-
-    private static async Task WaitForAsync(Func<Task<bool>> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(60);
-        while (!await condition())
-        {
-            Assert.True(DateTime.UtcNow < deadline, "The condition did not hold within 60 seconds.");
-            await Task.Delay(200, CancellationToken);
-        }
-    }
+        await WaitUntilAsync(
+            async () =>
+            {
+                var status = (string?)await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
+                return Array.IndexOf(statuses, status) >= 0;
+            },
+            $"The request did not reach {string.Join(" or ", statuses)}.",
+            TimeSpan.FromSeconds(60));
 
     // Runs the publisher until the request is final, then stops it and returns its result.
     private static async Task<AdminResult> RunPublisherAsync(AdminScenario scenario, string tenant, Guid request)

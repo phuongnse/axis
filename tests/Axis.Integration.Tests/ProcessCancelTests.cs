@@ -3,6 +3,7 @@ using System.Text.Json;
 using Axis.Data.Naming;
 using Axis.Server.Tests;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 using static Axis.Integration.Tests.SampleAppFixture;
 
 namespace Axis.Integration.Tests;
@@ -204,7 +205,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
 
         var run = Task.Run(() => fixture.RunUntilIdleAsync(CancellationToken), CancellationToken);
         await WaitUntilAsync(async () => run.IsCompleted || await fixture.AdminCountAsync(
-            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1);
+            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1, "The run did not wait on the lock.");
         Assert.False(run.IsCompleted);
 
         using (var response = await CancelAsync(dung, instance, Reason))

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Axis.Data.Naming;
 using Axis.Server.Tests;
+using static Axis.Integration.Tests.Polling;
 using static Axis.Integration.Tests.SampleAppFixture;
 
 namespace Axis.Integration.Tests;
@@ -114,7 +115,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
 
         var start = PostStartAsync(anna, subject);
         await WaitUntilAsync(async () => start.IsCompleted || await fixture.AdminCountAsync(
-            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1);
+            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1, "The start did not wait on the lock.");
         await transaction.CommitAsync(CancellationToken);
 
         using var response = await start;

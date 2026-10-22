@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Axis.Server.Tests;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 using static Axis.Integration.Tests.SampleAppFixture;
 
 namespace Axis.Integration.Tests;
@@ -31,7 +32,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
         var logs = new LogCollector();
         using (var workerA = await fixture.StartWorkerAsync(logs))
         {
-            await WaitUntilAsync(async () => await StateAsync(instance) == "waiting:managerApproval");
+            await WaitUntilAsync(async () => await StateAsync(instance) == "waiting:managerApproval", "The instance did not wait for approval.");
             await workerA.StopAsync(CancellationToken);
         }
 
@@ -49,7 +50,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
 
         using (var workerB = await fixture.StartWorkerAsync(logs))
         {
-            await WaitUntilAsync(async () => await StateAsync(instance) == $"{state}:{steps.Split(',')[^1]}");
+            await WaitUntilAsync(async () => await StateAsync(instance) == $"{state}:{steps.Split(',')[^1]}", $"The instance did not reach {state}.");
             await workerB.StopAsync(CancellationToken);
         }
 
@@ -113,7 +114,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
             try
             {
                 await WaitUntilAsync(async () => await fixture.AdminCountAsync(
-                    "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1);
+                    "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1, "The lost session did not wait on the lock.");
                 Assert.Equal(1L, await fixture.CountAsync(
                     "SELECT count(*) FROM pg_locks WHERE NOT granted AND relation = 'axis.audit_records'::regclass"));
 
@@ -122,7 +123,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
                 // second lease runs out, so it cannot claim the item again.
                 Assert.Equal(1L, await fixture.AdminCountAsync(
                     "SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'"));
-                await WaitUntilAsync(() => Task.FromResult(crashedLogs.Entries.Any(entry => entry.StartsWith("Error", StringComparison.Ordinal))));
+                await WaitUntilAsync(() => Task.FromResult(crashedLogs.Entries.Any(entry => entry.StartsWith("Error", StringComparison.Ordinal))), "The lost session was not logged.");
                 await workerA.StopAsync(CancellationToken);
             }
             finally
@@ -145,7 +146,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
         var logs = new LogCollector();
         using (var workerB = await fixture.StartWorkerAsync(logs))
         {
-            await WaitUntilAsync(async () => await StateAsync(instance) == "waiting:managerApproval");
+            await WaitUntilAsync(async () => await StateAsync(instance) == "waiting:managerApproval", "The instance did not wait for approval.");
             await workerB.StopAsync(CancellationToken);
         }
 

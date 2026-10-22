@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
@@ -45,7 +46,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         using var hostTwo = BuildHost("two", logs, ("a", tenantA));
         await hostOne.StartAsync(CancellationToken);
         await hostTwo.StartAsync(CancellationToken);
-        await WaitUntilAsync(async () => await CountAsync(tenantA, "axis.process_work_items") == 0);
+        await WaitUntilAsync(async () => await CountAsync(tenantA, "axis.process_work_items") == 0, "The work items were not all completed.");
         await hostOne.StopAsync(CancellationToken);
         await hostTwo.StopAsync(CancellationToken);
 
@@ -121,7 +122,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         using (var host = BuildHost("worker", logs, ("a", tenantA), ("b", tenantB)))
         {
             await host.StartAsync(CancellationToken);
-            await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 3 && await CountAsync(tenantB, "test_runs") == 3);
+            await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 3 && await CountAsync(tenantB, "test_runs") == 3, "The work did not run three times for each tenant.");
 
             // Another poll of both tenants, so a claim of the stray item would have happened by now.
             await Task.Delay(TimeSpan.FromMilliseconds(200), CancellationToken);
@@ -159,7 +160,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         using (var host = BuildHost("worker", logs, bindings, ("a", tenantA), ("b", tenantB)))
         {
             await host.StartAsync(CancellationToken);
-            await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 1 && await CountAsync(tenantB, "test_runs") == 1);
+            await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 1 && await CountAsync(tenantB, "test_runs") == 1, "The work did not run once for each tenant.");
             await host.StopAsync(CancellationToken);
         }
 
@@ -184,7 +185,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         using (var host = BuildHost("worker", logs, bindings, ("a", tenantA)))
         {
             await host.StartAsync(CancellationToken);
-            await WaitUntilAsync(async () => await CountAsync(tenantA, "axis.process_work_items") == 0);
+            await WaitUntilAsync(async () => await CountAsync(tenantA, "axis.process_work_items") == 0, "The work items were not all completed.");
             await host.StopAsync(CancellationToken);
         }
 
@@ -230,7 +231,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         using var host = BuildHost("worker", logs, ("a", tenantA));
         await host.StartAsync(CancellationToken);
 
-        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Waiting for the database of tenant a to be migrated.")));
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Waiting for the database of tenant a to be migrated.")), "The worker did not wait for the migration of tenant a.");
 
         // Two more poll intervals, so a failing poll would have logged an error by now.
         await Task.Delay(TimeSpan.FromMilliseconds(100), CancellationToken);
@@ -242,10 +243,10 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         // failed poll. A poll that began before the grants can also log its failure after MigrateAsync returns.
         // The worker logs that the tenant is ready only after its release check read the granted tables, so
         // every poll after that log began after the grants. Only errors after it count.
-        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Tenant a is ready for work.")));
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Tenant a is ready for work.")), "The worker did not become ready for work.");
         var loggedAfterGrants = logs.Entries.Count;
         var item = await EnqueueAsync(tenantA, "a", RecordKind);
-        await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 1);
+        await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 1, "The work did not run.");
         await host.StopAsync(CancellationToken);
 
         Assert.Equal([new Run(item, "a", "worker")], await RunsAsync(tenantA));
@@ -361,16 +362,6 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await using var command = dataSource.CreateCommand(sql);
         return await command.ExecuteScalarAsync(CancellationToken);
-    }
-
-    private static async Task WaitUntilAsync(Func<Task<bool>> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (!await condition())
-        {
-            Assert.True(DateTime.UtcNow < deadline, "The workers did not finish within 30 seconds.");
-            await Task.Delay(TimeSpan.FromMilliseconds(50), CancellationToken);
-        }
     }
 
     private sealed record Run(Guid ItemId, string TenantId, string Worker);

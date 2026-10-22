@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
@@ -137,16 +138,6 @@ public sealed class WorkerHealthTests(PostgreSqlFixture database) : IClassFixtur
 
         // Due a minute ago, so a small clock difference with the database does not delay the claim.
         await WorkItemQueue.EnqueueAsync(connection, null, "a", BlockKind, DateTimeOffset.UtcNow.AddMinutes(-1), CancellationToken);
-    }
-
-    private static async Task WaitUntilAsync(Func<Task<bool>> condition, string failure, TimeSpan? timeout = null)
-    {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
-        while (!await condition())
-        {
-            Assert.True(DateTime.UtcNow < deadline, failure);
-            await Task.Delay(TimeSpan.FromMilliseconds(100), CancellationToken);
-        }
     }
 
     /// <summary>Starts and then waits until the worker stops, so the loop never returns to polling.</summary>
