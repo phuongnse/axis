@@ -10,9 +10,11 @@
     "request.amountNegative": "The amount cannot be negative.",
     "request.approve": "Approve the request",
     "request.decide": "Decide on the request",
+    "request.settle": "Settle the request",
     "requestDecision.main": "Decision",
     "requestReview.main": "Request",
     "requestReview.step": "Review",
+    "requestSettlement.main": "Settlement",
     "role.auditor": "Auditor",
     "role.clerk": "Clerk",
     "role.finance": "Finance",
@@ -20,6 +22,7 @@
     "role.reviewer": "Reviewer",
     "site.title": "Steps",
     "task.approve": "Approve",
-    "task.reject": "Reject"
+    "task.reject": "Reject",
+    "task.settle": "Settle"
   }
 }

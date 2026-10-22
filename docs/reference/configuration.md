@@ -131,19 +131,53 @@ flowchart LR
      page schema requires `columns` on a `columns` widget, `tabs` on a `tabs`
      widget, and `title` with `widgets` on a `section` widget. It does not allow them on
      any other widget, and no container may name an `entity`, `dataSource`,
-     `form`, `formPage` or `actions` (`AXC0004`).
+     `form`, `formPage`, `actions`, `rowActions` or `toolbarActions` (`AXC0004`).
 
-     *(Planned for M12.)* Page parameters and `navigate` actions
-     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) add
-     these checks. Each code is assigned when the check is built:
-     - an unknown target `page`,
-     - an unknown parameter,
-     - a missing required parameter,
-     - an expression of the wrong type,
-     - `record` on a page that is not a form page, or over another entity,
-     - a duplicate page parameter name, or one of `page`, `pageSize` and
-       `sort`,
-     - an unknown parameter type, or an unknown `reference` target.
+     A page's `parameters` ([D63](../decisions/d63-navigate-actions-and-page-parameters.md))
+     are checked in file order, at `/parameters/{i}`:
+     - a name that an earlier parameter already uses, or one of `page`,
+       `pageSize` and `sort`, ignoring letter case, is `AXC0231` at `/name`,
+     - the type is checked by the entity field rules, as a data source
+       parameter is. An unknown type is `AXC0004`, a missing `values` or
+       `target` is `AXC0014`, an unknown `reference` target is `AXC0012` at
+       `/target`, a child entity target is `AXC0040` and a target without a
+       display field is `AXC0030`. A `reference` parameter's `target` is a
+       `field target` edge in the reference index,
+     - a page that holds a `form` widget declares no parameters. Otherwise it
+       is `AXC0236` at `/parameters`.
+
+     `navigate` actions
+     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) in a
+     form widget's `actions` and a table's `rowActions` and `toolbarActions`
+     are checked at the action's pointer. The page does not read its parameters
+     yet:
+     - a target `page` that no loaded page has is `AXC0232` at `/page`. A page
+       that failed to load is not reported again,
+     - a parameter the target page does not declare, or one given twice
+       ignoring letter case, is `AXC0233` at `/parameters/{name}`,
+     - a required parameter of the target that the action leaves out is
+       `AXC0234` at the action,
+     - each parameter value is an expression, checked against the target
+       parameter's type. A parse error, an unknown name or a wrong type is
+       reported with the expression's own code at `/parameters/{name}`,
+     - on a form, or a table over an entity, the expression sees the record's
+       fields plus `id`. On a table over a data source it sees the projected
+       columns plus `id`. `id` is a reference to the root entity. In
+       `toolbarActions` it sees no names, because a toolbar has no row. It
+       resolves bare names only, with no paths, rules or aggregates,
+     - `rowActions` on a table over a grouped data source, and `rowActions` or
+       `toolbarActions` on a `form`, `taskInbox` or `processInspector` widget,
+       are `AXC0060` at that property. Only `navigate` entries are accepted in
+       `rowActions` and `toolbarActions` for now,
+     - each target is a `navigate page` edge in the reference index.
+
+     A `navigate` action may also set `record`, an expression for the id of
+     the record a form page opens. It is checked like a parameter value, against
+     the same names, and its type must be a reference to the entity of the
+     target's form widget. A form widget over a `form` has that form's entity.
+     `record` on a target that holds no form widget, or whose form is over
+     another entity, is `AXC0235` at `/record`. A parse error or an unknown
+     name keeps the expression's own code.
    - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded
@@ -733,7 +767,7 @@ to show where a resource is used and what it uses.
 | `text entry` | Text | `/texts/{key}` | Text key |
 | `package` | Application | `/packages/{i}` | Extension package |
 | `module` | Application | `/modules/{i}` | Module |
-| `field target` | Entity, data source, page *(planned for M12)* | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
+| `field target` | Entity, data source, page | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
 | `field target` | Endpoint | `/input/{i}/target` | Entity |
 | `field sequence` | Entity | `/fields/{i}/sequence` | Sequence |
 | `rule call` | Entity, data source, rule, process, policy | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter` | Rule |
@@ -743,7 +777,7 @@ to show where a resource is used and what it uses.
 | `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
 | `widget form` | Page | `/widgets/{i}/form` | Form |
 | `widget form page` | Page | `/widgets/{i}/formPage` (removed in M12) | Page |
-| `navigate page` *(planned for M12)* | Page | `/widgets/{i}/rowActions/{j}/page`, `/widgets/{i}/toolbarActions/{j}/page`, `/widgets/{i}/actions/{j}/page` | Page |
+| `navigate page` | Page | `/widgets/{i}/rowActions/{j}/page`, `/widgets/{i}/toolbarActions/{j}/page`, `/widgets/{i}/actions/{j}/page` | Page |
 | `widget process` | Page | `/widgets/{i}/process` | Process |
 | `action process` | Page | `/widgets/{i}/actions/{j}/process` | Process |
 | `form entity` | Form | `/entity` | Entity |

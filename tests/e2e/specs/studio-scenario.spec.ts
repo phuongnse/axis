@@ -6,6 +6,7 @@ import { startServer } from '../activate'
 import { pickOption } from '../select'
 import { e2eApp, studioFolder } from '../server-settings'
 import { useSession } from '../sessions'
+import { createResource } from '../studio-resources'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -32,15 +33,6 @@ test.describe('Studio edits a scenario in the typed editor', () => {
       await rm(copy, { recursive: true, force: true })
     }
   })
-
-  async function create(page: Page, kind: string, label: string, value: string) {
-    await page.getByRole('button', { name: 'New resource' }).click()
-    const dialog = page.getByRole('dialog')
-    await dialog.getByRole('combobox', { name: 'Kind' }).click()
-    await page.getByTitle(kind, { exact: true }).click()
-    await dialog.getByRole('textbox', { name: label }).fill(value)
-    await dialog.getByRole('button', { name: 'Create' }).click()
-  }
 
   async function choose(page: Page, field: Locator, option: string) {
     await pickOption(field.getByRole('combobox'), option)
@@ -72,7 +64,7 @@ test.describe('Studio edits a scenario in the typed editor', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     const before = await diagnostics(page)
 
-    await create(page, 'scenario', 'Name', 'ApprovalFlow')
+    await createResource(page, 'scenario', 'ApprovalFlow')
     await expect(page).toHaveURL(/resource=/)
     await expect(page.getByTestId('studio-resource-details')).toContainText('scenarios/approval-flow.json')
     await expect(page.getByTestId('studio-scenario')).toBeVisible()

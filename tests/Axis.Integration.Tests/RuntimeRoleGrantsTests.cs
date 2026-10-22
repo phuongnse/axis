@@ -1,5 +1,6 @@
 using Axis.Data.Storage;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
@@ -31,16 +32,8 @@ public sealed class RuntimeRoleGrantsTests(PostgreSqlFixture database) : IClassF
         await grant;
     }
 
-    // Waits until the grant queues on the lock. The deadline keeps a grant that never waits from hanging the test.
-    private static async Task WaitForWaiterAsync(string connectionString)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (await WaitingCountAsync(connectionString) < 1)
-        {
-            Assert.True(DateTime.UtcNow < deadline, "The grant did not queue on the lock in time.");
-            await Task.Delay(50, CancellationToken);
-        }
-    }
+    private static Task WaitForWaiterAsync(string connectionString) =>
+        WaitUntilAsync(async () => await WaitingCountAsync(connectionString) >= 1, "The grant did not queue on the lock in time.");
 
     private static async Task<long> WaitingCountAsync(string connectionString)
     {

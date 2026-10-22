@@ -10,6 +10,7 @@ namespace Axis.Integration.Tests;
 /// <c>migrate</c> over 20 tenant databases, with one and with four tenants at a time, and <c>activate</c> of the purchase
 /// request sample over the same 20 tenants each finish within the time limit and report every tenant done.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class AdminFleetPerformanceTests(AdminFleetFixture fixture) : IClassFixture<AdminFleetFixture>
 {
     private const string OldVersion = "20000101000000_Old";

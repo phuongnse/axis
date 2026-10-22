@@ -5,9 +5,10 @@
 // Each suite NAME has its results in DIR/NAME.xml. CWD is the directory, relative to
 // the root, that the suite's relative file paths start from. The Markdown summary is
 // appended to $GITHUB_STEP_SUMMARY when it is set and printed otherwise. On GitHub
-// Actions every failed test also gets an ::error annotation. A suite named by --skipped did
-// not run and has no results file. It is reported as skipped. Exits 1 when any other suite
-// has failed tests or no results file.
+// Actions every failed test also gets an ::error annotation. When the summary goes to
+// that file, the failed tests are also listed on stdout, for the job log. A suite named
+// by --skipped did not run and has no results file. It is reported as skipped. Exits 1
+// when any other suite has failed tests or no results file.
 import { appendFileSync, existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -236,6 +237,25 @@ export function formatAnnotations(report) {
   return lines
 }
 
+const maxMessageLines = 20
+
+/** The failed tests as plain text for the job log, or no lines when every test passed. */
+export function formatFailedTests(report) {
+  const failures = report.suites.flatMap((suite) => suite.failures)
+  if (failures.length === 0) return []
+  const lines = ['Failed tests:']
+  for (const failure of failures) {
+    const location = failure.file ? ` (${failure.line ? `${failure.file}:${failure.line}` : failure.file})` : ''
+    lines.push(`- ${failure.suite}: ${failure.name}${location}`)
+    const messageLines = (failure.message || '(no message)').split(/\r?\n/)
+    for (const line of messageLines.slice(0, maxMessageLines)) lines.push(`    ${line}`)
+    if (messageLines.length > maxMessageLines) {
+      lines.push(`    ... ${messageLines.length - maxMessageLines} more lines, see the job summary`)
+    }
+  }
+  return lines
+}
+
 /** Runs the report with command-line arguments and returns the exit code. */
 export function main(args, env = process.env, stdout = process.stdout) {
   let resultsDir
@@ -257,6 +277,9 @@ export function main(args, env = process.env, stdout = process.stdout) {
   else stdout.write(summary)
   if (env.GITHUB_ACTIONS === 'true') {
     for (const line of formatAnnotations(report)) stdout.write(`${line}\n`)
+  }
+  if (env.GITHUB_STEP_SUMMARY) {
+    for (const line of formatFailedTests(report)) stdout.write(`${line}\n`)
   }
   return report.ok ? 0 : 1
 }

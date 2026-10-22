@@ -17,6 +17,7 @@ namespace Axis.Integration.Tests;
 /// index, the share of the compile time that the index adds, the Studio diagnostics and patch answers,
 /// the where-used answers, and the compile of an application that declares three modules.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class AuthoringPerformanceTests
 {
     // Each answer is one full compile of the folder, so it has the limit of CompilePerformanceTests.

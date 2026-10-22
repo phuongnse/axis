@@ -1,0 +1,17 @@
+{
+  "id": "7bedd31c-4c73-42e1-9e9b-b8444d44a768",
+  "kind": "form",
+  "name": "RequestSettlement",
+  "formatVersion": 1,
+  "entity": "Request",
+  "sections": [
+    {
+      "title": { "textKey": "requestSettlement.main" },
+      "fields": [
+        { "field": "amount", "readOnly": true },
+        { "field": "comment", "requiredWhen": "amount > 100" },
+        { "field": "divisor", "visibleWhen": "amount > 1000", "requiredWhen": "amount > 100" }
+      ]
+    }
+  ]
+}

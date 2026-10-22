@@ -13,6 +13,7 @@ import type {
   WidgetAccess,
 } from './platform/site'
 import { ThemeModeProvider } from './platform/theme'
+import { isBlurred } from './test/antd'
 
 vi.mock('./platform/navigation')
 
@@ -142,6 +143,8 @@ const pages: Record<string, PageMetadata> = {
         process: null,
         instancesPath: null,
         actions: [],
+        rowActions: [],
+        toolbarActions: [],
         access: noteAccess,
       },
     ],
@@ -160,6 +163,8 @@ const pages: Record<string, PageMetadata> = {
         process: null,
         instancesPath: null,
         actions: [],
+        rowActions: [],
+        toolbarActions: [],
         access: noteAccess,
       },
     ],
@@ -178,6 +183,8 @@ const pages: Record<string, PageMetadata> = {
         process: null,
         instancesPath: null,
         actions: [],
+        rowActions: [],
+        toolbarActions: [],
         access: null,
       },
     ],
@@ -196,6 +203,8 @@ const pages: Record<string, PageMetadata> = {
         process: 'NoteReview',
         instancesPath,
         actions: [],
+        rowActions: [],
+        toolbarActions: [],
         access: null,
       },
     ],
@@ -394,7 +403,7 @@ describe('App', () => {
     // Spin keeps the list blurred, with pointer-events: none, for one commit after loading ends.
     const link = await waitFor(() => {
       const found = screen.getByRole('link', { name: 'E2E notes' })
-      expect(found.closest('.ant-spin-blur')).toBeNull()
+      expect(isBlurred(found)).toBe(false)
       return found
     })
     expect(link).toHaveAttribute('href', '/e2e')

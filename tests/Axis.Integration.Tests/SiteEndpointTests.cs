@@ -182,7 +182,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("ItemSections", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(
-            ["type", "formPage", "entity", "dataSource", "form", "tasksPath", "process", "instancesPath", "actions", "access"],
+            ["type", "formPage", "entity", "dataSource", "form", "tasksPath", "process", "instancesPath", "actions", "rowActions", "toolbarActions", "access"],
             widget.EnumerateObject().Select(property => property.Name));
         Assert.Equal("form", widget.GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("formPage").ValueKind);
@@ -208,7 +208,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("MyTasks", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(
-            """{"type":"taskInbox","formPage":null,"entity":null,"dataSource":null,"form":null,"tasksPath":"/api/apps/RecordsApp/tasks","process":null,"instancesPath":null,"actions":[],"access":null}""",
+            """{"type":"taskInbox","formPage":null,"entity":null,"dataSource":null,"form":null,"tasksPath":"/api/apps/RecordsApp/tasks","process":null,"instancesPath":null,"actions":[],"rowActions":[],"toolbarActions":[],"access":null}""",
             widget.GetRawText());
     }
 

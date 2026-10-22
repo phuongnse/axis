@@ -7,9 +7,11 @@ import type {
   EntityWidgetMetadata,
   FieldMetadata,
   FieldType,
+  NavigateAction,
   WidgetAccess,
   WidgetMetadata,
 } from './site'
+import { isSortableHeader } from '../test/antd'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
 
@@ -50,6 +52,8 @@ const noteWidget: EntityWidgetMetadata = {
   process: null,
   instancesPath: null,
   actions: [],
+  rowActions: [],
+  toolbarActions: [],
   access: everyAction,
   entity: {
     name: 'Note',
@@ -84,6 +88,8 @@ const noteListWidget: WidgetMetadata = {
   process: null,
   instancesPath: null,
   actions: [],
+  rowActions: [],
+  toolbarActions: [],
   access: everyAction,
   dataSource: {
     name: 'NoteList',
@@ -143,6 +149,9 @@ const texts = {
   'note.dueAt': 'Due at',
   'note.category': 'Category',
   'note.lines': 'Lines',
+  'note.details': 'Details',
+  'note.edit': 'Edit',
+  'note.add': 'Add note',
   'shell.form.choose': 'Choose',
   'shell.form.clear': 'Clear',
   'filter.title': 'Title contains',
@@ -327,6 +336,8 @@ describe('TableWidget', () => {
       process: null,
       instancesPath: null,
       actions: [],
+      rowActions: [],
+      toolbarActions: [],
       access: everyAction,
       dataSource: {
         name: 'NotesByDepartment',
@@ -362,6 +373,113 @@ describe('TableWidget', () => {
     // Group rows have no id, so each needs a key of its own.
     expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/)
     errors.mockRestore()
+  })
+
+  describe('navigate actions', () => {
+    const detail: NavigateAction = {
+      type: 'navigate',
+      page: 'TicketDetail',
+      labelKey: 'note.details',
+      parameters: { ticket: 'id' },
+      record: null,
+      opensForm: false,
+    }
+    const createNote: NavigateAction = {
+      type: 'navigate',
+      page: 'NoteForm',
+      labelKey: 'note.add',
+      parameters: {},
+      record: null,
+      opensForm: true,
+    }
+
+    it('opens the target page with the row id in the query, from the table address', async () => {
+      stubRecords()
+      renderWidget('?page=2', { ...noteWidget, rowActions: [detail] })
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Details' }))
+
+      expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail')
+      expect(search()).toBe(`?ticket=${noteId}`)
+      expect(screen.getByTestId('from')).toHaveTextContent('/e2e/notes?page=2')
+    })
+
+    it('opens the record of a form page with record', async () => {
+      stubRecords()
+      renderWidget('', { ...noteWidget, rowActions: [{ ...createNote, labelKey: 'note.edit', record: 'id' }] })
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      await userEvent.click(within(row).getByRole('button', { name: 'Edit' }))
+
+      expect(screen.getByTestId('path')).toHaveTextContent(`/e2e/noteform/${noteId}`)
+      expect(search()).toBe('')
+    })
+
+    it('hides a row button whose expression the SPA cannot work out', async () => {
+      stubRecords()
+      renderWidget('', { ...noteWidget, rowActions: [{ ...detail, parameters: { ticket: 'concat(title, id)' } }] })
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      expect(within(row).queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
+    })
+
+    it('shows a toolbar button to a form page only with the create grant', async () => {
+      stubRecords()
+      const { unmount } = renderWidget('', {
+        ...noteWidget,
+        formPage: null,
+        access: { actions: ['read'], createFields: [], updateFields: [] },
+        toolbarActions: [createNote],
+      })
+      await screen.findByRole('row', { name: /Buy paper/ })
+      expect(screen.queryByRole('button', { name: 'Add note' })).not.toBeInTheDocument()
+      unmount()
+
+      stubRecords()
+      renderWidget('', { ...noteWidget, formPage: null, toolbarActions: [createNote] })
+      await screen.findByRole('row', { name: /Buy paper/ })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Add note' }))
+
+      expect(screen.getByTestId('path')).toHaveTextContent('/e2e/noteform/new')
+    })
+
+    it('shows a toolbar button to a page that is not a form page without the create grant', async () => {
+      stubRecords()
+      renderWidget('', {
+        ...noteWidget,
+        formPage: null,
+        access: { actions: ['read'], createFields: [], updateFields: [] },
+        toolbarActions: [{ ...detail, parameters: { kind: "'all'" } }],
+      })
+      await screen.findByRole('row', { name: /Buy paper/ })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Details' }))
+
+      expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail')
+      expect(search()).toBe('?kind=all')
+    })
+
+    it('shows no button on a group row, which has no id', async () => {
+      const groupedWidget: WidgetMetadata = {
+        ...noteListWidget,
+        formPage: null,
+        rowActions: [detail],
+        dataSource: {
+          ...noteListWidget.dataSource!,
+          columns: [{ name: 'departmentName', type: 'text', labelKey: null, values: null, target: null }],
+        },
+      }
+      stubRecords(
+        '{"items":[{"id":null,"values":{"departmentName":"Finance"},"labels":{}}],"page":1,"pageSize":10,"totalCount":1}',
+      )
+
+      renderWidget('', groupedWidget)
+
+      const row = await screen.findByRole('row', { name: /Finance/ })
+      expect(within(row).queryByRole('button')).not.toBeInTheDocument()
+    })
   })
 
   it('sorts from page 1 and keeps parameters it does not own', async () => {
@@ -447,8 +565,8 @@ describe('TableWidget', () => {
     renderWidget()
 
     await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.getByRole('columnheader', { name: 'Title' })).toHaveClass('ant-table-column-has-sorters')
-    expect(screen.getByRole('columnheader', { name: 'Category' })).not.toHaveClass('ant-table-column-has-sorters')
+    expect(isSortableHeader(screen.getByRole('columnheader', { name: 'Title' }))).toBe(true)
+    expect(isSortableHeader(screen.getByRole('columnheader', { name: 'Category' }))).toBe(false)
   })
 
   it('shows no column for a child collection and ignores it as a sort', async () => {
@@ -484,6 +602,8 @@ describe('TableWidget', () => {
       process: null,
       instancesPath: null,
       actions: [],
+      rowActions: [],
+      toolbarActions: [],
       access: everyAction,
     })
 

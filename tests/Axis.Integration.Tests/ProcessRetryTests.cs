@@ -3,6 +3,7 @@ using System.Text.Json;
 using Axis.Data.Naming;
 using Axis.Server.Tests;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 using static Axis.Integration.Tests.SampleAppFixture;
 
 namespace Axis.Integration.Tests;
@@ -134,7 +135,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
                 return problem.RootElement.GetProperty("title").GetString();
             }, CancellationToken);
             await WaitUntilAsync(async () => retry.IsCompleted || await fixture.AdminCountAsync(
-                "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1);
+                "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1, "The retry did not wait on the lock.");
             Assert.False(retry.IsCompleted);
 
             await transaction.CommitAsync(CancellationToken);

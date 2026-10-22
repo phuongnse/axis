@@ -6,6 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
+import { hasFieldError, isRequiredLabel } from '../test/antd'
 import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
@@ -43,6 +44,8 @@ const noteWidget: EntityWidgetMetadata = {
   process: null,
   instancesPath: null,
   actions: [],
+  rowActions: [],
+  toolbarActions: [],
   access: null,
   entity: {
     name: 'Note',
@@ -291,7 +294,13 @@ function historyRequests() {
 
 function CurrentLocation() {
   const location = useLocation()
-  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>
+  const state = location.state as { from?: string } | null
+  return (
+    <>
+      <output data-testid="location">{`${location.pathname}${location.search}`}</output>
+      <output data-testid="from">{state?.from}</output>
+    </>
+  )
 }
 
 function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata = noteWidget) {
@@ -390,8 +399,8 @@ describe('FormWidget', () => {
     renderForm()
 
     // Ant Design marks a required item by a class on its label; the server still decides.
-    expect(screen.getByText('Title', { selector: 'label' })).toHaveClass('ant-form-item-required')
-    expect(screen.getByText('Code', { selector: 'label' })).not.toHaveClass('ant-form-item-required')
+    expect(isRequiredLabel(screen.getByText('Title', { selector: 'label' }))).toBe(true)
+    expect(isRequiredLabel(screen.getByText('Code', { selector: 'label' }))).toBe(false)
   })
 
   it('confirms a picker value on Enter without sending the form', async () => {
@@ -698,8 +707,8 @@ describe('FormWidget', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByTestId('field-error-lines-1-quantity')).toHaveTextContent('Must be an integer.')
-    expect(screen.getByLabelText('Quantity 2').closest('.ant-form-item')).toHaveClass('ant-form-item-has-error')
-    expect(screen.getByLabelText('Quantity 1').closest('.ant-form-item')).not.toHaveClass('ant-form-item-has-error')
+    expect(hasFieldError(screen.getByLabelText('Quantity 2'))).toBe(true)
+    expect(hasFieldError(screen.getByLabelText('Quantity 1'))).toBe(false)
     expect(screen.getByTestId('field-error-lines')).toHaveTextContent('Too many rows.')
     // A row the form does not have cannot hold the error, so it shows above the form.
     expect(screen.getByTestId('form-error')).toHaveTextContent('Out of range.')
@@ -970,6 +979,56 @@ describe('FormWidget', () => {
       renderForm(null, actionWidget)
       expect(await screen.findByLabelText('Title')).toHaveValue('')
       expect(screen.queryByRole('button', { name: 'Close note' })).toBeNull()
+    })
+
+    it('shows a navigate button on a saved record that opens the target with the record values', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+
+      renderForm(noteId, {
+        ...actionWidget,
+        actions: [
+          {
+            type: 'navigate',
+            page: 'Notes',
+            labelKey: 'note.open',
+            parameters: { note: 'id', title: 'Title', category: 'category' },
+            record: null,
+            opensForm: false,
+          },
+          ...actionWidget.actions,
+        ],
+      })
+
+      await userEvent.click(await screen.findByRole('button', { name: 'note.open' }))
+
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        `/e2e/notes?note=${noteId}&title=Buy+paper&category=${categoryId}`,
+      )
+      expect(screen.getByTestId('from')).toHaveTextContent(`/e2e/noteform/${noteId}`)
+    })
+
+    it('shows no navigate button on a new record, and hides one it cannot work out', async () => {
+      const navigateAction = {
+        type: 'navigate' as const,
+        page: 'Notes',
+        labelKey: 'note.open',
+        parameters: {},
+        record: null,
+        opensForm: false,
+      }
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      const { unmount } = renderForm(null, { ...actionWidget, actions: [navigateAction] })
+      expect(await screen.findByLabelText('Title')).toHaveValue('')
+      expect(screen.queryByRole('button', { name: 'note.open' })).toBeNull()
+      unmount()
+
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, {
+        ...actionWidget,
+        actions: [{ ...navigateAction, parameters: { title: 'concat(title, code)' } }, ...actionWidget.actions],
+      })
+      expect(await screen.findByRole('button', { name: 'Close note' })).toBeEnabled()
+      expect(screen.queryByRole('button', { name: 'note.open' })).toBeNull()
     })
 
     it('keeps the action on a read-only form without a save button', async () => {

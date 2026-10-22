@@ -5,6 +5,7 @@ import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
+import { createResource } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -42,21 +43,8 @@ test.describe('the author builds the service desk with Studio only', () => {
   // that folder would be a file write. So retries are off.
   test.describe.configure({ mode: 'serial', retries: 0 })
 
-  async function create(page: Page, kind: string, label: string, value: string) {
-    await page.getByRole('button', { name: 'New resource' }).click()
-    const dialog = page.getByRole('dialog')
-    await dialog.getByRole('combobox', { name: 'Kind' }).click()
-    await page.getByTitle(kind, { exact: true }).click()
-    await dialog.getByRole('textbox', { name: label }).fill(value)
-    await dialog.getByRole('button', { name: 'Create' }).click()
-    // The dialog gives the focus back to the New resource button when its close animation ends. A key pressed before
-    // that, as the pick helpers press Enter, would open the dialog again, so the next step waits for it to be gone.
-    await expect(dialog).toBeHidden()
-  }
-
   async function createPage(page: Page, name: string) {
-    await create(page, 'page', 'Name', name)
-    // The editor of the page that was open stays on screen until the new page replaces it, so wait for the name.
+    await createResource(page, 'page', name)
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name' })).toHaveValue(name)
   }
 
@@ -71,14 +59,17 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   async function save(page: Page, answers: [field: string, choice: string][] = []) {
     // A save with a migration posts one changes call, and a save without one patches the resource.
-    const answer = page.waitForResponse((response) => {
-      const url = response.url()
-      const method = response.request().method()
-      return (
-        (method === 'PATCH' && url.includes('/api/studio/apps/ServiceDesk/resources/')) ||
-        (method === 'POST' && url.endsWith('/api/studio/apps/ServiceDesk/changes'))
-      )
-    })
+    const answer = page.waitForResponse(
+      (response) => {
+        const url = response.url()
+        const method = response.request().method()
+        return (
+          (method === 'PATCH' && url.includes('/api/studio/apps/ServiceDesk/resources/')) ||
+          (method === 'POST' && url.endsWith('/api/studio/apps/ServiceDesk/changes'))
+        )
+      },
+      { timeout: 60_000 },
+    )
     await page.getByRole('button', { name: 'Save' }).click()
     for (const [field, choice] of answers) {
       await expect(page.getByTestId('studio-migration-field')).toHaveText(field)
@@ -97,8 +88,15 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   async function writeLabel(page: Page, field: string, key: string, en: string) {
     const label = page.getByTestId(field).getByTestId('studio-label')
-    await label.getByRole('textbox', { name: 'Text key', exact: true }).fill(key)
-    await expect(label.getByRole('textbox', { name: 'en', exact: true })).toHaveValue(en)
+    const keyBox = label.getByRole('textbox', { name: 'Text key', exact: true })
+    const english = label.getByRole('textbox', { name: 'en', exact: true })
+    // The label editor fills the texts when the key is typed, from the names it has then. An editor that was replaced
+    // or got its names later starts over, so the key is typed again until the text shows.
+    await expect(async () => {
+      await keyBox.fill('')
+      await keyBox.fill(key)
+      await expect(english).toHaveValue(en, { timeout: 2_000 })
+    }).toPass({ timeout: 20_000 })
     await label.getByRole('button', { name: 'Write texts' }).click()
     await expect(label.getByTestId('studio-label-written')).toBeVisible()
   }
@@ -230,11 +228,11 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
     await expect(starter.getByRole('button')).toHaveCount(0)
 
-    await create(page, 'text', 'Locale', 'en')
+    await createResource(page, 'text', 'en', 'TextsEn')
     await expect(page.getByTestId('studio-resource-details')).toContainText('texts/en.json')
     await expectForm(page)
 
-    await create(page, 'text', 'Locale', 'vi')
+    await createResource(page, 'text', 'vi', 'TextsVi')
     await expect(page.getByTestId('studio-resource-details')).toContainText('texts/vi.json')
     await expectForm(page)
 
@@ -262,7 +260,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['agent', 'role.agent'],
       ['service-desk-lead', 'role.serviceDeskLead'],
     ]) {
-      await create(page, 'role', 'Name', name)
+      await createResource(page, 'role', name)
       // The editor of the previous role stays on screen until the new role replaces it, so wait for the file.
       await expect(page.getByTestId('studio-resource-details')).toContainText(`roles/${name}.json`)
       await expectForm(page)
@@ -276,7 +274,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    await create(page, 'sequence', 'Name', 'TicketNumber')
+    await createResource(page, 'sequence', 'TicketNumber')
     await expectForm(page)
     await page.getByTestId('studio-field-/format').getByRole('textbox').fill('SD-{yyyy}-{n:5}')
     await save(page)
@@ -288,7 +286,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
-    await create(page, 'entity', 'Name', 'Category')
+    await createResource(page, 'entity', 'Category')
     await expectForm(page)
     await writeLabel(page, 'studio-field-/label', 'category.label', en['category.label'])
 
@@ -314,7 +312,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    await create(page, 'seed', 'Name', 'Categories')
+    await createResource(page, 'seed', 'Categories')
     await expectForm(page)
     await pick(page, 'studio-field-/entity', 'Category')
     await page.getByTestId('studio-field-/sync').getByRole('checkbox').check()
@@ -345,7 +343,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
-    await create(page, 'entity', 'Name', 'Ticket')
+    await createResource(page, 'entity', 'Ticket')
     await expectForm(page)
     await writeLabel(page, 'studio-field-/label', 'ticket.label', en['ticket.label'])
 
@@ -426,7 +424,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['AllTicketList', 'data-sources/all-ticket-list.json'],
     ]) {
       const list = await sample<SampleDataSource>(file)
-      await create(page, 'dataSource', 'Name', name)
+      await createResource(page, 'dataSource', name)
       await expectForm(page)
       await pick(page, 'studio-field-/entity', list.entity)
       // The starter has the first row, so only the later rows are added.
@@ -453,7 +451,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['TicketConfirmation', 'forms/ticket-confirmation.json'],
     ]) {
       const form = await sample<SampleForm>(file)
-      await create(page, 'form', 'Name', name)
+      await createResource(page, 'form', name)
       await expectForm(page)
       await pick(page, 'studio-field-/entity', form.entity)
       for (const [sectionIndex, section] of form.sections.entries()) {
@@ -493,7 +491,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
-    await create(page, 'process', 'Name', 'TicketHandling')
+    await createResource(page, 'process', 'TicketHandling')
     await expectForm(page)
     await pick(page, 'studio-field-/entity', 'Ticket')
     await page.getByTestId('studio-step-0').getByRole('button', { name: 'Remove step' }).click()
@@ -718,7 +716,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
       const ids = await shownCategoryIds(page)
 
-      await create(page, 'scenario', 'Name', name)
+      await createResource(page, 'scenario', name)
       await expect(page.getByTestId('studio-resource-details')).toContainText(file)
       await expectForm(page)
 

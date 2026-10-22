@@ -163,7 +163,7 @@ Content-Type: application/json
 
 ## Form state of a task
 
-*(Planned for M12.)* `POST /api/apps/{app}/tasks/{id}/form-state` answers
+`POST /api/apps/{app}/tasks/{id}/form-state` answers
 what the task's form shows for a draft, as the record API's
 [form state](record-api.md#form-state) does for a record form
 ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
@@ -180,6 +180,8 @@ It needs `Content-Type: application/json` and the
 - It uses the form from the task's release and the subject record. Fields the
   user may not read are left out of `fields`.
 - It writes nothing, and runs no unique or reference-existence check.
+- A subject record that no longer exists is a `404` with the title "No record
+  has this id.".
 - The checks follow the task check order below: `401`, `404`, `403`, then
   `409` when the task is not `open`.
 
@@ -192,9 +194,9 @@ type follows the record API's
 
 A request is checked in this order, and the first failure is the response:
 `401`, then `404`, then `403`, then `409`, then `415`, then `400`. So a user
-who may not act on a task never learns its state. A completion without the
-[CSRF header](record-api.md#create-update-and-delete) is a `403` before any
-of these checks.
+who may not act on a task never learns its state. A completion or a form
+state call without the [CSRF header](record-api.md#create-update-and-delete)
+is a `403` before any of these checks.
 
 - **`401`.** Nobody is signed in.
   Every task route needs a signed-in user.
@@ -221,7 +223,7 @@ of these checks.
   }
   ```
 - **`403`.** The user is not the assignee and does not hold the assignee
-  role, or the active release no longer declares that role. This applies to reading one task as well as completing it.
+  role, or the active release no longer declares that role. This applies to reading one task, asking for its form state and completing it.
 
   ```json
   {
@@ -250,11 +252,14 @@ of these checks.
   - A value for a field the form does not make editable, or the user may
     not read, is keyed `/values/<field>` with the message "Cannot be set.".
   - A missing `version` when `values` is not empty is keyed `/version`.
+  - A visible field of the task's form whose `requiredWhen` is true and that
+    is left `null` is keyed `/values/<field>` with "Required.". It is
+    evaluated on the record as it will be stored, whether or not the body
+    sends `values`: without `values` it reads the stored record. Nothing is
+    written and the task stays open. A hidden field is not required.
   - *(Planned for M12.)* A value for a field whose `readOnlyWhen` is true, or
-    that is hidden, is keyed `/values/<field>` with "Cannot be set.". A
-    visible field whose `requiredWhen` is true and that is left `null` is
-    keyed `/values/<field>` with "Required.". Both are evaluated on the record
-    as it will be stored.
+    that is hidden, is keyed `/values/<field>` with "Cannot be set.". It is
+    evaluated on the record as it will be stored.
   - Any other property, a repeated property and a body that is not a JSON
     object get the record API's keys and messages, such as "Unknown
     property.".

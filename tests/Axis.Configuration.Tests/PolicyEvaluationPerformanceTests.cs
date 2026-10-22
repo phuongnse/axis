@@ -9,6 +9,7 @@ namespace Axis.Configuration.Tests;
 /// Evaluating the grants of one request stays cheap for a user with many roles under many
 /// policies, so computing them once per request, not once per record, is enough.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class PolicyEvaluationPerformanceTests
 {
     private const int RoleCount = 10;

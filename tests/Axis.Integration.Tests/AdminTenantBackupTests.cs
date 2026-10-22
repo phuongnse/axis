@@ -122,7 +122,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         var file = Path.Combine(folder.Path, "backup.tar");
         try
         {
-            await AdminBackupFixture.WaitUntilAsync(() => Task.FromResult(created.Count >= 3 || writer.IsFaulted));
+            await Polling.WaitUntilAsync(() => Task.FromResult(created.Count >= 3 || writer.IsFaulted), "The writer did not create three records.");
             Assert.False(writer.IsFaulted, "Creating records failed.");
             before = [.. created];
             result = await fixture.BackupAsync(file);
@@ -463,17 +463,6 @@ public sealed class AdminBackupFixture : IAsyncLifetime
         }
 
         return id;
-    }
-
-    /// <summary>Waits until <paramref name="condition"/> holds, for at most 30 seconds.</summary>
-    public static async Task WaitUntilAsync(Func<Task<bool>> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (!await condition())
-        {
-            Assert.True(DateTime.UtcNow < deadline, "The condition did not hold within 30 seconds.");
-            await Task.Delay(TimeSpan.FromMilliseconds(50), CancellationToken);
-        }
     }
 
     private static Guid PurchaseRequestsApplication { get; } = Guid.Parse("219102bc-864f-42ed-874a-c19eaee0d1ba");

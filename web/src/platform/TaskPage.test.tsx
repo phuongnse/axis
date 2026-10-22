@@ -48,6 +48,8 @@ const inboxWidget: WidgetMetadata = {
   process: null,
   instancesPath: null,
   actions: [],
+  rowActions: [],
+  toolbarActions: [],
   access: null,
 }
 

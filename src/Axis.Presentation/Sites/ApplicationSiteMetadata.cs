@@ -18,11 +18,23 @@ public sealed record ApplicationSite(string Path, string TitleKey, SiteLocales L
 public sealed record SiteNavigationItem(string Page, string LabelKey);
 
 /// <summary>
-/// What the SPA needs to render a page: its title and its widgets. The widgets are the top level of a tree: a
+/// What the SPA needs to render a page: its title, its parameters and its widgets. The widgets are the top level of a tree: a
 /// <see cref="ColumnsWidgetMetadata"/>, <see cref="TabsWidgetMetadata"/> or <see cref="SectionWidgetMetadata"/> holds
 /// the others.
 /// </summary>
-public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<PageWidgetMetadata> Widgets);
+/// <param name="Parameters">The typed values the page reads from its URL, in file order. Empty when the page declares none.</param>
+public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<PageParameterMetadata> Parameters, IReadOnlyList<PageWidgetMetadata> Widgets);
+
+/// <summary>
+/// One parameter of a page. <see cref="Values"/> is set for enum and <see cref="Target"/> for reference.
+/// </summary>
+/// <param name="Type">The type name as written in page files, such as <c>date-time</c>.</param>
+public sealed record PageParameterMetadata(
+    string Name,
+    string Type,
+    bool Required,
+    IReadOnlyList<string>? Values,
+    ReferenceTarget? Target);
 
 /// <summary>
 /// One widget of a page: a <see cref="WidgetMetadata"/> that shows something, or a container around other widgets.
@@ -81,12 +93,15 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// field the form shows. <see cref="TasksPath"/> is set only on a task inbox, which has no entity or data source.
 /// <see cref="Process"/> and <see cref="InstancesPath"/> are set only on a process inspector, which has no entity or data source either.
 /// <see cref="Actions"/> is empty on every widget but a form widget that declares actions.
+/// <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table that declares them.
 /// <see cref="Access"/> is set on a table or form widget and null on a task inbox and a process inspector.
 /// </summary>
 /// <param name="TasksPath">The path of the application's task API, which lists the signed-in user's open tasks.</param>
 /// <param name="Process">The process an inspector inspects, by its declared name.</param>
 /// <param name="InstancesPath">The path of the process's instance list endpoint, so a client never builds it.</param>
-/// <param name="Actions">The buttons a form widget shows on a saved record, in page file order.</param>
+/// <param name="Actions">The <c>startProcess</c> and <c>navigate</c> actions of a form widget, in page file order.</param>
+/// <param name="RowActions">The <c>navigate</c> actions of a table widget on each row, in page file order.</param>
+/// <param name="ToolbarActions">The <c>navigate</c> actions of a table widget above its rows, in page file order.</param>
 /// <param name="Access">
 /// What the user may do with the widget's entity, or with the root entity of its data source.
 /// </param>
@@ -100,6 +115,8 @@ public sealed record WidgetMetadata(
     string? Process,
     string? InstancesPath,
     IReadOnlyList<ActionMetadata> Actions,
+    IReadOnlyList<ActionMetadata> RowActions,
+    IReadOnlyList<ActionMetadata> ToolbarActions,
     WidgetAccess? Access) : PageWidgetMetadata;
 
 /// <summary>
@@ -111,12 +128,53 @@ public sealed record WidgetMetadata(
 /// <param name="UpdateFields">The fields an update may write, in declaration order. Empty without <c>update</c>.</param>
 public sealed record WidgetAccess(IReadOnlyList<string> Actions, IReadOnlyList<string> CreateFields, IReadOnlyList<string> UpdateFields);
 
+/// <summary>
+/// One action of a widget: a <see cref="StartProcessActionMetadata"/> or a <see cref="NavigateActionMetadata"/>.
+/// Its JSON is that of the runtime type, and every kind writes <c>type</c> first.
+/// </summary>
+[JsonConverter(typeof(ActionMetadataConverter))]
+public abstract record ActionMetadata
+{
+    /// <summary>The kind of action as written in page files: <c>startProcess</c> or <c>navigate</c>.</summary>
+    public abstract string Type { get; init; }
+}
+
+/// <summary>Writes an action by its runtime type, so each kind has only its own properties.</summary>
+public sealed class ActionMetadataConverter : JsonConverter<ActionMetadata>
+{
+    public override ActionMetadata Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        throw new NotSupportedException("Page metadata is only written.");
+
+    public override void Write(Utf8JsonWriter writer, ActionMetadata value, JsonSerializerOptions options) =>
+        JsonSerializer.Serialize(writer, value, value.GetType(), options);
+}
+
 /// <summary>A <c>startProcess</c> action of a form widget, which starts a process for the form's record.</summary>
-/// <param name="Type">The kind of action: always <c>startProcess</c>.</param>
 /// <param name="Process">The process, by its declared name.</param>
 /// <param name="LabelKey">The text key of the button's label.</param>
 /// <param name="InstancesPath">The path of the process start endpoint, so a client never builds it.</param>
-public sealed record ActionMetadata(string Type, string Process, string LabelKey, string InstancesPath);
+public sealed record StartProcessActionMetadata(string Process, string LabelKey, string InstancesPath) : ActionMetadata
+{
+    [JsonPropertyOrder(-1)]
+    public override string Type { get; init; } = "startProcess";
+}
+
+/// <summary>A <c>navigate</c> action, which opens another page.</summary>
+/// <param name="Page">The target page, by its declared name.</param>
+/// <param name="LabelKey">The text key of the button's label.</param>
+/// <param name="Parameters">The expression of each target page parameter the action gives, by the name the target declares. Empty when it gives none.</param>
+/// <param name="Record">The expression of the record id a form page opens, or null.</param>
+/// <param name="OpensForm">Whether the target page holds a form widget.</param>
+public sealed record NavigateActionMetadata(
+    string Page,
+    string LabelKey,
+    IReadOnlyDictionary<string, string> Parameters,
+    string? Record,
+    bool OpensForm) : ActionMetadata
+{
+    [JsonPropertyOrder(-1)]
+    public override string Type { get; init; } = "navigate";
+}
 
 /// <summary>The form a form widget lays its entity's fields out with: its sections and its wizard steps in display order.</summary>
 /// <param name="Steps">The wizard steps in order. Empty when the form declares none.</param>

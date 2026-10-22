@@ -19,7 +19,9 @@ namespace Axis.Configuration.Compilation;
 /// rules it is given, and resolves paths through reference fields to the target entity's fields. A
 /// process scope resolves paths the same way, and a data change trigger's <c>when</c> uses the process
 /// scope. No other scope resolves paths. A rule call qualified with a module id is allowed only
-/// where the scope is given the application's <c>modules</c>.
+/// where the scope is given the application's <c>modules</c>. A navigate action's parameter sees
+/// <c>id</c>, as a reference to the root entity, and the names of the row or record. It has no
+/// rules, no collections and resolves no paths.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -178,6 +180,14 @@ public static class ExpressionScopes
     internal static ExpressionScope ForMigration(IEnumerable<(string Name, FieldDefinition Field)> fields) =>
         Build(
             fields.Select(pair => (pair.Name, TypeOf(pair.Field))),
+            rules: null,
+            collections: null,
+            referenceFields: null);
+
+    /// <summary>The scope of a navigate action's parameter: <c>id</c> as a reference to the root entity, when there is a row or record, then the given names. No rules, collections or paths.</summary>
+    internal static ExpressionScope ForNavigate(string? rootEntity, IEnumerable<(string Name, ExpressionType? Type)> names) =>
+        Build(
+            [.. rootEntity is null ? [] : new[] { ("id", (ExpressionType?)ExpressionType.Reference(rootEntity)) }, .. names],
             rules: null,
             collections: null,
             referenceFields: null);

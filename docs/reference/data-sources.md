@@ -446,7 +446,8 @@ data sources.
 - **Grouped data sources.** A table may bind a data source with an
   `aggregate`. Each row is a group. Its columns are the group fields in
   `groupBy` order, then the measures. A group row has `id: null`, so it has
-  no open link.
+  no open link. It has no row actions either: `rowActions` on such a table is
+  `AXC0060` at `/widgets/{i}/rowActions`.
 - **Form page.** A `formPage` must be a form over the root entity
   (`AXC0022`), because each row carries the id of its root record. A
   `formPage` on a table over a data source with an `aggregate` is also

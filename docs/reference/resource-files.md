@@ -96,23 +96,31 @@ site, and its widgets are its content:
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record. See
   [frontend.md](frontend.md).
-- A `table` widget may list `rowActions` and `toolbarActions` *(planned for
-  M12)*. Each entry has a `type`, such as
+- A `table` widget may list `rowActions` and `toolbarActions`. For now each
+  entry is a `navigate` action, which the compiler checks and the SPA shows as
+  a button. The other entries are *(planned for M12)*. An entry has a `type`, such as
   `{ "type": "delete", "label": { "textKey": "purchaseRequest.delete" } }` or
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`.
   `navigate` may sit in either list. `startProcess` and `delete` sit in
-  `rowActions` only, and the row is their subject. An entry may have a
-  `visibleWhen`, a boolean expression over the row's fields. See
+  `rowActions` only, and the row is their subject. They and `visibleWhen`, a
+  boolean expression over the row's fields, are still planned. See
   [frontend.md](frontend.md) and
   [D59](../decisions/d59-table-row-and-toolbar-actions.md).
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
   `{ "type": "table", "dataSource": "PurchaseRequestList", "formPage": "PurchaseRequestForm" }`.
   Its columns are the data source's projected fields. See
   [widget binding](data-sources.md#widget-binding).
-- A page may declare typed `parameters` *(planned for M12)*. Each has a
-  `name`, a `type` (an entity field type) and `required`. A `reference`
-  parameter also names its `target` entity. A value lives in the URL query
-  under the parameter name. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+- A page may declare typed `parameters`. Each has a `name`, a `type` (text,
+  integer, decimal, boolean, date, date-time, enum or reference) and
+  `required`, which defaults to false. An `enum` parameter also lists its
+  `values` and a `reference` parameter names its `target` entity. The type is
+  checked by the same rules as an entity field, so a bad type, missing
+  `values` or `target`, or an unknown `target` gives `AXC0004`, `AXC0014`,
+  `AXC0012`, `AXC0040` or `AXC0030`. A name that an earlier parameter already
+  uses, or that is `page`, `pageSize` or `sort`, ignoring letter case, is
+  `AXC0231`. The compiled page lists its parameters in file order. A value
+  living in the URL query under the parameter name is *(planned for M12)*. See
+  [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 
   ```json
   {
@@ -126,15 +134,20 @@ site, and its widgets are its content:
   }
   ```
 
-- A `navigate` action opens another page *(planned for M12)*. It sits in a
+- A `navigate` action opens another page. The compiler checks its shape, and
+  the SPA shows its button. It sits in a
   table's `rowActions` or `toolbarActions` ([D59](../decisions/d59-table-row-and-toolbar-actions.md)),
   or in a form's `actions`:
   `{ "type": "navigate", "page": "TicketDetail", "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }`.
   Each value is an expression, see
-  [expressions](expressions.md#names-and-references). A page whose widget is a form
-  declares no parameters. An action to it may set `record`, a reference to the
-  form's entity, instead of `parameters`: it opens `/{page}/{id}`, and without
-  `record` it opens `/{page}/new`.
+  [expressions](expressions.md#names-and-references). In `toolbarActions` the
+  expressions see no names, because a toolbar has no row. The checks are in
+  [configuration](configuration.md). A page whose widget is a form
+  declares no parameters, otherwise it is `AXC0236`. An action to it may set
+  `record`, a reference to the form's entity, instead of `parameters`, and the
+  compiler checks it (`AXC0235`). The button opens `/{page}/{id}` with
+  `record`, and `/{page}/new` without it on a form page. Reading the
+  parameter values on the target page is *(planned for M12)*.
 
 A page may hold a tree of widgets. The container
 widgets `columns`, `tabs` and `section` hold other widgets, see
@@ -560,8 +573,10 @@ A `form` resource (see [frontend](frontend.md)) can show, require and lock
 fields depending on the record, and can split its sections into wizard steps
 ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 The schema, the compile checks, the compiled model, the page and task metadata and the
-evaluation through the [form state endpoint](record-api.md#form-state) are built.
-Enforcing the conditions on write stays *(planned for M12)*.
+evaluation through the [form state endpoint](record-api.md#form-state) and the
+[task form state route](task-api.md#form-state-of-a-task) are built.
+The server enforces `requiredWhen` on write. Refusing a value for a hidden or `readOnlyWhen`
+field stays *(planned for M12)*.
 
 - **Conditions.** A field entry may have `visibleWhen`, `requiredWhen` and
   `readOnlyWhen`. A section may have `visibleWhen`. Each is a boolean
@@ -587,8 +602,10 @@ Enforcing the conditions on write stays *(planned for M12)*.
   own.
 - **On write.** The record API enforces `requiredWhen` only when the write
   names the form in `?form=`. It never enforces `readOnlyWhen`. The task API
-  enforces both. See [the record API](record-api.md#create-update-and-delete)
-  and [the task API](task-api.md#task-api-errors).
+  enforces `requiredWhen` on every completion, and *(planned for M12)* it
+  enforces `readOnlyWhen` and hidden fields too. See
+  [the record API](record-api.md#create-update-and-delete) and
+  [the task API](task-api.md#task-api-errors).
 - **Steps.** `steps` is an optional list on the form. Each step has a `title`
   label and `sections`, a list of section names. When `steps` is present,
   every section has a `name` and is in exactly one step. The steps show in

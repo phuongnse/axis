@@ -114,10 +114,13 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// transaction. When the active release is no longer the given release, it writes nothing and the
 /// outcome is <see cref="RecordCommandOutcome.ReleaseChanged"/>, so the caller can run it again on the
 /// new release. A delete never starts a process and takes no lock.
+/// A create or update may name a form of the entity. The form is checked after the grant and the
+/// record checks and before the content type: a name that is no form of the entity is invalid.
 /// A body is checked in order: content type, then body, then a field that no grant for the action
 /// covers, then the computed fields of the record as it will be stored and of its rows, then the
-/// entity's validations on that record, then storage. An update of an entity with computed fields
-/// or validations reads the stored record first, so an unknown record is not found there.
+/// form's <c>requiredWhen</c> conditions and the entity's validations on that record, then storage.
+/// An update of an entity with computed fields or validations, or with a form that has
+/// <c>requiredWhen</c> conditions, reads the stored record first, so an unknown record is not found there.
 /// </summary>
 public static class RecordCommand
 {
@@ -130,6 +133,7 @@ public static class RecordCommand
         EntityModel model,
         RecordActor actor,
         RecordBodyReader readBody,
+        string? form,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -137,6 +141,12 @@ public static class RecordCommand
         if (!access.Granted)
         {
             return new RecordCommandResult(RecordCommandOutcome.Denied);
+        }
+
+        FormModel? formModel = null;
+        if (form is not null && !TryResolveForm(application, model, form, out formModel))
+        {
+            return Invalid(UnknownForm());
         }
 
         if (await readBody(cancellationToken) is not { } body)
@@ -179,7 +189,10 @@ public static class RecordCommand
 
             // The validations run in the write transaction, so their now() is its start time.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            if (RecordValidator.ValidateCreate(application, model, computed.Values, computed.Rows, now) is { } failures)
+            var failures = RecordFormRequirements.Merge(
+                formModel is null ? null : RecordFormRequirements.Check(application, model, formModel, null, computed.Values, computed.Rows, now),
+                RecordValidator.ValidateCreate(application, model, computed.Values, computed.Rows, now));
+            if (failures is not null)
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return Invalid(failures);
@@ -225,6 +238,7 @@ public static class RecordCommand
         Guid recordId,
         RecordActor actor,
         RecordBodyReader readBody,
+        string? form,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -281,6 +295,12 @@ public static class RecordCommand
             checkedVersions.Add(match.Version);
         }
 
+        FormModel? formModel = null;
+        if (form is not null && !TryResolveForm(application, model, form, out formModel))
+        {
+            return Invalid(UnknownForm());
+        }
+
         if (await readBody(cancellationToken) is not { } body)
         {
             return new RecordCommandResult(RecordCommandOutcome.UnsupportedContent);
@@ -307,7 +327,7 @@ public static class RecordCommand
         // earlier, so a write that passes the version check finds the record as computed here and
         // validated below.
         Record? stored = null;
-        if (model.Validations.Count > 0 || model.HasComputedFields)
+        if (model.Validations.Count > 0 || model.HasComputedFields || formModel?.HasRequiredWhen == true)
         {
             stored = await RecordQueries.GetAsync(connection, application, model, recordId, cancellationToken);
             if (stored is null)
@@ -336,7 +356,10 @@ public static class RecordCommand
 
             // The validations run in the write transaction, so their now() is its start time.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            if (RecordValidator.ValidateUpdate(application, model, stored, computed.Values, computed.Rows, now) is { } failures)
+            var failures = RecordFormRequirements.Merge(
+                formModel is null ? null : RecordFormRequirements.Check(application, model, formModel, stored, computed.Values, computed.Rows, now),
+                RecordValidator.ValidateUpdate(application, model, stored, computed.Values, computed.Rows, now));
+            if (failures is not null)
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return Invalid(failures);
@@ -552,6 +575,16 @@ public static class RecordCommand
 
     private static RecordCommandResult Invalid(IDictionary<string, string[]> errors) =>
         new(RecordCommandOutcome.Invalid, Errors: errors);
+
+    // The form must be one of the entity's forms. A repeated or empty name never names one.
+    private static bool TryResolveForm(ApplicationModel application, EntityModel model, string name, out FormModel? form)
+    {
+        form = application.TryGetForm(name, out var found) && found.Entity.Id == model.Id ? found : null;
+        return form is not null;
+    }
+
+    private static Dictionary<string, string[]> UnknownForm() =>
+        new() { ["form"] = ["Must name a form of this entity."] };
 
     // Maps a storage result that is not a success. The conflicts name no column or constraint:
     // the storage names are not part of the outcome.

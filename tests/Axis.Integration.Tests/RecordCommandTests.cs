@@ -32,6 +32,7 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
             item,
             new RecordActor("rita", "Rita Reader", ["reader"]),
             Body,
+            null,
             NullLoggerFactory.Instance,
             CancellationToken);
 
@@ -57,6 +58,7 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
             item,
             new RecordActor("cmd-actor", "Command Actor", ["employee"]),
             Body,
+            null,
             NullLoggerFactory.Instance,
             CancellationToken);
 
@@ -84,6 +86,7 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
             item,
             new RecordActor("cmd-actor", "Command Actor", ["employee"]),
             Body,
+            null,
             NullLoggerFactory.Instance,
             CancellationToken);
 

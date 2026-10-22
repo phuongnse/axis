@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { emptyDescription } from '../test/antd'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { Shell } from './Shell'
 import { TextProvider } from './TextProvider'
@@ -83,7 +84,7 @@ describe('Shell', () => {
   it('shows an empty table in Vietnamese for vi', () => {
     renderShell('vi', ['/'], [], <Table columns={[{ title: 'Name', dataIndex: 'name' }]} dataSource={[]} />)
 
-    expect(screen.getByText(viVN.Empty!.description!, { selector: '.ant-empty-description' })).toBeInTheDocument()
+    expect(emptyDescription(viVN.Empty!.description!)).toBeInTheDocument()
   })
 })
 

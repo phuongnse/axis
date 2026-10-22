@@ -400,7 +400,18 @@ public static class ApplicationCompiler
         }
 
         PresentationChecker.Check(
-            loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, moduleReferences, references, rules, declaredModules, diagnostics);
+            loaded,
+            FindEntity,
+            FindPage,
+            FindDataSource,
+            FindForm,
+            FindProcess,
+            (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, report),
+            moduleReferences,
+            references,
+            rules,
+            declaredModules,
+            diagnostics);
         CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, references, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, rules, declaredModules, diagnostics);
         ProcessChecker.Check(
@@ -1660,6 +1671,33 @@ public static class ApplicationCompiler
     {
         List<WidgetModel> BuildWidgets(IReadOnlyList<WidgetDefinition> widgets) => [.. widgets.Select(BuildWidget)];
 
+        // The checker has resolved every process and page an action names, so the lookups always succeed.
+        IReadOnlyList<WidgetActionModel> BuildActions(IReadOnlyList<WidgetActionDefinition>? actions) =>
+            actions is null || actions.Count == 0 ? [] : [.. actions.Select(BuildAction)];
+
+        WidgetActionModel BuildAction(WidgetActionDefinition action)
+        {
+            if (action.Type == "startProcess")
+            {
+                var process = processesByName[action.Process!];
+                return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
+            }
+
+            // The checker has matched each key to a parameter of the target, ignoring letter case. The model
+            // keys them by the declared name, so a client never fixes the case itself.
+            var target = pagesByName[action.Page!];
+            var parameters = action.Parameters is not { Count: > 0 }
+                ? NavigateActionModel.NoParameters
+                : action.Parameters.ToDictionary(
+                    pair => target.Parameters.First(parameter => string.Equals(parameter.Name, pair.Key, StringComparison.OrdinalIgnoreCase)).Name,
+                    pair => pair.Value);
+            return new NavigateActionModel(PageReferenceTo(target), action.Label)
+            {
+                Parameters = parameters,
+                Record = action.Record,
+            };
+        }
+
         WidgetModel BuildWidget(WidgetDefinition widget)
         {
             // A container holds widgets and no reference. A leaf keeps the shared empty lists, so equal leaves stay equal.
@@ -1699,15 +1737,11 @@ public static class ApplicationCompiler
                 form is null ? null : new FormReference(form.Id, form.Name),
                 inspected is null ? null : new ProcessReference(inspected.Id, inspected.Name))
             {
-                // Each action is named as its process declares it. A widget without
+                // Each action is named as its process or page declares it. A widget without
                 // actions keeps the shared empty list, so equal widgets stay equal.
-                Actions = widget.Actions is null
-                    ? []
-                    : [.. widget.Actions.Select(action =>
-                    {
-                        var process = processesByName[action.Process];
-                        return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
-                    })],
+                Actions = BuildActions(widget.Actions),
+                RowActions = BuildActions(widget.RowActions),
+                ToolbarActions = BuildActions(widget.ToolbarActions),
             };
         }
 
@@ -1717,6 +1751,12 @@ public static class ApplicationCompiler
             Name = page.Name,
             Title = page.Title,
             File = page.File,
+            Parameters = [.. page.Parameters.Select(parameter => new PageParameterModel(
+                parameter.Name,
+                FieldTypes.Parse(parameter.Type),
+                parameter.Required ?? false,
+                parameter.Values,
+                parameter.Target is not null && entitiesByName.GetValueOrDefault(parameter.Target) is { } target ? new EntityReference(target.Id, target.Name) : null))],
             Widgets = BuildWidgets(page.Widgets),
         };
     }

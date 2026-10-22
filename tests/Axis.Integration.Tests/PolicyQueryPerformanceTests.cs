@@ -18,6 +18,7 @@ namespace Axis.Integration.Tests;
 /// <c>currentUser()</c> stay fast at a realistic size: each read answers within the time limit,
 /// and its plan finds each department through the primary key index.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : IClassFixture<DataDatabaseFixture>
 {
     private const int RequestCount = 100_000;

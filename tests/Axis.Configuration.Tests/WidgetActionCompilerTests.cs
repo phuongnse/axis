@@ -29,7 +29,7 @@ public sealed class WidgetActionCompilerTests
         Assert.NotNull(result.Model);
         var widget = Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "OrderForm").Widgets);
         Assert.Equal(
-            [new StartProcessActionModel(new ProcessReference(Guid.Parse(ProcessId), "OrderReview"), new TextReference("order.submit"))],
+            new WidgetActionModel[] { new StartProcessActionModel(new ProcessReference(Guid.Parse(ProcessId), "OrderReview"), new TextReference("order.submit")) },
             widget.Actions);
         var table = Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "Orders").Widgets);
         Assert.Empty(table.Actions);

@@ -60,7 +60,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
         var first = await BuildWorkerAsync(scenario.Platform);
         try
         {
-            await AdminBackupFixture.WaitUntilAsync(async () => await StateAsync(original, instanceA) == Waiting);
+            await Polling.WaitUntilAsync(async () => await StateAsync(original, instanceA) == Waiting, "The original instance did not wait.");
         }
         finally
         {
@@ -98,7 +98,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
         try
         {
             // B was due at backup time: it only reaches the manager if the worker of the new tenant claims its work item.
-            await AdminBackupFixture.WaitUntilAsync(async () => await StateAsync(restored, instanceB) == Waiting);
+            await Polling.WaitUntilAsync(async () => await StateAsync(restored, instanceB) == Waiting, "The restored instance did not wait.");
 
             var task = (Guid)(await PostgreSqlServer.AdminScalarAsync(
                 DatabaseOf(restored),
@@ -112,7 +112,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
                 Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
             }
 
-            await AdminBackupFixture.WaitUntilAsync(async () => (await StateAsync(restored, instanceA))?.StartsWith("completed:", StringComparison.Ordinal) == true);
+            await Polling.WaitUntilAsync(async () => (await StateAsync(restored, instanceA))?.StartsWith("completed:", StringComparison.Ordinal) == true, "The restored instance did not complete.");
 
             using var read = await chau.SendAsync(Request($"{App}/entities/PurchaseRequest/records/{requestA:D}", newHost), CancellationToken);
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);

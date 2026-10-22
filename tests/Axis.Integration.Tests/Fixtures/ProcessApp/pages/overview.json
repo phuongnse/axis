@@ -8,7 +8,25 @@
     {
       "type": "columns",
       "columns": [
-        { "width": 8, "widgets": [{ "type": "table", "entity": "Request" }] },
+        {
+          "width": 8,
+          "widgets": [
+            {
+              "type": "table",
+              "entity": "Request",
+              "rowActions": [
+                {
+                  "type": "navigate",
+                  "page": "Submissions",
+                  "label": { "textKey": "request.showSubmissions" },
+                  "parameters": { "request": "id" }
+                },
+                { "type": "navigate", "page": "RequestForm", "label": { "textKey": "pages.requestForm.title" }, "record": "id" }
+              ],
+              "toolbarActions": [{ "type": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }]
+            }
+          ]
+        },
         {
           "width": 4,
           "widgets": [

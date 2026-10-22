@@ -335,17 +335,6 @@ public sealed class SampleAppFixture : IAsyncLifetime
     public ValueTask<NpgsqlConnection> OpenConnectionAsync() =>
         (_dataSource ?? throw new InvalidOperationException("The fixture is not initialized.")).OpenConnectionAsync(CancellationToken);
 
-    /// <summary>Waits until <paramref name="condition"/> holds, for at most 30 seconds.</summary>
-    public static async Task WaitUntilAsync(Func<Task<bool>> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (!await condition())
-        {
-            Assert.True(DateTime.UtcNow < deadline, "The condition did not hold within 30 seconds.");
-            await Task.Delay(TimeSpan.FromMilliseconds(50), CancellationToken);
-        }
-    }
-
     /// <summary>The id of the sample's active release in the tenant.</summary>
     public async Task<Guid> ActiveReleaseIdAsync(CancellationToken cancellationToken)
     {

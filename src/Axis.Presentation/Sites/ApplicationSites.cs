@@ -51,7 +51,16 @@ public static class ApplicationSites
         var page = application.Pages.FirstOrDefault(candidate => string.Equals(candidate.Name, pageName, StringComparison.OrdinalIgnoreCase));
         return page is null
             ? null
-            : new PageMetadata(page.Name, page.Title.TextKey, [.. page.Widgets.Select(widget => Widget(application, widget))]);
+            : new PageMetadata(
+                page.Name,
+                page.Title.TextKey,
+                [.. page.Parameters.Select(parameter => new PageParameterMetadata(
+                    parameter.Name,
+                    FieldTypes.Name(parameter.Type),
+                    parameter.Required,
+                    parameter.Values,
+                    parameter.Target is { } target ? Target(application, target.Name) : null))],
+                [.. page.Widgets.Select(widget => Widget(application, widget))]);
     }
 
     private static TextResource? FindText(ApplicationModel application, string locale) =>
@@ -81,12 +90,28 @@ public static class ApplicationSites
             widget.Type == WidgetType.TaskInbox ? $"/api/apps/{application.Manifest.Name}/tasks" : null,
             widget.Process?.Name,
             widget.Process is { } process ? $"/api/apps/{application.Manifest.Name}/processes/{process.Name}/instances" : null,
-            [.. widget.Actions.Select(action => new ActionMetadata(
-                "startProcess",
-                action.Process.Name,
-                action.Label.TextKey,
-                $"/api/apps/{application.Manifest.Name}/processes/{action.Process.Name}/instances"))],
+            [.. widget.Actions.Select(action => Action(application, action))],
+            [.. widget.RowActions.Select(action => Action(application, action))],
+            [.. widget.ToolbarActions.Select(action => Action(application, action))],
             FullAccess(application, widget));
+
+    private static ActionMetadata Action(ApplicationModel application, WidgetActionModel action) =>
+        action switch
+        {
+            StartProcessActionModel start => new StartProcessActionMetadata(
+                start.Process.Name,
+                start.Label.TextKey,
+                $"/api/apps/{application.Manifest.Name}/processes/{start.Process.Name}/instances"),
+
+            // The compiler resolves every navigate target, so the lookup always succeeds.
+            NavigateActionModel navigate => new NavigateActionMetadata(
+                navigate.Page.Name,
+                navigate.Label.TextKey,
+                navigate.Parameters,
+                navigate.Record,
+                application.Pages.First(page => page.Name == navigate.Page.Name).Leaves().Any(leaf => leaf.Type == WidgetType.Form)),
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
+        };
 
     /// <summary>
     /// The entity a table or form widget is about: its own entity, or the root entity of its data

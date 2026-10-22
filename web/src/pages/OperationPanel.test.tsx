@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +8,7 @@ import { TextProvider } from '../platform/TextProvider'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { chooseOption, optionTexts, selectRoot } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { forbiddenOperationKeys, operationJsonOnlyKeys, withOperation } from './operationKeys'
 import { ProcessEditor } from './ProcessEditor'
@@ -134,16 +135,6 @@ function renderEditor(known = true, value: Record<string, unknown> = process, on
   return onChange
 }
 
-/** Picks an option of the open dropdown. A selected value elsewhere has the same title, so only an option counts. */
-async function choose(title: string) {
-  const option = await waitFor(() => {
-    const found = document.querySelector(`.ant-select-item-option[title="${title}"]`)
-    expect(found).not.toBeNull()
-    return found!
-  })
-  await userEvent.click(option)
-}
-
 function step(index: number) {
   return within(screen.getByTestId(`studio-step-${index}`))
 }
@@ -176,14 +167,14 @@ describe.each(['light', 'dark'])('The operation panel in %s mode', (mode) => {
     const root = screen.getByTestId('studio-field-/steps/0/operation')
     expect(root.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
     expect(root).toBeVisible()
-    expect(step(0).getByRole('combobox', { name: 'Operation' }).closest('.ant-select')).toBeVisible()
+    expect(selectRoot(step(0).getByRole('combobox', { name: 'Operation' }))).toBeVisible()
     expect(
       within(screen.getByTestId('studio-field-/steps/0/set/status')).getByRole('textbox', { name: 'Expression' }),
     ).toBeVisible()
-    expect(step(1).getByRole('combobox', { name: 'Connector' }).closest('.ant-select')).toBeVisible()
+    expect(selectRoot(step(1).getByRole('combobox', { name: 'Connector' }))).toBeVisible()
     expect(step(1).getByRole('spinbutton', { name: 'Attempts' })).toBeVisible()
     expect(step(1).getByRole('textbox', { name: 'Backoff' })).toBeVisible()
-    expect(step(2).getByRole('combobox', { name: 'Event' }).closest('.ant-select')).toBeVisible()
+    expect(selectRoot(step(2).getByRole('combobox', { name: 'Event' }))).toBeVisible()
     expect(step(3).getByRole('textbox', { name: 'Package operation' })).toBeVisible()
   })
 })
@@ -193,7 +184,7 @@ describe('An updateRecord step', () => {
     renderEditor()
     await screen.findAllByTestId('studio-expression-type')
 
-    expect(step(0).getByRole('combobox', { name: 'Operation' }).closest('.ant-select')).toBeVisible()
+    expect(selectRoot(step(0).getByRole('combobox', { name: 'Operation' }))).toBeVisible()
     for (const key of ['status', 'totalAmount']) {
       const row = within(screen.getByTestId(`studio-field-/steps/0/set/${key}`))
       expect(row.getByRole('combobox', { name: 'Field' })).toBeVisible()
@@ -207,9 +198,9 @@ describe('An updateRecord step', () => {
     const onChange = renderEditor()
 
     await userEvent.click(step(0).getByRole('combobox', { name: 'Add mapping Set' }))
-    const options = [...document.querySelectorAll('.ant-select-item-option')].map((option) => option.textContent)
+    const options = optionTexts()
     expect(options).toEqual(['purchaseOrderNumber'])
-    await choose('purchaseOrderNumber')
+    await chooseOption('purchaseOrderNumber')
 
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/set/purchaseOrderNumber', '')
   })
@@ -219,7 +210,7 @@ describe('An updateRecord step', () => {
 
     const row = within(screen.getByTestId('studio-field-/steps/0/set/status'))
     await userEvent.click(row.getByRole('combobox', { name: 'Field' }))
-    await choose('purchaseOrderNumber')
+    await chooseOption('purchaseOrderNumber')
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/set', {
       purchaseOrderNumber: "'submitted'",
       totalAmount: '1',
@@ -258,7 +249,7 @@ describe('An updateRecord step', () => {
     const onChange = renderEditor()
 
     await userEvent.click(step(0).getByRole('combobox', { name: 'Operation' }))
-    await choose('raiseEvent')
+    await chooseOption('raiseEvent')
 
     const [pointer, next] = onChange.mock.lastCall as [string, Record<string, unknown>]
     expect(pointer).toBe('/steps/0')
@@ -269,7 +260,7 @@ describe('An updateRecord step', () => {
     const onChange = renderEditor()
 
     await userEvent.click(step(0).getByRole('combobox', { name: 'Operation' }))
-    await choose('Package operation')
+    await chooseOption('Package operation')
 
     expect(onChange).toHaveBeenLastCalledWith('/steps/0', {
       name: 'update',
@@ -306,7 +297,7 @@ describe('A callConnector step', () => {
     const onChange = renderEditor()
 
     await userEvent.click(step(1).getByRole('combobox', { name: 'Connector operation' }))
-    await choose('cancelPurchaseOrder')
+    await chooseOption('cancelPurchaseOrder')
 
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/connector/operation', 'cancelPurchaseOrder')
   })
@@ -316,7 +307,7 @@ describe('A callConnector step', () => {
 
     const row = within(screen.getByTestId('studio-field-/steps/1/output/orderNumber'))
     await userEvent.click(row.getByRole('combobox', { name: 'Entity field' }))
-    await choose('status')
+    await chooseOption('status')
 
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/output/orderNumber', 'status')
   })
@@ -383,9 +374,9 @@ describe('A raiseEvent step', () => {
     expect(row.getByRole('textbox', { name: 'Expression' })).toBeVisible()
 
     await userEvent.click(step(2).getByRole('combobox', { name: 'Add mapping Event fields' }))
-    const options = [...document.querySelectorAll('.ant-select-item-option')].map((option) => option.textContent)
+    const options = optionTexts()
     expect(options).toEqual(['amount'])
-    await choose('amount')
+    await chooseOption('amount')
     expect(onChange).toHaveBeenLastCalledWith('/steps/2/fields/amount', '')
   })
 
@@ -417,7 +408,7 @@ describe('A package operation step', () => {
     expect(step(3).getByRole('textbox', { name: 'Package operation' })).toHaveValue(
       'payment-references/creditorReference',
     )
-    expect(step(3).getByRole('combobox', { name: 'Operation' }).closest('.ant-select')).toBeVisible()
+    expect(selectRoot(step(3).getByRole('combobox', { name: 'Operation' }))).toBeVisible()
     expect(screen.getByTestId('studio-field-/steps/3/input/reference')).toBeVisible()
     expect(screen.getByTestId('studio-field-/steps/3/output/creditorReference')).toBeVisible()
     expect(step(3).getByRole('spinbutton', { name: 'Attempts' })).toHaveValue('2')

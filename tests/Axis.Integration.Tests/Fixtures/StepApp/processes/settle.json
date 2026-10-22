@@ -1,0 +1,21 @@
+{
+  "id": "aea7f9fa-d81a-419d-bb86-803b1f2a7d30",
+  "kind": "process",
+  "name": "Settle",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "settle",
+  "steps": [
+    {
+      "name": "settle",
+      "type": "task",
+      "label": { "textKey": "request.settle" },
+      "assignee": { "user": "department.manager" },
+      "form": "RequestSettlement",
+      "outcomes": [
+        { "name": "settle", "label": { "textKey": "task.settle" }, "next": "settled" }
+      ]
+    },
+    { "name": "settled", "type": "end" }
+  ]
+}
