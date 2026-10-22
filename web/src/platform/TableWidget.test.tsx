@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   DataSourceParameter,
   EntityWidgetMetadata,
@@ -15,6 +15,7 @@ import type {
 import { isSortableHeader } from '../test/antd'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
+import { phoneWidthQuery } from './usePhoneWidth'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
   return {
@@ -145,6 +146,7 @@ const texts = {
   'shell.table.no': 'No',
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
+  'shell.table.rowActions': 'Actions',
   'note.title': 'Title',
   'note.done': 'Done',
   'note.dueAt': 'Due at',
@@ -335,6 +337,60 @@ describe('TableWidget', () => {
 
       expect(screen.getByTestId('path')).toHaveTextContent(`/e2e/noteform/${noteId}`)
       expect(search()).toBe('')
+    })
+
+    describe('at phone width', () => {
+      beforeEach(() => {
+        vi.stubGlobal('matchMedia', (query: string) => ({
+          matches: query === phoneWidthQuery,
+          media: query,
+          onchange: null,
+          addListener() {},
+          removeListener() {},
+          addEventListener() {},
+          removeEventListener() {},
+          dispatchEvent: () => false,
+        }))
+      })
+
+      it('folds the row actions into one Actions button', async () => {
+        stubRecords()
+        renderWidget('', {
+          ...noteWidget,
+          rowActions: [detail, { ...createNote, labelKey: 'note.edit', record: 'id' }],
+        })
+        const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+        const buttons = within(row).getAllByRole('button')
+        expect(buttons).toHaveLength(1)
+        expect(buttons[0]).toHaveAccessibleName('Actions')
+        expect(screen.queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+      })
+
+      it('opens the target page from a menu entry, from the table address', async () => {
+        stubRecords()
+        renderWidget('?page=2', {
+          ...noteWidget,
+          rowActions: [detail, { ...createNote, labelKey: 'note.edit', record: 'id' }],
+        })
+        const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+        await userEvent.click(within(row).getByRole('button', { name: 'Actions' }))
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Details' }))
+
+        expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail')
+        expect(search()).toBe(`?ticket=${noteId}`)
+        expect(screen.getByTestId('from')).toHaveTextContent('/e2e/notes?page=2')
+      })
+
+      it('shows no menu button on a row whose actions are all hidden', async () => {
+        stubRecords()
+        renderWidget('', { ...noteWidget, rowActions: [{ ...detail, parameters: { ticket: 'concat(title, id)' } }] })
+        const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+        expect(within(row).queryByRole('button')).not.toBeInTheDocument()
+      })
     })
 
     it('hides a row button whose expression the SPA cannot work out', async () => {
