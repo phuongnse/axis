@@ -1655,44 +1655,70 @@ public static class ApplicationCompiler
         Dictionary<string, PageResource> pagesByName,
         Dictionary<string, DataSourceResource> dataSourcesByName,
         Dictionary<string, FormResource> formsByName,
-        Dictionary<string, ProcessResource> processesByName) =>
-        new()
+        Dictionary<string, ProcessResource> processesByName)
+    {
+        List<WidgetModel> BuildWidgets(IReadOnlyList<WidgetDefinition> widgets) => [.. widgets.Select(BuildWidget)];
+
+        WidgetModel BuildWidget(WidgetDefinition widget)
+        {
+            // A container holds widgets and no reference. A leaf keeps the shared empty lists, so equal leaves stay equal.
+            switch (WidgetTypes.Parse(widget.Type))
+            {
+                case WidgetType.Columns:
+                    return new WidgetModel(WidgetType.Columns, null, null)
+                    {
+                        Columns = [.. widget.Columns!.Select(column => new WidgetColumnModel(column.Width, BuildWidgets(column.Widgets)))],
+                    };
+                case WidgetType.Tabs:
+                    return new WidgetModel(WidgetType.Tabs, null, null)
+                    {
+                        Tabs = [.. widget.Tabs!.Select(tab => new WidgetTabModel(tab.Label, BuildWidgets(tab.Widgets)))],
+                    };
+                case WidgetType.Section:
+                    return new WidgetModel(WidgetType.Section, null, null)
+                    {
+                        Title = widget.Title,
+                        Collapsed = widget.Collapsed ?? false,
+                        Widgets = BuildWidgets(widget.Widgets!),
+                    };
+            }
+
+            // A checked widget names exactly one of an entity, a data source and a form. A
+            // form widget over a form shows the form's entity.
+            var form = widget.Form is null ? null : formsByName[widget.Form];
+            var entityName = widget.Entity ?? form?.Entity;
+            var entity = entityName is null ? null : entitiesByName[entityName];
+            var dataSource = widget.DataSource is null ? null : dataSourcesByName[widget.DataSource];
+            var inspected = widget.Process is null ? null : processesByName[widget.Process];
+            return new WidgetModel(
+                WidgetTypes.Parse(widget.Type),
+                entity is null ? null : new EntityReference(entity.Id, entity.Name),
+                widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]),
+                dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name),
+                form is null ? null : new FormReference(form.Id, form.Name),
+                inspected is null ? null : new ProcessReference(inspected.Id, inspected.Name))
+            {
+                // Each action is named as its process declares it. A widget without
+                // actions keeps the shared empty list, so equal widgets stay equal.
+                Actions = widget.Actions is null
+                    ? []
+                    : [.. widget.Actions.Select(action =>
+                    {
+                        var process = processesByName[action.Process];
+                        return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
+                    })],
+            };
+        }
+
+        return new()
         {
             Id = page.Id,
             Name = page.Name,
             Title = page.Title,
             File = page.File,
-            Widgets = page.Widgets
-                .Select(widget =>
-                {
-                    // A checked widget names exactly one of an entity, a data source and a form. A
-                    // form widget over a form shows the form's entity.
-                    var form = widget.Form is null ? null : formsByName[widget.Form];
-                    var entityName = widget.Entity ?? form?.Entity;
-                    var entity = entityName is null ? null : entitiesByName[entityName];
-                    var dataSource = widget.DataSource is null ? null : dataSourcesByName[widget.DataSource];
-                    var inspected = widget.Process is null ? null : processesByName[widget.Process];
-                    return new WidgetModel(
-                        WidgetTypes.Parse(widget.Type),
-                        entity is null ? null : new EntityReference(entity.Id, entity.Name),
-                        widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]),
-                        dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name),
-                        form is null ? null : new FormReference(form.Id, form.Name),
-                        inspected is null ? null : new ProcessReference(inspected.Id, inspected.Name))
-                    {
-                        // Each action is named as its process declares it. A widget without
-                        // actions keeps the shared empty list, so equal widgets stay equal.
-                        Actions = widget.Actions is null
-                            ? []
-                            : [.. widget.Actions.Select(action =>
-                            {
-                                var process = processesByName[action.Process];
-                                return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
-                            })],
-                    };
-                })
-                .ToList(),
+            Widgets = BuildWidgets(page.Widgets),
         };
+    }
 
     /// <summary>Builds a checked form, with each field named as its entity declares it.</summary>
     private static FormModel BuildForm(FormResource form, Dictionary<string, EntityResource> entitiesByName)

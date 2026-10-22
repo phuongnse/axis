@@ -117,6 +117,21 @@ flowchart LR
      resolve ignoring letter case, and a name whose file was not loaded
      because of its own errors is not reported again. Site titles, navigation labels, page titles and action labels join the
      `AXC0028` check.
+     A page's `widgets` form a tree, see
+     [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+     The checks above apply to every widget at any depth, and a problem is
+     reported at the widget's own pointer, such as
+     `/widgets/0/columns/1/widgets/0/entity`. The widget lists nest at most 4
+     levels deep, and the page's own list is level 1, otherwise the container
+     that would hold a list on level 5 is `AXC0221`. The `width` of the
+     columns of one `columns` widget add up to 12, otherwise it is `AXC0222` at
+     `/widgets/{i}/columns`. A second `table` is `AXC0223`, and a second
+     `form`, `taskInbox` or `processInspector` is `AXC0224`, both at the second
+     widget. A tab label and a section title join the `AXC0028` check. The
+     page schema requires `columns` on a `columns` widget, `tabs` on a `tabs`
+     widget, and `title` with `widgets` on a `section` widget. It does not allow them on
+     any other widget, and no container may name an `entity`, `dataSource`,
+     `form`, `formPage` or `actions` (`AXC0004`).
    - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded
