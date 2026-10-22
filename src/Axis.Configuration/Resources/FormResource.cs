@@ -11,4 +11,7 @@ public sealed record FormResource : Resource
 
     /// <summary>The sections in display order.</summary>
     public required IReadOnlyList<FormSectionDefinition> Sections { get; init; }
+
+    /// <summary>The wizard steps in order, or null when the form is not a wizard.</summary>
+    public IReadOnlyList<FormStepDefinition>? Steps { get; init; }
 }

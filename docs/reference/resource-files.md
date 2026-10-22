@@ -88,7 +88,8 @@ site, and its widgets are its content:
   shorthand for all its fields in one section. A `table` names an `entity`, as
   shorthand for all records of that entity, or a `dataSource`.
 - A `table` widget may name a `formPage`: the page with the `form` widget
-  that opens one of its records.
+  that opens one of its records. M12 removes `formPage` *(planned for M12)*,
+  see the navigate action below.
 - A `form` widget may list `actions`. Each is
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record. See
@@ -106,6 +107,32 @@ site, and its widgets are its content:
   `{ "type": "table", "dataSource": "PurchaseRequestList", "formPage": "PurchaseRequestForm" }`.
   Its columns are the data source's projected fields. See
   [widget binding](data-sources.md#widget-binding).
+- A page may declare typed `parameters` *(planned for M12)*. Each has a
+  `name`, a `type` (an entity field type) and `required`. A `reference`
+  parameter also names its `target` entity. A value lives in the URL query
+  under the parameter name. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+
+  ```json
+  {
+    "id": "a1c2e3f4-5b6d-4789-8abc-0d1e2f3a4b5c",
+    "kind": "page",
+    "name": "TicketDetail",
+    "formatVersion": 1,
+    "title": { "textKey": "pages.ticketDetail.title" },
+    "parameters": [{ "name": "ticket", "type": "reference", "target": "Ticket", "required": true }],
+    "widgets": []
+  }
+  ```
+
+- A `navigate` action opens another page *(planned for M12)*. It sits in a
+  table's `rowActions` or `toolbarActions` ([D59](../decisions/d59-table-row-and-toolbar-actions.md)),
+  or in a form's `actions`:
+  `{ "type": "navigate", "page": "TicketDetail", "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }`.
+  Each value is an expression, see
+  [expressions](expressions.md#names-and-references). A page whose widget is a form
+  declares no parameters. An action to it may set `record`, a reference to the
+  form's entity, instead of `parameters`: it opens `/{page}/{id}`, and without
+  `record` it opens `/{page}/new`.
 
 A page may hold a tree of widgets. The container
 widgets `columns`, `tabs` and `section` hold other widgets, see
@@ -527,10 +554,11 @@ validation calls the rules of its own module, see [modules](modules-and-template
 
 ## Form conditions and steps
 
-*(Planned for M12.)* A `form` resource (see [frontend](frontend.md)) can show, require and lock
+A `form` resource (see [frontend](frontend.md)) can show, require and lock
 fields depending on the record, and can split its sections into wizard steps
 ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
-Diagnostic codes come with the issues that build each check.
+The schema, the compile checks, the compiled model and the page and task metadata are built.
+Evaluating the conditions and enforcing them on write stay *(planned for M12)*.
 
 - **Conditions.** A field entry may have `visibleWhen`, `requiredWhen` and
   `readOnlyWhen`. A section may have `visibleWhen`. Each is a boolean
@@ -562,10 +590,29 @@ Diagnostic codes come with the issues that build each check.
   label and `sections`, a list of section names. When `steps` is present,
   every section has a `name` and is in exactly one step. The steps show in
   the order listed. A step whose sections are all hidden is skipped.
-- **Compile checks.** A condition that is not boolean, or that names an
-  unknown field. A condition that reads a field the form does not list.
-  `visibleWhen` on a field the entity marks `required`. A step that names an
-  unknown section, or names one twice. A section that is in no step.
+- **Compile checks.** Each condition is type-checked as a boolean over the
+  form's entity, as an entity validation is, and a problem has the
+  expression code at the condition's path, such as `AXC0048` for a condition
+  that is not boolean and `AXC0046` for an unknown name. A condition on a
+  module's form calls no rules, as a module's data source filter does. The
+  new checks have their own codes:
+  - `AXC0225`: a condition reads a field the form does not list, at the
+    condition. It looks at the fields the condition names, a reference path's
+    first field and an aggregate's collection field. It does not look at the
+    child row's fields inside an aggregate.
+  - `AXC0226`: `visibleWhen` on a field the entity marks `required`, at the
+    field's `visibleWhen`.
+  - `AXC0227`: a section `name` already used, ignoring letter case, at
+    `/sections/{i}/name`.
+  - `AXC0228`: a step names a section the form does not have, at
+    `/steps/{s}/sections/{k}`.
+  - `AXC0229`: a step names a section that is already in a step, at the same
+    path.
+  - `AXC0230`: the form has `steps` and a section has no name or is in no
+    step, at `/sections/{i}`.
+
+  Each step `title` is a text key and joins the `AXC0028` check, at
+  `/steps/{s}/title/textKey`.
 - **Not enforced as security.** Conditions on the record API are not a
   security boundary, because a caller that does not name the form skips
   `requiredWhen`. A rule that must always hold belongs in an entity

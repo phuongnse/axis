@@ -22,12 +22,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   API never name an Ant Design component, prop or token. A custom widget builds
   on Axis widgets and Axis tokens and never imports the UI library directly.
   Specialised libraries such as React Flow and CodeMirror follow the same rule.
-  No layer renders UI from a schema on top of Ant Design. The shell and the page
-  containers still use ProComponents until it is removed _(planned for M12)_.
+  No layer renders UI from a schema on top of Ant Design.
 - **Widgets expose their state to tests and assistive technology.** They are
   found by role, accessible name and ARIA state, never by a class of the UI
   library. Where the library leaves a state out, such as loading (`aria-busy`)
-  or the current page (`aria-current`), the widget adds it.
+  or the current page (`aria-current`, as on the active navigation entry), the
+  widget adds it.
 - **Design tokens and previews** *(planned for M12)*. An Axis token file in
   `web/src/platform/` holds the colours for light and dark mode, type, spacing
   and radius, and the theme reads it. It replaces `sharedTokens` in
@@ -48,10 +48,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   and the `startProcess` action are agreed in
   [D20](../decisions/d20-human-tasks-task-inbox-and-forms.md). The
   `form` resource, the task inbox, the task page and the `startProcess` action
-  are built. Navigate actions are expected to replace the table's
-  `formPage` link; see
-  [D15](../decisions/d15-presentation-model.md), where that part is
-  still **Proposed**.
+  are built. Navigate actions and page parameters replace the table's
+  `formPage` link in M12 _(planned for M12)_; see [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Text.** All UI strings come from text resources.
 - **Sites and texts.** The server describes sites to the SPA through
   read-only endpoints. Like every other `/api` path, they need a known tenant
@@ -271,7 +269,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - **Actions.** A `startProcess` action is left out of `actions` when the
       user has no `start` grant on its process. The same holds for a `table`
       row action *(planned for M12)*, and its `delete` row action is left out
-      when `access.actions` lacks `delete`.
+      when `access.actions` lacks `delete`. A `navigate` action whose target
+      page the user cannot read is left out too _(planned for M12)_.
     - **Access.** Every `table` and `form` widget gets an `access` object.
       It says which entity actions the user may take, and which fields each
       write action covers:
@@ -309,6 +308,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values |
+  | `/{site}/{page}?ticket=<id>` | _(planned for M12)_ a page with parameters: the values sit in the query under the parameter names |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
   | `/{site}/{inboxpage}/{taskId}` | the task page of the task with that id, under the page of a task inbox |
@@ -322,6 +322,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     or `processInspector`.
   - `{site}` is the site path. `{page}` is the page name in lower case, as
     navigation links write it. The server matches both ignoring letter case.
+  - A required page parameter that is missing from the URL, or has the wrong
+    form, shows the not-found page inside the site shell _(planned for M12)_.
   - An unknown site shows the not-found page inside the platform shell. An
     unknown page shows it inside the site shell.
     An address with more than three segments, such as `/e2e/notes/42/edit`,
@@ -470,7 +472,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     button is a link: a click with a modifier key or the middle button opens
     the form in a new tab or window. Both pass the table's address, with
     its paging and sorting, to the form in history state. Without a form
-    page there is no create button and no open column.
+    page there is no create button and no open column. In M12 the open link
+    becomes a `rowActions` navigate with `record: id`, and the create button a
+    `toolbarActions` navigate without `record`, still gated by `access`
+    `create` _(planned for M12)_.
   - **Row and toolbar actions** *(planned for M12)*. See
     [D59](../decisions/d59-table-row-and-toolbar-actions.md).
     - **Where.** Toolbar actions sit next to the create button. Row actions
@@ -478,6 +483,28 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `navigate` action may sit in either list. `startProcess` and `delete`
       are row actions only. A row of a data source acts on its root record,
       and a group row has no actions.
+    - **Navigate.** A button that opens another page and sets its
+      parameters. A My tickets row opens a TicketDetail page and sets its
+      `ticket` parameter:
+
+      ```json
+      {
+        "type": "table",
+        "entity": "Ticket",
+        "rowActions": [
+          {
+            "type": "navigate",
+            "page": "TicketDetail",
+            "label": { "textKey": "tickets.open" },
+            "parameters": { "ticket": "id" }
+          }
+        ]
+      }
+      ```
+
+      The target page declares
+      `"parameters": [{ "name": "ticket", "type": "reference", "target": "Ticket", "required": true }]`.
+      The click goes to `/{site}/ticketdetail?ticket=<id>`. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
     - **`visibleWhen`.** An action hides when its expression over the row is
       `false`, `null` or fails. It only shapes the UI. The server decides, as
       in [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).
@@ -551,9 +578,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     that no locale has is `AXC0028`. See
     [Configuration pipeline](configuration.md#configuration-pipeline).
   - A form over a child entity is not checked yet.
-  - *(Planned for M12.)* Fields get `visibleWhen`, `requiredWhen` and
-    `readOnlyWhen`, sections get `visibleWhen` and a `name`, and a form may
-    have `steps`. See
+  - Fields get `visibleWhen`, `requiredWhen` and `readOnlyWhen`, sections get
+    `visibleWhen` and a `name`, and a form may have `steps`. The compiler
+    checks them. The SPA does not use them yet *(planned for M12)*. See
     [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 - **Form widget.** A page whose widget is a `form` creates a record at
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
@@ -760,7 +787,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Form metadata**. Page metadata gives the widget's
     `entity` with all its fields, so the SPA knows every field's type. It
     adds:
-    - `form`: `{ "name", "sections": [ { "titleKey", "fields": [ { "name", "readOnly" } ] } ] }`,
+    - `form`: `{ "name", "sections": [ { "name", "titleKey", "visibleWhen", "fields": [ { "name", "readOnly", "visibleWhen" } ] } ], "steps": [ { "titleKey", "sections" } ] }`,
       or `null` when the widget names an `entity`. `readOnly` already
       includes computed, sequence and creator fields. Field names are as the entity
       declares them.
@@ -768,11 +795,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
       so the SPA never builds it itself.
-    - *(Planned for M12.)* `form` also holds `visibleWhen` on each field and
-      section, as `true` when it has a condition and `false` otherwise.
-      It holds `steps`, each with a `titleKey` and its section names, and each
-      section's `name`. It holds no expressions, because they stay on the
-      server.
+    - `form` also holds `visibleWhen` on each field and section, as `true`
+      when it has a condition and `false` otherwise. It holds `steps`, each
+      with a `titleKey` and its section names, and `[]` when the form has
+      none. Each section has a `name`, which is `null` when it has none. It
+      holds no expressions, because they stay on the server. A user who may
+      not read any field of a section gets no such section, and its name is
+      left out of the steps. A step left with no section is left out.
 - **Task inbox widget**. A page whose widget is a
   `taskInbox` lists the signed-in user's open tasks in the application,
   through the [task API](task-api.md).
@@ -851,87 +880,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - The task page has no history panel.
   - The platform texts `shell.task.*` hold the assigned elsewhere and
     already completed messages, and the load and complete errors.
-- **Process inspector widget**. A page whose widget is a
-  `processInspector` names one process. It lists the process's instances and
-  opens one, through the [inspection API](process-inspection.md#process-inspection).
-
-  ```json
-  { "type": "processInspector", "process": "PurchaseRequestApproval" }
-  ```
-
-  - **Compile.** The `process` must name a loaded process, otherwise it is
-    `AXC0192` at `/widgets/{i}/process`. The widget names none of `entity`,
-    `dataSource` and `form` (`AXC0060` at that property), and no `formPage`
-    (`AXC0022`).
-  - **Metadata.** The widget has `"entity": null`, `"dataSource": null`,
-    `"form": null`, `"formPage": null` and `"tasksPath": null`. It adds
-    `process` and an `instancesPath`, such as
-    `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances"`,
-    the list endpoint. The SPA never builds the path itself. It uses `process` to link the record history to the page, see
-    **History** under the form widget. The widget has `"access": null` and
-    `"actions": []`. The page endpoint answers `403` to a user without an
-    `inspect` grant on the process, and site navigation leaves the page out.
-  - **List.** The page lists the instances with their state, step, subject id,
-    release and times. Rows keep the API's order, newest first. A clearable
-    select above the list filters by state, and offers the five states with
-    platform texts. `state`, `page` and `pageSize` live in the URL, as for a
-    table. Changing the state goes back to page 1. A `state` in the URL that is
-    not one of the five is dropped. The step column shows the step's name,
-    because a list row carries no label key. Each row has an Open link.
-  - **Instance page.** A row opens `/{site}/{page}/{instanceId}`, with the
-    page name in lower case. `new` and an id in the wrong form show the
-    not-found page, and the instance is not requested. The page reads the
-    instance detail and shows the steps as a list in graph order, each with
-    its type and its transitions, with no diagram. Steps the instance has run
-    are marked as taken, and the step it is at is marked as current, whatever
-    the instance state. Below it are the history rows with the step, the
-    times, the decision and the error, then the tasks, then the calls with
-    their attempts. A call whose `inputHidden` is `true` shows "hidden" in
-    place of its input. A shown input is a list of its top-level properties,
-    where a number keeps its source digits.
-  - **Commands.** The page has a Cancel instance and a Retry button for each
-    of those commands that the instance detail's `commands` lists. With none
-    listed, it has no button, and a command name this build does not know is
-    left out. A button opens a dialog that asks for a reason. The reason is
-    required, must not be blank and has at most 500 characters, and Send is
-    blocked until it is valid. On success, the dialog closes and the page reads
-    the instance detail again, so it shows the new state, tasks, calls and
-    `commands`. On a `400`, `403`, `404` or `409`, the dialog shows the
-    problem's title. Any other failure shows a generic text, and a `401`
-    starts sign-in. The Retry dialog first warns when a call on the instance's
-    current step has `failed`, and that call is a package call whose
-    `idempotent` is not `true`. A failed connector call gets no warning. The
-    server still checks every command, so the page never decides who may act.
-  - **Resolve.** A call whose `resolvable` is `true` has a Resolve button,
-    whether it is a connector or a package call. A call that is not resolvable
-    has none, because the server decides what may be resolved and by whom. The
-    button opens a dialog that asks for a reason, with the rules of the other
-    commands, and an outcome, `succeeded` or `failed`. The outcome has no
-    default, and Send is blocked until one is chosen. For `succeeded`, the
-    dialog shows one input for each declared output of the call, labelled with
-    its name and type, with the required ones marked and checked before Send.
-    A `boolean` output is a true/false choice, and every other type is text,
-    so a date or date-time is typed as the API takes it. The values go out
-    typed: an integer or decimal keeps every digit, a boolean is `true` or
-    `false`, and an empty optional output is left out. A `failed` outcome sends
-    no output. On success, the dialog closes and the page reads the instance
-    again. On a `400`, the message of each `/output/{name}` error shows under
-    that output's field, and the problem's title shows in the dialog. Any other
-    refusal shows its title, and any other failure shows a generic text.
-  - **Labels.** Step labels come from the texts of the instance's `releaseId`,
-    loaded with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as
-    the inbox does. A step without a label shows its name.
-  - **Errors.** With nobody signed in, the API answers `401` and the widget
-    starts sign-in like any other call. A `403` shows a message that the user
-    may not inspect the process. A `404` on the instance page shows a message
-    that the instance does not exist, inside the page. Any other failure shows
-    a generic load error. The server checks every request, so the page never
-    decides who may inspect.
-  - The platform texts `shell.inspector.*` hold the column headers, the
-    section titles, the instance states, the "hidden" text, the empty texts
-    and the messages. The texts `shell.inspector.commands.*` hold the command
-    buttons, the dialog's labels, the reason errors, the retry warning and the
-    resolve labels and errors.
+- **Process inspector widget**. A page whose widget is a `processInspector` lists the instances of
+  one process and opens one. See [process-inspector-widget.md](process-inspector-widget.md).
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a

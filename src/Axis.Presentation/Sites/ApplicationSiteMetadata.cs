@@ -118,18 +118,28 @@ public sealed record WidgetAccess(IReadOnlyList<string> Actions, IReadOnlyList<s
 /// <param name="InstancesPath">The path of the process start endpoint, so a client never builds it.</param>
 public sealed record ActionMetadata(string Type, string Process, string LabelKey, string InstancesPath);
 
-/// <summary>The form a form widget lays its entity's fields out with: its sections in display order.</summary>
-public sealed record FormMetadata(string Name, IReadOnlyList<FormSectionMetadata> Sections);
+/// <summary>The form a form widget lays its entity's fields out with: its sections and its wizard steps in display order.</summary>
+/// <param name="Steps">The wizard steps in order. Empty when the form declares none.</param>
+public sealed record FormMetadata(string Name, IReadOnlyList<FormSectionMetadata> Sections, IReadOnlyList<FormStepMetadata> Steps);
 
-/// <summary>One section of a form: the text key of its title and its fields in display order.</summary>
-public sealed record FormSectionMetadata(string TitleKey, IReadOnlyList<FormFieldMetadata> Fields);
+/// <summary>One section of a form: its name, the text key of its title and its fields in display order.</summary>
+/// <param name="Name">The section's name, which a step lists. Null when the section has none.</param>
+/// <param name="VisibleWhen">
+/// Whether the section has a <c>visibleWhen</c> condition. The condition itself never leaves the
+/// server: a client gets the answer from the form state endpoint.
+/// </param>
+public sealed record FormSectionMetadata(string? Name, string TitleKey, bool VisibleWhen, IReadOnlyList<FormFieldMetadata> Fields);
 
 /// <summary>One field of a form section, by its declared name.</summary>
 /// <param name="ReadOnly">
 /// Whether a client shows the field without letting it be changed, and never sends it. A computed,
 /// numbered or creator field is always read-only.
 /// </param>
-public sealed record FormFieldMetadata(string Name, bool ReadOnly);
+/// <param name="VisibleWhen">Whether the field has a <c>visibleWhen</c> condition, which stays on the server.</param>
+public sealed record FormFieldMetadata(string Name, bool ReadOnly, bool VisibleWhen);
+
+/// <summary>One wizard step of a form: the text key of its title and the names of its sections.</summary>
+public sealed record FormStepMetadata(string TitleKey, IReadOnlyList<string> Sections);
 
 /// <summary>The entity a widget shows, with its fields and the path of its record API.</summary>
 public sealed record EntityMetadata(string Name, string? LabelKey, string? DisplayField, string RecordsPath, IReadOnlyList<FieldMetadata> Fields);

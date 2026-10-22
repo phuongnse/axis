@@ -1,7 +1,7 @@
-import { PageContainer } from '@ant-design/pro-components'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams } from 'react-router'
 import { FormWidget } from '../platform/FormWidget'
+import { PageLayout } from '../platform/PageLayout'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
 import { fetchPage, type EntityWidgetMetadata, type PageMetadata, type WidgetMetadata } from '../platform/site'
@@ -97,7 +97,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       return <NotFoundPage />
     }
     return (
-      <PageContainer title={t(page.titleKey)}>
+      <PageLayout title={t(page.titleKey)}>
         <TaskPage
           sitePath={sitePath}
           pageName={page.name}
@@ -106,7 +106,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
           locale={locale}
           fallbackLocale={fallbackLocale}
         />
-      </PageContainer>
+      </PageLayout>
     )
   }
   // An instance's address is under its inspector page. `new` and an id in the wrong form are no instance.
@@ -115,7 +115,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       return <NotFoundPage />
     }
     return (
-      <PageContainer title={t(page.titleKey)}>
+      <PageLayout title={t(page.titleKey)}>
         <ProcessInstancePage
           sitePath={sitePath}
           widget={widget}
@@ -123,7 +123,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
           locale={locale}
           fallbackLocale={fallbackLocale}
         />
-      </PageContainer>
+      </PageLayout>
     )
   }
   // A table page has no record segment, and a form page always has one.
@@ -132,7 +132,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
     return <NotFoundPage />
   }
   return (
-    <PageContainer title={t(page.titleKey)}>
+    <PageLayout title={t(page.titleKey)}>
       {widget?.type === 'table' && <TableWidget sitePath={sitePath} widget={widget} locale={locale} />}
       {widget?.type === 'form' && hasEntity(widget) && (
         <FormWidget
@@ -156,6 +156,6 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       {widget?.type === 'processInspector' && (
         <ProcessInspectorWidget sitePath={sitePath} pageName={page.name} widget={widget} locale={locale} />
       )}
-    </PageContainer>
+    </PageLayout>
   )
 }

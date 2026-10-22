@@ -2,6 +2,11 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
+using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Functions;
+using Axis.Expressions.Parsing;
+using Axis.Expressions.Syntax;
+using Axis.Expressions.Typing;
 
 namespace Axis.Configuration.Compilation;
 
@@ -27,11 +32,22 @@ internal static class PresentationChecker
         Func<string, ProcessResource?> findProcess,
         ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
+        IReadOnlyList<ExpressionRule> rules,
+        IReadOnlySet<string> declaredModules,
         List<Diagnostic> diagnostics)
     {
         foreach (var form in loaded.Forms)
         {
-            CheckForm(form, loaded, findEntity, moduleReferences, references, diagnostics);
+            var isModule = ApplicationCompiler.IsModuleResource(form);
+            CheckForm(
+                form,
+                loaded,
+                findEntity,
+                moduleReferences,
+                references,
+                isModule ? [] : rules,
+                isModule ? null : declaredModules,
+                diagnostics);
         }
 
         foreach (var page in loaded.Pages)
@@ -50,7 +66,11 @@ internal static class PresentationChecker
 
     /// <summary>
     /// Checks a form: its entity exists, every section title has a text key, and each field is a
-    /// field of the entity listed once across all sections, ignoring letter case.
+    /// field of the entity listed once across all sections, ignoring letter case. Each condition
+    /// parses and type-checks as a boolean over the entity, and reads only fields the form lists.
+    /// A field the entity marks <c>required</c> has no <c>visibleWhen</c>. Section names are unique
+    /// and, when the form has steps, every section is in exactly one step. A module form's
+    /// conditions call no rules, as a module's data source filters do.
     /// </summary>
     private static void CheckForm(
         FormResource form,
@@ -58,6 +78,8 @@ internal static class PresentationChecker
         Func<string, EntityResource?> findEntity,
         ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
+        IReadOnlyList<ExpressionRule> rules,
+        IReadOnlySet<string>? modules,
         List<Diagnostic> diagnostics)
     {
         void Report(string code, string message, string path) =>
@@ -110,6 +132,242 @@ internal static class PresentationChecker
                         path);
                 }
             }
+        }
+
+        CheckSectionNames(form, Report);
+        if (entity is not null)
+        {
+            CheckConditions(form, entity, findEntity, references, rules, modules, Report);
+        }
+
+        CheckSteps(form, references, diagnostics, Report);
+    }
+
+    /// <summary>Checks that section names are unique, ignoring letter case, and reports a repeat at its name.</summary>
+    private static void CheckSectionNames(FormResource form, Action<string, string, string> report)
+    {
+        var firstPathByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < form.Sections.Count; index++)
+        {
+            var name = form.Sections[index].Name;
+            var path = $"/sections/{index}/name";
+            if (name is not null && !firstPathByName.TryAdd(name, path))
+            {
+                report(
+                    DiagnosticCodes.DuplicateFormSectionName,
+                    $"The section name '{name}' is already used at '{firstPathByName[name]}'. A form names each section once.",
+                    path);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks the steps: each title is a known text key, each step section names a section of the
+    /// form, no section is in two steps, and, when there are steps, each section has a name and is in
+    /// one. A section name matches ignoring letter case.
+    /// </summary>
+    private static void CheckSteps(
+        FormResource form,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics,
+        Action<string, string, string> report)
+    {
+        if (form.Steps is null)
+        {
+            return;
+        }
+
+        var sectionNames = new HashSet<string>(
+            form.Sections.Select(section => section.Name).OfType<string>(), StringComparer.OrdinalIgnoreCase);
+        var firstPathByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var stepIndex = 0; stepIndex < form.Steps.Count; stepIndex++)
+        {
+            var step = form.Steps[stepIndex];
+            ApplicationCompiler.CheckTextKey(step.Title, form, $"/steps/{stepIndex}/title", references, diagnostics);
+
+            for (var sectionIndex = 0; sectionIndex < step.Sections.Count; sectionIndex++)
+            {
+                var name = step.Sections[sectionIndex];
+                var path = $"/steps/{stepIndex}/sections/{sectionIndex}";
+                if (!sectionNames.Contains(name))
+                {
+                    report(
+                        DiagnosticCodes.UnknownStepSection,
+                        $"The step section '{name}' was not found. The form has no section with that name.",
+                        path);
+                }
+                else if (!firstPathByName.TryAdd(name, path))
+                {
+                    report(
+                        DiagnosticCodes.DuplicateStepSection,
+                        $"The section '{name}' is already in a step at '{firstPathByName[name]}'. A section is in exactly one step.",
+                        path);
+                }
+            }
+        }
+
+        for (var index = 0; index < form.Sections.Count; index++)
+        {
+            var name = form.Sections[index].Name;
+            if (name is null)
+            {
+                report(
+                    DiagnosticCodes.SectionInNoStep,
+                    "The section has no name. When a form has steps, each section needs a name to be in a step.",
+                    $"/sections/{index}");
+            }
+            else if (!firstPathByName.ContainsKey(name))
+            {
+                report(
+                    DiagnosticCodes.SectionInNoStep,
+                    $"The section '{name}' is in no step. When a form has steps, each section is in exactly one step.",
+                    $"/sections/{index}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks every condition of the form over the entity's fields, child collections and the named
+    /// rules, and that <c>visibleWhen</c> is not on a field the entity marks <c>required</c>. A
+    /// condition may name only fields the form lists. An expression problem is reported at the
+    /// condition with its own code.
+    /// </summary>
+    private static void CheckConditions(
+        FormResource form,
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity,
+        ReferenceIndexBuilder references,
+        IReadOnlyList<ExpressionRule> rules,
+        IReadOnlySet<string>? modules,
+        Action<string, string, string> report)
+    {
+        var hasConditions = form.Sections.Any(section =>
+            section.VisibleWhen is not null
+            || section.Fields.Any(field => field.VisibleWhen is not null || field.RequiredWhen is not null || field.ReadOnlyWhen is not null));
+        if (!hasConditions)
+        {
+            return;
+        }
+
+        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: findEntity, modules: modules);
+        var listed = new HashSet<string>(
+            form.Sections.SelectMany(section => section.Fields).Select(field => field.Field), StringComparer.OrdinalIgnoreCase);
+
+        void Check(string? expression, string path)
+        {
+            if (expression is not null)
+            {
+                CheckCondition(form, expression, path, scope, listed, modules is not null, references, report);
+            }
+        }
+
+        for (var sectionIndex = 0; sectionIndex < form.Sections.Count; sectionIndex++)
+        {
+            var section = form.Sections[sectionIndex];
+            Check(section.VisibleWhen, $"/sections/{sectionIndex}/visibleWhen");
+            for (var fieldIndex = 0; fieldIndex < section.Fields.Count; fieldIndex++)
+            {
+                var field = section.Fields[fieldIndex];
+                var path = $"/sections/{sectionIndex}/fields/{fieldIndex}";
+                Check(field.VisibleWhen, $"{path}/visibleWhen");
+                Check(field.RequiredWhen, $"{path}/requiredWhen");
+                Check(field.ReadOnlyWhen, $"{path}/readOnlyWhen");
+
+                if (field.VisibleWhen is not null && ApplicationCompiler.FindField(entity, field.Field)?.Required == true)
+                {
+                    report(
+                        DiagnosticCodes.VisibleWhenOnRequiredField,
+                        $"The field '{field.Field}' is required by the entity '{entity.Name}', so it cannot have 'visibleWhen'. The entity would still require a field nobody can fill.",
+                        $"{path}/visibleWhen");
+                }
+            }
+        }
+    }
+
+    private static void CheckCondition(
+        FormResource form,
+        string expression,
+        string path,
+        ExpressionScope scope,
+        IReadOnlySet<string> listed,
+        bool recordRuleCalls,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        ExpressionDiagnostic? problem = parsed.Succeeded ? null : parsed.Diagnostic;
+        ExpressionType? type = null;
+        string? unlisted = null;
+        if (parsed.Succeeded)
+        {
+            var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
+            if (check.Succeeded)
+            {
+                // Module rule calls add no edges, as for module rules.
+                if (recordRuleCalls)
+                {
+                    references.AddRuleCalls(form, path, check);
+                }
+
+                unlisted = FirstUnlistedField(parsed.Expression, check, listed);
+            }
+
+            problem = check.Diagnostic;
+            type = check.Type;
+        }
+
+        references.RecordExpression(form, path, type, problem);
+
+        if (problem is not null)
+        {
+            report(problem.Code, problem.Message, path);
+        }
+        else if (unlisted is not null)
+        {
+            report(
+                DiagnosticCodes.UnlistedFormConditionField,
+                $"The condition reads the field '{unlisted}', which the form does not list. A condition reads only fields the form lists.",
+                path);
+        }
+    }
+
+    /// <summary>
+    /// The first field of the entity that <paramref name="node"/> reads and <paramref name="listed"/>
+    /// lacks, or null. A path reads its first field. An aggregate reads its collection field, and
+    /// its item expression reads the child row, so it is skipped. A rule body sees only its
+    /// arguments, so a rule call reads what its arguments read.
+    /// </summary>
+    private static string? FirstUnlistedField(ExpressionNode node, ExpressionCheckResult check, IReadOnlySet<string> listed)
+    {
+        switch (node)
+        {
+            case NameNode name:
+                return listed.Contains(name.Name) ? null : name.Name;
+
+            case MemberNode member:
+                return FirstUnlistedField(member.Target, check, listed);
+
+            case UnaryNode unary:
+                return FirstUnlistedField(unary.Operand, check, listed);
+
+            case BinaryNode binary:
+                return FirstUnlistedField(binary.Left, check, listed) ?? FirstUnlistedField(binary.Right, check, listed);
+
+            case IsNullNode isNull:
+                return FirstUnlistedField(isNull.Operand, check, listed);
+
+            case InNode inList:
+                return FirstUnlistedField(inList.Operand, check, listed)
+                    ?? inList.Items.Select(item => FirstUnlistedField(item, check, listed)).FirstOrDefault(name => name is not null);
+
+            case CallNode call:
+                var isAggregate = !check.RuleCalls.ContainsKey(call)
+                    && ExpressionFunctions.AggregateNames.Contains(call.Name, StringComparer.OrdinalIgnoreCase);
+                var arguments = isAggregate ? call.Arguments.Take(1) : call.Arguments;
+                return arguments.Select(argument => FirstUnlistedField(argument, check, listed)).FirstOrDefault(name => name is not null);
+
+            default:
+                return null;
         }
     }
 
