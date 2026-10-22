@@ -71,15 +71,18 @@ public sealed class ApplicationCompilerTests
         Assert.Equal("Phòng ban", result.Model.Texts[1].Texts["department.label"]);
 
         var purchaseRequestReference = new EntityReference(Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a01"), "PurchaseRequest");
-        var formPage = new PageReference(Guid.Parse("e7a0f4c3-9d5b-4e1a-9f3c-4b5d6e7f8a08"), "PurchaseRequestForm");
+        var requestForm = new PageReference(Guid.Parse("e7a0f4c3-9d5b-4e1a-9f3c-4b5d6e7f8a08"), "PurchaseRequestForm");
         var tablePage = new PageReference(Guid.Parse("d6f9e3b2-8c4a-4d0f-8e2b-3a4c5d6e7f07"), "PurchaseRequests");
-        Assert.Equal([formPage.Name, tablePage.Name], result.Model.Pages.Select(page => page.Name));
+        Assert.Equal([requestForm.Name, tablePage.Name], result.Model.Pages.Select(page => page.Name));
         Assert.Equal(
-            new WidgetModel(WidgetType.Form, purchaseRequestReference, null),
+            new WidgetModel(WidgetType.Form, purchaseRequestReference),
             Assert.Single(result.Model.Pages[0].Widgets));
-        Assert.Equal(
-            new WidgetModel(WidgetType.Table, purchaseRequestReference, formPage),
-            Assert.Single(result.Model.Pages[1].Widgets));
+        var table = Assert.Single(result.Model.Pages[1].Widgets);
+        Assert.Equal((WidgetType.Table, purchaseRequestReference), (table.Type, table.Entity));
+        var openAction = Assert.IsType<NavigateActionModel>(Assert.Single(table.RowActions));
+        Assert.Equal((requestForm, "actions.open", "id"), (openAction.Page, openAction.Label.TextKey, openAction.Record));
+        var newAction = Assert.IsType<NavigateActionModel>(Assert.Single(table.ToolbarActions));
+        Assert.Equal((requestForm, "actions.new", null), (newAction.Page, newAction.Label.TextKey, newAction.Record));
         Assert.Equal(("pages/purchase-requests.json", "pages.requests.title"), (result.Model.Pages[1].File, result.Model.Pages[1].Title.TextKey));
 
         var site = Assert.Single(result.Model.Sites);

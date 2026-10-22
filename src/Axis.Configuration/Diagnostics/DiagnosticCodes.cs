@@ -25,6 +25,7 @@ public static class DiagnosticCodes
     public const string ApplicationNameActiveForOtherApplication = "AXC0020";
 
     public const string UnknownWidgetEntity = "AXC0021";
+    // Retired: the removed form page link of table widgets. Never reported and never reused.
     public const string InvalidFormPage = "AXC0022";
     public const string UnknownNavigationPage = "AXC0023";
     public const string UnknownWidgetDataSource = "AXC0059";

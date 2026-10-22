@@ -68,7 +68,7 @@ public sealed class ApplicationLoaderTests
             (ResourceKinds.Text, "TextsEn", "en", "texts/en.json"),
             (english.Kind, english.Name, english.Locale, english.File));
         Assert.Equal("Purchase requests", english.Texts["purchaseRequests.label"]);
-        Assert.Equal(9, english.Texts.Count);
+        Assert.Equal(11, english.Texts.Count);
 
         var site = Assert.Single(result.Sites);
         Assert.Equal(

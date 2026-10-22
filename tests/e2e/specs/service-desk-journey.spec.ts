@@ -642,7 +642,22 @@ test.describe('the author builds the service desk with Studio only', () => {
       await writeLabel(page, 'studio-field-/title', titleKey, en[titleKey])
       await pick(page, 'studio-field-/widgets/0/type', 'table')
       await pick(page, 'studio-field-/widgets/0/dataSource', list)
-      await pick(page, 'studio-field-/widgets/0/formPage', 'TicketForm')
+      // A row action opens the ticket, and a toolbar action starts a new one.
+      for (const [kind, key, record] of [
+        ['rowActions', 'actions.open', 'id'],
+        ['toolbarActions', 'actions.new', undefined],
+      ] as const) {
+        const action = `studio-field-/widgets/0/${kind}/0`
+        await page
+          .getByTestId(`studio-field-/widgets/0/${kind}`)
+          .getByRole('button', { name: 'Add navigate action' })
+          .click()
+        await pick(page, `${action}/page`, 'TicketForm')
+        await writeLabel(page, `${action}/label`, key, en[key])
+        if (record) {
+          await page.getByTestId(`${action}/record`).getByRole('textbox').fill(record)
+        }
+      }
       await save(page)
     }
   })
@@ -811,7 +826,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     await useJourneySession(page, 'anna')
     await page.goto(`${journeyURL}/service-desk/mytickets`)
-    await page.getByRole('link', { name: 'New' }).click()
+    await page.getByRole('button', { name: 'New', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/ticketform\/new$/)
     await page.getByRole('textbox', { name: 'Title' }).fill(title)
     await page.getByRole('textbox', { name: 'Description', exact: true }).fill('It shows a black screen.')
@@ -820,7 +835,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytickets$/)
 
-    await page.getByRole('row', { name: new RegExp(title) }).getByRole('link', { name: 'Open' }).click()
+    await page.getByRole('row', { name: new RegExp(title) }).getByRole('button', { name: 'Open', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/ticketform\/[^/]+$/)
     const id = page.url().split('/').pop()
     await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)

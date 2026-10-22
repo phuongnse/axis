@@ -37,7 +37,6 @@ const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
 // Without access the form is not shaped by grants, so every field the form shows can be written.
 const noteWidget: EntityWidgetMetadata = {
   type: 'form',
-  formPage: null,
   dataSource: null,
   form: null,
   tasksPath: null,

@@ -19,13 +19,6 @@ public sealed record WidgetDefinition
     /// <summary>The form whose sections a <c>form</c> widget shows, in place of <see cref="Entity"/>.</summary>
     public string? Form { get; init; }
 
-    /// <summary>
-    /// The page that opens a record of a <c>table</c> widget, holding a <c>form</c> widget over the
-    /// widget's entity, or over the root entity of its data source. That form widget may name the
-    /// entity itself or a form over it.
-    /// </summary>
-    public string? FormPage { get; init; }
-
     /// <summary>The process a <c>processInspector</c> widget inspects.</summary>
     public string? Process { get; init; }
 

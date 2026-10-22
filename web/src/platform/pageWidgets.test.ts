@@ -52,10 +52,9 @@ describe('typeChanges', () => {
   })
 
   it('adds an empty process when the new type is a process inspector', () => {
-    expect(typeChanges({ type: 'table', dataSource: 'List', formPage: 'Edit' }, 'processInspector')).toEqual([
+    expect(typeChanges({ type: 'table', dataSource: 'List' }, 'processInspector')).toEqual([
       ['/type', 'processInspector'],
       ['/dataSource', undefined],
-      ['/formPage', undefined],
       ['/process', ''],
     ])
   })
@@ -87,7 +86,6 @@ describe('widget keys', () => {
       'dataSource',
       'entity',
       'form',
-      'formPage',
       'process',
       'rowActions',
       'toolbarActions',

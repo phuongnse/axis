@@ -446,13 +446,12 @@ data sources.
 - **Grouped data sources.** A table may bind a data source with an
   `aggregate`. Each row is a group. Its columns are the group fields in
   `groupBy` order, then the measures. A group row has `id: null`, so it has
-  no open link. It has no row actions either: `rowActions` on such a table is
+  no id to open. It has no row actions either: `rowActions` on such a table is
   `AXC0060` at `/widgets/{i}/rowActions`.
-- **Form page.** A `formPage` must be a form over the root entity
-  (`AXC0022`), because each row carries the id of its root record. A
-  `formPage` on a table over a data source with an `aggregate` is also
-  `AXC0022`, because a group is not a record. M12 replaces `formPage` by the
-  `record` rule of a navigate action *(planned for M12)*.
+- **Opening a row.** Each row carries the id of its root record. A row
+  `navigate` action with `record: id` opens a form over the root entity, and the
+  `record` rule of the action checks it (`AXC0235`). A table over a data source
+  with an `aggregate` has no row actions, because a group is not a record.
 - **Page parameters** *(planned for M12)*. A table binds a page parameter to a
   data source parameter with a name map on the widget:
   `"parameters": { "<data source parameter>": "<page parameter>" }`. The two

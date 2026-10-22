@@ -17,7 +17,6 @@ public sealed class ApplicationSitesTests
 
         Assert.NotNull(page);
         var widget = Assert.IsType<WidgetMetadata>(Assert.Single(page.Widgets));
-        Assert.Null(widget.FormPage);
         Assert.Null(widget.Entity);
         Assert.NotNull(widget.DataSource);
         Assert.Equal(

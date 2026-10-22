@@ -13,6 +13,8 @@
     "pages.ticketForm.title": "Ticket",
     "pages.myTasks.title": "My tasks",
     "pages.allTickets.title": "All tickets",
+    "actions.open": "Open",
+    "actions.new": "New",
     "category.label": "Category",
     "category.name": "Name",
     "category.defaultAgent": "Default agent",

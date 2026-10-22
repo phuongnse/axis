@@ -49,7 +49,6 @@ const texts: Record<string, Record<string, string>> = {
     'shell.notFound.home': 'Go to the home page',
     'shell.form.save': 'Save',
     'shell.form.cancel': 'Cancel',
-    'shell.table.create': 'New',
     'shell.table.empty': 'No records yet.',
   },
   vi: {
@@ -81,6 +80,7 @@ const siteTexts: Record<string, Record<string, string>> = {
     'nav.categories': 'Categories',
     'pages.notes.title': 'All notes',
     'pages.noteForm.title': 'Note',
+    'notes.new': 'New',
     'shell.theme.dark': 'Night mode',
   },
   vi: {
@@ -89,6 +89,7 @@ const siteTexts: Record<string, Record<string, string>> = {
     'nav.categories': 'Danh mục',
     'pages.notes.title': 'Tất cả ghi chú',
     'pages.noteForm.title': 'Ghi chú',
+    'notes.new': 'Tạo mới',
     'shell.theme.dark': 'Chế độ đêm',
   },
 }
@@ -135,7 +136,6 @@ const pages: Record<string, PageMetadata> = {
     widgets: [
       {
         type: 'table',
-        formPage: 'NoteForm',
         entity: noteEntity,
         dataSource: null,
         form: null,
@@ -144,7 +144,9 @@ const pages: Record<string, PageMetadata> = {
         instancesPath: null,
         actions: [],
         rowActions: [],
-        toolbarActions: [],
+        toolbarActions: [
+          { type: 'navigate', page: 'NoteForm', labelKey: 'notes.new', parameters: {}, record: null, opensForm: true },
+        ],
         access: noteAccess,
       },
     ],
@@ -155,7 +157,6 @@ const pages: Record<string, PageMetadata> = {
     widgets: [
       {
         type: 'form',
-        formPage: null,
         entity: noteEntity,
         dataSource: null,
         form: null,
@@ -175,7 +176,6 @@ const pages: Record<string, PageMetadata> = {
     widgets: [
       {
         type: 'taskInbox',
-        formPage: null,
         entity: null,
         dataSource: null,
         form: null,
@@ -195,7 +195,6 @@ const pages: Record<string, PageMetadata> = {
     widgets: [
       {
         type: 'processInspector',
-        formPage: null,
         entity: null,
         dataSource: null,
         form: null,
@@ -512,7 +511,8 @@ describe('App', () => {
 
     expect(await screen.findByText('No records yet.')).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'title' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'New' })).toHaveAttribute('href', '/e2e/noteform/new')
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+    expect(screen.getByTestId('location')).toHaveTextContent('/e2e/noteform/new')
     expect(fetch).toHaveBeenCalledWith('/api/apps/E2eApp/entities/Note/records', expect.anything())
   })
 

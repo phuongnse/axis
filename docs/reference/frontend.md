@@ -49,8 +49,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   [D20](../decisions/d20-human-tasks-task-inbox-and-forms.md). The
   `form` resource, the task inbox, the task page and the `startProcess` action
   are built. The `navigate` buttons on table rows, the table toolbar and saved
-  forms are built. Navigate actions and page parameters replace the table's
-  `formPage` link in M12 _(planned for M12)_; see [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+  forms are built. A table opens and creates records through them: the table's
+  `formPage` link is removed; see [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Text.** All UI strings come from text resources.
 - **Sites and texts.** The server describes sites to the SPA through
   read-only endpoints. Like every other `/api` path, they need a known tenant
@@ -91,7 +91,6 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     "widgets": [
       {
         "type": "table",
-        "formPage": "ItemForm",
         "entity": {
           "name": "Item",
           "labelKey": "item.label",
@@ -125,7 +124,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         "process": null,
         "instancesPath": null,
         "actions": [],
-        "rowActions": [], "toolbarActions": [],
+        "rowActions": [
+          { "type": "navigate", "page": "ItemForm", "labelKey": "items.open", "parameters": {}, "record": "id", "opensForm": true }
+        ],
+        "toolbarActions": [
+          { "type": "navigate", "page": "ItemForm", "labelKey": "items.new", "parameters": {}, "record": null, "opensForm": true }
+        ],
         "access": {
           "actions": ["read", "create", "update", "delete"],
           "createFields": ["name", "department"],
@@ -141,9 +145,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     can show each site without one more request per site.
   - `type` of a widget is `table`, `form`, `taskInbox` or
     `processInspector`, or `detail`, `chart` or `kpi` *(planned for M12)*.
-    `formPage` is the
-    page holding the form for a table's records, and `null` otherwise. On a
-    `table` or `form`, exactly one of `entity` and `dataSource` is set, and
+    On a `table` or `form`, exactly one of `entity` and `dataSource` is set, and
     the other is `null`. A `taskInbox` has both `null`, and so does a
     `processInspector`. The data source
     binding of the table widget below describes `dataSource`.
@@ -192,7 +194,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         {
           "type": "columns",
           "columns": [
-            { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "formPage": "PurchaseRequestForm", "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
+            { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
             {
               "width": 4,
               "widgets": [
@@ -200,7 +202,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
                   "type": "section",
                   "titleKey": "pages.overview.tasks",
                   "collapsed": false,
-                  "widgets": [{ "type": "taskInbox", "entity": null, "formPage": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "access": null }]
+                  "widgets": [{ "type": "taskInbox", "entity": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "access": null }]
                 }
               ]
             }
@@ -236,7 +238,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `fields` lists a child collection's child entity fields in declaration
     order, each in the same shape as an entity field. The form builds the
     columns and inputs of the collection's table from them.
-  - Names in responses (page, form page, entity, and the application in
+  - Names in responses (page, entity, and the application in
     `recordsPath`) are the model's declared names, not the letter case of the
     request.
   - The texts endpoint serves any locale the site's application has texts
@@ -318,7 +320,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       - `createFields` and `updateFields` list the fields the user's
         `create` and `update` grants cover, in declaration order. Each is
         `[]` when the action is not in `actions`.
-      - A table shows its create button only with `create`. A form shows a
+      - A table shows a toolbar action to a form without `record` only with `create`. A form shows a
         field it may not write as read-only, as on a computed field, and
         never sends it. On a new record it writes the `createFields`, and on
         a saved record the `updateFields`.
@@ -454,10 +456,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       input and the table shows no rows. The load error alert is for other
       failures.
     - **Rows.** The table requests its rows from `rowsPath`. A row carries
-      the id of its root record, so its open link and the create button go
-      to the `formPage` as for an entity table. A group row of a grouped data
-      source has `id: null`. A table over a grouped data source has no form
-      page, so it has no open link and no create button.
+      the id of its root record, so a row action with `record: id` opens its
+      form as for an entity table. A group row of a grouped data source has
+      `id: null` and no row actions.
   - **Changes.** A new sort or page size starts again at page 1, because the
     old page number means nothing under a new order or size. Only the
     pagination control moves between pages. Each change adds a history entry.
@@ -494,17 +495,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     number, so `1250.50` shows as `1250.5` there. The web unit tests need
     Node 22 or later for the same reason. The API never coerces a string to a
     number, so the form widget sends numbers back as JSON numbers.
-  - **Links.** When the widget names a form page, a create button links to
-    `/{site}/{formpage}/new`, if the widget's `access` has `create`. Each row
-    has an open link to
-    `/{site}/{formpage}/{id}`, with the page name in lower case. The create
-    button is a link: a click with a modifier key or the middle button opens
-    the form in a new tab or window. Both pass the table's address, with
-    its paging and sorting, to the form in history state. Without a form
-    page there is no create button and no open column. In M12 the open link
-    becomes a `rowActions` navigate with `record: id`, and the create button a
-    `toolbarActions` navigate without `record`, still gated by `access`
-    `create` _(planned for M12)_.
+  - **Links.** The table has no open link and no create button of its own. A
+    sample opens a record with a `rowActions` navigate with `record: id`, and
+    creates one with a `toolbarActions` navigate without `record`, still gated
+    by `access` `create`. Both pass the table's address, with its paging and
+    sorting, to the form in history state.
   - **Row and toolbar actions.** See
     [D59](../decisions/d59-table-row-and-toolbar-actions.md). Page metadata
     lists the `navigate` actions in `rowActions` and `toolbarActions`,
@@ -512,7 +507,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `record` and `opensForm`. The `navigate` buttons are built. The
     `visibleWhen` condition, the delete and `startProcess` row actions and the
     phone menu are _(planned for M12)_.
-    - **Where.** Toolbar actions sit next to the create button. Row actions
+    - **Where.** Toolbar actions sit above the table. Row actions
       are buttons in the row, and fold into a menu at phone width. A
       `navigate` action may sit in either list. `startProcess` and `delete`
       are row actions only. A row of a data source acts on its root record,
@@ -542,7 +537,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       With `record`, the button opens `/{site}/{page}/{id}`. Without it, an
       action to a form page, one with `opensForm`, opens `/{site}/{page}/new`.
       A toolbar action to a form page without `record` shows only when the
-      table's `access.actions` holds `create`, as the create button does. A
+      table's `access.actions` holds `create`. A
       click passes the table's address, with its paging and sorting, to the
       page in history state, so a form returns to it after save or cancel.
     - **Values.** The SPA has no expression engine. It works out a bare name

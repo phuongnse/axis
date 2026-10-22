@@ -14,7 +14,6 @@ const instancesPath = '/api/apps/E2eApp/processes/NoteReview/instances'
 
 const inspectorWidget: WidgetMetadata = {
   type: 'processInspector',
-  formPage: null,
   entity: null,
   dataSource: null,
   form: null,

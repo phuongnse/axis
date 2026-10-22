@@ -178,15 +178,13 @@ export interface WidgetAccess {
 
 /**
  * One widget of a page. On a table or form, exactly one of `entity` and `dataSource` is set: the
- * widget shows all records of an entity, or the rows of a data source. `formPage` is set only on a
- * table that names the page holding its form. `form` is set only on a form widget that names a form,
- * and `entity` is then the form's entity with every field. A task inbox has neither an entity nor a
- * data source, and lists the signed-in user's tasks from `tasksPath`. A process inspector has neither,
- * and lists the instances of its `process` from `instancesPath`.
+ * widget shows all records of an entity, or the rows of a data source. `form` is set only on a form
+ * widget that names a form, and `entity` is then the form's entity with every field. A task inbox has
+ * neither an entity nor a data source, and lists the signed-in user's tasks from `tasksPath`. A process
+ * inspector has neither, and lists the instances of its `process` from `instancesPath`.
  */
 export interface WidgetMetadata {
   type: 'table' | 'form' | 'taskInbox' | 'processInspector'
-  formPage: string | null
   entity: EntityMetadata | null
   dataSource: DataSourceMetadata | null
   form: FormMetadata | null

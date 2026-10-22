@@ -11,6 +11,8 @@
     "pages.myRequests.title": "My requests",
     "pages.requestForm.title": "Request",
     "pages.myTasks.title": "My tasks",
+    "actions.open": "Open",
+    "actions.new": "New",
     "request.label": "Request",
     "request.number": "Number",
     "request.requester": "Requester",

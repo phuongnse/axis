@@ -13,6 +13,8 @@
     "purchasing.title": "Mua hàng",
     "purchasing.nav.requests": "Đề nghị mua hàng",
     "pages.requests.title": "Đề nghị mua hàng",
-    "pages.requestForm.title": "Đề nghị mua hàng"
+    "pages.requestForm.title": "Đề nghị mua hàng",
+    "actions.open": "Mở",
+    "actions.new": "Tạo mới"
   }
 }

@@ -1704,17 +1704,17 @@ public static class ApplicationCompiler
             switch (WidgetTypes.Parse(widget.Type))
             {
                 case WidgetType.Columns:
-                    return new WidgetModel(WidgetType.Columns, null, null)
+                    return new WidgetModel(WidgetType.Columns, null)
                     {
                         Columns = [.. widget.Columns!.Select(column => new WidgetColumnModel(column.Width, BuildWidgets(column.Widgets)))],
                     };
                 case WidgetType.Tabs:
-                    return new WidgetModel(WidgetType.Tabs, null, null)
+                    return new WidgetModel(WidgetType.Tabs, null)
                     {
                         Tabs = [.. widget.Tabs!.Select(tab => new WidgetTabModel(tab.Label, BuildWidgets(tab.Widgets)))],
                     };
                 case WidgetType.Section:
-                    return new WidgetModel(WidgetType.Section, null, null)
+                    return new WidgetModel(WidgetType.Section, null)
                     {
                         Title = widget.Title,
                         Collapsed = widget.Collapsed ?? false,
@@ -1732,7 +1732,6 @@ public static class ApplicationCompiler
             return new WidgetModel(
                 WidgetTypes.Parse(widget.Type),
                 entity is null ? null : new EntityReference(entity.Id, entity.Name),
-                widget.FormPage is null ? null : PageReferenceTo(pagesByName[widget.FormPage]),
                 dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name),
                 form is null ? null : new FormReference(form.Id, form.Name),
                 inspected is null ? null : new ProcessReference(inspected.Id, inspected.Name))

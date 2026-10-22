@@ -44,7 +44,6 @@ public sealed class FormCompilerTests
         Assert.Equal(new EntityReference(Guid.Parse(OrderId), "Order"), widget.Entity);
         Assert.Equal(new FormReference(Guid.Parse(FormId), "OrderLayout"), widget.Form);
         Assert.Null(widget.DataSource);
-        Assert.Null(widget.FormPage);
 
         Assert.True(result.Model.TryGetForm("orderlayout", out var form));
         Assert.Equal(new EntityReference(Guid.Parse(OrderId), "Order"), form.Entity);
@@ -203,7 +202,7 @@ public sealed class FormCompilerTests
     }
 
     [Fact]
-    public void Table_whose_form_page_shows_a_form_over_another_entity_is_reported_at_its_form_page()
+    public void Table_whose_row_action_opens_a_form_over_another_entity_is_reported_at_its_record()
     {
         using var folder = Folder(Form("Order", TwoSections))
             .With("forms/customer-layout.json", """
@@ -216,7 +215,7 @@ public sealed class FormCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.InvalidFormPage, "pages/orders.json", "/widgets/0/formPage"),
+            (DiagnosticCodes.InvalidNavigateRecord, "pages/orders.json", "/widgets/0/rowActions/0/record"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Contains("'Customer'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);

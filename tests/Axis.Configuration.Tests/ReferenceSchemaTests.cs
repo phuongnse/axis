@@ -39,7 +39,6 @@ public sealed class ReferenceSchemaTests
         (ReferenceRelations.WidgetEntity, "page", "properties/widgets/items/properties/entity", "entity"),
         (ReferenceRelations.WidgetDataSource, "page", "properties/widgets/items/properties/dataSource", "dataSource"),
         (ReferenceRelations.WidgetForm, "page", "properties/widgets/items/properties/form", "form"),
-        (ReferenceRelations.WidgetFormPage, "page", "properties/widgets/items/properties/formPage", "page"),
         (ReferenceRelations.WidgetProcess, "page", "properties/widgets/items/properties/process", "process"),
         (ReferenceRelations.ActionProcess, "page", "properties/widgets/items/properties/actions/items/properties/process", "process"),
         (ReferenceRelations.NavigatePage, "page", "$defs/action/properties/page", "page"),

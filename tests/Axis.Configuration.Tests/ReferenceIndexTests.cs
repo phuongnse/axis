@@ -481,7 +481,7 @@ public sealed class ReferenceIndexTests
         const string Parameter = """{ "name": "client", "type": "reference", "target": "Client" }""";
         using (var folder = PresentationCompilerTests.Folder()
             .With("entities/client.json", PresentationCompilerTests.Client)
-            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "type": "table", "entity": "Order", "formPage": "OrderForm" }""", parameters: Parameter)))
+            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "type": "table", "entity": "Order" }""", parameters: Parameter)))
         {
             var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -490,14 +490,13 @@ public sealed class ReferenceIndexTests
                 new (string, string, string)[]
                 {
                     (ReferenceRelations.WidgetEntity, "/widgets/0/entity", "Order"),
-                    (ReferenceRelations.WidgetFormPage, "/widgets/0/formPage", "OrderForm"),
                     (ReferenceRelations.FieldTarget, "/parameters/0/target", "Client"),
                 },
                 EdgesFrom(result, "Orders"));
         }
 
         using (var folder = PresentationCompilerTests.Folder()
-            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "type": "table", "entity": "Order", "formPage": "OrderForm" }""", parameters: Parameter.Replace("Client", "Missing", StringComparison.Ordinal))))
+            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "type": "table", "entity": "Order" }""", parameters: Parameter.Replace("Client", "Missing", StringComparison.Ordinal))))
         {
             var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -577,7 +576,7 @@ public sealed class ReferenceIndexTests
             .Where(field => field.IsLiteral)
             .Select(field => (string)field.GetRawConstantValue()!)
             .ToList();
-        Assert.Equal(40, expected.Count);
+        Assert.Equal(39, expected.Count);
 
         var relations = new HashSet<string>();
         using (var packages = new TemporaryFolder().Install("1.0.0"))
@@ -635,7 +634,7 @@ public sealed class ReferenceIndexTests
             """)
         .With("pages/orders.json", PresentationCompilerTests.Page(
             "Orders",
-            """{ "type": "table", "entity": "Order", "formPage": "OrderForm" }""",
+            """{ "type": "table", "entity": "Order" }""",
             "55555555-5555-4555-8555-555555555551"))
         .With("pages/order-list.json", PresentationCompilerTests.Page(
             "OrderList",

@@ -14,7 +14,6 @@ const tasksPath = '/api/apps/E2eApp/tasks'
 
 const inboxWidget: WidgetMetadata = {
   type: 'taskInbox',
-  formPage: null,
   entity: null,
   dataSource: null,
   form: null,

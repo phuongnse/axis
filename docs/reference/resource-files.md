@@ -78,7 +78,14 @@ site, and its widgets are its content:
   "name": "PurchaseRequests",
   "formatVersion": 1,
   "title": { "textKey": "pages.requests.title" },
-  "widgets": [{ "type": "table", "entity": "PurchaseRequest", "formPage": "PurchaseRequestForm" }]
+  "widgets": [
+    {
+      "type": "table",
+      "entity": "PurchaseRequest",
+      "rowActions": [{ "type": "navigate", "page": "PurchaseRequestForm", "label": { "textKey": "actions.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "page": "PurchaseRequestForm", "label": { "textKey": "actions.new" } }]
+    }
+  ]
 }
 ```
 
@@ -89,9 +96,8 @@ site, and its widgets are its content:
   shorthand for all records of that entity, or a `dataSource`. M12 adds the
   leaf widgets `detail`, `chart` and `kpi` *(planned for M12)*, see
   [frontend.md](frontend.md).
-- A `table` widget may name a `formPage`: the page with the `form` widget
-  that opens one of its records. M12 removes `formPage` *(planned for M12)*,
-  see the navigate action below.
+- A `table` widget opens and creates records through `navigate` actions, see
+  below. It has no link to a form page of its own.
 - A `form` widget may list `actions`. Each is
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record. See
@@ -107,7 +113,7 @@ site, and its widgets are its content:
   [frontend.md](frontend.md) and
   [D59](../decisions/d59-table-row-and-toolbar-actions.md).
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
-  `{ "type": "table", "dataSource": "PurchaseRequestList", "formPage": "PurchaseRequestForm" }`.
+  `{ "type": "table", "dataSource": "PurchaseRequestList" }`.
   Its columns are the data source's projected fields. See
   [widget binding](data-sources.md#widget-binding).
 - A page may declare typed `parameters`. Each has a `name`, a `type` (text,
@@ -167,7 +173,7 @@ widgets `columns`, `tabs` and `section` hold other widgets, see
         {
           "width": 8,
           "widgets": [
-            { "type": "table", "entity": "PurchaseRequest", "formPage": "PurchaseRequestForm" }
+            { "type": "table", "entity": "PurchaseRequest" }
           ]
         },
         {

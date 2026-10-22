@@ -11,6 +11,8 @@
     "pages.myLeaveRequests.title": "My leave requests",
     "pages.leaveRequestForm.title": "Leave request",
     "pages.myTasks.title": "My tasks",
+    "actions.open": "Open",
+    "actions.new": "New",
     "leaveRequest.label": "Leave request",
     "leaveRequest.number": "Number",
     "leaveRequest.employee": "Employee",

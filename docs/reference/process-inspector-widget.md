@@ -15,10 +15,9 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
 
   - **Compile.** The `process` must name a loaded process, otherwise it is
     `AXC0192` at `/widgets/{i}/process`. The widget names none of `entity`,
-    `dataSource` and `form` (`AXC0060` at that property), and no `formPage`
-    (`AXC0022`).
+    `dataSource` and `form` (`AXC0060` at that property).
   - **Metadata.** The widget has `"entity": null`, `"dataSource": null`,
-    `"form": null`, `"formPage": null` and `"tasksPath": null`. It adds
+    `"form": null` and `"tasksPath": null`. It adds
     `process` and an `instancesPath`, such as
     `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances"`,
     the list endpoint. The SPA never builds the path itself. It uses `process` to link the record history to the page, see

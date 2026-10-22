@@ -11,6 +11,8 @@
     "items.title": "Items",
     "itemsByDepartment.title": "Items by department",
     "itemForm.title": "Item",
+    "items.open": "Open",
+    "items.new": "New",
     "itemSections.main": "Main",
     "itemSections.pricing": "Pricing",
     "itemSections.stepMain": "Main step",

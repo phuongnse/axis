@@ -24,7 +24,7 @@ rest of the frontend is in [frontend.md](frontend.md).
     `"kpi": null`, and adds `detail`:
 
     ```json
-    { "type": "detail", "entity": { "name": "Ticket", "fields": [{ "name": "title", "type": "text" }] }, "formPage": null, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [{ "type": "startProcess", "process": "TicketHandling", "labelKey": "tickets.handle", "instancesPath": "/api/apps/ServiceDesk/processes/TicketHandling/instances" }], "access": { "actions": ["read"], "createFields": [], "updateFields": [] }, "detail": { "record": "ticket" }, "chart": null, "kpi": null }
+    { "type": "detail", "entity": { "name": "Ticket", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [{ "type": "startProcess", "process": "TicketHandling", "labelKey": "tickets.handle", "instancesPath": "/api/apps/ServiceDesk/processes/TicketHandling/instances" }], "access": { "actions": ["read"], "createFields": [], "updateFields": [] }, "detail": { "record": "ticket" }, "chart": null, "kpi": null }
     ```
 
   - **Record.** The SPA reads the record that the page parameter `record`

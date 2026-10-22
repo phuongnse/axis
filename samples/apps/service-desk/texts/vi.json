@@ -13,6 +13,8 @@
     "pages.ticketForm.title": "Yêu cầu hỗ trợ",
     "pages.myTasks.title": "Nhiệm vụ của tôi",
     "pages.allTickets.title": "Tất cả yêu cầu",
+    "actions.open": "Mở",
+    "actions.new": "Tạo mới",
     "category.label": "Danh mục",
     "category.name": "Tên",
     "category.defaultAgent": "Nhân viên hỗ trợ mặc định",

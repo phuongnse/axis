@@ -83,7 +83,6 @@ public static class ApplicationSites
     private static WidgetMetadata Leaf(ApplicationModel application, WidgetModel widget) =>
         new(
             WidgetTypes.Name(widget.Type),
-            widget.FormPage?.Name,
             widget.Entity is { } entity ? DescribeEntity(application, entity.Name) : null,
             widget.DataSource is { } dataSource ? DataSource(application, dataSource.Name) : null,
             widget.Form is { } form ? DescribeForm(application, form.Name) : null,

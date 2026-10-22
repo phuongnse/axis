@@ -4,5 +4,12 @@
   "name": "Items",
   "formatVersion": 1,
   "title": { "textKey": "items.title" },
-  "widgets": [{ "type": "table", "entity": "Item", "formPage": "ItemForm" }]
+  "widgets": [
+    {
+      "type": "table",
+      "entity": "Item",
+      "rowActions": [{ "type": "navigate", "page": "ItemForm", "label": { "textKey": "items.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "page": "ItemForm", "label": { "textKey": "items.new" } }]
+    }
+  ]
 }

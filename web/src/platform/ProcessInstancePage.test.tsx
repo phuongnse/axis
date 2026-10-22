@@ -17,7 +17,6 @@ const releaseId = '0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01'
 
 const inspectorWidget: WidgetMetadata = {
   type: 'processInspector',
-  formPage: null,
   entity: null,
   dataSource: null,
   form: null,

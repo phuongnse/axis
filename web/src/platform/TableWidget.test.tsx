@@ -1,4 +1,4 @@
-import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -45,7 +45,6 @@ const everyAction: WidgetAccess = {
 
 const noteWidget: EntityWidgetMetadata = {
   type: 'table',
-  formPage: 'NoteForm',
   dataSource: null,
   form: null,
   tasksPath: null,
@@ -81,7 +80,6 @@ const rowsPath = '/api/apps/E2eApp/data-sources/NoteList/rows'
 // A table over a data source whose default page size is 10, which is also offered by default.
 const noteListWidget: WidgetMetadata = {
   type: 'table',
-  formPage: 'NoteForm',
   entity: null,
   form: null,
   tasksPath: null,
@@ -138,8 +136,6 @@ const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
 const notePage = `{"items":[{"id":"${noteId}","version":1,"values":{"title":"Buy paper","done":false,"dueAt":null,"category":"${categoryId}"},"labels":{"category":"Office"}}],"page":1,"pageSize":20,"totalCount":45}`
 
 const texts = {
-  'shell.table.create': 'New',
-  'shell.table.open': 'Open',
   'shell.table.yes': 'Yes',
   'shell.table.no': 'No',
   'shell.table.empty': 'No records yet.',
@@ -225,103 +221,19 @@ describe('TableWidget', () => {
     expect(within(row).getByText('No')).toBeInTheDocument()
   })
 
-  it('links the create button and each row to the form page', async () => {
+  it('has no open link and no create button without navigate actions', async () => {
     stubRecords()
 
     renderWidget()
-
-    const row = await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.getByRole('link', { name: 'New' })).toHaveAttribute('href', '/e2e/noteform/new')
-    expect(within(row).getByRole('link', { name: 'Open' })).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
-  })
-
-  it('opens the form in place on a plain click of the create button', async () => {
-    stubRecords()
-    renderWidget()
-    await screen.findByRole('row', { name: /Buy paper/ })
-
-    await userEvent.click(screen.getByRole('link', { name: 'New' }))
-
-    expect(screen.getByTestId('path')).toHaveTextContent('/e2e/noteform/new')
-  })
-
-  it('passes the table address with its paging and sorting to the form it opens', async () => {
-    stubRecords()
-    renderWidget('?pageSize=10&sort=-title')
-    const row = await screen.findByRole('row', { name: /Buy paper/ })
-
-    await userEvent.click(within(row).getByRole('link', { name: 'Open' }))
-
-    expect(screen.getByTestId('path')).toHaveTextContent(`/e2e/noteform/${noteId}`)
-    expect(screen.getByTestId('from')).toHaveTextContent('/e2e/notes?pageSize=10&sort=-title')
-  })
-
-  it('passes the table address to the create form', async () => {
-    stubRecords()
-    renderWidget('?page=2')
-    await screen.findByRole('row', { name: /Buy paper/ })
-
-    await userEvent.click(screen.getByRole('link', { name: 'New' }))
-
-    expect(screen.getByTestId('path')).toHaveTextContent('/e2e/noteform/new')
-    expect(screen.getByTestId('from')).toHaveTextContent('/e2e/notes?page=2')
-  })
-
-  it('keeps the link behaviour of the create button on a ctrl-click', async () => {
-    stubRecords()
-    renderWidget()
-    await screen.findByRole('row', { name: /Buy paper/ })
-    const link = screen.getByRole('link', { name: 'New' })
-    const click = createEvent.click(link, { ctrlKey: true })
-    // jsdom cannot open a new tab, so stop the default action once the widget has seen the click.
-    const browserDefault = vi.fn((event: Event) => event.preventDefault())
-    window.addEventListener('click', browserDefault)
-
-    fireEvent(link, click)
-
-    window.removeEventListener('click', browserDefault)
-    expect(browserDefault).toHaveBeenCalled()
-    expect(screen.getByTestId('path')).toHaveTextContent('/e2e/notes')
-  })
-
-  it('keeps a field named open next to the open column', async () => {
-    stubRecords(
-      `{"items":[{"id":"${noteId}","version":1,"values":{"open":"Monday"},"labels":{}}],"page":1,"pageSize":20,"totalCount":1}`,
-    )
-
-    renderWidget('', { ...noteWidget, entity: { ...noteWidget.entity, fields: [field('open', 'text', null)] } })
-
-    const row = await screen.findByRole('row', { name: /Monday/ })
-    expect(within(row).getByRole('link', { name: 'Open' })).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
-    await userEvent.click(screen.getByText('open'))
-    await waitFor(() => expect(search()).toBe('?sort=open'))
-    expect(screen.getByRole('columnheader', { name: 'open' })).toHaveAttribute('aria-sort', 'ascending')
-  })
-
-  it('has no create button and no open link without a form page', async () => {
-    stubRecords()
-
-    renderWidget('', { ...noteWidget, formPage: null })
 
     await screen.findByRole('row', { name: /Buy paper/ })
     expect(screen.queryByRole('link', { name: 'New' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Open' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'New' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument()
   })
 
-  it('has no create button without a create grant, and still links each row to the form page', async () => {
-    stubRecords()
-
-    renderWidget('', {
-      ...noteWidget,
-      access: { actions: ['read', 'update'], createFields: [], updateFields: ['title'] },
-    })
-
-    const row = await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.queryByRole('link', { name: 'New' })).not.toBeInTheDocument()
-    expect(within(row).getByRole('link', { name: 'Open' })).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
-  })
-
-  it('shows the groups of a grouped data source with measure names as headers and no open link or create button', async () => {
+  it('shows the groups of a grouped data source with measure names as headers and no row action buttons', async () => {
     const departmentTarget = {
       entity: 'Department',
       displayField: 'name',
@@ -329,7 +241,6 @@ describe('TableWidget', () => {
     }
     const groupedWidget: WidgetMetadata = {
       type: 'table',
-      formPage: null,
       entity: null,
       form: null,
       tasksPath: null,
@@ -428,7 +339,6 @@ describe('TableWidget', () => {
       stubRecords()
       const { unmount } = renderWidget('', {
         ...noteWidget,
-        formPage: null,
         access: { actions: ['read'], createFields: [], updateFields: [] },
         toolbarActions: [createNote],
       })
@@ -437,7 +347,7 @@ describe('TableWidget', () => {
       unmount()
 
       stubRecords()
-      renderWidget('', { ...noteWidget, formPage: null, toolbarActions: [createNote] })
+      renderWidget('', { ...noteWidget, toolbarActions: [createNote] })
       await screen.findByRole('row', { name: /Buy paper/ })
 
       await userEvent.click(screen.getByRole('button', { name: 'Add note' }))
@@ -449,7 +359,6 @@ describe('TableWidget', () => {
       stubRecords()
       renderWidget('', {
         ...noteWidget,
-        formPage: null,
         access: { actions: ['read'], createFields: [], updateFields: [] },
         toolbarActions: [{ ...detail, parameters: { kind: "'all'" } }],
       })
@@ -464,7 +373,6 @@ describe('TableWidget', () => {
     it('shows no button on a group row, which has no id', async () => {
       const groupedWidget: WidgetMetadata = {
         ...noteListWidget,
-        formPage: null,
         rowActions: [detail],
         dataSource: {
           ...noteListWidget.dataSource!,
@@ -594,7 +502,6 @@ describe('TableWidget', () => {
 
     renderWidget('', {
       type: 'table',
-      formPage: null,
       entity: { ...noteWidget.entity, fields: [field('price', 'decimal', null)] },
       dataSource: null,
       form: null,
@@ -620,13 +527,8 @@ describe('TableWidget', () => {
     renderWidget('?pageSize=10', noteListWidget)
 
     const row = await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
-      'Title',
-      'departmentName',
-      '',
-    ])
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Title', 'departmentName'])
     expect(within(row).getByText('Finance')).toBeInTheDocument()
-    expect(within(row).getByRole('link', { name: 'Open' })).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
     // The data source's own page size is the default, so the URL and the request leave it out.
     await waitFor(() => expect(search()).toBe(''))
     expect(requests()).toEqual([rowsPath])

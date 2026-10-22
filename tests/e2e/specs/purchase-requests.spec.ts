@@ -46,7 +46,7 @@ test('a purchase request is created with line items, shows the computed total, i
   const cell = (label: string) => page.getByLabel(label, { exact: true })
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
 
-  await page.getByRole('link', { name: 'New' }).click()
+  await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
   await page.getByRole('textbox', { name: 'Title' }).fill(title)
   // The server sets the requester to the signed-in user, so the form shows it read-only.
@@ -74,7 +74,7 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(row).toContainText('2550.90')
 
   // The server computes each line amount and the total on save, so the form shows them once reopened.
-  await row.getByRole('link', { name: 'Open' }).click()
+  await row.getByRole('button', { name: 'Open', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
   await expect(cell('Amount 1')).toHaveValue('2500.90')
   await expect(cell('Amount 2')).toHaveValue('50.00')
@@ -90,7 +90,7 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(edited).toContainText('Acme Supplies')
 
   await page.getByRole('switch', { name: 'Dark mode' }).click()
-  await edited.getByRole('link', { name: 'Open' }).click()
+  await edited.getByRole('button', { name: 'Open', exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
   await expect(dark.getByRole('textbox', { name: 'Title' })).toHaveValue(`${title} edited`)
   await expect(dark.getByLabel('Department', { exact: true })).toHaveValue('Finance')
@@ -107,7 +107,7 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
 
   // The server numbers the request on create, so the new form shows the field empty and read-only.
-  await page.getByRole('link', { name: 'New' }).click()
+  await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
   await expect(number).toHaveValue('')
   await expect(number).toHaveAttribute('readonly')
@@ -123,7 +123,7 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   await expect(page).toHaveURL(tablePath)
   await page
     .getByRole('row', { name: new RegExp(`${title} `) })
-    .getByRole('link', { name: 'Open' })
+    .getByRole('button', { name: 'Open', exact: true })
     .click()
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
   await expect(number).toHaveAttribute('readonly')
@@ -302,8 +302,8 @@ test('the per-department page shows one row per department with its total, sorts
   await expect(row('Engineering')).toContainText(engineering)
   await expect(row('Operations')).toBeVisible()
   await expect(row('Finance')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Open' })).toHaveCount(0)
-  await expect(page.getByRole('link', { name: 'New' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Open', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'New', exact: true })).toHaveCount(0)
 
   const order = async (names: string[]) => {
     for (const [index, name] of names.entries()) {
@@ -329,7 +329,7 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
   const title = `Lines ${run}`
   const cell = (label: string) => page.getByLabel(label, { exact: true })
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
-  await page.getByRole('link', { name: 'New' }).click()
+  await page.getByRole('button', { name: 'New', exact: true }).click()
   await page.getByRole('textbox', { name: 'Title' }).fill(title)
   await choose(page, 'department', 'Department', 'Finance')
   await select(page, 'Status', 'draft')
@@ -370,7 +370,7 @@ test('searching in the supplier lookup filters the suppliers by name, and pickin
   page,
 }) => {
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
-  await page.getByRole('link', { name: 'New' }).click()
+  await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
 
   await page.getByTestId('reference-supplier').getByRole('button', { name: 'Choose' }).click()

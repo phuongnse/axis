@@ -4,5 +4,12 @@
   "name": "Notes",
   "formatVersion": 1,
   "title": { "textKey": "pages.notes.title" },
-  "widgets": [{ "type": "table", "entity": "Note", "formPage": "NoteForm" }]
+  "widgets": [
+    {
+      "type": "table",
+      "entity": "Note",
+      "rowActions": [{ "type": "navigate", "page": "NoteForm", "label": { "textKey": "notes.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "page": "NoteForm", "label": { "textKey": "notes.new" } }]
+    }
+  ]
 }

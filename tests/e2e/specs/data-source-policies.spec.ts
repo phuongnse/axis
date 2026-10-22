@@ -32,7 +32,7 @@ test('a data source table and a reference lookup show only the records the user 
   await expect(page.getByRole('row', { name: new RegExp(`Private ${run}`) })).toHaveCount(0)
 
   await page.goto('/e2e/notes')
-  await page.getByRole('link', { name: 'New' }).click()
+  await page.getByRole('button', { name: 'New', exact: true }).click()
   await page.getByRole('button', { name: 'Choose' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('row', { name: new RegExp(`0 Shared ${run}`) })).toBeVisible()

@@ -13,6 +13,8 @@
     "purchasing.title": "Purchasing",
     "purchasing.nav.requests": "Purchase requests",
     "pages.requests.title": "Purchase requests",
-    "pages.requestForm.title": "Purchase request"
+    "pages.requestForm.title": "Purchase request",
+    "actions.open": "Open",
+    "actions.new": "New"
   }
 }

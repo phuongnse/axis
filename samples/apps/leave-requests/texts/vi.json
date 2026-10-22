@@ -11,6 +11,8 @@
     "pages.myLeaveRequests.title": "Đơn nghỉ phép của tôi",
     "pages.leaveRequestForm.title": "Đơn nghỉ phép",
     "pages.myTasks.title": "Nhiệm vụ của tôi",
+    "actions.open": "Mở",
+    "actions.new": "Tạo mới",
     "leaveRequest.label": "Đơn nghỉ phép",
     "leaveRequest.number": "Số đơn",
     "leaveRequest.employee": "Nhân viên",

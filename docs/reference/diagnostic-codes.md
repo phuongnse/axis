@@ -14,7 +14,7 @@ whole application folder. `path` is a JSON Pointer (RFC 6901) into that file,
 such as `/fields/0/type`, or empty when the problem concerns the whole file or
 the whole folder. Messages never contain absolute paths or exception text,
 because they are shown to application authors. Codes have the form `AXCnnnn`
-and never change meaning. Compile reports all diagnostics, not just the first,
+and never change meaning. A retired code is never reported again and keeps its row. Compile reports all diagnostics, not just the first,
 sorted by file and then path.
 
 | Code | Meaning |
@@ -40,7 +40,7 @@ sorted by file and then path.
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 | `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
 | `AXC0021` | A widget's `entity` names no loaded entity. Reported at `/widgets/{i}/entity`. |
-| `AXC0022` | A widget's `formPage` is set on a `form`, `taskInbox` or `processInspector` widget, names no loaded page, or names a page whose `form` widget is not over the same entity, or over the root entity of the widget's data source, or is set on a table whose data source has an `aggregate`. A `form` widget that names a form is over the form's entity. Reported at `/widgets/{i}/formPage`, or at the widget's own pointer when it sits in a container. A page with several widgets is judged by its first `form` widget, or by its first widget when it has none. |
+| `AXC0022` | Retired. It was the removed `formPage` property of a table widget. It is never reported and the number is never reused. |
 | `AXC0023` | A navigation entry names no loaded page. Reported at `/navigation/{i}/page`. |
 | `AXC0024` | A site path is reserved by the platform, or another site of the application already uses it. Reported at `/path` of the later file. |
 | `AXC0025` | A site's default or fallback locale is not in `available`, or an available locale has no `text` resource. Reported at that locale. |

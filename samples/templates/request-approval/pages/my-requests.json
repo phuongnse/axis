@@ -10,7 +10,25 @@
     {
       "type": "table",
       "dataSource": "RequestList",
-      "formPage": "RequestForm"
+      "rowActions": [
+        {
+          "type": "navigate",
+          "page": "RequestForm",
+          "label": {
+            "textKey": "actions.open"
+          },
+          "record": "id"
+        }
+      ],
+      "toolbarActions": [
+        {
+          "type": "navigate",
+          "page": "RequestForm",
+          "label": {
+            "textKey": "actions.new"
+          }
+        }
+      ]
     }
   ]
 }
