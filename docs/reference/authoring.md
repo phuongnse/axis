@@ -434,14 +434,18 @@ Studio's expression editor can show errors as the author types. The body is
   at `path` and compiles the folder in memory. The compile checks the
   expression where it stands, so the names in scope, the expected type, the
   [SQL subset](expressions.md#sql-subset) and the policy-filter rules are the
-  compile's own, not a copy of them. The body carries no draft content, so a
-  place that the author has just added and not saved is not found.
+  compile's own, not a copy of them. The body carries no draft content. The
+  `path` may point at a string, which the text replaces, or at a property the
+  saved object lacks, which the text adds. So an optional expression that the
+  author has just added is checked before the first save, such as a form field's
+  `requiredWhen`. A place inside an object that the saved resource lacks is not
+  found.
 - **Where it works.** In every place the compile checks an expression: computed
   fields, validations, rules, data source filters, process conditions and
-  values, policy filters, migration values, endpoint values and trigger
-  conditions.
-- **No expression place.** A `path` that does not point at a string in the saved
-  resource is `400`. So is a place where the compile checks no expression
+  values, policy filters, migration values, endpoint values, trigger
+  conditions and form conditions.
+- **No expression place.** A `path` that points at neither a string nor a
+  missing property of an object in the saved resource is `400`. So is a place where the compile checks no expression
   because another problem in the resource skips the check, such as a process
   step whose subject entity is unknown. A save shows no problem at such a place
   either.

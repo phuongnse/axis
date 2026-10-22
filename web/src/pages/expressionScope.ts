@@ -77,7 +77,24 @@ function fieldOptions(
   }
   const entity = entityOf(kind, draft, pointer)
   const found = names.entities.find((item) => item.name.toLowerCase() === entity?.toLowerCase())
-  return found ? found.fields.map((field) => option(field.name, 'field', false)) : []
+  if (!found) {
+    return []
+  }
+  // A form condition reads only the fields the form lists.
+  const listed = kind === 'form' ? listedFields(draft) : undefined
+  return found.fields
+    .filter((field) => listed === undefined || listed.has(field.name.toLowerCase()))
+    .map((field) => option(field.name, 'field', false))
+}
+
+function listedFields(draft: Record<string, unknown>): Set<string> {
+  const sections = Array.isArray(draft.sections) ? draft.sections : []
+  const listed = sections.flatMap((section) => {
+    const fields =
+      section !== null && typeof section === 'object' ? (section as Record<string, unknown>).fields : undefined
+    return Array.isArray(fields) ? fields.map((field) => stringProperty(field, 'field')) : []
+  })
+  return new Set(listed.filter((name): name is string => name !== undefined).map((name) => name.toLowerCase()))
 }
 
 function entityOf(kind: string, draft: Record<string, unknown>, pointer: string): string | undefined {
@@ -88,7 +105,7 @@ function entityOf(kind: string, draft: Record<string, unknown>, pointer: string)
     }
     return stringProperty(draft.grants[Number(match[1])], 'entity')
   }
-  if (kind === 'dataSource' || kind === 'process') {
+  if (kind === 'dataSource' || kind === 'process' || kind === 'form') {
     return stringProperty(draft, 'entity')
   }
   return undefined

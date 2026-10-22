@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Tests;
 using Axis.Server.Tests;
 using Json.Pointer;
@@ -101,6 +102,37 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
 
         Assert.Equal("enum", answer.RootElement.GetProperty("type").GetString());
         Assert.Equal(0, answer.RootElement.GetProperty("diagnostics").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_condition_not_yet_saved_is_checked_where_the_form_field_would_hold_it()
+    {
+        const string File = "forms/purchase-request-review.json";
+        const string Path = "/sections/1/fields/0/requiredWhen";
+        var id = await _studio.IdOfAsync(File);
+        var before = Hash(File);
+
+        using var boolean = await _studio.CheckAsync(id, Path, "totalAmount > 1000");
+        Assert.Equal("boolean", boolean.RootElement.GetProperty("type").GetString());
+        Assert.Equal(0, boolean.RootElement.GetProperty("diagnostics").GetArrayLength());
+
+        using var wrong = await _studio.CheckAsync(id, Path, "totalAmount + 1");
+        Assert.Equal(JsonValueKind.Null, wrong.RootElement.GetProperty("type").ValueKind);
+        Assert.Single(wrong.RootElement.GetProperty("diagnostics").EnumerateArray());
+
+        Assert.Equal(before, Hash(File));
+    }
+
+    [Fact]
+    public async Task A_condition_that_reads_a_field_the_form_does_not_list_answers_the_unlisted_field_code()
+    {
+        var id = await _studio.IdOfAsync("forms/purchase-request-review.json");
+
+        // The review form does not list purchaseOrderNumber.
+        using var answer = await _studio.CheckAsync(id, "/sections/1/fields/0/requiredWhen", "purchaseOrderNumber is not null");
+
+        var diagnostic = Assert.Single(answer.RootElement.GetProperty("diagnostics").EnumerateArray());
+        Assert.Equal(DiagnosticCodes.UnlistedFormConditionField, diagnostic.GetProperty("code").GetString());
     }
 
     [Fact]
