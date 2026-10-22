@@ -48,7 +48,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   and the `startProcess` action are agreed in
   [D20](../decisions/d20-human-tasks-task-inbox-and-forms.md). The
   `form` resource, the task inbox, the task page and the `startProcess` action
-  are built. Navigate actions and page parameters replace the table's
+  are built. The `navigate` buttons on table rows, the table toolbar and saved
+  forms are built. Navigate actions and page parameters replace the table's
   `formPage` link in M12 _(planned for M12)_; see [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Text.** All UI strings come from text resources.
 - **Sites and texts.** The server describes sites to the SPA through
@@ -519,11 +520,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     becomes a `rowActions` navigate with `record: id`, and the create button a
     `toolbarActions` navigate without `record`, still gated by `access`
     `create` _(planned for M12)_.
-  - **Row and toolbar actions** *(planned for M12)*. See
+  - **Row and toolbar actions.** See
     [D59](../decisions/d59-table-row-and-toolbar-actions.md). Page metadata
-    already lists the `navigate` actions in `rowActions` and `toolbarActions`,
-    without those to pages the user cannot read, each with its `parameters`
-    and `record`. The buttons are still planned.
+    lists the `navigate` actions in `rowActions` and `toolbarActions`,
+    without those to pages the user cannot read, each with its `parameters`,
+    `record` and `opensForm`. The `navigate` buttons are built. The
+    `visibleWhen` condition, the delete and `startProcess` row actions and the
+    phone menu are _(planned for M12)_.
     - **Where.** Toolbar actions sit next to the create button. Row actions
       are buttons in the row, and fold into a menu at phone width. A
       `navigate` action may sit in either list. `startProcess` and `delete`
@@ -551,6 +554,20 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       The target page declares
       `"parameters": [{ "name": "ticket", "type": "reference", "target": "Ticket", "required": true }]`.
       The click goes to `/{site}/ticketdetail?ticket=<id>`. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+      With `record`, the button opens `/{site}/{page}/{id}`. Without it, an
+      action to a form page, one with `opensForm`, opens `/{site}/{page}/new`.
+      A toolbar action to a form page without `record` shows only when the
+      table's `access.actions` holds `create`, as the create button does. A
+      click passes the table's address, with its paging and sorting, to the
+      page in history state, so a form returns to it after save or cancel.
+    - **Values.** The SPA has no expression engine. It works out a bare name
+      (`id`, a column or a field, matched ignoring case) and a literal (text in
+      single quotes, a number, `true`, `false` or `null`). A button whose
+      expression uses anything else is hidden. A toolbar has no row, so only
+      its literals resolve. A parameter whose value is `null` is left out of
+      the query, and a button whose `record` is `null` is hidden. The target
+      page does not read its parameters from the URL or bind them yet
+      _(planned for M12)_.
     - **`visibleWhen`.** An action hides when its expression over the row is
       `false`, `null` or fails. It only shapes the UI. The server decides, as
       in [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).
@@ -841,12 +858,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
       so the SPA never builds it itself. A `navigate` action is
-      `{ "type": "navigate", "page", "labelKey", "parameters", "record" }`, with
+      `{ "type": "navigate", "page", "labelKey", "parameters", "record", "opensForm" }`, with
       the target page's declared name. `parameters` maps each parameter name,
       as the target page declares it, to its expression, or is `{}`. `record`
       is the expression of the record id, or `null`. The expressions go to the
-      browser as written. It follows file order, and the form widget still
-      shows only `startProcess` buttons.
+      browser as written. `opensForm` is `true` when the target page holds a
+      form widget, so the SPA opens `/new` without `record`. It follows file
+      order. A saved record shows a button for each `navigate` action after
+      its `startProcess` buttons, with values from the record as it was
+      loaded, so unsaved edits are not used. A new record shows none.
     - `form` also holds `visibleWhen` on each field and section, as `true`
       when it has a condition and `false` otherwise. It holds `steps`, each
       with a `titleKey` and its section names, and `[]` when the form has

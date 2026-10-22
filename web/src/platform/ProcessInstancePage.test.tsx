@@ -25,6 +25,8 @@ const inspectorWidget: WidgetMetadata = {
   process: 'PurchaseRequestApproval',
   instancesPath,
   actions: [],
+  rowActions: [],
+  toolbarActions: [],
   parameters: {},
   access: null,
 }

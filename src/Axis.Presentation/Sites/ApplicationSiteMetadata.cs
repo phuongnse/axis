@@ -167,11 +167,13 @@ public sealed record StartProcessActionMetadata(string Process, string LabelKey,
 /// <param name="LabelKey">The text key of the button's label.</param>
 /// <param name="Parameters">The expression of each target page parameter the action gives, by the name the target declares. Empty when it gives none.</param>
 /// <param name="Record">The expression of the record id a form page opens, or null.</param>
+/// <param name="OpensForm">Whether the target page holds a form widget.</param>
 public sealed record NavigateActionMetadata(
     string Page,
     string LabelKey,
     IReadOnlyDictionary<string, string> Parameters,
-    string? Record) : ActionMetadata
+    string? Record,
+    bool OpensForm) : ActionMetadata
 {
     [JsonPropertyOrder(-1)]
     public override string Type { get; init; } = "navigate";

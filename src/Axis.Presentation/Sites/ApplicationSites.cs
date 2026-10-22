@@ -103,7 +103,14 @@ public static class ApplicationSites
                 start.Process.Name,
                 start.Label.TextKey,
                 $"/api/apps/{application.Manifest.Name}/processes/{start.Process.Name}/instances"),
-            NavigateActionModel navigate => new NavigateActionMetadata(navigate.Page.Name, navigate.Label.TextKey, navigate.Parameters, navigate.Record),
+
+            // The compiler resolves every navigate target, so the lookup always succeeds.
+            NavigateActionModel navigate => new NavigateActionMetadata(
+                navigate.Page.Name,
+                navigate.Label.TextKey,
+                navigate.Parameters,
+                navigate.Record,
+                application.Pages.First(page => page.Name == navigate.Page.Name).Leaves().Any(leaf => leaf.Type == WidgetType.Form)),
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
         };
 
