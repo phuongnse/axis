@@ -61,6 +61,25 @@ describe('expressionScope', () => {
     expect(labels).toContain('currentUser()')
   })
 
+  it('offers a form condition only the fields the form lists', () => {
+    const draft = {
+      entity: 'purchaserequest',
+      sections: [{ fields: [{ field: 'Title' }, { field: 'unknown' }, 3, null] }, { fields: 'broken' }, null],
+    }
+    const labels = labelsOf(expressionScope('form', draft, '/sections/0/fields/0/requiredWhen', names))
+
+    expect(labels).toContain('title')
+    expect(labels).not.toContain('requester')
+    expect(labels).not.toContain('code')
+    expect(labels).toContain('length()')
+  })
+
+  it('offers a form condition no field while the form lists none', () => {
+    const draft = { entity: 'PurchaseRequest', sections: 'broken' }
+
+    expect(labelsOf(expressionScope('form', draft, '/sections/0/visibleWhen', names))).not.toContain('title')
+  })
+
   it('offers only the functions and aggregates when no names are loaded', () => {
     const options = expressionScope('policy', { grants: [{ entity: 'PurchaseRequest' }] }, '/grants/0/filter', null)
 

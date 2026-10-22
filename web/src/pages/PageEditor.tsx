@@ -1,6 +1,19 @@
 import { Button, Card, Flex, Input, Select, Typography } from 'antd'
 import { useContext, useState } from 'react'
-import { typeChanges, widgetSummary, widgetTypes } from '../platform/pageWidgets'
+import { getAt } from '../platform/jsonPatch'
+import {
+  addableTypes,
+  childLists,
+  containerTypes,
+  type ListPart,
+  moveTo,
+  newWidget,
+  type PathStep,
+  typeChanges,
+  widgetLists,
+  widgetSummary,
+  widgetTypes,
+} from '../platform/pageWidgets'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
@@ -25,20 +38,24 @@ function JsonOnly() {
 }
 
 /**
- * The editor of a page. It shows the page's name and title, its widgets as a list, and a panel for the selected
- * widget's type with every property that type takes. A `form` panel also lists its `startProcess` actions. The page
- * holds one widget today, so the list has no add, remove or reorder. A property is a name picked from the
- * application's names, and a table's data source and entity, like a form's entity and form, exclude each other, so a
- * pick clears the other. The editor edits the draft through `onChange`, so a key it does not show, on the page or
- * on a widget, stays as it is. A widget of a type it has no panel for shows its type and points to the JSON view.
+ * The editor of a page. It shows the page's name and title, its widgets as a tree, and a panel for the selected
+ * widget. The tree nests the widgets inside `columns`, `tabs` and `section`. Every list has an Add widget picker,
+ * and every widget has Move up, Move down, Remove and a Move to picker that lists the other widget lists. A new
+ * container starts with two columns of width 6, one tab, or an empty section. A container's type is fixed, and its
+ * widths, labels and title are edited in the JSON view. The panel of a `table`, `form`, `taskInbox` or
+ * `processInspector` widget shows its type with every property that type takes. A `form` panel also lists its
+ * `startProcess` actions. A property is a name picked from the application's names, and a table's data source and
+ * entity, like a form's entity and form, exclude each other, so a pick clears the other. The editor edits the
+ * draft through `onChange`, so a key it does not show, on the page or on a widget, stays as it is. A widget of a
+ * type it has no panel for shows its type and points to the JSON view.
  */
 export function PageEditor({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
   const label = useContext(LabelTextsContext)
-  const [selected, setSelected] = useState(0)
+  const [picked, setPicked] = useState('/widgets/0')
   const widgets = Array.isArray(value.widgets) ? value.widgets : undefined
-  const index = widgets === undefined ? 0 : Math.min(selected, Math.max(widgets.length - 1, 0))
+  const selected = getAt(value, picked) === undefined ? '/widgets/0' : picked
 
   return (
     <Flex vertical gap="small" data-testid="studio-page-editor">
@@ -71,23 +88,18 @@ export function PageEditor({ value, onChange }: { value: Content; onChange: Chan
             <JsonOnly />
           ) : (
             <>
-              <Flex vertical gap="small" role="list">
-                {widgets.map((widget, position) => (
-                  <Button
-                    key={position}
-                    role="listitem"
-                    type={position === index ? 'primary' : 'default'}
-                    aria-current={position === index}
-                    data-testid={`studio-widget-${position}`}
-                    style={{ textAlign: 'left' }}
-                    onClick={() => setSelected(position)}
-                  >
-                    {isContent(widget) ? widgetSummary(widget) : ''}
-                  </Button>
-                ))}
-              </Flex>
+              <WidgetList
+                pointer="/widgets"
+                widgets={widgets}
+                tree={{ widgets, selected, onSelect: setPicked, onChange }}
+              />
               {widgets.length > 0 && (
-                <WidgetPanel index={index} widget={widgets[index]} pageName={text(value.name)} onChange={onChange} />
+                <WidgetPanel
+                  base={selected}
+                  widget={getAt(value, selected)}
+                  pageName={text(value.name)}
+                  onChange={onChange}
+                />
               )}
             </>
           )}
@@ -95,6 +107,182 @@ export function PageEditor({ value, onChange }: { value: Content; onChange: Chan
       </div>
     </Flex>
   )
+}
+
+/** What every list and row of the widget tree needs: the page's widgets, the selected pointer and the edits. */
+interface Tree {
+  widgets: unknown[]
+  selected: string
+  onSelect: (pointer: string) => void
+  onChange: ChangeHandler
+}
+
+/** The widgets of one list as rows, then the picker that adds a widget at the end of the list. */
+function WidgetList({ pointer, widgets, tree }: { pointer: string; widgets: unknown[]; tree: Tree }) {
+  const t = useText()
+
+  return (
+    <Flex vertical gap="small">
+      <Flex vertical gap="small" role="list" data-testid={`studio-widget-list-${pointer}`}>
+        {widgets.map((widget, index) => (
+          <WidgetRow key={index} listPointer={pointer} index={index} widgets={widgets} widget={widget} tree={tree} />
+        ))}
+      </Flex>
+      <div>
+        <Select
+          aria-label={t('shell.studio.page.addWidget')}
+          placeholder={t('shell.studio.page.addWidget')}
+          showSearch
+          optionFilterProp="label"
+          virtual={false}
+          style={{ minWidth: 240 }}
+          value={null}
+          options={addableTypes.map((option) => ({ value: option, label: option }))}
+          onChange={(type: string) => tree.onChange(pointer, [...widgets, newWidget(type)])}
+        />
+      </div>
+    </Flex>
+  )
+}
+
+/** The words that name a part of a container, such as `Column 2` or `Tab 1`. A section has none. */
+function usePartLabel() {
+  const t = useText()
+  return (part: ListPart): string | undefined => {
+    if (part.kind === 'section') {
+      return undefined
+    }
+    return `${t(part.kind === 'column' ? 'shell.studio.page.column' : 'shell.studio.page.tab')} ${part.index + 1}`
+  }
+}
+
+/** One widget: the button that selects it, its move and remove buttons, and the lists inside a container. */
+function WidgetRow({
+  listPointer,
+  index,
+  widgets,
+  widget,
+  tree,
+}: {
+  listPointer: string
+  index: number
+  widgets: unknown[]
+  widget: unknown
+  tree: Tree
+}) {
+  const t = useText()
+  const partLabel = usePartLabel()
+  const pointer = `${listPointer}/${index}`
+  const content = isContent(widget) ? widget : undefined
+  const container =
+    content !== undefined && typeof content.type === 'string' && containerTypes.includes(content.type)
+      ? content
+      : undefined
+  const children = container === undefined ? [] : childLists(container, pointer)
+  const pageList = t('shell.studio.page.pageList')
+  const targets = widgetLists(tree.widgets)
+    .filter((list) => list.pointer !== listPointer && !list.pointer.startsWith(`${pointer}/`))
+    .map((list) => ({
+      value: list.pointer,
+      label: [pageList, ...list.path.flatMap((step) => stepLabels(step, partLabel))].join(' › '),
+    }))
+
+  function move(offset: number) {
+    const next = [...widgets]
+    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
+    tree.onChange(listPointer, next)
+  }
+
+  function caption(list: { part: ListPart }): string | undefined {
+    const name = partLabel(list.part)
+    if (name !== undefined && list.part.kind === 'column' && Array.isArray(container?.columns)) {
+      const column = container.columns[list.part.index]
+      return isContent(column) && typeof column.width === 'number' ? `${name} · ${column.width}` : name
+    }
+    return name
+  }
+
+  return (
+    <div role="listitem">
+      <Flex vertical gap="small">
+        <Flex gap="small" wrap align="center" data-testid={`studio-widget-row-${pointer}`}>
+          <Button
+            type={pointer === tree.selected ? 'primary' : 'default'}
+            aria-current={pointer === tree.selected}
+            data-testid={`studio-widget-${pointer}`}
+            style={{ textAlign: 'left' }}
+            onClick={() => tree.onSelect(pointer)}
+          >
+            {content !== undefined ? widgetSummary(content) : ''}
+          </Button>
+          <Button disabled={index === 0} onClick={() => move(-1)}>
+            {t('shell.studio.page.moveUp')}
+          </Button>
+          <Button disabled={index === widgets.length - 1} onClick={() => move(1)}>
+            {t('shell.studio.page.moveDown')}
+          </Button>
+          <Button
+            danger
+            onClick={() =>
+              tree.onChange(
+                listPointer,
+                widgets.filter((_, at) => at !== index),
+              )
+            }
+          >
+            {t('shell.studio.page.removeWidget')}
+          </Button>
+          <Select
+            aria-label={t('shell.studio.page.moveTo')}
+            placeholder={t('shell.studio.page.moveTo')}
+            showSearch
+            optionFilterProp="label"
+            virtual={false}
+            style={{ minWidth: 200 }}
+            value={null}
+            options={targets}
+            onChange={(target: string) => {
+              const moved = moveTo(tree.widgets, pointer, target)
+              if (moved !== undefined) {
+                tree.onChange('/widgets', moved.widgets)
+                tree.onSelect(moved.pointer)
+              }
+            }}
+          />
+        </Flex>
+        {container !== undefined && (
+          <Flex vertical gap="small" style={{ marginInlineStart: 24 }}>
+            {children.map((list) => (
+              <Flex vertical gap="small" key={list.pointer}>
+                {caption(list) !== undefined && <Typography.Text type="secondary">{caption(list)}</Typography.Text>}
+                <WidgetList
+                  pointer={list.pointer}
+                  widgets={getAt({ widgets: tree.widgets }, list.pointer) as unknown[]}
+                  tree={tree}
+                />
+              </Flex>
+            ))}
+            {children.length !== partCount(container) && <JsonOnly />}
+          </Flex>
+        )}
+      </Flex>
+    </div>
+  )
+}
+
+/** How many widget lists a container should hold, or one when it has no list of parts the editor can count. */
+function partCount(widget: Content): number {
+  if (widget.type === 'section') {
+    return 1
+  }
+  const parts = widget.type === 'columns' ? widget.columns : widget.tabs
+  return Array.isArray(parts) ? parts.length : -1
+}
+
+/** The names a step adds to a list's path, such as `columns 1` and `Column 2`. */
+function stepLabels(step: PathStep, partLabel: (part: ListPart) => string | undefined): string[] {
+  const part = partLabel(step.part)
+  return part === undefined ? [`${step.type} ${step.position}`] : [`${step.type} ${step.position}`, part]
 }
 
 /** The picker of a name, or a plain box while the application's names have not loaded. */
@@ -142,19 +330,31 @@ function NameField({
 }
 
 function WidgetPanel({
-  index,
+  base,
   widget,
   pageName,
   onChange,
 }: {
-  index: number
+  /** The pointer of the selected widget. */
+  base: string
   widget: unknown
   pageName: string
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const base = `/widgets/${index}`
   const type = isContent(widget) && typeof widget.type === 'string' ? widget.type : undefined
+
+  if (type !== undefined && containerTypes.includes(type)) {
+    return (
+      <Flex vertical gap="small" data-testid={`studio-field-${base}`}>
+        <div data-testid={`studio-field-${base}/type`}>
+          <div>{t('shell.studio.page.widgetType')}</div>
+          <Typography.Text>{type}</Typography.Text>
+        </div>
+        <JsonOnly />
+      </Flex>
+    )
+  }
 
   if (!isContent(widget) || type === undefined || !widgetTypes.includes(type)) {
     return (

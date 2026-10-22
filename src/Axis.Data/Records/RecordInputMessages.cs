@@ -20,6 +20,8 @@ internal static class RecordInputMessages
 
     public const string MustBeArray = "Must be an array of row objects.";
 
+    public const string FieldNames = "Must be an array of field names.";
+
     public const string Text = "Must be a text value.";
 
     public const string NullCharacter = "Must not contain the null character.";

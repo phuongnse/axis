@@ -297,7 +297,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
     - When the names do not load, the list offers the functions only. Typing and
       Save keep working.
   - The check uses the saved resource, so a draft path that is not saved yet may
-    have no answer. When there is no answer, or the check answers `400` or
+    have no answer. A property that the saved object lacks has one: a new
+    `requiredWhen` on a saved form field is checked before the first save. A
+    place inside a new field or item that the file does not hold has none.
+    When there is no answer, or the check answers `400` or
     `401`, the last result stays on screen. A `401` does not start sign-in, so
     the draft is kept. The editor never blocks Save.
 - **Entity designer** *(built)*. An `entity` resource opens in a designer on
@@ -442,7 +445,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - See [roles and policies](roles-and-policies.md).
 - **Editors by kind.** Studio uses a typed editor for the kinds listed here, the entity
   designer for `entity`, and the generic form for every other kind. The seed editor,
-  the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the text
+  the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the form steps panel, the text
   editor, the process editor's step list, with its decision, end, task and operation panels, and the entity designer are
   built. The last column lists what still needs the JSON view, because the form cannot show it.
 
@@ -451,7 +454,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | `application` | Generic form                          | Nothing                                                               |
   | `entity`      | Entity designer                       | Nothing                                                               |
   | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives each container a panel |
-  | `form`        | Generic form                          | Nothing                                                               |
+  | `form`        | Generic form, typed steps panel       | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
   | `process`     | Typed editor with the process graph   | Nothing                                                               |
   | `rule`        | Generic form                          | Nothing                                                               |
@@ -491,15 +494,28 @@ Run and the Test results list, the read-only view of a module entity, and the re
     - **Pickers.** The form page picker lists every page except the current
       one. The action's process picker lists every process. Neither checks
       what the choice holds, so a wrong choice shows as a diagnostic after the
-      save.
-    - **Widgets.** A page holds one widget today, so the list has no add,
-      remove or reorder.
-    - **Widget tree** *(planned for M12)*. The editor shows the page's widgets
-      as nested rows. The author can add and remove a widget, move it up or
-      down and move it into a container. Each container type has a panel. A
-      `columns` panel edits the column widths. A `tabs` panel edits the tab
-      labels, with one text box per locale. A `section` panel edits the title
-      and the collapsed state. See [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+      save. The form page picker goes when M12 removes `formPage`. Until a
+      panel exists, navigate actions and page parameters are edited in the JSON
+      view ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md))
+      *(planned for M12)*.
+    - **Widget tree** *(built)*. The editor shows the page's widgets as
+      nested rows. A container shows its columns, tabs or section body as
+      nested lists, and a row opens that widget's panel at its own pointer,
+      such as `/widgets/0/columns/1/widgets/0`. Every list has an Add widget
+      picker with all seven types. A new `columns` starts with two columns of
+      width 6, a new `tabs` with one tab and a new `section` empty. Every row
+      has Move up, Move down and Remove, which replace only the list that holds
+      the widget, and a Move to picker. Move to lists every other widget list
+      as a path such as `Page › columns 1 › Column 2`, leaves out the widget's
+      own list and the lists inside it, and replaces the page's `widgets` in
+      one change. A container's type is fixed, and its panel points to the JSON
+      view. The editor does not check the depth limit or an empty list, so the
+      compiler reports them after the save. A widget keeps every key the editor
+      does not know when it moves.
+    - **Container panels** *(planned for M12)*. Each container type has a
+      panel. A `columns` panel edits the column widths. A `tabs` panel edits
+      the tab labels, with one text box per locale. A `section` panel edits the
+      title and the collapsed state. See [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
     - **Unknown keys.** A key the editor does not show, on the page or on a
       widget, is saved unchanged. A widget of a type with no panel, such as one
       M12 adds, shows its type and points to the JSON view.
@@ -642,6 +658,15 @@ Run and the Test results list, the read-only view of a module entity, and the re
     names, and is typed while those are unknown. **Add mapping** lists the
     fields that have no row. Renaming a row's field keeps its place in the
     file, and a value that is not an object is left to the JSON view.
+  - **Form steps** *(built)*. The form keeps the generic form for its entity,
+    sections and fields, which includes an expression editor for each
+    `visibleWhen`, `requiredWhen` and `readOnlyWhen`. Its `steps` show as cards
+    with a title, a section picker, **Move up**, **Move down** and **Remove**.
+    **Add step** appends a card. The picker lists the sections that have a
+    `name`, so an unnamed section is not offered. Removing the last step removes
+    `steps`, and the form goes back to one page. A condition offers the fields
+    that the form lists, because a condition reads only those. A `steps` value
+    that is not a list is left to the JSON view.
   - **Page editor and M12.** M12 adds layouts and widgets while this editor is
     built, see
     [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)

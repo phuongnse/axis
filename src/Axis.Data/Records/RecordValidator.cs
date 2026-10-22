@@ -105,9 +105,9 @@ public static class RecordValidator
     }
 
     /// <summary>
-    /// The record as it will be stored: every column field starts as <c>null</c>, then takes its
-    /// stored value and then the body's. The child collections are added by
-    /// <see cref="RecordCollections.TryAdd"/>.
+    /// The record as the interpreter reads it, keyed by field name: every column field starts as
+    /// null, then takes its stored value and then the value from <paramref name="values"/>. Child
+    /// collections are added with <see cref="RecordCollections.TryAdd"/>.
     /// </summary>
     internal static Dictionary<string, (object? Value, bool Exact)> BuildRecord(
         EntityModel entity,

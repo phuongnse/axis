@@ -48,10 +48,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   and the `startProcess` action are agreed in
   [D20](../decisions/d20-human-tasks-task-inbox-and-forms.md). The
   `form` resource, the task inbox, the task page and the `startProcess` action
-  are built. Navigate actions are expected to replace the table's
-  `formPage` link; see
-  [D15](../decisions/d15-presentation-model.md), where that part is
-  still **Proposed**.
+  are built. Navigate actions and page parameters replace the table's
+  `formPage` link in M12 _(planned for M12)_; see [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Text.** All UI strings come from text resources.
 - **Sites and texts.** The server describes sites to the SPA through
   read-only endpoints. Like every other `/api` path, they need a known tenant
@@ -138,13 +136,18 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `titles` in the site list has one entry per available locale of the site,
     from the locale as the site declares it to the title text. The home page
     can show each site without one more request per site.
-  - `type` of a widget is `table`, `form` or `taskInbox` or
-    `processInspector`. `formPage` is the
+  - `type` of a widget is `table`, `form`, `taskInbox` or
+    `processInspector`, or `detail`, `chart` or `kpi` *(planned for M12)*.
+    `formPage` is the
     page holding the form for a table's records, and `null` otherwise. On a
     `table` or `form`, exactly one of `entity` and `dataSource` is set, and
     the other is `null`. A `taskInbox` has both `null`, and so does a
     `processInspector`. The data source
     binding of the table widget below describes `dataSource`.
+  - *(Planned for M12.)* A `detail` sets `entity`, `form` when it names a
+    form, `actions` and `access`, and has `"dataSource": null`. A `chart` and
+    a `kpi` set `dataSource`, and have `"entity": null`, `"form": null`,
+    `"actions": []` and `"access": null`.
   - Every widget also has `form`, never left out. It is the widget's form
     resource on a `form` widget that names one, and `null` otherwise. It is
     described under **Form metadata** of the form widget.
@@ -153,13 +156,16 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - Every widget also has `process` and `instancesPath`,
     never left out. They are described under the process inspector widget, and
     are `null` on every other widget.
+  - Every widget also has `detail`, `chart` and `kpi` *(planned for M12)*,
+    never left out. Each is described under its widget, and is `null` on every
+    other widget. The examples on this page leave them out until M12.
   - Every widget also has `actions`, never left out. It
     is described under the form widget, and is `[]` on a widget it does not
     apply to. A table's `startProcess` row actions are left out without
     `start`, and its `delete` row action without `delete` *(planned for M12)*.
   - Every widget also has `access`, never left out. It is described under
     **Policies** below, and is `null` on a `taskInbox` and on a
-    `processInspector`.
+    `processInspector`, and on a `chart` and a `kpi` *(planned for M12)*.
   - A page may hold a tree of widgets. A container widget
     carries only `type` and its own keys. A leaf widget keeps every key above.
     A tab carries `labelKey`, and a `section` carries `titleKey` and
@@ -253,7 +259,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       [data source endpoint](data-sources.md#authorization) needs. A
       `taskInbox` is always readable. A
       `processInspector` is readable when the user holds an `inspect` grant on
-      its process.
+      its process. *(Planned for M12.)* A `detail` needs a `read` grant on its
+      entity. A `chart` or a `kpi` whose data source the user cannot run is
+      left out of the page, as a table is.
     - **Pages with a tree.** An unreadable widget is
       left out. A column or tab whose widgets are all left out is left out,
       and the other columns keep their declared widths. A container left with
@@ -267,12 +275,18 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       left out. A child collection field covers its rows as a whole, so it
       is left out, or kept with all its `fields`. `id` and `version` are not
       affected. The task API's form does the same, see
-      [policies on tasks](task-api.md).
+      [policies on tasks](task-api.md). *(Planned for M12.)* A `detail` leaves
+      out unreadable fields as its form metadata does, and an empty section
+      too. A `chart` or `kpi` measure over a field the user may not read
+      follows the data source's field check, which leaves the widget out.
     - **Actions.** A `startProcess` action is left out of `actions` when the
       user has no `start` grant on its process. The same holds for a `table`
       row action *(planned for M12)*, and its `delete` row action is left out
-      when `access.actions` lacks `delete`.
-    - **Access.** Every `table` and `form` widget gets an `access` object.
+      when `access.actions` lacks `delete`. A `navigate` action whose target
+      page the user cannot read is left out too _(planned for M12)_. A
+      `kpi`'s `navigate` to such a page is `null` _(planned for M12)_.
+    - **Access.** Every `table` and `form` widget, and every `detail`
+      *(planned for M12)*, gets an `access` object.
       It says which entity actions the user may take, and which fields each
       write action covers:
 
@@ -309,6 +323,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values |
+  | `/{site}/{page}?ticket=<id>` | _(planned for M12)_ a page with parameters: the values sit in the query under the parameter names |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
   | `/{site}/{inboxpage}/{taskId}` | the task page of the task with that id, under the page of a task inbox |
@@ -316,12 +331,16 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   - A page holds at most one `table` and at most one
     `form`, `taskInbox` or `processInspector`, so every part of the address
-    has one owner. The compiler checks this. `?page=&pageSize=&sort=` and the data source parameter
+    has one owner. A `detail`, a `chart` and a `kpi` own no part of the
+    address and read only page parameters, so they do not count
+    *(planned for M12)*. The compiler checks this. `?page=&pageSize=&sort=` and the data source parameter
     values belong to the page's one `table`. `/new` and `/{id}` belong to its
     one `form`. `/{taskId}` and `/{instanceId}` belong to its one `taskInbox`
     or `processInspector`.
   - `{site}` is the site path. `{page}` is the page name in lower case, as
     navigation links write it. The server matches both ignoring letter case.
+  - A required page parameter that is missing from the URL, or has the wrong
+    form, shows the not-found page inside the site shell _(planned for M12)_.
   - An unknown site shows the not-found page inside the platform shell. An
     unknown page shows it inside the site shell.
     An address with more than three segments, such as `/e2e/notes/42/edit`,
@@ -470,7 +489,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     button is a link: a click with a modifier key or the middle button opens
     the form in a new tab or window. Both pass the table's address, with
     its paging and sorting, to the form in history state. Without a form
-    page there is no create button and no open column.
+    page there is no create button and no open column. In M12 the open link
+    becomes a `rowActions` navigate with `record: id`, and the create button a
+    `toolbarActions` navigate without `record`, still gated by `access`
+    `create` _(planned for M12)_.
   - **Row and toolbar actions** *(planned for M12)*. See
     [D59](../decisions/d59-table-row-and-toolbar-actions.md).
     - **Where.** Toolbar actions sit next to the create button. Row actions
@@ -478,6 +500,28 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `navigate` action may sit in either list. `startProcess` and `delete`
       are row actions only. A row of a data source acts on its root record,
       and a group row has no actions.
+    - **Navigate.** A button that opens another page and sets its
+      parameters. A My tickets row opens a TicketDetail page and sets its
+      `ticket` parameter:
+
+      ```json
+      {
+        "type": "table",
+        "entity": "Ticket",
+        "rowActions": [
+          {
+            "type": "navigate",
+            "page": "TicketDetail",
+            "label": { "textKey": "tickets.open" },
+            "parameters": { "ticket": "id" }
+          }
+        ]
+      }
+      ```
+
+      The target page declares
+      `"parameters": [{ "name": "ticket", "type": "reference", "target": "Ticket", "required": true }]`.
+      The click goes to `/{site}/ticketdetail?ticket=<id>`. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
     - **`visibleWhen`.** An action hides when its expression over the row is
       `false`, `null` or fails. It only shapes the UI. The server decides, as
       in [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).
@@ -775,165 +819,120 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       holds no expressions, because they stay on the server. A user who may
       not read any field of a section gets no such section, and its name is
       left out of the steps. A step left with no section is left out.
-- **Task inbox widget**. A page whose widget is a
-  `taskInbox` lists the signed-in user's open tasks in the application,
-  through the [task API](task-api.md).
+- **Detail widget** *(planned for M12)*. A page whose widget is a `detail`
+  shows one record read-only, read through the record API. It writes
+  nothing. See [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
 
   ```json
-  {
-    "id": "e1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a5b",
-    "kind": "page",
-    "name": "MyTasks",
-    "formatVersion": 1,
-    "title": { "textKey": "pages.myTasks.title" },
-    "widgets": [{ "type": "taskInbox" }]
-  }
+  { "type": "detail", "entity": "Ticket", "record": "ticket", "actions": [{ "type": "startProcess", "process": "TicketHandling", "label": { "textKey": "tickets.handle" } }] }
   ```
 
-  - **Compile.** A `taskInbox` names no `entity`, `dataSource` or `form`,
-    otherwise it is `AXC0060` at that property. It names no `formPage`,
-    otherwise it is `AXC0022` at `/widgets/{i}/formPage`.
-  - **Metadata.** The widget has `"entity": null`, `"dataSource": null`,
-    `"form": null`, `"formPage": null` and a `tasksPath`, such as
-    `"/api/apps/PurchasingApp/tasks"`. `tasksPath` is `null` on every other
-    widget and never left out.
-  - **Order.** Rows keep the task API's order: the earliest due date first,
-    and tasks with no due date last. The SPA does not sort them again.
-  - **Columns.** The task's label, from the step's label text key, the
-    subject's label and the due date, formatted as a `date-time` cell. An
-    empty subject label or due date is an empty cell.
-    The inbox loads the texts of each release its rows name through
-    `releaseId`, once per release. Tasks from several releases each show
-    their own release's labels. The table stays loading until those texts
-    have arrived, and a failed load shows the inbox's load error.
-  - **Paging.** `page` and `pageSize` live in the URL, as for a table. There
-    is no sort.
-  - **Links.** Each row opens the task page at
-    `/{site}/{inboxpage}/{taskId}`, with the inbox page name in lower case.
-  - **Signed out.** With nobody signed in, the task API answers `401`, and
-    the widget starts sign-in like any other call. The platform texts
-    `shell.tasks.*` hold the column headers, the empty text and the load
-    error.
-- **Task page**. The address `/{site}/{inboxpage}/{taskId}`
-  shows one task, under the page of its task inbox.
-  - It loads the texts of the task's `releaseId` with
-    `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, for the
-    current and the fallback locale. The step, form and outcome labels use
-    those texts first, then the site texts and the platform texts. If they
-    fail to load, the page shows its load error.
-  - It shows the step's label, the subject's label, the due date and the
-    form's sections over the subject record. The layout and the field types
-    come from the task read's `form`, and the values from the subject
-    record, read through the record API.
-  - *(Planned for M12.)* The form behaves as the form widget does in
-    its **Conditions and steps**, using the task's
-    [form state route](task-api.md#form-state-of-a-task). Outcome buttons are
-    on the last step.
-  - It has one button per outcome, with the outcome's label.
-  - A click sends the outcome, the changed editable values and the record's
-    `version` to the complete endpoint. On success it returns to the inbox.
-  - A `403` shows a message that the task is assigned to someone else.
-  - A `409` for a decided task shows a message that the task is already
-    completed, and loads the task again.
-  - A `400` maps its keys as the form widget does: `/values/<field>` under
-    that field, and every other key, such as `/outcome`, above the form.
-  - A `409` that names keys, such as a stale `/version` or a duplicate
-    unique value, is mapped the same way. There is no reload button.
-  - A task that is not `open`, when the page loads or after a `409` loads it
-    again, shows only the already completed message, with no form or
-    outcome buttons. So nobody retries a decision that cannot succeed.
-  - With nobody signed in, the task read answers `401`, and the page starts
-    sign-in like any other call.
-  - Any other failure to load the task or its subject record, or to
-    complete it, shows a generic error message.
-  - On success the page goes to the inbox page's plain address, without the
-    paging the person came from.
-  - The `version` is sent even when no field changed. The task API ignores
-    it then.
-  - The task page has no history panel.
-  - The platform texts `shell.task.*` hold the assigned elsewhere and
-    already completed messages, and the load and complete errors.
-- **Process inspector widget**. A page whose widget is a
-  `processInspector` names one process. It lists the process's instances and
-  opens one, through the [inspection API](process-inspection.md#process-inspection).
+  - **Compile.** The widget names exactly one of `form` and `entity`, as a form
+    widget does (`AXC0060`). A `form` that names no loaded form is `AXC0077`.
+    `record` names a page parameter that is `required`, of type `reference`,
+    and whose `target` is the widget's entity. Otherwise it is a new check,
+    with no code yet. `actions` follow the form widget's rules, with
+    `navigate` allowed. The labels join `AXC0028`.
+  - **Metadata.** It reuses `entity`, `form`, `actions` and `access` of the
+    form widget, with `"dataSource": null` and `"chart": null` and
+    `"kpi": null`, and adds `detail`:
+
+    ```json
+    { "type": "detail", "entity": { "name": "Ticket", "fields": [{ "name": "title", "type": "text" }] }, "formPage": null, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [{ "type": "startProcess", "process": "TicketHandling", "labelKey": "tickets.handle", "instancesPath": "/api/apps/ServiceDesk/processes/TicketHandling/instances" }], "access": { "actions": ["read"], "createFields": [], "updateFields": [] }, "detail": { "record": "ticket" }, "chart": null, "kpi": null }
+    ```
+
+  - **Record.** The SPA reads the record that the page parameter `record`
+    names, from the entity's `recordsPath`. A missing or malformed parameter
+    and a record that is missing or unreadable show the not-found page inside
+    the site shell.
+  - **Fields.** With a `form`, the widget shows its sections in order under
+    their titles. Without one, it shows every readable field in declaration
+    order. Every value is read-only and formatted as a table cell shows it. The
+    widget ignores `visibleWhen`, `requiredWhen`, `readOnlyWhen` and `steps`.
+  - **Actions.** A `startProcess` button follows the form widget's **Start
+    process action**, without a save first. A `navigate` action sees the
+    record's fields and `id`, as on a form
+    ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)).
+- **Chart widget** *(planned for M12)*. A page whose widget is a `chart` draws
+  the groups of a grouped data source as a `bar`, a `line` or a `pie`. See
+  [D64](../decisions/d64-detail-chart-and-kpi-widgets.md) and the
+  [widget binding](data-sources.md#widget-binding).
 
   ```json
-  { "type": "processInspector", "process": "PurchaseRequestApproval" }
+  { "type": "chart", "kind": "bar", "dataSource": "OpenTicketsByCategory", "category": "category", "measures": [{ "name": "openCount", "label": { "textKey": "dashboard.byCategory.open" } }], "title": { "textKey": "dashboard.byCategory.title" } }
   ```
 
-  - **Compile.** The `process` must name a loaded process, otherwise it is
-    `AXC0192` at `/widgets/{i}/process`. The widget names none of `entity`,
-    `dataSource` and `form` (`AXC0060` at that property), and no `formPage`
-    (`AXC0022`).
-  - **Metadata.** The widget has `"entity": null`, `"dataSource": null`,
-    `"form": null`, `"formPage": null` and `"tasksPath": null`. It adds
-    `process` and an `instancesPath`, such as
-    `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances"`,
-    the list endpoint. The SPA never builds the path itself. It uses `process` to link the record history to the page, see
-    **History** under the form widget. The widget has `"access": null` and
-    `"actions": []`. The page endpoint answers `403` to a user without an
-    `inspect` grant on the process, and site navigation leaves the page out.
-  - **List.** The page lists the instances with their state, step, subject id,
-    release and times. Rows keep the API's order, newest first. A clearable
-    select above the list filters by state, and offers the five states with
-    platform texts. `state`, `page` and `pageSize` live in the URL, as for a
-    table. Changing the state goes back to page 1. A `state` in the URL that is
-    not one of the five is dropped. The step column shows the step's name,
-    because a list row carries no label key. Each row has an Open link.
-  - **Instance page.** A row opens `/{site}/{page}/{instanceId}`, with the
-    page name in lower case. `new` and an id in the wrong form show the
-    not-found page, and the instance is not requested. The page reads the
-    instance detail and shows the steps as a list in graph order, each with
-    its type and its transitions, with no diagram. Steps the instance has run
-    are marked as taken, and the step it is at is marked as current, whatever
-    the instance state. Below it are the history rows with the step, the
-    times, the decision and the error, then the tasks, then the calls with
-    their attempts. A call whose `inputHidden` is `true` shows "hidden" in
-    place of its input. A shown input is a list of its top-level properties,
-    where a number keeps its source digits.
-  - **Commands.** The page has a Cancel instance and a Retry button for each
-    of those commands that the instance detail's `commands` lists. With none
-    listed, it has no button, and a command name this build does not know is
-    left out. A button opens a dialog that asks for a reason. The reason is
-    required, must not be blank and has at most 500 characters, and Send is
-    blocked until it is valid. On success, the dialog closes and the page reads
-    the instance detail again, so it shows the new state, tasks, calls and
-    `commands`. On a `400`, `403`, `404` or `409`, the dialog shows the
-    problem's title. Any other failure shows a generic text, and a `401`
-    starts sign-in. The Retry dialog first warns when a call on the instance's
-    current step has `failed`, and that call is a package call whose
-    `idempotent` is not `true`. A failed connector call gets no warning. The
-    server still checks every command, so the page never decides who may act.
-  - **Resolve.** A call whose `resolvable` is `true` has a Resolve button,
-    whether it is a connector or a package call. A call that is not resolvable
-    has none, because the server decides what may be resolved and by whom. The
-    button opens a dialog that asks for a reason, with the rules of the other
-    commands, and an outcome, `succeeded` or `failed`. The outcome has no
-    default, and Send is blocked until one is chosen. For `succeeded`, the
-    dialog shows one input for each declared output of the call, labelled with
-    its name and type, with the required ones marked and checked before Send.
-    A `boolean` output is a true/false choice, and every other type is text,
-    so a date or date-time is typed as the API takes it. The values go out
-    typed: an integer or decimal keeps every digit, a boolean is `true` or
-    `false`, and an empty optional output is left out. A `failed` outcome sends
-    no output. On success, the dialog closes and the page reads the instance
-    again. On a `400`, the message of each `/output/{name}` error shows under
-    that output's field, and the problem's title shows in the dialog. Any other
-    refusal shows its title, and any other failure shows a generic text.
-  - **Labels.** Step labels come from the texts of the instance's `releaseId`,
-    loaded with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as
-    the inbox does. A step without a label shows its name.
-  - **Errors.** With nobody signed in, the API answers `401` and the widget
-    starts sign-in like any other call. A `403` shows a message that the user
-    may not inspect the process. A `404` on the instance page shows a message
-    that the instance does not exist, inside the page. Any other failure shows
-    a generic load error. The server checks every request, so the page never
-    decides who may inspect.
-  - The platform texts `shell.inspector.*` hold the column headers, the
-    section titles, the instance states, the "hidden" text, the empty texts
-    and the messages. The texts `shell.inspector.commands.*` hold the command
-    buttons, the dialog's labels, the reason errors, the retry warning and the
-    resolve labels and errors.
+  - **Compile.** The binding checks are in
+    [data-sources.md](data-sources.md#widget-binding). `kind` is `bar`, `line`
+    or `pie`. A `pie` has exactly one measure. The `title` and the measure
+    labels join `AXC0028`. A chart has no `entity`, `form` or `actions`
+    (`AXC0060`). Configuration names no chart library and no library option.
+  - **Metadata.** The widget has the `dataSource` object of the table
+    binding, `"entity": null`, `"form": null`, `"actions": []` and
+    `"access": null`, and adds `chart`. A measure's `labelKey` is a text key,
+    because a data source measure has no label:
+
+    ```json
+    { "type": "chart", "entity": null, "dataSource": { "name": "OpenTicketsByCategory", "rowsPath": "/api/apps/ServiceDesk/data-sources/OpenTicketsByCategory/rows", "entity": "Ticket", "parameters": [], "pageSize": 20, "columns": [] }, "chart": { "kind": "bar", "titleKey": "dashboard.byCategory.title", "category": "category", "measures": [{ "name": "openCount", "labelKey": "dashboard.byCategory.open" }] }, "detail": null, "kpi": null, "access": null }
+    ```
+
+    The example leaves `columns` empty and the keys that stay `null` or `[]`
+    out. A widget carries them all.
+  - **Rows.** The chart sends one request to `rowsPath` with `pageSize=100`,
+    the largest page size, and never pages. When `totalCount` is over 100, a
+    note under the chart says that only the first 100 groups show. Each row is
+    one category. A `reference` category shows its label from `labels`, and a
+    `null` category shows a platform text.
+  - **Values.** Decimals arrive as source text, as under **Number source
+    text**. The SPA turns them into numbers only to draw. The tooltip and the
+    data table keep the source text.
+  - **Look.** Series colours come from the theme tokens, in light and dark
+    mode. The SPA loads the library lazily in its own chunk, as it loads React
+    Flow, so a page without a chart never loads it.
+  - **Accessibility.** The title is the chart's accessible name. Screen readers
+    get the data as a table, with the category and each measure as columns.
+    Loading, empty and error states use platform texts.
+- **KPI widget** *(planned for M12)*. A page whose widget is a `kpi` shows one
+  measure of a data source as a tile, with its label. See
+  [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
+
+  ```json
+  { "type": "kpi", "dataSource": "OpenTicketTotals", "measure": "openCount", "label": { "textKey": "dashboard.open.label" }, "comparison": { "measure": "urgentCount", "label": { "textKey": "dashboard.urgent.label" } }, "navigate": { "type": "navigate", "page": "AllTickets", "label": { "textKey": "dashboard.open.show" } } }
+  ```
+
+  - **Compile.** The binding checks are in
+    [data-sources.md](data-sources.md#widget-binding). `comparison` and
+    `navigate` are optional. A navigate action follows D63's checks, and its
+    expressions see only the page's parameters. The labels join `AXC0028`. A
+    KPI has no `entity`, `form` or `actions` (`AXC0060`).
+  - **Metadata.** The widget has the `dataSource` object, `"entity": null`,
+    `"form": null`, `"actions": []` and `"access": null`, and adds `kpi`:
+
+    ```json
+    "kpi": {
+      "measure": "openCount",
+      "labelKey": "dashboard.open.label",
+      "comparison": { "measure": "urgentCount", "labelKey": "dashboard.urgent.label" },
+      "navigate": { "type": "navigate", "page": "AllTickets", "labelKey": "dashboard.open.show", "parameters": {} }
+    }
+    ```
+
+    `comparison` and `navigate` are `null` when the widget has none. The
+    `navigate` is `null` too when the user cannot read its page.
+  - **Value.** The SPA reads the one total row of the data source. The value
+    is formatted as a table cell shows it, and a `null` measure shows a
+    platform text for an empty value. The comparison is a second labelled
+    value. The SPA computes no difference and no percentage.
+  - **Click and reading.** With a `navigate`, the tile is a link to the target
+    page. The tile reads as `<label>: <value>`, and a comparison adds
+    `<comparison label>: <comparison value>`. Loading and error states use
+    platform texts.
+- **Task inbox widget**. A page whose widget is a `taskInbox` lists the signed-in user's open
+  tasks. See [task-inbox-widget.md](task-inbox-widget.md).
+- **Task page**. The address `/{site}/{inboxpage}/{taskId}` shows one task, under the page of its
+  task inbox. See [task-inbox-widget.md](task-inbox-widget.md).
+- **Process inspector widget**. A page whose widget is a `processInspector` lists the instances of
+  one process and opens one. See [process-inspector-widget.md](process-inspector-widget.md).
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a
