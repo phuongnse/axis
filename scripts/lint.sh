@@ -13,6 +13,9 @@ if git grep -nE --untracked '(^|[^[:alnum:]_-])ant-[[:alnum:]]' -- tests; then
   exit 1
 fi
 
+# Specs match accessible names and texts exactly. Only a regular expression matches part of one.
+node scripts/check-locators.mjs
+
 # A test outside a *PerformanceTests class passes or fails the same way on any runner, so it measures
 # no elapsed time. A polling deadline built on DateTime.UtcNow only ends a wait and is allowed.
 if git grep -nE --untracked '(^|[^[:alnum:]_])(Stopwatch|GetElapsedTime)([^[:alnum:]_]|$)|\.Elapsed([^[:alnum:]_]|$)' -- 'tests/*.cs' ':(exclude)tests/*PerformanceTests.cs'; then

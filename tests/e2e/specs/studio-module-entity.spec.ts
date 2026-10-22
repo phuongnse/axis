@@ -51,8 +51,8 @@ test.describe("Studio opens a module entity read-only", () => {
       await expect(field).toHaveValue(name);
       await expect(field).toBeDisabled();
     }
-    for (const name of [/save/i, /delete/i, /add field/i]) {
-      await expect(page.getByRole("button", { name })).toHaveCount(0);
-    }
+    await expect(page.getByRole("button", { name: /save/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /delete/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /add field/i })).toHaveCount(0);
   });
 });
