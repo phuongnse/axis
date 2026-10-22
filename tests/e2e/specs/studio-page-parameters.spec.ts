@@ -65,12 +65,12 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     const field = page.getByTestId(label);
     await field.getByRole("textbox", { name: "en", exact: true }).fill(en);
     await field.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
-    await field.getByRole("button", { name: "Write texts" }).click();
+    await field.getByRole("button", { name: "Write texts", exact: true }).click();
     await expect(field.getByTestId("studio-label-written")).toBeVisible();
   }
 
   async function save(page: Page) {
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByTestId("studio-saved")).toBeVisible();
   }
 
@@ -83,30 +83,30 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await useSession(page, "hoa");
     await page.goto(`${server.url}/studio?app=PurchaseRequests`);
 
-    await page.getByRole("button", { name: "New application" }).click();
+    await page.getByRole("button", { name: "New application", exact: true }).click();
     const dialog = page.getByRole("dialog");
-    await dialog.getByRole("textbox", { name: "Name" }).fill(name);
-    await dialog.getByRole("radio", { name: "Request approval" }).click();
-    await dialog.getByRole("button", { name: "Create" }).click();
+    await dialog.getByRole("textbox", { name: "Name", exact: true }).fill(name);
+    await dialog.getByRole("radio", { name: /^Request approval/ }).click();
+    await dialog.getByRole("button", { name: "Create", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`app=${name}$`));
     await expect(dialog).toBeHidden();
 
-    await page.getByRole("button", { name: "New resource" }).click();
-    await dialog.getByRole("combobox", { name: "Kind" }).click();
+    await page.getByRole("button", { name: "New resource", exact: true }).click();
+    await dialog.getByRole("combobox", { name: "Kind", exact: true }).click();
     await page.getByTitle("page", { exact: true }).click();
-    await dialog.getByRole("textbox", { name: "Name" }).fill("RequestDetail");
-    await dialog.getByRole("button", { name: "Create" }).click();
+    await dialog.getByRole("textbox", { name: "Name", exact: true }).fill("RequestDetail");
+    await dialog.getByRole("button", { name: "Create", exact: true }).click();
     // The dialog gives the focus back to the New resource button when its close animation ends, and the pick helpers
     // press Enter, so they start only when it is gone.
     await expect(dialog).toBeHidden();
     const editor = page.getByTestId("studio-page-editor");
-    await expect(editor.getByRole("textbox", { name: "Name" })).toHaveValue(
+    await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
       "RequestDetail",
     );
 
     // The names load again, so the entities of the new application are offered below.
     await page.reload();
-    await expect(editor.getByRole("textbox", { name: "Name" })).toHaveValue(
+    await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
       "RequestDetail",
     );
     await writeTexts(
@@ -116,11 +116,11 @@ test.describe("Studio declares a page parameter and links to the page", () => {
       `Chi tiết yêu cầu ${stamp}`,
     );
 
-    await page.getByRole("button", { name: "Add parameter" }).click();
-    await page.getByRole("textbox", { name: "Parameter name" }).fill("request");
+    await page.getByRole("button", { name: "Add parameter", exact: true }).click();
+    await page.getByRole("textbox", { name: "Parameter name", exact: true }).fill("request");
     await pick(page, "studio-field-/parameters/0/type", "reference");
     await pick(page, "studio-field-/parameters/0/target", "Request");
-    await page.getByRole("switch", { name: "Required" }).click();
+    await page.getByRole("switch", { name: "Required", exact: true }).click();
     await save(page);
 
     // The names list the new parameter after a reload, and the link below offers it.
@@ -129,13 +129,13 @@ test.describe("Studio declares a page parameter and links to the page", () => {
       .getByTestId("studio-group-page")
       .getByRole("button", { name: "MyRequests", exact: true })
       .click();
-    await expect(editor.getByRole("textbox", { name: "Name" })).toHaveValue(
+    await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
       "MyRequests",
     );
 
     await page
       .getByTestId("studio-field-/widgets/0/rowActions")
-      .getByRole("button", { name: "Add navigate action" })
+      .getByRole("button", { name: "Add navigate action", exact: true })
       .click();
     const action = "studio-field-/widgets/0/rowActions/1";
     await pick(page, `${action}/page`, "RequestDetail");
@@ -161,10 +161,10 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     };
     expect(list.widgets[0].rowActions[1].parameters).toEqual({ request: "id" });
 
-    await page.getByRole("button", { name: "Publish" }).click();
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
     await page
       .getByRole("dialog")
-      .getByRole("button", { name: "Publish" })
+      .getByRole("button", { name: "Publish", exact: true })
       .click();
     await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
       "data-status",
@@ -194,13 +194,13 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await page.goto(`${server.url}/${site.path}/myrequests`);
     await page
       .getByRole("row", { name: new RegExp(title) })
-      .getByRole("button", { name: "Details" })
+      .getByRole("button", { name: "Details", exact: true })
       .click();
     await expect(page).toHaveURL(
       `${server.url}/${site.path}/requestdetail?request=${id}`,
     );
     await expect(
-      page.getByRole("heading", { name: `Request detail ${stamp}` }),
+      page.getByRole("heading", { name: `Request detail ${stamp}`, exact: true }),
     ).toBeVisible();
   });
 });

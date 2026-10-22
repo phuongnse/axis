@@ -61,10 +61,10 @@ test.describe('Studio on a copy of its own', () => {
     const entity = items.find((item) => item.file === 'entities/purchase-request.json')!
 
     await page.goto(`${server.url}/`)
-    await page.getByRole('banner').getByRole('link', { name: 'Studio' }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Studio', exact: true }).click()
     // The sample is the only application, so it is picked without a choice.
     await expect(page).toHaveURL(/\/studio\?app=PurchaseRequests$/)
-    await page.getByRole('searchbox', { name: 'Search by name or id' }).fill('PurchaseRequest')
+    await page.getByRole('searchbox', { name: 'Search by name or id', exact: true }).fill('PurchaseRequest')
     await page.getByTestId(`studio-resource-${entity.id}`).click()
 
     await expect(page.getByTestId('studio-resource-details')).toContainText('entities/purchase-request.json')
@@ -85,7 +85,7 @@ test.describe('Studio on a copy of its own', () => {
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${entity.id}`)
     await page.getByTestId(`studio-field-/fields/${index}/maxLength`).getByRole('spinbutton').fill(String(next))
-    await page.getByRole('button', { name: 'Save' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()
 
     const after: unknown = JSON.parse(await readFile(file, 'utf8'))
@@ -133,11 +133,11 @@ test.describe('Studio on a copy of its own', () => {
     await editor.click()
     await editor.press('ControlOrMeta+A')
     await editor.pressSequentially('req')
-    await expect(page.getByRole('option', { name: 'requester' })).toBeVisible()
+    await expect(page.getByRole('option', { name: 'requester', exact: true })).toBeVisible()
 
     await editor.press('ControlOrMeta+A')
     await editor.pressSequentially('cur')
-    await expect(page.getByRole('option', { name: 'currentUser()' })).toBeVisible()
+    await expect(page.getByRole('option', { name: 'currentUser()', exact: true })).toBeVisible()
 
     expect(await readFile(file, 'utf8')).toBe(before)
   })
@@ -154,7 +154,7 @@ test.describe('Studio on a copy of its own', () => {
       .getByTestId('studio-used-by')
       .getByTestId('studio-reference')
       .filter({ hasText: 'entities/purchase-request.json · Path: /fields/3/target' })
-      .getByRole('button', { name: 'PurchaseRequest' })
+      .getByRole('button', { name: 'PurchaseRequest', exact: true })
       .click()
 
     await expect(page).toHaveURL(new RegExp(`resource=${entity.id}`))
@@ -175,7 +175,7 @@ test.describe('Studio on a copy of its own', () => {
         page.getByTestId('studio-field-/widgets/0/dataSource').getByRole('combobox'),
         'PurchaseRequestList',
       )
-      await page.getByRole('button', { name: 'Save' }).click()
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
       await page.reload()
@@ -184,7 +184,7 @@ test.describe('Studio on a copy of its own', () => {
           .getByTestId('studio-uses')
           .getByTestId('studio-reference')
           .filter({ hasText: 'pages/requests-by-department.json · Path: /widgets/0/dataSource' })
-          .getByRole('button', { name: 'PurchaseRequestList' }),
+          .getByRole('button', { name: 'PurchaseRequestList', exact: true }),
       ).toBeVisible()
     } finally {
       await writeFile(file, original)
@@ -247,9 +247,9 @@ test.describe('Studio on a copy of its own', () => {
 
       await page.goto(`${server.url}/studio?app=PurchaseRequests&view=policies`)
       await page.getByTestId('studio-matrix-cell-matrix-tester-entity-Supplier').click()
-      await page.getByRole('button', { name: 'Add grant' }).click()
-      await page.getByTestId('studio-matrix-actions').getByRole('checkbox', { name: 'read' }).check()
-      await page.getByRole('button', { name: 'Save' }).click()
+      await page.getByRole('button', { name: 'Add grant', exact: true }).click()
+      await page.getByTestId('studio-matrix-actions').getByRole('checkbox', { name: 'read', exact: true }).check()
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-matrix-saved')).toBeVisible()
 
       const written = JSON.parse(await readFile(policyFile, 'utf8')) as Record<string, unknown>
@@ -290,7 +290,7 @@ test.describe('Studio on a copy of its own', () => {
 
       await page.goto(`${restarted.url}/studio?app=PurchaseRequests&resource=${supplier.id}`)
       await page.getByTestId('studio-field-/fields/1/maxLength').getByRole('spinbutton').fill(String(next))
-      await page.getByRole('button', { name: 'Save' }).click()
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
       const { port } = restarted
@@ -358,11 +358,11 @@ test.describe('Studio on a copy of its own', () => {
     try {
       await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${seed.id}`)
       await expect(page.getByTestId('studio-seed-row')).toHaveCount(before.records.length)
-      await page.getByRole('button', { name: 'Add record' }).click()
+      await page.getByRole('button', { name: 'Add record', exact: true }).click()
       const row = page.getByTestId('studio-seed-row').nth(before.records.length)
-      await row.getByRole('textbox', { name: 'code' }).fill(code)
-      await row.getByRole('textbox', { name: 'name' }).fill('Test department')
-      await page.getByRole('button', { name: 'Save' }).click()
+      await row.getByRole('textbox', { name: 'code', exact: true }).fill(code)
+      await row.getByRole('textbox', { name: 'name', exact: true }).fill('Test department')
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
       const diagnosticsAfter = await (
@@ -392,10 +392,10 @@ test.describe('Studio on a copy of its own', () => {
     try {
       await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${english.id}`)
       const add = page.getByTestId('studio-text-add')
-      await add.getByRole('textbox', { name: 'New key' }).fill(key)
-      await add.getByRole('textbox', { name: 'en' }).fill('E2E text')
-      await add.getByRole('textbox', { name: 'vi' }).fill('Văn bản E2E')
-      await add.getByRole('button', { name: 'Add key' }).click()
+      await add.getByRole('textbox', { name: 'New key', exact: true }).fill(key)
+      await add.getByRole('textbox', { name: 'en', exact: true }).fill('E2E text')
+      await add.getByRole('textbox', { name: 'vi', exact: true }).fill('Văn bản E2E')
+      await add.getByRole('button', { name: 'Add key', exact: true }).click()
       await expect(page.locator(`[data-testid="studio-text-row"][data-key="${key}"]`)).toBeVisible()
 
       const [en, vi] = await Promise.all(
@@ -425,12 +425,12 @@ test.describe('Studio on a copy of its own', () => {
 
     try {
       await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${connector.id}`)
-      await expect(page.getByRole('textbox', { name: 'URL binding' })).toHaveValue('PurchasingSystemUrl')
-      await page.getByRole('button', { name: 'Add operation' }).click()
+      await expect(page.getByRole('textbox', { name: 'URL binding', exact: true })).toHaveValue('PurchasingSystemUrl')
+      await page.getByRole('button', { name: 'Add operation', exact: true }).click()
       const added = before.operations.length
       await page.getByTestId(`studio-field-/operations/${added}/name`).getByRole('textbox').fill(name)
       await page.getByTestId(`studio-field-/operations/${added}/path`).getByRole('textbox').fill('/ping')
-      await page.getByRole('button', { name: 'Save' }).click()
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
       const diagnosticsAfter = await (
@@ -471,7 +471,7 @@ test.describe('Studio on a copy of its own', () => {
       // The type line shows only once CodeMirror has replaced the read-only Suspense fallback.
       await expect(row.getByTestId('studio-expression-type')).toBeVisible()
       await expression.fill('trim(title)')
-      await page.getByRole('button', { name: 'Save' }).click()
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
       const diagnosticsAfter = await (
@@ -499,12 +499,12 @@ test.describe('Studio on a copy of its own', () => {
 
     try {
       await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
-      await expect(page.getByRole('textbox', { name: 'Text key' })).toHaveValue('pages.labelTextsE2e.title')
-      await page.getByRole('textbox', { name: 'en' }).fill('Label texts')
-      await page.getByRole('textbox', { name: 'vi' }).fill('Văn bản nhãn')
-      await page.getByRole('button', { name: 'Write texts' }).click()
+      await expect(page.getByRole('textbox', { name: 'Text key', exact: true })).toHaveValue('pages.labelTextsE2e.title')
+      await page.getByRole('textbox', { name: 'en', exact: true }).fill('Label texts')
+      await page.getByRole('textbox', { name: 'vi', exact: true }).fill('Văn bản nhãn')
+      await page.getByRole('button', { name: 'Write texts', exact: true }).click()
       await expect(page.getByTestId('studio-label-written')).toBeVisible()
-      await page.getByRole('button', { name: 'Save' }).click()
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
       const [en, vi] = await Promise.all(
@@ -555,8 +555,8 @@ test.describe('Studio on a copy of its own', () => {
 
     await page.goto(`${server.url}/`)
     const banner = page.getByRole('banner')
-    await expect(banner.getByRole('button', { name: 'Anna Employee' })).toBeVisible()
-    await expect(banner.getByRole('link', { name: 'Studio' })).toHaveCount(0)
+    await expect(banner.getByRole('button', { name: 'Anna Employee', exact: true })).toBeVisible()
+    await expect(banner.getByRole('link', { name: /studio/i })).toHaveCount(0)
     await page.goto(`${server.url}/studio`)
 
     await expect(page.getByTestId('studio-forbidden')).toBeVisible()
@@ -574,8 +574,8 @@ test.describe('Studio on a copy of its own', () => {
 
       await page.goto(`${noPublisher.url}/studio?app=PurchaseRequests`)
 
-      await expect(page.getByRole('button', { name: 'Validate' })).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Publish' })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Validate', exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: /publish/i })).toHaveCount(0)
     } finally {
       await noPublisher.stop()
     }

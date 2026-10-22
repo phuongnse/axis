@@ -46,14 +46,14 @@ test.describe('Studio creates a resource from a starter', () => {
         response.request().method() === 'PATCH' && response.url().includes('/api/studio/apps/PurchaseRequests/resources/'),
       { timeout: 60_000 },
     )
-    await page.getByRole('button', { name: 'Save' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()
     const { diagnostics } = (await (await answer).json()) as { diagnostics: { file: string }[] }
     return diagnostics
   }
 
   async function addField(page: Page, index: number, name: string, type: string) {
-    await page.getByRole('button', { name: 'Add field' }).click()
+    await page.getByRole('button', { name: 'Add field', exact: true }).click()
     await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(name)
     await pick(page, `studio-field-/fields/${index}/type`, type)
   }
@@ -98,7 +98,7 @@ test.describe('Studio creates a resource from a starter', () => {
   }) => {
     await useSession(page, 'hoa')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
-    const entityName = page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name' })
+    const entityName = page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name', exact: true })
 
     await createResource(page, 'entity', 'ProjectTask')
     await expect(entityName).toHaveValue('ProjectTask')
@@ -139,7 +139,7 @@ test.describe('Studio creates a resource from a starter', () => {
 
     await useSession(page, 'hoa')
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
-    await expect(page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name' })).toHaveValue(
+    await expect(page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name', exact: true })).toHaveValue(
       'Project',
     )
 
@@ -165,9 +165,9 @@ test.describe('Studio creates a resource from a starter', () => {
   test('a click on the disabled Create button fails within the action timeout and names the button', async ({ page }) => {
     await useSession(page, 'hoa')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
-    await page.getByRole('button', { name: 'New resource' }).click()
-    const dialog = page.getByRole('dialog', { name: 'New resource' })
-    const create = dialog.getByRole('button', { name: 'Create' })
+    await page.getByRole('button', { name: 'New resource', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'New resource', exact: true })
+    const create = dialog.getByRole('button', { name: 'Create', exact: true })
 
     const started = Date.now()
     const error = await create.click().catch((caught: Error) => caught)
@@ -176,6 +176,6 @@ test.describe('Studio creates a resource from a starter', () => {
     expect((error as Error).message).toContain('Timeout 15000ms')
     expect((error as Error).message).toContain('Create')
     expect(Date.now() - started).toBeLessThan(20_000)
-    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   })
 })
