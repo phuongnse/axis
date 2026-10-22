@@ -65,9 +65,9 @@ async function editInStudio(
   change(content)
 
   await page.goto(`${serverUrl}/studio?app=PurchaseRequests&resource=${resource.id}`)
-  await page.getByRole('tab', { name: 'JSON' }).click()
-  await page.getByRole('textbox', { name: 'JSON' }).fill(JSON.stringify(content, null, 2))
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('tab', { name: 'JSON', exact: true }).click()
+  await page.getByRole('textbox', { name: 'JSON', exact: true }).fill(JSON.stringify(content, null, 2))
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByTestId('studio-saved')).toBeVisible()
 }
 
@@ -91,10 +91,10 @@ async function signInToPreview(browser: Browser, baseURL: string, user: string) 
 
 /** Clicks Publish, fills the dialog's label and confirms. */
 async function publishWithLabel(page: Page, label: string) {
-  await page.getByRole('button', { name: 'Publish' }).click()
+  await page.getByRole('button', { name: 'Publish', exact: true }).click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('textbox', { name: 'Label (optional)' }).fill(label)
-  await dialog.getByRole('button', { name: 'Publish' }).click()
+  await dialog.getByRole('textbox', { name: 'Label (optional)', exact: true }).fill(label)
+  await dialog.getByRole('button', { name: 'Publish', exact: true }).click()
 }
 
 /**
@@ -104,15 +104,15 @@ async function publishWithLabel(page: Page, label: string) {
  */
 async function reviewAndApprove(page: Page, title: string, shown: string, hidden: string) {
   const row = await waitForTask(page, title)
-  await row.getByRole('link', { name: 'Manager approval' }).click()
+  await row.getByRole('link', { name: 'Manager approval', exact: true }).click()
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title)
   for (const mode of ['light', 'dark']) {
-    if (mode === 'dark') await page.getByRole('switch', { name: 'Dark mode' }).click()
+    if (mode === 'dark') await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
     const theme = page.locator(`[data-theme-mode="${mode}"]`)
     await expect(theme.getByRole('heading', { name: shown, exact: true })).toBeVisible()
-    await expect(theme.getByRole('heading', { name: hidden, exact: true })).toHaveCount(0)
+    await expect(theme.getByRole('heading', { name: new RegExp(hidden) })).toHaveCount(0)
   }
-  await page.getByRole('button', { name: 'Approve' }).click()
+  await page.getByRole('button', { name: 'Approve', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/mytasks$/)
 }
 
@@ -181,7 +181,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(page.getByTestId('studio-release-number')).toBeVisible()
       await useSession(page, 'anna')
       await page.goto('/purchasing/suppliers')
-      await expect(page.getByRole('columnheader', { name: heading })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: heading, exact: true })).toBeVisible()
     } finally {
       await server.stop()
     }
@@ -217,7 +217,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       const { context, page: preview } = await signInToPreview(browser, baseURL!, 'anna')
       try {
         await preview.goto('/purchasing/suppliers')
-        await expect(preview.getByRole('columnheader', { name: heading })).toBeVisible()
+        await expect(preview.getByRole('columnheader', { name: heading, exact: true })).toBeVisible()
       } finally {
         await context.close()
       }
@@ -225,7 +225,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await useSession(page, 'anna')
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: 'Name', exact: true })).toBeVisible()
-      await expect(page.getByRole('columnheader', { name: heading })).toHaveCount(0)
+      await expect(page.getByRole('columnheader', { name: new RegExp(heading) })).toHaveCount(0)
     } finally {
       await server.stop()
     }
@@ -257,7 +257,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await useSession(page, 'anna')
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: 'Name', exact: true })).toBeVisible()
-      await expect(page.getByRole('columnheader', { name: heading })).toHaveCount(0)
+      await expect(page.getByRole('columnheader', { name: new RegExp(heading) })).toHaveCount(0)
     } finally {
       await server.stop()
     }
@@ -300,10 +300,10 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       const first = page.getByTestId('studio-release-row').filter({ hasText: `First ${stamp}` })
       const number = await first.getAttribute('data-number')
-      await first.getByRole('button', { name: 'Roll back' }).click()
+      await first.getByRole('button', { name: 'Roll back', exact: true }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toContainText(`Release ${number} First ${stamp}`)
-      await dialog.getByRole('button', { name: 'Roll back' }).click()
+      await dialog.getByRole('button', { name: 'Roll back', exact: true }).click()
 
       await expect(status).toContainText('Rolled back', { timeout: 60_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
@@ -317,8 +317,8 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       await useSession(page, 'anna')
       await page.goto('/purchasing/suppliers')
-      await expect(page.getByRole('columnheader', { name: headingA })).toBeVisible()
-      await expect(page.getByRole('columnheader', { name: headingB })).toHaveCount(0)
+      await expect(page.getByRole('columnheader', { name: headingA, exact: true })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: new RegExp(headingB) })).toHaveCount(0)
     } finally {
       await server.stop()
     }
@@ -385,8 +385,8 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(rows.and(page.locator('[data-number="2"]'))).toHaveAttribute('data-active', 'true')
 
       const earlier = page.locator('[data-testid="studio-release-row"][data-number="1"]')
-      await earlier.getByRole('button', { name: 'Roll back' }).click()
-      await page.getByRole('dialog').getByRole('button', { name: 'Roll back' }).click()
+      await earlier.getByRole('button', { name: 'Roll back', exact: true }).click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Roll back', exact: true }).click()
 
       await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed', {
         timeout: 60_000,
@@ -440,7 +440,7 @@ test.describe('the active release of the purchase request sample changes', () =>
         content.texts['pages.suppliers.title'] = title
       })
 
-      await page.getByRole('button', { name: 'Validate' }).click()
+      await page.getByRole('button', { name: 'Validate', exact: true }).click()
       await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
       const diagnostics = page.getByTestId('studio-diagnostics')
       await expect(diagnostics.locator('li')).toHaveCount(0)
@@ -458,7 +458,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await useSession(page, 'anna')
       await page.goto(suppliers)
       await expect(page.getByText('Suppliers', { exact: true }).first()).toBeVisible()
-      await expect(page.getByText(title, { exact: true })).toHaveCount(0)
+      await expect(page.getByText(new RegExp(title))).toHaveCount(0)
 
       await useSession(page, 'hoa')
       await page.goto(`${server.url}/studio?app=PurchaseRequests`)
@@ -492,15 +492,15 @@ test.describe('the active release of the purchase request sample changes', () =>
       await page
         .locator(`[data-testid="studio-release-row"][data-number="${before.number}"]`)
         .first()
-        .getByRole('button', { name: 'Roll back' })
+        .getByRole('button', { name: 'Roll back', exact: true })
         .click()
-      await page.getByRole('dialog').getByRole('button', { name: 'Roll back' }).click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Roll back', exact: true }).click()
       await expect(status).toContainText('Rolled back', { timeout: 60_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
       await useSession(page, 'anna')
       await page.goto(suppliers)
       await expect(page.getByText('Suppliers', { exact: true }).first()).toBeVisible()
-      await expect(page.getByText(title, { exact: true })).toHaveCount(0)
+      await expect(page.getByText(new RegExp(title))).toHaveCount(0)
     } finally {
       await server.stop()
     }

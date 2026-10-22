@@ -85,7 +85,7 @@ test.describe('the active release of the release application changes', () => {
     await page.goto(`/release-app/tasks/${taskId}`)
 
     await expect(page.getByLabel('Topic', { exact: true })).toHaveValue(topic)
-    await expect(page.getByLabel('Headline', { exact: true })).toHaveCount(0)
+    await expect(page.getByLabel(/Headline/)).toHaveCount(0)
   })
 
   test('a task started after the new release shows its label', async ({
@@ -101,7 +101,7 @@ test.describe('the active release of the release application changes', () => {
     await page.goto(`/release-app/tasks/${taskId}`)
 
     await expect(page.getByLabel('Headline', { exact: true })).toHaveValue(topic)
-    await expect(page.getByLabel('Topic', { exact: true })).toHaveCount(0)
+    await expect(page.getByLabel(/Topic/)).toHaveCount(0)
   })
 })
 

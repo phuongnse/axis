@@ -273,7 +273,7 @@ test('a form in two sections shows both titles, and saving keeps its read-only f
   await expect(code).toHaveValue(`S-${run}`)
   await expect(code).not.toBeEditable()
   // A field the form does not list is not shown.
-  await expect(page.getByLabel('Done', { exact: true })).toBeHidden()
+  await expect(page.getByLabel(/Done/)).toBeHidden()
 
   await page.getByLabel('Priority', { exact: true }).fill('4')
   await page.getByRole('button', { name: 'Save', exact: true }).click()

@@ -26,7 +26,7 @@ async function departmentId(request: APIRequestContext, name: string) {
 
 /** Opens the lookup of the reference field `field`, labelled `label`, and picks the row named `name`. */
 async function choose(page: Page, field: string, label: string, name: string) {
-  await page.getByTestId(`reference-${field}`).getByRole('button', { name: 'Choose' }).click()
+  await page.getByTestId(`reference-${field}`).getByRole('button', { name: 'Choose', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
   await expect(dialog).toBeHidden()
@@ -48,14 +48,14 @@ test('a purchase request is created with line items, shows the computed total, i
 
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
-  await page.getByRole('textbox', { name: 'Title' }).fill(title)
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
   // The server sets the requester to the signed-in user, so the form shows it read-only.
   await expect(page.getByLabel('Requester', { exact: true })).toHaveAttribute('readonly')
   await choose(page, 'department', 'Department', 'Finance')
   await choose(page, 'supplier', 'Supplier', 'Acme Supplies')
   await select(page, 'Currency', 'VND')
-  await page.getByRole('button', { name: 'Add row' }).click()
-  await page.getByRole('button', { name: 'Add row' }).click()
+  await page.getByRole('button', { name: 'Add row', exact: true }).click()
+  await page.getByRole('button', { name: 'Add row', exact: true }).click()
   await cell('Description 1').fill('Desk')
   await cell('Quantity 1').fill('2')
   await cell('Unit price 1').fill('1250.45')
@@ -63,7 +63,7 @@ test('a purchase request is created with line items, shows the computed total, i
   await cell('Quantity 2').fill('1')
   await cell('Unit price 2').fill('50.00')
   await select(page, 'Status', 'draft')
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
@@ -75,12 +75,12 @@ test('a purchase request is created with line items, shows the computed total, i
 
   // The server computes each line amount and the total on save, so the form shows them once reopened.
   await row.getByRole('button', { name: 'Open', exact: true }).click()
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
   await expect(cell('Amount 1')).toHaveValue('2500.90')
   await expect(cell('Amount 2')).toHaveValue('50.00')
   await expect(cell('Total amount')).toHaveValue('2550.90')
-  await page.getByRole('textbox', { name: 'Title' }).fill(`${title} edited`)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(`${title} edited`)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
   const edited = page.getByRole('row', { name: new RegExp(`${title} edited`) })
@@ -89,13 +89,13 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(edited).toContainText('Finance')
   await expect(edited).toContainText('Acme Supplies')
 
-  await page.getByRole('switch', { name: 'Dark mode' }).click()
+  await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
   await edited.getByRole('button', { name: 'Open', exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
-  await expect(dark.getByRole('textbox', { name: 'Title' })).toHaveValue(`${title} edited`)
+  await expect(dark.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(`${title} edited`)
   await expect(dark.getByLabel('Department', { exact: true })).toHaveValue('Finance')
   await expect(dark.getByLabel('Total amount', { exact: true })).toHaveValue('2550.90')
-  await dark.getByRole('button', { name: 'Cancel' }).click()
+  await dark.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page).toHaveURL(tablePath)
 })
 
@@ -111,21 +111,21 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
   await expect(number).toHaveValue('')
   await expect(number).toHaveAttribute('readonly')
-  await page.getByRole('textbox', { name: 'Title' }).fill(title)
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
   await choose(page, 'department', 'Department', 'Finance')
-  await page.getByRole('button', { name: 'Add row' }).click()
+  await page.getByRole('button', { name: 'Add row', exact: true }).click()
   await page.getByLabel('Description 1', { exact: true }).fill('Paper')
   await page.getByLabel('Quantity 1', { exact: true }).fill('1')
   await page.getByLabel('Unit price 1', { exact: true }).fill('10')
   await select(page, 'Status', 'draft')
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
   await page
     .getByRole('row', { name: new RegExp(`${title} `) })
     .getByRole('button', { name: 'Open', exact: true })
     .click()
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
   await expect(number).toHaveAttribute('readonly')
   await expect(number).toHaveValue(new RegExp(`^PR-${new Date().getUTCFullYear()}-\\d{5}$`))
 })
@@ -178,15 +178,15 @@ test('the purchase request list reads a data source, shows department names, and
   const first = page.getByRole('row').filter({ has: page.getByRole('cell') }).first()
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode' }).click()
+      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
     }
     await page.reload()
 
     await expect(page.locator(`[data-theme-mode="${mode}"]`)).toBeVisible()
     await expect(page).toHaveURL(listPath)
     await expect(page.getByRole('main').locator('[aria-current="page"]')).toHaveText('2')
-    await expect(page.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'descending')
-    await expect(page.getByRole('columnheader', { name: 'Department' })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Title', exact: true })).toHaveAttribute('aria-sort', 'descending')
+    await expect(page.getByRole('columnheader', { name: 'Department', exact: true })).toBeVisible()
     await expect(first).toContainText(`${prefix} 01`)
     await expect(first).toContainText('Finance')
   }
@@ -220,8 +220,8 @@ test('the purchase request list filters by status, and keeps the filter and its 
   await expect(returned).toBeVisible()
 
   const filters = page.getByTestId('filter-bar')
-  // The inline form ends a label with a colon, so the name is matched as text.
-  const statusFilter = filters.getByRole('combobox', { name: 'Status' })
+  // The inline filter label ends with a colon, so its accessible name includes it.
+  const statusFilter = filters.getByRole('combobox', { name: 'Status :', exact: true })
   await pickOption(statusFilter, 'returned')
 
   const filteredPath = /\/purchasing\/purchaserequests\?statusFilter=returned&pageSize=100&sort=-title$/
@@ -302,23 +302,23 @@ test('the per-department page shows one row per department with its total, sorts
   await expect(row('Engineering')).toContainText(engineering)
   await expect(row('Operations')).toBeVisible()
   await expect(row('Finance')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Open', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'New', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Open/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /New/ })).toHaveCount(0)
 
   const order = async (names: string[]) => {
     for (const [index, name] of names.entries()) {
       await expect(rows.nth(index)).toContainText(name)
     }
   }
-  await page.getByRole('columnheader', { name: 'total' }).click()
+  await page.getByRole('columnheader', { name: 'total', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/requestsbydepartment\?sort=total$/)
   await order(['Engineering', 'Finance', 'Operations'])
 
-  await page.getByRole('columnheader', { name: 'total' }).click()
+  await page.getByRole('columnheader', { name: 'total', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/requestsbydepartment\?sort=-total$/)
   await order(['Operations', 'Finance', 'Engineering'])
   await page.reload()
-  await expect(page.getByRole('columnheader', { name: 'total' })).toHaveAttribute('aria-sort', 'descending')
+  await expect(page.getByRole('columnheader', { name: 'total', exact: true })).toHaveAttribute('aria-sort', 'descending')
   await order(['Operations', 'Finance', 'Engineering'])
 })
 
@@ -330,11 +330,11 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
   const cell = (label: string) => page.getByLabel(label, { exact: true })
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
   await page.getByRole('button', { name: 'New', exact: true }).click()
-  await page.getByRole('textbox', { name: 'Title' }).fill(title)
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
   await choose(page, 'department', 'Department', 'Finance')
   await select(page, 'Status', 'draft')
-  await page.getByRole('button', { name: 'Add row' }).click()
-  await page.getByRole('button', { name: 'Add row' }).click()
+  await page.getByRole('button', { name: 'Add row', exact: true }).click()
+  await page.getByRole('button', { name: 'Add row', exact: true }).click()
   await cell('Description 1').fill('Desk lamp')
   await cell('Quantity 1').fill('0')
   await cell('Unit price 1').fill('10')
@@ -345,10 +345,10 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
   // One save reports both lines, and the lines add up to -5, so the total rule fires as well.
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode' }).click()
+      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
     }
     const theme = page.locator(`[data-theme-mode="${mode}"]`)
-    await theme.getByRole('button', { name: 'Save' }).click()
+    await theme.getByRole('button', { name: /^(loading )?Save$/ }).click()
     await expect(theme.getByTestId('field-error-lineItems-0-quantity')).toHaveText(
       'Quantity must be greater than zero.',
     )
@@ -361,7 +361,7 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
   const dark = page.locator('[data-theme-mode="dark"]')
   await dark.getByLabel('Quantity 1', { exact: true }).fill('1')
   await dark.getByLabel('Unit price 2', { exact: true }).fill('0')
-  await dark.getByRole('button', { name: 'Save' }).click()
+  await dark.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page).toHaveURL(tablePath)
   await expect(page.getByRole('row', { name: new RegExp(`${title} `) })).toContainText('10.00')
 })
@@ -373,10 +373,10 @@ test('searching in the supplier lookup filters the suppliers by name, and pickin
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
 
-  await page.getByTestId('reference-supplier').getByRole('button', { name: 'Choose' }).click()
+  await page.getByTestId('reference-supplier').getByRole('button', { name: 'Choose', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('row', { name: /Acme Supplies/ })).toBeVisible()
-  await dialog.getByLabel('Search').fill('glob')
+  await dialog.getByLabel('Search', { exact: true }).fill('glob')
 
   // The search ignores case, so `glob` finds Globex.
   await expect(dialog.getByRole('row', { name: /Globex/ })).toBeVisible()
@@ -393,10 +393,10 @@ test('switching the locale to Vietnamese shows the Vietnamese navigation', async
   // navigation entry into the overflow menu, so this test uses a wider window.
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/purchasing/purchaserequests')
-  await expect(page.getByRole('menuitem', { name: 'Purchase requests' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Purchase requests', exact: true })).toBeVisible()
 
   // The radio input itself takes no pointer events: people click its label.
-  await page.getByRole('radiogroup', { name: 'Language' }).getByText('Tiếng Việt').click()
+  await page.getByRole('radiogroup', { name: 'Language', exact: true }).getByText('Tiếng Việt', { exact: true }).click()
 
   // Exact names, because "Theo phòng ban" also holds "Phòng ban".
   for (const item of ['Yêu cầu mua hàng', 'Theo phòng ban', 'Phòng ban', 'Nhà cung cấp']) {
