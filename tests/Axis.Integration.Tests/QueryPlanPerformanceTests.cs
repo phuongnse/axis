@@ -12,6 +12,7 @@ namespace Axis.Integration.Tests;
 /// lookup stay fast at a realistic size: the reads answer within the time limit where a limit is set,
 /// and the plan of each query uses its index.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : IClassFixture<ProcessStepFixture>
 {
     private const int OpenTasks = 10_000;

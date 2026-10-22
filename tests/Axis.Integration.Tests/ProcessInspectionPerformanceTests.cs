@@ -12,6 +12,7 @@ namespace Axis.Integration.Tests;
 /// the detail of an instance with fifty history rows and twenty call attempts, answer within the time limit.
 /// The plan of each page query uses an index and never reads the whole table.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class ProcessInspectionPerformanceTests(ProcessInspectionData data) : IClassFixture<ProcessInspectionData>
 {
     private const int PageSize = 50;

@@ -8,6 +8,7 @@ namespace Axis.Integration.Tests;
 /// One occurrence of the schedule trigger <c>ReviewLargeRequests</c> fans out over ten thousand
 /// matching requests within the time limit, and each request gets exactly one started instance.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class ScheduleFanOutPerformanceTests(ScheduleTriggerFixture fixture) : IClassFixture<ScheduleTriggerFixture>
 {
     private const int Records = 10_000;
