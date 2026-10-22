@@ -32,8 +32,8 @@ decision. Only the items under **Later** are not built.
   the application and opens the task page.
 - **Start process action:** a `form` widget can declare a `startProcess`
   action, shown as a button. It saves the record first, then starts the
-  process. Navigate actions stay **Proposed** in
-  [D15](d15-presentation-model.md).
+  process. Navigate actions are agreed in
+  [D63](d63-navigate-actions-and-page-parameters.md).
 - **Form resource:** a `form` resource has one entity and sections of fields,
   and each field can be read-only. A `form` widget names a `form`, or an
   `entity` as shorthand for all its fields. The same `form` serves a page and
