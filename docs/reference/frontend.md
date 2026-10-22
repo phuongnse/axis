@@ -528,11 +528,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     [D59](../decisions/d59-table-row-and-toolbar-actions.md). Page metadata
     lists the `navigate` actions in `rowActions` and `toolbarActions`,
     without those to pages the user cannot read, each with its `parameters`,
-    `record` and `opensForm`. The `navigate` buttons are built. The
-    `visibleWhen` condition, the delete and `startProcess` row actions and the
-    phone menu are _(planned for M12)_.
+    `record` and `opensForm`. The `navigate` buttons and the phone
+    menu are built. The `visibleWhen` condition and the delete and
+    `startProcess` row actions are _(planned for M12)_.
     - **Where.** Toolbar actions sit above the table. Row actions
-      are buttons in the row, and fold into a menu at phone width. A
+      are buttons in the row. Below 768 px, a row's actions fold into one
+      menu button labelled by the platform text `shell.table.rowActions`. A
       `navigate` action may sit in either list. `startProcess` and `delete`
       are row actions only. A row of a data source acts on its root record,
       and a group row has no actions.
@@ -940,8 +941,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
 - **Phone width** *(planned for M12)*. Below a fixed 768 px breakpoint, Ant
   Design's `md`, columns stack in file order, tab headers scroll and a table
-  scrolls sideways inside its widget. The site shell's navigation collapses
-  into a menu. There is no per-widget setting until a sample needs one, see
+  scrolls sideways inside its widget. A table's row actions fold into one
+  menu per row, which is built. The site shell's navigation collapses into a
+  menu. There is no per-widget setting until a sample needs one, see
   [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
 
 ## Studio

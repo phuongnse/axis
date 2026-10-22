@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Table, type TableColumnsType, type TableProps } from 'antd'
+import { Alert, Button, Dropdown, Flex, Table, type TableColumnsType, type TableProps } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { FilterBar } from './FilterBar'
@@ -17,6 +17,7 @@ import {
   type TableSort,
 } from './tableQuery'
 import { useText } from './texts'
+import { usePhoneWidth } from './usePhoneWidth'
 
 interface TableWidgetProps {
   sitePath: string
@@ -89,7 +90,8 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * a button on every row with an id, and each toolbar action a button above the table. Both open
  * the target page with the parameter values in the URL query. A toolbar action to a form page
  * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
- * a button whose expressions the SPA cannot work out is hidden.
+ * a button whose expressions the SPA cannot work out is hidden. Below 768 px, a row's actions fold
+ * into one "Actions" menu.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
  * and the back button keep them. A data source table also has a filter bar, whose values live in the
  * URL under the parameter names. A data source parameter that the widget binds to a page parameter has
@@ -98,6 +100,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  */
 export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
+  const phone = usePhoneWidth()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { rowActions, toolbarActions } = widget
@@ -213,25 +216,45 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
             return null
           }
           const scope = { id: record.id, values: record.values }
+          const list = rowActions.flatMap((action, index) => {
+            const path = navigatePath(sitePath, action, scope)
+            return path ? [{ action, path, index }] : []
+          })
+          if (list.length === 0) {
+            return null
+          }
+          if (phone) {
+            return (
+              <Dropdown
+                trigger={['click']}
+                autoFocus
+                menu={{
+                  items: list.map(({ action, path, index }) => ({
+                    key: String(index),
+                    label: t(action.labelKey),
+                    onClick: () => navigate(path, { state: { from } }),
+                  })),
+                  'aria-label': t('shell.table.rowActions'),
+                }}
+              >
+                <Button size="small">{t('shell.table.rowActions')}</Button>
+              </Dropdown>
+            )
+          }
           return (
             <Flex gap="small">
-              {rowActions.map((action, index) => {
-                const path = navigatePath(sitePath, action, scope)
-                return (
-                  path && (
-                    <Button key={index} size="small" onClick={() => navigate(path, { state: { from } })}>
-                      {t(action.labelKey)}
-                    </Button>
-                  )
-                )
-              })}
+              {list.map(({ action, path, index }) => (
+                <Button key={index} size="small" onClick={() => navigate(path, { state: { from } })}>
+                  {t(action.labelKey)}
+                </Button>
+              ))}
             </Flex>
           )
         },
       })
     }
     return result
-  }, [fields, from, locale, navigate, query.sort, rowActions, sitePath, t])
+  }, [fields, from, locale, navigate, phone, query.sort, rowActions, sitePath, t])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
