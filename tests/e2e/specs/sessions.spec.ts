@@ -8,7 +8,7 @@ test('a switch made while the previous user loads a page signs in the new user',
 
   await useSession(page, 'dung')
   await page.goto('/purchasing/mytasks')
-  await expect(page.getByRole('banner').getByRole('button', { name: 'Dung Finance Reviewer' })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Dung Finance Reviewer', exact: true })).toBeVisible()
   await expectSessionUser(page, 'dung')
 })
 

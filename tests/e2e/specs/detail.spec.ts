@@ -27,7 +27,7 @@ test('a detail page shows a note read-only, its start button closes the note and
   await expect(detail).toContainText('Priority')
   await expect(page.getByRole('textbox')).toHaveCount(0)
 
-  await page.getByRole('button', { name: 'Close note' }).click()
+  await page.getByRole('button', { name: 'Close note', exact: true }).click()
   await expect(page.getByTestId('detail-started')).toHaveText('The process has started.')
   // The worker runs the first step some time after the start.
   await expect(async () => {
@@ -35,9 +35,9 @@ test('a detail page shows a note read-only, its start button closes the note and
     await expect(detail).toContainText('closed', { timeout: 1_000 })
   }).toPass({ timeout: 30_000 })
 
-  await page.getByRole('button', { name: 'Edit note' }).click()
+  await page.getByRole('button', { name: 'Edit note', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`/e2e/noteactions/${note.id}$`))
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(`Detail ${run}`)
+  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(`Detail ${run}`)
 })
 
 test('a detail page for a note that does not exist shows the not-found page', async ({ page }) => {
