@@ -882,11 +882,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       or `null` when the widget names an `entity`. `readOnly` already
       includes computed, sequence and creator fields. Field names are as the entity
       declares them.
-    - `actions`: `[ { "type", "process", "labelKey", "instancesPath" } ]`,
+    - `actions`: `[ { "type", "process", "labelKey", "instancesPath", "visibleWhen" } ]`,
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
       so the SPA never builds it itself. A `navigate` action is
-      `{ "type": "navigate", "page", "labelKey", "parameters", "record", "opensForm" }`, with
+      `{ "type": "navigate", "page", "labelKey", "parameters", "record", "opensForm", "visibleWhen" }`, with
       the target page's declared name. `parameters` maps each parameter name,
       as the target page declares it, to its expression, or is `{}`. `record`
       is the expression of the record id, or `null`. The expressions go to the

@@ -26,7 +26,7 @@ rest of the frontend is in [frontend.md](frontend.md).
     `detail`, written after `access` and before `kpi`:
 
     ```json
-    { "type": "detail", "entity": { "name": "Ticket", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [{ "type": "startProcess", "process": "TicketHandling", "labelKey": "tickets.handle", "instancesPath": "/api/apps/ServiceDesk/processes/TicketHandling/instances" }], "access": { "actions": ["read"], "createFields": [], "updateFields": [] }, "detail": { "record": "ticket" }, "kpi": null }
+    { "type": "detail", "entity": { "name": "Ticket", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [{ "type": "startProcess", "process": "TicketHandling", "labelKey": "tickets.handle", "instancesPath": "/api/apps/ServiceDesk/processes/TicketHandling/instances", "visibleWhen": null }], "access": { "actions": ["read"], "createFields": [], "updateFields": [] }, "detail": { "record": "ticket" }, "kpi": null }
     ```
 
   - **Record.** The SPA reads the record that the page parameter `record`
@@ -106,7 +106,7 @@ rest of the frontend is in [frontend.md](frontend.md).
       "measure": "openCount",
       "labelKey": "dashboard.open.label",
       "comparison": { "measure": "urgentCount", "labelKey": "dashboard.urgent.label" },
-      "navigate": { "type": "navigate", "page": "AllTickets", "labelKey": "dashboard.open.show", "parameters": {}, "record": null, "opensForm": false }
+      "navigate": { "type": "navigate", "page": "AllTickets", "labelKey": "dashboard.open.show", "parameters": {}, "record": null, "opensForm": false, "visibleWhen": null }
     }
     ```
 
