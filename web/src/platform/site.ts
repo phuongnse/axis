@@ -190,6 +190,11 @@ export interface WidgetMetadata {
   instancesPath: string | null
   /** The actions of a form widget the user may take, and `[]` on every other widget. */
   actions: WidgetAction[]
+  /**
+   * The page parameter that gives each data source parameter its value on a table, keyed by the data
+   * source parameter's name, and `{}` on every other widget. A bound parameter has no filter input.
+   */
+  parameters: Record<string, string>
   /** What the user may do with a table or form widget's entity, and `null` on a task inbox and a process inspector. */
   access: WidgetAccess | null
 }
@@ -197,10 +202,20 @@ export interface WidgetMetadata {
 /** A widget over an entity. A form widget is always one: it is never bound to a data source. */
 export type EntityWidgetMetadata = WidgetMetadata & { entity: EntityMetadata }
 
+/** One typed value a page reads from its URL. `values` is for an enum and `target` for a reference. */
+export interface PageParameter {
+  name: string
+  type: FieldType
+  required: boolean
+  values: string[] | null
+  target: ReferenceTarget | null
+}
+
 /** A page of an application site, as served by `GET /api/sites/{path}/pages/{page}`. */
 export interface PageMetadata {
   name: string
   titleKey: string
+  parameters: PageParameter[]
   widgets: WidgetMetadata[]
 }
 

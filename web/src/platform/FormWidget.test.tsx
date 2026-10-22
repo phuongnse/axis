@@ -44,6 +44,7 @@ const noteWidget: EntityWidgetMetadata = {
   process: null,
   instancesPath: null,
   actions: [],
+  parameters: {},
   access: null,
   entity: {
     name: 'Note',

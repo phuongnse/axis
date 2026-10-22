@@ -22,6 +22,7 @@ const inspectorWidget: WidgetMetadata = {
   process: 'NoteReview',
   instancesPath,
   actions: [],
+  parameters: {},
   access: null,
 }
 

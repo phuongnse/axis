@@ -119,7 +119,8 @@ site, and its widgets are its content:
   `AXC0012`, `AXC0040` or `AXC0030`. A name that an earlier parameter already
   uses, or that is `page`, `pageSize` or `sort`, ignoring letter case, is
   `AXC0231`. The compiled page lists its parameters in file order. A value
-  living in the URL query under the parameter name is *(planned for M12)*. See
+  lives in the URL query under the parameter name, and a table can bind it to a
+  data source parameter. See
   [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 
   ```json

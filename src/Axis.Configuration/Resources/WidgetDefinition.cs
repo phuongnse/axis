@@ -38,6 +38,12 @@ public sealed record WidgetDefinition
     /// <summary>The <c>navigate</c> buttons a <c>table</c> widget shows above its rows, or null when it has none.</summary>
     public IReadOnlyList<WidgetActionDefinition>? ToolbarActions { get; init; }
 
+    /// <summary>
+    /// The page parameter that gives each data source parameter its value on a <c>table</c> widget over a data source,
+    /// keyed by the data source parameter name, or null when it binds none.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Parameters { get; init; }
+
     /// <summary>The columns of a <c>columns</c> widget, or null on any other widget.</summary>
     public IReadOnlyList<WidgetColumnDefinition>? Columns { get; init; }
 
