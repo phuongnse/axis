@@ -98,7 +98,7 @@ async function openTask(page: Page, title: string, label: string) {
     await page.goto("/service-desk/mytasks?pageSize=100");
     await expect(row).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
-  await row.getByRole("link", { name: label }).click();
+  await row.getByRole("link", { name: label, exact: true }).click();
 }
 
 test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna confirms it closed", async ({
@@ -114,20 +114,20 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
   await useSession(page, "anna");
   await page.goto(`/service-desk/ticketform/${id}`);
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(title);
-  await page.getByRole("button", { name: "Submit" }).click();
+  await page.getByRole("button", { name: "Submit", exact: true }).click();
   await expect(page.getByTestId("form-started")).toBeVisible();
 
   await useSession(page, "linh");
   await openTask(page, title, "Triage ticket");
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(title);
   await page.getByLabel("Assigned agent", { exact: true }).fill("khoa");
-  await page.getByRole("button", { name: "Assign" }).click();
+  await page.getByRole("button", { name: "Assign", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
 
   await useSession(page, "khoa");
   await openTask(page, title, "Resolve ticket");
   await page.getByLabel("Resolution", { exact: true }).fill("Replaced the battery.");
-  await page.getByRole("button", { name: "Resolve" }).click();
+  await page.getByRole("button", { name: "Resolve", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
 
   await useSession(page, "anna");
@@ -135,7 +135,7 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
   await expect(page.getByLabel("Resolution", { exact: true })).toHaveValue(
     "Replaced the battery.",
   );
-  await page.getByRole("button", { name: "Confirm" }).click();
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
 
   // The worker ends the process some time after the decision.
@@ -180,7 +180,7 @@ test("an agent cannot open a ticket that is assigned to another agent, by its fo
 
   await page.goto(`/service-desk/ticketform/${id}`);
   await expect(page.getByTestId("not-found")).toBeVisible();
-  await expect(page.getByLabel("Title", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel(/Title/i)).toHaveCount(0);
 
   expect((await page.request.get(`${recordsPath}/${id}`)).status()).toBe(404);
 });

@@ -32,7 +32,7 @@ test('paging and sorting go through the record API and stay in the URL', async (
   const sortRequest = page.waitForRequest(
     (request) => request.url().includes(`${notesPath}?`) && request.url().includes('sort=title'),
   )
-  await page.getByRole('columnheader', { name: 'Title' }).click()
+  await page.getByRole('columnheader', { name: 'Title', exact: true }).click()
   expect((await sortRequest).url()).not.toContain('page=')
   await expect(page).toHaveURL(/\/e2e\/notes\?pageSize=10&sort=title$/)
 
@@ -47,7 +47,7 @@ test('paging and sorting go through the record API and stay in the URL', async (
 
   await expect(page).toHaveURL(/\/e2e\/notes\?page=2&pageSize=10&sort=title$/)
   await expect(page.getByRole('main').locator('[aria-current="page"]')).toHaveText('2')
-  await expect(page.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'ascending')
+  await expect(page.getByRole('columnheader', { name: 'Title', exact: true })).toHaveAttribute('aria-sort', 'ascending')
 })
 
 test('a note shows the name of the category it references', async ({ page, request }) => {

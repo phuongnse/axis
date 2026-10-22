@@ -126,7 +126,7 @@ test("anna submits a leave request, chau approves it in My tasks, and anna sees 
   await useSession(page, "anna");
   await page.goto(`/leave/leaverequestform/${id}`);
   await expect(page.getByLabel("Reason", { exact: true })).toHaveValue(reason);
-  await page.getByRole("button", { name: "Submit" }).click();
+  await page.getByRole("button", { name: "Submit", exact: true }).click();
   await expect(page.getByTestId("form-started")).toBeVisible();
 
   await useSession(page, "chau");
@@ -136,9 +136,9 @@ test("anna submits a leave request, chau approves it in My tasks, and anna sees 
     await page.goto("/leave/mytasks?pageSize=100");
     await expect(row).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
-  await row.getByRole("link", { name: "Manager approval" }).click();
+  await row.getByRole("link", { name: "Manager approval", exact: true }).click();
   await expect(page.getByLabel("Reason", { exact: true })).toHaveValue(reason);
-  await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page).toHaveURL(/\/leave\/mytasks$/);
 
   await useSession(page, "anna");
@@ -162,7 +162,7 @@ test("an employee cannot open another employee's leave request, by its form or t
 
   await page.goto(`/leave/leaverequestform/${id}`);
   await expect(page.getByTestId("not-found")).toBeVisible();
-  await expect(page.getByLabel("Reason", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel(/Reason/i)).toHaveCount(0);
 
   expect((await page.request.get(`${recordsPath}/${id}`)).status()).toBe(404);
 });
@@ -215,7 +215,7 @@ test("a request whose last day is before its first day cannot be submitted, and 
   const started = page.waitForResponse((response) =>
     response.url().endsWith("/processes/LeaveRequestApproval/instances"),
   );
-  await page.getByRole("button", { name: "Submit" }).click();
+  await page.getByRole("button", { name: "Submit", exact: true }).click();
 
   expect((await started).status()).toBe(400);
   await expect(page.getByTestId("form-error")).toHaveText(
