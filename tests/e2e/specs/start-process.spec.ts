@@ -20,10 +20,10 @@ test('a saved note closes through the action, which saves the edited title first
   const note = await createNote(request, { title: `Close ${run}`, status: 'open' })
 
   await page.goto(`/e2e/noteactions/${note.id}`)
-  const title = page.getByRole('textbox', { name: 'Title' })
+  const title = page.getByRole('textbox', { name: '* Title', exact: true })
   await expect(title).toHaveValue(`Close ${run}`)
   await title.fill(`Close ${run} edited`)
-  await page.getByRole('button', { name: 'Close note' }).click()
+  await page.getByRole('button', { name: 'Close note', exact: true }).click()
 
   await expect(page.getByTestId('form-started')).toHaveText('The process has started.')
   await expect(page).toHaveURL(new RegExp(`/e2e/noteactions/${note.id}$`))
@@ -45,9 +45,9 @@ test('a note that fails the start condition shows its message, and no instance s
   const note = await createNote(request, { title: `Closed ${run}`, status: 'closed' })
 
   await page.goto(`/e2e/noteactions/${note.id}`)
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(`Closed ${run}`)
+  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(`Closed ${run}`)
   const start = page.waitForResponse((response) => response.url().endsWith('/processes/NoteClose/instances'))
-  await page.getByRole('button', { name: 'Close note' }).click()
+  await page.getByRole('button', { name: 'Close note', exact: true }).click()
 
   expect((await start).status()).toBe(400)
   await expect(page.getByTestId('form-error')).toHaveText('Only an open note can be closed.')

@@ -45,7 +45,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   async function createPage(page: Page, name: string) {
     await createResource(page, 'page', name)
-    await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name' })).toHaveValue(name)
+    await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   }
 
   async function pick(page: Page, testId: string, option: string, filter?: string) {
@@ -70,7 +70,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       },
       { timeout: 60_000 },
     )
-    await page.getByRole('button', { name: 'Save' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
     for (const [field, choice] of answers) {
       await expect(page.getByTestId('studio-migration-field')).toHaveText(field)
       await page.getByRole('button', { name: choice, exact: true }).click()
@@ -83,7 +83,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   }
 
   async function expectForm(page: Page) {
-    await expect(page.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Form', exact: true })).toHaveAttribute('aria-selected', 'true')
   }
 
   async function writeLabel(page: Page, field: string, key: string, en: string) {
@@ -97,7 +97,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await keyBox.fill(key)
       await expect(english).toHaveValue(en, { timeout: 2_000 })
     }).toPass({ timeout: 20_000 })
-    await label.getByRole('button', { name: 'Write texts' }).click()
+    await label.getByRole('button', { name: 'Write texts', exact: true }).click()
     await expect(label.getByTestId('studio-label-written')).toBeVisible()
   }
 
@@ -111,7 +111,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     const cell = page.getByTestId(`studio-matrix-cell-${role}-${kind}-${target}`)
     await cell.click()
     for (const [index, grant] of grants.entries()) {
-      await page.getByRole('button', { name: 'Add grant' }).click()
+      await page.getByRole('button', { name: 'Add grant', exact: true }).click()
       const own = page.getByTestId('studio-matrix-own-grant').nth(index)
       for (const action of grant.actions) {
         // The matrix ticks the box a moment after the click, which check() would report as no change.
@@ -121,7 +121,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       }
       if (grant.filter !== undefined) {
         await expect(own.locator('.cm-editor')).toBeVisible()
-        await own.getByRole('textbox', { name: 'Record filter' }).fill(grant.filter)
+        await own.getByRole('textbox', { name: 'Record filter', exact: true }).fill(grant.filter)
       }
       if (grant.fields !== undefined) {
         await pickOptions(own.getByRole('combobox'), grant.fields)
@@ -209,10 +209,10 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio`)
 
-    await page.getByRole('button', { name: 'New application' }).click()
+    await page.getByRole('button', { name: 'New application', exact: true }).click()
     const dialog = page.getByRole('dialog')
-    await dialog.getByRole('textbox', { name: 'Name' }).fill('ServiceDesk')
-    await dialog.getByRole('button', { name: 'Create' }).click()
+    await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('ServiceDesk')
+    await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     await expect(page).toHaveURL(/app=ServiceDesk$/)
   })
 
@@ -224,8 +224,8 @@ test.describe('the author builds the service desk with Studio only', () => {
     await starter.getByRole('button').click()
     await expectForm(page)
 
-    await page.getByRole('button', { name: 'Delete' }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+    await page.getByRole('button', { name: 'Delete', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(starter.getByRole('button')).toHaveCount(0)
 
     await createResource(page, 'text', 'en', 'TextsEn')
@@ -244,7 +244,8 @@ test.describe('the author builds the service desk with Studio only', () => {
       await add.getByRole('textbox', { name: 'New key', exact: true }).fill(key)
       await add.getByRole('textbox', { name: 'en', exact: true }).fill(text)
       await add.getByRole('textbox', { name: 'vi', exact: true }).fill(vietnamese[key])
-      await add.getByRole('button', { name: 'Add key' }).click()
+      // Ant Design adds "loading" to the name while the button is busy.
+      await add.getByRole('button', { name: /^(loading )?Add key$/ }).click()
       await expect(add.getByRole('textbox', { name: 'New key', exact: true })).toHaveValue('')
       await expectForm(page)
     }
@@ -410,8 +411,8 @@ test.describe('the author builds the service desk with Studio only', () => {
     const migrations = page.getByTestId('studio-group-migration')
     await migrations.getByRole('button').click()
     await expectForm(page)
-    await page.getByRole('button', { name: 'Delete' }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+    await page.getByRole('button', { name: 'Delete', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(migrations).toHaveCount(0)
   })
 
@@ -494,7 +495,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await createResource(page, 'process', 'TicketHandling')
     await expectForm(page)
     await pick(page, 'studio-field-/entity', 'Ticket')
-    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Remove step' }).click()
+    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Remove step', exact: true }).click()
 
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
     const steps: [name: string, type: string][] = [
@@ -511,17 +512,17 @@ test.describe('the author builds the service desk with Studio only', () => {
     ]
     // Every name exists before any transition is picked, because the pickers offer only named steps.
     for (const [index, [name, type]] of steps.entries()) {
-      await pickOption(page.getByRole('combobox', { name: 'Add step' }), type)
-      await stepCard(index).getByRole('textbox', { name: 'Step name' }).fill(name)
+      await pickOption(page.getByRole('combobox', { name: 'Add step', exact: true }), type)
+      await stepCard(index).getByRole('textbox', { name: 'Step name', exact: true }).fill(name)
     }
 
     async function operation(index: number, sets: [field: string, expression: string][], next: string) {
       await pick(page, `studio-field-/steps/${index}/operation`, 'updateRecord')
       for (const [field, expression] of sets) {
-        await pickOption(stepCard(index).getByRole('combobox', { name: 'Add mapping Set' }), field)
+        await pickOption(stepCard(index).getByRole('combobox', { name: 'Add mapping Set', exact: true }), field)
         const row = page.getByTestId(`studio-field-/steps/${index}/set/${field}`)
         await expect(row.locator('.cm-editor')).toBeVisible()
-        await row.getByRole('textbox', { name: 'Expression' }).fill(expression)
+        await row.getByRole('textbox', { name: 'Expression', exact: true }).fill(expression)
       }
       await pick(page, `studio-field-/steps/${index}/next`, next)
     }
@@ -617,7 +618,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await writeLabel(page, 'studio-field-/title', 'pages.ticketForm.title', en['pages.ticketForm.title'])
     await pick(page, 'studio-field-/widgets/0/type', 'form')
     await pick(page, 'studio-field-/widgets/0/entity', 'Ticket')
-    await page.getByRole('button', { name: 'Add action' }).click()
+    await page.getByRole('button', { name: 'Add action', exact: true }).click()
     await pick(page, 'studio-field-/widgets/0/actions/0/process', 'TicketHandling')
     await writeLabel(page, 'studio-field-/widgets/0/actions/0/label', 'ticket.submit', en['ticket.submit'])
     await save(page)
@@ -650,7 +651,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         const action = `studio-field-/widgets/0/${kind}/0`
         await page
           .getByTestId(`studio-field-/widgets/0/${kind}`)
-          .getByRole('button', { name: 'Add navigate action' })
+          .getByRole('button', { name: 'Add navigate action', exact: true })
           .click()
         await pick(page, `${action}/page`, 'TicketForm')
         await writeLabel(page, `${action}/label`, key, en[key])
@@ -693,9 +694,9 @@ test.describe('the author builds the service desk with Studio only', () => {
     const home = page.getByTestId('studio-group-page').getByRole('button', { name: 'Home', exact: true })
     await home.click()
     await expectForm(page)
-    await page.getByRole('button', { name: 'Delete' }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
-    await expect(home).toHaveCount(0)
+    await page.getByRole('button', { name: 'Delete', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(page.getByTestId("studio-group-page").getByRole("button", { name: /Home/i })).toHaveCount(0)
   })
 
   test('the author builds the three access policies in the policy matrix', async ({ page }) => {
@@ -797,8 +798,8 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    await page.getByRole('button', { name: 'Publish' }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Publish' }).click()
+    await page.getByRole('button', { name: 'Publish', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Publish', exact: true }).click()
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 120_000,
     })
@@ -816,7 +817,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await page.goto(`${journeyURL}/service-desk/mytasks?pageSize=100`)
       await expect(row).toBeVisible({ timeout: 1_000 })
     }).toPass({ timeout: 30_000 })
-    await row.getByRole('link', { name: label }).click()
+    await row.getByRole('link', { name: label, exact: true }).click()
   }
 
   test('anna submits a ticket on the published site, linh triages it to khoa, khoa resolves it, and anna confirms it closed', async ({
@@ -828,37 +829,37 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/service-desk/mytickets`)
     await page.getByRole('button', { name: 'New', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/ticketform\/new$/)
-    await page.getByRole('textbox', { name: 'Title' }).fill(title)
+    await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
     await page.getByRole('textbox', { name: 'Description', exact: true }).fill('It shows a black screen.')
     // The requester's create grant only allows the statuses draft and reopened.
     await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'draft')
-    await page.getByRole('button', { name: 'Save' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytickets$/)
 
     await page.getByRole('row', { name: new RegExp(title) }).getByRole('button', { name: 'Open', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/ticketform\/[^/]+$/)
     const id = page.url().split('/').pop()
-    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
-    await page.getByRole('button', { name: 'Submit' }).click()
+    await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+    await page.getByRole('button', { name: 'Submit', exact: true }).click()
     await expect(page.getByTestId('form-started')).toBeVisible()
 
     await useJourneySession(page, 'linh')
     await openTask(page, title, 'Triage ticket')
-    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+    await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
     await page.getByLabel('Assigned agent', { exact: true }).fill('khoa')
-    await page.getByRole('button', { name: 'Assign' }).click()
+    await page.getByRole('button', { name: 'Assign', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
     await useJourneySession(page, 'khoa')
     await openTask(page, title, 'Resolve ticket')
     await page.getByLabel('Resolution', { exact: true }).fill('Replaced the battery.')
-    await page.getByRole('button', { name: 'Resolve' }).click()
+    await page.getByRole('button', { name: 'Resolve', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
     await useJourneySession(page, 'anna')
     await openTask(page, title, 'Confirm resolution')
     await expect(page.getByLabel('Resolution', { exact: true })).toHaveValue('Replaced the battery.')
-    await page.getByRole('button', { name: 'Confirm' }).click()
+    await page.getByRole('button', { name: 'Confirm', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
     // The worker ends the process some time after the decision.

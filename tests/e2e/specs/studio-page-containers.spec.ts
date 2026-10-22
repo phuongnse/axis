@@ -64,33 +64,33 @@ test.describe('Studio builds a page with two columns', () => {
     await useSession(page, 'hoa')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
-    await page.getByRole('button', { name: 'New application' }).click()
+    await page.getByRole('button', { name: 'New application', exact: true }).click()
     const dialog = page.getByRole('dialog')
-    await dialog.getByRole('textbox', { name: 'Name' }).fill(name)
-    await dialog.getByRole('radio', { name: 'Request approval' }).click()
-    await dialog.getByRole('button', { name: 'Create' }).click()
+    await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+    await dialog.getByRole('radio', { name: /^Request approval/ }).click()
+    await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`app=${name}$`))
     await expect(dialog).toBeHidden()
 
-    await page.getByRole('button', { name: 'New resource' }).click()
-    await dialog.getByRole('combobox', { name: 'Kind' }).click()
+    await page.getByRole('button', { name: 'New resource', exact: true }).click()
+    await dialog.getByRole('combobox', { name: 'Kind', exact: true }).click()
     await page.getByTitle('page', { exact: true }).click()
-    await dialog.getByRole('textbox', { name: 'Name' }).fill('Overview')
-    await dialog.getByRole('button', { name: 'Create' }).click()
+    await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Overview')
+    await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     // The dialog gives the focus back to the New resource button when its close animation ends, and the pick helpers
     // press Enter, so they start only when it is gone.
     await expect(dialog).toBeHidden()
     const editor = page.getByTestId('studio-page-editor')
-    await expect(editor.getByRole('textbox', { name: 'Name' })).toHaveValue('Overview')
+    await expect(editor.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Overview')
 
     // The names load again, so the entities of the new application are offered below.
     await page.reload()
-    await expect(editor.getByRole('textbox', { name: 'Name' })).toHaveValue('Overview')
+    await expect(editor.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Overview')
 
     const title = page.getByTestId('studio-field-/title')
     await title.getByRole('textbox', { name: 'en', exact: true }).fill(`Overview ${stamp}`)
     await title.getByRole('textbox', { name: 'vi', exact: true }).fill(`Tổng quan ${stamp}`)
-    await title.getByRole('button', { name: 'Write texts' }).click()
+    await title.getByRole('button', { name: 'Write texts', exact: true }).click()
     await expect(title.getByTestId('studio-label-written')).toBeVisible()
 
     await pickOption(addWidgetPicker(page), 'columns')
@@ -102,7 +102,7 @@ test.describe('Studio builds a page with two columns', () => {
 
     // The starter task inbox goes into the second column. The columns widget is then the first widget.
     await pickOption(
-      page.getByTestId('studio-widget-row-/widgets/0').getByRole('combobox', { name: 'Move to' }),
+      page.getByTestId('studio-widget-row-/widgets/0').getByRole('combobox', { name: 'Move to', exact: true }),
       'Page › columns 2 › Column 2',
     )
     await page.getByTestId('studio-widget-/widgets/0').click()
@@ -113,7 +113,7 @@ test.describe('Studio builds a page with two columns', () => {
     await expect(first).toHaveValue('8')
     await expect(second).toHaveValue('4')
 
-    await page.getByRole('button', { name: 'Save' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()
 
     const folder = await applicationFolder(name)
@@ -130,8 +130,8 @@ test.describe('Studio builds a page with two columns', () => {
       },
     ])
 
-    await page.getByRole('button', { name: 'Publish' }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Publish' }).click()
+    await page.getByRole('button', { name: 'Publish', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Publish', exact: true }).click()
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 60_000,
     })
@@ -139,6 +139,6 @@ test.describe('Studio builds a page with two columns', () => {
     const sites = await readdir(path.join(folder, 'sites'))
     const site = JSON.parse(await readFile(path.join(folder, 'sites', sites[0]), 'utf8')) as { path: string }
     await page.goto(`${server.url}/${site.path}/overview`)
-    await expect(page.getByRole('heading', { name: `Overview ${stamp}` })).toBeVisible()
+    await expect(page.getByRole('heading', { name: `Overview ${stamp}`, exact: true })).toBeVisible()
   })
 })

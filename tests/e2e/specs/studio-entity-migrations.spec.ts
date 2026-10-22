@@ -45,10 +45,10 @@ async function publishedOrder(page: Page, testInfo: TestInfo, prefix: string) {
   try {
     await useSession(page, "hoa");
     await page.goto(`${server.url}/studio?app=${name}`);
-    await page.getByRole("button", { name: "Publish" }).click();
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
     await page
       .getByRole("dialog")
-      .getByRole("button", { name: "Publish" })
+      .getByRole("button", { name: "Publish", exact: true })
       .click();
     await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
       "data-status",
@@ -99,17 +99,17 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
         .getByTestId("studio-field-/fields/1/name")
         .getByRole("textbox")
         .fill("remark");
-      await page.getByRole("button", { name: "Save" }).click();
+      await page.getByRole("button", { name: "Save", exact: true }).click();
       const question = page.getByTestId("studio-migration-question");
       await expect(question).toContainText("note → remark");
-      await page.getByRole("button", { name: "Keep data" }).click();
+      await page.getByRole("button", { name: "Keep data", exact: true }).click();
 
       await expect(page.getByTestId("studio-saved")).toBeVisible();
       expect(await savedMigration(folder)).toEqual([
         { type: "renameField", from: "note", to: "remark" },
       ]);
 
-      await page.getByRole("button", { name: "Validate" }).click();
+      await page.getByRole("button", { name: "Validate", exact: true }).click();
       await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
         "data-status",
         "succeeded",
@@ -136,13 +136,13 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
     try {
       await page
         .getByTestId("studio-field-/fields/1")
-        .getByRole("button", { name: "Remove field" })
+        .getByRole("button", { name: "Remove field", exact: true })
         .click();
-      await page.getByRole("button", { name: "Save" }).click();
+      await page.getByRole("button", { name: "Save", exact: true }).click();
       await expect(page.getByTestId("studio-migration-question")).toContainText(
         "note",
       );
-      await page.getByRole("button", { name: "Drop data" }).click();
+      await page.getByRole("button", { name: "Drop data", exact: true }).click();
 
       await expect(page.getByTestId("studio-saved")).toBeVisible();
       expect(await savedMigration(folder)).toEqual([
@@ -166,19 +166,19 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
         .getByTestId("studio-field-/fields/0/maxLength")
         .getByRole("spinbutton")
         .fill("10");
-      await page.getByRole("button", { name: "Save" }).click();
+      await page.getByRole("button", { name: "Save", exact: true }).click();
       await expect(page.getByTestId("studio-migration-question")).toContainText(
         "number",
       );
-      await page.getByRole("textbox", { name: "Convert expression" }).fill("number");
-      await page.getByRole("button", { name: "Add convert" }).click();
+      await page.getByRole("textbox", { name: "Convert expression", exact: true }).fill("number");
+      await page.getByRole("button", { name: "Add convert", exact: true }).click();
 
       await expect(page.getByTestId("studio-saved")).toBeVisible();
       expect(await savedMigration(folder)).toEqual([
         { type: "convert", field: "number", value: "number" },
       ]);
 
-      await page.getByRole("button", { name: "Validate" }).click();
+      await page.getByRole("button", { name: "Validate", exact: true }).click();
       await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
         "data-status",
         "succeeded",

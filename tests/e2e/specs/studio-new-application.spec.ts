@@ -32,13 +32,13 @@ test.describe('Studio creates an application', () => {
   })
 
   async function createApplication(page: Page, name: string, template?: string) {
-    await page.getByRole('button', { name: 'New application' }).click()
+    await page.getByRole('button', { name: 'New application', exact: true }).click()
     const dialog = page.getByRole('dialog')
-    await dialog.getByRole('textbox', { name: 'Name' }).fill(name)
+    await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
     if (template !== undefined) {
-      await dialog.getByRole('radio', { name: template }).click()
+      await dialog.getByRole('radio', { name: new RegExp(`^${template}`) }).click()
     }
-    await dialog.getByRole('button', { name: 'Create' }).click()
+    await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   }
 
   test('an author creates a blank application, and Studio picks it', async ({ page }) => {
@@ -70,10 +70,10 @@ test.describe('Studio creates an application', () => {
     const before = await readdir(applications)
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
-    await page.getByRole('button', { name: 'New application' }).click()
+    await page.getByRole('button', { name: 'New application', exact: true }).click()
     const dialog = page.getByRole('dialog')
-    await dialog.getByRole('textbox', { name: 'Name' }).fill('PurchaseRequests')
-    await dialog.getByRole('button', { name: 'Create' }).click()
+    await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('PurchaseRequests')
+    await dialog.getByRole('button', { name: 'Create', exact: true }).click()
 
     await expect(dialog).toContainText('An application with this name already exists.')
     await expect(dialog).toBeVisible()
@@ -88,6 +88,6 @@ test.describe('Studio creates an application', () => {
     await me
 
     await expect(page.getByTestId('studio-diagnostics')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'New application' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /new application/i })).toHaveCount(0)
   })
 })

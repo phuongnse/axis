@@ -39,7 +39,7 @@ test.describe("Studio edits form conditions and steps", () => {
     const field = page.getByTestId(label);
     await field.getByRole("textbox", { name: "en", exact: true }).fill(en);
     await field.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
-    await field.getByRole("button", { name: "Write texts" }).click();
+    await field.getByRole("button", { name: "Write texts", exact: true }).click();
     await expect(field.getByTestId("studio-label-written")).toBeVisible();
   }
 
@@ -93,13 +93,13 @@ test.describe("Studio edits form conditions and steps", () => {
       .fill("decision");
 
     const steps = page.getByTestId("studio-field-/steps");
-    await steps.getByRole("button", { name: "Add step" }).click();
+    await steps.getByRole("button", { name: "Add step", exact: true }).click();
     await writeTexts(page, "studio-field-/steps/0/title", "Request", "Yêu cầu");
     await pickOptions(
       page.getByTestId("studio-field-/steps/0/sections").getByRole("combobox"),
       ["request"],
     );
-    await steps.getByRole("button", { name: "Add step" }).click();
+    await steps.getByRole("button", { name: "Add step", exact: true }).click();
     await writeTexts(
       page,
       "studio-field-/steps/1/title",
@@ -112,10 +112,10 @@ test.describe("Studio edits form conditions and steps", () => {
     );
     await page
       .getByTestId("studio-field-/steps/1")
-      .getByRole("button", { name: "Move up" })
+      .getByRole("button", { name: "Move up", exact: true })
       .click();
 
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByTestId("studio-saved")).toBeVisible();
 
     expect(await diagnostics()).toEqual(before);

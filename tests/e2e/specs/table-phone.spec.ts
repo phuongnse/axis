@@ -26,13 +26,13 @@ test("at phone width, a row's Actions menu opens by keyboard and runs an action"
   await expect(row.getByRole("button")).toHaveCount(1);
 
   // Clicking the title cell makes the next Tab start from that cell.
-  await row.getByRole("cell", { name: title }).click();
+  await row.getByRole("cell", { name: title, exact: true }).click();
   await page.keyboard.press("Tab");
-  await expect(row.getByRole("button", { name: "Actions" })).toBeFocused();
+  await expect(row.getByRole("button", { name: "Actions", exact: true })).toBeFocused();
 
   await page.keyboard.press("Enter");
   // The menu moves focus to its first entry once it has opened.
-  const open = page.getByRole("menuitem", { name: "Open" });
+  const open = page.getByRole("menuitem", { name: "Open", exact: true });
   await expect(open).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");

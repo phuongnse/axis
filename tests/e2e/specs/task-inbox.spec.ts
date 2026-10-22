@@ -28,7 +28,7 @@ test('the manager a task is assigned to sees it in the inbox in light and dark m
 
   await useSession(page, 'binh')
   await page.goto('/e2e/tasks')
-  await expect(page.getByRole('banner').getByRole('button', { name: 'Binh Engineering Manager' })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Binh Engineering Manager', exact: true })).toBeVisible()
   const row = page.getByRole('row', { name: new RegExp(title) })
   // The worker creates the task some time after the start, so the inbox is loaded again until it shows.
   await expect(async () => {
@@ -38,11 +38,11 @@ test('the manager a task is assigned to sees it in the inbox in light and dark m
 
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode' }).click()
+      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     const themedRow = shell.getByRole('row', { name: new RegExp(title) })
-    await expect(themedRow.getByRole('link', { name: 'Review the note' })).toHaveAttribute(
+    await expect(themedRow.getByRole('link', { name: 'Review the note', exact: true })).toHaveAttribute(
       'href',
       /^\/e2e\/tasks\/[0-9a-f-]{36}$/,
     )
@@ -53,8 +53,8 @@ test('the manager a task is assigned to sees it in the inbox in light and dark m
   const otherContext = await browser.newContext({ baseURL, storageState: sessionFile('anna') })
   const other = await otherContext.newPage()
   await other.goto('/e2e/tasks')
-  await expect(other.getByRole('banner').getByRole('button', { name: 'Anna Employee' })).toBeVisible()
-  await expect(other.getByRole('main').getByText('No open tasks.')).toBeVisible()
-  await expect(other.getByText(title)).toHaveCount(0)
+  await expect(other.getByRole('banner').getByRole('button', { name: 'Anna Employee', exact: true })).toBeVisible()
+  await expect(other.getByRole('main').getByText('No open tasks.', { exact: true })).toBeVisible()
+  await expect(other.getByText(new RegExp(title, 'i'))).toHaveCount(0)
   await otherContext.close()
 })

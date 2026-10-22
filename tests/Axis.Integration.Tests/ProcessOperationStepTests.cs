@@ -95,8 +95,6 @@ public sealed class ProcessOperationStepTests(ProcessStepFixture fixture) : ICla
         var row = Assert.Single(await fixture.HistoryAsync(instanceId));
         Assert.Equal("lower", row.Step);
         Assert.Equal("The record update was rejected: /values/amount: request.amountNegative", row.Error);
-        Assert.DoesNotContain("500", row.Error, StringComparison.Ordinal);
-        Assert.DoesNotContain("-1", row.Error, StringComparison.Ordinal);
         Assert.Null(row.Output);
         Assert.Equal([AuditActions.ProcessFailed], await fixture.SystemAuditActionsAsync(instanceId));
         Assert.Equal(
