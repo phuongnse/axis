@@ -309,7 +309,8 @@ agrees it. The answer is:
   rules: [{ id, name, module, parameters: [{ name, type }], resultType }],
   connectors: [{ id, name, operations: [{ name }] }],
   events: [{ id, name, fields: [{ name, type }] }],
-  roles, sequences, forms, pages: [{ id, name }],
+  roles, sequences, forms: [{ id, name }],
+  pages: [{ id, name, parameters: [{ name, type, required }] }],
   texts: [{ key, texts: { <locale>: <text> }, usedBy }] }
 ```
 
@@ -328,6 +329,7 @@ agrees it. The answer is:
 - **Order.** Each list holds the module resources first, then the
   application's own in file path order. A step that is not a task has
   `outcomes: []`. Text keys are sorted ordinally.
+- **Page `parameters`.** The parameters the page declares, in file order. `required` is false when the file leaves it out.
 - **`locales`.** The locales of the folder's text resources.
 - **`texts`.** Each key comes with its text in every locale, and `usedBy`, the
   number of `label text` edges in the [reference index](configuration.md#reference-index).

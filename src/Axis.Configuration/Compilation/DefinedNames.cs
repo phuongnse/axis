@@ -16,7 +16,7 @@ public sealed record DefinedNames(
     IReadOnlyList<DefinedResource> Roles,
     IReadOnlyList<DefinedResource> Sequences,
     IReadOnlyList<DefinedResource> Forms,
-    IReadOnlyList<DefinedResource> Pages,
+    IReadOnlyList<DefinedPage> Pages,
     IReadOnlyList<DefinedText> Texts)
 {
     public static DefinedNames Empty { get; } = new([], [], [], [], [], [], [], [], [], [], [], []);
@@ -60,8 +60,14 @@ public sealed record DefinedOperation(string Name);
 
 public sealed record DefinedEvent(Guid Id, string Name, IReadOnlyList<DefinedTyped> Fields);
 
-/// <summary>A role, sequence, form or page.</summary>
+/// <summary>A role, sequence or form.</summary>
 public sealed record DefinedResource(Guid Id, string Name);
+
+/// <summary>A page and the parameters it declares.</summary>
+public sealed record DefinedPage(Guid Id, string Name, IReadOnlyList<DefinedPageParameter> Parameters);
+
+/// <summary>A page parameter: its name, its type and whether a link must give it.</summary>
+public sealed record DefinedPageParameter(string Name, string Type, bool Required);
 
 /// <summary>A text key with its text in each locale that has it, and the number of label uses.</summary>
 public sealed record DefinedText(string Key, IReadOnlyDictionary<string, string> Texts, int UsedBy);
