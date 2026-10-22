@@ -175,7 +175,7 @@ test("an employee does not see another employee's request in the list or by its 
   await expect(row(page, lanTitle)).toHaveCount(0);
   await page.goto(`/purchasing/purchaserequestform/${lanId}`);
   await expect(page.getByTestId("not-found")).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Title" })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: /Title/ })).toHaveCount(0);
 
   expect((await page.request.get(`${recordsPath}/${lanId}`)).status()).toBe(
     404,
@@ -234,9 +234,9 @@ test("an employee who opens a manager's task cannot see or complete it, and the 
 
   await page.goto(`/purchasing/mytasks/${taskId}`);
   await expect(
-    page.getByText("This task is assigned to someone else."),
+    page.getByText("This task is assigned to someone else.", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Approve/ })).toHaveCount(0);
   const inboxLoad = page.waitForResponse(
     (response) => new URL(response.url()).pathname === tasksPath,
   );
@@ -244,7 +244,7 @@ test("an employee who opens a manager's task cannot see or complete it, and the 
   expect((await inboxLoad).status()).toBe(200);
   // The inbox has rendered its answer once the table stops loading.
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
-  await expect(page.getByText(title)).toHaveCount(0);
+  await expect(page.getByText(new RegExp(title))).toHaveCount(0);
 
   expect((await page.request.get(`${tasksPath}/${taskId}`)).status()).toBe(403);
   const completed = await page.request.post(`${tasksPath}/${taskId}/complete`, {
@@ -284,12 +284,12 @@ test("a finance reviewer sees a submitted request read-only, and an update throu
   await useSession(page, "dung");
 
   await page.goto(`/purchasing/purchaserequestform/${id}`);
-  const titleInput = page.getByRole("textbox", { name: "Title" });
+  const titleInput = page.getByRole("textbox", { name: "* Title", exact: true });
   await expect(titleInput).toHaveValue(title);
   await expect(titleInput).toHaveAttribute("readonly");
-  await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Submit" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Save/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Submit/ })).toHaveCount(0);
 
   const read = await page.request.get(`${recordsPath}/${id}`);
   expect(read.status()).toBe(200);
@@ -330,7 +330,7 @@ const signedOutPages: {
     user: "anna",
     api: (id) => `${recordsPath}/${id}`,
     expectation: (page, title) =>
-      expect(page.getByRole("textbox", { name: "Title" })).toHaveValue(title),
+      expect(page.getByRole("textbox", { name: "* Title", exact: true })).toHaveValue(title),
   },
   {
     // An employee may not read this data source, so its department manager signs in.
@@ -398,7 +398,7 @@ test("a signed-out person who opens My tasks signs in on the Keycloak login page
   await logIn(page, "chau");
 
   await page.waitForURL(`${baseURL}${address}`);
-  await expect(page.getByRole("columnheader", { name: "Task" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Task", exact: true })).toBeVisible();
 });
 
 test("a signed-out person who opens a task's address signs in on the Keycloak login page and lands back on it", async ({
@@ -418,5 +418,5 @@ test("a signed-out person who opens a task's address signs in on the Keycloak lo
   await logIn(page, "chau");
 
   await page.waitForURL(`${baseURL}${address}`);
-  await expect(page.getByRole("button", { name: "Approve" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Approve", exact: true })).toBeVisible();
 });

@@ -105,7 +105,7 @@ test('the purchasing system submits a request through the endpoint, and the depa
   expect(body.instanceId).toBeDefined()
 
   const row = await waitForTask(page, title)
-  await expect(row.getByRole('link', { name: 'Manager approval' })).toBeVisible()
+  await expect(row.getByRole('link', { name: 'Manager approval', exact: true })).toBeVisible()
 })
 
 test('a repeated endpoint call with the same Idempotency-Key returns the first request, and the manager has one task', async ({

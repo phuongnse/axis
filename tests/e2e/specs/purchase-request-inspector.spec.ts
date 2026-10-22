@@ -56,16 +56,16 @@ test('the operator opens an instance waiting for the manager and sees the path a
   const { requestId, instanceId } = await startWaitingInstance(page)
 
   await page.goto('/purchasing/approvals?state=waiting&pageSize=100')
-  await expect(page.getByRole('banner').getByRole('button', { name: 'Giang Operator' })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Giang Operator', exact: true })).toBeVisible()
   await page
     .getByRole('row', { name: new RegExp(requestId) })
-    .getByRole('link', { name: 'Open' })
+    .getByRole('link', { name: 'Open', exact: true })
     .click()
   await expect(page).toHaveURL(new RegExp(`/purchasing/approvals/${instanceId}$`))
 
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode' }).click()
+      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     await expect(shell.getByTestId('inspector-step-submit')).toContainText('Taken')
@@ -95,8 +95,8 @@ test('an employee has no Approvals entry, sees no instance and is refused by the
 
   await useSession(page, 'anna')
   await page.goto('/purchasing/mytasks')
-  await expect(page.getByRole('menuitem', { name: 'My tasks' })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: 'Approvals' })).toHaveCount(0)
+  await expect(page.getByRole('menuitem', { name: 'My tasks', exact: true })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: /Approvals/ })).toHaveCount(0)
 
   await page.goto(`/purchasing/approvals/${instanceId}`)
   await expect(page.getByTestId('shell-error')).toBeVisible()
@@ -125,8 +125,8 @@ test('a finance reviewer cancels a waiting request in the inspector and its task
   await expect(page.getByTestId('inspector-command-retry')).toHaveCount(0)
   await page.getByTestId('inspector-command-cancel').click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByLabel('Reason').fill('The request was raised by mistake')
-  await dialog.getByRole('button', { name: 'Send' }).click()
+  await dialog.getByLabel('Reason', { exact: true }).fill('The request was raised by mistake')
+  await dialog.getByRole('button', { name: 'Send', exact: true }).click()
 
   await expect(page.getByTestId('inspector-instance')).toContainText('Cancelled')
   await expect(page.getByTestId('inspector-command-cancel')).toHaveCount(0)
@@ -196,10 +196,10 @@ test('a finance reviewer resolves an unknown purchase order call in the inspecto
   await page.goto(`/purchasing/approvals/${instanceId}`)
   await page.getByTestId(`inspector-resolve-${callId}`).click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByLabel('Reason').fill('The order exists in the purchasing system')
-  await dialog.getByLabel('Succeeded').check()
-  await dialog.getByLabel('orderNumber (text)').fill(orderNumber)
-  await dialog.getByRole('button', { name: 'Send' }).click()
+  await dialog.getByLabel('Reason', { exact: true }).fill('The order exists in the purchasing system')
+  await dialog.getByLabel('Succeeded', { exact: true }).check()
+  await dialog.getByLabel('orderNumber (text)', { exact: true }).fill(orderNumber)
+  await dialog.getByRole('button', { name: 'Send', exact: true }).click()
   await expect(dialog).toHaveCount(0)
 
   await expect(async () => {

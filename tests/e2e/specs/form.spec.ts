@@ -36,7 +36,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
 
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
-  await page.getByRole('textbox', { name: 'Title' }).fill(title)
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
   await page.getByLabel('Code', { exact: true }).fill(`C-${run}`)
   await page.getByLabel('Priority', { exact: true }).fill('7')
   await page.getByLabel('Amount', { exact: true }).fill('12.50')
@@ -46,7 +46,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
   // Enter in a picker confirms the value and does not send the form.
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
   await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'open')
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
@@ -55,9 +55,9 @@ test('a note is created and edited in the form, in light and dark mode', async (
   }
 
   await row.getByRole('button', { name: 'Open', exact: true }).click()
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
-  await page.getByRole('textbox', { name: 'Title' }).fill(`${title} edited`)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(`${title} edited`)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
   const edited = page.getByRole('row', { name: new RegExp(`${title} edited`) })
@@ -65,11 +65,11 @@ test('a note is created and edited in the form, in light and dark mode', async (
   await page.reload()
   await expect(edited).toContainText(`C-${run}`)
 
-  await page.getByRole('switch', { name: 'Dark mode' }).click()
+  await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
   await edited.getByRole('button', { name: 'Open', exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
-  await expect(dark.getByRole('textbox', { name: 'Title' })).toHaveValue(`${title} edited`)
-  await dark.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dark.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(`${title} edited`)
+  await dark.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page).toHaveURL(tablePath)
 })
 
@@ -82,15 +82,15 @@ test('a note saved by a signed-in user shows its creator read-only', async ({ pa
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
   await expect(page.getByLabel('Created by', { exact: true })).toHaveValue('')
-  await page.getByRole('textbox', { name: 'Title' }).fill(title)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(/\/e2e\/notes\?pageSize=100&sort=-title$/)
   await page
     .getByRole('row', { name: new RegExp(`${title} `) })
     .getByRole('button', { name: 'Open', exact: true })
     .click()
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
   const createdBy = page.getByLabel('Created by', { exact: true })
   await expect(createdBy).toHaveValue(me.id)
   await expect(createdBy).not.toBeEditable()
@@ -105,14 +105,14 @@ test('line items are added, edited and removed in the form, in light and dark mo
 
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
-  await page.getByRole('textbox', { name: 'Title' }).fill(title)
-  await page.getByRole('button', { name: 'Add row' }).click()
-  await page.getByRole('button', { name: 'Add row' }).click()
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+  await page.getByRole('button', { name: 'Add row', exact: true }).click()
+  await page.getByRole('button', { name: 'Add row', exact: true }).click()
   await cell('Description 1').fill('Pens')
   await cell('Quantity 1').fill('2')
   await cell('Description 2').fill('Ink')
   await cell('Quantity 2').fill('1')
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
@@ -123,12 +123,12 @@ test('line items are added, edited and removed in the form, in light and dark mo
   await expect(cell('Quantity 2')).toHaveValue('1')
   const id = /\/e2e\/noteform\/([0-9a-f-]+)$/.exec(page.url())![1]
 
-  await page.getByRole('switch', { name: 'Dark mode' }).click()
+  await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
   await dark.getByLabel('Quantity 1', { exact: true }).fill('5')
   await dark.getByRole('button', { name: 'Remove', exact: true }).nth(1).click()
   await expect(cell('Description 2')).toHaveCount(0)
-  await dark.getByRole('button', { name: 'Save' }).click()
+  await dark.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
   await row.getByRole('button', { name: 'Open', exact: true }).click()
@@ -152,22 +152,22 @@ test('after a signed-in user edits a note, its history shows the update first, i
   const tablePath = /\/e2e\/notes\?pageSize=100&sort=-title$/
   await useSession(page, 'binh')
   await page.goto('/e2e/notes?pageSize=100&sort=-title')
-  await expect(page.getByRole('banner').getByRole('button', { name: 'Binh Engineering Manager' })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Binh Engineering Manager', exact: true })).toBeVisible()
   // The page's request context shares the session cookie, so Binh creates the note.
   await createRecord(page.request, 'Note', { title })
   await page.reload()
 
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
   await row.getByRole('button', { name: 'Open', exact: true }).click()
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
-  await page.getByRole('textbox', { name: 'Title' }).fill(`${title} edited`)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(`${title} edited`)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page).toHaveURL(tablePath)
 
   const edited = page.getByRole('row', { name: new RegExp(`${title} edited`) })
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode' }).click()
+      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
     }
     await edited.getByRole('button', { name: 'Open', exact: true }).click()
     const history = page.locator(`[data-theme-mode="${mode}"]`).getByTestId('record-history')
@@ -179,7 +179,7 @@ test('after a signed-in user edits a note, its history shows the update first, i
     }
     await expect(entries.nth(1)).toContainText('Created')
     await expect(entries.nth(1)).toContainText('Binh Engineering Manager')
-    await page.getByRole('button', { name: 'Cancel' }).click()
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(page).toHaveURL(tablePath)
   }
 })
@@ -187,7 +187,7 @@ test('after a signed-in user edits a note, its history shows the update first, i
 test('an empty form shows the server error under the title', async ({ page }) => {
   await page.goto('/e2e/noteform/new')
 
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page.getByTestId('field-error-title')).toHaveText('Required.')
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
@@ -198,8 +198,8 @@ test('editing the title leaves an untouched date-time unchanged', async ({ page,
   const note = await createRecord(request, 'Note', { title: `Fraction ${run}`, dueAt: '2026-10-06T02:00:00.123456Z' })
 
   await page.goto(`/e2e/noteform/${note.id}`)
-  await page.getByRole('textbox', { name: 'Title' }).fill(`Fraction ${run} edited`)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(`Fraction ${run} edited`)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   // Opened without a table, the form returns to the site, which opens its first page.
   await expect(page).toHaveURL(/\/e2e\/notes$/)
 
@@ -216,7 +216,7 @@ test('a stale version shows a conflict, and a duplicate code an error under Code
   await createRecord(request, 'Note', { title: `Conflict ${run} B`, code: `B-${run}` })
 
   await page.goto(`/e2e/noteform/${a.id}`)
-  const titleInput = page.getByRole('textbox', { name: 'Title' })
+  const titleInput = page.getByRole('textbox', { name: '* Title', exact: true })
   await expect(titleInput).toHaveValue(`Conflict ${run} A`)
   const patched = await request.patch(`${notesPath}/${a.id}`, {
     data: { version: 1, values: { title: 'Changed elsewhere' } },
@@ -225,15 +225,15 @@ test('a stale version shows a conflict, and a duplicate code an error under Code
   expect(patched.status()).toBe(200)
 
   await titleInput.fill('Changed here')
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: /^(loading )?Save$/ }).click()
 
   await expect(page.getByTestId('form-conflict')).toBeVisible()
-  await page.getByRole('button', { name: 'Reload' }).click()
+  await page.getByRole('button', { name: 'Reload', exact: true }).click()
   await expect(titleInput).toHaveValue('Changed elsewhere')
   await expect(page.getByTestId('form-conflict')).toBeHidden()
 
   await page.getByLabel('Code', { exact: true }).fill(`B-${run}`)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: /^(loading )?Save$/ }).click()
 
   await expect(page.getByTestId('field-error-code')).toHaveText('Must be unique.')
 })
@@ -247,14 +247,14 @@ test('a category is picked in the lookup and shows on the saved note', async ({ 
   await page.goto('/e2e/notes?pageSize=100&sort=-title')
 
   await page.getByRole('button', { name: 'New', exact: true }).click()
-  await page.getByRole('textbox', { name: 'Title' }).fill(`Lookup ${run}`)
-  await page.getByRole('button', { name: 'Choose' }).click()
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(`Lookup ${run}`)
+  await page.getByRole('button', { name: 'Choose', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('row', { name: new RegExp(category) }).click()
 
   await expect(dialog).toBeHidden()
   await expect(page.getByLabel('Category', { exact: true })).toHaveValue(category)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
   await expect(page.getByRole('row', { name: new RegExp(`Lookup ${run} `) })).toContainText(category)
@@ -265,17 +265,17 @@ test('a form in two sections shows both titles, and saving keeps its read-only f
   const note = await createRecord(request, 'Note', { title: `Sections ${run}`, code: `S-${run}` })
 
   await page.goto(`/e2e/notesections/${note.id}`)
-  await expect(page.getByRole('heading', { name: 'Main' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Details' })).toBeVisible()
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(`Sections ${run}`)
+  await expect(page.getByRole('heading', { name: 'Main', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Details', exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(`Sections ${run}`)
   const code = page.getByLabel('Code', { exact: true })
   await expect(code).toHaveValue(`S-${run}`)
   await expect(code).not.toBeEditable()
   // A field the form does not list is not shown.
-  await expect(page.getByLabel('Done', { exact: true })).toBeHidden()
+  await expect(page.getByLabel(/Done/)).toBeHidden()
 
   await page.getByLabel('Priority', { exact: true }).fill('4')
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page).toHaveURL(/\/e2e\/notes$/)
 
   const read = await request.get(`${notesPath}/${note.id}`)
