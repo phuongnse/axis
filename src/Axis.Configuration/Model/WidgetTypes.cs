@@ -9,6 +9,7 @@ public static class WidgetTypes
         ["form"] = WidgetType.Form,
         ["taskInbox"] = WidgetType.TaskInbox,
         ["processInspector"] = WidgetType.ProcessInspector,
+        ["kpi"] = WidgetType.Kpi,
         ["columns"] = WidgetType.Columns,
         ["tabs"] = WidgetType.Tabs,
         ["section"] = WidgetType.Section,

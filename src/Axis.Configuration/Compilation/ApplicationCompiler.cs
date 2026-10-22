@@ -1758,7 +1758,27 @@ public static class ApplicationCompiler
                 RowActions = BuildActions(widget.RowActions),
                 ToolbarActions = BuildActions(widget.ToolbarActions),
                 Parameters = BuildParameters(widget),
+                Kpi = BuildKpi(widget, dataSource),
             };
+        }
+
+        // The checker has matched each measure to one of the data source's, ignoring letter case. The model
+        // keeps the declared name, so a client never fixes the case itself.
+        KpiModel? BuildKpi(WidgetDefinition widget, DataSourceResource? source)
+        {
+            if (widget.Measure is null || source is null)
+            {
+                return null;
+            }
+
+            string Declared(string measure) =>
+                source.Aggregate!.Measures.First(candidate => string.Equals(candidate.Name, measure, StringComparison.OrdinalIgnoreCase)).Name;
+
+            return new KpiModel(
+                Declared(widget.Measure),
+                widget.Label!,
+                widget.Comparison is { } comparison ? new KpiComparisonModel(Declared(comparison.Measure), comparison.Label) : null,
+                widget.Navigate is { } navigate ? (NavigateActionModel)BuildAction(navigate) : null);
         }
 
         return new()

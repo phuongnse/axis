@@ -95,7 +95,8 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <see cref="Actions"/> is empty on every widget but a form widget that declares actions.
 /// <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table that declares them.
 /// <see cref="Parameters"/> is empty on every widget but a table over a data source that binds page parameters.
-/// <see cref="Access"/> is set on a table or form widget and null on a task inbox and a process inspector.
+/// <see cref="Access"/> is set on a table or form widget and null on a task inbox, a process inspector and a kpi.
+/// <see cref="Kpi"/> is set only on a kpi widget, which has a <see cref="DataSource"/> and no entity.
 /// </summary>
 /// <param name="TasksPath">The path of the application's task API, which lists the signed-in user's open tasks.</param>
 /// <param name="Process">The process an inspector inspects, by its declared name.</param>
@@ -107,6 +108,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <param name="Access">
 /// What the user may do with the widget's entity, or with the root entity of its data source.
 /// </param>
+/// <param name="Kpi">What a kpi widget shows, or null on any other widget.</param>
 public sealed record WidgetMetadata(
     string Type,
     string? FormPage,
@@ -120,7 +122,20 @@ public sealed record WidgetMetadata(
     IReadOnlyList<ActionMetadata> RowActions,
     IReadOnlyList<ActionMetadata> ToolbarActions,
     IReadOnlyDictionary<string, string> Parameters,
-    WidgetAccess? Access) : PageWidgetMetadata;
+    WidgetAccess? Access,
+    KpiMetadata? Kpi) : PageWidgetMetadata;
+
+/// <summary>What a kpi widget shows of its data source's one total row.</summary>
+/// <param name="Measure">The measure to show, by the name the data source declares.</param>
+/// <param name="LabelKey">The text key of the tile's label.</param>
+/// <param name="Comparison">A second measure shown next to the first, or null when the widget has none.</param>
+/// <param name="Navigate">The action a click opens, or null when the widget has none or the user may not read its page.</param>
+public sealed record KpiMetadata(string Measure, string LabelKey, KpiComparisonMetadata? Comparison, NavigateActionMetadata? Navigate);
+
+/// <summary>The second measure of a kpi widget.</summary>
+/// <param name="Measure">The measure, by the name the data source declares.</param>
+/// <param name="LabelKey">The text key of its label.</param>
+public sealed record KpiComparisonMetadata(string Measure, string LabelKey);
 
 /// <summary>
 /// The entity actions a user may take on a widget's entity, and the fields each write action covers.

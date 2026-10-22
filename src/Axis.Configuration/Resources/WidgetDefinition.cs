@@ -2,7 +2,7 @@ namespace Axis.Configuration.Resources;
 
 /// <summary>
 /// A widget as written in the page file. It names an entity, a data source or, for a form widget, a
-/// form. A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container: it holds other widgets
+/// form. A <c>kpi</c> widget names a data source and one of its measures. A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container: it holds other widgets
 /// and binds nothing. Whether that binding, its entity, data source, form and form page exist is checked by
 /// <see cref="Compilation.ApplicationCompiler"/>, not by the loader.
 /// </summary>
@@ -58,6 +58,26 @@ public sealed record WidgetDefinition
 
     /// <summary>The widgets of a <c>section</c> widget, or null on any other widget.</summary>
     public IReadOnlyList<WidgetDefinition>? Widgets { get; init; }
+
+    /// <summary>The measure of its data source that a <c>kpi</c> widget shows, or null on any other widget.</summary>
+    public string? Measure { get; init; }
+
+    /// <summary>The label of a <c>kpi</c> widget, or null on any other widget.</summary>
+    public TextReference? Label { get; init; }
+
+    /// <summary>The second measure a <c>kpi</c> widget shows next to the first, or null when it has none.</summary>
+    public KpiComparisonDefinition? Comparison { get; init; }
+
+    /// <summary>The <c>navigate</c> action a <c>kpi</c> widget opens when clicked, or null when it has none.</summary>
+    public WidgetActionDefinition? Navigate { get; init; }
+}
+
+/// <summary>The comparison of a <c>kpi</c> widget: a second measure of the same data source and its label.</summary>
+public sealed record KpiComparisonDefinition
+{
+    public required string Measure { get; init; }
+
+    public required TextReference Label { get; init; }
 }
 
 /// <summary>One column of a <c>columns</c> widget: a width out of 12 and the widgets it holds.</summary>

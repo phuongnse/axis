@@ -139,17 +139,19 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `titles` in the site list has one entry per available locale of the site,
     from the locale as the site declares it to the title text. The home page
     can show each site without one more request per site.
-  - `type` of a widget is `table`, `form`, `taskInbox` or
-    `processInspector`, or `detail`, `chart` or `kpi` *(planned for M12)*.
+  - `type` of a widget is `table`, `form`, `taskInbox`,
+    `processInspector` or `kpi`, or `detail` or `chart` *(planned for M12)*.
     `formPage` is the
     page holding the form for a table's records, and `null` otherwise. On a
     `table` or `form`, exactly one of `entity` and `dataSource` is set, and
     the other is `null`. A `taskInbox` has both `null`, and so does a
     `processInspector`. The data source
     binding of the table widget below describes `dataSource`.
+  - A `kpi` sets `dataSource`, and has `"entity": null`, `"form": null`,
+    `"actions": []` and `"access": null`.
   - *(Planned for M12.)* A `detail` sets `entity`, `form` when it names a
-    form, `actions` and `access`, and has `"dataSource": null`. A `chart` and
-    a `kpi` set `dataSource`, and have `"entity": null`, `"form": null`,
+    form, `actions` and `access`, and has `"dataSource": null`. A `chart`
+    sets `dataSource`, and has `"entity": null`, `"form": null`,
     `"actions": []` and `"access": null`.
   - Every widget also has `form`, never left out. It is the widget's form
     resource on a `form` widget that names one, and `null` otherwise. It is
@@ -159,9 +161,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - Every widget also has `process` and `instancesPath`,
     never left out. They are described under the process inspector widget, and
     are `null` on every other widget.
-  - Every widget also has `detail`, `chart` and `kpi` *(planned for M12)*,
+  - Every widget also has `kpi`, never left out. It is described under the
+    KPI widget, and is `null` on every other widget. It is written after
+    `access`.
+  - Every widget also has `detail` and `chart` *(planned for M12)*,
     never left out. Each is described under its widget, and is `null` on every
-    other widget. The examples on this page leave them out until M12.
+    other widget. The examples on this page leave them out until M12, and
+    leave out `kpi`, which is `null` on all of them.
   - Every widget also has `actions`, never left out. It
     is described under the form widget, and is `[]` on a widget it does not
     apply to. A table's `startProcess` row actions are left out without
@@ -180,8 +186,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `reference`, as a data source parameter has it, and `null` otherwise. The
     SPA reads them to check the values in the address.
   - Every widget also has `access`, never left out. It is described under
-    **Policies** below, and is `null` on a `taskInbox` and on a
-    `processInspector`, and on a `chart` and a `kpi` *(planned for M12)*.
+    **Policies** below, and is `null` on a `taskInbox`, on a
+    `processInspector` and on a `kpi`, and on a `chart` *(planned for M12)*.
   - A page may hold a tree of widgets. A container widget
     carries only `type` and its own keys. A leaf widget keeps every key above.
     A tab carries `labelKey`, and a `section` carries `titleKey` and
@@ -275,9 +281,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       [data source endpoint](data-sources.md#authorization) needs. A
       `taskInbox` is always readable. A
       `processInspector` is readable when the user holds an `inspect` grant on
-      its process. *(Planned for M12.)* A `detail` needs a `read` grant on its
-      entity. A `chart` or a `kpi` whose data source the user cannot run is
-      left out of the page, as a table is.
+      its process. A `kpi` whose data source the user cannot run is left out
+      of the page, as a table is. *(Planned for M12.)* A `detail` needs a
+      `read` grant on its entity. A `chart` whose data source the user cannot
+      run is left out too.
     - **Pages with a tree.** An unreadable widget is
       left out. A column or tab whose widgets are all left out is left out,
       and the other columns keep their declared widths. A container left with
@@ -293,14 +300,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       affected. The task API's form does the same, see
       [policies on tasks](task-api.md). *(Planned for M12.)* A `detail` leaves
       out unreadable fields as its form metadata does, and an empty section
-      too. A `chart` or `kpi` measure over a field the user may not read
-      follows the data source's field check, which leaves the widget out.
+      too. A `kpi` measure over a field the user may not read follows the
+      data source's field check, which leaves the widget out. A `chart`
+      does the same.
     - **Actions.** A `startProcess` action is left out of `actions` when the
       user has no `start` grant on its process. The same holds for a `table`
       row action *(planned for M12)*, and its `delete` row action is left out
       when `access.actions` lacks `delete`. A `navigate` action whose target
       page the user cannot read is left out too. A
-      `kpi`'s `navigate` to such a page is `null` _(planned for M12)_.
+      `kpi`'s `navigate` to such a page is `null`.
     - **Access.** Every `table` and `form` widget, and every `detail`
       *(planned for M12)*, gets an `access` object.
       It says which entity actions the user may take, and which fields each
@@ -347,8 +355,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   - A page holds at most one `table` and at most one
     `form`, `taskInbox` or `processInspector`, so every part of the address
-    has one owner. A `detail`, a `chart` and a `kpi` own no part of the
-    address and read only page parameters, so they do not count
+    has one owner. A `kpi` owns no part of the address and reads only page
+    parameters, so it does not count. A `detail` and a `chart` own none either
     *(planned for M12)*. The compiler checks this. `?page=&pageSize=&sort=` and the data source parameter
     values belong to the page's one `table`. `/new` and `/{id}` belong to its
     one `form`. `/{taskId}` and `/{instanceId}` belong to its one `taskInbox`
