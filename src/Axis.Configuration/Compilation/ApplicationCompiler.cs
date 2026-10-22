@@ -400,7 +400,18 @@ public static class ApplicationCompiler
         }
 
         PresentationChecker.Check(
-            loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, moduleReferences, references, rules, declaredModules, diagnostics);
+            loaded,
+            FindEntity,
+            FindPage,
+            FindDataSource,
+            FindForm,
+            FindProcess,
+            (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, report),
+            moduleReferences,
+            references,
+            rules,
+            declaredModules,
+            diagnostics);
         CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, references, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, rules, declaredModules, diagnostics);
         ProcessChecker.Check(
@@ -1717,6 +1728,12 @@ public static class ApplicationCompiler
             Name = page.Name,
             Title = page.Title,
             File = page.File,
+            Parameters = [.. page.Parameters.Select(parameter => new PageParameterModel(
+                parameter.Name,
+                FieldTypes.Parse(parameter.Type),
+                parameter.Required ?? false,
+                parameter.Values,
+                parameter.Target is not null && entitiesByName.GetValueOrDefault(parameter.Target) is { } target ? new EntityReference(target.Id, target.Name) : null))],
             Widgets = BuildWidgets(page.Widgets),
         };
     }
