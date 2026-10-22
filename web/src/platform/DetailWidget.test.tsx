@@ -93,7 +93,13 @@ const sectionsWidget: EntityWidgetMetadata = {
   },
 }
 
-const closeAction = { type: 'startProcess' as const, process: 'NoteClose', labelKey: 'noteClose.action', instancesPath }
+const closeAction = {
+  type: 'startProcess' as const,
+  process: 'NoteClose',
+  labelKey: 'noteClose.action',
+  instancesPath,
+  visibleWhen: null,
+}
 const openAction = {
   type: 'navigate' as const,
   page: 'Notes',
@@ -101,6 +107,7 @@ const openAction = {
   parameters: { note: 'id', title: 'title' },
   record: null,
   opensForm: false,
+  visibleWhen: null,
 }
 
 function noteJson(title: string, version = 1) {

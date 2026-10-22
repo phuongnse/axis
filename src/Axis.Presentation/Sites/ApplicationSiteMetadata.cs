@@ -160,6 +160,14 @@ public abstract record ActionMetadata
 {
     /// <summary>The kind of action as written in page files: <c>startProcess</c> or <c>navigate</c>.</summary>
     public abstract string Type { get; init; }
+
+    /// <summary>
+    /// The boolean expression over the row that decides whether a row action shows, or null when it always
+    /// shows. It is written last. A client works out only part of the expression language and hides the
+    /// button when it cannot work the expression out.
+    /// </summary>
+    [JsonPropertyOrder(1)]
+    public string? VisibleWhen { get; init; }
 }
 
 /// <summary>Writes an action by its runtime type, so each kind has only its own properties.</summary>

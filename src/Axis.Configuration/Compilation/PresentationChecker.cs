@@ -750,6 +750,11 @@ internal static class PresentationChecker
                     {
                         CheckStartProcess(rowActions[index], rowActionPath, recordEntity, page, loaded, findProcess, references, diagnostics);
                     }
+
+                    if (rowActions[index].VisibleWhen is { } visibleWhen)
+                    {
+                        CheckVisibleWhen(visibleWhen, $"{rowActionPath}/visibleWhen", rowScope, page, references, diagnostics);
+                    }
                 }
             }
 
@@ -1152,6 +1157,44 @@ internal static class PresentationChecker
                     $"{actionPath}/process",
                     page.Id));
             }
+        }
+    }
+
+    /// <summary>
+    /// Checks the <c>visibleWhen</c> of a row action: a boolean expression over the row. When
+    /// <paramref name="scope"/> is null, because the record or data source of the widget is unknown and
+    /// has a diagnostic of its own, it is only parsed.
+    /// </summary>
+    private static void CheckVisibleWhen(
+        string expression,
+        string path,
+        ExpressionScope? scope,
+        PageResource page,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        ExpressionType? type = null;
+        ExpressionDiagnostic? problem;
+        if (!parsed.Succeeded)
+        {
+            problem = parsed.Diagnostic;
+        }
+        else if (scope is null)
+        {
+            problem = null;
+        }
+        else
+        {
+            var check = ExpressionTypeChecker.Check(parsed.Expression!, scope, ExpressionType.Boolean);
+            type = check.Type;
+            problem = check.Diagnostic;
+        }
+
+        references.RecordExpression(page, path, type, problem);
+        if (problem is not null)
+        {
+            diagnostics.Add(new Diagnostic(problem.Code, problem.Message, page.File, path, page.Id));
         }
     }
 

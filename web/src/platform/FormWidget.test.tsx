@@ -170,7 +170,9 @@ const instancesPath = '/api/apps/E2eApp/processes/NoteClose/instances'
 // A note form with an action that starts the NoteClose process.
 const actionWidget: EntityWidgetMetadata = {
   ...noteWidget,
-  actions: [{ type: 'startProcess', process: 'NoteClose', labelKey: 'noteClose.action', instancesPath }],
+  actions: [
+    { type: 'startProcess', process: 'NoteClose', labelKey: 'noteClose.action', instancesPath, visibleWhen: null },
+  ],
 }
 
 const instanceJson = `{"id":"01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7e","process":"NoteClose","subjectId":"${noteId}","releaseId":"01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7f","state":"running"}`
@@ -996,6 +998,7 @@ describe('FormWidget', () => {
             parameters: { note: 'id', title: 'Title', category: 'category' },
             record: null,
             opensForm: false,
+            visibleWhen: null,
           },
           ...actionWidget.actions,
         ],
@@ -1017,6 +1020,7 @@ describe('FormWidget', () => {
         parameters: {},
         record: null,
         opensForm: false,
+        visibleWhen: null,
       }
       stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
       const { unmount } = renderForm(null, { ...actionWidget, actions: [navigateAction] })

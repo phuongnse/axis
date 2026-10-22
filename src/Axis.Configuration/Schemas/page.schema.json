@@ -80,7 +80,7 @@
         },
         "rowActions": {
           "type": "array",
-          "items": { "$ref": "#/$defs/action" }
+          "items": { "$ref": "#/$defs/rowAction" }
         },
         "toolbarActions": {
           "type": "array",
@@ -190,6 +190,27 @@
         "label": { "$ref": "#/$defs/textReference" },
         "parameters": { "$ref": "#/$defs/navigateParameters" },
         "record": { "type": "string", "minLength": 1, "x-axis-expression": true }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "navigate" } } },
+          "then": { "required": ["page"], "properties": { "process": false } },
+          "else": { "required": ["process"], "properties": { "page": false, "parameters": false, "record": false } }
+        }
+      ]
+    },
+    "rowAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "label"],
+      "properties": {
+        "type": { "enum": ["startProcess", "navigate"] },
+        "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" },
+        "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
+        "label": { "$ref": "#/$defs/textReference" },
+        "parameters": { "$ref": "#/$defs/navigateParameters" },
+        "record": { "type": "string", "minLength": 1, "x-axis-expression": true },
+        "visibleWhen": { "type": "string", "minLength": 1, "x-axis-expression": true }
       },
       "allOf": [
         {

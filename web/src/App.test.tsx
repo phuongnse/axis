@@ -146,7 +146,15 @@ const pages: Record<string, PageMetadata> = {
         actions: [],
         rowActions: [],
         toolbarActions: [
-          { type: 'navigate', page: 'NoteForm', labelKey: 'notes.new', parameters: {}, record: null, opensForm: true },
+          {
+            type: 'navigate',
+            page: 'NoteForm',
+            labelKey: 'notes.new',
+            parameters: {},
+            record: null,
+            opensForm: true,
+            visibleWhen: null,
+          },
         ],
         parameters: {},
         access: noteAccess,

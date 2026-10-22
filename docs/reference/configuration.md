@@ -205,6 +205,15 @@ flowchart LR
        only (`AXC0004` for another type). A row `startProcess` is checked like
        a form's: a label text key, a loaded process (`AXC0087`) over the
        table's root entity (`AXC0088`), both at `/widgets/{i}/rowActions/{j}/process`,
+     - a row action, `navigate` or `startProcess`, may have `visibleWhen`, a
+       boolean expression over the row. It sees the same names as a `navigate`
+       parameter. A parse error, an unknown name or a wrong type is reported
+       with the expression's own code, for example `AXC0048` for a result that
+       is not boolean, at `/widgets/{i}/rowActions/{j}/visibleWhen`. The
+       schema refuses `visibleWhen` in `toolbarActions`, on a form's `actions`
+       and on a kpi's `navigate` (`AXC0004`). The compiler does not refuse a
+       well-typed condition that the SPA cannot work out, see
+       [frontend.md](frontend.md),
      - each target is a `navigate page` edge in the reference index.
 
      A `navigate` action may also set `record`, an expression for the id of

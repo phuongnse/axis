@@ -26,6 +26,7 @@ import {
 } from './tableQuery'
 import { useText } from './texts'
 import { usePhoneWidth } from './usePhoneWidth'
+import { isVisible } from './visibleWhen'
 
 interface TableWidgetProps {
   sitePath: string
@@ -274,8 +275,12 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           }
           const scope = { id: record.id, values: record.values }
           // A start action runs for the row. A navigate action opens its page, or is dropped when its path is unknown.
+          // An action whose visibleWhen is not plainly true is dropped.
           const list = rowActions.flatMap(
             (action, index): { action: WidgetAction; index: number; run: () => void }[] => {
+              if (!isVisible(action.visibleWhen, scope)) {
+                return []
+              }
               if (action.type === 'startProcess') {
                 return [{ action, index, run: () => void runStart(action, record.id!) }]
               }
