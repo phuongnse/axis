@@ -107,6 +107,18 @@ flowchart LR
      `form` (`AXC0060` at that property).
      The page schema requires `process` on a `processInspector` and does not
      allow it on any other widget (`AXC0004`).
+     A `kpi` widget needs a `dataSource` that names a loaded data source
+     (`AXC0059`) with an `aggregate` whose `groupBy` is empty (`AXC0237`), a
+     `measure` of that aggregate, and a `label`. An optional `comparison` has a
+     `measure` and a `label`. A measure that the aggregate does not declare is
+     `AXC0238` at `/widgets/{i}/measure` or `/widgets/{i}/comparison/measure`.
+     A `kpi` names no `entity`, `form` or `actions` (`AXC0060` at that
+     property), and its data source has no
+     required parameter (`AXC0060` at `/widgets/{i}/dataSource`). Its optional
+     `navigate` is checked as any `navigate` action is, with page parameters
+     as the only names in its expressions. The page schema requires `measure` and
+     `label` on a `kpi` and does not allow them, or `comparison` and
+     `navigate`, on any other widget (`AXC0004`).
      `actions` are allowed only on a `form` widget
      (`AXC0060` at `/widgets/{i}/actions`). An action's `process` must name a
      loaded process (`AXC0087`) over the entity of the form's records

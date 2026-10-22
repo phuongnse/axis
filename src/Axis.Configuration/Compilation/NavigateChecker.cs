@@ -180,7 +180,7 @@ internal static class NavigateChecker
     }
 
     /// <summary>The type a page parameter holds, built as the page check builds it, or null for a type with no value, which has a diagnostic on the target page.</summary>
-    private static ExpressionType? ExpectedType(PageParameterDefinition parameter) =>
+    internal static ExpressionType? ExpectedType(PageParameterDefinition parameter) =>
         ExpressionScopes.TypeOf(new FieldDefinition
         {
             Name = parameter.Name,

@@ -3,7 +3,7 @@ namespace Axis.Configuration.Resources;
 /// <summary>
 /// An action as written in the page file. A <c>startProcess</c> action of a <c>form</c> widget is a
 /// button that starts the named process for the form's record. A <c>navigate</c> action, in a form
-/// widget's <c>actions</c> or a table's <c>rowActions</c> and <c>toolbarActions</c>, opens the
+/// widget's <c>actions</c>, a table's <c>rowActions</c> and <c>toolbarActions</c> or a kpi's <c>navigate</c>, opens the
 /// named page and gives each of its parameters an expression. Whether the process or page exists,
 /// and whether the parameters fit, is checked by <see cref="Compilation.ApplicationCompiler"/>,
 /// not by the loader.

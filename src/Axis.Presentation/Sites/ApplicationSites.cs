@@ -93,7 +93,14 @@ public static class ApplicationSites
             [.. widget.RowActions.Select(action => Action(application, action))],
             [.. widget.ToolbarActions.Select(action => Action(application, action))],
             widget.Parameters,
-            FullAccess(application, widget));
+            FullAccess(application, widget),
+            widget.Kpi is { } kpi
+                ? new KpiMetadata(
+                    kpi.Measure,
+                    kpi.Label.TextKey,
+                    kpi.Comparison is { } comparison ? new KpiComparisonMetadata(comparison.Measure, comparison.Label.TextKey) : null,
+                    kpi.Navigate is { } navigate ? (NavigateActionMetadata)Action(application, navigate) : null)
+                : null);
 
     private static ActionMetadata Action(ApplicationModel application, WidgetActionModel action) =>
         action switch
@@ -133,10 +140,11 @@ public static class ApplicationSites
             : null;
     }
 
-    // Without a user to shape it, access lists every entity action and every field.
+    // Without a user to shape it, access lists every entity action and every field. A kpi reads a total
+    // row of its data source, not records, so it has none.
     private static WidgetAccess? FullAccess(ApplicationModel application, WidgetModel widget)
     {
-        if (WidgetEntity(application, widget) is not { } entity)
+        if (widget.Type == WidgetType.Kpi || WidgetEntity(application, widget) is not { } entity)
         {
             return null;
         }

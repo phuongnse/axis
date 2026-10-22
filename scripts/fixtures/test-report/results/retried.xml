@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="e2e" tests="2" failures="0" errors="0" time="2.0">
+    <testsuite name="sample.spec.ts" tests="2" failures="0" errors="0" skipped="0" time="2.0">
+        <testcase classname="sample.spec.ts" name="Sample › retries once" time="1.2"></testcase>
+        <testcase classname="sample.spec.ts" name="Sample › stays green" time="0.8"></testcase>
+    </testsuite>
+</testsuites>

@@ -1,0 +1,28 @@
+{
+  "config": { "rootDir": "__ROOT__/tests/e2e/specs" },
+  "suites": [
+    {
+      "title": "sample.spec.ts",
+      "file": "sample.spec.ts",
+      "line": 0,
+      "column": 0,
+      "specs": [
+        {
+          "title": "adds numbers",
+          "ok": true,
+          "file": "sample.spec.ts",
+          "line": 2,
+          "column": 7,
+          "tests": [
+            {
+              "projectName": "chromium",
+              "status": "expected",
+              "results": [{ "status": "passed", "errors": [] }]
+            }
+          ]
+        }
+      ],
+      "suites": []
+    }
+  ]
+}

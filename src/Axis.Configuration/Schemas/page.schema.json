@@ -68,7 +68,7 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["table", "form", "taskInbox", "processInspector", "columns", "tabs", "section"] },
+        "type": { "enum": ["table", "form", "taskInbox", "processInspector", "kpi", "columns", "tabs", "section"] },
         "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
         "dataSource": { "$ref": "#/$defs/dataSourceName", "x-axis-reference": "dataSource" },
         "form": { "$ref": "#/$defs/name", "x-axis-reference": "form" },
@@ -102,13 +102,30 @@
         },
         "title": { "$ref": "#/$defs/textReference" },
         "collapsed": { "type": "boolean" },
-        "widgets": { "$ref": "#/$defs/widgets" }
+        "widgets": { "$ref": "#/$defs/widgets" },
+        "measure": { "$ref": "#/$defs/name" },
+        "label": { "$ref": "#/$defs/textReference" },
+        "comparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["measure", "label"],
+          "properties": {
+            "measure": { "$ref": "#/$defs/name" },
+            "label": { "$ref": "#/$defs/textReference" }
+          }
+        },
+        "navigate": { "$ref": "#/$defs/navigateAction" }
       },
       "allOf": [
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "processInspector" } } },
           "then": { "required": ["process"] },
           "else": { "properties": { "process": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "kpi" } } },
+          "then": { "required": ["dataSource", "measure", "label"], "properties": { "parameters": false } },
+          "else": { "properties": { "measure": false, "label": false, "comparison": false, "navigate": false } }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "columns" } } },
@@ -128,7 +145,7 @@
         {
           "if": { "required": ["type"], "properties": { "type": { "enum": ["columns", "tabs", "section"] } } },
           "then": {
-            "properties": { "entity": false, "dataSource": false, "form": false, "actions": false, "rowActions": false, "toolbarActions": false, "parameters": false }
+            "properties": { "entity": false, "dataSource": false, "form": false, "actions": false, "rowActions": false, "toolbarActions": false, "parameters": false, "measure": false, "label": false, "comparison": false, "navigate": false }
           }
         }
       ]

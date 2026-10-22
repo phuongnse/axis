@@ -3,12 +3,14 @@
 // Usage: node scripts/test-report.mjs [--results-dir DIR] [--root DIR] [--skipped NAME]... NAME:CWD...
 //
 // Each suite NAME has its results in DIR/NAME.xml. CWD is the directory, relative to
-// the root, that the suite's relative file paths start from. The Markdown summary is
-// appended to $GITHUB_STEP_SUMMARY when it is set and printed otherwise. On GitHub
-// Actions every failed test also gets an ::error annotation. When the summary goes to
-// that file, the failed tests are also listed on stdout, for the job log. A suite named
-// by --skipped did not run and has no results file. It is reported as skipped. Exits 1
-// when any other suite has failed tests or no results file.
+// the root, that the suite's relative file paths start from. A suite may also have
+// DIR/NAME.json, a Playwright JSON report, which lists the tests that failed and then
+// passed on a retry. The Markdown summary is appended to $GITHUB_STEP_SUMMARY when it is
+// set and printed otherwise. On GitHub Actions every failed test also gets an ::error
+// annotation. When the summary goes to that file, the failed tests and the tests that
+// passed on a retry are also listed on stdout, for the job log. Retried tests do not fail
+// the run. A suite named by --skipped did not run and has no results file. It is reported
+// as skipped. Exits 1 when any other suite has failed tests or no results file.
 import { appendFileSync, existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -128,15 +130,68 @@ export function locateFailure(test, root, cwd) {
   return frames[0] ?? {}
 }
 
+const ansiColor = /\u001b\[[0-9;]*m/g
+
+/** Finds the tests that a Playwright JSON report marks flaky: they failed, then passed on a retry. */
+export function parseRetried(report) {
+  const retried = []
+  const visit = (suite, titles) => {
+    for (const spec of suite.specs ?? []) {
+      for (const test of spec.tests ?? []) {
+        if (test.status !== 'flaky') continue
+        const failed = test.results.find((result) => result.status !== 'passed' && result.status !== 'skipped')
+        retried.push({
+          name: [...titles, spec.title].join(' › '),
+          file: path.join(report.config.rootDir, spec.file),
+          line: spec.line,
+          message: (failed?.error?.message ?? failed?.errors?.[0]?.message ?? '').replace(ansiColor, '').trim(),
+        })
+      }
+    }
+    for (const child of suite.suites ?? []) visit(child, [...titles, child.title])
+  }
+  for (const suite of report.suites ?? []) visit(suite, [])
+  return retried
+}
+
+/** Reads the tests a suite's Playwright JSON report marks flaky. A missing or unreadable file lists none. */
+function readRetried(file, name, root, cwd) {
+  try {
+    return parseRetried(JSON.parse(readFileSync(file, 'utf8'))).map((test) => {
+      const location = resolveFile(test.file, root, cwd)
+      return {
+        suite: name,
+        name: test.name,
+        message: test.message,
+        ...(location ? { file: location, line: test.line } : {}),
+      }
+    })
+  } catch {
+    return []
+  }
+}
+
 /** Reads the results of each suite. Suites are "NAME:CWD" strings or { name, cwd } objects. */
 export function buildReport({ suites, resultsDir, root, skipped = [] }) {
   const results = suites.map((suite) => {
     const [name, cwd = '.'] = typeof suite === 'string' ? suite.split(/:(.*)/s) : [suite.name, suite.cwd]
     if (skipped.includes(name)) {
-      return { name, missing: false, unaffected: true, passed: 0, failed: 0, skipped: 0, duration: 0, failures: [] }
+      return {
+        name,
+        missing: false,
+        unaffected: true,
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+        duration: 0,
+        failures: [],
+        retried: [],
+      }
     }
     const file = path.join(resultsDir, `${name}.xml`)
-    if (!existsSync(file)) return { name, missing: true, passed: 0, failed: 0, skipped: 0, duration: 0, failures: [] }
+    if (!existsSync(file)) {
+      return { name, missing: true, passed: 0, failed: 0, skipped: 0, duration: 0, failures: [], retried: [] }
+    }
 
     const { tests, time } = parseJunit(readFileSync(file, 'utf8'))
     const count = (status) => tests.filter((test) => test.status === status).length
@@ -156,6 +211,7 @@ export function buildReport({ suites, resultsDir, root, skipped = [] }) {
       skipped: count('skipped'),
       duration: time,
       failures,
+      retried: readRetried(path.join(resultsDir, `${name}.json`), name, root, cwd || '.'),
     }
   })
   return { suites: results, ok: results.every((suite) => !suite.missing && suite.failed === 0) }
@@ -182,7 +238,19 @@ function codeBlock(text, indent) {
 
 const tableCell = (text) => String(text).replace(/\|/g, '\\|')
 
-/** The Markdown summary: one table row per suite, then each failed test. */
+function summaryEntries(tests) {
+  return tests.flatMap((test) => {
+    const location = test.file ? ` (${codeSpan(test.line ? `${test.file}:${test.line}` : test.file)})` : ''
+    return [
+      `- **${test.suite}**: ${codeSpan(test.name)}${location}`,
+      '',
+      codeBlock(test.message || '(no message)', '  '),
+      '',
+    ]
+  })
+}
+
+/** The Markdown summary: one table row per suite, then each failed test and each test that passed on a retry. */
 export function formatSummary(report) {
   const lines = [
     '## Test results',
@@ -196,23 +264,17 @@ export function formatSummary(report) {
     } else if (suite.missing) {
       lines.push(`| ${tableCell(suite.name)} (missing: no results file) | - | - | - | - |`)
     } else {
+      const passed = suite.retried.length > 0 ? `${suite.passed} (${suite.retried.length} on retry)` : suite.passed
       lines.push(
-        `| ${tableCell(suite.name)} | ${suite.passed} | ${suite.failed} | ${suite.skipped} | ${formatDuration(suite.duration)} |`,
+        `| ${tableCell(suite.name)} | ${passed} | ${suite.failed} | ${suite.skipped} | ${formatDuration(suite.duration)} |`,
       )
     }
   }
 
   const failures = report.suites.flatMap((suite) => suite.failures)
-  if (failures.length > 0) {
-    lines.push('', '### Failed tests', '')
-    for (const failure of failures) {
-      const location = failure.file
-        ? ` (${codeSpan(failure.line ? `${failure.file}:${failure.line}` : failure.file)})`
-        : ''
-      lines.push(`- **${failure.suite}**: ${codeSpan(failure.name)}${location}`, '')
-      lines.push(codeBlock(failure.message || '(no message)', '  '), '')
-    }
-  }
+  if (failures.length > 0) lines.push('', '### Failed tests', '', ...summaryEntries(failures))
+  const retried = report.suites.flatMap((suite) => suite.retried)
+  if (retried.length > 0) lines.push('', '### Passed on a retry', '', ...summaryEntries(retried))
   return `${lines.join('\n').trimEnd()}\n`
 }
 
@@ -239,21 +301,35 @@ export function formatAnnotations(report) {
 
 const maxMessageLines = 20
 
-/** The failed tests as plain text for the job log, or no lines when every test passed. */
-export function formatFailedTests(report) {
-  const failures = report.suites.flatMap((suite) => suite.failures)
-  if (failures.length === 0) return []
-  const lines = ['Failed tests:']
-  for (const failure of failures) {
-    const location = failure.file ? ` (${failure.line ? `${failure.file}:${failure.line}` : failure.file})` : ''
-    lines.push(`- ${failure.suite}: ${failure.name}${location}`)
-    const messageLines = (failure.message || '(no message)').split(/\r?\n/)
+function formatTestList(title, tests) {
+  if (tests.length === 0) return []
+  const lines = [title]
+  for (const test of tests) {
+    const location = test.file ? ` (${test.line ? `${test.file}:${test.line}` : test.file})` : ''
+    lines.push(`- ${test.suite}: ${test.name}${location}`)
+    const messageLines = (test.message || '(no message)').split(/\r?\n/)
     for (const line of messageLines.slice(0, maxMessageLines)) lines.push(`    ${line}`)
     if (messageLines.length > maxMessageLines) {
       lines.push(`    ... ${messageLines.length - maxMessageLines} more lines, see the job summary`)
     }
   }
   return lines
+}
+
+/** The failed tests as plain text for the job log, or no lines when every test passed. */
+export function formatFailedTests(report) {
+  return formatTestList(
+    'Failed tests:',
+    report.suites.flatMap((suite) => suite.failures),
+  )
+}
+
+/** The tests that passed on a retry as plain text for the job log, or no lines when there are none. */
+export function formatRetriedTests(report) {
+  return formatTestList(
+    'Passed on a retry:',
+    report.suites.flatMap((suite) => suite.retried),
+  )
 }
 
 /** Runs the report with command-line arguments and returns the exit code. */
@@ -279,7 +355,7 @@ export function main(args, env = process.env, stdout = process.stdout) {
     for (const line of formatAnnotations(report)) stdout.write(`${line}\n`)
   }
   if (env.GITHUB_STEP_SUMMARY) {
-    for (const line of formatFailedTests(report)) stdout.write(`${line}\n`)
+    for (const line of [...formatFailedTests(report), ...formatRetriedTests(report)]) stdout.write(`${line}\n`)
   }
   return report.ok ? 0 : 1
 }

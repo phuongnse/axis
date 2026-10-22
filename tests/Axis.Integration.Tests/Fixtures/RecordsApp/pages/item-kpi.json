@@ -1,0 +1,17 @@
+{
+  "id": "0ec79624-7872-4f71-a6c8-5bf1f3ec40e2",
+  "kind": "page",
+  "name": "ItemKpi",
+  "formatVersion": 1,
+  "title": { "textKey": "itemKpi.title" },
+  "widgets": [
+    {
+      "type": "kpi",
+      "dataSource": "ItemTotals",
+      "measure": "items",
+      "label": { "textKey": "itemKpi.items" },
+      "comparison": { "measure": "priceSum", "label": { "textKey": "itemKpi.priceSum" } },
+      "navigate": { "type": "navigate", "page": "Departments", "label": { "textKey": "itemKpi.showDepartments" } }
+    }
+  ]
+}

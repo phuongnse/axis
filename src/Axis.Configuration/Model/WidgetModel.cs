@@ -13,6 +13,7 @@ namespace Axis.Configuration.Model;
 /// page parameters. <see cref="Process"/> is set only on a process inspector, which has no other reference.
 /// A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container with no reference of its own: it holds
 /// <see cref="Columns"/>, <see cref="Tabs"/> or <see cref="Widgets"/>, and every other widget leaves those empty.
+/// A <c>kpi</c> widget sets <see cref="DataSource"/> and <see cref="Kpi"/>, and no other reference.
 /// Records compare lists by reference, so two widgets with containers are equal only when they share those lists.
 /// </summary>
 public sealed record WidgetModel(
@@ -51,7 +52,20 @@ public sealed record WidgetModel(
 
     /// <summary>The widgets of a <c>section</c> widget, in page file order.</summary>
     public IReadOnlyList<WidgetModel> Widgets { get; init; } = [];
+
+    /// <summary>What a <c>kpi</c> widget shows of its data source, or null on any other widget.</summary>
+    public KpiModel? Kpi { get; init; }
 }
+
+/// <summary>
+/// What a <c>kpi</c> widget shows: one measure of the single total row of its data source, as the data
+/// source declares the measure's name, with a label, an optional <paramref name="Comparison"/> and an
+/// optional <paramref name="Navigate"/> action that a click opens.
+/// </summary>
+public sealed record KpiModel(string Measure, TextReference Label, KpiComparisonModel? Comparison, NavigateActionModel? Navigate);
+
+/// <summary>The second measure of a <c>kpi</c> widget, as its data source declares the name, and its label.</summary>
+public sealed record KpiComparisonModel(string Measure, TextReference Label);
 
 /// <summary>One column of a <c>columns</c> widget. The widths of a widget's columns add up to 12.</summary>
 public sealed record WidgetColumnModel(int Width, IReadOnlyList<WidgetModel> Widgets);

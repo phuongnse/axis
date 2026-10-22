@@ -1,0 +1,26 @@
+{
+  "id": "fa299c91-c975-4026-8d22-66601da931e4",
+  "kind": "page",
+  "name": "ItemKpiOverview",
+  "formatVersion": 1,
+  "title": { "textKey": "itemKpiOverview.title" },
+  "widgets": [
+    {
+      "type": "columns",
+      "columns": [
+        { "width": 8, "widgets": [{ "type": "table", "entity": "Item" }] },
+        {
+          "width": 4,
+          "widgets": [
+            {
+              "type": "kpi",
+              "dataSource": "ItemTotals",
+              "measure": "items",
+              "label": { "textKey": "itemKpi.items" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

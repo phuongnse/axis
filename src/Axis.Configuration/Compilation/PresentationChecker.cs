@@ -604,6 +604,12 @@ internal static class PresentationChecker
             return;
         }
 
+        if (type == WidgetType.Kpi)
+        {
+            CheckKpi(widget, path, page, loaded, findPage, findDataSource, findForm, moduleReferences, references, diagnostics);
+            return;
+        }
+
         if (!isForm && widget.Actions is not null)
         {
             // An action starts a process for one record, which only a form shows.
@@ -741,6 +747,111 @@ internal static class PresentationChecker
             {
                 NavigateChecker.Check(toolbarActions[index], $"{path}/toolbarActions/{index}", toolbarScope, page, loaded, findPage, findForm, references, diagnostics);
             }
+        }
+    }
+
+    /// <summary>
+    /// Checks a <c>kpi</c> widget. It shows one measure of the single total row of a data source, so it binds no
+    /// entity or form and has no actions. The data source has an aggregate with no <c>groupBy</c>, each measure
+    /// is one of the aggregate's, and no data source parameter is required, because a tile has no filter input.
+    /// The expressions of its <c>navigate</c> action see only the page's parameters.
+    /// </summary>
+    private static void CheckKpi(
+        WidgetDefinition widget,
+        string path,
+        PageResource page,
+        ApplicationLoadResult loaded,
+        Func<string, PageResource?> findPage,
+        Func<string, DataSourceResource?> findDataSource,
+        Func<string, FormResource?> findForm,
+        ModuleReferences moduleReferences,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics)
+    {
+        void Report(string code, string message, string path) =>
+            diagnostics.Add(new Diagnostic(code, message, page.File, path, page.Id));
+
+        foreach (var (property, value) in new[] { ("entity", widget.Entity), ("form", widget.Form) })
+        {
+            if (value is not null)
+            {
+                Report(DiagnosticCodes.InvalidWidgetBinding, $"'{property}' does not apply to kpi widgets.", $"{path}/{property}");
+            }
+        }
+
+        if (widget.Actions is not null)
+        {
+            Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+        }
+
+        ReportTableActions(widget, path, Report);
+
+        ApplicationCompiler.CheckTextKey(widget.Label!, page, $"{path}/label", references, diagnostics);
+        if (widget.Comparison is { } comparison)
+        {
+            ApplicationCompiler.CheckTextKey(comparison.Label, page, $"{path}/comparison/label", references, diagnostics);
+        }
+
+        // The page schema requires the data source and the measure on a kpi.
+        var dataSourceName = widget.DataSource!;
+        if (findDataSource(dataSourceName) is { } dataSource)
+        {
+            references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
+            CheckKpiDataSource(widget, path, dataSource, Report);
+        }
+        else if (!loaded.UnloadedDataSourceNames.Contains(dataSourceName)
+            && !moduleReferences.ReportUndeclared(dataSourceName, $"{path}/dataSource", Report))
+        {
+            Report(
+                DiagnosticCodes.UnknownWidgetDataSource,
+                $"The data source '{dataSourceName}' was not found. No loaded data source has that name.",
+                $"{path}/dataSource");
+        }
+
+        if (widget.Navigate is { } navigate)
+        {
+            var scope = ExpressionScopes.ForNavigate(null, page.Parameters.Select(parameter => (parameter.Name, NavigateChecker.ExpectedType(parameter))));
+            NavigateChecker.Check(navigate, $"{path}/navigate", scope, page, loaded, findPage, findForm, references, diagnostics);
+        }
+    }
+
+    /// <summary>Checks the data source of a <c>kpi</c> widget: one total row, the named measures and no required parameter.</summary>
+    private static void CheckKpiDataSource(WidgetDefinition widget, string path, DataSourceResource dataSource, Action<string, string, string> report)
+    {
+        if (dataSource.Aggregate is not { GroupBy.Count: 0 } aggregate)
+        {
+            report(
+                DiagnosticCodes.KpiDataSourceNotTotal,
+                $"The data source '{dataSource.Name}' must have an 'aggregate' with an empty 'groupBy', so that it has one total row. A kpi shows that row.",
+                $"{path}/dataSource");
+        }
+        else
+        {
+            void CheckMeasure(string measure, string measurePath)
+            {
+                if (!aggregate.Measures.Any(candidate => string.Equals(candidate.Name, measure, StringComparison.OrdinalIgnoreCase)))
+                {
+                    report(
+                        DiagnosticCodes.UnknownKpiMeasure,
+                        $"The measure '{measure}' was not found. The data source '{dataSource.Name}' has no measure with that name.",
+                        measurePath);
+                }
+            }
+
+            CheckMeasure(widget.Measure!, $"{path}/measure");
+            if (widget.Comparison is { } comparison)
+            {
+                CheckMeasure(comparison.Measure, $"{path}/comparison/measure");
+            }
+        }
+
+        // A kpi has no filter input and binds no page parameter, so a required parameter would fail every request.
+        foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true))
+        {
+            report(
+                DiagnosticCodes.InvalidWidgetBinding,
+                $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A kpi has no filter input, so every parameter of its data source must be optional.",
+                $"{path}/dataSource");
         }
     }
 
