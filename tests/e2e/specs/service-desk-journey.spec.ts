@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { compareApplicationFolders } from '../folder-comparison'
-import { expectChosen, pickOption, pickOptions } from '../select'
+import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
 import { createResource } from '../studio-resources'
@@ -181,7 +181,11 @@ test.describe('the author builds the service desk with Studio only', () => {
     }
     if ('values' in step) {
       for (const [key, value] of Object.entries(step.values as Record<string, unknown>)) {
-        await pickNamed(page, `${at}/values`, 'Add value', key)
+        await pickAction(
+          page.getByTestId(`${at}/values`).getByRole('combobox', { name: 'Add value', exact: true }),
+          key,
+          page.getByTestId(`${at}/values/${key}`),
+        )
         if (enumFields.has(key)) {
           await pick(page, `${at}/values/${key}`, String(value))
         } else {
@@ -512,15 +516,15 @@ test.describe('the author builds the service desk with Studio only', () => {
     ]
     // Every name exists before any transition is picked, because the pickers offer only named steps.
     for (const [index, [name, type]] of steps.entries()) {
-      await pickOption(page.getByRole('combobox', { name: 'Add step', exact: true }), type)
+      await pickAction(page.getByRole('combobox', { name: 'Add step', exact: true }), type, stepCard(index))
       await stepCard(index).getByRole('textbox', { name: 'Step name', exact: true }).fill(name)
     }
 
     async function operation(index: number, sets: [field: string, expression: string][], next: string) {
       await pick(page, `studio-field-/steps/${index}/operation`, 'updateRecord')
       for (const [field, expression] of sets) {
-        await pickOption(stepCard(index).getByRole('combobox', { name: 'Add mapping Set', exact: true }), field)
         const row = page.getByTestId(`studio-field-/steps/${index}/set/${field}`)
+        await pickAction(stepCard(index).getByRole('combobox', { name: 'Add mapping Set', exact: true }), field, row)
         await expect(row.locator('.cm-editor')).toBeVisible()
         await row.getByRole('textbox', { name: 'Expression', exact: true }).fill(expression)
       }

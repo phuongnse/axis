@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { startServer } from '../activate'
-import { pickOption } from '../select'
+import { pickAction, pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 
@@ -57,8 +57,11 @@ test.describe('Studio edits a process in the process editor', () => {
     const before = await diagnostics(page)
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
-    await page.getByRole('combobox', { name: 'Add step', exact: true }).click()
-    await page.getByRole('option', { name: 'decision', exact: true }).click()
+    await pickAction(
+      page.getByRole('combobox', { name: 'Add step', exact: true }),
+      'decision',
+      page.getByTestId('studio-step-10'),
+    )
     const card = page.getByTestId('studio-step-10')
     await card.getByRole('textbox', { name: 'Step name', exact: true }).fill('checkTotal')
     await card.getByRole('button', { name: 'Add branch', exact: true }).click()

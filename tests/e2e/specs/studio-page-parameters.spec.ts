@@ -92,8 +92,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await expect(dialog).toBeHidden();
 
     await page.getByRole("button", { name: "New resource", exact: true }).click();
-    await dialog.getByRole("combobox", { name: "Kind", exact: true }).click();
-    await page.getByTitle("page", { exact: true }).click();
+    await pickOption(dialog.getByRole("combobox", { name: "Kind", exact: true }), "page");
     await dialog.getByRole("textbox", { name: "Name", exact: true }).fill("RequestDetail");
     await dialog.getByRole("button", { name: "Create", exact: true }).click();
     // The dialog gives the focus back to the New resource button when its close animation ends, and the pick helpers

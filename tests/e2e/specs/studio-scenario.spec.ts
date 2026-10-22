@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { startServer } from '../activate'
-import { pickOption } from '../select'
+import { pickAction, pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 import { createResource } from '../studio-resources'
@@ -74,7 +74,11 @@ test.describe('Studio edits a scenario in the typed editor', () => {
     await choose(page, page.getByTestId('studio-field-/steps/0/entity'), 'PurchaseRequest')
     await choose(page, page.getByTestId('studio-field-/steps/0/as'), 'author')
     await page.getByTestId('studio-field-/steps/0/save').getByRole('textbox').fill('request')
-    await choose(page, page.getByTestId('studio-field-/steps/0/values'), 'title')
+    await pickAction(
+      page.getByTestId('studio-field-/steps/0/values').getByRole('combobox', { name: 'Add value', exact: true }),
+      'title',
+      page.getByTestId('studio-field-/steps/0/values/title'),
+    )
     await page.getByTestId('studio-field-/steps/0/values/title').getByRole('textbox').fill('Laptops')
 
     await addStep(page, 1, 'startProcess')
