@@ -1758,8 +1758,16 @@ public static class ApplicationCompiler
                 ToolbarActions = BuildActions(widget.ToolbarActions),
                 Parameters = BuildParameters(widget),
                 Kpi = BuildKpi(widget, dataSource),
+                Detail = BuildDetail(widget),
             };
         }
+
+        // The checker has matched the record to a parameter of the page, ignoring letter case. The model keeps the
+        // declared name, so a client never fixes the case itself.
+        DetailModel? BuildDetail(WidgetDefinition widget) =>
+            widget.Record is null
+                ? null
+                : new DetailModel(page.Parameters.First(parameter => string.Equals(parameter.Name, widget.Record, StringComparison.OrdinalIgnoreCase)).Name);
 
         // The checker has matched each measure to one of the data source's, ignoring letter case. The model
         // keeps the declared name, so a client never fixes the case itself.

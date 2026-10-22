@@ -18,7 +18,7 @@ public sealed class ProcessInspectorPageTests(ProcessStartFixture fixture) : ICl
         using var page = await ReadJsonAsync(response);
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray());
         Assert.Equal(
-            """{"type":"processInspector","entity":null,"dataSource":null,"form":null,"tasksPath":null,"process":"Submit","instancesPath":"/api/apps/ProcessApp/processes/Submit/instances","actions":[],"rowActions":[],"toolbarActions":[],"parameters":{},"access":null,"kpi":null}""",
+            """{"type":"processInspector","entity":null,"dataSource":null,"form":null,"tasksPath":null,"process":"Submit","instancesPath":"/api/apps/ProcessApp/processes/Submit/instances","actions":[],"rowActions":[],"toolbarActions":[],"parameters":{},"access":null,"detail":null,"kpi":null}""",
             widget.GetRawText());
     }
 

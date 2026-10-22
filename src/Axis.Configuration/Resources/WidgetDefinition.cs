@@ -2,7 +2,8 @@ namespace Axis.Configuration.Resources;
 
 /// <summary>
 /// A widget as written in the page file. It names an entity, a data source or, for a form widget, a
-/// form. A <c>kpi</c> widget names a data source and one of its measures. A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container: it holds other widgets
+/// form. A <c>kpi</c> widget names a data source and one of its measures. A <c>detail</c> widget names an entity
+/// or a form, like a form widget, and the page parameter that picks its record. A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container: it holds other widgets
 /// and binds nothing. Whether that binding, its entity, data source, form and form page exist is checked by
 /// <see cref="Compilation.ApplicationCompiler"/>, not by the loader.
 /// </summary>
@@ -51,6 +52,9 @@ public sealed record WidgetDefinition
 
     /// <summary>The widgets of a <c>section</c> widget, or null on any other widget.</summary>
     public IReadOnlyList<WidgetDefinition>? Widgets { get; init; }
+
+    /// <summary>The page parameter that picks the record a <c>detail</c> widget shows, or null on any other widget.</summary>
+    public string? Record { get; init; }
 
     /// <summary>The measure of its data source that a <c>kpi</c> widget shows, or null on any other widget.</summary>
     public string? Measure { get; init; }

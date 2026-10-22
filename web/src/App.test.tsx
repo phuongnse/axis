@@ -150,6 +150,7 @@ const pages: Record<string, PageMetadata> = {
         ],
         parameters: {},
         access: noteAccess,
+        detail: null,
         kpi: null,
       },
     ],
@@ -172,6 +173,38 @@ const pages: Record<string, PageMetadata> = {
         toolbarActions: [],
         parameters: {},
         access: noteAccess,
+        detail: null,
+        kpi: null,
+      },
+    ],
+  },
+  notedetail: {
+    name: 'NoteDetail',
+    titleKey: 'pages.noteForm.title',
+    parameters: [
+      {
+        name: 'note',
+        type: 'reference',
+        required: true,
+        values: null,
+        target: { entity: 'Note', displayField: 'title', recordsPath: noteEntity.recordsPath },
+      },
+    ],
+    widgets: [
+      {
+        type: 'detail',
+        entity: noteEntity,
+        dataSource: null,
+        form: null,
+        tasksPath: null,
+        process: null,
+        instancesPath: null,
+        actions: [],
+        rowActions: [],
+        toolbarActions: [],
+        parameters: {},
+        access: noteAccess,
+        detail: { record: 'note' },
         kpi: null,
       },
     ],
@@ -194,6 +227,7 @@ const pages: Record<string, PageMetadata> = {
         toolbarActions: [],
         parameters: {},
         access: null,
+        detail: null,
         kpi: null,
       },
     ],
@@ -216,6 +250,7 @@ const pages: Record<string, PageMetadata> = {
         toolbarActions: [],
         parameters: {},
         access: null,
+        detail: null,
         kpi: null,
       },
     ],
@@ -552,6 +587,35 @@ describe('App', () => {
       expect.anything(),
     )
     expect(fetch).not.toHaveBeenCalledWith(`${noteEntity.recordsPath}/42`, expect.anything())
+  })
+
+  it('shows the not-found page for a detail page whose record parameter is missing or malformed, and requests no record', async () => {
+    stubServer()
+
+    for (const path of [
+      '/e2e/notedetail',
+      '/e2e/notedetail?note=42',
+      '/e2e/notedetail/new?note=6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7',
+    ]) {
+      const { unmount } = renderApp(path)
+
+      expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+      unmount()
+    }
+    const requested = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
+    expect(requested.filter((url) => url.startsWith(`${noteEntity.recordsPath}/`))).toEqual([])
+  })
+
+  it('requests the record a detail page names and shows the not-found page when there is none', async () => {
+    stubServer()
+
+    renderApp('/e2e/notedetail?note=6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7')
+
+    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(
+      `${noteEntity.recordsPath}/6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7`,
+      expect.anything(),
+    )
   })
 
   it('shows the not-found page for new or a malformed task id under a task inbox page, and requests no task', async () => {

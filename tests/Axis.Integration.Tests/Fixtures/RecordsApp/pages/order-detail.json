@@ -1,0 +1,9 @@
+{
+  "id": "6d4e8baf-3b85-4e8e-8bd0-904c3d00442d",
+  "kind": "page",
+  "name": "OrderDetail",
+  "formatVersion": 1,
+  "title": { "textKey": "orderDetail.title" },
+  "parameters": [{ "name": "order", "type": "reference", "required": true, "target": "Order" }],
+  "widgets": [{ "type": "detail", "form": "OrderSummary", "record": "order" }]
+}

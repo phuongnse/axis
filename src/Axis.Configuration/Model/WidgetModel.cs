@@ -13,7 +13,9 @@ namespace Axis.Configuration.Model;
 /// page parameters. <see cref="Process"/> is set only on a process inspector, which has no other reference.
 /// A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container with no reference of its own: it holds
 /// <see cref="Columns"/>, <see cref="Tabs"/> or <see cref="Widgets"/>, and every other widget leaves those empty.
-/// A <c>kpi</c> widget sets <see cref="DataSource"/> and <see cref="Kpi"/>, and no other reference.
+/// A <c>kpi</c> widget sets <see cref="DataSource"/> and <see cref="Kpi"/>, and no other reference. A <c>detail</c>
+/// widget sets <see cref="Entity"/>, or <see cref="Form"/> and its entity, and <see cref="Detail"/>, and can hold
+/// <see cref="Actions"/>, as a form widget does.
 /// Records compare lists by reference, so two widgets with containers are equal only when they share those lists.
 /// </summary>
 public sealed record WidgetModel(
@@ -55,7 +57,16 @@ public sealed record WidgetModel(
 
     /// <summary>What a <c>kpi</c> widget shows of its data source, or null on any other widget.</summary>
     public KpiModel? Kpi { get; init; }
+
+    /// <summary>What a <c>detail</c> widget shows, or null on any other widget.</summary>
+    public DetailModel? Detail { get; init; }
 }
+
+/// <summary>
+/// What a <c>detail</c> widget shows: the record that the page parameter <paramref name="Record"/> picks, as the
+/// page declares the name of the parameter.
+/// </summary>
+public sealed record DetailModel(string Record);
 
 /// <summary>
 /// What a <c>kpi</c> widget shows: one measure of the single total row of its data source, as the data

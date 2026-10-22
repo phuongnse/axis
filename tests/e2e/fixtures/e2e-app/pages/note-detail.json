@@ -1,0 +1,19 @@
+{
+  "id": "45fd60a3-ceeb-4262-84c2-45323218b77b",
+  "kind": "page",
+  "name": "NoteDetail",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.noteDetail.title" },
+  "parameters": [{ "name": "note", "type": "reference", "target": "Note", "required": true }],
+  "widgets": [
+    {
+      "type": "detail",
+      "entity": "Note",
+      "record": "note",
+      "actions": [
+        { "type": "startProcess", "process": "NoteClose", "label": { "textKey": "noteClose.action" } },
+        { "type": "navigate", "page": "NoteActions", "label": { "textKey": "noteDetail.edit" }, "record": "id" }
+      ]
+    }
+  ]
+}

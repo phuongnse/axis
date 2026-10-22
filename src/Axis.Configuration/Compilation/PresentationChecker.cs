@@ -544,7 +544,8 @@ internal static class PresentationChecker
             diagnostics.Add(new Diagnostic(code, message, page.File, path, page.Id));
 
         var type = WidgetTypes.Parse(widget.Type);
-        var isForm = type == WidgetType.Form;
+        // A detail shows one record as a form widget does, so it takes the form widget's path.
+        var isRecordLike = type is WidgetType.Form or WidgetType.Detail;
 
         if (type == WidgetType.TaskInbox)
         {
@@ -559,7 +560,7 @@ internal static class PresentationChecker
 
             if (widget.Actions is not null)
             {
-                Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+                Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form and detail widgets.", $"{path}/actions");
             }
 
             ReportTableActions(widget, path, Report);
@@ -581,7 +582,7 @@ internal static class PresentationChecker
 
             if (widget.Actions is not null)
             {
-                Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+                Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form and detail widgets.", $"{path}/actions");
             }
 
             ReportTableActions(widget, path, Report);
@@ -610,41 +611,41 @@ internal static class PresentationChecker
             return;
         }
 
-        if (!isForm && widget.Actions is not null)
+        if (!isRecordLike && widget.Actions is not null)
         {
-            // An action starts a process for one record, which only a form shows.
-            Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+            // An action starts a process for one record, which only a form or a detail shows.
+            Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form and detail widgets.", $"{path}/actions");
         }
 
-        if (isForm)
+        if (isRecordLike)
         {
-            // A form has one record and no rows or toolbar.
+            // A form or detail has one record and no rows or toolbar.
             ReportTableActions(widget, path, Report);
-            ReportParameters(widget, path, "form", Report);
+            ReportParameters(widget, path, widget.Type == "form" ? "form" : "detail", Report);
         }
 
-        if (isForm && widget.DataSource is not null)
+        if (isRecordLike && widget.DataSource is not null)
         {
-            // A form edits one record of an entity, which a projection of rows cannot.
+            // A form or detail shows one record of an entity, which a projection of rows cannot.
             Report(DiagnosticCodes.InvalidWidgetBinding, "'dataSource' applies only to table widgets.", $"{path}/dataSource");
             return;
         }
 
-        if (isForm && (widget.Form is null) == (widget.Entity is null))
+        if (isRecordLike && (widget.Form is null) == (widget.Entity is null))
         {
             // A form lays out the fields of its own entity, so naming an entity as well says nothing new.
-            Report(DiagnosticCodes.InvalidWidgetBinding, "A form widget must name exactly one of 'form' and 'entity'.", path);
+            Report(DiagnosticCodes.InvalidWidgetBinding, $"A {widget.Type} widget must name exactly one of 'form' and 'entity'.", path);
             return;
         }
 
-        if (!isForm && widget.Form is not null)
+        if (!isRecordLike && widget.Form is not null)
         {
-            Report(DiagnosticCodes.InvalidWidgetBinding, "'form' applies only to form widgets.", $"{path}/form");
+            Report(DiagnosticCodes.InvalidWidgetBinding, "'form' applies only to form and detail widgets.", $"{path}/form");
             return;
         }
 
         // A table shows all records of an entity or the rows of a data source, never both.
-        if (!isForm && (widget.Entity is null) == (widget.DataSource is null))
+        if (!isRecordLike && (widget.Entity is null) == (widget.DataSource is null))
         {
             Report(
                 DiagnosticCodes.InvalidWidgetBinding,
@@ -677,7 +678,7 @@ internal static class PresentationChecker
         }
         else if (widget.Entity is { } entityName)
         {
-            if (!isForm)
+            if (!isRecordLike)
             {
                 // An entity has no parameters, so there is nothing to bind.
                 ReportParameters(widget, path, "table over an entity", Report);
@@ -718,9 +719,13 @@ internal static class PresentationChecker
         // unknown, which has a diagnostic of its own.
         var rowScope = NavigateScope(recordEntity is null ? null : findEntity(recordEntity), source, findEntity);
 
-        if (isForm)
+        if (isRecordLike)
         {
             CheckActions(widget, page, path, recordEntity, rowScope, loaded, findPage, findForm, findProcess, references, diagnostics);
+            if (type == WidgetType.Detail)
+            {
+                CheckDetailRecord(widget, path, page, recordEntity, Report);
+            }
         }
         else
         {
@@ -747,6 +752,40 @@ internal static class PresentationChecker
             {
                 NavigateChecker.Check(toolbarActions[index], $"{path}/toolbarActions/{index}", toolbarScope, page, loaded, findPage, findForm, references, diagnostics);
             }
+        }
+    }
+
+    /// <summary>
+    /// Checks the <c>record</c> of a <c>detail</c> widget. It names a required <c>reference</c> parameter of the page
+    /// whose target is the entity of the widget's records, ignoring letter case. The URL query then always holds the
+    /// id of the record to show.
+    /// </summary>
+    private static void CheckDetailRecord(
+        WidgetDefinition widget,
+        string path,
+        PageResource page,
+        string? recordEntity,
+        Action<string, string, string> report)
+    {
+        // The page schema requires the record of a detail.
+        var name = widget.Record!;
+        var recordPath = $"{path}/record";
+        var parameter = page.Parameters.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (parameter is null)
+        {
+            report(DiagnosticCodes.InvalidDetailRecord, $"The record '{name}' is not a parameter of the page. Declare a required reference parameter with that name.", recordPath);
+        }
+        else if (parameter.Required != true)
+        {
+            report(DiagnosticCodes.InvalidDetailRecord, $"The parameter '{parameter.Name}' is optional, but a detail always needs a record. Make it required.", recordPath);
+        }
+        else if (parameter.Type != "reference")
+        {
+            report(DiagnosticCodes.InvalidDetailRecord, $"The parameter '{parameter.Name}' has type '{parameter.Type}', but a detail needs a reference to its record.", recordPath);
+        }
+        else if (recordEntity is not null && !string.Equals(parameter.Target, recordEntity, StringComparison.OrdinalIgnoreCase))
+        {
+            report(DiagnosticCodes.InvalidDetailRecord, $"The parameter '{parameter.Name}' refers to '{parameter.Target}', but the detail shows records of '{recordEntity}'.", recordPath);
         }
     }
 
@@ -781,7 +820,7 @@ internal static class PresentationChecker
 
         if (widget.Actions is not null)
         {
-            Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+            Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form and detail widgets.", $"{path}/actions");
         }
 
         ReportTableActions(widget, path, Report);

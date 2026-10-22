@@ -51,6 +51,7 @@ const inboxWidget: WidgetMetadata = {
   toolbarActions: [],
   parameters: {},
   access: null,
+  detail: null,
   kpi: null,
 }
 
