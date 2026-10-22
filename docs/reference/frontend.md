@@ -160,7 +160,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - Every widget also has `access`, never left out. It is described under
     **Policies** below, and is `null` on a `taskInbox` and on a
     `processInspector`.
-  - *(Planned for M12.)* A page may hold a tree of widgets. A container widget
+  - A page may hold a tree of widgets. A container widget
     carries only `type` and its own keys. A leaf widget keeps every key above.
     A tab carries `labelKey`, and a `section` carries `titleKey` and
     `collapsed`. A page with two columns, one holding a table and the other a
@@ -246,14 +246,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     This only shapes the UI. The server checks every request.
     - **Always shaped.** The endpoints need a session, so the metadata is
       always shaped by the user's grants.
-    - **Readable pages.** A page is readable when its widget is. A widget
+    - **Readable pages.** A page is readable when at least one of its widgets
+      is, see **Pages with a tree** below. A widget
       over an entity, or over a form of an entity, needs a `read` grant on
       that entity. A widget over a data source needs what the
       [data source endpoint](data-sources.md#authorization) needs. A
       `taskInbox` is always readable. A
       `processInspector` is readable when the user holds an `inspect` grant on
       its process.
-    - *(Planned for M12.)* **Pages with a tree.** An unreadable widget is
+    - **Pages with a tree.** An unreadable widget is
       left out. A column or tab whose widgets are all left out is left out,
       and the other columns keep their declared widths. A container left with
       no widget is left out. A page is readable when at least one of its
@@ -313,9 +314,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `/{site}/{inboxpage}/{taskId}` | the task page of the task with that id, under the page of a task inbox |
   | `/{site}/{inspectorpage}/{instanceId}` | the instance page of the process instance with that id, under the page of a process inspector |
 
-  - *(Planned for M12.)* A page holds at most one `table` and at most one
+  - A page holds at most one `table` and at most one
     `form`, `taskInbox` or `processInspector`, so every part of the address
-    has one owner. `?page=&pageSize=&sort=` and the data source parameter
+    has one owner. The compiler checks this. `?page=&pageSize=&sort=` and the data source parameter
     values belong to the page's one `table`. `/new` and `/{id}` belong to its
     one `form`. `/{taskId}` and `/{instanceId}` belong to its one `taskInbox`
     or `processInspector`.

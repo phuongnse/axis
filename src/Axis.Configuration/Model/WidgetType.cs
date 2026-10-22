@@ -7,4 +7,7 @@ public enum WidgetType
     Form,
     TaskInbox,
     ProcessInspector,
+    Columns,
+    Tabs,
+    Section,
 }

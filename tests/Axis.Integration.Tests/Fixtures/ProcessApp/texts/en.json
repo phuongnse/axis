@@ -7,6 +7,8 @@
   "texts": {
     "nav.requests": "Requests",
     "nav.submissions": "Submissions",
+    "pages.overview.inspector": "Submissions",
+    "pages.overview.title": "Overview",
     "pages.requests.title": "Requests",
     "pages.submissions.title": "Submissions",
     "request.cannotSubmit": "This request cannot be submitted.",

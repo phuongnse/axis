@@ -10,12 +10,7 @@
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
     "title": { "$ref": "#/$defs/textReference" },
-    "widgets": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "items": { "$ref": "#/$defs/widget" }
-    }
+    "widgets": { "$ref": "#/$defs/widgets" }
   },
   "$defs": {
     "id": {
@@ -40,12 +35,17 @@
         "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" }
       }
     },
+    "widgets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/widget" }
+    },
     "widget": {
       "type": "object",
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["table", "form", "taskInbox", "processInspector"] },
+        "type": { "enum": ["table", "form", "taskInbox", "processInspector", "columns", "tabs", "section"] },
         "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
         "dataSource": { "$ref": "#/$defs/dataSourceName", "x-axis-reference": "dataSource" },
         "form": { "$ref": "#/$defs/name", "x-axis-reference": "form" },
@@ -54,15 +54,67 @@
         "actions": {
           "type": "array",
           "items": { "$ref": "#/$defs/action" }
-        }
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/column" }
+        },
+        "tabs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/tab" }
+        },
+        "title": { "$ref": "#/$defs/textReference" },
+        "collapsed": { "type": "boolean" },
+        "widgets": { "$ref": "#/$defs/widgets" }
       },
       "allOf": [
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "processInspector" } } },
           "then": { "required": ["process"] },
           "else": { "properties": { "process": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "columns" } } },
+          "then": { "required": ["columns"] },
+          "else": { "properties": { "columns": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "tabs" } } },
+          "then": { "required": ["tabs"] },
+          "else": { "properties": { "tabs": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "section" } } },
+          "then": { "required": ["title", "widgets"] },
+          "else": { "properties": { "title": false, "collapsed": false, "widgets": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "enum": ["columns", "tabs", "section"] } } },
+          "then": {
+            "properties": { "entity": false, "dataSource": false, "form": false, "formPage": false, "actions": false }
+          }
         }
       ]
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "widgets"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "widgets": { "$ref": "#/$defs/widgets" }
+      }
+    },
+    "tab": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "widgets"],
+      "properties": {
+        "label": { "$ref": "#/$defs/textReference" },
+        "widgets": { "$ref": "#/$defs/widgets" }
+      }
     },
     "action": {
       "type": "object",
