@@ -9,7 +9,8 @@ namespace Axis.Configuration.Model;
 /// only on a form widget that names a form, and <see cref="Entity"/> is then the form's entity.
 /// <see cref="FormPage"/> is set only on a table widget that names the page holding the form for
 /// its records. <see cref="Actions"/> is empty on every widget but a form widget that declares
-/// actions. <see cref="Process"/> is set only on a process inspector, which has no other reference.
+/// actions, and <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table
+/// that declares them. <see cref="Process"/> is set only on a process inspector, which has no other reference.
 /// A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container with no reference of its own: it holds
 /// <see cref="Columns"/>, <see cref="Tabs"/> or <see cref="Widgets"/>, and every other widget leaves those empty.
 /// Records compare lists by reference, so two widgets with containers are equal only when they share those lists.
@@ -22,8 +23,14 @@ public sealed record WidgetModel(
     FormReference? Form = null,
     ProcessReference? Process = null)
 {
-    /// <summary>The processes a form widget can start for its record, in page file order.</summary>
-    public IReadOnlyList<StartProcessActionModel> Actions { get; init; } = [];
+    /// <summary>The <c>startProcess</c> and <c>navigate</c> actions of a form widget, in page file order.</summary>
+    public IReadOnlyList<WidgetActionModel> Actions { get; init; } = [];
+
+    /// <summary>The <c>navigate</c> actions a table widget shows on each row, in page file order.</summary>
+    public IReadOnlyList<WidgetActionModel> RowActions { get; init; } = [];
+
+    /// <summary>The <c>navigate</c> actions a table widget shows above its rows, in page file order.</summary>
+    public IReadOnlyList<WidgetActionModel> ToolbarActions { get; init; } = [];
 
     /// <summary>The columns of a <c>columns</c> widget, in page file order.</summary>
     public IReadOnlyList<WidgetColumnModel> Columns { get; init; } = [];

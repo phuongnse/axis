@@ -972,6 +972,19 @@ describe('FormWidget', () => {
       expect(screen.queryByRole('button', { name: 'Close note' })).toBeNull()
     })
 
+    it('renders no button for a navigate action and still renders the startProcess button', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+
+      renderForm(noteId, {
+        ...actionWidget,
+        actions: [{ type: 'navigate', page: 'Notes', labelKey: 'note.open' }, ...actionWidget.actions],
+      })
+
+      expect(await screen.findByRole('button', { name: 'Close note' })).toBeEnabled()
+      expect(screen.queryByRole('button', { name: 'note.open' })).toBeNull()
+      expect(screen.queryByText('note.open')).toBeNull()
+    })
+
     it('keeps the action on a read-only form without a save button', async () => {
       stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
 

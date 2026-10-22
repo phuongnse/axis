@@ -28,8 +28,8 @@ internal static class PageAccess
     /// <summary>
     /// <paramref name="metadata"/>, the metadata of <paramref name="page"/>, without the widgets
     /// <paramref name="roles"/> may not read, and without the columns, tabs and containers that leave empty. The widgets
-    /// that remain have only the fields the roles may read, the <c>startProcess</c> actions they may start and the
-    /// access they hold.
+    /// that remain have only the fields the roles may read, the <c>startProcess</c> actions they may start, the
+    /// <c>navigate</c> actions to pages they may read and the access they hold.
     /// </summary>
     public static PageMetadata Shape(ApplicationModel application, IReadOnlyList<string> roles, PageModel page, PageMetadata metadata) =>
         metadata with { Widgets = ShapeAll(application, roles, page.Widgets, metadata.Widgets) };
@@ -88,11 +88,24 @@ internal static class PageAccess
         {
             Entity = readable is null ? described.Entity : Readable(described.Entity, readable),
             Form = readable is null || described.Form is null ? described.Form : ApplicationSites.Readable(described.Form, readable),
-            Actions = [.. described.Actions.Where(action =>
-                application.TryGetProcess(action.Process, out var process) && PolicyEvaluator.AllowsStart(application, roles, process))],
+            Actions = [.. described.Actions.Where(action => Allows(application, roles, action))],
+            RowActions = [.. described.RowActions.Where(action => Allows(application, roles, action))],
+            ToolbarActions = [.. described.ToolbarActions.Where(action => Allows(application, roles, action))],
             Access = entity is null ? null : Access(application, roles, entity),
         };
     }
+
+    private static bool Allows(ApplicationModel application, IReadOnlyList<string> roles, ActionMetadata action) =>
+        action switch
+        {
+            StartProcessActionMetadata start =>
+                application.TryGetProcess(start.Process, out var process) && PolicyEvaluator.AllowsStart(application, roles, process),
+
+            // The compiler resolves every navigate target, so the lookup always succeeds. The metadata holds the declared name.
+            NavigateActionMetadata navigate =>
+                CanRead(application, roles, application.Pages.First(page => page.Name == navigate.Page)),
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
+        };
 
     // A child collection field covers its rows as a whole, so it is kept with all its fields or
     // left out.

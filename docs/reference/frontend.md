@@ -123,6 +123,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         "process": null,
         "instancesPath": null,
         "actions": [],
+        "rowActions": [], "toolbarActions": [],
         "access": {
           "actions": ["read", "create", "update", "delete"],
           "createFields": ["name", "department"],
@@ -163,6 +164,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     is described under the form widget, and is `[]` on a widget it does not
     apply to. A table's `startProcess` row actions are left out without
     `start`, and its `delete` row action without `delete` *(planned for M12)*.
+  - Every widget also has `rowActions` and `toolbarActions`, never left out.
+    A table lists its `navigate` actions in them. They are `[]` elsewhere.
   - Every widget also has `access`, never left out. It is described under
     **Policies** below, and is `null` on a `taskInbox` and on a
     `processInspector`, and on a `chart` and a `kpi` *(planned for M12)*.
@@ -180,7 +183,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         {
           "type": "columns",
           "columns": [
-            { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "formPage": "PurchaseRequestForm", "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [], "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
+            { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "formPage": "PurchaseRequestForm", "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
             {
               "width": 4,
               "widgets": [
@@ -188,7 +191,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
                   "type": "section",
                   "titleKey": "pages.overview.tasks",
                   "collapsed": false,
-                  "widgets": [{ "type": "taskInbox", "entity": null, "formPage": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "actions": [], "access": null }]
+                  "widgets": [{ "type": "taskInbox", "entity": null, "formPage": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "access": null }]
                 }
               ]
             }
@@ -283,7 +286,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       user has no `start` grant on its process. The same holds for a `table`
       row action *(planned for M12)*, and its `delete` row action is left out
       when `access.actions` lacks `delete`. A `navigate` action whose target
-      page the user cannot read is left out too _(planned for M12)_. A
+      page the user cannot read is left out too. A
       `kpi`'s `navigate` to such a page is `null` _(planned for M12)_.
     - **Access.** Every `table` and `form` widget, and every `detail`
       *(planned for M12)*, gets an `access` object.
@@ -494,7 +497,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `toolbarActions` navigate without `record`, still gated by `access`
     `create` _(planned for M12)_.
   - **Row and toolbar actions** *(planned for M12)*. See
-    [D59](../decisions/d59-table-row-and-toolbar-actions.md).
+    [D59](../decisions/d59-table-row-and-toolbar-actions.md). Page metadata
+    already lists the `navigate` actions in `rowActions` and `toolbarActions`,
+    without those to pages the user cannot read. The buttons are still planned.
     - **Where.** Toolbar actions sit next to the create button. Row actions
       are buttons in the row, and fold into a menu at phone width. A
       `navigate` action may sit in either list. `startProcess` and `delete`
@@ -811,7 +816,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - `actions`: `[ { "type", "process", "labelKey", "instancesPath" } ]`,
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
-      so the SPA never builds it itself.
+      so the SPA never builds it itself. A `navigate` action is
+      `{ "type": "navigate", "page", "labelKey" }`, with the target page's
+      declared name and no `parameters` yet. It follows file order, and the form
+      widget still shows only `startProcess` buttons.
     - `form` also holds `visibleWhen` on each field and section, as `true`
       when it has a condition and `false` otherwise. It holds `steps`, each
       with a `titleKey` and its section names, and `[]` when the form has

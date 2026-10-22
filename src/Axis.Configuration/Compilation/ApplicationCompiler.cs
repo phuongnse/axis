@@ -1671,6 +1671,21 @@ public static class ApplicationCompiler
     {
         List<WidgetModel> BuildWidgets(IReadOnlyList<WidgetDefinition> widgets) => [.. widgets.Select(BuildWidget)];
 
+        // The checker has resolved every process and page an action names, so the lookups always succeed.
+        IReadOnlyList<WidgetActionModel> BuildActions(IReadOnlyList<WidgetActionDefinition>? actions) =>
+            actions is null || actions.Count == 0 ? [] : [.. actions.Select(BuildAction)];
+
+        WidgetActionModel BuildAction(WidgetActionDefinition action)
+        {
+            if (action.Type == "startProcess")
+            {
+                var process = processesByName[action.Process!];
+                return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
+            }
+
+            return new NavigateActionModel(PageReferenceTo(pagesByName[action.Page!]), action.Label);
+        }
+
         WidgetModel BuildWidget(WidgetDefinition widget)
         {
             // A container holds widgets and no reference. A leaf keeps the shared empty lists, so equal leaves stay equal.
@@ -1710,16 +1725,11 @@ public static class ApplicationCompiler
                 form is null ? null : new FormReference(form.Id, form.Name),
                 inspected is null ? null : new ProcessReference(inspected.Id, inspected.Name))
             {
-                // Each action is named as its process declares it. A widget without
+                // Each action is named as its process or page declares it. A widget without
                 // actions keeps the shared empty list, so equal widgets stay equal.
-                // A navigate action is only checked so far, so it is not in the model.
-                Actions = widget.Actions is null || widget.Actions.All(action => action.Type != "startProcess")
-                    ? []
-                    : [.. widget.Actions.Where(action => action.Type == "startProcess").Select(action =>
-                    {
-                        var process = processesByName[action.Process!];
-                        return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
-                    })],
+                Actions = BuildActions(widget.Actions),
+                RowActions = BuildActions(widget.RowActions),
+                ToolbarActions = BuildActions(widget.ToolbarActions),
             };
         }
 
