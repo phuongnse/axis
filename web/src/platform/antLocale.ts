@@ -1,6 +1,6 @@
 import type { ConfigProviderProps } from 'antd'
-import enUS from 'antd/es/locale/en_US'
-import viVN from 'antd/es/locale/vi_VN'
+import enUS from 'antd/locale/en_US'
+import viVN from 'antd/locale/vi_VN'
 import 'dayjs/locale/vi'
 
 type AntLocale = NonNullable<ConfigProviderProps['locale']>
