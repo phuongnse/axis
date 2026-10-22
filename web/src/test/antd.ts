@@ -76,6 +76,13 @@ export function formItem(element: HTMLElement): HTMLElement {
   return item
 }
 
+/** The description item that holds the label `label`. */
+export function descriptionItem(label: string): HTMLElement {
+  const item = screen.getByText(label).closest<HTMLElement>('.ant-descriptions-item')
+  if (!item) throw new Error('The label is not inside a description item')
+  return item
+}
+
 export function hasFieldError(element: HTMLElement): boolean {
   return formItem(element).classList.contains('ant-form-item-has-error')
 }

@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DetailWidget } from './DetailWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
+import { descriptionItem } from '../test/antd'
 import { TextProvider } from './TextProvider'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
@@ -182,9 +183,9 @@ describe('DetailWidget', () => {
 
     expect(await screen.findByText('Main')).toBeInTheDocument()
     expect(screen.getByText('Details')).toBeInTheDocument()
-    expect(screen.getByText('Title').closest('.ant-descriptions-item')).toHaveTextContent('Buy paper')
-    expect(screen.getByText('Category').closest('.ant-descriptions-item')).toHaveTextContent('Office')
-    expect(screen.getByText('Done').closest('.ant-descriptions-item')).toHaveTextContent('Yes')
+    expect(descriptionItem('Title')).toHaveTextContent('Buy paper')
+    expect(descriptionItem('Category')).toHaveTextContent('Office')
+    expect(descriptionItem('Done')).toHaveTextContent('Yes')
     expect(screen.queryByText('priority')).toBeNull()
     // The rows of the child collection are the only inputs, and they are read-only.
     screen.getAllByRole('textbox').forEach((input) => expect(input).toHaveAttribute('readonly'))
@@ -197,8 +198,8 @@ describe('DetailWidget', () => {
     renderDetail()
 
     expect(await screen.findByText('Title')).toBeInTheDocument()
-    expect(screen.getByText('priority').closest('.ant-descriptions-item')).toHaveTextContent('7')
-    expect(screen.getByText('Category').closest('.ant-descriptions-item')).toHaveTextContent('Office')
+    expect(descriptionItem('priority')).toHaveTextContent('7')
+    expect(descriptionItem('Category')).toHaveTextContent('Office')
     expect(screen.queryByText('Main')).toBeNull()
   })
 
