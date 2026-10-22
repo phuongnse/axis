@@ -17,6 +17,12 @@ namespace Axis.Configuration.Compilation;
 /// </summary>
 internal static class PresentationChecker
 {
+    /// <summary>The most levels of widget lists on a page. The page's own list is level 1.</summary>
+    private const int MaxWidgetDepth = 4;
+
+    /// <summary>What the column widths of one <c>columns</c> widget add up to.</summary>
+    private const int ColumnWidthTotal = 12;
+
     public static void Check(
         ApplicationLoadResult loaded,
         Func<string, EntityResource?> findEntity,
@@ -382,220 +388,346 @@ internal static class PresentationChecker
 
         ApplicationCompiler.CheckTextKey(page.Title, page, "/title", references, diagnostics);
 
-        for (var index = 0; index < page.Widgets.Count; index++)
+        var leaves = new List<(WidgetDefinition Widget, string Path)>();
+        CheckWidgets(page.Widgets, "/widgets", 1, leaves, page, references, diagnostics);
+
+        foreach (var (widget, path) in leaves)
         {
-            var widget = page.Widgets[index];
-            var path = $"/widgets/{index}";
-            var type = WidgetTypes.Parse(widget.Type);
-            var isForm = type == WidgetType.Form;
+            CheckLeaf(widget, path, page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, moduleReferences, references, diagnostics);
+        }
 
-            if (type == WidgetType.TaskInbox)
-            {
-                // An inbox lists the signed-in user's tasks, so it binds no records and opens no form page.
-                foreach (var (property, value) in new[] { ("entity", widget.Entity), ("dataSource", widget.DataSource), ("form", widget.Form) })
-                {
-                    if (value is not null)
-                    {
-                        Report(DiagnosticCodes.InvalidWidgetBinding, $"'{property}' does not apply to task inbox widgets.", $"{path}/{property}");
-                    }
-                }
-
-                if (widget.FormPage is not null)
-                {
-                    Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
-                }
-
-                if (widget.Actions is not null)
-                {
-                    Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
-                }
-
-                continue;
-            }
-
-            if (type == WidgetType.ProcessInspector)
-            {
-                // An inspector lists the instances of one process, so it binds no records and opens no form page.
-                foreach (var (property, value) in new[] { ("entity", widget.Entity), ("dataSource", widget.DataSource), ("form", widget.Form) })
-                {
-                    if (value is not null)
-                    {
-                        Report(DiagnosticCodes.InvalidWidgetBinding, $"'{property}' does not apply to process inspector widgets.", $"{path}/{property}");
-                    }
-                }
-
-                if (widget.FormPage is not null)
-                {
-                    Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
-                }
-
-                if (widget.Actions is not null)
-                {
-                    Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
-                }
-
-                // The page schema requires the process on an inspector.
-                var processName = widget.Process!;
-                if (findProcess(processName) is { } process)
-                {
-                    references.Add(page, $"{path}/process", ReferenceRelations.WidgetProcess, ResourceNode.Of(process));
-                }
-                else if (!loaded.UnloadedProcessNames.Contains(processName))
-                {
-                    Report(
-                        DiagnosticCodes.UnknownWidgetProcess,
-                        $"The process '{processName}' was not found. No loaded process has that name.",
-                        $"{path}/process");
-                }
-
-                continue;
-            }
-
-            if (!isForm && widget.Actions is not null)
-            {
-                // An action starts a process for one record, which only a form shows.
-                Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
-            }
-
-            if (isForm && widget.DataSource is not null)
-            {
-                // A form edits one record of an entity, which a projection of rows cannot.
-                Report(DiagnosticCodes.InvalidWidgetBinding, "'dataSource' applies only to table widgets.", $"{path}/dataSource");
-                continue;
-            }
-
-            if (isForm && (widget.Form is null) == (widget.Entity is null))
-            {
-                // A form lays out the fields of its own entity, so naming an entity as well says nothing new.
-                Report(DiagnosticCodes.InvalidWidgetBinding, "A form widget must name exactly one of 'form' and 'entity'.", path);
-                continue;
-            }
-
-            if (!isForm && widget.Form is not null)
-            {
-                Report(DiagnosticCodes.InvalidWidgetBinding, "'form' applies only to form widgets.", $"{path}/form");
-                continue;
-            }
-
-            // A table shows all records of an entity or the rows of a data source, never both.
-            if (!isForm && (widget.Entity is null) == (widget.DataSource is null))
+        // The URL of a page has one table state and one record part, so a second of either is ambiguous.
+        var firstTable = leaves.FirstOrDefault(leaf => leaf.Widget.Type == "table").Path;
+        var firstRecordWidget = leaves.FirstOrDefault(leaf => IsRecordWidget(leaf.Widget)).Path;
+        foreach (var (widget, path) in leaves)
+        {
+            if (widget.Type == "table" && path != firstTable)
             {
                 Report(
-                    DiagnosticCodes.InvalidWidgetBinding,
-                    "A widget must name exactly one of 'entity' and 'dataSource'.",
+                    DiagnosticCodes.DuplicatePageTable,
+                    $"The page already holds a table at '{firstTable}'. A page holds at most one table.",
                     path);
-                continue;
             }
-
-            // The entity the widget's records belong to: its own, that of its form, or the root
-            // entity of its data source. Null when the form or data source is unknown.
-            string? recordEntity = widget.Entity;
-
-            // Whether the widget shows the groups of a data source rather than records.
-            var grouped = false;
-            if (widget.Form is { } formName)
-            {
-                if (findForm(formName) is { } form)
-                {
-                    references.Add(page, $"{path}/form", ReferenceRelations.WidgetForm, ResourceNode.Of(form));
-                    recordEntity = form.Entity;
-                }
-                else if (!loaded.UnloadedFormNames.Contains(formName))
-                {
-                    Report(
-                        DiagnosticCodes.UnknownWidgetForm,
-                        $"The form '{formName}' was not found. No loaded form has that name.",
-                        $"{path}/form");
-                }
-            }
-            else if (widget.Entity is { } entityName)
-            {
-                if (findEntity(entityName) is { } entity)
-                {
-                    references.Add(page, $"{path}/entity", ReferenceRelations.WidgetEntity, ResourceNode.Of(entity));
-                }
-                else if (!loaded.UnloadedEntityNames.Contains(entityName))
-                {
-                    Report(
-                        DiagnosticCodes.UnknownWidgetEntity,
-                        $"The entity '{entityName}' was not found. No loaded entity has that name.",
-                        $"{path}/entity");
-                }
-            }
-            else if (findDataSource(widget.DataSource!) is { } dataSource)
-            {
-                references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
-                recordEntity = dataSource.Entity;
-                grouped = dataSource.Aggregate is not null;
-
-                // A table has no inputs for parameter values yet, so a required one would make
-                // every request for its rows fail.
-                foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true))
-                {
-                    Report(
-                        DiagnosticCodes.InvalidWidgetBinding,
-                        $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A table can only show a data source whose parameters are all optional.",
-                        $"{path}/dataSource");
-                }
-            }
-            else if (!loaded.UnloadedDataSourceNames.Contains(widget.DataSource!)
-                && !moduleReferences.ReportUndeclared(widget.DataSource!, $"{path}/dataSource", Report))
+            else if (IsRecordWidget(widget) && path != firstRecordWidget)
             {
                 Report(
-                    DiagnosticCodes.UnknownWidgetDataSource,
-                    $"The data source '{widget.DataSource}' was not found. No loaded data source has that name.",
-                    $"{path}/dataSource");
-            }
-
-            if (isForm)
-            {
-                CheckActions(widget, page, path, recordEntity, loaded, findProcess, references, diagnostics);
-            }
-
-            if (widget.FormPage is not { } formPage)
-            {
-                continue;
-            }
-
-            if (isForm)
-            {
-                Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
-            }
-            else if (grouped)
-            {
-                Report(
-                    DiagnosticCodes.InvalidFormPage,
-                    $"The data source '{widget.DataSource}' is grouped. A group is not a record, so the table cannot name a form page.",
-                    $"{path}/formPage");
-            }
-            else if (findPage(formPage) is { } target)
-            {
-                references.Add(page, $"{path}/formPage", ReferenceRelations.WidgetFormPage, ResourceNode.Of(target));
-
-                // Rows of a data source carry the id of their root record, so the form must be over
-                // that root entity. A form widget that names a form is over the form's entity, and a
-                // form that is unknown is already reported on the target page.
-                var targetWidget = target.Widgets[0];
-                var targetEntity = targetWidget.Entity ?? (targetWidget.Form is { } targetForm ? findForm(targetForm)?.Entity : null);
-                if (WidgetTypes.Parse(targetWidget.Type) != WidgetType.Form
-                    || (recordEntity is not null && targetEntity is not null && !string.Equals(targetEntity, recordEntity, StringComparison.OrdinalIgnoreCase)))
-                {
-                    var expected = recordEntity is null ? "a form widget" : $"a form widget over '{recordEntity}'";
-                    Report(
-                        DiagnosticCodes.InvalidFormPage,
-                        $"The page '{target.Name}' must hold {expected}, but holds a {targetWidget.Type} widget over '{targetEntity ?? targetWidget.DataSource}'.",
-                        $"{path}/formPage");
-                }
-            }
-            else if (!loaded.UnloadedPageNames.Contains(formPage))
-            {
-                Report(
-                    DiagnosticCodes.InvalidFormPage,
-                    $"The page '{formPage}' was not found. No loaded page has that name.",
-                    $"{path}/formPage");
+                    DiagnosticCodes.DuplicatePageRecordWidget,
+                    $"The page already holds a {leaves.First(leaf => leaf.Path == firstRecordWidget).Widget.Type} widget at '{firstRecordWidget}'. A page holds at most one form, task inbox or process inspector widget.",
+                    path);
             }
         }
     }
+
+    /// <summary>Whether the widget owns the record part of the page's URL.</summary>
+    private static bool IsRecordWidget(WidgetDefinition widget) =>
+        widget.Type is "form" or "taskInbox" or "processInspector";
+
+    /// <summary>
+    /// Walks a list of widgets. Each container is checked for its depth and column widths, its text keys are
+    /// checked, and its lists are walked one level deeper. Every other widget is collected in file order with
+    /// its pointer, to be checked by <see cref="CheckLeaf"/>.
+    /// </summary>
+    private static void CheckWidgets(
+        IReadOnlyList<WidgetDefinition> widgets,
+        string listPath,
+        int level,
+        List<(WidgetDefinition Widget, string Path)> leaves,
+        PageResource page,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics)
+    {
+        for (var index = 0; index < widgets.Count; index++)
+        {
+            var widget = widgets[index];
+            var path = $"{listPath}/{index}";
+            if (WidgetTypes.Parse(widget.Type) is not (WidgetType.Columns or WidgetType.Tabs or WidgetType.Section))
+            {
+                leaves.Add((widget, path));
+                continue;
+            }
+
+            // A container on the last level would hold a list on a level beyond it.
+            if (level >= MaxWidgetDepth)
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.TooDeepWidgetTree,
+                    $"The widget lists nest too deep. A page holds at most {MaxWidgetDepth} levels of widget lists, and this {widget.Type} widget would hold a list on level {level + 1}.",
+                    page.File,
+                    path,
+                    page.Id));
+                continue;
+            }
+
+            var columns = widget.Columns ?? [];
+            if (columns.Count > 0 && columns.Sum(column => column.Width) != ColumnWidthTotal)
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.InvalidColumnWidths,
+                    $"The column widths add up to {columns.Sum(column => column.Width)}. The widths of one columns widget must add up to {ColumnWidthTotal}.",
+                    page.File,
+                    $"{path}/columns",
+                    page.Id));
+            }
+
+            for (var columnIndex = 0; columnIndex < columns.Count; columnIndex++)
+            {
+                CheckWidgets(columns[columnIndex].Widgets, $"{path}/columns/{columnIndex}/widgets", level + 1, leaves, page, references, diagnostics);
+            }
+
+            var tabs = widget.Tabs ?? [];
+            for (var tabIndex = 0; tabIndex < tabs.Count; tabIndex++)
+            {
+                ApplicationCompiler.CheckTextKey(tabs[tabIndex].Label, page, $"{path}/tabs/{tabIndex}/label", references, diagnostics);
+                CheckWidgets(tabs[tabIndex].Widgets, $"{path}/tabs/{tabIndex}/widgets", level + 1, leaves, page, references, diagnostics);
+            }
+
+            if (widget.Widgets is { } children)
+            {
+                ApplicationCompiler.CheckTextKey(widget.Title!, page, $"{path}/title", references, diagnostics);
+                CheckWidgets(children, $"{path}/widgets", level + 1, leaves, page, references, diagnostics);
+            }
+        }
+    }
+
+    /// <summary>Checks one widget that shows something: its binding and every reference it holds.</summary>
+    private static void CheckLeaf(
+        WidgetDefinition widget,
+        string path,
+        PageResource page,
+        ApplicationLoadResult loaded,
+        Func<string, EntityResource?> findEntity,
+        Func<string, PageResource?> findPage,
+        Func<string, DataSourceResource?> findDataSource,
+        Func<string, FormResource?> findForm,
+        Func<string, ProcessResource?> findProcess,
+        ModuleReferences moduleReferences,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics)
+    {
+        void Report(string code, string message, string path) =>
+            diagnostics.Add(new Diagnostic(code, message, page.File, path, page.Id));
+
+        var type = WidgetTypes.Parse(widget.Type);
+        var isForm = type == WidgetType.Form;
+
+        if (type == WidgetType.TaskInbox)
+        {
+            // An inbox lists the signed-in user's tasks, so it binds no records and opens no form page.
+            foreach (var (property, value) in new[] { ("entity", widget.Entity), ("dataSource", widget.DataSource), ("form", widget.Form) })
+            {
+                if (value is not null)
+                {
+                    Report(DiagnosticCodes.InvalidWidgetBinding, $"'{property}' does not apply to task inbox widgets.", $"{path}/{property}");
+                }
+            }
+
+            if (widget.FormPage is not null)
+            {
+                Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
+            }
+
+            if (widget.Actions is not null)
+            {
+                Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+            }
+
+            return;
+        }
+
+        if (type == WidgetType.ProcessInspector)
+        {
+            // An inspector lists the instances of one process, so it binds no records and opens no form page.
+            foreach (var (property, value) in new[] { ("entity", widget.Entity), ("dataSource", widget.DataSource), ("form", widget.Form) })
+            {
+                if (value is not null)
+                {
+                    Report(DiagnosticCodes.InvalidWidgetBinding, $"'{property}' does not apply to process inspector widgets.", $"{path}/{property}");
+                }
+            }
+
+            if (widget.FormPage is not null)
+            {
+                Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
+            }
+
+            if (widget.Actions is not null)
+            {
+                Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+            }
+
+            // The page schema requires the process on an inspector.
+            var processName = widget.Process!;
+            if (findProcess(processName) is { } process)
+            {
+                references.Add(page, $"{path}/process", ReferenceRelations.WidgetProcess, ResourceNode.Of(process));
+            }
+            else if (!loaded.UnloadedProcessNames.Contains(processName))
+            {
+                Report(
+                    DiagnosticCodes.UnknownWidgetProcess,
+                    $"The process '{processName}' was not found. No loaded process has that name.",
+                    $"{path}/process");
+            }
+
+            return;
+        }
+
+        if (!isForm && widget.Actions is not null)
+        {
+            // An action starts a process for one record, which only a form shows.
+            Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form widgets.", $"{path}/actions");
+        }
+
+        if (isForm && widget.DataSource is not null)
+        {
+            // A form edits one record of an entity, which a projection of rows cannot.
+            Report(DiagnosticCodes.InvalidWidgetBinding, "'dataSource' applies only to table widgets.", $"{path}/dataSource");
+            return;
+        }
+
+        if (isForm && (widget.Form is null) == (widget.Entity is null))
+        {
+            // A form lays out the fields of its own entity, so naming an entity as well says nothing new.
+            Report(DiagnosticCodes.InvalidWidgetBinding, "A form widget must name exactly one of 'form' and 'entity'.", path);
+            return;
+        }
+
+        if (!isForm && widget.Form is not null)
+        {
+            Report(DiagnosticCodes.InvalidWidgetBinding, "'form' applies only to form widgets.", $"{path}/form");
+            return;
+        }
+
+        // A table shows all records of an entity or the rows of a data source, never both.
+        if (!isForm && (widget.Entity is null) == (widget.DataSource is null))
+        {
+            Report(
+                DiagnosticCodes.InvalidWidgetBinding,
+                "A widget must name exactly one of 'entity' and 'dataSource'.",
+                path);
+            return;
+        }
+
+        // The entity the widget's records belong to: its own, that of its form, or the root
+        // entity of its data source. Null when the form or data source is unknown.
+        string? recordEntity = widget.Entity;
+
+        // Whether the widget shows the groups of a data source rather than records.
+        var grouped = false;
+        if (widget.Form is { } formName)
+        {
+            if (findForm(formName) is { } form)
+            {
+                references.Add(page, $"{path}/form", ReferenceRelations.WidgetForm, ResourceNode.Of(form));
+                recordEntity = form.Entity;
+            }
+            else if (!loaded.UnloadedFormNames.Contains(formName))
+            {
+                Report(
+                    DiagnosticCodes.UnknownWidgetForm,
+                    $"The form '{formName}' was not found. No loaded form has that name.",
+                    $"{path}/form");
+            }
+        }
+        else if (widget.Entity is { } entityName)
+        {
+            if (findEntity(entityName) is { } entity)
+            {
+                references.Add(page, $"{path}/entity", ReferenceRelations.WidgetEntity, ResourceNode.Of(entity));
+            }
+            else if (!loaded.UnloadedEntityNames.Contains(entityName))
+            {
+                Report(
+                    DiagnosticCodes.UnknownWidgetEntity,
+                    $"The entity '{entityName}' was not found. No loaded entity has that name.",
+                    $"{path}/entity");
+            }
+        }
+        else if (findDataSource(widget.DataSource!) is { } dataSource)
+        {
+            references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
+            recordEntity = dataSource.Entity;
+            grouped = dataSource.Aggregate is not null;
+
+            // A table has no inputs for parameter values yet, so a required one would make
+            // every request for its rows fail.
+            foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true))
+            {
+                Report(
+                    DiagnosticCodes.InvalidWidgetBinding,
+                    $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A table can only show a data source whose parameters are all optional.",
+                    $"{path}/dataSource");
+            }
+        }
+        else if (!loaded.UnloadedDataSourceNames.Contains(widget.DataSource!)
+            && !moduleReferences.ReportUndeclared(widget.DataSource!, $"{path}/dataSource", Report))
+        {
+            Report(
+                DiagnosticCodes.UnknownWidgetDataSource,
+                $"The data source '{widget.DataSource}' was not found. No loaded data source has that name.",
+                $"{path}/dataSource");
+        }
+
+        if (isForm)
+        {
+            CheckActions(widget, page, path, recordEntity, loaded, findProcess, references, diagnostics);
+        }
+
+        if (widget.FormPage is not { } formPage)
+        {
+            return;
+        }
+
+        if (isForm)
+        {
+            Report(DiagnosticCodes.InvalidFormPage, "'formPage' applies only to table widgets.", $"{path}/formPage");
+        }
+        else if (grouped)
+        {
+            Report(
+                DiagnosticCodes.InvalidFormPage,
+                $"The data source '{widget.DataSource}' is grouped. A group is not a record, so the table cannot name a form page.",
+                $"{path}/formPage");
+        }
+        else if (findPage(formPage) is { } target)
+        {
+            references.Add(page, $"{path}/formPage", ReferenceRelations.WidgetFormPage, ResourceNode.Of(target));
+
+            // Rows of a data source carry the id of their root record, so the form must be over
+            // that root entity. A form widget that names a form is over the form's entity, and a
+            // form that is unknown is already reported on the target page.
+            var targetLeaves = Leaves(target.Widgets).ToList();
+            var targetWidget = targetLeaves.FirstOrDefault(leaf => WidgetTypes.Parse(leaf.Type) == WidgetType.Form) ?? targetLeaves[0];
+            var targetEntity = targetWidget.Entity ?? (targetWidget.Form is { } targetForm ? findForm(targetForm)?.Entity : null);
+            if (WidgetTypes.Parse(targetWidget.Type) != WidgetType.Form
+                || (recordEntity is not null && targetEntity is not null && !string.Equals(targetEntity, recordEntity, StringComparison.OrdinalIgnoreCase)))
+            {
+                var expected = recordEntity is null ? "a form widget" : $"a form widget over '{recordEntity}'";
+                Report(
+                    DiagnosticCodes.InvalidFormPage,
+                    $"The page '{target.Name}' must hold {expected}, but holds a {targetWidget.Type} widget over '{targetEntity ?? targetWidget.DataSource}'.",
+                    $"{path}/formPage");
+            }
+        }
+        else if (!loaded.UnloadedPageNames.Contains(formPage))
+        {
+            Report(
+                DiagnosticCodes.InvalidFormPage,
+                $"The page '{formPage}' was not found. No loaded page has that name.",
+                $"{path}/formPage");
+        }
+
+    }
+
+    /// <summary>The widgets that show something, not the containers around them, depth first in file order.</summary>
+    private static IEnumerable<WidgetDefinition> Leaves(IEnumerable<WidgetDefinition> widgets) =>
+        widgets.SelectMany(widget => WidgetTypes.Parse(widget.Type) switch
+        {
+            WidgetType.Columns => Leaves(widget.Columns!.SelectMany(column => column.Widgets)),
+            WidgetType.Tabs => Leaves(widget.Tabs!.SelectMany(tab => tab.Widgets)),
+            WidgetType.Section => Leaves(widget.Widgets!),
+            _ => [widget],
+        });
 
     /// <summary>
     /// Checks the actions of a form widget: each label has a text key, and each process exists and

@@ -117,6 +117,21 @@ flowchart LR
      resolve ignoring letter case, and a name whose file was not loaded
      because of its own errors is not reported again. Site titles, navigation labels, page titles and action labels join the
      `AXC0028` check.
+     A page's `widgets` form a tree, see
+     [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+     The checks above apply to every widget at any depth, and a problem is
+     reported at the widget's own pointer, such as
+     `/widgets/0/columns/1/widgets/0/entity`. The widget lists nest at most 4
+     levels deep, and the page's own list is level 1, otherwise the container
+     that would hold a list on level 5 is `AXC0221`. The `width` of the
+     columns of one `columns` widget add up to 12, otherwise it is `AXC0222` at
+     `/widgets/{i}/columns`. A second `table` is `AXC0223`, and a second
+     `form`, `taskInbox` or `processInspector` is `AXC0224`, both at the second
+     widget. A tab label and a section title join the `AXC0028` check. The
+     page schema requires `columns` on a `columns` widget, `tabs` on a `tabs`
+     widget, and `title` with `widgets` on a `section` widget. It does not allow them on
+     any other widget, and no container may name an `entity`, `dataSource`,
+     `form`, `formPage` or `actions` (`AXC0004`).
    - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded
@@ -130,11 +145,11 @@ flowchart LR
      checks, see
      [Form conditions and steps](resource-files.md#form-conditions-and-steps):
      each condition is a boolean expression over the entity, and it reads only
-     listed fields (`AXC0221`). `visibleWhen` is not allowed on a required
-     field (`AXC0222`). A section name is used once (`AXC0223`). A step names
-     a known section (`AXC0224`) that is in no other step (`AXC0225`), and
+     listed fields (`AXC0225`). `visibleWhen` is not allowed on a required
+     field (`AXC0226`). A section name is used once (`AXC0227`). A step names
+     a known section (`AXC0228`) that is in no other step (`AXC0229`), and
      when there are steps, every section has a name and is in one step
-     (`AXC0226`).
+     (`AXC0230`).
    - **Seeds.** A seed's `entity` must name a loaded entity, ignoring letter
      case, otherwise it is `AXC0032` at `/entity`. A name whose entity file
      was not loaded because of its own errors is not reported again. Seed

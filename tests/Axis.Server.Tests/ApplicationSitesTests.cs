@@ -16,7 +16,7 @@ public sealed class ApplicationSitesTests
         var page = ApplicationSites.FindPage(result.Model, "RequestsByDepartment");
 
         Assert.NotNull(page);
-        var widget = Assert.Single(page.Widgets);
+        var widget = Assert.IsType<WidgetMetadata>(Assert.Single(page.Widgets));
         Assert.Null(widget.FormPage);
         Assert.Null(widget.Entity);
         Assert.NotNull(widget.DataSource);
@@ -35,7 +35,7 @@ public sealed class ApplicationSitesTests
         var page = ApplicationSites.FindPage(result.Model, "PurchaseRequestForm");
 
         Assert.NotNull(page);
-        var widget = Assert.Single(page.Widgets);
+        var widget = Assert.IsType<WidgetMetadata>(Assert.Single(page.Widgets));
         Assert.NotNull(widget.Entity);
         Assert.Equal("number", widget.Entity.Fields[0].Name);
         Assert.True(widget.Entity.Fields[0].Sequence);
@@ -50,8 +50,8 @@ public sealed class ApplicationSitesTests
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
 
-        var table = Assert.Single(ApplicationSites.FindPage(result.Model, "PurchaseRequests")!.Widgets);
-        var inbox = Assert.Single(ApplicationSites.FindPage(result.Model, "MyTasks")!.Widgets);
+        var table = Assert.IsType<WidgetMetadata>(Assert.Single(ApplicationSites.FindPage(result.Model, "PurchaseRequests")!.Widgets));
+        var inbox = Assert.IsType<WidgetMetadata>(Assert.Single(ApplicationSites.FindPage(result.Model, "MyTasks")!.Widgets));
 
         // The table is over a data source, so its access is about the data source's root entity.
         Assert.Null(table.Entity);

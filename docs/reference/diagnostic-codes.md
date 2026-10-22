@@ -40,7 +40,7 @@ sorted by file and then path.
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
 | `AXC0020` | The application's `name` is active for another application `id`, ignoring letter case. Reported at `/name` of `application.json`, as the only diagnostic; nothing is provisioned or activated. |
 | `AXC0021` | A widget's `entity` names no loaded entity. Reported at `/widgets/{i}/entity`. |
-| `AXC0022` | A widget's `formPage` is set on a `form`, `taskInbox` or `processInspector` widget, names no loaded page, or names a page whose widget is not a `form` over the same entity, or over the root entity of the widget's data source, or is set on a table whose data source has an `aggregate`. A `form` widget that names a form is over the form's entity. Reported at `/widgets/{i}/formPage`. |
+| `AXC0022` | A widget's `formPage` is set on a `form`, `taskInbox` or `processInspector` widget, names no loaded page, or names a page whose `form` widget is not over the same entity, or over the root entity of the widget's data source, or is set on a table whose data source has an `aggregate`. A `form` widget that names a form is over the form's entity. Reported at `/widgets/{i}/formPage`, or at the widget's own pointer when it sits in a container. A page with several widgets is judged by its first `form` widget, or by its first widget when it has none. |
 | `AXC0023` | A navigation entry names no loaded page. Reported at `/navigation/{i}/page`. |
 | `AXC0024` | A site path is reserved by the platform, or another site of the application already uses it. Reported at `/path` of the later file. |
 | `AXC0025` | A site's default or fallback locale is not in `available`, or an available locale has no `text` resource. Reported at that locale. |
@@ -219,9 +219,13 @@ sorted by file and then path.
 | `AXC0218` | A `test` request names a scenario that the application does not have. The message names the scenario. Reported on the request, with an empty file and path, once for each unknown name. |
 | `AXC0219` | A `test` request ran for more than 10 minutes, see [test](authoring.md#test). The message names the limit. Reported on the request, with an empty file and path. |
 | `AXC0220` | The publisher stopped while a `test` request ran, see [test](authoring.md#test). Reported on the request, with an empty file and path. |
-| `AXC0221` | A form condition reads a field the form does not list, see [form conditions and steps](resource-files.md#form-conditions-and-steps). Reported at the condition. |
-| `AXC0222` | A form field has `visibleWhen` and its entity field is `required`, see [form conditions and steps](resource-files.md#form-conditions-and-steps). Reported at the field's `visibleWhen`. |
-| `AXC0223` | A form section `name` is already used by an earlier section, ignoring letter case. Reported at the repeated `name`. |
-| `AXC0224` | A form step lists a section name that no section of the form has. Reported at the name in the step's `sections`. |
-| `AXC0225` | A form step lists a section that is already in a step. Reported at the repeated name in the step's `sections`. |
-| `AXC0226` | A form has `steps` and a section has no name or is in no step. Reported at the section. |
+| `AXC0221` | A page's widget lists nest too deep: a `columns`, `tabs` or `section` widget would hold a list on level 5, and the page's own list is level 1. Reported at that container's pointer, such as `/widgets/0/columns/0/widgets/0/tabs/0/widgets/0/widgets/0`, see [resource files](resource-files.md). |
+| `AXC0222` | The `width` of the columns of one `columns` widget do not add up to 12. The message gives the sum. Reported at `/widgets/{i}/columns`, or at that pointer inside a container. |
+| `AXC0223` | A page holds a second `table` widget, whatever it shows. The message names the first table's pointer. Reported at the second table. |
+| `AXC0224` | A page holds a second `form`, `taskInbox` or `processInspector` widget, counted together. The message names the first one's pointer. Reported at the second widget. |
+| `AXC0225` | A form condition reads a field the form does not list, see [form conditions and steps](resource-files.md#form-conditions-and-steps). Reported at the condition. |
+| `AXC0226` | A form field has `visibleWhen` and its entity field is `required`, see [form conditions and steps](resource-files.md#form-conditions-and-steps). Reported at the field's `visibleWhen`. |
+| `AXC0227` | A form section `name` is already used by an earlier section, ignoring letter case. Reported at the repeated `name`. |
+| `AXC0228` | A form step lists a section name that no section of the form has. Reported at the name in the step's `sections`. |
+| `AXC0229` | A form step lists a section that is already in a step. Reported at the repeated name in the step's `sections`. |
+| `AXC0230` | A form has `steps` and a section has no name or is in no step. Reported at the section. |

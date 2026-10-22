@@ -82,9 +82,8 @@ site, and its widgets are its content:
 }
 ```
 
-- A page holds one widget today, and one or more *(planned for M12)*. The
-  widget `type` is `table` or
-  `form`. A `form` names a `form` resource, which lays out the fields of
+- A page holds one or more widgets. A leaf widget `type` is `table`, `form`,
+  `taskInbox` or `processInspector`. A `form` names a `form` resource, which lays out the fields of
   one entity in sections (see [frontend.md](frontend.md)), or an `entity`, as
   shorthand for all its fields in one section. A `table` names an `entity`, as
   shorthand for all records of that entity, or a `dataSource`.
@@ -103,14 +102,12 @@ site, and its widgets are its content:
   `visibleWhen`, a boolean expression over the row's fields. See
   [frontend.md](frontend.md) and
   [D59](../decisions/d59-table-row-and-toolbar-actions.md).
-- The page has no entity or template of its own, so more widgets and a
-  layout can be added without a format change.
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
   `{ "type": "table", "dataSource": "PurchaseRequestList", "formPage": "PurchaseRequestForm" }`.
   Its columns are the data source's projected fields. See
   [widget binding](data-sources.md#widget-binding).
 
-*(Planned for M12.)* A page may hold a tree of widgets. The container
+A page may hold a tree of widgets. The container
 widgets `columns`, `tabs` and `section` hold other widgets, see
 [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md):
 
@@ -168,6 +165,9 @@ widgets `columns`, `tabs` and `section` hold other widgets, see
   level 1.
 - A page holds at most one `table` of any kind, and at most one `form`,
   `taskInbox` or `processInspector`, so the URL state stays unambiguous.
+  Every `widgets`, `columns` and `tabs` list has at least one entry.
+- The compiler checks every widget at any depth. A problem is reported at the
+  widget's own JSON pointer, such as `/widgets/0/columns/1/widgets/0/entity`.
 - `formatVersion` stays 1. Today's pages stay valid.
 
 A `seed` holds records with fixed ids for one entity:
@@ -569,19 +569,19 @@ Evaluating the conditions and enforcing them on write stay *(planned for M12)*.
   that is not boolean and `AXC0046` for an unknown name. A condition on a
   module's form calls no rules, as a module's data source filter does. The
   new checks have their own codes:
-  - `AXC0221`: a condition reads a field the form does not list, at the
+  - `AXC0225`: a condition reads a field the form does not list, at the
     condition. It looks at the fields the condition names, a reference path's
     first field and an aggregate's collection field. It does not look at the
     child row's fields inside an aggregate.
-  - `AXC0222`: `visibleWhen` on a field the entity marks `required`, at the
+  - `AXC0226`: `visibleWhen` on a field the entity marks `required`, at the
     field's `visibleWhen`.
-  - `AXC0223`: a section `name` already used, ignoring letter case, at
+  - `AXC0227`: a section `name` already used, ignoring letter case, at
     `/sections/{i}/name`.
-  - `AXC0224`: a step names a section the form does not have, at
+  - `AXC0228`: a step names a section the form does not have, at
     `/steps/{s}/sections/{k}`.
-  - `AXC0225`: a step names a section that is already in a step, at the same
+  - `AXC0229`: a step names a section that is already in a step, at the same
     path.
-  - `AXC0226`: the form has `steps` and a section has no name or is in no
+  - `AXC0230`: the form has `steps` and a section has no name or is in no
     step, at `/sections/{i}`.
 
   Each step `title` is a text key and joins the `AXC0028` check, at

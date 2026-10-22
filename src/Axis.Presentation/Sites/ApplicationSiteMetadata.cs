@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace Axis.Presentation.Sites;
 
 /// <summary>The sites of every active application in the tenant, in path order.</summary>
@@ -14,8 +17,60 @@ public sealed record ApplicationSite(string Path, string TitleKey, SiteLocales L
 /// <summary>One navigation entry of an application site: the page it opens and the text key of its label.</summary>
 public sealed record SiteNavigationItem(string Page, string LabelKey);
 
-/// <summary>What the SPA needs to render a page: its title and its widgets.</summary>
-public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<WidgetMetadata> Widgets);
+/// <summary>
+/// What the SPA needs to render a page: its title and its widgets. The widgets are the top level of a tree: a
+/// <see cref="ColumnsWidgetMetadata"/>, <see cref="TabsWidgetMetadata"/> or <see cref="SectionWidgetMetadata"/> holds
+/// the others.
+/// </summary>
+public sealed record PageMetadata(string Name, string TitleKey, IReadOnlyList<PageWidgetMetadata> Widgets);
+
+/// <summary>
+/// One widget of a page: a <see cref="WidgetMetadata"/> that shows something, or a container around other widgets.
+/// Its JSON is that of the runtime type, and every kind writes <c>type</c> as its widget type name.
+/// </summary>
+[JsonConverter(typeof(PageWidgetMetadataConverter))]
+public abstract record PageWidgetMetadata
+{
+    /// <summary>The widget type name as written in page files, such as <c>table</c> or <c>columns</c>.</summary>
+    public abstract string Type { get; init; }
+}
+
+/// <summary>Writes a page widget by its runtime type, so each kind has only its own properties.</summary>
+public sealed class PageWidgetMetadataConverter : JsonConverter<PageWidgetMetadata>
+{
+    public override PageWidgetMetadata Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        throw new NotSupportedException("Page metadata is only written.");
+
+    public override void Write(Utf8JsonWriter writer, PageWidgetMetadata value, JsonSerializerOptions options) =>
+        JsonSerializer.Serialize(writer, value, value.GetType(), options);
+}
+
+/// <summary>A <c>columns</c> widget: its columns in page file order.</summary>
+public sealed record ColumnsWidgetMetadata(IReadOnlyList<ColumnMetadata> Columns) : PageWidgetMetadata
+{
+    [JsonPropertyOrder(-1)]
+    public override string Type { get; init; } = "columns";
+}
+
+/// <summary>One column of a <c>columns</c> widget: its width out of 12 and the widgets it holds.</summary>
+public sealed record ColumnMetadata(int Width, IReadOnlyList<PageWidgetMetadata> Widgets);
+
+/// <summary>A <c>tabs</c> widget: its tabs in page file order.</summary>
+public sealed record TabsWidgetMetadata(IReadOnlyList<TabMetadata> Tabs) : PageWidgetMetadata
+{
+    [JsonPropertyOrder(-1)]
+    public override string Type { get; init; } = "tabs";
+}
+
+/// <summary>One tab of a <c>tabs</c> widget: the text key of its label and the widgets it holds.</summary>
+public sealed record TabMetadata(string LabelKey, IReadOnlyList<PageWidgetMetadata> Widgets);
+
+/// <summary>A <c>section</c> widget: a titled group of widgets that may start collapsed.</summary>
+public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IReadOnlyList<PageWidgetMetadata> Widgets) : PageWidgetMetadata
+{
+    [JsonPropertyOrder(-1)]
+    public override string Type { get; init; } = "section";
+}
 
 /// <summary>
 /// One widget. On a table or form widget, exactly one of <see cref="Entity"/> and
@@ -45,7 +100,7 @@ public sealed record WidgetMetadata(
     string? Process,
     string? InstancesPath,
     IReadOnlyList<ActionMetadata> Actions,
-    WidgetAccess? Access);
+    WidgetAccess? Access) : PageWidgetMetadata;
 
 /// <summary>
 /// The entity actions a user may take on a widget's entity, and the fields each write action covers.

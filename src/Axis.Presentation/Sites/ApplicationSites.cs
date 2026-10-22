@@ -57,7 +57,21 @@ public static class ApplicationSites
     private static TextResource? FindText(ApplicationModel application, string locale) =>
         application.Texts.FirstOrDefault(text => string.Equals(text.Locale, locale, StringComparison.OrdinalIgnoreCase));
 
-    private static WidgetMetadata Widget(ApplicationModel application, WidgetModel widget) =>
+    private static PageWidgetMetadata Widget(ApplicationModel application, WidgetModel widget) =>
+        widget.Type switch
+        {
+            WidgetType.Columns => new ColumnsWidgetMetadata(
+                [.. widget.Columns.Select(column => new ColumnMetadata(column.Width, [.. column.Widgets.Select(child => Widget(application, child))]))]),
+            WidgetType.Tabs => new TabsWidgetMetadata(
+                [.. widget.Tabs.Select(tab => new TabMetadata(tab.Label.TextKey, [.. tab.Widgets.Select(child => Widget(application, child))]))]),
+            WidgetType.Section => new SectionWidgetMetadata(
+                widget.Title!.TextKey,
+                widget.Collapsed,
+                [.. widget.Widgets.Select(child => Widget(application, child))]),
+            _ => Leaf(application, widget),
+        };
+
+    private static WidgetMetadata Leaf(ApplicationModel application, WidgetModel widget) =>
         new(
             WidgetTypes.Name(widget.Type),
             widget.FormPage?.Name,
