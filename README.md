@@ -50,5 +50,7 @@ start with [AGENTS.md](AGENTS.md).
 ## Technology
 
 - Backend: C# on .NET 10 and ASP.NET Core.
-- Frontend: React, TypeScript, Ant Design and ProComponents.
+- Frontend: React, TypeScript and Ant Design. The UI library stays inside the
+  SPA, see
+  [D58](docs/decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md).
 - Storage: PostgreSQL.

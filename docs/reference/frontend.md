@@ -15,6 +15,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   templates. Those components and a single token-based theme with light and
   dark modes live in `web/src/platform/`. Feature code assembles them and
   adds no styling of its own.
+- **The UI library is a detail of the SPA.** The SPA builds on Ant Design for
+  its base components
+  ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
+  Configuration, page metadata, configurable theme tokens and the custom widget
+  API never name an Ant Design component, prop or token. A custom widget builds
+  on Axis widgets and Axis tokens and never imports the UI library directly.
+  Specialised libraries such as React Flow and CodeMirror follow the same rule.
+  No layer renders UI from a schema on top of Ant Design. The shell and the page
+  containers still use ProComponents until it is removed _(planned for M12)_.
 - **Design tokens and previews** *(planned for M12)*. An Axis token file in
   `web/src/platform/` holds the colours for light and dark mode, type, spacing
   and radius, and the theme reads it. It replaces `sharedTokens` in
@@ -28,7 +37,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   or a `form` resource, which lays the entity's fields out in sections, and a
   table binds an entity or a data source. The container widgets `columns`,
   `tabs` and `section` hold other widgets, see
-  [D58](../decisions/d58-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+  [D59](../decisions/d59-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
   Data sources are agreed in
   [D18](../decisions/d18-data-sources.md) and described in
   [data-sources.md](data-sources.md). Shared `form` resources, the task inbox
@@ -902,7 +911,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   Design's `md`, columns stack in file order, tab headers scroll and a table
   scrolls sideways inside its widget. The site shell's navigation collapses
   into a menu. There is no per-widget setting until a sample needs one, see
-  [D58](../decisions/d58-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+  [D59](../decisions/d59-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
 
 ## Studio
 
