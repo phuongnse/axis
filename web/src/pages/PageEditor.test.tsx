@@ -8,6 +8,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { chooseOption, clearButton, clearSelect, optionTexts, shownDropdown } from '../test/antd'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
 
@@ -82,32 +83,6 @@ function renderEditor(value: Record<string, unknown>, onChange = vi.fn(), loaded
     </ThemeModeProvider>,
   )
   return onChange
-}
-
-/** Opens the picker in a field and clicks one of its options. */
-async function choose(field: HTMLElement, option: string) {
-  await userEvent.click(within(field).getByRole('combobox'))
-  // A dropdown that closed a moment ago may still be in the page, so take the one that is open and has the option.
-  const dropdown = await waitFor(() => {
-    const open = [
-      ...document.querySelectorAll<HTMLElement>(
-        '.ant-select-dropdown:not(.ant-select-dropdown-hidden):not(.ant-slide-up-leave)',
-      ),
-    ].find((candidate) => within(candidate).queryByTitle(option) !== null)
-    expect(open).toBeDefined()
-    return open!
-  })
-  await userEvent.click(within(dropdown).getByTitle(option))
-}
-
-async function clear(field: HTMLElement) {
-  await userEvent.hover(within(field).getByRole('combobox'))
-  await userEvent.click(field.querySelector('.ant-select-clear')!)
-}
-
-function optionsOf(): string[] {
-  const open = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')!
-  return [...open.querySelectorAll('.ant-select-item-option')].map((option) => option.textContent ?? '')
 }
 
 const table = { type: 'table', dataSource: 'PurchaseRequestList', formPage: 'ReviewForm' }
@@ -202,16 +177,16 @@ describe('PageEditor table panel', () => {
   it('edits the data source and the form page at their pointers', async () => {
     const onChange = renderEditor(page(table))
 
-    await choose(screen.getByTestId('studio-field-/widgets/0/dataSource'), 'SupplierList')
+    await chooseOption('SupplierList', screen.getByTestId('studio-field-/widgets/0/dataSource'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/dataSource', 'SupplierList')
-    await choose(screen.getByTestId('studio-field-/widgets/0/formPage'), 'EditPage')
+    await chooseOption('EditPage', screen.getByTestId('studio-field-/widgets/0/formPage'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/formPage', 'EditPage')
   })
 
   it('clears an optional picker by removing its key', async () => {
     const onChange = renderEditor(page(table))
 
-    await clear(screen.getByTestId('studio-field-/widgets/0/formPage'))
+    await clearSelect(screen.getByTestId('studio-field-/widgets/0/formPage'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/formPage', undefined)
   })
 
@@ -219,13 +194,13 @@ describe('PageEditor table panel', () => {
     renderEditor(page(table))
 
     await userEvent.click(within(screen.getByTestId('studio-field-/widgets/0/formPage')).getByRole('combobox'))
-    await waitFor(() => expect(optionsOf()).toEqual(['ReviewForm', 'EditPage']))
+    await waitFor(() => expect(optionTexts(shownDropdown()!)).toEqual(['ReviewForm', 'EditPage']))
   })
 
   it('picking an entity clears the data source, and picking a data source clears the entity', async () => {
     const onChange = renderEditor(page({ type: 'table', dataSource: 'PurchaseRequestList' }))
 
-    await choose(screen.getByTestId('studio-field-/widgets/0/entity'), 'Supplier')
+    await chooseOption('Supplier', screen.getByTestId('studio-field-/widgets/0/entity'))
     expect(onChange.mock.calls).toEqual([
       ['/widgets/0/entity', 'Supplier'],
       ['/widgets/0/dataSource', undefined],
@@ -235,7 +210,7 @@ describe('PageEditor table panel', () => {
   it('clears the entity when a data source is picked', async () => {
     const onChange = renderEditor(page({ type: 'table', entity: 'PurchaseRequest' }))
 
-    await choose(screen.getByTestId('studio-field-/widgets/0/dataSource'), 'SupplierList')
+    await chooseOption('SupplierList', screen.getByTestId('studio-field-/widgets/0/dataSource'))
     expect(onChange.mock.calls).toEqual([
       ['/widgets/0/dataSource', 'SupplierList'],
       ['/widgets/0/entity', undefined],
@@ -262,7 +237,7 @@ describe('PageEditor form panel', () => {
   it('edits the entity and the form at their pointers, each clearing the other', async () => {
     const onChange = renderEditor(page({ type: 'form', entity: 'PurchaseRequest' }))
 
-    await choose(screen.getByTestId('studio-field-/widgets/0/form'), 'RequestForm')
+    await chooseOption('RequestForm', screen.getByTestId('studio-field-/widgets/0/form'))
     expect(onChange.mock.calls).toEqual([
       ['/widgets/0/form', 'RequestForm'],
       ['/widgets/0/entity', undefined],
@@ -272,14 +247,14 @@ describe('PageEditor form panel', () => {
   it('picks an entity without touching the form when the form is not set', async () => {
     const onChange = renderEditor(page({ type: 'form', entity: 'PurchaseRequest' }))
 
-    await choose(screen.getByTestId('studio-field-/widgets/0/entity'), 'Supplier')
+    await chooseOption('Supplier', screen.getByTestId('studio-field-/widgets/0/entity'))
     expect(onChange.mock.calls).toEqual([['/widgets/0/entity', 'Supplier']])
   })
 
   it('edits the process of an action', async () => {
     const onChange = renderEditor(page(form))
 
-    await choose(screen.getByTestId('studio-field-/widgets/0/actions/0/process'), 'Onboarding')
+    await chooseOption('Onboarding', screen.getByTestId('studio-field-/widgets/0/actions/0/process'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/actions/0/process', 'Onboarding')
   })
 
@@ -330,7 +305,7 @@ describe('PageEditor processInspector panel', () => {
 
     const field = screen.getByTestId('studio-field-/widgets/0/process')
     expect(field).toHaveTextContent('PurchaseRequestApproval')
-    await choose(field, 'Onboarding')
+    await chooseOption('Onboarding', field)
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/process', 'Onboarding')
   })
 
@@ -338,7 +313,7 @@ describe('PageEditor processInspector panel', () => {
     renderEditor(page({ type: 'processInspector', process: 'Onboarding' }))
 
     await userEvent.hover(within(screen.getByTestId('studio-field-/widgets/0/process')).getByRole('combobox'))
-    expect(document.querySelector('.ant-select-clear')).toBeNull()
+    expect(clearButton()).toBeNull()
   })
 })
 
@@ -346,7 +321,7 @@ describe('PageEditor widget type', () => {
   it('drops the known keys the new type does not take and keeps the others', async () => {
     const onChange = renderEditor(page({ ...form, form: 'RequestForm', 'x-note': 'keep' }))
 
-    await choose(screen.getByTestId('studio-field-/widgets/0/type'), 'table')
+    await chooseOption('table', screen.getByTestId('studio-field-/widgets/0/type'))
     expect(onChange.mock.calls).toEqual([
       ['/widgets/0/type', 'table'],
       ['/widgets/0/form', undefined],
@@ -357,7 +332,7 @@ describe('PageEditor widget type', () => {
   it('adds an empty process for a process inspector', async () => {
     const onChange = renderEditor(page({ type: 'taskInbox' }))
 
-    await choose(screen.getByTestId('studio-field-/widgets/0/type'), 'processInspector')
+    await chooseOption('processInspector', screen.getByTestId('studio-field-/widgets/0/type'))
     expect(onChange.mock.calls).toEqual([
       ['/widgets/0/type', 'processInspector'],
       ['/widgets/0/process', ''],

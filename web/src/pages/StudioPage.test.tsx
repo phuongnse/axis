@@ -9,6 +9,7 @@ import { assignLocation } from '../platform/navigation'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
+import { segmentLabel } from '../test/antd'
 import { StudioPage } from './StudioPage'
 
 vi.mock('../platform/navigation', () => ({ assignLocation: vi.fn() }))
@@ -532,7 +533,7 @@ describe('StudioPage', () => {
     expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
     expect(screen.getByTestId('studio-diagnostics')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByText('Resources', { selector: '.ant-segmented-item-label' }))
+    await userEvent.click(segmentLabel('Resources'))
 
     expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)

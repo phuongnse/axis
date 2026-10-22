@@ -10,6 +10,7 @@ import { setAt } from '../platform/jsonPatch'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { loadKindSchema } from '../platform/studioSchemas'
+import { chooseOption } from '../test/antd'
 import { StudioEditor } from './StudioEditor'
 
 const folder = '/api/studio/apps/Shop'
@@ -580,22 +581,6 @@ async function expressionView(field: HTMLElement): Promise<EditorView> {
   return view as unknown as EditorView
 }
 
-/** The option of the dropdown opened last. A title also marks a closed select that shows the same value. */
-async function optionOf(name: string): Promise<HTMLElement> {
-  return waitFor(() => {
-    const found = [...document.querySelectorAll<HTMLElement>('.ant-select-item-option')].filter(
-      (element) => element.title === name && !element.closest('.ant-select-dropdown-hidden'),
-    )
-    expect(found.length).toBeGreaterThan(0)
-    return found[found.length - 1]
-  })
-}
-
-async function pick(field: HTMLElement, option: string) {
-  await userEvent.click(within(field).getByRole('combobox'))
-  await userEvent.click(await optionOf(option))
-}
-
 function sentSteps(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown>[] {
   return sentPatch(fetchMock).find((operation) => operation.path === '/steps')!.value as Record<string, unknown>[]
 }
@@ -608,8 +593,8 @@ describe('StudioEditor for a process', () => {
     const when = await screen.findByTestId('studio-field-/steps/2/branches/0/when', {}, slow)
     const view = await expressionView(when)
     act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'totalAmount > 5' } }))
-    await pick(screen.getByTestId('studio-field-/steps/2/branches/1/next'), 'markRejected')
-    await pick(screen.getByTestId('studio-field-/steps/2/otherwise'), 'markRejected')
+    await chooseOption('markRejected', screen.getByTestId('studio-field-/steps/2/branches/1/next'))
+    await chooseOption('markRejected', screen.getByTestId('studio-field-/steps/2/otherwise'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -671,7 +656,7 @@ describe('StudioEditor for a process', () => {
     renderResource(processItem)
 
     await userEvent.click(await screen.findByRole('combobox', { name: 'Add step' }, slow))
-    await userEvent.click(await optionOf('decision'))
+    await chooseOption('decision')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -744,7 +729,7 @@ describe('StudioEditor for a process', () => {
     renderResource(processItem)
 
     const card = await screen.findByTestId('studio-step-0', {}, slow)
-    await pick(within(card).getByTestId('studio-field-/steps/0/type'), 'decision')
+    await chooseOption('decision', within(card).getByTestId('studio-field-/steps/0/type'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -763,7 +748,7 @@ describe('StudioEditor for a process', () => {
     renderResource(processItem)
 
     const card = await screen.findByTestId('studio-step-0', {}, slow)
-    await pick(within(card).getByTestId('studio-field-/steps/0/type'), 'task')
+    await chooseOption('task', within(card).getByTestId('studio-field-/steps/0/type'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -1149,7 +1134,7 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    await pick(await screen.findByTestId('studio-field-/fields/0/type', {}, slow), 'enum')
+    await chooseOption('enum', await screen.findByTestId('studio-field-/fields/0/type', {}, slow))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -1267,7 +1252,7 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    await pick(await screen.findByTestId('studio-field-/fields/2/type', {}, slow), 'integer')
+    await chooseOption('integer', await screen.findByTestId('studio-field-/fields/2/type', {}, slow))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('note')
     expect(screen.getByRole('button', { name: 'Add convert' })).toBeDisabled()
@@ -1296,7 +1281,7 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    await pick(await screen.findByTestId('studio-field-/fields/2/type', {}, slow), 'integer')
+    await chooseOption('integer', await screen.findByTestId('studio-field-/fields/2/type', {}, slow))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByTestId('studio-migration-question')).not.toBeInTheDocument())
@@ -1314,7 +1299,7 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    await pick(await screen.findByTestId('studio-field-/fields/2/type', {}, slow), 'enum')
+    await chooseOption('enum', await screen.findByTestId('studio-field-/fields/2/type', {}, slow))
     expect(screen.getByTestId('studio-migration-warning-/fields/2')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-migration-warning-/fields/1')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -1332,7 +1317,7 @@ describe('StudioEditor for an entity', () => {
     const name = within(await screen.findByTestId('studio-field-/fields/2/name', {}, slow)).getByRole('textbox')
     await userEvent.clear(name)
     await userEvent.type(name, 'remark')
-    await pick(screen.getByTestId('studio-field-/fields/2/type'), 'integer')
+    await chooseOption('integer', screen.getByTestId('studio-field-/fields/2/type'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('note → remark')
     await userEvent.click(screen.getByRole('button', { name: 'Keep data' }))

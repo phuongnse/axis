@@ -6,6 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
+import { hasFieldError, isRequiredLabel } from '../test/antd'
 import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
@@ -390,8 +391,8 @@ describe('FormWidget', () => {
     renderForm()
 
     // Ant Design marks a required item by a class on its label; the server still decides.
-    expect(screen.getByText('Title', { selector: 'label' })).toHaveClass('ant-form-item-required')
-    expect(screen.getByText('Code', { selector: 'label' })).not.toHaveClass('ant-form-item-required')
+    expect(isRequiredLabel(screen.getByText('Title', { selector: 'label' }))).toBe(true)
+    expect(isRequiredLabel(screen.getByText('Code', { selector: 'label' }))).toBe(false)
   })
 
   it('confirms a picker value on Enter without sending the form', async () => {
@@ -698,8 +699,8 @@ describe('FormWidget', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByTestId('field-error-lines-1-quantity')).toHaveTextContent('Must be an integer.')
-    expect(screen.getByLabelText('Quantity 2').closest('.ant-form-item')).toHaveClass('ant-form-item-has-error')
-    expect(screen.getByLabelText('Quantity 1').closest('.ant-form-item')).not.toHaveClass('ant-form-item-has-error')
+    expect(hasFieldError(screen.getByLabelText('Quantity 2'))).toBe(true)
+    expect(hasFieldError(screen.getByLabelText('Quantity 1'))).toBe(false)
     expect(screen.getByTestId('field-error-lines')).toHaveTextContent('Too many rows.')
     // A row the form does not have cannot hold the error, so it shows above the form.
     expect(screen.getByTestId('form-error')).toHaveTextContent('Out of range.')

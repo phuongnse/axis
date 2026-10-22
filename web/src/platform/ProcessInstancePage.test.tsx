@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { formItem } from '../test/antd'
 import { assignLocation } from './navigation'
 import { ProcessInstancePage } from './ProcessInstancePage'
 import type { WidgetMetadata } from './site'
@@ -540,7 +541,7 @@ describe('ProcessInstancePage', () => {
     fireEvent.change(within(dialog).getByLabelText('orderNumber (text)'), { target: { value: '12' } })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
-    const field = within(dialog).getByLabelText('orderNumber (text)').closest('.ant-form-item')! as HTMLElement
+    const field = formItem(within(dialog).getByLabelText('orderNumber (text)'))
     expect(await within(field).findByText('Must be text.')).toBeInTheDocument()
     expect(within(dialog).getByTestId('inspector-command-error')).toHaveTextContent('The request has errors.')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
