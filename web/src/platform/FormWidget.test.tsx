@@ -334,6 +334,35 @@ describe('FormWidget', () => {
     expect(screen.getByLabelText('Category')).toHaveAttribute('readonly')
   })
 
+  it('lists the choices of an enum as options, and marks the chosen one as selected', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    renderForm(noteId)
+    const status = await screen.findByRole('combobox', { name: 'Status' })
+
+    await userEvent.click(status)
+    const listbox = await screen.findByRole('listbox')
+    expect(within(listbox).getAllByRole('option')).toHaveLength(2)
+    expect(within(listbox).getByRole('option', { name: 'open' })).toHaveAttribute('aria-selected', 'false')
+    expect(within(listbox).getByRole('option', { name: 'closed' })).toHaveAttribute('aria-selected', 'false')
+
+    await userEvent.click(within(listbox).getByRole('option', { name: 'closed' }))
+    await userEvent.click(status)
+
+    const reopened = await screen.findByRole('listbox')
+    expect(within(reopened).getByRole('option', { name: 'closed' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(reopened).getByRole('option', { name: 'open' })).toHaveAttribute('aria-selected', 'false')
+  })
+
+  it('names the group of a reference input after its field, to find its Choose button', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+
+    renderForm(noteId)
+
+    const group = await screen.findByTestId('reference-category')
+    expect(within(group).getByLabelText('Category')).toHaveValue('Office')
+    expect(within(group).getByRole('button', { name: 'Choose' })).toBeInTheDocument()
+  })
+
   it('shows the history of a saved record below the form', async () => {
     stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
 

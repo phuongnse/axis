@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { compareApplicationFolders } from '../folder-comparison'
+import { expectChosen, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
 
@@ -56,30 +57,13 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name' })).toHaveValue(name)
   }
 
-  // A virtual list keeps a hidden copy of its options in the dropdown, so only the visible option is clicked.
-  async function openDropdown(page: Page, opener: Locator) {
-    await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
-    await opener.click()
-    return page.locator('.ant-select-dropdown:visible')
-  }
-
   async function pick(page: Page, testId: string, option: string, filter?: string) {
-    const field = page.getByTestId(testId)
-    const dropdown = await openDropdown(page, field.locator('.ant-select-selector'))
-    if (filter !== undefined) {
-      await field.getByRole('combobox').fill(filter)
-    }
-    await dropdown.getByText(option, { exact: true }).filter({ visible: true }).click()
+    await pickOption(page.getByTestId(testId).getByRole('combobox'), option, filter)
   }
 
   // A row with more than one select names the one to pick, since pick() would match them all.
   async function pickNamed(page: Page, testId: string, name: string, option: string) {
-    const select = page
-      .getByTestId(testId)
-      .locator('.ant-select')
-      .filter({ has: page.getByRole('combobox', { name, exact: true }) })
-    const dropdown = await openDropdown(page, select.locator('.ant-select-selector'))
-    await dropdown.getByText(option, { exact: true }).filter({ visible: true }).click()
+    await pickOption(page.getByTestId(testId).getByRole('combobox', { name, exact: true }), option)
   }
 
   async function save(page: Page, answers: [field: string, choice: string][] = []) {
@@ -139,11 +123,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await own.getByRole('textbox', { name: 'Record filter' }).fill(grant.filter)
       }
       if (grant.fields !== undefined) {
-        await own.locator('.ant-select-selector').click()
-        for (const field of grant.fields) {
-          await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: field, exact: true }).click()
-        }
-        await page.keyboard.press('Escape')
+        await pickOptions(own.getByRole('combobox'), grant.fields)
       }
     }
     await page.getByTestId('studio-matrix-own-grants').getByRole('button', { name: 'Save', exact: true }).click()
@@ -530,16 +510,14 @@ test.describe('the author builds the service desk with Studio only', () => {
     ]
     // Every name exists before any transition is picked, because the pickers offer only named steps.
     for (const [index, [name, type]] of steps.entries()) {
-      await page.getByRole('combobox', { name: 'Add step' }).click()
-      await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: type, exact: true }).click()
+      await pickOption(page.getByRole('combobox', { name: 'Add step' }), type)
       await stepCard(index).getByRole('textbox', { name: 'Step name' }).fill(name)
     }
 
     async function operation(index: number, sets: [field: string, expression: string][], next: string) {
       await pick(page, `studio-field-/steps/${index}/operation`, 'updateRecord')
       for (const [field, expression] of sets) {
-        await stepCard(index).getByRole('combobox', { name: 'Add mapping Set' }).click()
-        await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: field, exact: true }).click()
+        await pickOption(stepCard(index).getByRole('combobox', { name: 'Add mapping Set' }), field)
         const row = page.getByTestId(`studio-field-/steps/${index}/set/${field}`)
         await expect(row.locator('.cm-editor')).toBeVisible()
         await row.getByRole('textbox', { name: 'Expression' }).fill(expression)
@@ -757,14 +735,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await page.keyboard.press('Tab')
         const row = page.getByTestId(`studio-field-/users/${user}`)
         await expect(row).toBeVisible()
-        await row.locator('.ant-select-selector').click()
-        const roleList = page.locator(
-          `[id="${await row.getByRole('combobox', { name: 'Roles', exact: true }).getAttribute('aria-controls')}"]`,
-        )
-        for (const role of roles) {
-          await roleList.getByRole('option', { name: role, exact: true }).click()
-        }
-        await page.keyboard.press('Escape')
+        await pickOptions(row.getByRole('combobox', { name: 'Roles', exact: true }), roles)
         for (const role of roles) {
           await expect(row).toContainText(role)
         }
@@ -821,13 +792,6 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(rows).toHaveAttribute('data-active', 'true')
   })
 
-  /** The value the Status select shows. */
-  function statusValue(page: Page) {
-    return page
-      .locator('.ant-form-item')
-      .filter({ has: page.getByText('Status', { exact: true }) })
-      .locator('.ant-select-selection-item')
-  }
 
   /** Opens the task `label` of the ticket `title` in My tasks. It waits until the worker creates the task. */
   async function openTask(page: Page, title: string, label: string) {
@@ -851,8 +815,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('textbox', { name: 'Title' }).fill(title)
     await page.getByRole('textbox', { name: 'Description', exact: true }).fill('It shows a black screen.')
     // The requester's create grant only allows the statuses draft and reopened.
-    await page.getByLabel('Status', { exact: true }).click()
-    await page.locator('.ant-select-item-option[title="draft"]').click()
+    await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'draft')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytickets$/)
 
@@ -885,7 +848,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     // The worker ends the process some time after the decision.
     await expect(async () => {
       await page.goto(`${journeyURL}/service-desk/ticketform/${id}`)
-      await expect(statusValue(page)).toHaveText('closed', { timeout: 1_000 })
+      await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), 'closed', { timeout: 1_000 })
     }).toPass({ timeout: 30_000 })
   })
 })

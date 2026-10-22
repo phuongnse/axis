@@ -28,7 +28,7 @@ issue #932 on 2026-10-21.
   row at a time.
 
 The `navigate` action has the shape that
-[D62](d62-navigate-actions-and-page-parameters.md) defines. A row of a table
+[D63](d63-navigate-actions-and-page-parameters.md) defines. A row of a table
 bound to a data source acts on its root record, and a group row has no
 actions.
 

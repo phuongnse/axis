@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { startServer } from '../activate'
+import { pickOption } from '../select'
 import { e2eApp, studioFolder } from '../server-settings'
 import { useSession } from '../sessions'
 
@@ -45,9 +46,7 @@ test.describe('Studio edits a process in the process editor', () => {
   }
 
   async function pick(page: Page, field: string, name: string) {
-    await page.getByTestId(`studio-field-${field}`).locator('.ant-select-selector').click()
-    // The dropdown of the previous pick may still be leaving, with the same option. The newest one is last.
-    await page.getByRole('option', { name, exact: true }).last().click()
+    await pickOption(page.getByTestId(`studio-field-${field}`).getByRole('combobox'), name)
   }
 
   test('an author adds a decision step, makes submit lead to it and saves without a new diagnostic', async ({

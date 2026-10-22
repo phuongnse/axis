@@ -134,6 +134,7 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
                   {output.type === 'boolean' ? (
                     <Select
                       allowClear
+                      virtual={false}
                       options={[
                         { value: true, label: 'true' },
                         { value: false, label: 'false' },

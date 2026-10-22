@@ -388,6 +388,19 @@ describe('TableWidget', () => {
     await waitFor(() => expect(requests()).toContain(`${recordsPath}?page=2&sort=-title`))
   })
 
+  it('is busy while the records load, and marks the current page', async () => {
+    stubRecords()
+    const { container } = renderWidget('?page=2')
+    const root = container.firstElementChild as HTMLElement
+    expect(root).toHaveAttribute('aria-busy', 'true')
+
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    expect(root).toHaveAttribute('aria-busy', 'false')
+    expect(screen.getByTitle('2').querySelector('[aria-current="page"]')).toHaveTextContent('2')
+    expect(container.querySelectorAll('[aria-current="page"]')).toHaveLength(1)
+  })
+
   it('changes the page size from page 1', async () => {
     const requests = stubRecords()
     renderWidget('?page=2&pageSize=10&sort=title')

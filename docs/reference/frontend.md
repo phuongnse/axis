@@ -2,7 +2,7 @@
 
 Detailed reference for the frontend: the SPA, its rendering from metadata and
 its widgets. The conventions of [architecture.md](../architecture.md) apply:
-sections marked *(planned for Mx)* are not built yet, and Dn refers to
+sections marked _(planned for Mx)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
 - **One SPA for all applications.** The SPA renders from metadata served by
@@ -24,7 +24,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   Specialised libraries such as React Flow and CodeMirror follow the same rule.
   No layer renders UI from a schema on top of Ant Design. The shell and the page
   containers still use ProComponents until it is removed _(planned for M12)_.
-- **Design tokens and previews** *(planned for M12)*. An Axis token file in
+- **Widgets expose their state to tests and assistive technology.** They are
+  found by role, accessible name and ARIA state, never by a class of the UI
+  library. Where the library leaves a state out, such as loading (`aria-busy`)
+  or the current page (`aria-current`), the widget adds it.
+- **Design tokens and previews** _(planned for M12)_. An Axis token file in
   `web/src/platform/` holds the colours for light and dark mode, type, spacing
   and radius, and the theme reads it. It replaces `sharedTokens` in
   `web/src/platform/theme.tsx`. Preview pages show the tokens and each widget,
@@ -33,7 +37,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   [D57](../decisions/d57-a-design-system-published-from-the-repository.md)
   and [Design changes](../delivery.md#design-changes).
 - **How pages and widgets grow.** A page has one widget today, and a tree of
-  widgets *(planned for M12)*. A form binds an entity
+  widgets _(planned for M12)_. A form binds an entity
   or a `form` resource, which lays the entity's fields out in sections, and a
   table binds an entity or a data source. The container widgets `columns`,
   `tabs` and `section` hold other widgets, see
@@ -45,7 +49,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   [D20](../decisions/d20-human-tasks-task-inbox-and-forms.md). The
   `form` resource, the task inbox, the task page and the `startProcess` action
   are built. Navigate actions and page parameters replace the table's
-  `formPage` link in M12 *(planned for M12)*; see [D62](../decisions/d62-navigate-actions-and-page-parameters.md).
+  `formPage` link in M12 _(planned for M12)_; see [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Text.** All UI strings come from text resources.
 - **Sites and texts.** The server describes sites to the SPA through
   read-only endpoints. Like every other `/api` path, they need a known tenant
@@ -69,12 +73,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   found by path, not by application name, because the path is what users see
   and one application can have several sites. Four endpoints describe them.
 
-  | Method and path | Response |
-  | --- | --- |
-  | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles" } ] }`, every site of every active application, in path order |
-  | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey" } ] }` |
+  | Method and path                        | Response                                                                                                                                                                                                                                                               |
+  | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `GET /api/sites`                       | `{ "sites": [ { "path", "titleKey", "titles" } ] }`, every site of every active application, in path order                                                                                                                                                             |
+  | `GET /api/sites/{path}`                | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey" } ] }`                                                                                                                                                  |
   | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts. Optional `?release={releaseId}` serves any stored release of the site's application. An unknown id, a non-UUID or another application's release answers `404`. |
-  | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below |
+  | `GET /api/sites/{path}/pages/{page}`   | the page metadata shown below                                                                                                                                                                                                                                          |
 
   A page response looks like this:
 
@@ -93,17 +97,34 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
           "recordsPath": "/api/apps/RecordsApp/entities/Item/records",
           "fields": [
             {
-              "name": "name", "type": "text", "labelKey": null,
-              "required": true, "unique": false, "computed": false, "sequence": false,
-              "creator": false, "maxLength": 100,
-              "precision": null, "scale": null, "values": null, "target": null,
+              "name": "name",
+              "type": "text",
+              "labelKey": null,
+              "required": true,
+              "unique": false,
+              "computed": false,
+              "sequence": false,
+              "creator": false,
+              "maxLength": 100,
+              "precision": null,
+              "scale": null,
+              "values": null,
+              "target": null,
               "fields": null
             },
             {
-              "name": "department", "type": "reference", "labelKey": "item.department",
-              "required": false, "unique": false, "computed": false, "sequence": false,
-              "creator": false, "maxLength": null,
-              "precision": null, "scale": null, "values": null,
+              "name": "department",
+              "type": "reference",
+              "labelKey": "item.department",
+              "required": false,
+              "unique": false,
+              "computed": false,
+              "sequence": false,
+              "creator": false,
+              "maxLength": null,
+              "precision": null,
+              "scale": null,
+              "values": null,
               "target": {
                 "entity": "Department",
                 "displayField": "name",
@@ -150,11 +171,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - Every widget also has `actions`, never left out. It
     is described under the form widget, and is `[]` on a widget it does not
     apply to. A table's `startProcess` row actions are left out without
-    `start`, and its `delete` row action without `delete` *(planned for M12)*.
+    `start`, and its `delete` row action without `delete` _(planned for M12)_.
   - Every widget also has `access`, never left out. It is described under
     **Policies** below, and is `null` on a `taskInbox` and on a
     `processInspector`.
-  - *(Planned for M12.)* A page may hold a tree of widgets. A container widget
+  - _(Planned for M12.)_ A page may hold a tree of widgets. A container widget
     carries only `type` and its own keys. A leaf widget keeps every key above.
     A tab carries `labelKey`, and a `section` carries `titleKey` and
     `collapsed`. A page with two columns, one holding a table and the other a
@@ -168,7 +189,30 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         {
           "type": "columns",
           "columns": [
-            { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "formPage": "PurchaseRequestForm", "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [], "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
+            {
+              "width": 8,
+              "widgets": [
+                {
+                  "type": "table",
+                  "entity": {
+                    "name": "PurchaseRequest",
+                    "fields": [{ "name": "title", "type": "text" }]
+                  },
+                  "formPage": "PurchaseRequestForm",
+                  "dataSource": null,
+                  "form": null,
+                  "tasksPath": null,
+                  "process": null,
+                  "instancesPath": null,
+                  "actions": [],
+                  "access": {
+                    "actions": ["read"],
+                    "createFields": [],
+                    "updateFields": []
+                  }
+                }
+              ]
+            },
             {
               "width": 4,
               "widgets": [
@@ -176,7 +220,20 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
                   "type": "section",
                   "titleKey": "pages.overview.tasks",
                   "collapsed": false,
-                  "widgets": [{ "type": "taskInbox", "entity": null, "formPage": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "actions": [], "access": null }]
+                  "widgets": [
+                    {
+                      "type": "taskInbox",
+                      "entity": null,
+                      "formPage": null,
+                      "dataSource": null,
+                      "form": null,
+                      "tasksPath": "/api/apps/PurchaseRequests/tasks",
+                      "process": null,
+                      "instancesPath": null,
+                      "actions": [],
+                      "access": null
+                    }
+                  ]
                 }
               ]
             }
@@ -185,6 +242,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       ]
     }
     ```
+
   - `entity` is the widget's entity: its name, its label key, its display
     field, the path of its record API in `recordsPath`, and its fields in
     declaration order. A `child-collection` field is listed too. Tables show
@@ -247,7 +305,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `taskInbox` is always readable. A
       `processInspector` is readable when the user holds an `inspect` grant on
       its process.
-    - *(Planned for M12.)* **Pages with a tree.** An unreadable widget is
+    - _(Planned for M12.)_ **Pages with a tree.** An unreadable widget is
       left out. A column or tab whose widgets are all left out is left out,
       and the other columns keep their declared widths. A container left with
       no widget is left out. A page is readable when at least one of its
@@ -263,9 +321,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       [policies on tasks](task-api.md).
     - **Actions.** A `startProcess` action is left out of `actions` when the
       user has no `start` grant on its process. The same holds for a `table`
-      row action *(planned for M12)*, and its `delete` row action is left out
+      row action _(planned for M12)_, and its `delete` row action is left out
       when `access.actions` lacks `delete`. A `navigate` action whose target
-      page the user cannot read is left out too *(planned for M12)*.
+      page the user cannot read is left out too _(planned for M12)_.
     - **Access.** Every `table` and `form` widget gets an `access` object.
       It says which entity actions the user may take, and which fields each
       write action covers:
@@ -294,22 +352,22 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         new record and `update` on a saved one. Cancel and the start process
         buttons stay.
       - A `taskInbox` has `"access": null`, and so does a `processInspector`.
+
 - **Routing.** The SPA routes on the client with `react-router` v7. The
   server answers every other path with the SPA, so each address below
   answers 200.
 
-  | Address | Shows |
-  | --- | --- |
-  | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in |
-  | `/{site}` | the site's first navigation entry, by redirect |
-  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values |
-  | `/{site}/{page}?ticket=<id>` | *(planned for M12)* a page with parameters: the values sit in the query under the parameter names |
-  | `/{site}/{page}/new` | the form of a form page, to create a record |
-  | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
-  | `/{site}/{inboxpage}/{taskId}` | the task page of the task with that id, under the page of a task inbox |
-  | `/{site}/{inspectorpage}/{instanceId}` | the instance page of the process instance with that id, under the page of a process inspector |
-
-  - *(Planned for M12.)* A page holds at most one `table` and at most one
+  | Address                                | Shows                                                                                                                                                                                                                                                                               |
+  | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `/`                                    | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in |
+  | `/{site}`                              | the site's first navigation entry, by redirect                                                                                                                                                                                                                                      |
+  | `/{site}/{page}`                       | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values                                                                                                               |
+  | `/{site}/{page}?ticket=<id>`           | _(planned for M12)_ a page with parameters: the values sit in the query under the parameter names                                                                                                                                                                                   |
+  | `/{site}/{page}/new`                   | the form of a form page, to create a record                                                                                                                                                                                                                                         |
+  | `/{site}/{page}/{id}`                  | the form of a form page, to edit the record with that id                                                                                                                                                                                                                            |
+  | `/{site}/{inboxpage}/{taskId}`         | the task page of the task with that id, under the page of a task inbox                                                                                                                                                                                                              |
+  | `/{site}/{inspectorpage}/{instanceId}` | the instance page of the process instance with that id, under the page of a process inspector                                                                                                                                                                                       |
+  - _(Planned for M12.)_ A page holds at most one `table` and at most one
     `form`, `taskInbox` or `processInspector`, so every part of the address
     has one owner. `?page=&pageSize=&sort=` and the data source parameter
     values belong to the page's one `table`. `/new` and `/{id}` belong to its
@@ -318,7 +376,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - `{site}` is the site path. `{page}` is the page name in lower case, as
     navigation links write it. The server matches both ignoring letter case.
   - A required page parameter that is missing from the URL, or has the wrong
-    form, shows the not-found page inside the site shell *(planned for M12)*.
+    form, shows the not-found page inside the site shell _(planned for M12)_.
   - An unknown site shows the not-found page inside the platform shell. An
     unknown page shows it inside the site shell.
     An address with more than three segments, such as `/e2e/notes/42/edit`,
@@ -335,6 +393,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - Inside a site, the shell shows the site's title, navigation and locales.
     The theme toggle and the locale switch work as they do on the platform
     site.
+
 - **Table widget.** A page whose widget is a `table` lists the records of its
   entity through the record API, or the rows of its data source, in the
   shared Ant Design table.
@@ -424,6 +483,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       to the `formPage` as for an entity table. A group row of a grouped data
       source has `id: null`. A table over a grouped data source has no form
       page, so it has no open link and no create button.
+
   - **Changes.** A new sort or page size starts again at page 1, because the
     old page number means nothing under a new order or size. Only the
     pagination control moves between pages. Each change adds a history entry.
@@ -440,15 +500,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     not at all.
   - **Values.** Values are formatted for display and never changed:
 
-    | Field type | Shown as |
-    | --- | --- |
-    | `date-time` | date and time to the second in the UI locale and the browser's time zone. The fraction is dropped |
-    | `date` | the date in the UI locale, without a time-zone shift |
-    | `integer`, `decimal` | exactly as the API wrote them, right-aligned |
-    | `boolean` | a localized yes or no |
-    | `reference` | the label from `labels` |
-    | `text`, `enum` | the value |
-    | `null` | an empty cell |
+    | Field type           | Shown as                                                                                          |
+    | -------------------- | ------------------------------------------------------------------------------------------------- |
+    | `date-time`          | date and time to the second in the UI locale and the browser's time zone. The fraction is dropped |
+    | `date`               | the date in the UI locale, without a time-zone shift                                              |
+    | `integer`, `decimal` | exactly as the API wrote them, right-aligned                                                      |
+    | `boolean`            | a localized yes or no                                                                             |
+    | `reference`          | the label from `labels`                                                                           |
+    | `text`, `enum`       | the value                                                                                         |
+    | `null`               | an empty cell                                                                                     |
 
   - **Number source text.** The SPA parses record responses with the source
     text of each JSON number, so `values` holds integers and decimals as
@@ -470,8 +530,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     page there is no create button and no open column. In M12 the open link
     becomes a `rowActions` navigate with `record: id`, and the create button a
     `toolbarActions` navigate without `record`, still gated by `access`
-    `create` *(planned for M12)*.
-  - **Row and toolbar actions** *(planned for M12)*. See
+    `create` _(planned for M12)_.
+  - **Row and toolbar actions** _(planned for M12)_. See
     [D59](../decisions/d59-table-row-and-toolbar-actions.md).
     - **Where.** Toolbar actions sit next to the create button. Row actions
       are buttons in the row, and fold into a menu at phone width. A
@@ -483,15 +543,24 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `ticket` parameter:
 
       ```json
-      { "type": "table", "entity": "Ticket", "rowActions": [
-        { "type": "navigate", "page": "TicketDetail",
-          "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }
-      ] }
+      {
+        "type": "table",
+        "entity": "Ticket",
+        "rowActions": [
+          {
+            "type": "navigate",
+            "page": "TicketDetail",
+            "label": { "textKey": "tickets.open" },
+            "parameters": { "ticket": "id" }
+          }
+        ]
+      }
       ```
 
       The target page declares
       `"parameters": [{ "name": "ticket", "type": "reference", "target": "Ticket", "required": true }]`.
-      The click goes to `/{site}/ticketdetail?ticket=<id>`. See [D62](../decisions/d62-navigate-actions-and-page-parameters.md).
+      The click goes to `/{site}/ticketdetail?ticket=<id>`. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+
     - **`visibleWhen`.** An action hides when its expression over the row is
       `false`, `null` or fails. It only shapes the UI. The server decides, as
       in [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).
@@ -565,6 +634,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     that no locale has is `AXC0028`. See
     [Configuration pipeline](configuration.md#configuration-pipeline).
   - A form over a child entity is not checked yet.
+  - _(Planned for M12.)_ Fields get `visibleWhen`, `requiredWhen` and
+    `readOnlyWhen`, sections get `visibleWhen` and a `name`, and a form may
+    have `steps`. See
+    [Form conditions and steps](resource-files.md#form-conditions-and-steps).
+
 - **Form widget.** A page whose widget is a `form` creates a record at
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
   record API. It adds no rules of its own: the server validates.
@@ -574,16 +648,16 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     titles (see **Form binding**). A required field's label is
     marked, but the mark blocks nothing: the server still decides.
 
-    | Field type | Input |
-    | --- | --- |
-    | `text` | a text input limited to `maxLength` |
-    | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is |
-    | `boolean` | a checkbox |
-    | `date` | a date picker |
-    | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction |
-    | `enum` | a choice of the declared values, as written in the entity file |
-    | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
-    | `child-collection` | a table of its rows, described under **Child collections** |
+    | Field type                                                                                                            | Input                                                                                                                                                    |
+    | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `text`                                                                                                                | a text input limited to `maxLength`                                                                                                                      |
+    | `integer`, `decimal`                                                                                                  | a plain text input with a numeric keyboard hint. It keeps the typed text as it is                                                                        |
+    | `boolean`                                                                                                             | a checkbox                                                                                                                                               |
+    | `date`                                                                                                                | a date picker                                                                                                                                            |
+    | `date-time`                                                                                                           | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction                                           |
+    | `enum`                                                                                                                | a choice of the declared values, as written in the entity file                                                                                           |
+    | `reference`                                                                                                           | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button   |
+    | `child-collection`                                                                                                    | a table of its rows, described under **Child collections**                                                                                               |
     | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
 
   - **Lookup.** The choose button opens a dialog titled with the field's
@@ -742,6 +816,32 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       text saying the record is already in a running process. Any other
       answer shows a generic platform error.
     - The button is disabled while the save and the start run.
+
+  - **Conditions and steps** _(planned for M12)_. The widget asks the server
+    which fields to show, require and lock, and which messages to show. It
+    has no evaluator of its own
+    ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+    - **Calls.** It calls the [form state endpoint](record-api.md#form-state)
+      with the draft values and the touched fields. The call goes out at once
+      after a choice: a select, a checkbox, a date or a picked record. It goes
+      out 300 ms after typing stops in a text or number input.
+    - **Pending answers.** While an answer is pending, the widget keeps the
+      last answered states. It drops an answer that a newer call has
+      overtaken.
+    - **States.** Per the answer, a field is hidden, marked required or made
+      read-only. A hidden field is not sent. The messages in `errors` show
+      under the touched fields.
+    - **Touched.** A field becomes touched when it loses focus or changes.
+    - **Save.** The widget always sends `?form=` with the form's name on
+      create and update, so the server enforces `requiredWhen`.
+    - **Steps.** A form with `steps` shows one step at a time, with Back and
+      Next. Next sends every visible field of the step as touched and stays
+      on the step when any key of `errors` names one of them. Back never
+      checks. A step whose sections are all hidden is skipped.
+    - **Last step.** Save and the `startProcess` actions are on the last
+      step. After a failed save, the form opens the first step that has an
+      error. The current step stays out of the URL, because a draft does not
+      survive a reload.
   - **Form metadata**. Page metadata gives the widget's
     `entity` with all its fields, so the SPA knows every field's type. It
     adds:
@@ -753,6 +853,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
       so the SPA never builds it itself.
+    - _(Planned for M12.)_ `form` also holds `visibleWhen` on each field and
+      section, as `true` when it has a condition and `false` otherwise.
+      It holds `steps`, each with a `titleKey` and its section names, and each
+      section's `name`. It holds no expressions, because they stay on the
+      server.
 - **Task inbox widget**. A page whose widget is a
   `taskInbox` lists the signed-in user's open tasks in the application,
   through the [task API](task-api.md).
@@ -792,6 +897,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     the widget starts sign-in like any other call. The platform texts
     `shell.tasks.*` hold the column headers, the empty text and the load
     error.
+
 - **Task page**. The address `/{site}/{inboxpage}/{taskId}`
   shows one task, under the page of its task inbox.
   - It loads the texts of the task's `releaseId` with
@@ -803,6 +909,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     form's sections over the subject record. The layout and the field types
     come from the task read's `form`, and the values from the subject
     record, read through the record API.
+  - _(Planned for M12.)_ The form behaves as the form widget does in
+    its **Conditions and steps**, using the task's
+    [form state route](task-api.md#form-state-of-a-task). Outcome buttons are
+    on the last step.
   - It has one button per outcome, with the outcome's label.
   - A click sends the outcome, the changed editable values and the record's
     `version` to the complete endpoint. On success it returns to the inbox.
@@ -827,87 +937,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - The task page has no history panel.
   - The platform texts `shell.task.*` hold the assigned elsewhere and
     already completed messages, and the load and complete errors.
-- **Process inspector widget**. A page whose widget is a
-  `processInspector` names one process. It lists the process's instances and
-  opens one, through the [inspection API](process-inspection.md#process-inspection).
-
-  ```json
-  { "type": "processInspector", "process": "PurchaseRequestApproval" }
-  ```
-
-  - **Compile.** The `process` must name a loaded process, otherwise it is
-    `AXC0192` at `/widgets/{i}/process`. The widget names none of `entity`,
-    `dataSource` and `form` (`AXC0060` at that property), and no `formPage`
-    (`AXC0022`).
-  - **Metadata.** The widget has `"entity": null`, `"dataSource": null`,
-    `"form": null`, `"formPage": null` and `"tasksPath": null`. It adds
-    `process` and an `instancesPath`, such as
-    `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances"`,
-    the list endpoint. The SPA never builds the path itself. It uses `process` to link the record history to the page, see
-    **History** under the form widget. The widget has `"access": null` and
-    `"actions": []`. The page endpoint answers `403` to a user without an
-    `inspect` grant on the process, and site navigation leaves the page out.
-  - **List.** The page lists the instances with their state, step, subject id,
-    release and times. Rows keep the API's order, newest first. A clearable
-    select above the list filters by state, and offers the five states with
-    platform texts. `state`, `page` and `pageSize` live in the URL, as for a
-    table. Changing the state goes back to page 1. A `state` in the URL that is
-    not one of the five is dropped. The step column shows the step's name,
-    because a list row carries no label key. Each row has an Open link.
-  - **Instance page.** A row opens `/{site}/{page}/{instanceId}`, with the
-    page name in lower case. `new` and an id in the wrong form show the
-    not-found page, and the instance is not requested. The page reads the
-    instance detail and shows the steps as a list in graph order, each with
-    its type and its transitions, with no diagram. Steps the instance has run
-    are marked as taken, and the step it is at is marked as current, whatever
-    the instance state. Below it are the history rows with the step, the
-    times, the decision and the error, then the tasks, then the calls with
-    their attempts. A call whose `inputHidden` is `true` shows "hidden" in
-    place of its input. A shown input is a list of its top-level properties,
-    where a number keeps its source digits.
-  - **Commands.** The page has a Cancel instance and a Retry button for each
-    of those commands that the instance detail's `commands` lists. With none
-    listed, it has no button, and a command name this build does not know is
-    left out. A button opens a dialog that asks for a reason. The reason is
-    required, must not be blank and has at most 500 characters, and Send is
-    blocked until it is valid. On success, the dialog closes and the page reads
-    the instance detail again, so it shows the new state, tasks, calls and
-    `commands`. On a `400`, `403`, `404` or `409`, the dialog shows the
-    problem's title. Any other failure shows a generic text, and a `401`
-    starts sign-in. The Retry dialog first warns when a call on the instance's
-    current step has `failed`, and that call is a package call whose
-    `idempotent` is not `true`. A failed connector call gets no warning. The
-    server still checks every command, so the page never decides who may act.
-  - **Resolve.** A call whose `resolvable` is `true` has a Resolve button,
-    whether it is a connector or a package call. A call that is not resolvable
-    has none, because the server decides what may be resolved and by whom. The
-    button opens a dialog that asks for a reason, with the rules of the other
-    commands, and an outcome, `succeeded` or `failed`. The outcome has no
-    default, and Send is blocked until one is chosen. For `succeeded`, the
-    dialog shows one input for each declared output of the call, labelled with
-    its name and type, with the required ones marked and checked before Send.
-    A `boolean` output is a true/false choice, and every other type is text,
-    so a date or date-time is typed as the API takes it. The values go out
-    typed: an integer or decimal keeps every digit, a boolean is `true` or
-    `false`, and an empty optional output is left out. A `failed` outcome sends
-    no output. On success, the dialog closes and the page reads the instance
-    again. On a `400`, the message of each `/output/{name}` error shows under
-    that output's field, and the problem's title shows in the dialog. Any other
-    refusal shows its title, and any other failure shows a generic text.
-  - **Labels.** Step labels come from the texts of the instance's `releaseId`,
-    loaded with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as
-    the inbox does. A step without a label shows its name.
-  - **Errors.** With nobody signed in, the API answers `401` and the widget
-    starts sign-in like any other call. A `403` shows a message that the user
-    may not inspect the process. A `404` on the instance page shows a message
-    that the instance does not exist, inside the page. Any other failure shows
-    a generic load error. The server checks every request, so the page never
-    decides who may inspect.
-  - The platform texts `shell.inspector.*` hold the column headers, the
-    section titles, the instance states, the "hidden" text, the empty texts
-    and the messages. The texts `shell.inspector.commands.*` hold the command
-    buttons, the dialog's labels, the reason errors, the retry warning and the
-    resolve labels and errors.
+- **Process inspector widget**. A page whose widget is a `processInspector` lists the instances of
+  one process and opens one. See [process-inspector-widget.md](process-inspector-widget.md).
 - **Locale.** The shell header has a locale switch next to the light/dark
   toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a
@@ -956,7 +987,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     catalog has the same keys, so the development rule never hides a
     platform text behind a site that lacks it.
 
-- **Phone width** *(planned for M12)*. Below a fixed 768 px breakpoint, Ant
+- **Phone width** _(planned for M12)_. Below a fixed 768 px breakpoint, Ant
   Design's `md`, columns stack in file order, tab headers scroll and a table
   scrolls sideways inside its widget. The site shell's navigation collapses
   into a menu. There is no per-widget setting until a sample needs one, see

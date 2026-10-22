@@ -2,6 +2,7 @@ import { Alert, Table, type TableColumnsType, type TableProps } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { formatValue } from './formatValue'
+import { markCurrentPage } from './pagination'
 import type { WidgetMetadata } from './site'
 import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
 import { fetchTasks, type TaskListItem, type TaskPage } from './tasks'
@@ -135,20 +136,23 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
     return <Alert data-testid="tasks-error" type="error" message={t('shell.tasks.loadFailed')} />
   }
   return (
-    <Table<TaskListItem>
-      rowKey="id"
-      columns={columns}
-      dataSource={state.page?.items}
-      loading={loading || textsLoading}
-      locale={{ emptyText: t('shell.tasks.empty') }}
-      pagination={{
-        current: query.page,
-        pageSize: query.pageSize,
-        total: state.page?.totalCount ?? 0,
-        pageSizeOptions: pageSizes,
-        showSizeChanger: true,
-      }}
-      onChange={onChange}
-    />
+    <div aria-busy={loading || textsLoading}>
+      <Table<TaskListItem>
+        rowKey="id"
+        columns={columns}
+        dataSource={state.page?.items}
+        loading={loading || textsLoading}
+        locale={{ emptyText: t('shell.tasks.empty') }}
+        pagination={{
+          current: query.page,
+          pageSize: query.pageSize,
+          total: state.page?.totalCount ?? 0,
+          pageSizeOptions: pageSizes,
+          showSizeChanger: true,
+          itemRender: markCurrentPage(query.page),
+        }}
+        onChange={onChange}
+      />
+    </div>
   )
 }

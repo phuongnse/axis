@@ -119,7 +119,7 @@ flowchart LR
      `AXC0028` check.
 
      *(Planned for M12.)* Page parameters and `navigate` actions
-     ([D62](../decisions/d62-navigate-actions-and-page-parameters.md)) add
+     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) add
      these checks. Each code is assigned when the check is built:
      - an unknown target `page`,
      - an unknown parameter,

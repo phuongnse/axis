@@ -77,6 +77,7 @@ export function FieldCell(props: CellProps) {
     case 'boolean':
       return (
         <Select
+          virtual={false}
           aria-label={field.name}
           aria-invalid={problem !== undefined}
           status={status}
@@ -93,6 +94,7 @@ export function FieldCell(props: CellProps) {
     case 'enum':
       return (
         <Select
+          virtual={false}
           aria-label={field.name}
           aria-invalid={problem !== undefined}
           status={status}

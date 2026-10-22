@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { startServer } from '../activate'
+import { openSelect, pickOption } from '../select'
 import { e2eApp, studioFolder } from '../server-settings'
 import { useSession } from '../sessions'
 
@@ -123,8 +124,7 @@ test('an author picks a data source of a page from the names and the Uses list s
 
   try {
     await page.goto(`/studio?app=PurchaseRequests&resource=${pageResource.id}`)
-    await page.getByTestId('studio-field-/widgets/0/dataSource').locator('.ant-select-selector').click()
-    await page.getByRole('option', { name: 'PurchaseRequestList' }).click()
+    await pickOption(page.getByTestId('studio-field-/widgets/0/dataSource').getByRole('combobox'), 'PurchaseRequestList')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()
 
@@ -152,9 +152,9 @@ test('an author opens a grant field picker and it offers the fields of the grant
   const expected = names.entities.find((entity) => entity.name === 'PurchaseRequest')!.fields.map((field) => field.name)
 
   await page.goto(`/studio?app=PurchaseRequests&resource=${policy.id}`)
-  await page.getByTestId('studio-field-/grants/1/fields/0').locator('.ant-select-selector').click()
+  const choices = await openSelect(page.getByTestId('studio-field-/grants/1/fields/0').getByRole('combobox'))
 
-  await expect(page.getByRole('option')).toHaveText(expected)
+  await expect(choices.getByRole('option')).toHaveText(expected)
 })
 
 test('an author sees what the employee role may do in the policy matrix', async ({ page }) => {

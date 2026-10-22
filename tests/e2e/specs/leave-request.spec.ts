@@ -3,9 +3,9 @@ import {
   test,
   type APIRequest,
   type APIRequestContext,
-  type Page,
 } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
+import { expectChosen } from "../select";
 import { sessionFile, useSession, type SampleUser } from "../sessions";
 
 // The leave request sample runs on the same platform as the purchase request sample, with no platform
@@ -113,14 +113,6 @@ async function taskId(
   });
 }
 
-/** The value the Status select shows. */
-function statusValue(page: Page) {
-  return page
-    .locator(".ant-form-item")
-    .filter({ has: page.getByText("Status", { exact: true }) })
-    .locator(".ant-select-selection-item");
-}
-
 test("anna submits a leave request, chau approves it in My tasks, and anna sees it approved with its days", async ({
   page,
   playwright,
@@ -153,9 +145,7 @@ test("anna submits a leave request, chau approves it in My tasks, and anna sees 
   // The worker ends the process some time after the decision.
   await expect(async () => {
     await page.goto(`/leave/leaverequestform/${id}`);
-    await expect(statusValue(page)).toHaveText("approved", {
-      timeout: 1_000,
-    });
+    await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), "approved", { timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
   await expect(page.getByLabel("Days", { exact: true })).toHaveValue("3");
 });
@@ -221,7 +211,7 @@ test("a request whose last day is before its first day cannot be submitted, and 
   await useSession(page, "anna");
 
   await page.goto(`/leave/leaverequestform/${id}`);
-  await expect(statusValue(page)).toHaveText("draft");
+  await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), "draft");
   const started = page.waitForResponse((response) =>
     response.url().endsWith("/processes/LeaveRequestApproval/instances"),
   );

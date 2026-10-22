@@ -113,7 +113,7 @@ site, and its widgets are its content:
 - A page may declare typed `parameters` *(planned for M12)*. Each has a
   `name`, a `type` (an entity field type) and `required`. A `reference`
   parameter also names its `target` entity. A value lives in the URL query
-  under the parameter name. See [D62](../decisions/d62-navigate-actions-and-page-parameters.md).
+  under the parameter name. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 
   ```json
   {
@@ -551,6 +551,119 @@ validation calls the rules of its own module, see [modules](modules-and-template
     (`AXC0068`);
   - has no record routes of its own;
   - has no `reference` or `child-collection` fields (`AXC0041`).
+
+## Form conditions and steps
+
+*(Planned for M12.)* A `form` resource (see [frontend](frontend.md)) can show, require and lock
+fields depending on the record, and can split its sections into wizard steps
+([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+Diagnostic codes come with the issues that build each check.
+
+- **Conditions.** A field entry may have `visibleWhen`, `requiredWhen` and
+  `readOnlyWhen`. A section may have `visibleWhen`. Each is a boolean
+  expression in the [expression language](expressions.md). It reads the
+  entity's own fields by name, as a validation does. Aggregates over child
+  collections, rules and `now()` are allowed.
+- **False by default.** A condition that is `null` or stops with a run-time
+  error counts as false. So a field with a `visibleWhen` that fails is hidden.
+- **Only listed fields.** A condition reads only fields the form lists. This
+  limits what a condition can reveal. A condition over a field the user may
+  not read still changes the state the user sees, which can leak one bit of
+  that field. Authors keep that in mind.
+- **Hidden.** A hidden section hides its fields. A hidden field is shown
+  nowhere, is never sent and is not required by `requiredWhen`. An entity field
+  marked `required` cannot have `visibleWhen`, because the entity would still
+  require a field nobody can fill.
+- **Read-only.** `readOnly: true` wins over `readOnlyWhen`. A computed,
+  sequence or creator field stays read-only.
+- **When evaluated.** The server evaluates the conditions on the record as it
+  will be stored, after computed fields are calculated. This is the point
+  where validations run. The SPA gets the answers from the
+  [form state endpoint](record-api.md#form-state). It has no evaluator of its
+  own.
+- **On write.** The record API enforces `requiredWhen` only when the write
+  names the form in `?form=`. It never enforces `readOnlyWhen`. The task API
+  enforces both. See [the record API](record-api.md#create-update-and-delete)
+  and [the task API](task-api.md#task-api-errors).
+- **Steps.** `steps` is an optional list on the form. Each step has a `title`
+  label and `sections`, a list of section names. When `steps` is present,
+  every section has a `name` and is in exactly one step. The steps show in
+  the order listed. A step whose sections are all hidden is skipped.
+- **Compile checks.** A condition that is not boolean, or that names an
+  unknown field. A condition that reads a field the form does not list.
+  `visibleWhen` on a field the entity marks `required`. A step that names an
+  unknown section, or names one twice. A section that is in no step.
+- **Not enforced as security.** Conditions on the record API are not a
+  security boundary, because a caller that does not name the form skips
+  `requiredWhen`. A rule that must always hold belongs in an entity
+  [validation](#entity-logic).
+- **Left out.** Conditions on the cells of a child collection.
+
+A service desk ticket needs a resolution only when it is resolved. The
+`TicketUpdate` form below lists `status` and `resolution` of the `Ticket`
+entity of the service desk sample:
+
+```json
+{
+  "id": "6c1d7e52-0a4b-4f83-9d2e-3b5a7c9e1f40",
+  "kind": "form",
+  "name": "TicketUpdate",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "sections": [
+    {
+      "title": { "textKey": "ticket.sections.update" },
+      "fields": [
+        { "field": "status" },
+        {
+          "field": "resolution",
+          "visibleWhen": "status == \"resolved\"",
+          "requiredWhen": "status == \"resolved\""
+        }
+      ]
+    }
+  ]
+}
+```
+
+1. An agent opens a ticket with the status `assigned`. The form state
+   endpoint answers that `resolution` is not visible and not required. The
+   form does not show it.
+2. The agent chooses `resolved`. The form calls the endpoint at once, and the
+   answer says that `resolution` is visible and required.
+3. The agent saves with `resolution` empty. The write names the form in
+   `?form=TicketUpdate`, and the answer is a `400` keyed `/values/resolution`
+   with "Required.".
+4. The agent switches the status back to `assigned`. The answer hides
+   `resolution` again, and the form does not send it.
+
+A wizard names its sections and lists them in `steps`. This form has two steps:
+
+```json
+{
+  "id": "2f8b4d60-7e1c-4a95-b3d6-8c0e2a4f6b71",
+  "kind": "form",
+  "name": "TicketWizard",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "sections": [
+    {
+      "name": "problem",
+      "title": { "textKey": "ticket.sections.problem" },
+      "fields": [{ "field": "title" }, { "field": "description" }]
+    },
+    {
+      "name": "triage",
+      "title": { "textKey": "ticket.sections.triage" },
+      "fields": [{ "field": "category" }, { "field": "priority" }]
+    }
+  ],
+  "steps": [
+    { "title": { "textKey": "ticket.steps.problem" }, "sections": ["problem"] },
+    { "title": { "textKey": "ticket.steps.triage" }, "sections": ["triage"] }
+  ]
+}
+```
 
 ## Sequences
 

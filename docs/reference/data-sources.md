@@ -456,6 +456,6 @@ data sources.
   types must match. A required data source parameter is allowed only when it
   is bound to a required page parameter. A bound parameter has no filter
   input, and its value comes from the page parameter in the URL. See
-  [D62](../decisions/d62-navigate-actions-and-page-parameters.md).
+  [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Schema.** The data source's schema reaches the SPA in page metadata, in
   the widget's `dataSource` object. There is no separate schema endpoint.
