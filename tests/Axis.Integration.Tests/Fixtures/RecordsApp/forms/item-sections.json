@@ -14,7 +14,7 @@
       "name": "pricing",
       "title": { "textKey": "itemSections.pricing" },
       "visibleWhen": "quantity > 0",
-      "fields": [{ "field": "price", "visibleWhen": "quantity > 0" }, { "field": "total" }]
+      "fields": [{ "field": "price", "visibleWhen": "quantity > 0", "requiredWhen": "quantity > 10" }, { "field": "total" }]
     }
   ],
   "steps": [

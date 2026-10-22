@@ -530,8 +530,9 @@ validation calls the rules of its own module, see [modules](modules-and-template
 A `form` resource (see [frontend](frontend.md)) can show, require and lock
 fields depending on the record, and can split its sections into wizard steps
 ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
-The schema, the compile checks, the compiled model and the page and task metadata are built.
-Evaluating the conditions and enforcing them on write stay *(planned for M12)*.
+The schema, the compile checks, the compiled model, the page and task metadata and the
+evaluation through the [form state endpoint](record-api.md#form-state) are built.
+Enforcing the conditions on write stays *(planned for M12)*.
 
 - **Conditions.** A field entry may have `visibleWhen`, `requiredWhen` and
   `readOnlyWhen`. A section may have `visibleWhen`. Each is a boolean

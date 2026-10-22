@@ -84,6 +84,40 @@ public static partial class RecordInputParser
         return Parse(utf8Body, inputEntity, application, RecordOperation.Create, InputProperty);
     }
 
+    /// <summary>
+    /// Parses the <c>values</c> of a draft, an object the caller has already found, against
+    /// <paramref name="entity"/>. Unlike a create it keeps the valid values next to the errors, and
+    /// it does not report a required field the draft leaves out or sets to <c>null</c> on the owner,
+    /// which the caller does. The rows keep their own checks. Errors are keyed <c>/values/…</c>.
+    /// Returns null when a property name cannot be read.
+    /// </summary>
+    public static RecordDraftResult? ParseDraft(JsonElement values, EntityModel entity, ApplicationModel application)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(application);
+
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var parsed = new Dictionary<string, object?>(StringComparer.Ordinal);
+        var rows = new Dictionary<string, RecordRows>(StringComparer.Ordinal);
+        if (!ReadValues(values, "/" + ValuesProperty, entity, application, parsed, rows, errors, draft: true))
+        {
+            return null;
+        }
+
+        var input = new RecordInput
+        {
+            Values = RecordQueries.Columns(entity)
+                .Where(field => parsed.ContainsKey(field.Name))
+                .Select(field => new RecordValue(field, parsed[field.Name]))
+                .ToList(),
+            Rows = entity.Fields
+                .Where(field => rows.ContainsKey(field.Name))
+                .Select(field => rows[field.Name])
+                .ToList(),
+        };
+        return new RecordDraftResult(input, errors);
+    }
+
     private static RecordInputResult Parse(
         ReadOnlyMemory<byte> utf8Body,
         EntityModel entity,
@@ -207,7 +241,9 @@ public static partial class RecordInputParser
     /// <summary>
     /// Reads the values object at <paramref name="pointer"/>, the owner's values or one row, against
     /// the fields of <paramref name="entity"/>. Returns false when a property name cannot be read.
-    /// <paramref name="rows"/> is null for a row, whose entity has no child collection.
+    /// <paramref name="rows"/> is null for a row, whose entity has no child collection. In a
+    /// <paramref name="draft"/> a <c>null</c> is a value even for a required field, because the
+    /// user may be clearing it; the caller reports it as missing.
     /// </summary>
     private static bool ReadValues(
         JsonElement values,
@@ -216,7 +252,8 @@ public static partial class RecordInputParser
         ApplicationModel application,
         Dictionary<string, object?> parsed,
         Dictionary<string, RecordRows>? rows,
-        SortedDictionary<string, string[]> errors)
+        SortedDictionary<string, string[]> errors,
+        bool draft = false)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in values.EnumerateObject())
@@ -259,7 +296,11 @@ public static partial class RecordInputParser
                 continue;
             }
 
-            if (ReadValue(property.Value, field, out var value) is { } message)
+            if (draft && property.Value.ValueKind == JsonValueKind.Null)
+            {
+                parsed[name] = null;
+            }
+            else if (ReadValue(property.Value, field, out var value) is { } message)
             {
                 AddError(errors, propertyPointer, message);
             }
