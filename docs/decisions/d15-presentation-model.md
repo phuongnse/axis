@@ -12,7 +12,7 @@ Status: **Agreed**
 - **Forms:** a `form` resource serves both a `form` widget and a process
   task. See [D20](d20-human-tasks-task-inbox-and-forms.md).
 - **Navigation:** see
-  [D61](d61-navigate-actions-and-page-parameters.md).
+  [D62](d62-navigate-actions-and-page-parameters.md).
 
 _Why:_ the page and widget split shapes data sources (M2), process task forms
 (M3) and authorization (M4). Keeping the page free of an entity or template

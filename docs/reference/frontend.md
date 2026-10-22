@@ -32,17 +32,20 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   System artifact. See
   [D57](../decisions/d57-a-design-system-published-from-the-repository.md)
   and [Design changes](../delivery.md#design-changes).
-- **How pages and widgets grow.** A page has one widget. A form binds an entity
+- **How pages and widgets grow.** A page has one widget today, and a tree of
+  widgets *(planned for M12)*. A form binds an entity
   or a `form` resource, which lays the entity's fields out in sections, and a
-  table binds an entity or a data source. Container widgets such as tabs, sections and columns will hold
-  other widgets. Data sources are agreed in
+  table binds an entity or a data source. The container widgets `columns`,
+  `tabs` and `section` hold other widgets, see
+  [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+  Data sources are agreed in
   [D18](../decisions/d18-data-sources.md) and described in
   [data-sources.md](data-sources.md). Shared `form` resources, the task inbox
   and the `startProcess` action are agreed in
   [D20](../decisions/d20-human-tasks-task-inbox-and-forms.md). The
   `form` resource, the task inbox, the task page and the `startProcess` action
   are built. Navigate actions and page parameters replace the table's
-  `formPage` link in M12 *(planned for M12)*; see [D61](../decisions/d61-navigate-actions-and-page-parameters.md).
+  `formPage` link in M12 *(planned for M12)*; see [D62](../decisions/d62-navigate-actions-and-page-parameters.md).
 - **Text.** All UI strings come from text resources.
 - **Sites and texts.** The server describes sites to the SPA through
   read-only endpoints. Like every other `/api` path, they need a known tenant
@@ -151,6 +154,37 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - Every widget also has `access`, never left out. It is described under
     **Policies** below, and is `null` on a `taskInbox` and on a
     `processInspector`.
+  - *(Planned for M12.)* A page may hold a tree of widgets. A container widget
+    carries only `type` and its own keys. A leaf widget keeps every key above.
+    A tab carries `labelKey`, and a `section` carries `titleKey` and
+    `collapsed`. A page with two columns, one holding a table and the other a
+    section with a task inbox:
+
+    ```json
+    {
+      "name": "Overview",
+      "titleKey": "pages.overview.title",
+      "widgets": [
+        {
+          "type": "columns",
+          "columns": [
+            { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "formPage": "PurchaseRequestForm", "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [], "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
+            {
+              "width": 4,
+              "widgets": [
+                {
+                  "type": "section",
+                  "titleKey": "pages.overview.tasks",
+                  "collapsed": false,
+                  "widgets": [{ "type": "taskInbox", "entity": null, "formPage": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "actions": [], "access": null }]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    ```
   - `entity` is the widget's entity: its name, its label key, its display
     field, the path of its record API in `recordsPath`, and its fields in
     declaration order. A `child-collection` field is listed too. Tables show
@@ -213,6 +247,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `taskInbox` is always readable. A
       `processInspector` is readable when the user holds an `inspect` grant on
       its process.
+    - *(Planned for M12.)* **Pages with a tree.** An unreadable widget is
+      left out. A column or tab whose widgets are all left out is left out,
+      and the other columns keep their declared widths. A container left with
+      no widget is left out. A page is readable when at least one of its
+      widgets is.
     - **Unreadable pages.** The page endpoint answers `403` for a page the
       user cannot read. Site navigation leaves out entries whose page the
       user cannot read.
@@ -270,6 +309,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `/{site}/{inboxpage}/{taskId}` | the task page of the task with that id, under the page of a task inbox |
   | `/{site}/{inspectorpage}/{instanceId}` | the instance page of the process instance with that id, under the page of a process inspector |
 
+  - *(Planned for M12.)* A page holds at most one `table` and at most one
+    `form`, `taskInbox` or `processInspector`, so every part of the address
+    has one owner. `?page=&pageSize=&sort=` and the data source parameter
+    values belong to the page's one `table`. `/new` and `/{id}` belong to its
+    one `form`. `/{taskId}` and `/{instanceId}` belong to its one `taskInbox`
+    or `processInspector`.
   - `{site}` is the site path. `{page}` is the page name in lower case, as
     navigation links write it. The server matches both ignoring letter case.
   - A required page parameter that is missing from the URL, or has the wrong
@@ -446,7 +491,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
       The target page declares
       `"parameters": [{ "name": "ticket", "type": "reference", "target": "Ticket", "required": true }]`.
-      The click goes to `/{site}/ticketdetail?ticket=<id>`. See [D61](../decisions/d61-navigate-actions-and-page-parameters.md).
+      The click goes to `/{site}/ticketdetail?ticket=<id>`. See [D62](../decisions/d62-navigate-actions-and-page-parameters.md).
     - **`visibleWhen`.** An action hides when its expression over the row is
       `false`, `null` or fails. It only shapes the UI. The server decides, as
       in [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).
@@ -910,6 +955,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     both locales of a catalog moves on to the next catalog. Every locale of a
     catalog has the same keys, so the development rule never hides a
     platform text behind a site that lacks it.
+
+- **Phone width** *(planned for M12)*. Below a fixed 768 px breakpoint, Ant
+  Design's `md`, columns stack in file order, tab headers scroll and a table
+  scrolls sideways inside its widget. The site shell's navigation collapses
+  into a menu. There is no per-widget setting until a sample needs one, see
+  [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
 
 ## Studio
 

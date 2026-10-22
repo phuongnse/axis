@@ -284,7 +284,7 @@ Paths in validations and computed fields are not built. There a path is
   names are the row's columns, or the record's fields for a table over an
   entity. On a form they are the record's fields. `id` is the id of the root
   record, typed as a reference to the root entity. A path takes at most 3
-  hops, as elsewhere. See [D61](../decisions/d61-navigate-actions-and-page-parameters.md).
+  hops, as elsewhere. See [D62](../decisions/d62-navigate-actions-and-page-parameters.md).
 - **Child collection.** A child collection field gives a `list<Entity>`,
   which only aggregates accept. Inside an aggregate's item expression, names
   are the child row's fields, computed ones included, and nothing else: no
