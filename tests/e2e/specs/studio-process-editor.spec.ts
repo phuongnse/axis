@@ -57,18 +57,18 @@ test.describe('Studio edits a process in the process editor', () => {
     const before = await diagnostics(page)
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
-    await page.getByRole('combobox', { name: 'Add step' }).click()
+    await page.getByRole('combobox', { name: 'Add step', exact: true }).click()
     await page.getByRole('option', { name: 'decision', exact: true }).click()
     const card = page.getByTestId('studio-step-10')
-    await card.getByRole('textbox', { name: 'Step name' }).fill('checkTotal')
-    await card.getByRole('button', { name: 'Add branch' }).click()
+    await card.getByRole('textbox', { name: 'Step name', exact: true }).fill('checkTotal')
+    await card.getByRole('button', { name: 'Add branch', exact: true }).click()
     const when = page.getByTestId('studio-field-/steps/10/branches/0/when')
     await expect(when.locator('.cm-editor')).toBeVisible()
     await when.getByRole('textbox').fill('totalAmount > 0')
     await pick(page, '/steps/10/branches/0/next', 'managerApproval')
     await pick(page, '/steps/10/otherwise', 'markRejected')
     await pick(page, '/steps/0/next', 'checkTotal')
-    await page.getByRole('button', { name: 'Save' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
 
     await expect(page.getByTestId('studio-saved')).toBeVisible()
     expect(await diagnostics(page)).toEqual(before)
@@ -92,8 +92,8 @@ test.describe('Studio edits a process in the process editor', () => {
     await expect(page.getByTestId('studio-step-8')).toContainText('markRejected')
     const status = page.getByTestId('studio-field-/steps/8/set/status')
     await expect(status.locator('.cm-editor')).toBeVisible()
-    await status.getByRole('textbox', { name: 'Expression' }).fill("'returned'")
-    await page.getByRole('button', { name: 'Save' }).click()
+    await status.getByRole('textbox', { name: 'Expression', exact: true }).fill("'returned'")
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
 
     await expect(page.getByTestId('studio-saved')).toBeVisible()
     expect(await diagnostics(page)).toEqual(before)
@@ -116,7 +116,7 @@ test.describe('Studio edits a process in the process editor', () => {
     await expect(page.getByTestId('studio-step-3')).toContainText('financeApproval')
     await page.getByTestId('studio-field-/steps/3/dueIn').getByRole('textbox').fill('P5D')
     await pick(page, '/steps/3/outcomes/1/next', 'markRejected')
-    await page.getByRole('button', { name: 'Save' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
 
     await expect(page.getByTestId('studio-saved')).toBeVisible()
     const expected = structuredClone(before)
@@ -135,8 +135,8 @@ test.describe('Studio edits a process in the process editor', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
     const card = page.getByTestId('studio-step-4')
     await expect(card).toContainText('markApproved')
-    await card.getByRole('button', { name: 'Remove step' }).click()
-    await page.getByRole('button', { name: 'Save' }).click()
+    await card.getByRole('button', { name: 'Remove step', exact: true }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()
 
     const diagnostic = page
@@ -167,12 +167,12 @@ test.describe('Studio edits a process in the process editor', () => {
       await expect(page.getByTestId(`rf__edge-/steps/${i}/next`)).toHaveCount(1)
       await expect(page.getByTestId(`studio-graph-node-${i}`)).not.toHaveAttribute('data-marked')
 
-      await page.getByRole('tab', { name: 'JSON' }).click()
-      const textarea = page.getByRole('textbox', { name: 'JSON' })
+      await page.getByRole('tab', { name: 'JSON', exact: true }).click()
+      const textarea = page.getByRole('textbox', { name: 'JSON', exact: true })
       const draft = JSON.parse(await textarea.inputValue()) as { steps: { next?: string }[] }
       draft.steps[i].next = 'noSuchStep'
       await textarea.fill(JSON.stringify(draft, null, 2))
-      await page.getByRole('button', { name: 'Save' }).click()
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
 
       await expect(page.getByTestId('studio-saved')).toBeVisible()
       const node = page.getByTestId(`studio-graph-node-${i}`)

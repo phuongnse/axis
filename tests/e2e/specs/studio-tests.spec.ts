@@ -88,7 +88,7 @@ test('the test controls do not show when the server has Studio:Tests off', async
     await page.goto(`${off.url}/studio?app=PurchaseRequests`)
     // Publish shows only once GET /api/me has answered, so the test controls have been decided too.
     await expect(page.getByTestId('studio-publish')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Validate' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Validate', exact: true })).toBeVisible()
     await expect(page.getByTestId('studio-run-tests')).toHaveCount(0)
 
     await page.getByTestId(`studio-resource-${approvalBelowThreshold}`).click()

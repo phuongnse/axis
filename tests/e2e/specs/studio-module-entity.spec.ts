@@ -39,7 +39,7 @@ test.describe("Studio opens a module entity read-only", () => {
 
     await page
       .getByTestId("studio-group-module-entities")
-      .getByRole("button", { name: "departments/Department" })
+      .getByRole("button", { name: "departments/Department", exact: true })
       .click();
 
     await expect(page.getByTestId("studio-entity-designer")).toBeVisible();
@@ -51,7 +51,7 @@ test.describe("Studio opens a module entity read-only", () => {
       await expect(field).toHaveValue(name);
       await expect(field).toBeDisabled();
     }
-    for (const name of ["Save", "Delete", "Add field"]) {
+    for (const name of [/save/i, /delete/i, /add field/i]) {
       await expect(page.getByRole("button", { name })).toHaveCount(0);
     }
   });
