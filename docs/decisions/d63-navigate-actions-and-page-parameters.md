@@ -4,7 +4,9 @@ Status: **Agreed**
 
 Navigate actions with typed page parameters replace the table's `formPage`
 link. This settles the navigation point of
-[D15](d15-presentation-model.md). All of it is _(planned for M12)_. The owner
+[D15](d15-presentation-model.md). Page parameters are built, with their name and
+type checks and their `field target` edge in the reference index. The URL values, the table
+binding, the form page rule and the navigate actions are _(planned for M12)_. The owner
 confirmed these points on issue #931 on 2026-10-21.
 
 - **Page parameters:**
