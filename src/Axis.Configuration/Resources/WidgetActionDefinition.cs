@@ -28,4 +28,7 @@ public sealed record WidgetActionDefinition
 
     /// <summary>The expression of the id of the record a <c>navigate</c> action opens in a form page, or null when it names none. The schema refuses it on a <c>startProcess</c> action.</summary>
     public string? Record { get; init; }
+
+    /// <summary>The boolean expression over the row that decides whether the button shows, or null when it always shows. The schema allows it only in a table's <c>rowActions</c>.</summary>
+    public string? VisibleWhen { get; init; }
 }

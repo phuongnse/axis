@@ -125,10 +125,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         "instancesPath": null,
         "actions": [],
         "rowActions": [
-          { "type": "navigate", "page": "ItemForm", "labelKey": "items.open", "parameters": {}, "record": "id", "opensForm": true }
+          { "type": "navigate", "page": "ItemForm", "labelKey": "items.open", "parameters": {}, "record": "id", "opensForm": true, "visibleWhen": null }
         ],
         "toolbarActions": [
-          { "type": "navigate", "page": "ItemForm", "labelKey": "items.new", "parameters": {}, "record": null, "opensForm": true }
+          { "type": "navigate", "page": "ItemForm", "labelKey": "items.new", "parameters": {}, "record": null, "opensForm": true, "visibleWhen": null }
         ],
         "parameters": {},
         "access": {
@@ -177,7 +177,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `start`, and its `delete` row action without `delete` *(planned for M12)*.
   - Every widget also has `rowActions` and `toolbarActions`, never left out.
     A table lists its `navigate` and `startProcess` row actions and its
-    `navigate` toolbar actions in them. They are `[]` elsewhere.
+    `navigate` toolbar actions in them. They are `[]` elsewhere. Every action
+    also has `visibleWhen`, never left out: the expression text of a row
+    action's condition, or `null` when it has none. It is always `null` outside
+    `rowActions`.
   - Every widget also has `parameters`, never left out: on a table over a data
     source, the name of the page parameter that gives each data source
     parameter its value, as `{ "<data source parameter>": "<page parameter>" }`,
@@ -531,8 +534,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     without those to pages the user cannot read, each with its `parameters`,
     `record` and `opensForm`. It lists a `startProcess` in `rowActions` only
     with a `start` grant on its process. The `navigate` and `startProcess`
-    buttons are built. The `visibleWhen` condition, the delete row action and
-    the phone menu are _(planned for M12)_.
+    buttons and the `visibleWhen` condition are built. The delete row action
+    and the phone menu are _(planned for M12)_.
     - **Where.** Toolbar actions sit above the table. Row actions
       are buttons in the row, and fold into a menu at phone width. A
       `navigate` action may sit in either list. `startProcess` and `delete`
@@ -566,17 +569,35 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       table's `access.actions` holds `create`. A
       click passes the table's address, with its paging and sorting, to the
       page in history state, so a form returns to it after save or cancel.
-    - **Values.** The SPA has no expression engine. It works out a bare name
-      (`id`, a column or a field, matched ignoring case) and a literal (text in
-      single quotes, a number, `true`, `false` or `null`). A button whose
-      expression uses anything else is hidden. A toolbar has no row, so only
-      its literals resolve. A parameter whose value is `null` is left out of
-      the query, and a button whose `record` is `null` is hidden. The target
-      page does not read its parameters from the URL or bind them yet
-      _(planned for M12)_.
-    - **`visibleWhen`.** An action hides when its expression over the row is
-      `false`, `null` or fails. It only shapes the UI. The server decides, as
-      in [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).
+    - **Values.** The SPA has no full expression engine. It works out a bare
+      name (`id`, a column or a field, matched ignoring case) and a literal
+      (text in single quotes, a number, `true`, `false` or `null`). A button
+      whose expression uses anything else is hidden. The one exception is
+      `visibleWhen`, which works out a larger part of the language, see below.
+      A toolbar has no row, so only its literals resolve. A parameter whose
+      value is `null` is left out of the query, and a button whose `record` is
+      `null` is hidden. The target page does not read its parameters from the
+      URL or bind them yet _(planned for M12)_.
+    - **`visibleWhen`.** A row action may have a boolean expression over the
+      row. The compiler checks it against the row's names, as it checks a
+      `navigate` parameter. The SPA works out only part of the language:
+      names, literals, `==`, `!=`, `is null`, `is not null`, `in (…)` with
+      literal items, `and`, `or`, `not` and parentheses. Keywords ignore
+      letter case. The button shows only when the result is `true`. It hides
+      when the result is `false` or `null`. It also hides when the condition
+      uses syntax outside that part, such as `<`, `+`, a path or a function
+      call, or reads a name the row does not hold. A field the user may not
+      read is not in the row, so it counts as a missing name. A missing name
+      hides the button even where `and` or `or` could stop early. Comparison
+      is null safe: `null == null` is `true` and `null in (…)` is `false`. In
+      `and`, `or` and `not`, `null` means unknown, so `not null` and
+      `true and null` are `null` and hide the button, while `false and null`
+      is `false`. A number literal compares as a number with a value, so `5`
+      equals a stored `5.00`. Two names compare by their text. The compiler
+      does not refuse a well-typed condition the SPA cannot work out, such as
+      `amount > 100`, so the author must stay inside this part. It only shapes
+      the UI. The server decides, as in
+      [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).
     - **Delete.** A row has a delete button only when the widget's
       `access.actions` holds `delete`. Without it there is no button. A click
       opens a confirmation dialog. On confirm the SPA sends

@@ -1680,7 +1680,10 @@ public static class ApplicationCompiler
             if (action.Type == "startProcess")
             {
                 var process = processesByName[action.Process!];
-                return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label);
+                return new StartProcessActionModel(new ProcessReference(process.Id, process.Name), action.Label)
+                {
+                    VisibleWhen = action.VisibleWhen,
+                };
             }
 
             // The checker has matched each key to a parameter of the target, ignoring letter case. The model
@@ -1695,6 +1698,7 @@ public static class ApplicationCompiler
             {
                 Parameters = parameters,
                 Record = action.Record,
+                VisibleWhen = action.VisibleWhen,
             };
         }
 

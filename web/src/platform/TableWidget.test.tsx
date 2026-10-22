@@ -304,6 +304,7 @@ describe('TableWidget', () => {
       parameters: { ticket: 'id' },
       record: null,
       opensForm: false,
+      visibleWhen: null,
     }
     const createNote: NavigateAction = {
       type: 'navigate',
@@ -312,6 +313,7 @@ describe('TableWidget', () => {
       parameters: {},
       record: null,
       opensForm: true,
+      visibleWhen: null,
     }
 
     it('opens the target page with the row id in the query, from the table address', async () => {
@@ -343,6 +345,24 @@ describe('TableWidget', () => {
       const row = await screen.findByRole('row', { name: /Buy paper/ })
 
       expect(within(row).queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
+    })
+
+    it('shows a row button only on the rows where its visibleWhen is true', async () => {
+      const otherId = '01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c80'
+      stubRecords(
+        `{"items":[{"id":"${noteId}","version":1,"values":{"title":"Buy paper","status":"open"},"labels":{}},{"id":"${otherId}","version":1,"values":{"title":"Sell paper","status":"closed"},"labels":{}}],"page":1,"pageSize":20,"totalCount":2}`,
+      )
+      const statusField = { ...field('status', 'enum', 'note.status'), values: ['open', 'closed'] }
+      renderWidget('', {
+        ...noteWidget,
+        entity: { ...noteWidget.entity, fields: [field('title', 'text', 'note.title'), statusField] },
+        rowActions: [{ ...detail, visibleWhen: "status == 'open'" }],
+      })
+      const open = await screen.findByRole('row', { name: /Buy paper/ })
+      const closed = await screen.findByRole('row', { name: /Sell paper/ })
+
+      expect(within(open).getByRole('button', { name: 'Details' })).toBeInTheDocument()
+      expect(within(closed).queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
     })
 
     it('shows a toolbar button to a form page only with the create grant', async () => {
@@ -756,6 +776,7 @@ describe('TableWidget', () => {
       process: 'NoteClose',
       labelKey: 'note.close',
       instancesPath: '/api/apps/E2eApp/processes/NoteClose/instances',
+      visibleWhen: null,
     }
     const closableWidget = { ...noteWidget, rowActions: [closeNote] }
 

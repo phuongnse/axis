@@ -113,9 +113,11 @@ site, and its widgets are its content:
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }` or
   `{ "type": "delete", "label": { "textKey": "purchaseRequest.delete" } }`.
   `navigate` may sit in either list. `startProcess` and `delete` sit in
-  `rowActions` only, and the row is their subject. `delete` and `visibleWhen`,
-  a boolean expression over the row's fields, are still planned. See
-  [frontend.md](frontend.md) and
+  `rowActions` only, and the row is their subject. A `navigate` or
+  `startProcess` entry in `rowActions` may have `visibleWhen`, a boolean
+  expression over the row, such as `"visibleWhen": "status == 'open'"`. The
+  schema refuses it in `toolbarActions`, in a form's `actions` and on a kpi's
+  `navigate`. `delete` is still planned. See [frontend.md](frontend.md) and
   [D59](../decisions/d59-table-row-and-toolbar-actions.md).
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
   `{ "type": "table", "dataSource": "PurchaseRequestList" }`.

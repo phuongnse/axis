@@ -137,20 +137,22 @@ export interface FormMetadata {
 /**
  * A `startProcess` action of a form widget or a table row: a button that starts `process` for the
  * form's record or the row's record by posting to `instancesPath`, the start endpoint, so the SPA
- * never builds that URL itself.
+ * never builds that URL itself. `visibleWhen` is the boolean expression over the row that decides
+ * whether a row action shows, or `null` when it always shows.
  */
 export interface StartProcessAction {
   type: 'startProcess'
   process: string
   labelKey: string
   instancesPath: string
+  visibleWhen: string | null
 }
 
 /**
  * A `navigate` action: opens the page `page`, by its declared name. `parameters` holds the expression
  * of each target page parameter the action gives, and `record` the expression of the record id a
  * form page opens, or `null`. `opensForm` says whether the target page holds a form widget, so the
- * SPA knows to open `/new` when no `record` is given.
+ * SPA knows to open `/new` when no `record` is given. `visibleWhen` is as on a `startProcess` action.
  */
 export interface NavigateAction {
   type: 'navigate'
@@ -159,6 +161,7 @@ export interface NavigateAction {
   parameters: Record<string, string>
   record: string | null
   opensForm: boolean
+  visibleWhen: string | null
 }
 
 /** One action of a form widget or a table row, in page file order. */

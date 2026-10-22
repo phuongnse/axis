@@ -309,6 +309,84 @@ public sealed class NavigateActionCompilerTests
     }
 
     [Fact]
+    public void Row_action_with_a_boolean_visibleWhen_compiles_and_keeps_its_text()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "number == 'A-1' and quantity is not null" } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var widget = Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Equal("number == 'A-1' and quantity is not null", Assert.Single(widget.RowActions).VisibleWhen);
+    }
+
+    [Fact]
+    public void Row_action_without_visibleWhen_keeps_none()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotNull(result.Model);
+        var widget = Assert.Single(Assert.Single(result.Model.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Null(Assert.Single(widget.RowActions).VisibleWhen);
+    }
+
+    [Fact]
+    public void Non_boolean_visibleWhen_is_reported_at_the_visibleWhen_and_gives_no_model()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "number" } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.ResultTypeMismatch, OrdersFile, "/widgets/0/rowActions/0/visibleWhen"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void VisibleWhen_naming_an_unknown_name_is_reported_at_the_visibleWhen()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "missing == 1" } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UnknownName, OrdersFile, "/widgets/0/rowActions/0/visibleWhen"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void VisibleWhen_on_a_toolbar_action_is_a_schema_violation()
+    {
+        using var folder = Folder(
+            """{ "type": "table", "entity": "Order", "toolbarActions": [ { "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" }, "visibleWhen": "true" } ] }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, OrdersFile), (diagnostic.Code, diagnostic.File));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void VisibleWhen_on_a_form_action_is_a_schema_violation()
+    {
+        using var folder = Folder(
+            """{ "type": "form", "entity": "Order", "actions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "true" } ] }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, OrdersFile), (diagnostic.Code, diagnostic.File));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void Navigate_label_with_a_text_key_no_locale_has_is_reported_at_its_label()
     {
         using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.missing" }, "parameters": { "order": "id" } } ]"""));

@@ -7,13 +7,13 @@ namespace Axis.Integration.Tests;
 
 public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClassFixture<ProcessStartFixture>
 {
-    private const string ShowSubmissions = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions","parameters":{},"record":null,"opensForm":false}""";
+    private const string ShowSubmissions = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions","parameters":{},"record":null,"opensForm":false,"visibleWhen":null}""";
 
-    private const string ShowSubmissionsOfRow = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions","parameters":{"request":"id"},"record":null,"opensForm":false}""";
+    private const string ShowSubmissionsOfRow = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions","parameters":{"request":"id"},"record":null,"opensForm":false,"visibleWhen":null}""";
 
-    private const string OpenRequestForm = """{"type":"navigate","page":"RequestForm","labelKey":"pages.requestForm.title","parameters":{},"record":"id","opensForm":true}""";
+    private const string OpenRequestForm = """{"type":"navigate","page":"RequestForm","labelKey":"pages.requestForm.title","parameters":{},"record":"id","opensForm":true,"visibleWhen":null}""";
 
-    private const string StartSubmit = """{"type":"startProcess","process":"Submit","labelKey":"request.submit","instancesPath":"/api/apps/ProcessApp/processes/Submit/instances"}""";
+    private const string StartSubmit = """{"type":"startProcess","process":"Submit","labelKey":"request.submit","instancesPath":"/api/apps/ProcessApp/processes/Submit/instances","visibleWhen":null}""";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -57,7 +57,7 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
 
         Assert.Equal(
             [
-                """{"type":"startProcess","process":"Submit","labelKey":"request.submit","instancesPath":"/api/apps/ProcessApp/processes/Submit/instances"}""",
+                """{"type":"startProcess","process":"Submit","labelKey":"request.submit","instancesPath":"/api/apps/ProcessApp/processes/Submit/instances","visibleWhen":null}""",
                 ShowSubmissions,
             ],
             RawItems(form.GetProperty("actions")));

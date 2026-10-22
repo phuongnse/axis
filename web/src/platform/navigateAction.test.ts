@@ -15,6 +15,7 @@ function action(overrides: Partial<NavigateAction> = {}): NavigateAction {
     parameters: {},
     record: null,
     opensForm: false,
+    visibleWhen: null,
     ...overrides,
   }
 }

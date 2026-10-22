@@ -18,6 +18,7 @@ import {
   type TableSort,
 } from './tableQuery'
 import { useText } from './texts'
+import { isVisible } from './visibleWhen'
 
 interface TableWidgetProps {
   sitePath: string
@@ -266,6 +267,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           return (
             <Flex gap="small">
               {rowActions.map((action, index) => {
+                if (!isVisible(action.visibleWhen, scope)) {
+                  return null
+                }
                 if (action.type === 'startProcess') {
                   return (
                     <Button

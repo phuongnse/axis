@@ -30,6 +30,8 @@ const expressionNodes: [kind: string, pointer: string][] = [
   ['endpoint', '/properties/values/additionalProperties'],
   ['page', '/$defs/navigateParameters/additionalProperties'],
   ['page', '/$defs/action/properties/record'],
+  ['page', '/$defs/rowAction/properties/visibleWhen'],
+  ['page', '/$defs/rowAction/properties/record'],
   ['page', '/$defs/navigateAction/properties/record'],
 ]
 

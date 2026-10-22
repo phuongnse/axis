@@ -108,7 +108,10 @@ public static class ApplicationSites
             StartProcessActionModel start => new StartProcessActionMetadata(
                 start.Process.Name,
                 start.Label.TextKey,
-                $"/api/apps/{application.Manifest.Name}/processes/{start.Process.Name}/instances"),
+                $"/api/apps/{application.Manifest.Name}/processes/{start.Process.Name}/instances")
+            {
+                VisibleWhen = start.VisibleWhen,
+            },
 
             // The compiler resolves every navigate target, so the lookup always succeeds.
             NavigateActionModel navigate => new NavigateActionMetadata(
@@ -116,7 +119,10 @@ public static class ApplicationSites
                 navigate.Label.TextKey,
                 navigate.Parameters,
                 navigate.Record,
-                application.Pages.First(page => page.Name == navigate.Page.Name).Leaves().Any(leaf => leaf.Type == WidgetType.Form)),
+                application.Pages.First(page => page.Name == navigate.Page.Name).Leaves().Any(leaf => leaf.Type == WidgetType.Form))
+            {
+                VisibleWhen = navigate.VisibleWhen,
+            },
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
         };
 

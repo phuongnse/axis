@@ -8,7 +8,7 @@ export interface NavigateScope {
 }
 
 const namePattern = /^[A-Za-z][A-Za-z0-9]*$/
-const numberPattern = /^-?\d+(\.\d+)?$/
+export const numberPattern = /^-?\d+(\.\d+)?$/
 const textPattern = /^'((?:[^']|'')*)'$/
 
 /**
