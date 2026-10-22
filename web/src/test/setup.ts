@@ -8,7 +8,7 @@ afterEach(() => {
   localStorage.clear()
 })
 
-// Components can leave timers pending when they unmount: the ProLayout menu starts a 400 ms one
+// Components can leave timers pending when they unmount: the Ant Design menu starts a 400 ms one
 // and never clears it. Let them fire while jsdom still provides `window`. Switch back to real
 // timers first, so a file that leaves fake timers on cannot stall the wait.
 afterAll(() => {

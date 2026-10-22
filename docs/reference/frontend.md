@@ -22,12 +22,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   API never name an Ant Design component, prop or token. A custom widget builds
   on Axis widgets and Axis tokens and never imports the UI library directly.
   Specialised libraries such as React Flow and CodeMirror follow the same rule.
-  No layer renders UI from a schema on top of Ant Design. The shell and the page
-  containers still use ProComponents until it is removed _(planned for M12)_.
+  No layer renders UI from a schema on top of Ant Design.
 - **Widgets expose their state to tests and assistive technology.** They are
   found by role, accessible name and ARIA state, never by a class of the UI
   library. Where the library leaves a state out, such as loading (`aria-busy`)
-  or the current page (`aria-current`), the widget adds it.
+  or the current page (`aria-current`, as on the active navigation entry), the
+  widget adds it.
 - **Design tokens and previews** *(planned for M12)*. An Axis token file in
   `web/src/platform/` holds the colours for light and dark mode, type, spacing
   and radius, and the theme reads it. It replaces `sharedTokens` in
