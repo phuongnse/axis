@@ -520,14 +520,24 @@ Run and the Test results list, the read-only view of a module entity, and the re
       the widget, and a Move to picker. Move to lists every other widget list
       as a path such as `Page › columns 1 › Column 2`, leaves out the widget's
       own list and the lists inside it, and replaces the page's `widgets` in
-      one change. A container's type is fixed, and its panel points to the JSON
-      view. The editor does not check the depth limit or an empty list, so the
+      one change. A container's type is fixed, and its panel edits the rest. The
+      editor does not check the depth limit or an empty list, so the
       compiler reports them after the save. A widget keeps every key the editor
       does not know when it moves.
-    - **Container panels** *(planned for M12)*. Each container type has a
-      panel. A `columns` panel edits the column widths. A `tabs` panel edits
-      the tab labels, with one text box per locale. A `section` panel edits the
-      title and the collapsed state. See [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+    - **Container panels** *(built)*. Each container type has a panel under
+      its fixed type. A `columns` panel shows one width box from 1 to 12 for
+      each column. The editor does not check that the widths add up to 12, so
+      the compiler reports it after the save. Add column adds a column that
+      takes what is left of 12, or 1 when nothing is left, and keeps the other
+      widths. Remove column drops a column with the widgets in it. A `tabs`
+      panel shows each tab's label as a key with one text box per locale, and
+      has Add tab and Remove tab. A `section` panel shows the title the same
+      way, and a Collapsed switch. Switching Collapsed off removes the
+      `collapsed` key, because a section starts expanded. Remove column and
+      Remove tab are disabled when one is left, because the schema needs at
+      least one. A key the panels do not show, on a column, a tab or a section,
+      stays in the saved file. A container whose parts are malformed, such as
+      `columns` that is not a list, points to the JSON view. See [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
     - **Unknown keys.** A key the editor does not show, on the page or on a
       widget, is saved unchanged. A widget of a type with no panel, such as one
       M12 adds, shows its type and points to the JSON view.
