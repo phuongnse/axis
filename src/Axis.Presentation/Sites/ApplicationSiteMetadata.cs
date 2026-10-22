@@ -101,7 +101,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <param name="Process">The process an inspector inspects, by its declared name.</param>
 /// <param name="InstancesPath">The path of the process's instance list endpoint, so a client never builds it.</param>
 /// <param name="Actions">The <c>startProcess</c> and <c>navigate</c> actions of a form widget, in page file order.</param>
-/// <param name="RowActions">The <c>navigate</c> actions of a table widget on each row, in page file order.</param>
+/// <param name="RowActions">The <c>startProcess</c> and <c>navigate</c> actions of a table widget on each row, in page file order.</param>
 /// <param name="ToolbarActions">The <c>navigate</c> actions of a table widget above its rows, in page file order.</param>
 /// <param name="Parameters">The name of the page parameter that gives each data source parameter its value, by the data source parameter's name.</param>
 /// <param name="Access">
