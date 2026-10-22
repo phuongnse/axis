@@ -123,6 +123,8 @@ function SchemaNode({
     input = (
       <Select
         aria-label={name}
+        showSearch
+        optionFilterProp="label"
         style={{ minWidth: 240 }}
         allowClear={!required}
         value={value as string | number | undefined}

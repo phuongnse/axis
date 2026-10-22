@@ -165,6 +165,8 @@ export function ScenarioStep({
           ))}
         {missing.length > 0 && (
           <Select
+            showSearch
+            optionFilterProp="label"
             virtual={false}
             aria-label={t('shell.studio.scenario.addValue')}
             placeholder={t('shell.studio.scenario.addValue')}
@@ -370,6 +372,8 @@ export function ScenarioStep({
         <Flex vertical gap="small">
           <Field pointer={at('type')} name={t('shell.studio.scenario.stepType')}>
             <Select
+              showSearch
+              optionFilterProp="label"
               virtual={false}
               aria-label={t('shell.studio.scenario.stepType')}
               value={type ?? null}

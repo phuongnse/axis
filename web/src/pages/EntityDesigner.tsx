@@ -317,6 +317,8 @@ function Fields({
                   <div data-testid={`studio-field-/fields/${index}/type`}>
                     <Select
                       aria-label={t('shell.studio.entity.fieldType')}
+                      showSearch
+                      optionFilterProp="label"
                       virtual={false}
                       style={{ minWidth: 160 }}
                       value={typeof content.type === 'string' ? content.type : undefined}
