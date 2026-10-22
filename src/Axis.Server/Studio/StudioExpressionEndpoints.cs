@@ -20,8 +20,9 @@ namespace Axis.Server.Studio;
 /// expression with <c>end</c> exclusive. <c>type</c> is null when there is a diagnostic. The checks run in the order of the
 /// rest of the authoring API: session (401), author role (403), application (404), then 415 for a content type other than
 /// <c>application/json</c>, 400 for a body that is not an expression check, 404 for a resource id the application does
-/// not have, and 400 for a path that holds no expression. A path holds no expression when it does not point at a string,
-/// or when the compile checks no expression there, as when another problem in the resource skips the check.
+/// not have, and 400 for a path that holds no expression. A path holds no expression when it points at neither a string
+/// nor a missing property of an object the saved resource has, so a condition not yet saved is checked in place. It also
+/// holds none when the compile checks no expression there, as when another problem in the resource skips the check.
 /// </summary>
 internal static class StudioExpressionEndpoints
 {
@@ -74,7 +75,7 @@ internal static class StudioExpressionEndpoints
             return StudioEndpoints.NotFound(StudioEndpoints.NoResource);
         }
 
-        var edited = Replace(found, pointer, expression);
+        var edited = Place(found, pointer, expression);
         if (edited is null)
         {
             return NoExpression();
@@ -111,18 +112,36 @@ internal static class StudioExpressionEndpoints
     private static IResult NoExpression() =>
         StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The path holds no expression.");
 
-    /// <summary>The resource's JSON with the string at <paramref name="pointer"/> replaced, or null when it holds no string there.</summary>
-    private static string? Replace(StudioFile file, JsonPointer pointer, string expression)
+    /// <summary>
+    /// The resource's JSON with <paramref name="expression"/> at <paramref name="pointer"/>: in place of the string there, or
+    /// as a new property when the object that would hold it exists. Null when the path is neither.
+    /// </summary>
+    private static string? Place(StudioFile file, JsonPointer pointer, string expression)
     {
         try
         {
             var content = JsonNode.Parse(file.Bytes);
-            if (!pointer.TryEvaluate(content, out var current) || current is not JsonValue value || !value.TryGetValue<string>(out _))
+            var value = JsonValue.Create(expression);
+            PatchOperation operation;
+            if (pointer.TryEvaluate(content, out var current))
+            {
+                if (current is not JsonValue existing || !existing.TryGetValue<string>(out _))
+                {
+                    return null;
+                }
+
+                operation = PatchOperation.Replace(pointer, value);
+            }
+            else if (pointer.GetParent() is { } holder && holder.TryEvaluate(content, out var parent) && parent is JsonObject)
+            {
+                operation = PatchOperation.Add(pointer, value);
+            }
+            else
             {
                 return null;
             }
 
-            var result = new JsonPatch(PatchOperation.Replace(pointer, JsonValue.Create(expression))).Apply(content);
+            var result = new JsonPatch(operation).Apply(content);
             return result.IsSuccess ? result.Result?.ToJsonString() : null;
         }
         catch (Exception exception) when (exception is System.Text.Json.JsonException or InvalidOperationException or ArgumentException)

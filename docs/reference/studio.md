@@ -297,7 +297,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
     - When the names do not load, the list offers the functions only. Typing and
       Save keep working.
   - The check uses the saved resource, so a draft path that is not saved yet may
-    have no answer. When there is no answer, or the check answers `400` or
+    have no answer. A property that the saved object lacks has one: a new
+    `requiredWhen` on a saved form field is checked before the first save. A
+    place inside a new field or item that the file does not hold has none.
+    When there is no answer, or the check answers `400` or
     `401`, the last result stays on screen. A `401` does not start sign-in, so
     the draft is kept. The editor never blocks Save.
 - **Entity designer** *(built)*. An `entity` resource opens in a designer on
@@ -442,7 +445,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - See [roles and policies](roles-and-policies.md).
 - **Editors by kind.** Studio uses a typed editor for the kinds listed here, the entity
   designer for `entity`, and the generic form for every other kind. The seed editor,
-  the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the text
+  the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the form steps panel, the text
   editor, the process editor's step list, with its decision, end, task and operation panels, and the entity designer are
   built. The last column lists what still needs the JSON view, because the form cannot show it.
 
@@ -451,7 +454,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | `application` | Generic form                          | Nothing                                                               |
   | `entity`      | Entity designer                       | Nothing                                                               |
   | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives each container a panel |
-  | `form`        | Generic form                          | Nothing                                                               |
+  | `form`        | Generic form, typed steps panel       | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
   | `process`     | Typed editor with the process graph   | Nothing                                                               |
   | `rule`        | Generic form                          | Nothing                                                               |
@@ -642,6 +645,15 @@ Run and the Test results list, the read-only view of a module entity, and the re
     names, and is typed while those are unknown. **Add mapping** lists the
     fields that have no row. Renaming a row's field keeps its place in the
     file, and a value that is not an object is left to the JSON view.
+  - **Form steps** *(built)*. The form keeps the generic form for its entity,
+    sections and fields, which includes an expression editor for each
+    `visibleWhen`, `requiredWhen` and `readOnlyWhen`. Its `steps` show as cards
+    with a title, a section picker, **Move up**, **Move down** and **Remove**.
+    **Add step** appends a card. The picker lists the sections that have a
+    `name`, so an unnamed section is not offered. Removing the last step removes
+    `steps`, and the form goes back to one page. A condition offers the fields
+    that the form lists, because a condition reads only those. A `steps` value
+    that is not a list is left to the JSON view.
   - **Page editor and M12.** M12 adds layouts and widgets while this editor is
     built, see
     [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
