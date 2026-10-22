@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
 import { FormWidget } from '../platform/FormWidget'
+import { KpiWidget } from '../platform/KpiWidget'
 import { PageLayout } from '../platform/PageLayout'
 import { readPageParameters } from '../platform/pageParameters'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
@@ -166,6 +167,9 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       )}
       {widget?.type === 'processInspector' && (
         <ProcessInspectorWidget sitePath={sitePath} pageName={page.name} widget={widget} locale={locale} />
+      )}
+      {widget?.type === 'kpi' && (
+        <KpiWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
       )}
     </PageLayout>
   )

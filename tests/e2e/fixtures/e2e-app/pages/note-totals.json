@@ -1,0 +1,17 @@
+{
+  "id": "7e03569b-2c43-4f6e-8b1d-9cfb3b118591",
+  "kind": "page",
+  "name": "NoteTotals",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.noteTotals.title" },
+  "widgets": [
+    {
+      "type": "kpi",
+      "dataSource": "NoteTotals",
+      "measure": "notes",
+      "label": { "textKey": "kpi.notes" },
+      "comparison": { "measure": "amountSum", "label": { "textKey": "kpi.amountSum" } },
+      "navigate": { "type": "navigate", "page": "Notes", "label": { "textKey": "kpi.showNotes" } }
+    }
+  ]
+}

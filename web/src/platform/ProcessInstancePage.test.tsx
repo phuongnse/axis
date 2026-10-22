@@ -29,6 +29,7 @@ const inspectorWidget: WidgetMetadata = {
   toolbarActions: [],
   parameters: {},
   access: null,
+  kpi: null,
 }
 
 // The instance detail example of the processes reference, with an open task and two calls. The

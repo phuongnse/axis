@@ -79,8 +79,8 @@ rest of the frontend is in [frontend.md](frontend.md).
     get the data as a table, with the category and each measure as columns.
     Loading, empty and error states use platform texts.
 - **KPI widget**. A page whose widget is a `kpi` shows one
-  measure of a data source as a tile, with its label. The compile checks and
-  the page metadata are built. The tile in the SPA is *(planned for M12)*. See
+  measure of a data source as a tile, with its label. The compile checks, the
+  page metadata and the tile in the SPA are built. See
   [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
 
   ```json
@@ -112,11 +112,12 @@ rest of the frontend is in [frontend.md](frontend.md).
     the keys of every `navigate` action, see
     [frontend.md](frontend.md). A user who cannot run the data source gets no
     widget, as with a table.
-  - **Value** *(planned for M12)*. The SPA reads the one total row of the data source. The value
+  - **Value**. The SPA reads the one total row of the data source. The value
     is formatted as a table cell shows it, and a `null` measure shows a
     platform text for an empty value. The comparison is a second labelled
     value. The SPA computes no difference and no percentage.
-  - **Click and reading** *(planned for M12)*. With a `navigate`, the tile is a link to the target
-    page. The tile reads as `<label>: <value>`, and a comparison adds
+  - **Click and reading**. With a `navigate`, the tile is a link to the target
+    page. The navigate label is the tile's last line, inside the link. The
+    tile reads as `<label>: <value>`, and a comparison adds
     `<comparison label>: <comparison value>`. Loading and error states use
     platform texts.
