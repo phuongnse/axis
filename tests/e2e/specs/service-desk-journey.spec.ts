@@ -49,6 +49,9 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByTitle(kind, { exact: true }).click()
     await dialog.getByRole('textbox', { name: label }).fill(value)
     await dialog.getByRole('button', { name: 'Create' }).click()
+    // The dialog gives the focus back to the New resource button when its close animation ends. A key pressed before
+    // that, as the pick helpers press Enter, would open the dialog again, so the next step waits for it to be gone.
+    await expect(dialog).toBeHidden()
   }
 
   async function createPage(page: Page, name: string) {

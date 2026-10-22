@@ -70,12 +70,16 @@ test.describe('Studio builds a page with two columns', () => {
     await dialog.getByRole('radio', { name: 'Request approval' }).click()
     await dialog.getByRole('button', { name: 'Create' }).click()
     await expect(page).toHaveURL(new RegExp(`app=${name}$`))
+    await expect(dialog).toBeHidden()
 
     await page.getByRole('button', { name: 'New resource' }).click()
     await dialog.getByRole('combobox', { name: 'Kind' }).click()
     await page.getByTitle('page', { exact: true }).click()
     await dialog.getByRole('textbox', { name: 'Name' }).fill('Overview')
     await dialog.getByRole('button', { name: 'Create' }).click()
+    // The dialog gives the focus back to the New resource button when its close animation ends, and the pick helpers
+    // press Enter, so they start only when it is gone.
+    await expect(dialog).toBeHidden()
     const editor = page.getByTestId('studio-page-editor')
     await expect(editor.getByRole('textbox', { name: 'Name' })).toHaveValue('Overview')
 

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -777,6 +777,37 @@ describe('PageEditor container panels', () => {
     expect(tabChange.mock.lastCall![1]).toContainEqual(tabs.tabs[1])
     await userEvent.click(within(screen.getByTestId('studio-tab-0')).getByRole('button', { name: 'Remove tab' }))
     expect(tabChange.mock.lastCall![1]).toContainEqual(tabs.tabs[1])
+    cleanup()
+
+    // An edit of a section is a write at one key of it, so the other keys stay in the saved file.
+    const sectionChange = await open(section)
+    const key = within(screen.getByTestId('studio-field-/widgets/0/title')).getByRole('textbox', { name: 'en' })
+    await userEvent.type(key, '!')
+    await userEvent.click(within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch'))
+    const pointers = sectionChange.mock.calls.map(([pointer]) => pointer)
+    expect(pointers.every((pointer) => pointer.startsWith('/widgets/0/') && pointer !== '/widgets/0')).toBe(true)
+    expect(pointers).toContain('/widgets/0/collapsed')
+  })
+
+  it('writes the texts of a section title and puts its key in the draft', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ resources: [], diagnostics: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const onChange = await open(section)
+
+    const title = within(screen.getByTestId('studio-field-/widgets/0/title'))
+    await userEvent.type(title.getByRole('textbox', { name: 'en' }), '!')
+    await userEvent.click(title.getByRole('button', { name: 'Write texts' }))
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('/widgets/0/title', { textKey: 'pages.review.title' }))
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(decodeURIComponent(url)).toContain('/texts/pages.review.title')
+    expect(JSON.parse(init.body as string)).toEqual({ texts: { en: 'Review!', vi: 'Xem xét' } })
   })
 
   it('writes only the collapsed key on a section with a key it does not show', async () => {
@@ -789,8 +820,13 @@ describe('PageEditor container panels', () => {
   })
 
   it('shows a malformed part as JSON only and keeps its Remove button', async () => {
-    await open({ type: 'columns', columns: [{ width: 6, widgets: [inbox] }, 'oops'] })
+    const onChange = await open({ type: 'columns', columns: [{ width: 6, widgets: [inbox] }, 'oops'] })
 
-    expect(within(screen.getByTestId('studio-column-1')).getByTestId('studio-json-only')).toBeVisible()
+    const part = within(screen.getByTestId('studio-column-1'))
+    expect(part.getByTestId('studio-json-only')).toBeVisible()
+    const remove = part.getByRole('button', { name: 'Remove column' })
+    expect(remove).toBeEnabled()
+    await userEvent.click(remove)
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns', [{ width: 6, widgets: [inbox] }])
   })
 })
