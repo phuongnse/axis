@@ -94,6 +94,15 @@ site, and its widgets are its content:
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record. See
   [frontend.md](frontend.md).
+- A `table` widget may list `rowActions` and `toolbarActions` *(planned for
+  M12)*. Each entry has a `type`, such as
+  `{ "type": "delete", "label": { "textKey": "purchaseRequest.delete" } }` or
+  `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`.
+  `navigate` may sit in either list. `startProcess` and `delete` sit in
+  `rowActions` only, and the row is their subject. An entry may have a
+  `visibleWhen`, a boolean expression over the row's fields. See
+  [frontend.md](frontend.md) and
+  [D59](../decisions/d59-table-row-and-toolbar-actions.md).
 - The page has no entity or template of its own, so more widgets and a
   layout can be added without a format change.
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
@@ -103,7 +112,7 @@ site, and its widgets are its content:
 
 *(Planned for M12.)* A page may hold a tree of widgets. The container
 widgets `columns`, `tabs` and `section` hold other widgets, see
-[D59](../decisions/d59-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md):
+[D60](../decisions/d60-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md):
 
 ```json
 {
@@ -130,16 +139,12 @@ widgets `columns`, `tabs` and `section` hold other widgets, see
               "tabs": [
                 {
                   "label": { "textKey": "pages.overview.tasks" },
-                  "widgets": [{ "type": "taskInbox" }]
-                },
-                {
-                  "label": { "textKey": "pages.overview.help" },
                   "widgets": [
                     {
                       "type": "section",
-                      "title": { "textKey": "pages.overview.helpTitle" },
+                      "title": { "textKey": "pages.overview.tasksTitle" },
                       "collapsed": true,
-                      "widgets": [{ "type": "form", "entity": "PurchaseRequest" }]
+                      "widgets": [{ "type": "taskInbox" }]
                     }
                   ]
                 }
