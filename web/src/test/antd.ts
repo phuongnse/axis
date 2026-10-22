@@ -97,3 +97,8 @@ export function isBlurred(element: HTMLElement): boolean {
 export function segmentLabel(text: string): HTMLElement {
   return screen.getByText(text, { selector: '.ant-segmented-item-label' })
 }
+
+/** The description of an empty state that shows `text`. */
+export function emptyDescription(text: string): HTMLElement {
+  return screen.getByText(text, { selector: '.ant-empty-description' })
+}
