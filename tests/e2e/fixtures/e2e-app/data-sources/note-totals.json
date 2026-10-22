@@ -1,0 +1,15 @@
+{
+  "id": "1b5da11d-e9d3-410b-a2e4-279516ddd2be",
+  "kind": "dataSource",
+  "name": "NoteTotals",
+  "formatVersion": 1,
+  "entity": "Note",
+  "fields": [{ "name": "amount", "path": "amount" }],
+  "aggregate": {
+    "groupBy": [],
+    "measures": [
+      { "name": "notes", "function": "count" },
+      { "name": "amountSum", "function": "sum", "field": "amount" }
+    ]
+  }
+}

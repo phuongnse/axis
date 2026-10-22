@@ -1,0 +1,15 @@
+{
+  "id": "056b4c51-dd07-42e1-b81f-22556ac20f1a",
+  "kind": "page",
+  "name": "NoteCount",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.noteCount.title" },
+  "widgets": [
+    {
+      "type": "kpi",
+      "dataSource": "NoteTotals",
+      "measure": "notes",
+      "label": { "textKey": "kpi.notes" }
+    }
+  ]
+}
