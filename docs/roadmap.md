@@ -7,15 +7,9 @@
 - **Rolling wave.** Only the current milestone is broken into issues. The next
   milestone is broken down when the current one is nearly done, using what was
   learned.
-- **Issue size.** One issue is one behaviour, aiming for 2–5 acceptance
-  criteria that a test or command can verify. More than five is a signal to
-  check whether the issue holds more than one behaviour. If it does, split it.
-  If every criterion checks the same behaviour, more are fine. A plan is not
-  revised only to cut the number of criteria. It must fit in a single NexKit
-  agent session.
-  If a NexKit plan reports `too_large`, the issue is split into parts. Each
-  part is a sub-issue of the parent, in the parent's milestone, and is marked
-  *blocked by* the earlier parts it needs. See [delivery.md](delivery.md).
+- **Issue size.** One issue is one behaviour that fits in a single NexKit
+  agent session. The sizing rule and how a `too_large` issue is split are in
+  [the life of an issue](delivery.md#the-life-of-an-issue).
 - **Docs first.** An issue links to the doc sections it implements. When an
   issue changes agreed behaviour, it updates the docs in the same pull request.
 - **Cross-cutting qualities are built in, not added later.** Every milestone
