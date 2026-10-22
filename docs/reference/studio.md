@@ -453,7 +453,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
   | `application` | Generic form                          | Nothing                                                               |
   | `entity`      | Entity designer                       | Nothing                                                               |
-  | `page`        | Typed editor                          | The page's `parameters`, and a widget or layout that M12 adds, until M12 gives each container a panel |
+  | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives each container a panel |
   | `form`        | Generic form, typed steps panel       | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
   | `process`     | Typed editor with the process graph   | Nothing                                                               |
@@ -496,19 +496,34 @@ Run and the Test results list, the read-only view of a module entity, and the re
     - **Navigate actions.** A navigate action
       ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) has a
       page picker, a label with a text box for each locale, an optional
-      `record` expression and parameter rows. A parameter row is a name and an
-      expression. The page picker lists every page, including the current one,
-      because a page may open itself with other parameters. A table offers only
-      navigate actions. A form offers Add action for `startProcess` and Add
-      navigate action. An empty Record box removes the `record` key. Parameter
-      names are typed, not picked, and a wrong name shows as a diagnostic after
-      the save.
+      `record` expression and parameter expressions. The page picker lists
+      every page, including the current one, because a page may open itself
+      with other parameters. A table offers only navigate actions. A form
+      offers Add action for `startProcess` and Add navigate action. An empty
+      Record box removes the `record` key.
+      - **Parameter expressions.** When the names list the target page, the
+        action shows one expression box for each parameter the page declares,
+        with the parameter's type and `required` beside it. An empty box
+        leaves the parameter out. A value the page does not declare stays
+        visible with a note and Remove, because the compiler refuses it.
+        Picking another page removes the values the new page does not declare,
+        ignoring letter case. While the names have not loaded, or when the page
+        is not in them, the action keeps rows where the author types the
+        parameter name, and a wrong name shows as a diagnostic after the save.
     - **Pickers.** The action's process picker lists every process. It does
       not check what the choice holds, so a wrong choice shows as a diagnostic
-      after the save. Page
-      parameters are edited in the JSON view
-      ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md))
-      *(planned for M12)*.
+      after the save.
+    - **Page parameters.** A Parameters list sits between the title and the
+      widgets. Each parameter has a name, a type picker over `text`,
+      `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and
+      `reference`, a Required switch and Remove. Add parameter appends a `text`
+      parameter with an empty name. A `reference` parameter also has a target
+      entity picker and an `enum` parameter has its values. A type change
+      removes the `target` or the `values` that the new type does not take.
+      Switching Required off removes the `required` key. The names answer lists
+      each page's parameters, which is how a navigate action knows them
+      ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md)).
+      `parameters` that is not a list points to the JSON view.
     - **Widget tree** *(built)*. The editor shows the page's widgets as
       nested rows. A container shows its columns, tabs or section body as
       nested lists, and a row opens that widget's panel at its own pointer,

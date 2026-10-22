@@ -109,13 +109,14 @@ site, and its widgets are its content:
   a button that starts the process for the form's record. See
   [frontend.md](frontend.md).
 - A `table` widget may list `rowActions` and `toolbarActions`. For now each
-  entry is a `navigate` action, which the compiler checks and the SPA shows as
-  a button. The other entries are *(planned for M12)*. An entry has a `type`, such as
-  `{ "type": "delete", "label": { "textKey": "purchaseRequest.delete" } }` or
-  `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`.
+  entry is a `navigate` action or, in `rowActions`, a `startProcess` action.
+  The compiler checks them and the SPA shows each as a button. The other entries
+  are *(planned for M12)*. An entry has a `type`, such as
+  `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }` or
+  `{ "type": "delete", "label": { "textKey": "purchaseRequest.delete" } }`.
   `navigate` may sit in either list. `startProcess` and `delete` sit in
-  `rowActions` only, and the row is their subject. They and `visibleWhen`, a
-  boolean expression over the row's fields, are still planned. See
+  `rowActions` only, and the row is their subject. `delete` and `visibleWhen`,
+  a boolean expression over the row's fields, are still planned. See
   [frontend.md](frontend.md) and
   [D59](../decisions/d59-table-row-and-toolbar-actions.md).
 - A `table` widget may name a `dataSource` instead of an `entity`, such as

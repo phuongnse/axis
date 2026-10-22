@@ -201,10 +201,17 @@ export interface StudioNameStep {
   outcomes: string[]
 }
 
-/** A named resource in `GET .../names`, such as a role, form or page. */
+/** A named resource in `GET .../names`, such as a role, sequence or form. */
 export interface StudioNameResource {
   id: string
   name: string
+}
+
+/** A page in `GET .../names`, with the parameters it declares. */
+export interface StudioNamePage {
+  id: string
+  name: string
+  parameters: { name: string; type: string; required: boolean }[]
 }
 
 /** A text key in `GET .../names`, with its text in each locale that has it. */
@@ -232,7 +239,7 @@ export interface StudioNames {
   roles: StudioNameResource[]
   sequences: StudioNameResource[]
   forms: StudioNameResource[]
-  pages: StudioNameResource[]
+  pages: StudioNamePage[]
   texts: StudioNameText[]
 }
 

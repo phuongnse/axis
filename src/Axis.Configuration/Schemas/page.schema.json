@@ -80,7 +80,7 @@
         },
         "rowActions": {
           "type": "array",
-          "items": { "$ref": "#/$defs/navigateAction" }
+          "items": { "$ref": "#/$defs/action" }
         },
         "toolbarActions": {
           "type": "array",

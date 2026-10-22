@@ -129,7 +129,9 @@ flowchart LR
      `actions` are allowed only on a `form` or `detail` widget
      (`AXC0060` at `/widgets/{i}/actions`). An action's `process` must name a
      loaded process (`AXC0087`) over the entity of the form's records
-     (`AXC0088`), both at `/widgets/{i}/actions/{j}/process`. A navigation entry
+     (`AXC0088`), both at `/widgets/{i}/actions/{j}/process`. A `startProcess`
+     entry in a table's `rowActions` is checked the same way against the table's
+     root entity, at `/widgets/{i}/rowActions/{j}/process`. A navigation entry
      must name a loaded page (`AXC0023`). Entity, page, data source, form and process names
      resolve ignoring letter case, and a name whose file was not loaded
      because of its own errors is not reported again. Site titles, navigation labels, page titles and action labels join the
@@ -198,8 +200,11 @@ flowchart LR
        resolves bare names only, with no paths, rules or aggregates,
      - `rowActions` on a table over a grouped data source, and `rowActions` or
        `toolbarActions` on a `form`, `taskInbox` or `processInspector` widget,
-       are `AXC0060` at that property. Only `navigate` entries are accepted in
-       `rowActions` and `toolbarActions` for now,
+       are `AXC0060` at that property. `rowActions` accepts `navigate` and
+       `startProcess` entries, and `toolbarActions` accepts `navigate` entries
+       only (`AXC0004` for another type). A row `startProcess` is checked like
+       a form's: a label text key, a loaded process (`AXC0087`) over the
+       table's root entity (`AXC0088`), both at `/widgets/{i}/rowActions/{j}/process`,
      - each target is a `navigate page` edge in the reference index.
 
      A `navigate` action may also set `record`, an expression for the id of
@@ -809,7 +814,7 @@ to show where a resource is used and what it uses.
 | `widget form` | Page | `/widgets/{i}/form` | Form |
 | `navigate page` | Page | `/widgets/{i}/rowActions/{j}/page`, `/widgets/{i}/toolbarActions/{j}/page`, `/widgets/{i}/actions/{j}/page` | Page |
 | `widget process` | Page | `/widgets/{i}/process` | Process |
-| `action process` | Page | `/widgets/{i}/actions/{j}/process` | Process |
+| `action process` | Page | `/widgets/{i}/actions/{j}/process`, `/widgets/{i}/rowActions/{j}/process` | Process |
 | `form entity` | Form | `/entity` | Entity |
 | `seed entity` | Seed | `/entity` | Entity |
 | `data source entity` | Data source | `/entity` | Entity |

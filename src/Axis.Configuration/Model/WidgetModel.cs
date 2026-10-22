@@ -28,7 +28,7 @@ public sealed record WidgetModel(
     /// <summary>The <c>startProcess</c> and <c>navigate</c> actions of a form widget, in page file order.</summary>
     public IReadOnlyList<WidgetActionModel> Actions { get; init; } = [];
 
-    /// <summary>The <c>navigate</c> actions a table widget shows on each row, in page file order.</summary>
+    /// <summary>The <c>startProcess</c> and <c>navigate</c> actions a table widget shows on each row, in page file order.</summary>
     public IReadOnlyList<WidgetActionModel> RowActions { get; init; } = [];
 
     /// <summary>The <c>navigate</c> actions a table widget shows above its rows, in page file order.</summary>

@@ -741,7 +741,15 @@ internal static class PresentationChecker
                 var rowActions = widget.RowActions ?? [];
                 for (var index = 0; index < rowActions.Count; index++)
                 {
-                    NavigateChecker.Check(rowActions[index], $"{path}/rowActions/{index}", rowScope, page, loaded, findPage, findForm, references, diagnostics);
+                    var rowActionPath = $"{path}/rowActions/{index}";
+                    if (rowActions[index].Type == "navigate")
+                    {
+                        NavigateChecker.Check(rowActions[index], rowActionPath, rowScope, page, loaded, findPage, findForm, references, diagnostics);
+                    }
+                    else
+                    {
+                        CheckStartProcess(rowActions[index], rowActionPath, recordEntity, page, loaded, findProcess, references, diagnostics);
+                    }
                 }
             }
 
@@ -1069,8 +1077,8 @@ internal static class PresentationChecker
 
     /// <summary>
     /// Checks the actions of a form widget: each label has a text key. A <c>startProcess</c> action
-    /// names a process that exists and is over the entity of the form's records, ignoring letter
-    /// case. A <c>navigate</c> action is checked by <see cref="NavigateChecker"/> against
+    /// is checked by <see cref="CheckStartProcess"/> against the entity of the form's records. A
+    /// <c>navigate</c> action is checked by <see cref="NavigateChecker"/> against
     /// <paramref name="scope"/>, the names of the form's record.
     /// </summary>
     private static void CheckActions(
@@ -1097,35 +1105,52 @@ internal static class PresentationChecker
                 continue;
             }
 
-            ApplicationCompiler.CheckTextKey(action.Label, page, $"{actionPath}/label", references, diagnostics);
+            CheckStartProcess(action, actionPath, recordEntity, page, loaded, findProcess, references, diagnostics);
+        }
+    }
 
-            // The schema requires the process of a startProcess action.
-            var processName = action.Process!;
-            if (findProcess(processName) is not { } process)
+    /// <summary>
+    /// Checks a <c>startProcess</c> action of a form or a table row: its label has a text key and
+    /// its process exists and is over <paramref name="recordEntity"/>, ignoring letter case.
+    /// </summary>
+    private static void CheckStartProcess(
+        WidgetActionDefinition action,
+        string actionPath,
+        string? recordEntity,
+        PageResource page,
+        ApplicationLoadResult loaded,
+        Func<string, ProcessResource?> findProcess,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics)
+    {
+        ApplicationCompiler.CheckTextKey(action.Label, page, $"{actionPath}/label", references, diagnostics);
+
+        // The schema requires the process of a startProcess action.
+        var processName = action.Process!;
+        if (findProcess(processName) is not { } process)
+        {
+            if (!loaded.UnloadedProcessNames.Contains(processName))
             {
-                if (!loaded.UnloadedProcessNames.Contains(processName))
-                {
-                    diagnostics.Add(new Diagnostic(
-                        DiagnosticCodes.UnknownActionProcess,
-                        $"The process '{processName}' was not found. No loaded process has that name.",
-                        page.File,
-                        $"{actionPath}/process",
-                        page.Id));
-                }
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.UnknownActionProcess,
+                    $"The process '{processName}' was not found. No loaded process has that name.",
+                    page.File,
+                    $"{actionPath}/process",
+                    page.Id));
             }
-            else
+        }
+        else
+        {
+            references.Add(page, $"{actionPath}/process", ReferenceRelations.ActionProcess, ResourceNode.Of(process));
+            if (recordEntity is not null && !string.Equals(process.Entity, recordEntity, StringComparison.OrdinalIgnoreCase))
             {
-                references.Add(page, $"{actionPath}/process", ReferenceRelations.ActionProcess, ResourceNode.Of(process));
-                if (recordEntity is not null && !string.Equals(process.Entity, recordEntity, StringComparison.OrdinalIgnoreCase))
-                {
-                    // The action starts the process for the form's record, so it must be its subject.
-                    diagnostics.Add(new Diagnostic(
-                        DiagnosticCodes.ActionProcessOverOtherEntity,
-                        $"The process '{process.Name}' is over the entity '{process.Entity}', but the form shows records of '{recordEntity}'.",
-                        page.File,
-                        $"{actionPath}/process",
-                        page.Id));
-                }
+                // The action starts the process for the record, so it must be its subject.
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.ActionProcessOverOtherEntity,
+                    $"The process '{process.Name}' is over the entity '{process.Entity}', but the widget shows records of '{recordEntity}'.",
+                    page.File,
+                    $"{actionPath}/process",
+                    page.Id));
             }
         }
     }

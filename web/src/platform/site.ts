@@ -135,8 +135,9 @@ export interface FormMetadata {
 }
 
 /**
- * A `startProcess` action of a form widget: a button that starts `process` for the form's record by
- * posting to `instancesPath`, the start endpoint, so the SPA never builds that URL itself.
+ * A `startProcess` action of a form widget or a table row: a button that starts `process` for the
+ * form's record or the row's record by posting to `instancesPath`, the start endpoint, so the SPA
+ * never builds that URL itself.
  */
 export interface StartProcessAction {
   type: 'startProcess'
@@ -160,7 +161,7 @@ export interface NavigateAction {
   opensForm: boolean
 }
 
-/** One action of a form widget, in page file order. */
+/** One action of a form widget or a table row, in page file order. */
 export type WidgetAction = StartProcessAction | NavigateAction
 
 /**
@@ -196,8 +197,8 @@ export interface WidgetMetadata {
   instancesPath: string | null
   /** The actions of a form or detail widget the user may take, and `[]` on every other widget. */
   actions: WidgetAction[]
-  /** The navigate actions a table shows on each row, and `[]` on every other widget. */
-  rowActions: NavigateAction[]
+  /** The `startProcess` and navigate actions a table shows on each row, and `[]` on every other widget. */
+  rowActions: WidgetAction[]
   /** The navigate actions a table shows above its rows, and `[]` on every other widget. */
   toolbarActions: NavigateAction[]
   /**
