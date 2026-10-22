@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using Axis.Expressions.Evaluation;
 using Axis.Expressions.Parsing;
@@ -27,9 +26,6 @@ public sealed class ExpressionInterpreterTests
     private static readonly Guid _sales = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000011");
     private static readonly Guid _support = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000012");
     private static readonly Guid _binh = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000021");
-
-    /// <summary>The time a worst-case expression may take to finish or run out of steps.</summary>
-    private static readonly TimeSpan _worstCaseTime = TimeSpan.FromSeconds(2);
 
     /// <summary>A value for every field, so that no result is <c>null</c> unless the expression makes it so.</summary>
     private static readonly Dictionary<string, object?> _setValues = new()
@@ -343,7 +339,7 @@ public sealed class ExpressionInterpreterTests
     }
 
     [Fact]
-    public void A_validation_that_fans_out_through_rule_calls_stops_within_the_time_limit()
+    public void A_validation_that_fans_out_through_rule_calls_stops_at_the_step_budget()
     {
         // F0 adds one, and each level above calls the one below 4 times: 8 nested levels and 4^7 leaf calls.
         var rule = Rule("F0", "x + 1", ExpressionType.Integer, ("x", ExpressionType.Integer));
@@ -353,16 +349,15 @@ public sealed class ExpressionInterpreterTests
             rule = Rule($"F{k}", $"{below} + {below} + {below} + {below}", ExpressionType.Integer, [rule], ("x", ExpressionType.Integer));
         }
 
-        var stopwatch = Stopwatch.StartNew();
-        var result = EvaluateWithRules("F7(i) > 0", [rule]);
-        stopwatch.Stop();
+        var (result, steps) = EvaluateWithRulesCountingSteps("F7(i) > 0", [rule]);
 
+        // Every charge is one step, so the budget is used up exactly and the evaluation stops there.
         Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, result.Error?.Kind);
-        Assert.True(stopwatch.Elapsed < _worstCaseTime, $"The evaluation took {stopwatch.Elapsed}.");
+        Assert.Equal(ExpressionLimits.MaxSteps, steps);
     }
 
     [Fact]
-    public void Text_doubled_through_rule_calls_stops_within_the_time_limit()
+    public void Text_doubled_through_rule_calls_stops_at_the_step_budget()
     {
         // D1 doubles its text, and each level above applies the one below twice, so D8 would double it 2^7 times.
         var rule = Rule("D1", "concat(s, s)", ExpressionType.Text, ("s", ExpressionType.Text));
@@ -371,12 +366,12 @@ public sealed class ExpressionInterpreterTests
             rule = Rule($"D{k}", $"D{k - 1}(D{k - 1}(s))", ExpressionType.Text, [rule], ("s", ExpressionType.Text));
         }
 
-        var stopwatch = Stopwatch.StartNew();
-        var result = EvaluateWithRules("length(D8(t)) > 0", [rule]);
-        stopwatch.Stop();
+        var (result, steps) = EvaluateWithRulesCountingSteps("length(D8(t)) > 0", [rule]);
 
+        // A concat charges one step for each 1,000 characters of its result, so the charge that
+        // fails can come before the last step is used. The bound is that no step past the budget is taken.
         Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, result.Error?.Kind);
-        Assert.True(stopwatch.Elapsed < _worstCaseTime, $"The evaluation took {stopwatch.Elapsed}.");
+        Assert.InRange(steps, ExpressionLimits.MaxSteps / 2, ExpressionLimits.MaxSteps);
     }
 
     [Theory]
@@ -799,13 +794,18 @@ public sealed class ExpressionInterpreterTests
         Rule(name, body, result, [], parameters);
 
     private static ExpressionEvaluationResult EvaluateWithRules(
+        string text, IEnumerable<ExpressionRule> rules, params (string Name, object? Value)[] overrides) =>
+        EvaluateWithRulesCountingSteps(text, rules, overrides).Result;
+
+    /// <summary>Evaluates like <see cref="EvaluateWithRules"/> and also gives the steps the interpreter used.</summary>
+    private static (ExpressionEvaluationResult Result, int Steps) EvaluateWithRulesCountingSteps(
         string text, IEnumerable<ExpressionRule> rules, params (string Name, object? Value)[] overrides)
     {
         var parsed = ExpressionParser.Parse(text);
         Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
         var checkedType = ExpressionTypeChecker.Check(parsed.Expression, new ExpressionScope(_fields, rules), ExpressionType.Null);
         Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
-        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values(overrides));
+        return ExpressionInterpreter.EvaluateCountingSteps(parsed.Expression, checkedType, Values(overrides));
     }
 
     /// <summary>Evaluates <paramref name="text"/> over <paramref name="scope"/>, with <paramref name="now"/> as the time of <c>now()</c>.</summary>

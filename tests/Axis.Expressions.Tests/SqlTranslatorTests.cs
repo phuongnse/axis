@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Sql;
@@ -303,19 +302,30 @@ public sealed class SqlTranslatorTests
     [Fact]
     public void Rule_chain_past_the_inlined_node_cap_is_outside_the_subset_before_rendering()
     {
-        var rules = Chain(8);
-        var stopwatch = Stopwatch.StartNew();
+        var parsed = ExpressionParser.Parse("L8(i)");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, new ExpressionScope(_fields, Chain(8)), ExpressionType.Boolean);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+        var columns = 0;
 
-        var result = TranslateWithRules("L8(i)", rules);
+        var (result, nodes) = SqlTranslator.TranslateCountingNodes(
+            parsed.Expression,
+            path =>
+            {
+                columns++;
+                return Column(path);
+            },
+            check);
 
-        stopwatch.Stop();
+        // The count stops at the first node past the cap, and no column is rendered before that.
+        Assert.Equal(ExpressionLimits.MaxInlinedNodes + 1, nodes);
+        Assert.Equal(0, columns);
         Assert.False(result.Succeeded);
         Assert.Null(result.Sql);
         Assert.Empty(result.Parameters);
         Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, 0), (result.Diagnostic.Code, result.Diagnostic.Offset));
         Assert.Contains("'L8'", result.Diagnostic.Message, StringComparison.Ordinal);
         Assert.Contains("2,000", result.Diagnostic.Message, StringComparison.Ordinal);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1), $"Took {stopwatch.Elapsed}.");
     }
 
     [Theory]
