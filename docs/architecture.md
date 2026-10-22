@@ -737,6 +737,10 @@ Playwright specs find elements by role, accessible name and ARIA state, and neve
 select a class of the UI library. `scripts/lint.sh` fails when a file under
 `tests/` names a class that starts with `ant-`. Specs pick select options only through the helpers in `tests/e2e/select.ts`, and use `pickAction` for selects that act and then clear themselves.
 
+Playwright specs match accessible names and texts exactly. A string name or text passed to
+`getByRole`, `getByLabel`, `getByText` or `getByTitle` comes with `exact: true`. Only a regular
+expression matches part of a name. `scripts/lint.sh` fails on a call that breaks this.
+
 Only `*PerformanceTests` classes may assert on elapsed time, because they run alone.
 Other tests prove a bound with a count, such as the steps used or the nodes inlined, and
 show that nothing waited through an outcome. `scripts/lint.sh` fails when a test file
