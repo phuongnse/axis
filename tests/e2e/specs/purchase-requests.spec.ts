@@ -184,7 +184,7 @@ test('the purchase request list reads a data source, shows department names, and
 
     await expect(page.locator(`[data-theme-mode="${mode}"]`)).toBeVisible()
     await expect(page).toHaveURL(listPath)
-    await expect(page.locator('[aria-current="page"]')).toHaveText('2')
+    await expect(page.getByRole('main').locator('[aria-current="page"]')).toHaveText('2')
     await expect(page.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'descending')
     await expect(page.getByRole('columnheader', { name: 'Department' })).toBeVisible()
     await expect(first).toContainText(`${prefix} 01`)

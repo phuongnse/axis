@@ -399,7 +399,8 @@ public static class ApplicationCompiler
                 diagnostics);
         }
 
-        PresentationChecker.Check(loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, moduleReferences, references, diagnostics);
+        PresentationChecker.Check(
+            loaded, FindEntity, FindPage, FindDataSource, FindForm, FindProcess, moduleReferences, references, rules, declaredModules, diagnostics);
         CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, references, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, rules, declaredModules, diagnostics);
         ProcessChecker.Check(
@@ -554,7 +555,7 @@ public static class ApplicationCompiler
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(
                 dataSourcesByName[dataSource.Name], entities, IsModuleResource(dataSource) ? [] : rules, IsModuleResource(dataSource) ? null : declaredModules)).ToList(),
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, rules, declaredModules)).ToList(),
-            Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName)).ToList(),
+            Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName, IsModuleResource(form) ? [] : rules, IsModuleResource(form) ? null : declaredModules)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules, declaredModules)).ToList(),
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
@@ -1720,10 +1721,24 @@ public static class ApplicationCompiler
         };
     }
 
-    /// <summary>Builds a checked form, with each field named as its entity declares it.</summary>
-    private static FormModel BuildForm(FormResource form, Dictionary<string, EntityResource> entitiesByName)
+    /// <summary>
+    /// Builds a checked form, with each field named as its entity declares it. Each condition is
+    /// compiled over the entity's fields and the named rules. A step names its sections as the
+    /// sections declare them.
+    /// </summary>
+    private static FormModel BuildForm(
+        FormResource form, Dictionary<string, EntityResource> entitiesByName, IEnumerable<ExpressionRule> rules, IReadOnlySet<string>? modules)
     {
         var entity = entitiesByName[form.Entity];
+        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: name => entitiesByName.GetValueOrDefault(name), modules: modules);
+
+        ExpressionModel? Compile(string? condition) =>
+            condition is null ? null : ExpressionModel.Compile(condition, scope, ExpressionType.Boolean);
+
+        // A checked step names only sections of the form.
+        string SectionName(string name) =>
+            form.Sections.First(section => string.Equals(section.Name, name, StringComparison.OrdinalIgnoreCase)).Name!;
+
         return new FormModel
         {
             Id = form.Id,
@@ -1734,9 +1749,19 @@ public static class ApplicationCompiler
                 .Select(section => new FormSectionModel(
                     section.Title,
                     section.Fields
-                        .Select(field => new FormFieldModel(FindField(entity, field.Field)!.Name, field.ReadOnly ?? false))
-                        .ToList()))
+                        .Select(field => new FormFieldModel(
+                            FindField(entity, field.Field)!.Name,
+                            field.ReadOnly ?? false,
+                            Compile(field.VisibleWhen),
+                            Compile(field.RequiredWhen),
+                            Compile(field.ReadOnlyWhen)))
+                        .ToList(),
+                    section.Name,
+                    Compile(section.VisibleWhen)))
                 .ToList(),
+            Steps = form.Steps is null
+                ? []
+                : [.. form.Steps.Select(step => new FormStepModel(step.Title, [.. step.Sections.Select(SectionName)]))],
         };
     }
 

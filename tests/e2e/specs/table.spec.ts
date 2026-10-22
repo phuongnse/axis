@@ -46,7 +46,7 @@ test('paging and sorting go through the record API and stay in the URL', async (
   await page.reload()
 
   await expect(page).toHaveURL(/\/e2e\/notes\?page=2&pageSize=10&sort=title$/)
-  await expect(page.locator('[aria-current="page"]')).toHaveText('2')
+  await expect(page.getByRole('main').locator('[aria-current="page"]')).toHaveText('2')
   await expect(page.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'ascending')
 })
 

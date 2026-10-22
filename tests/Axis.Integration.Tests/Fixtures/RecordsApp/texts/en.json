@@ -13,6 +13,8 @@
     "itemForm.title": "Item",
     "itemSections.main": "Main",
     "itemSections.pricing": "Pricing",
+    "itemSections.stepMain": "Main step",
+    "itemSections.stepPricing": "Pricing step",
     "departments.title": "Departments",
     "myTasks.title": "My tasks",
     "item.department": "Department",

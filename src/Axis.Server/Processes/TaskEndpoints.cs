@@ -278,12 +278,9 @@ internal static class TaskEndpoints
         var form = ApplicationSites.DescribeForm(release, formModel.Name);
         var entity = ApplicationSites.DescribeEntity(release, formModel.Entity.Name);
         var readable = TaskCompletionCommand.Readable(active, roles, task.SubjectEntityId);
-        var sections = form.Sections;
         if (readable is not null)
         {
-            sections = [.. sections
-                .Select(section => section with { Fields = [.. section.Fields.Where(field => readable.Contains(field.Name))] })
-                .Where(section => section.Fields.Count > 0)];
+            form = ApplicationSites.Readable(form, readable);
             entity = entity with { Fields = [.. entity.Fields.Where(field => readable.Contains(field.Name))] };
         }
 
@@ -299,7 +296,7 @@ internal static class TaskEndpoints
                 task.AssigneeKind == ProcessTasks.UserAssignee ? task.Assignee : null,
                 task.AssigneeKind == ProcessTasks.RoleAssignee ? task.Assignee : null),
             Subject(release, task, labels, readable),
-            new TaskForm(form.Name, sections, entity),
+            new TaskForm(form.Name, form.Sections, form.Steps, entity),
             [.. step.Outcomes.Select(outcome => new TaskOutcome(outcome.Name, outcome.Label.TextKey))],
             task.DueAt?.UtcDateTime,
             task.CreatedAt.UtcDateTime,
@@ -409,7 +406,7 @@ internal sealed record TaskSubject(string Entity, Guid Id, string? Label);
 internal sealed record TaskAssignee(string? User, string? Role);
 
 /// <summary>The form a task is completed on, in the shape of a form widget's metadata, with its entity's metadata.</summary>
-internal sealed record TaskForm(string Name, IReadOnlyList<FormSectionMetadata> Sections, EntityMetadata Entity);
+internal sealed record TaskForm(string Name, IReadOnlyList<FormSectionMetadata> Sections, IReadOnlyList<FormStepMetadata> Steps, EntityMetadata Entity);
 
 /// <summary>An outcome a task can be completed with.</summary>
 internal sealed record TaskOutcome(string Name, string LabelKey);

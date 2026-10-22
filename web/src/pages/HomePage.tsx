@@ -1,7 +1,7 @@
-import { PageContainer, ProCard } from '@ant-design/pro-components'
-import { Alert, Badge, List } from 'antd'
+import { Alert, Badge, Card, List } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { PageLayout } from '../platform/PageLayout'
 import { useServerStatus, type ServerStatus } from '../platform/serverStatus'
 import { fetchSites, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
@@ -39,7 +39,7 @@ function SiteList() {
   }, [])
 
   return (
-    <ProCard title={t('shell.home.sites.title')}>
+    <Card title={t('shell.home.sites.title')}>
       {failed ? (
         <Alert data-testid="sites-error" type="error" message={t('shell.home.sites.loadFailed')} />
       ) : sites === null ? (
@@ -56,7 +56,7 @@ function SiteList() {
           )}
         />
       )}
-    </ProCard>
+    </Card>
   )
 }
 
@@ -65,17 +65,15 @@ export function HomePage() {
   const serverStatus = useServerStatus()
 
   return (
-    <PageContainer title={t('shell.home.title')}>
-      <ProCard ghost direction="column" gutter={[0, 16]}>
-        <ProCard title={t('shell.serverStatus.title')}>
-          <Badge
-            data-testid="server-status"
-            status={statusBadge[serverStatus]}
-            text={t(`shell.serverStatus.${serverStatus}`)}
-          />
-        </ProCard>
-        <SiteList />
-      </ProCard>
-    </PageContainer>
+    <PageLayout title={t('shell.home.title')}>
+      <Card title={t('shell.serverStatus.title')}>
+        <Badge
+          data-testid="server-status"
+          status={statusBadge[serverStatus]}
+          text={t(`shell.serverStatus.${serverStatus}`)}
+        />
+      </Card>
+      <SiteList />
+    </PageLayout>
   )
 }

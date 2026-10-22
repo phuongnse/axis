@@ -223,3 +223,9 @@ sorted by file and then path.
 | `AXC0222` | The `width` of the columns of one `columns` widget do not add up to 12. The message gives the sum. Reported at `/widgets/{i}/columns`, or at that pointer inside a container. |
 | `AXC0223` | A page holds a second `table` widget, whatever it shows. The message names the first table's pointer. Reported at the second table. |
 | `AXC0224` | A page holds a second `form`, `taskInbox` or `processInspector` widget, counted together. The message names the first one's pointer. Reported at the second widget. |
+| `AXC0225` | A form condition reads a field the form does not list, see [form conditions and steps](resource-files.md#form-conditions-and-steps). Reported at the condition. |
+| `AXC0226` | A form field has `visibleWhen` and its entity field is `required`, see [form conditions and steps](resource-files.md#form-conditions-and-steps). Reported at the field's `visibleWhen`. |
+| `AXC0227` | A form section `name` is already used by an earlier section, ignoring letter case. Reported at the repeated `name`. |
+| `AXC0228` | A form step lists a section name that no section of the form has. Reported at the name in the step's `sections`. |
+| `AXC0229` | A form step lists a section that is already in a step. Reported at the repeated name in the step's `sections`. |
+| `AXC0230` | A form has `steps` and a section has no name or is in no step. Reported at the section. |
