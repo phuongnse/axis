@@ -1,6 +1,7 @@
 # Shared by the test scripts. Source it from the repository root.
 # Every suite runs even after another one fails, writes a JUnit file to
 # artifacts/test-results/NAME.xml, and scripts/test-report.mjs reports on them.
+# A suite may also write artifacts/test-results/NAME.json, a Playwright JSON report.
 
 root="$(pwd)"
 results_dir="${AXIS_TEST_RESULTS_DIR:-$root/artifacts/test-results}"
@@ -15,7 +16,7 @@ skipped=()
 run_suite() {
   local name="$1" cwd="$2"
   shift 2
-  rm -f "$results_dir/$name.xml"
+  rm -f "$results_dir/$name.xml" "$results_dir/$name.json"
   suites+=("$name:$cwd")
   "$@" || status=1
 }
@@ -24,7 +25,7 @@ run_suite() {
 # Registers a suite whose results another suite writes to $results_dir/NAME.xml. Call it
 # before that suite runs, so a results file left by an earlier run is removed first.
 expect_suite() {
-  rm -f "$results_dir/$1.xml"
+  rm -f "$results_dir/$1.xml" "$results_dir/$1.json"
   suites+=("$1:$2")
 }
 
@@ -40,7 +41,7 @@ affected() {
 # skip_suite NAME CWD
 # Registers a suite that does not run, so the summary lists it as skipped.
 skip_suite() {
-  rm -f "$results_dir/$1.xml"
+  rm -f "$results_dir/$1.xml" "$results_dir/$1.json"
   suites+=("$1:$2")
   skipped+=(--skipped "$1")
 }

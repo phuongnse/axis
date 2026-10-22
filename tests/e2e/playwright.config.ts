@@ -3,7 +3,7 @@ import { e2eApp, journeyServerEnv, journeyURL, leaveRequests, purchaseRequests, 
 
 const port = Number(process.env.AXIS_E2E_PORT ?? 5280)
 const baseURL = `http://127.0.0.1:${port}`
-// scripts/e2e.sh keeps the server output in a log file and the JUnit results with the other suites.
+// scripts/e2e.sh keeps the server output in a log file and the JUnit and JSON results with the other suites.
 const serverCommand = 'dotnet run --project ../../src/Axis.Server --no-launch-profile --no-build -c Release'
 const serverLog = process.env.AXIS_E2E_SERVER_LOG
 const journeyServerLog = process.env.AXIS_E2E_JOURNEY_SERVER_LOG
@@ -33,6 +33,7 @@ export default defineConfig({
     ['list'],
     ['html', { open: 'never' }],
     ['junit', { outputFile: process.env.AXIS_E2E_JUNIT ?? 'test-results/junit.xml' }],
+    ['json', { outputFile: process.env.AXIS_E2E_JSON ?? 'test-results/results.json' }],
   ],
   use: {
     baseURL,

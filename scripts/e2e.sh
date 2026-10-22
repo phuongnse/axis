@@ -223,6 +223,7 @@ if affected playwright; then
 
   export AXIS_E2E_SERVER_LOG="$root/artifacts/logs/e2e-server.log"
   export AXIS_E2E_JUNIT="$results_dir/playwright.xml"
+  export AXIS_E2E_JSON="$results_dir/playwright.json"
   export AXIS_E2E_WORKER_LOG="$root/artifacts/logs/e2e-worker.log"
   export AXIS_E2E_JOURNEY_SERVER_LOG="$root/artifacts/logs/e2e-journey-server.log"
   publisher_log="$root/artifacts/logs/e2e-publisher.log"
