@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react'
-import { DatePicker } from 'antd'
+import { DatePicker, Table, theme } from 'antd'
+import viVN from 'antd/locale/vi_VN'
 import dayjs from 'dayjs'
+import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
@@ -19,7 +21,18 @@ const navigationTexts = [
   { texts: { 'nav.home': 'Home', 'nav.notes': 'Notes', 'nav.categories': 'Categories' }, fallbackTexts: {} },
 ]
 
-function renderShell(locale: string, initialEntries = ['/'], navigation: typeof notesNavigation = []) {
+/** Shows the container background token the theme gives components inside the shell. */
+function Background() {
+  const { token } = theme.useToken()
+  return <span data-testid="background">{token.colorBgContainer}</span>
+}
+
+function renderShell(
+  locale: string,
+  initialEntries = ['/'],
+  navigation: typeof notesNavigation = [],
+  children: ReactNode = <DatePicker />,
+) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <ThemeModeProvider>
@@ -31,7 +44,7 @@ function renderShell(locale: string, initialEntries = ['/'], navigation: typeof 
             locale={locale}
             onLocaleChange={() => {}}
           >
-            <DatePicker />
+            {children}
           </Shell>
         </TextProvider>
       </ThemeModeProvider>
@@ -66,6 +79,31 @@ describe('Shell', () => {
     expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'Chọn thời điểm')
     expect(dayjs.locale()).toBe('vi')
   })
+
+  it('shows an empty table in Vietnamese for vi', () => {
+    renderShell('vi', ['/'], [], <Table columns={[{ title: 'Name', dataIndex: 'name' }]} dataSource={[]} />)
+
+    expect(screen.getByText(viVN.Empty!.description!, { selector: '.ant-empty-description' })).toBeInTheDocument()
+  })
+})
+
+describe.each(['light', 'dark'] as const)('Shell in %s mode', (mode) => {
+  beforeEach(() => localStorage.setItem('axis.themeMode', mode))
+
+  it('gives components the background token of the mode', () => {
+    renderShell('en', ['/'], [], <Background />)
+
+    const expected = theme.getDesignToken({
+      algorithm: mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
+    }).colorBgContainer
+    expect(screen.getByTestId('background')).toHaveTextContent(expected)
+  })
+})
+
+it('gives dark mode a different background token from light mode', () => {
+  expect(theme.getDesignToken({ algorithm: theme.darkAlgorithm }).colorBgContainer).not.toBe(
+    theme.getDesignToken({ algorithm: theme.defaultAlgorithm }).colorBgContainer,
+  )
 })
 
 describe('Shell navigation', () => {
