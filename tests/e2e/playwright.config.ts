@@ -36,6 +36,8 @@ export default defineConfig({
   ],
   use: {
     baseURL,
+    // An action that cannot run fails fast and names its element, instead of waiting for the test timeout.
+    actionTimeout: 15_000,
     trace: 'retain-on-failure',
   },
   projects: [
