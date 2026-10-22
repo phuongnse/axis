@@ -38,8 +38,8 @@ export async function createRequest(page: Page, prefix: string, unitPrice: numbe
 /** Opens the request form and submits the request. */
 export async function submit(page: Page, id: string, title: string) {
   await page.goto(`/purchasing/purchaserequestform/${id}`)
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
-  await page.getByRole('button', { name: 'Submit' }).click()
+  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+  await page.getByRole('button', { name: 'Submit', exact: true }).click()
   await expect(page.getByTestId('form-started')).toBeVisible()
 }
 
@@ -66,12 +66,12 @@ export async function decide(
   comment?: string,
 ) {
   const row = await waitForTask(page, title)
-  await row.getByRole('link', { name: task }).click()
+  await row.getByRole('link', { name: task, exact: true }).click()
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title)
   if (comment !== undefined) {
     await page.getByLabel('Decision comments', { exact: true }).fill(comment)
   }
-  await page.getByRole('button', { name: outcome }).click()
+  await page.getByRole('button', { name: outcome, exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/mytasks$/)
 }
 

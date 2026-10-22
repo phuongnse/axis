@@ -314,6 +314,8 @@ function StudioWorkspace() {
         <Select
           aria-label={t('shell.studio.application')}
           placeholder={t('shell.studio.application')}
+          showSearch
+          optionFilterProp="label"
           style={{ maxWidth: 360 }}
           value={application}
           options={apps.map((app) => ({ value: app.name, label: app.name }))}

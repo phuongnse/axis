@@ -94,6 +94,8 @@ export function FieldCell(props: CellProps) {
     case 'enum':
       return (
         <Select
+          showSearch
+          optionFilterProp="label"
           virtual={false}
           aria-label={field.name}
           aria-invalid={problem !== undefined}

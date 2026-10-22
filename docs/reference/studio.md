@@ -37,7 +37,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
 - **New resource.** A **New resource** button above the search box opens a
   dialog that asks for the kind and the name, or the locale for a `text`
   resource. The kind picker lists the 18 kinds that the create route accepts,
-  which is every kind except the manifest.
+  which is every kind except the manifest. The author can type to narrow it.
   - It sends the kind's starter with an id from `crypto.randomUUID()`. A starter
     is the smallest content that passes the kind's schema. A reference the
     author must still choose is an empty string, so it shows up as a diagnostic.

@@ -105,7 +105,9 @@ export function StudioNewResource({
             <Select
               aria-label={t('shell.studio.newResource.kind')}
               value={kind}
-              // All kinds render, so each one can be reached without scrolling the list.
+              // All kinds render, so each one can be reached without scrolling the list, and the author can type to narrow it.
+              showSearch
+              optionFilterProp="label"
               virtual={false}
               // The list opens inside the dialog, so it moves with the dialog's opening animation. In the page body
               // it keeps the place it had when it opened, and a click on a kind can miss its option.

@@ -735,7 +735,7 @@ are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
 
 Playwright specs find elements by role, accessible name and ARIA state, and never
 select a class of the UI library. `scripts/lint.sh` fails when a file under
-`tests/` names a class that starts with `ant-`.
+`tests/` names a class that starts with `ant-`. Specs pick select options only through the helpers in `tests/e2e/select.ts`, and use `pickAction` for selects that act and then clear themselves.
 
 Only `*PerformanceTests` classes may assert on elapsed time, because they run alone.
 Other tests prove a bound with a count, such as the steps used or the nodes inlined, and

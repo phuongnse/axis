@@ -1248,6 +1248,21 @@ describe('StudioPage publishing', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Create' }))
     }
 
+    it('narrows the kinds to what is typed', async () => {
+      stubCreate(201)
+      renderPage()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New resource' }))
+      await userEvent.type(screen.getByRole('combobox', { name: 'Kind' }), 'proc')
+
+      expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['process'])
+      await userEvent.click(screen.getByRole('option', { name: 'process' }))
+      const create = screen.getByRole('button', { name: 'Create' })
+      expect(create).toBeDisabled()
+      await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Approval')
+      expect(create).toBeEnabled()
+    })
+
     it('creates a text resource that copies the texts of the default locale of the first site', async () => {
       const fetchMock = stubCreate(201)
       renderPage()

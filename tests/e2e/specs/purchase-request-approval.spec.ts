@@ -74,7 +74,7 @@ async function countHistory(page: Page, ...texts: string[]) {
   const history = page.getByTestId('record-history')
   const entries = history.getByTestId('history-entry')
   const matching = texts.reduce((locator, text) => locator.filter({ hasText: text }), entries)
-  const next = history.getByTitle('Next Page')
+  const next = history.getByTitle('Next Page', { exact: true })
   await expect(entries.first()).toBeVisible()
   // An earlier count leaves the panel on its last page.
   const first = history.getByTitle('1', { exact: true })
@@ -178,7 +178,7 @@ test('a returned request is edited and submitted again, and the manager then app
   await expect(page.getByLabel('Decision comments', { exact: true })).toHaveValue(comment)
   await page.getByLabel('Quantity 1', { exact: true }).fill('2')
   // Submit saves the edit before it starts the process.
-  await page.getByRole('button', { name: 'Submit' }).click()
+  await page.getByRole('button', { name: 'Submit', exact: true }).click()
   await expect(page.getByTestId('form-started')).toBeVisible()
 
   await useSession(page, 'chau')
@@ -206,11 +206,11 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
 
   await useSession(page, 'anna')
   await page.goto(`/purchasing/purchaserequestform/${id}`)
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title)
+  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
   const start = page.waitForResponse((response) =>
     response.url().endsWith('/processes/PurchaseRequestApproval/instances'),
   )
-  await page.getByRole('button', { name: 'Submit' }).click()
+  await page.getByRole('button', { name: 'Submit', exact: true }).click()
 
   expect((await start).status()).toBe(400)
   await expect(page.getByTestId('form-error')).toHaveText(
