@@ -67,4 +67,5 @@ files agree, title and status included.
 | [D54](decisions/d54-the-entity-designer-and-the-policy-matrix.md) | The entity designer and the policy matrix | **Agreed** |
 | [D55](decisions/d55-running-test-scenarios-from-studio.md) | Running test scenarios from Studio | **Agreed** |
 | [D56](decisions/d56-a-service-desk-as-the-third-sample-application.md) | A service desk as the third sample application | **Agreed** |
-| [D57](decisions/d57-conditional-form-states-validation-as-you-type-and-wizard-steps.md) | Conditional form states, validation as you type and wizard steps | **Agreed** |
+| [D57](decisions/d57-a-design-system-published-from-the-repository.md) | A design system published from the repository | **Agreed** |
+| [D58](decisions/d58-conditional-form-states-validation-as-you-type-and-wizard-steps.md) | Conditional form states, validation as you type and wizard steps | **Agreed** |

@@ -128,8 +128,10 @@ state:
   `form` metadata, plus `entity` in the shape of a widget's `entity`
   metadata, so the task page knows each field's type. See
   [frontend](frontend.md). The example shortens both. *(Planned for M12.)*
-  The form's fields may carry the condition expressions, and the form may
-  have `steps`, as in
+  The `form` carries the same additions as the form metadata in
+  [frontend](frontend.md): `visibleWhen` as a yes or no flag on each field
+  and section, each section's `name`, and `steps`. The condition expressions
+  stay on the server. See
   [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 - `completedAt`, `completedBy` and `outcome` are `null` while the task is
   `open`.
@@ -159,7 +161,7 @@ Content-Type: application/json
 *(Planned for M12.)* `POST /api/apps/{app}/tasks/{id}/form-state` answers
 what the task's form shows for a draft, as the record API's
 [form state](record-api.md#form-state) does for a record form
-([D57](../decisions/d57-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
+([D58](../decisions/d58-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 It needs `Content-Type: application/json` and the
 [CSRF header](record-api.md#create-update-and-delete).
 
