@@ -1,12 +1,13 @@
 import { Alert, Button, Flex, Form } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { navigatePath } from './navigateAction'
 import { buildRecordBody } from './recordBody'
 import { RecordHistory } from './RecordHistory'
 import { newIdempotencyKey, startProcess } from './processes'
 import { fetchRecord, saveRecord, type RecordItem, type RecordProblem } from './records'
-import type { EntityWidgetMetadata, StartProcessAction } from './site'
+import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
@@ -40,12 +41,15 @@ type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
  * widget's access says, is read-only too: on a new record the `create` fields, and on a saved one
  * the `update` fields. Without the `create` or `update` grant the form has no save button. A saved
  * record shows its history below the form, and a button for each of the widget's `startProcess` actions, which
- * lists only the processes the user may start. A `navigate` action has no button yet. A new record has neither. An action saves the
- * changed fields, then starts its process for the record.
+ * lists only the processes the user may start. An action saves the changed fields, then starts its
+ * process for the record. A saved record also shows a button for each `navigate` action, after the
+ * start buttons. It opens the target page with the record as it was loaded, so unsaved edits are not
+ * used, and it is hidden when the SPA cannot work out an expression. A new record has no action buttons.
  */
 export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
   const navigate = useNavigate()
+  const location = useLocation()
   const { entity } = widget
   const { access } = widget
   const writeAction = recordId === null ? 'create' : 'update'
@@ -66,6 +70,8 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   const [conflict, setConflict] = useState(false)
   const [saving, setSaving] = useState(false)
   const [starting, setStarting] = useState(false)
+  // The record as it was last loaded or saved, which the navigate buttons read their values from.
+  const [record, setRecord] = useState<RecordItem | null>(null)
   const [started, setStarted] = useState(false)
   // The Idempotency-Key of each action's start that got no final answer, by start endpoint, so a
   // retry cannot start a second instance.
@@ -74,6 +80,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   const start = useCallback(
     (record: RecordItem) => {
       startForm(record)
+      setRecord(record)
       setConflict(false)
       setLoad('ready')
     },
@@ -262,6 +269,25 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
                   {t(action.labelKey)}
                 </Button>
               ))}
+          {recordId !== null &&
+            record?.id === recordId &&
+            widget.actions
+              .filter((action): action is NavigateAction => action.type === 'navigate')
+              .map((action, index) => {
+                const path = navigatePath(sitePath, action, { id: recordId, values: record.values })
+                return (
+                  path && (
+                    <Button
+                      key={index}
+                      htmlType="button"
+                      disabled={saving || starting}
+                      onClick={() => navigate(path, { state: { from: `${location.pathname}${location.search}` } })}
+                    >
+                      {t(action.labelKey)}
+                    </Button>
+                  )
+                )
+              })}
         </Flex>
       </Form>
       {recordId !== null && (

@@ -44,6 +44,8 @@ const noteWidget: EntityWidgetMetadata = {
   process: null,
   instancesPath: null,
   actions: [],
+  rowActions: [],
+  toolbarActions: [],
   access: null,
   entity: {
     name: 'Note',
@@ -292,7 +294,13 @@ function historyRequests() {
 
 function CurrentLocation() {
   const location = useLocation()
-  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>
+  const state = location.state as { from?: string } | null
+  return (
+    <>
+      <output data-testid="location">{`${location.pathname}${location.search}`}</output>
+      <output data-testid="from">{state?.from}</output>
+    </>
+  )
 }
 
 function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata = noteWidget) {
@@ -973,17 +981,54 @@ describe('FormWidget', () => {
       expect(screen.queryByRole('button', { name: 'Close note' })).toBeNull()
     })
 
-    it('renders no button for a navigate action and still renders the startProcess button', async () => {
+    it('shows a navigate button on a saved record that opens the target with the record values', async () => {
       stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
 
       renderForm(noteId, {
         ...actionWidget,
-        actions: [{ type: 'navigate', page: 'Notes', labelKey: 'note.open' }, ...actionWidget.actions],
+        actions: [
+          {
+            type: 'navigate',
+            page: 'Notes',
+            labelKey: 'note.open',
+            parameters: { note: 'id', title: 'Title', category: 'category' },
+            record: null,
+            opensForm: false,
+          },
+          ...actionWidget.actions,
+        ],
       })
 
+      await userEvent.click(await screen.findByRole('button', { name: 'note.open' }))
+
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        `/e2e/notes?note=${noteId}&title=Buy+paper&category=${categoryId}`,
+      )
+      expect(screen.getByTestId('from')).toHaveTextContent(`/e2e/noteform/${noteId}`)
+    })
+
+    it('shows no navigate button on a new record, and hides one it cannot work out', async () => {
+      const navigateAction = {
+        type: 'navigate' as const,
+        page: 'Notes',
+        labelKey: 'note.open',
+        parameters: {},
+        record: null,
+        opensForm: false,
+      }
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      const { unmount } = renderForm(null, { ...actionWidget, actions: [navigateAction] })
+      expect(await screen.findByLabelText('Title')).toHaveValue('')
+      expect(screen.queryByRole('button', { name: 'note.open' })).toBeNull()
+      unmount()
+
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, {
+        ...actionWidget,
+        actions: [{ ...navigateAction, parameters: { title: 'concat(title, code)' } }, ...actionWidget.actions],
+      })
       expect(await screen.findByRole('button', { name: 'Close note' })).toBeEnabled()
       expect(screen.queryByRole('button', { name: 'note.open' })).toBeNull()
-      expect(screen.queryByText('note.open')).toBeNull()
     })
 
     it('keeps the action on a read-only form without a save button', async () => {

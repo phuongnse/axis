@@ -149,8 +149,8 @@ flowchart LR
      `navigate` actions
      ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) in a
      form widget's `actions` and a table's `rowActions` and `toolbarActions`
-     are checked at the action's pointer. The page and the buttons do not use
-     them yet:
+     are checked at the action's pointer. The page does not read its parameters
+     yet:
      - a target `page` that no loaded page has is `AXC0232` at `/page`. A page
        that failed to load is not reported again,
      - a parameter the target page does not declare, or one given twice

@@ -7,11 +7,11 @@ namespace Axis.Integration.Tests;
 
 public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClassFixture<ProcessStartFixture>
 {
-    private const string ShowSubmissions = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions","parameters":{},"record":null}""";
+    private const string ShowSubmissions = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions","parameters":{},"record":null,"opensForm":false}""";
 
-    private const string ShowSubmissionsOfRow = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions","parameters":{"request":"id"},"record":null}""";
+    private const string ShowSubmissionsOfRow = """{"type":"navigate","page":"Submissions","labelKey":"request.showSubmissions","parameters":{"request":"id"},"record":null,"opensForm":false}""";
 
-    private const string OpenRequestForm = """{"type":"navigate","page":"RequestForm","labelKey":"pages.requestForm.title","parameters":{},"record":"id"}""";
+    private const string OpenRequestForm = """{"type":"navigate","page":"RequestForm","labelKey":"pages.requestForm.title","parameters":{},"record":"id","opensForm":true}""";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
