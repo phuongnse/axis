@@ -20,6 +20,7 @@ import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
+import { MappingRows } from './MappingRows'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -47,7 +48,9 @@ function JsonOnly() {
  * edits the width of each column, the label of each tab and the title and collapsed state of a section, and adds
  * or removes columns and tabs. The panel of a `table`, `form`, `taskInbox` or
  * `processInspector` widget shows its type with every property that type takes. A `form` panel also lists its
- * `startProcess` actions. A property is a name picked from the application's names, and a table's data source and
+ * `actions`, which are `startProcess` or `navigate`, and a `table` panel lists its `rowActions` and `toolbarActions`,
+ * which are `navigate`. A navigate action has a target page, a label, a `record` expression and parameter
+ * expressions. A property is a name picked from the application's names, and a table's data source and
  * entity, like a form's entity and form, exclude each other, so a pick clears the other. The editor edits the
  * draft through `onChange`, so a key it does not show, on the page or on a widget, stays as it is. A widget of a
  * type it has no panel for shows its type and points to the JSON view.
@@ -424,6 +427,20 @@ function WidgetPanel({
             without={pageName}
             onPick={(next) => pick('formPage', next)}
           />
+          <Actions
+            pointer={`${base}/rowActions`}
+            title={t('shell.studio.page.rowActions')}
+            actions={widget.rowActions}
+            startProcess={false}
+            onChange={onChange}
+          />
+          <Actions
+            pointer={`${base}/toolbarActions`}
+            title={t('shell.studio.page.toolbarActions')}
+            actions={widget.toolbarActions}
+            startProcess={false}
+            onChange={onChange}
+          />
         </>
       )}
       {type === 'form' && (
@@ -444,7 +461,13 @@ function WidgetPanel({
             required={false}
             onPick={(next) => pick('form', next, 'entity')}
           />
-          <Actions pointer={`${base}/actions`} actions={widget.actions} onChange={onChange} />
+          <Actions
+            pointer={`${base}/actions`}
+            title={t('shell.studio.page.actions')}
+            actions={widget.actions}
+            startProcess
+            onChange={onChange}
+          />
         </>
       )}
       {type === 'processInspector' && (
@@ -620,17 +643,90 @@ function TextReferenceField({
   )
 }
 
-/** The `startProcess` actions of a form widget, each with its process and label. */
-function Actions({ pointer, actions, onChange }: { pointer: string; actions: unknown; onChange: ChangeHandler }) {
+/** The label of an action, with a box for each locale, or a plain key box while the names have not loaded. */
+function ActionLabel({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
   const label = useContext(LabelTextsContext)
+
+  return (
+    <div data-testid={`studio-field-${pointer}`}>
+      <div>{t('shell.studio.page.actionLabel')}</div>
+      {names !== undefined && label !== null ? (
+        <LabelTexts pointer={pointer} value={value} onChange={onChange} />
+      ) : (
+        <Input
+          aria-label={t('shell.studio.labelKey')}
+          value={text(isContent(value) ? value.textKey : undefined)}
+          onChange={(event) => onChange(`${pointer}/textKey`, event.target.value)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** The fields of a `navigate` action: its page, label, optional `record` expression and parameter expressions. */
+function NavigateFields({ pointer, action, onChange }: { pointer: string; action: Content; onChange: ChangeHandler }) {
+  const t = useText()
+
+  return (
+    <>
+      <NameField
+        pointer={`${pointer}/page`}
+        label={t('shell.studio.page.actionPage')}
+        kind="page"
+        current={action.page}
+        required
+        onPick={(next) => onChange(`${pointer}/page`, next)}
+      />
+      <ActionLabel pointer={`${pointer}/label`} value={action.label} onChange={onChange} />
+      <div data-testid={`studio-field-${pointer}/record`}>
+        <div>{t('shell.studio.page.actionRecord')}</div>
+        <Input
+          aria-label={t('shell.studio.page.actionRecord')}
+          value={text(action.record)}
+          onChange={(event) =>
+            onChange(`${pointer}/record`, event.target.value === '' ? undefined : event.target.value)
+          }
+        />
+      </div>
+      <MappingRows
+        pointer={`${pointer}/parameters`}
+        title={t('shell.studio.page.actionParameters')}
+        value={action.parameters}
+        keyLabel={t('shell.studio.page.parameterName')}
+        target={{ kind: 'expression' }}
+        onChange={onChange}
+      />
+    </>
+  )
+}
+
+/**
+ * A list of actions of a widget, each with its fields. A `navigate` action has a page, a label, a `record` and
+ * parameters. Any other action is a `startProcess` action with a process and a label. The list always offers Add
+ * navigate action, and offers Add action for `startProcess` only when `startProcess` is set.
+ */
+function Actions({
+  pointer,
+  title,
+  actions,
+  startProcess,
+  onChange,
+}: {
+  pointer: string
+  title: string
+  actions: unknown
+  startProcess: boolean
+  onChange: ChangeHandler
+}) {
+  const t = useText()
   const list = Array.isArray(actions) ? actions : []
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
       <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.page.actions')}</Typography.Text>
+        <Typography.Text strong>{title}</Typography.Text>
         {actions !== undefined && !Array.isArray(actions) ? (
           <JsonOnly />
         ) : (
@@ -650,26 +746,21 @@ function Actions({ pointer, actions, onChange }: { pointer: string; actions: unk
                 <Card size="small" key={position} data-testid={`studio-action-${position}`}>
                   <Flex vertical gap="small">
                     <Typography.Text>{text(action.type)}</Typography.Text>
-                    <NameField
-                      pointer={`${actionPointer}/process`}
-                      label={t('shell.studio.page.actionProcess')}
-                      kind="process"
-                      current={action.process}
-                      required
-                      onPick={(next) => onChange(`${actionPointer}/process`, next)}
-                    />
-                    <div data-testid={`studio-field-${actionPointer}/label`}>
-                      <div>{t('shell.studio.page.actionLabel')}</div>
-                      {names !== undefined && label !== null ? (
-                        <LabelTexts pointer={`${actionPointer}/label`} value={action.label} onChange={onChange} />
-                      ) : (
-                        <Input
-                          aria-label={t('shell.studio.labelKey')}
-                          value={text(isContent(action.label) ? action.label.textKey : undefined)}
-                          onChange={(event) => onChange(`${actionPointer}/label/textKey`, event.target.value)}
+                    {action.type === 'navigate' ? (
+                      <NavigateFields pointer={actionPointer} action={action} onChange={onChange} />
+                    ) : (
+                      <>
+                        <NameField
+                          pointer={`${actionPointer}/process`}
+                          label={t('shell.studio.page.actionProcess')}
+                          kind="process"
+                          current={action.process}
+                          required
+                          onPick={(next) => onChange(`${actionPointer}/process`, next)}
                         />
-                      )}
-                    </div>
+                        <ActionLabel pointer={`${actionPointer}/label`} value={action.label} onChange={onChange} />
+                      </>
+                    )}
                     <div>
                       <Button danger onClick={() => onChange(actionPointer, undefined)}>
                         {t('shell.studio.page.removeAction')}
@@ -679,15 +770,22 @@ function Actions({ pointer, actions, onChange }: { pointer: string; actions: unk
                 </Card>
               )
             })}
-            <div>
+            <Flex gap="small" wrap>
+              {startProcess && (
+                <Button
+                  onClick={() =>
+                    onChange(pointer, [...list, { type: 'startProcess', process: '', label: { textKey: '' } }])
+                  }
+                >
+                  {t('shell.studio.page.addAction')}
+                </Button>
+              )}
               <Button
-                onClick={() =>
-                  onChange(pointer, [...list, { type: 'startProcess', process: '', label: { textKey: '' } }])
-                }
+                onClick={() => onChange(pointer, [...list, { type: 'navigate', page: '', label: { textKey: '' } }])}
               >
-                {t('shell.studio.page.addAction')}
+                {t('shell.studio.page.addNavigateAction')}
               </Button>
-            </div>
+            </Flex>
           </>
         )}
       </Flex>

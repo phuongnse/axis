@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect } from 'vitest'
 
-// The one place that knows Ant Design's class names. The Ant Design 6 upgrade should change only this file.
+// The one place that knows Ant Design's class names. A change in Ant Design's markup should change only this file.
 
 const openDropdownSelector = '.ant-select-dropdown:not(.ant-select-dropdown-hidden):not(.ant-slide-up-leave)'
 
@@ -90,7 +90,7 @@ export function isSortableHeader(header: HTMLElement): boolean {
 
 /** Whether `element` sits in a spin area that is still blurred while it loads. */
 export function isBlurred(element: HTMLElement): boolean {
-  return element.closest('.ant-spin-blur') !== null
+  return element.closest('.ant-spin-blur, .ant-spin-spinning') !== null
 }
 
 /** The label of a segmented control's item with `text`. */

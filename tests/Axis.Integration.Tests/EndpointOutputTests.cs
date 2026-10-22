@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -10,8 +9,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Endpoints with <c>output</c> and <c>wait</c>: the call waits for its instance after the commit,
 /// and the status location reports the instance to the caller who started it. EndpointApp's
-/// <c>ImportClosedNote</c> closes the note at once, <c>ImportReviewedNote</c> waits on a task for
-/// the role <c>importer</c>, and <c>ImportFailingNote</c> breaks a validation and fails.
+/// <c>ImportClosedNote</c> closes the note at once, <c>ImportReviewedNote</c> and
+/// <c>ImportRepeatedNote</c> wait on a task for the role <c>importer</c>, and <c>ImportFailingNote</c> breaks a validation and fails.
 /// </summary>
 public sealed class EndpointOutputTests(EndpointOutputFixture fixture) : IClassFixture<EndpointOutputFixture>
 {
@@ -143,13 +142,21 @@ public sealed class EndpointOutputTests(EndpointOutputFixture fixture) : IClassF
     [Fact]
     public async Task A_failed_instance_ends_the_wait_with_202_and_no_output_and_its_status_location_answers_the_same()
     {
-        var elapsed = Stopwatch.StartNew();
-        using var response = await CallWithWorkerAsync("ImportFailingNote", """{ "input": { "title": "Bound to fail", "quantity": 2 } }""");
-        elapsed.Stop();
+        // The endpoint waits 30 seconds, so a call that answers within the 9-second deadline is 3.3 times
+        // short of its wait.
+        var call = CallAsync("ImportFailingNote", """{ "input": { "title": "Bound to fail", "quantity": 2 } }""");
+        await Polling.WaitUntilAsync(
+            async () =>
+            {
+                await fixture.RunUntilIdleAsync(CancellationToken);
+                return call.IsCompleted;
+            },
+            "The call kept waiting for its failed instance.",
+            TimeSpan.FromSeconds(9));
+        using var response = await call;
 
         var body = await response.Content.ReadAsStringAsync(CancellationToken);
         Assert.True(response.StatusCode == HttpStatusCode.Accepted, body);
-        Assert.True(elapsed.Elapsed < TimeSpan.FromSeconds(9), $"The call waited {elapsed.Elapsed} for a failed instance.");
         using var json = JsonDocument.Parse(body);
         Assert.Equal(["recordId", "instanceId", "state"], json.RootElement.EnumerateObject().Select(property => property.Name));
         Assert.Equal("failed", json.RootElement.GetProperty("state").GetString());
@@ -167,23 +174,31 @@ public sealed class EndpointOutputTests(EndpointOutputFixture fixture) : IClassF
     public async Task A_repeat_never_waits_and_answers_202_until_the_instance_completes_then_201_with_the_output()
     {
         const string Key = "reviewed-repeat";
+        const string Title = "Repeat review";
         const string Body = """{ "input": { "title": "Repeat review" } }""";
-        using var first = await CallWithWorkerAsync("ImportReviewedNote", Body, Key);
-        using var firstJson = await ReadJsonAsync(first, HttpStatusCode.Accepted);
-        var recordId = firstJson.RootElement.GetProperty("recordId").GetGuid();
-        var instanceId = firstJson.RootElement.GetProperty("instanceId").GetGuid();
+        var first = CallAsync("ImportRepeatedNote", Body, Key);
 
-        // The endpoint waits up to three seconds, and a repeat answers at once.
-        var started = Stopwatch.GetTimestamp();
-        using (var waiting = await CallAsync("ImportReviewedNote", Body, Key))
+        Guid? found;
+        while ((found = await fixture.FindInstanceAsync(Title)) is null)
         {
-            Assert.True(Stopwatch.GetElapsedTime(started) < TimeSpan.FromSeconds(3));
+            Assert.False(first.IsCompleted, "The first call ended before its instance was found.");
+            await Task.Delay(20, CancellationToken);
+        }
+
+        var instanceId = found.Value;
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        // The endpoint waits up to 30 seconds. A repeat answers while the first call still waits.
+        Guid recordId;
+        using (var waiting = await CallAsync("ImportRepeatedNote", Body, Key))
+        {
+            Assert.False(first.IsCompleted, "The repeat answered only after the first call stopped waiting.");
             using var json = await ReadJsonAsync(waiting, HttpStatusCode.Accepted);
             Assert.Equal(["recordId", "instanceId", "state"], json.RootElement.EnumerateObject().Select(property => property.Name));
-            Assert.Equal(recordId, json.RootElement.GetProperty("recordId").GetGuid());
+            recordId = json.RootElement.GetProperty("recordId").GetGuid();
             Assert.Equal(instanceId, json.RootElement.GetProperty("instanceId").GetGuid());
             Assert.Equal("waiting", json.RootElement.GetProperty("state").GetString());
-            Assert.Equal($"{Endpoints}/ImportReviewedNote/instances/{instanceId:D}", waiting.Headers.Location?.ToString());
+            Assert.Equal($"{Endpoints}/ImportRepeatedNote/instances/{instanceId:D}", waiting.Headers.Location?.ToString());
         }
 
         var task = await fixture.TaskIdAsync(instanceId);
@@ -196,7 +211,12 @@ public sealed class EndpointOutputTests(EndpointOutputFixture fixture) : IClassF
 
         await fixture.RunUntilIdleAsync(CancellationToken);
 
-        using var done = await CallAsync("ImportReviewedNote", Body, Key);
+        using var firstResponse = await first;
+        using var firstJson = await ReadJsonAsync(firstResponse, HttpStatusCode.Created);
+        Assert.Equal("completed", firstJson.RootElement.GetProperty("state").GetString());
+        Assert.Equal(recordId, firstJson.RootElement.GetProperty("recordId").GetGuid());
+
+        using var done = await CallAsync("ImportRepeatedNote", Body, Key);
         using var doneJson = await ReadJsonAsync(done, HttpStatusCode.Created);
         var root = doneJson.RootElement;
         Assert.Null(done.Headers.Location);

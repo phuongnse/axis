@@ -1,0 +1,17 @@
+{
+  "id": "9c7221fc-4cce-46b8-b22e-98dba66cfc7b",
+  "kind": "dataSource",
+  "name": "CategoryNotes",
+  "formatVersion": 1,
+  "entity": "Note",
+  "fields": [
+    { "name": "title", "path": "title" },
+    { "name": "category", "path": "category" }
+  ],
+  "parameters": [
+    { "name": "inCategory", "type": "reference", "target": "Category", "required": true }
+  ],
+  "filter": "category == inCategory",
+  "sort": "title",
+  "pageSize": 100
+}

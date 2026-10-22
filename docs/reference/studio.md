@@ -453,7 +453,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
   | `application` | Generic form                          | Nothing                                                               |
   | `entity`      | Entity designer                       | Nothing                                                               |
-  | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives each container a panel |
+  | `page`        | Typed editor                          | The page's `parameters`, and a widget or layout that M12 adds, until M12 gives each container a panel |
   | `form`        | Generic form, typed steps panel       | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
   | `process`     | Typed editor with the process graph   | Nothing                                                               |
@@ -481,8 +481,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
     type and a summary such as `table · PurchaseRequestList`. A panel per
     widget type, `table`, `form`, `taskInbox` and `processInspector`, shows the
     properties the widget has today. A `table` panel has entity, data source
-    and form page pickers. A `form` panel has entity and form pickers and its
-    `startProcess` actions, each with a process picker and a label. A
+    and form page pickers, then `rowActions` and `toolbarActions` lists of
+    navigate actions. A `form` panel has entity and form pickers and its
+    `actions`, each a `startProcess` action with a process picker and a label,
+    or a navigate action. A
     `taskInbox` panel has no properties. A `processInspector` panel has a
     process picker. The JSON view stays as a second view of the same draft.
     - **Type change.** Choosing another type removes the known properties the
@@ -491,12 +493,22 @@ Run and the Test results list, the read-only view of a module entity, and the re
     - **Exclusive bindings.** The compiler accepts exactly one of a table's
       entity and data source, and one of a form's entity and form. Picking one
       clears the other.
+    - **Navigate actions.** A navigate action
+      ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) has a
+      page picker, a label with a text box for each locale, an optional
+      `record` expression and parameter rows. A parameter row is a name and an
+      expression. The page picker lists every page, including the current one,
+      because a page may open itself with other parameters. A table offers only
+      navigate actions. A form offers Add action for `startProcess` and Add
+      navigate action. An empty Record box removes the `record` key. Parameter
+      names are typed, not picked, and a wrong name shows as a diagnostic after
+      the save.
     - **Pickers.** The form page picker lists every page except the current
       one. The action's process picker lists every process. Neither checks
       what the choice holds, so a wrong choice shows as a diagnostic after the
-      save. The form page picker goes when M12 removes `formPage`. Until a
-      panel exists, navigate actions and page parameters are edited in the JSON
-      view ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md))
+      save. The form page picker goes when M12 removes `formPage`. Page
+      parameters are edited in the JSON view
+      ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md))
       *(planned for M12)*.
     - **Widget tree** *(built)*. The editor shows the page's widgets as
       nested rows. A container shows its columns, tabs or section body as

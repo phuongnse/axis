@@ -10,7 +10,8 @@ namespace Axis.Configuration.Model;
 /// <see cref="FormPage"/> is set only on a table widget that names the page holding the form for
 /// its records. <see cref="Actions"/> is empty on every widget but a form widget that declares
 /// actions, and <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table
-/// that declares them. <see cref="Process"/> is set only on a process inspector, which has no other reference.
+/// that declares them. <see cref="Parameters"/> is empty on every widget but a table over a data source that binds
+/// page parameters. <see cref="Process"/> is set only on a process inspector, which has no other reference.
 /// A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container with no reference of its own: it holds
 /// <see cref="Columns"/>, <see cref="Tabs"/> or <see cref="Widgets"/>, and every other widget leaves those empty.
 /// Records compare lists by reference, so two widgets with containers are equal only when they share those lists.
@@ -31,6 +32,12 @@ public sealed record WidgetModel(
 
     /// <summary>The <c>navigate</c> actions a table widget shows above its rows, in page file order.</summary>
     public IReadOnlyList<WidgetActionModel> ToolbarActions { get; init; } = [];
+
+    /// <summary>
+    /// The page parameter that gives each data source parameter its value, keyed by the declared name of the data
+    /// source parameter, with the declared name of the page parameter as the value.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Parameters { get; init; } = NavigateActionModel.NoParameters;
 
     /// <summary>The columns of a <c>columns</c> widget, in page file order.</summary>
     public IReadOnlyList<WidgetColumnModel> Columns { get; init; } = [];

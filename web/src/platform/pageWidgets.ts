@@ -11,7 +11,7 @@ export const addableTypes = [...widgetTypes, ...containerTypes]
 
 /** The properties each widget type takes besides `type`, from the page schema and the compiler's rules. */
 export const widgetKeys: Record<string, string[]> = {
-  table: ['entity', 'dataSource', 'formPage'],
+  table: ['entity', 'dataSource', 'formPage', 'rowActions', 'toolbarActions'],
   form: ['entity', 'form', 'actions'],
   taskInbox: [],
   processInspector: ['process'],

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useParams } from 'react-router'
+import { useLocation, useParams, useSearchParams } from 'react-router'
 import { FormWidget } from '../platform/FormWidget'
 import { PageLayout } from '../platform/PageLayout'
+import { readPageParameters } from '../platform/pageParameters'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
 import { fetchPage, type EntityWidgetMetadata, type PageMetadata, type WidgetMetadata } from '../platform/site'
@@ -65,6 +66,7 @@ interface SitePageProps {
 
 function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordId, returnTo }: SitePageProps) {
   const t = useText()
+  const [searchParams] = useSearchParams()
   const [page, setPage] = useState<PageMetadata | null | 'failed'>()
 
   useEffect(() => {
@@ -88,6 +90,13 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
   }
   if (page === 'failed') {
     return <ShellError />
+  }
+
+  // A page whose required parameter is missing or malformed in the address names no page. This runs
+  // before any widget renders, so no rows are requested.
+  const pageValues = readPageParameters(searchParams, page.parameters)
+  if (pageValues === null) {
+    return <NotFoundPage />
   }
 
   const widget = page.widgets[0]
@@ -133,7 +142,9 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
   }
   return (
     <PageLayout title={t(page.titleKey)}>
-      {widget?.type === 'table' && <TableWidget sitePath={sitePath} widget={widget} locale={locale} />}
+      {widget?.type === 'table' && (
+        <TableWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
+      )}
       {widget?.type === 'form' && hasEntity(widget) && (
         <FormWidget
           widget={widget}

@@ -8,6 +8,7 @@
     { "endpoint": "ImportNote", "actions": ["invoke"] },
     { "endpoint": "ImportClosedNote", "actions": ["invoke"] },
     { "endpoint": "ImportReviewedNote", "actions": ["invoke"] },
+    { "endpoint": "ImportRepeatedNote", "actions": ["invoke"] },
     { "endpoint": "ImportFailingNote", "actions": ["invoke"] }
   ]
 }

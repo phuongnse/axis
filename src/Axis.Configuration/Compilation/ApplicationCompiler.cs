@@ -1698,6 +1698,21 @@ public static class ApplicationCompiler
             };
         }
 
+        // The checker has matched each key to a parameter of the data source and each value to a parameter of the
+        // page, ignoring letter case. The model uses the declared names, so a client never fixes the case itself.
+        IReadOnlyDictionary<string, string> BuildParameters(WidgetDefinition widget)
+        {
+            if (widget.Parameters is not { Count: > 0 } || widget.DataSource is null)
+            {
+                return NavigateActionModel.NoParameters;
+            }
+
+            var source = dataSourcesByName[widget.DataSource];
+            return widget.Parameters.ToDictionary(
+                pair => source.Parameters.First(parameter => string.Equals(parameter.Name, pair.Key, StringComparison.OrdinalIgnoreCase)).Name,
+                pair => page.Parameters.First(parameter => string.Equals(parameter.Name, pair.Value, StringComparison.OrdinalIgnoreCase)).Name);
+        }
+
         WidgetModel BuildWidget(WidgetDefinition widget)
         {
             // A container holds widgets and no reference. A leaf keeps the shared empty lists, so equal leaves stay equal.
@@ -1742,6 +1757,7 @@ public static class ApplicationCompiler
                 Actions = BuildActions(widget.Actions),
                 RowActions = BuildActions(widget.RowActions),
                 ToolbarActions = BuildActions(widget.ToolbarActions),
+                Parameters = BuildParameters(widget),
             };
         }
 
