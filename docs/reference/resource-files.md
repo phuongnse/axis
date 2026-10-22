@@ -567,7 +567,8 @@ A `form` resource (see [frontend](frontend.md)) can show, require and lock
 fields depending on the record, and can split its sections into wizard steps
 ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 The schema, the compile checks, the compiled model, the page and task metadata and the
-evaluation through the [form state endpoint](record-api.md#form-state) are built.
+evaluation through the [form state endpoint](record-api.md#form-state) and the
+[task form state route](task-api.md#form-state-of-a-task) are built.
 Enforcing the conditions on write stays *(planned for M12)*.
 
 - **Conditions.** A field entry may have `visibleWhen`, `requiredWhen` and
