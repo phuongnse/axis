@@ -1,0 +1,14 @@
+{
+  "id": "4aa34405-cdce-4366-9a5b-b724bc16ab98",
+  "kind": "page",
+  "name": "NoteDeletes",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.noteDeletes.title" },
+  "widgets": [
+    {
+      "type": "table",
+      "entity": "Note",
+      "rowActions": [{ "type": "delete", "label": { "textKey": "notes.delete" } }]
+    }
+  ]
+}

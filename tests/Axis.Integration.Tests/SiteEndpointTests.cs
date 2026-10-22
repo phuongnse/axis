@@ -72,7 +72,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("table", widget.GetProperty("type").GetString());
         Assert.Equal(
             [("navigate", "ItemForm", "items.open", "id")],
-            widget.GetProperty("rowActions").EnumerateArray().Select(action => (action.GetProperty("type").GetString(), action.GetProperty("page").GetString(), action.GetProperty("labelKey").GetString(), action.GetProperty("record").GetString())));
+            widget.GetProperty("rowActions").EnumerateArray().Where(action => action.GetProperty("type").GetString() == "navigate").Select(action => (action.GetProperty("type").GetString(), action.GetProperty("page").GetString(), action.GetProperty("labelKey").GetString(), action.GetProperty("record").GetString())));
         Assert.Equal(
             [("navigate", "ItemForm", "items.new", (string?)null)],
             widget.GetProperty("toolbarActions").EnumerateArray().Select(action => (action.GetProperty("type").GetString(), action.GetProperty("page").GetString(), action.GetProperty("labelKey").GetString(), action.GetProperty("record").GetString())));

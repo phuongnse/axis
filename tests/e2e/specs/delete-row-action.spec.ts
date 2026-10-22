@@ -1,0 +1,56 @@
+import { expect, test, type APIRequestContext } from '@playwright/test'
+import { csrfHeaders } from '../csrf'
+import { sessionFile, useSession } from '../sessions'
+
+// anna holds the delete grant on notes. dung, a finance reviewer, reads notes whose title contains
+// 'Shared' and holds no delete grant.
+test.use({ storageState: sessionFile('anna') })
+
+// Specs run in parallel against one database, so these tests rely only on the notes they create. The
+// 'zzz' prefix and the descending sort put them on the first page.
+const notesPath = '/api/apps/E2eApp/entities/Note/records'
+const deletesPage = '/e2e/notedeletes?pageSize=100&sort=-title'
+
+async function createNote(request: APIRequestContext, title: string) {
+  const response = await request.post(notesPath, { data: { values: { title } }, headers: csrfHeaders })
+  expect(response.status()).toBe(201)
+  return (await response.json()) as { id: string }
+}
+
+test('a user with the delete grant deletes a note after confirming', async ({ page, request }) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  const title = `zzz Delete ${run}`
+  const note = await createNote(request, title)
+
+  await page.goto(deletesPage)
+  const row = page.getByRole('row', { name: new RegExp(title) })
+  await row.getByRole('button', { name: 'Delete' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('Delete this record? This cannot be undone.')
+  await dialog.getByRole('button', { name: 'Delete' }).click()
+
+  await expect(page.getByTestId('table-action-done')).toHaveText('The record was deleted.')
+  await expect(row).toHaveCount(0)
+  const read = await request.get(`${notesPath}/${note.id}`)
+  expect(read.status()).toBe(404)
+})
+
+test('a user without the delete grant sees no Delete button, and the server refuses a direct delete', async ({
+  page,
+  request,
+}) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  const title = `zzz Shared delete ${run}`
+  const note = await createNote(request, title)
+
+  await useSession(page, 'dung')
+  await page.goto(deletesPage)
+  const row = page.getByRole('row', { name: new RegExp(title) })
+  await expect(row).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0)
+
+  const denied = await page.request.delete(`${notesPath}/${note.id}`, { headers: csrfHeaders })
+  expect(denied.status()).toBe(403)
+  const read = await request.get(`${notesPath}/${note.id}`)
+  expect(read.status()).toBe(200)
+})

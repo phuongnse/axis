@@ -173,10 +173,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - Every widget also has `actions`, never left out. It
     is described under the form widget, and is `[]` on a widget it does not
     apply to. A table's `startProcess` row actions are left out without
-    `start`, and its `delete` row action without `delete` *(planned for M12)*.
+    `start`, and its `delete` row action without `delete`.
   - Every widget also has `rowActions` and `toolbarActions`, never left out.
-    A table lists its `navigate` and `startProcess` row actions and its
-    `navigate` toolbar actions in them. They are `[]` elsewhere. Every action
+    A table lists its `navigate`, `startProcess` and `delete` row actions and
+    its `navigate` toolbar actions in them. A `delete` is
+    `{ "type": "delete", "labelKey": "…", "recordsPath": "…", "visibleWhen": null }`.
+    `recordsPath` is the record API path of the table's entity, or of its data
+    source's root entity, so the SPA never builds it. They are `[]` elsewhere. Every action
     also has `visibleWhen`, never left out: the expression text of a row
     action's condition, or `null` when it has none. It is always `null` outside
     `rowActions`.
@@ -311,8 +314,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       same.
     - **Actions.** A `startProcess` action is left out of `actions` when the
       user has no `start` grant on its process. The same holds for a `table`
-      row `startProcess` action, and its `delete` row action *(planned for
-      M12)* is left out when `access.actions` lacks `delete`. A `navigate` action whose target
+      row `startProcess` action, and its `delete` row action is left out when
+      the user has no `delete` grant on the table's entity, or on the data
+      source's root entity, which is what `access.actions` lacks. A `navigate` action whose target
       page the user cannot read is left out too. A
       `kpi`'s `navigate` to such a page is `null`.
     - **Access.** Every `table`, `form` and `detail` widget gets an `access`
@@ -533,8 +537,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     without those to pages the user cannot read, each with its `parameters`,
     `record` and `opensForm`. It lists a `startProcess` in `rowActions` only
     with a `start` grant on its process. The `navigate` and `startProcess`
-    buttons, the `visibleWhen` condition and the phone menu are built. The
-    delete row action is _(planned for M12)_.
+    buttons, the `visibleWhen` condition, the delete button and the phone menu
+    are built.
     - **Where.** Toolbar actions sit above the table. Row actions
       are buttons in the row. Below 768 px, a row's actions fold into one
       menu button labelled by the platform text `shell.table.rowActions`. A
@@ -601,7 +605,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - **Delete.** A row has a delete button only when the widget's
       `access.actions` holds `delete`. Without it there is no button. A click
       opens a confirmation dialog. On confirm the SPA sends
-      `DELETE {recordsPath}/{id}` with `X-Axis-Csrf: 1`.
+      `DELETE {recordsPath}/{id}` with `X-Axis-Csrf: 1`. `recordsPath` comes
+      from the action's metadata. A delete action may have `visibleWhen`, such
+      as to show Delete only on drafts.
     - **After a delete.** On `204` it shows a success message and loads the
       current page of rows again. A page past the last page becomes the last
       page, as for an invalid `page`. A `403` shows a permission message,
@@ -609,7 +615,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       that the record no longer exists. A `409` shows one 'in use' text, for
       a record that another record references and for a record held by a
       running process. In each case the row stays. Any other answer shows
-      the generic platform error.
+      the generic platform error. The success and the failure messages show
+      above the table.
     - **Start process.** A row `startProcess` follows the rules of the form
       widget's **Start process action**, with the row as the subject and
       the same `Idempotency-Key` and `409` text. On `201` it loads the

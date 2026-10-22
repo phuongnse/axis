@@ -947,8 +947,9 @@ function ParameterExpressions({
 
 /**
  * A list of actions of a widget, each with its fields. A `navigate` action has a page, a label, a `record` and
- * parameters. Any other action is a `startProcess` action with a process and a label. The list always offers Add
- * navigate action, and offers Add action for `startProcess` only when `startProcess` is set.
+ * parameters. A `startProcess` action has a process and a label. Any other action, such as `delete`, is JSON only,
+ * and can be removed. The list always offers Add navigate action, and offers Add action for `startProcess` only
+ * when `startProcess` is set.
  */
 function Actions({
   pointer,
@@ -991,7 +992,7 @@ function Actions({
                     <Typography.Text>{text(action.type)}</Typography.Text>
                     {action.type === 'navigate' ? (
                       <NavigateFields pointer={actionPointer} action={action} onChange={onChange} />
-                    ) : (
+                    ) : action.type === 'startProcess' ? (
                       <>
                         <NameField
                           pointer={`${actionPointer}/process`}
@@ -1003,6 +1004,10 @@ function Actions({
                         />
                         <ActionLabel pointer={`${actionPointer}/label`} value={action.label} onChange={onChange} />
                       </>
+                    ) : (
+                      <div data-testid={`studio-field-${actionPointer}`}>
+                        <JsonOnly />
+                      </div>
                     )}
                     <div>
                       <Button danger onClick={() => onChange(actionPointer, undefined)}>

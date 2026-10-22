@@ -18,6 +18,8 @@
     "pages.noteDetail.title": "Note detail",
     "noteDetail.edit": "Edit note",
     "notes.open": "Open",
+    "notes.delete": "Delete",
+    "pages.noteDeletes.title": "Delete notes",
     "notes.new": "New",
     "pages.noteTotals.title": "Note totals",
     "pages.noteCount.title": "Note count",

@@ -204,7 +204,7 @@
       "additionalProperties": false,
       "required": ["type", "label"],
       "properties": {
-        "type": { "enum": ["startProcess", "navigate"] },
+        "type": { "enum": ["startProcess", "navigate", "delete"] },
         "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" },
         "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
         "label": { "$ref": "#/$defs/textReference" },
@@ -215,8 +215,15 @@
       "allOf": [
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "navigate" } } },
-          "then": { "required": ["page"], "properties": { "process": false } },
-          "else": { "required": ["process"], "properties": { "page": false, "parameters": false, "record": false } }
+          "then": { "required": ["page"], "properties": { "process": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "startProcess" } } },
+          "then": { "required": ["process"], "properties": { "page": false, "parameters": false, "record": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "delete" } } },
+          "then": { "properties": { "process": false, "page": false, "parameters": false, "record": false } }
         }
       ]
     },

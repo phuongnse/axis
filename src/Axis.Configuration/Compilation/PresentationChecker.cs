@@ -746,6 +746,10 @@ internal static class PresentationChecker
                     {
                         NavigateChecker.Check(rowActions[index], rowActionPath, rowScope, page, loaded, findPage, findForm, references, diagnostics);
                     }
+                    else if (rowActions[index].Type == "delete")
+                    {
+                        ApplicationCompiler.CheckTextKey(rowActions[index].Label, page, $"{rowActionPath}/label", references, diagnostics);
+                    }
                     else
                     {
                         CheckStartProcess(rowActions[index], rowActionPath, recordEntity, page, loaded, findProcess, references, diagnostics);
