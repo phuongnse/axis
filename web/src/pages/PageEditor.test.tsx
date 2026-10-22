@@ -570,14 +570,24 @@ describe('PageEditor widget tree', () => {
     ])
   })
 
-  it('shows the type of a container as fixed text and points to the JSON view', async () => {
+  it('shows the type of a container as fixed text and gives it a panel', async () => {
     renderEditor(tree())
 
     await userEvent.click(screen.getByTestId('studio-widget-/widgets/0'))
     const panel = screen.getByTestId('studio-field-/widgets/0')
     expect(within(panel).getByTestId('studio-field-/widgets/0/type')).toHaveTextContent('columns')
     expect(within(panel).queryByRole('combobox', { name: 'Widget type' })).not.toBeInTheDocument()
-    expect(panel.querySelector(':scope > [data-testid="studio-json-only"]')).not.toBeNull()
+    expect(within(panel).queryByTestId('studio-json-only')).not.toBeInTheDocument()
+    expect(within(panel).getByTestId('studio-field-/widgets/0/columns/0/width')).toBeVisible()
+  })
+
+  it('points to the JSON view when the parts of a container are malformed', async () => {
+    renderEditor(page(columns, { widgets: [{ type: 'columns', columns: 'oops' }] }))
+
+    await userEvent.click(screen.getByTestId('studio-widget-/widgets/0'))
+    const panel = screen.getByTestId('studio-field-/widgets/0')
+    expect(within(panel).getByTestId('studio-field-/widgets/0/type')).toHaveTextContent('columns')
+    expect(within(panel).getByTestId('studio-json-only')).toBeVisible()
   })
 
   it('keeps the type picker of a leaf widget to the four types with a panel', async () => {
@@ -586,5 +596,201 @@ describe('PageEditor widget tree', () => {
     await userEvent.click(screen.getByTestId('studio-widget-/widgets/1'))
     await userEvent.click(screen.getByRole('combobox', { name: 'Widget type' }))
     await waitFor(() => expect(optionsOf()).toEqual(['table', 'form', 'taskInbox', 'processInspector']))
+  })
+})
+
+describe('PageEditor container panels', () => {
+  const inbox = { type: 'taskInbox' }
+  const columns = {
+    type: 'columns',
+    columns: [
+      { width: 6, widgets: [inbox] },
+      { width: 6, widgets: [inbox], 'x-note': 'keep' },
+    ],
+  }
+  const tabs = {
+    type: 'tabs',
+    tabs: [
+      { label: { textKey: 'tabs.one' }, widgets: [inbox] },
+      { label: { textKey: 'tabs.two' }, widgets: [inbox], 'x-note': 'keep' },
+    ],
+  }
+  const section = { type: 'section', title: { textKey: 'pages.review.title' }, widgets: [inbox], 'x-note': 'keep' }
+
+  async function open(widget: Record<string, unknown>, onChange = vi.fn(), loaded: StudioNames | null = names) {
+    renderEditor(page(widget), onChange, loaded)
+    await userEvent.click(screen.getByTestId('studio-widget-/widgets/0'))
+    return onChange
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('edits the width of a column', async () => {
+    const onChange = await open(columns)
+
+    const width = within(screen.getByTestId('studio-field-/widgets/0/columns/1/width')).getByRole('spinbutton')
+    expect(width).toHaveValue('6')
+    await userEvent.clear(width)
+    await userEvent.type(width, '4')
+
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns/1/width', 4)
+  })
+
+  it('adds a column with the rest of 12 and removes a column, keeping the other columns as they are', async () => {
+    const onChange = await open({
+      ...columns,
+      columns: [columns.columns[0], columns.columns[1]].map((c) => ({ ...c, width: 4 })),
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add column' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns', [
+      { width: 4, widgets: [inbox] },
+      { width: 4, widgets: [inbox], 'x-note': 'keep' },
+      { width: 4, widgets: [] },
+    ])
+
+    await userEvent.click(within(screen.getByTestId('studio-column-0')).getByRole('button', { name: 'Remove column' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns', [{ width: 4, widgets: [inbox], 'x-note': 'keep' }])
+  })
+
+  it('adds a column of width 1 when the widths use all of 12', async () => {
+    const onChange = await open(columns)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add column' }))
+
+    expect(onChange.mock.lastCall![1]).toEqual([columns.columns[0], columns.columns[1], { width: 1, widgets: [] }])
+  })
+
+  it('disables Remove column on the last column', async () => {
+    await open({ type: 'columns', columns: [{ width: 12, widgets: [inbox] }] })
+
+    expect(screen.getByRole('button', { name: 'Remove column' })).toBeDisabled()
+  })
+
+  it('writes the texts of a tab label in every locale and puts its key in the draft', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ resources: [], diagnostics: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const onChange = await open(tabs)
+
+    const label = within(screen.getByTestId('studio-field-/widgets/0/tabs/1/label'))
+    await userEvent.type(label.getByRole('textbox', { name: 'en' }), 'Second')
+    await userEvent.type(label.getByRole('textbox', { name: 'vi' }), 'Thứ hai')
+    await userEvent.click(label.getByRole('button', { name: 'Write texts' }))
+
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    expect(onChange).toHaveBeenCalledWith('/widgets/0/tabs/1/label', { textKey: 'tabs.two' })
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(decodeURIComponent(url)).toContain('/texts/tabs.two')
+    expect(JSON.parse(init.body as string)).toEqual({ texts: { en: 'Second', vi: 'Thứ hai' } })
+  })
+
+  it('writes the key of a tab label when the names are not loaded', async () => {
+    const onChange = await open(tabs, vi.fn(), null)
+
+    const key = within(screen.getByTestId('studio-field-/widgets/0/tabs/1/label')).getByRole('textbox')
+    await userEvent.type(key, 'x')
+
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/tabs/1/label/textKey', 'tabs.twox')
+  })
+
+  it('adds a tab with an empty label and removes a tab, and disables Remove tab on the last one', async () => {
+    const onChange = await open(tabs)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add tab' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/tabs', [
+      tabs.tabs[0],
+      tabs.tabs[1],
+      { label: { textKey: '' }, widgets: [] },
+    ])
+
+    await userEvent.click(within(screen.getByTestId('studio-tab-0')).getByRole('button', { name: 'Remove tab' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/tabs', [tabs.tabs[1]])
+  })
+
+  it('disables Remove tab on the last tab', async () => {
+    await open({ type: 'tabs', tabs: [tabs.tabs[0]] })
+
+    expect(screen.getByRole('button', { name: 'Remove tab' })).toBeDisabled()
+  })
+
+  it('edits the title of a section', async () => {
+    const onChange = await open(section, vi.fn(), null)
+
+    const key = within(screen.getByTestId('studio-field-/widgets/0/title')).getByRole('textbox')
+    await userEvent.type(key, 'x')
+
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/title/textKey', 'pages.review.titlex')
+  })
+
+  it('shows the title of a section with a text box per locale', async () => {
+    await open(section)
+
+    const title = within(screen.getByTestId('studio-field-/widgets/0/title'))
+    expect(title.getByRole('textbox', { name: 'en' })).toHaveValue('Review')
+    expect(title.getByRole('textbox', { name: 'vi' })).toHaveValue('Xem xét')
+  })
+
+  it('switches Collapsed on by writing true', async () => {
+    const onChange = await open(section)
+
+    const collapsed = within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch')
+    expect(collapsed).not.toBeChecked()
+    await userEvent.click(collapsed)
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/collapsed', true)
+  })
+
+  it('switches Collapsed off by removing the key', async () => {
+    const onChange = await open({ ...section, collapsed: true })
+
+    const collapsed = within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch')
+    expect(collapsed).toBeChecked()
+    await userEvent.click(collapsed)
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/collapsed', undefined)
+  })
+
+  it('never writes a whole part, so a key the panels do not show stays', async () => {
+    const onChange = await open(columns)
+    const width = within(screen.getByTestId('studio-field-/widgets/0/columns/1/width')).getByRole('spinbutton')
+    await userEvent.clear(width)
+    await userEvent.type(width, '4')
+    await userEvent.click(screen.getByRole('button', { name: 'Add column' }))
+    await userEvent.click(within(screen.getByTestId('studio-column-0')).getByRole('button', { name: 'Remove column' }))
+
+    const pointers = onChange.mock.calls.map(([pointer]) => pointer)
+    expect(pointers.every((pointer) => pointer.startsWith('/widgets/0/columns'))).toBe(true)
+    const lists = onChange.mock.calls.filter(([pointer]) => pointer === '/widgets/0/columns')
+    expect(lists).toHaveLength(2)
+    for (const [, list] of lists) {
+      expect(list).toContainEqual(columns.columns[1])
+    }
+  })
+
+  it('keeps a key it does not show on a tab and on a section through an edit', async () => {
+    const tabChange = await open(tabs)
+    await userEvent.click(screen.getByRole('button', { name: 'Add tab' }))
+    expect(tabChange.mock.lastCall![1]).toContainEqual(tabs.tabs[1])
+    await userEvent.click(within(screen.getByTestId('studio-tab-0')).getByRole('button', { name: 'Remove tab' }))
+    expect(tabChange.mock.lastCall![1]).toContainEqual(tabs.tabs[1])
+  })
+
+  it('writes only the collapsed key on a section with a key it does not show', async () => {
+    const onChange = await open(section)
+
+    await userEvent.click(within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch'))
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith('/widgets/0/collapsed', true)
+  })
+
+  it('shows a malformed part as JSON only and keeps its Remove button', async () => {
+    await open({ type: 'columns', columns: [{ width: 6, widgets: [inbox] }, 'oops'] })
+
+    expect(within(screen.getByTestId('studio-column-1')).getByTestId('studio-json-only')).toBeVisible()
   })
 })

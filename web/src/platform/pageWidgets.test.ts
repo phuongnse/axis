@@ -5,6 +5,8 @@ import {
   containerTypes,
   knownWidgetKeys,
   moveTo,
+  newColumn,
+  newTab,
   newWidget,
   typeChanges,
   widgetKeys,
@@ -108,6 +110,25 @@ describe('newWidget', () => {
   it('adds the containers to the addable types and keeps the types with a panel apart', () => {
     expect(addableTypes).toEqual([...widgetTypes, ...containerTypes])
     expect(widgetTypes).toEqual(['table', 'form', 'taskInbox', 'processInspector'])
+  })
+})
+
+describe('newColumn', () => {
+  it('takes what is left of 12', () => {
+    expect(newColumn([{ width: 6 }])).toEqual({ width: 6, widgets: [] })
+    expect(newColumn([])).toEqual({ width: 12, widgets: [] })
+  })
+
+  it('takes 1 when nothing is left or the widths are not numbers', () => {
+    expect(newColumn([{ width: 6 }, { width: 6 }])).toEqual({ width: 1, widgets: [] })
+    expect(newColumn([{ width: 8 }, { width: 8 }])).toEqual({ width: 1, widgets: [] })
+    expect(newColumn(['x', { width: '6' }])).toEqual({ width: 12, widgets: [] })
+  })
+})
+
+describe('newTab', () => {
+  it('has an empty label key and no widgets', () => {
+    expect(newTab()).toEqual({ label: { textKey: '' }, widgets: [] })
   })
 })
 

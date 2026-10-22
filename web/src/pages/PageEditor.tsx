@@ -1,4 +1,4 @@
-import { Button, Card, Flex, Input, Select, Typography } from 'antd'
+import { Button, Card, Flex, Input, InputNumber, Select, Switch, Typography } from 'antd'
 import { useContext, useState } from 'react'
 import { getAt } from '../platform/jsonPatch'
 import {
@@ -7,6 +7,8 @@ import {
   containerTypes,
   type ListPart,
   moveTo,
+  newColumn,
+  newTab,
   newWidget,
   type PathStep,
   typeChanges,
@@ -41,8 +43,9 @@ function JsonOnly() {
  * The editor of a page. It shows the page's name and title, its widgets as a tree, and a panel for the selected
  * widget. The tree nests the widgets inside `columns`, `tabs` and `section`. Every list has an Add widget picker,
  * and every widget has Move up, Move down, Remove and a Move to picker that lists the other widget lists. A new
- * container starts with two columns of width 6, one tab, or an empty section. A container's type is fixed, and its
- * widths, labels and title are edited in the JSON view. The panel of a `table`, `form`, `taskInbox` or
+ * container starts with two columns of width 6, one tab, or an empty section. A container's type is fixed. Its panel
+ * edits the width of each column, the label of each tab and the title and collapsed state of a section, and adds
+ * or removes columns and tabs. The panel of a `table`, `form`, `taskInbox` or
  * `processInspector` widget shows its type with every property that type takes. A `form` panel also lists its
  * `startProcess` actions. A property is a name picked from the application's names, and a table's data source and
  * entity, like a form's entity and form, exclude each other, so a pick clears the other. The editor edits the
@@ -95,6 +98,7 @@ export function PageEditor({ value, onChange }: { value: Content; onChange: Chan
               />
               {widgets.length > 0 && (
                 <WidgetPanel
+                  key={selected}
                   base={selected}
                   widget={getAt(value, selected)}
                   pageName={text(value.name)}
@@ -351,7 +355,11 @@ function WidgetPanel({
           <div>{t('shell.studio.page.widgetType')}</div>
           <Typography.Text>{type}</Typography.Text>
         </div>
-        <JsonOnly />
+        {isContent(widget) && type === 'columns' && (
+          <ColumnsPanel base={base} columns={widget.columns} onChange={onChange} />
+        )}
+        {isContent(widget) && type === 'tabs' && <TabsPanel base={base} tabs={widget.tabs} onChange={onChange} />}
+        {isContent(widget) && type === 'section' && <SectionPanel base={base} widget={widget} onChange={onChange} />}
       </Flex>
     )
   }
@@ -450,6 +458,165 @@ function WidgetPanel({
         />
       )}
     </Flex>
+  )
+}
+
+/** The width of each column of a columns widget, and the buttons that add and remove columns. */
+function ColumnsPanel({ base, columns, onChange }: { base: string; columns: unknown; onChange: ChangeHandler }) {
+  const t = useText()
+  if (!Array.isArray(columns)) {
+    return <JsonOnly />
+  }
+
+  return (
+    <Flex vertical gap="small">
+      {columns.map((column, index) => (
+        <Card size="small" key={index} data-testid={`studio-column-${index}`}>
+          <Flex vertical gap="small">
+            <Typography.Text>{`${t('shell.studio.page.column')} ${index + 1}`}</Typography.Text>
+            {isContent(column) ? (
+              <div data-testid={`studio-field-${base}/columns/${index}/width`}>
+                <div>{t('shell.studio.page.width')}</div>
+                <InputNumber
+                  aria-label={t('shell.studio.page.width')}
+                  min={1}
+                  max={12}
+                  precision={0}
+                  value={typeof column.width === 'number' ? column.width : null}
+                  onChange={(next) => {
+                    if (typeof next === 'number') {
+                      onChange(`${base}/columns/${index}/width`, next)
+                    }
+                  }}
+                />
+              </div>
+            ) : (
+              <JsonOnly />
+            )}
+            <div>
+              <Button
+                danger
+                disabled={columns.length === 1}
+                onClick={() =>
+                  onChange(
+                    `${base}/columns`,
+                    columns.filter((_, at) => at !== index),
+                  )
+                }
+              >
+                {t('shell.studio.page.removeColumn')}
+              </Button>
+            </div>
+          </Flex>
+        </Card>
+      ))}
+      <div>
+        <Button onClick={() => onChange(`${base}/columns`, [...columns, newColumn(columns)])}>
+          {t('shell.studio.page.addColumn')}
+        </Button>
+      </div>
+    </Flex>
+  )
+}
+
+/** The label of each tab of a tabs widget, and the buttons that add and remove tabs. */
+function TabsPanel({ base, tabs, onChange }: { base: string; tabs: unknown; onChange: ChangeHandler }) {
+  const t = useText()
+  if (!Array.isArray(tabs)) {
+    return <JsonOnly />
+  }
+
+  return (
+    <Flex vertical gap="small">
+      {tabs.map((tab, index) => (
+        <Card size="small" key={index} data-testid={`studio-tab-${index}`}>
+          <Flex vertical gap="small">
+            <Typography.Text>{`${t('shell.studio.page.tab')} ${index + 1}`}</Typography.Text>
+            {isContent(tab) ? (
+              <div data-testid={`studio-field-${base}/tabs/${index}/label`}>
+                <div>{t('shell.studio.page.tabLabel')}</div>
+                <TextReferenceField
+                  // The label editors keep their state by position, so they remount when a tab is added or removed.
+                  key={`${index}:${tabs.length}`}
+                  pointer={`${base}/tabs/${index}/label`}
+                  value={tab.label}
+                  onChange={onChange}
+                />
+              </div>
+            ) : (
+              <JsonOnly />
+            )}
+            <div>
+              <Button
+                danger
+                disabled={tabs.length === 1}
+                onClick={() =>
+                  onChange(
+                    `${base}/tabs`,
+                    tabs.filter((_, at) => at !== index),
+                  )
+                }
+              >
+                {t('shell.studio.page.removeTab')}
+              </Button>
+            </div>
+          </Flex>
+        </Card>
+      ))}
+      <div>
+        <Button onClick={() => onChange(`${base}/tabs`, [...tabs, newTab()])}>{t('shell.studio.page.addTab')}</Button>
+      </div>
+    </Flex>
+  )
+}
+
+/** The title of a section and its Collapsed switch. Switching it off removes the key, because a section starts expanded. */
+function SectionPanel({ base, widget, onChange }: { base: string; widget: Content; onChange: ChangeHandler }) {
+  const t = useText()
+
+  return (
+    <Flex vertical gap="small">
+      <div data-testid={`studio-field-${base}/title`}>
+        <div>{t('shell.studio.page.title')}</div>
+        <TextReferenceField pointer={`${base}/title`} value={widget.title} onChange={onChange} />
+      </div>
+      <div data-testid={`studio-field-${base}/collapsed`}>
+        <Flex gap="small" align="center">
+          <Switch
+            aria-label={t('shell.studio.page.collapsed')}
+            checked={widget.collapsed === true}
+            onChange={(checked) => onChange(`${base}/collapsed`, checked ? true : undefined)}
+          />
+          <span>{t('shell.studio.page.collapsed')}</span>
+        </Flex>
+      </div>
+    </Flex>
+  )
+}
+
+/** A text reference as a key and a text box per locale, or as the plain key until the names are loaded. */
+function TextReferenceField({
+  pointer,
+  value,
+  onChange,
+}: {
+  pointer: string
+  value: unknown
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const names = useContext(StudioNamesContext)
+  const label = useContext(LabelTextsContext)
+
+  if (names !== undefined && label !== null) {
+    return <LabelTexts pointer={pointer} value={value} onChange={onChange} />
+  }
+  return (
+    <Input
+      aria-label={t('shell.studio.labelKey')}
+      value={text(isContent(value) ? value.textKey : undefined)}
+      onChange={(event) => onChange(`${pointer}/textKey`, event.target.value)}
+    />
   )
 }
 
