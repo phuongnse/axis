@@ -65,7 +65,7 @@ test.describe("Studio builds pages in the page editor", () => {
     await expect(page.getByTestId("studio-saved")).toBeVisible();
   }
 
-  test("an author builds a form page with an action and a table page that opens it, with no new diagnostic", async ({
+  test("an author builds a form page with an action and a table page that opens it with a row navigate, with no new diagnostic", async ({
     page,
   }) => {
     await useSession(page, "hoa");
@@ -122,6 +122,21 @@ test.describe("Studio builds pages in the page editor", () => {
       "PurchaseRequestList",
     );
     await pick(page, "studio-field-/widgets/0/formPage", "ReviewForm");
+    await page
+      .getByTestId("studio-field-/widgets/0/rowActions")
+      .getByRole("button", { name: "Add navigate action" })
+      .click();
+    await pick(page, "studio-field-/widgets/0/rowActions/0/page", "ReviewForm");
+    await writeTexts(
+      page,
+      "studio-field-/widgets/0/rowActions/0/label",
+      "Open",
+      "Mở",
+    );
+    await page
+      .getByTestId("studio-field-/widgets/0/rowActions/0/record")
+      .getByRole("textbox")
+      .fill("id");
     await save(page);
 
     expect(await diagnostics()).toEqual(before);
@@ -153,6 +168,14 @@ test.describe("Studio builds pages in the page editor", () => {
         type: "table",
         dataSource: "PurchaseRequestList",
         formPage: "ReviewForm",
+        rowActions: [
+          {
+            type: "navigate",
+            page: "ReviewForm",
+            label: { textKey: expect.stringMatching(/^pages\./) },
+            record: "id",
+          },
+        ],
       },
     ]);
   });

@@ -40,6 +40,17 @@ describe('typeChanges', () => {
     ])
   })
 
+  it('removes the row and toolbar actions of a table that becomes a form', () => {
+    const navigate = { type: 'navigate', page: 'Edit', label: { textKey: 'x' } }
+    expect(
+      typeChanges({ type: 'table', rowActions: [navigate], toolbarActions: [navigate], 'x-note': 'keep' }, 'form'),
+    ).toEqual([
+      ['/type', 'form'],
+      ['/rowActions', undefined],
+      ['/toolbarActions', undefined],
+    ])
+  })
+
   it('adds an empty process when the new type is a process inspector', () => {
     expect(typeChanges({ type: 'table', dataSource: 'List', formPage: 'Edit' }, 'processInspector')).toEqual([
       ['/type', 'processInspector'],
@@ -71,7 +82,16 @@ describe('typeChanges', () => {
 describe('widget keys', () => {
   it('lists every type, and the known keys are the union', () => {
     expect(Object.keys(widgetKeys)).toEqual(widgetTypes)
-    expect([...knownWidgetKeys].sort()).toEqual(['actions', 'dataSource', 'entity', 'form', 'formPage', 'process'])
+    expect([...knownWidgetKeys].sort()).toEqual([
+      'actions',
+      'dataSource',
+      'entity',
+      'form',
+      'formPage',
+      'process',
+      'rowActions',
+      'toolbarActions',
+    ])
   })
 })
 
