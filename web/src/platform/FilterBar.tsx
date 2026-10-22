@@ -101,6 +101,7 @@ function FilterInput(props: FilterInputProps) {
         <Select
           id={id}
           allowClear
+          virtual={false}
           style={{ width: inputWidth }}
           value={value}
           options={[

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { startServer } from "../activate";
+import { pickOption } from "../select";
 import { e2eApp, studioFolder } from "../server-settings";
 import { useSession } from "../sessions";
 
@@ -60,8 +61,7 @@ test.describe("Studio builds pages in the page editor", () => {
   }
 
   async function pick(page: Page, field: string, option: string) {
-    await page.getByTestId(field).locator(".ant-select-selector").click();
-    await page.getByRole("option", { name: option, exact: true }).click();
+    await pickOption(page.getByTestId(field).getByRole("combobox"), option);
   }
 
   async function save(page: Page) {

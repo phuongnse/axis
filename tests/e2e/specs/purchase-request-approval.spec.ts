@@ -74,23 +74,23 @@ async function countHistory(page: Page, ...texts: string[]) {
   const history = page.getByTestId('record-history')
   const entries = history.getByTestId('history-entry')
   const matching = texts.reduce((locator, text) => locator.filter({ hasText: text }), entries)
-  const next = history.locator('.ant-pagination-next')
+  const next = history.getByTitle('Next Page')
   await expect(entries.first()).toBeVisible()
   // An earlier count leaves the panel on its last page.
-  const first = history.locator('.ant-pagination-item-1')
+  const first = history.getByTitle('1', { exact: true })
   if ((await first.count()) > 0) {
     await first.click()
-    await expect(history.locator('.ant-pagination-item-active')).toHaveText('1')
-    await expect(history.locator('.ant-spin-spinning')).toHaveCount(0)
+    await expect(history.locator('[aria-current="page"]')).toHaveText('1')
+    await expect(history).toHaveAttribute('aria-busy', 'false')
   }
   let count = await matching.count()
   for (let current = 2; (await next.count()) > 0; current++) {
-    if ((await next.getAttribute('class'))?.includes('ant-pagination-disabled')) {
+    if ((await next.getAttribute('aria-disabled')) === 'true') {
       break
     }
     await next.click()
-    await expect(history.locator('.ant-pagination-item-active')).toHaveText(String(current))
-    await expect(history.locator('.ant-spin-spinning')).toHaveCount(0)
+    await expect(history.locator('[aria-current="page"]')).toHaveText(String(current))
+    await expect(history).toHaveAttribute('aria-busy', 'false')
     count += await matching.count()
   }
   return count

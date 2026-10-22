@@ -733,6 +733,10 @@ metadata, theme tokens or the custom widget API, see
 Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
 
+Playwright specs find elements by role, accessible name and ARIA state, and never
+select a class of the UI library. `scripts/lint.sh` fails when a file under
+`tests/` names a class that starts with `ant-`.
+
 `scripts/integration.sh` runs the scenarios of every application under
 `samples/apps/` and of every sample template under `samples/templates/` from the
 integration tests, on their Testcontainers PostgreSQL. See

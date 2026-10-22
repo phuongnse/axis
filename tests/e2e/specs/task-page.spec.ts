@@ -68,7 +68,7 @@ test('the manager opens a task from the inbox, fills in a field, approves and re
   await expect(page).toHaveURL(/\/e2e\/tasks$/)
   expect((await inboxLoad).ok()).toBe(true)
   // The inbox has rendered its answer once the table stops loading.
-  await expect(page.locator('.ant-table-wrapper .ant-spin-spinning')).toHaveCount(0)
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
   await expect(page.getByText(title)).toHaveCount(0)
   const note = await (await request.get(`${notesPath}/${noteId}`)).json()
   expect(note.values.priority).toBe(5)

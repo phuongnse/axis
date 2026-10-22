@@ -1,5 +1,6 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { expectChosen } from '../select'
 import { sessionFile } from '../sessions'
 
 // The record API needs a session with a grant, so these journeys start signed in as the employee anna.
@@ -12,14 +13,6 @@ async function createNote(request: APIRequestContext, values: Record<string, unk
   const response = await request.post(notesPath, { data: { values }, headers: csrfHeaders })
   expect(response.status()).toBe(201)
   return (await response.json()) as { id: string }
-}
-
-/** The value the Status select shows. */
-function statusValue(page: Page) {
-  return page
-    .locator('.ant-form-item')
-    .filter({ has: page.getByText('Status', { exact: true }) })
-    .locator('.ant-select-selection-item')
 }
 
 test('a saved note closes through the action, which saves the edited title first', async ({ page, request }) => {
@@ -37,7 +30,7 @@ test('a saved note closes through the action, which saves the edited title first
   // The worker runs the first step some time after the start.
   await expect(async () => {
     await page.reload()
-    await expect(statusValue(page)).toHaveText('closed', { timeout: 1_000 })
+    await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), 'closed', { timeout: 1_000 })
   }).toPass({ timeout: 30_000 })
   await expect(title).toHaveValue(`Close ${run} edited`)
 

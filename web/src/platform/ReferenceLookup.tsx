@@ -1,5 +1,6 @@
 import { Alert, Input, Modal, Table, type TableColumnsType } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
+import { markCurrentPage } from './pagination'
 import { fetchRecords, type RecordItem, type RecordPage, type RecordValue } from './records'
 import type { FieldMetadata } from './site'
 import { recordQuery } from './tableQuery'
@@ -102,7 +103,7 @@ function LookupList({ field, onPick }: Pick<ReferenceLookupProps, 'field' | 'onP
   )
 
   return (
-    <div data-testid="reference-lookup">
+    <div data-testid="reference-lookup" aria-busy={loading}>
       <Input
         allowClear
         value={text}
@@ -126,6 +127,7 @@ function LookupList({ field, onPick }: Pick<ReferenceLookupProps, 'field' | 'onP
             pageSize,
             total: state.page?.totalCount ?? 0,
             showSizeChanger: false,
+            itemRender: markCurrentPage(page),
             onChange: setPage,
           }}
           onRow={(record) => ({

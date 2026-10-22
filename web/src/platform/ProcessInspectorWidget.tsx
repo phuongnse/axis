@@ -10,6 +10,7 @@ import {
   type InstanceListItem,
   type InstancePage,
 } from './inspection'
+import { markCurrentPage } from './pagination'
 import type { WidgetMetadata } from './site'
 import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
 import { useText } from './texts'
@@ -184,6 +185,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
         placeholder={t('shell.inspector.allStates')}
         value={state}
         options={stateOptions}
+        virtual={false}
         onChange={onStateChange}
       />
       <Table<InstanceListItem>
@@ -198,6 +200,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
           total: load.page?.totalCount ?? 0,
           pageSizeOptions: pageSizes,
           showSizeChanger: true,
+          itemRender: markCurrentPage(query.page),
         }}
         onChange={onChange}
       />

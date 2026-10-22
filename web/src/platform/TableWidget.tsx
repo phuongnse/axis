@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useHref, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { FilterBar } from './FilterBar'
 import { formatValue } from './formatValue'
+import { markCurrentPage } from './pagination'
 import { fetchRecords, RecordQueryProblem, type RecordItem, type RecordPage, type RecordValue } from './records'
 import type { DataSourceColumn, DataSourceParameter, FieldMetadata, WidgetMetadata } from './site'
 import {
@@ -222,7 +223,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
   }
 
   return (
-    <Flex vertical gap="middle">
+    <Flex vertical gap="middle" aria-busy={loading}>
       {canCreate && (
         <Flex justify="flex-end">
           <Button
@@ -265,6 +266,7 @@ export function TableWidget({ sitePath, widget, locale }: TableWidgetProps) {
             total: parameterErrors ? 0 : (state.page?.totalCount ?? 0),
             pageSizeOptions: sizes,
             showSizeChanger: true,
+            itemRender: markCurrentPage(query.page),
           }}
           onChange={onChange}
         />

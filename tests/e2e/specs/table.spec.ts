@@ -39,14 +39,14 @@ test('paging and sorting go through the record API and stay in the URL', async (
   const pageRequest = page.waitForRequest(
     (request) => request.url().includes(`${notesPath}?`) && request.url().includes('page=2'),
   )
-  await page.locator('.ant-pagination-item-2').click()
+  await page.getByTitle('2', { exact: true }).click()
   expect((await pageRequest).url()).toContain('sort=title')
   await expect(page).toHaveURL(/\/e2e\/notes\?page=2&pageSize=10&sort=title$/)
 
   await page.reload()
 
   await expect(page).toHaveURL(/\/e2e\/notes\?page=2&pageSize=10&sort=title$/)
-  await expect(page.locator('.ant-pagination-item-active')).toHaveText('2')
+  await expect(page.locator('[aria-current="page"]')).toHaveText('2')
   await expect(page.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'ascending')
 })
 
