@@ -9,6 +9,7 @@
     { "entity": "Category", "actions": ["read", "create", "update", "delete"] },
     { "dataSource": "NoteRows", "actions": ["read"] },
     { "dataSource": "CategoryNotes", "actions": ["read"] },
+    { "dataSource": "NoteTotals", "actions": ["read"] },
     { "process": "NoteReview", "actions": ["start"] },
     { "process": "NoteClose", "actions": ["start"] }
   ]

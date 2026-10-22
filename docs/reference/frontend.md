@@ -882,7 +882,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   read-only. See [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md).
 - **Chart widget** *(planned for M12)*. A page whose widget is a `chart` draws a data source.
   See [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md).
-- **KPI widget** *(planned for M12)*. A page whose widget is a `kpi` shows one value. See
+- **KPI widget**. A page whose widget is a `kpi` shows one value. See
   [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md).
 - **Task inbox widget**. A page whose widget is a `taskInbox` lists the signed-in user's open
   tasks. See [task-inbox-widget.md](task-inbox-widget.md).

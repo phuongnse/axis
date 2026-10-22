@@ -184,7 +184,7 @@ export interface WidgetAccess {
  * inspector has neither, and lists the instances of its `process` from `instancesPath`.
  */
 export interface WidgetMetadata {
-  type: 'table' | 'form' | 'taskInbox' | 'processInspector'
+  type: 'table' | 'form' | 'taskInbox' | 'processInspector' | 'kpi'
   entity: EntityMetadata | null
   dataSource: DataSourceMetadata | null
   form: FormMetadata | null
@@ -207,6 +207,25 @@ export interface WidgetMetadata {
   parameters: Record<string, string>
   /** What the user may do with a table or form widget's entity, and `null` on a task inbox and a process inspector. */
   access: WidgetAccess | null
+  /** What a kpi widget shows, and `null` on every other widget. A kpi also has a `dataSource` and no entity. */
+  kpi: KpiMetadata | null
+}
+
+/** The second measure of a kpi widget and its text key. */
+export interface KpiComparisonMetadata {
+  measure: string
+  labelKey: string
+}
+
+/**
+ * What a kpi widget shows of its data source's one total row: a measure and its label, an optional
+ * second measure to compare it with, and an optional navigate action the whole tile opens.
+ */
+export interface KpiMetadata {
+  measure: string
+  labelKey: string
+  comparison: KpiComparisonMetadata | null
+  navigate: NavigateAction | null
 }
 
 /** A widget over an entity. A form widget is always one: it is never bound to a data source. */
