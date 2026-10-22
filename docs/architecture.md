@@ -743,6 +743,10 @@ show that nothing waited through an outcome. `scripts/lint.sh` fails when a test
 that is not named `*PerformanceTests.cs` uses `Stopwatch`, `.Elapsed` or `GetElapsedTime`.
 A polling deadline built on `DateTime.UtcNow` only ends a wait and is allowed.
 
+A test that asserts a value is absent from a log entry or a message uses a marker that
+cannot appear there by chance. Record ids are UUIDv7 hex, so a short number or a hex word
+can match one. Use a number of ten or more digits as the marker.
+
 `scripts/integration.sh` runs the scenarios of every application under
 `samples/apps/` and of every sample template under `samples/templates/` from the
 integration tests, on their Testcontainers PostgreSQL. See

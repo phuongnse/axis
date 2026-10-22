@@ -65,7 +65,7 @@ public sealed class TriggerSkipLogTests(DataDatabaseFixture database) : IClassFi
             model,
             entity,
             Guid.NewGuid(),
-            [new RecordValue(title, "Laptops"), new RecordValue(amount, "7341.29"), new RecordValue(divisor, 0L)],
+            [new RecordValue(title, "Laptops"), new RecordValue(amount, "386052719483.29"), new RecordValue(divisor, 0L)],
             [],
             cancellationToken: CancellationToken);
         Assert.Equal(RecordWriteOutcome.Written, created.Outcome);
@@ -85,7 +85,7 @@ public sealed class TriggerSkipLogTests(DataDatabaseFixture database) : IClassFi
         var skip = Assert.Single(logs.Entries, entry => entry.Contains("skipped the start of process Review", StringComparison.Ordinal));
         Assert.Contains("the when failed: DivisionByZero", skip, StringComparison.Ordinal);
         Assert.DoesNotContain("Division by zero", skip, StringComparison.Ordinal);
-        Assert.DoesNotContain("7341", skip, StringComparison.Ordinal);
-        Assert.DoesNotContain(logs.Entries, entry => entry.Contains("7341", StringComparison.Ordinal));
+        Assert.DoesNotContain("386052719483", skip, StringComparison.Ordinal);
+        Assert.DoesNotContain(logs.Entries, entry => entry.Contains("386052719483", StringComparison.Ordinal));
     }
 }

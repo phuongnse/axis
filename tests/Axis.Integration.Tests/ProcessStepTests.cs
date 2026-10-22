@@ -121,7 +121,7 @@ public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture
     [Fact]
     public async Task Step_that_fails_at_run_time_logs_the_step_and_the_error_kind_and_no_record_value()
     {
-        var subjectId = await fixture.InsertRequestAsync(7341.29m, 0);
+        var subjectId = await fixture.InsertRequestAsync(594827103865.29m, 0);
         var instanceId = await fixture.StartAsync("Divide", subjectId, fixture.FirstReleaseId);
 
         await fixture.RunUntilIdleAsync(CancellationToken);
@@ -130,7 +130,7 @@ public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture
             fixture.Logs.Entries,
             entry => entry.Contains($"Step check of process instance {instanceId} failed", StringComparison.Ordinal)
                 && entry.Contains("DivisionByZero", StringComparison.Ordinal));
-        Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Contains("7341", StringComparison.Ordinal));
+        Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Contains("594827103865", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -196,8 +196,6 @@ public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture
         Assert.Equal(ProcessStarts.Failed, (await fixture.InstanceAsync(instanceId)).State);
         var row = Assert.Single(await fixture.HistoryAsync(instanceId));
         Assert.Equal("The when of branch 0 of the step 'check' failed: ArgumentOutOfRange.", row.Error);
-        Assert.DoesNotContain("41", row.Error, StringComparison.Ordinal);
-        Assert.DoesNotContain("12345", row.Error, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -238,7 +236,6 @@ public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture
         Assert.Equal(ProcessStarts.Failed, (await fixture.InstanceAsync(instanceId)).State);
         var row = Assert.Single(await fixture.HistoryAsync(instanceId));
         Assert.Equal("Npgsql.PostgresException", row.Error);
-        Assert.DoesNotContain("4321", row.Error, StringComparison.Ordinal);
     }
 
     private Guid RequestEntityId
