@@ -35,8 +35,9 @@ goes to `artifacts/logs/e2e-server.log`, the E2E worker output to
 `artifacts/logs/e2e-worker.log`, the E2E journey server output to `artifacts/logs/e2e-journey-server.log`, the E2E publisher output to `artifacts/logs/e2e-publisher.log`, and the
 purchasing system stub output to `artifacts/logs/e2e-purchasing.log`. `scripts/test-report.mjs` then prints a
 summary per suite and the failed tests with their `file:line`. On GitHub Actions
-the summary goes to the job summary and each failed test becomes an error
-annotation.
+the summary goes to the job summary, and each failed test becomes an error
+annotation. The failed tests are also listed at the end of the job log, with each
+message cut to 20 lines.
 
 Each application's test scenarios are a suite of their own, named `scenarios-<application name>`.
 The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.
