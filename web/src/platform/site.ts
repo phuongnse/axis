@@ -188,7 +188,7 @@ export interface WidgetAccess {
  * inspector has neither, and lists the instances of its `process` from `instancesPath`.
  */
 export interface WidgetMetadata {
-  type: 'table' | 'form' | 'taskInbox' | 'processInspector' | 'kpi'
+  type: 'table' | 'form' | 'taskInbox' | 'processInspector' | 'kpi' | 'detail'
   entity: EntityMetadata | null
   dataSource: DataSourceMetadata | null
   form: FormMetadata | null
@@ -198,7 +198,7 @@ export interface WidgetMetadata {
   process: string | null
   /** The inspection API's instance list path on a process inspector, and `null` on every other widget. */
   instancesPath: string | null
-  /** The actions of a form widget the user may take, and `[]` on every other widget. */
+  /** The actions of a form or detail widget the user may take, and `[]` on every other widget. */
   actions: WidgetAction[]
   /** The `startProcess` and navigate actions a table shows on each row, and `[]` on every other widget. */
   rowActions: WidgetAction[]
@@ -209,10 +209,17 @@ export interface WidgetMetadata {
    * source parameter's name, and `{}` on every other widget. A bound parameter has no filter input.
    */
   parameters: Record<string, string>
-  /** What the user may do with a table or form widget's entity, and `null` on a task inbox and a process inspector. */
+  /** What the user may do with a table, form or detail widget's entity, and `null` on a task inbox and a process inspector. */
   access: WidgetAccess | null
+  /** What a detail widget shows, and `null` on every other widget. A detail has an `entity` and maybe a `form`. */
+  detail: DetailMetadata | null
   /** What a kpi widget shows, and `null` on every other widget. A kpi also has a `dataSource` and no entity. */
   kpi: KpiMetadata | null
+}
+
+/** What a detail widget shows: `record` names the page parameter whose value is the id of the record. */
+export interface DetailMetadata {
+  record: string
 }
 
 /** The second measure of a kpi widget and its text key. */

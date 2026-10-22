@@ -91,10 +91,11 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// is then the form's entity, with every field the user may read, so a client knows the type of each
 /// field the form shows. <see cref="TasksPath"/> is set only on a task inbox, which has no entity or data source.
 /// <see cref="Process"/> and <see cref="InstancesPath"/> are set only on a process inspector, which has no entity or data source either.
-/// <see cref="Actions"/> is empty on every widget but a form widget that declares actions.
+/// <see cref="Actions"/> is empty on every widget but a form or detail widget that declares actions.
 /// <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table that declares them.
 /// <see cref="Parameters"/> is empty on every widget but a table over a data source that binds page parameters.
-/// <see cref="Access"/> is set on a table or form widget and null on a task inbox, a process inspector and a kpi.
+/// <see cref="Access"/> is set on a table, form or detail widget and null on a task inbox, a process inspector and a kpi.
+/// <see cref="Detail"/> is set only on a detail widget, which has an <see cref="Entity"/> and optionally a <see cref="Form"/>.
 /// <see cref="Kpi"/> is set only on a kpi widget, which has a <see cref="DataSource"/> and no entity.
 /// </summary>
 /// <param name="TasksPath">The path of the application's task API, which lists the signed-in user's open tasks.</param>
@@ -107,6 +108,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <param name="Access">
 /// What the user may do with the widget's entity, or with the root entity of its data source.
 /// </param>
+/// <param name="Detail">What a detail widget shows, or null on any other widget.</param>
 /// <param name="Kpi">What a kpi widget shows, or null on any other widget.</param>
 public sealed record WidgetMetadata(
     string Type,
@@ -121,7 +123,12 @@ public sealed record WidgetMetadata(
     IReadOnlyList<ActionMetadata> ToolbarActions,
     IReadOnlyDictionary<string, string> Parameters,
     WidgetAccess? Access,
+    DetailMetadata? Detail,
     KpiMetadata? Kpi) : PageWidgetMetadata;
+
+/// <summary>What a detail widget shows: the record that one page parameter picks.</summary>
+/// <param name="Record">The page parameter whose value is the id of the record, by the name the page declares.</param>
+public sealed record DetailMetadata(string Record);
 
 /// <summary>What a kpi widget shows of its data source's one total row.</summary>
 /// <param name="Measure">The measure to show, by the name the data source declares.</param>

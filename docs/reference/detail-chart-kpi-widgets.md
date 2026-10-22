@@ -1,11 +1,11 @@
 # Detail, chart and KPI widgets
 
-Detailed reference for the `detail`, `chart` and `kpi` widgets of the SPA, all
+Detailed reference for the `detail`, `chart` and `kpi` widgets of the SPA. The `chart` widget is
 _(planned for M12)_. The conventions of [architecture.md](../architecture.md) apply: sections
 marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md). The
 rest of the frontend is in [frontend.md](frontend.md).
 
-- **Detail widget** *(planned for M12)*. A page whose widget is a `detail`
+- **Detail widget**. A page whose widget is a `detail`
   shows one record read-only, read through the record API. It writes
   nothing. See [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
 
@@ -16,21 +16,25 @@ rest of the frontend is in [frontend.md](frontend.md).
   - **Compile.** The widget names exactly one of `form` and `entity`, as a form
     widget does (`AXC0060`). A `form` that names no loaded form is `AXC0077`.
     `record` names a page parameter that is `required`, of type `reference`,
-    and whose `target` is the widget's entity. Otherwise it is a new check,
-    with no code yet. `actions` follow the form widget's rules, with
+    and whose `target` is the widget's entity, ignoring letter case.
+    Otherwise it is `AXC0239`, reported at `/widgets/{i}/record`. The page
+    schema requires `record` on a `detail` and rejects it on any other
+    widget, so a missing `record` is `AXC0004`. `actions` follow the form widget's rules, with
     `navigate` allowed. The labels join `AXC0028`.
   - **Metadata.** It reuses `entity`, `form`, `actions` and `access` of the
-    form widget, with `"dataSource": null` and `"chart": null` and
-    `"kpi": null`, and adds `detail`:
+    form widget, with `"dataSource": null` and `"kpi": null`, and adds
+    `detail`, written after `access` and before `kpi`:
 
     ```json
-    { "type": "detail", "entity": { "name": "Ticket", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [{ "type": "startProcess", "process": "TicketHandling", "labelKey": "tickets.handle", "instancesPath": "/api/apps/ServiceDesk/processes/TicketHandling/instances" }], "access": { "actions": ["read"], "createFields": [], "updateFields": [] }, "detail": { "record": "ticket" }, "chart": null, "kpi": null }
+    { "type": "detail", "entity": { "name": "Ticket", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [{ "type": "startProcess", "process": "TicketHandling", "labelKey": "tickets.handle", "instancesPath": "/api/apps/ServiceDesk/processes/TicketHandling/instances" }], "access": { "actions": ["read"], "createFields": [], "updateFields": [] }, "detail": { "record": "ticket" }, "kpi": null }
     ```
 
   - **Record.** The SPA reads the record that the page parameter `record`
     names, from the entity's `recordsPath`. A missing or malformed parameter
     and a record that is missing or unreadable show the not-found page inside
-    the site shell.
+    the site shell. The SPA shows only a page's first widget, so a `detail`
+    inside `columns`, `tabs` or a `section` has correct metadata but is not
+    rendered yet.
   - **Fields.** With a `form`, the widget shows its sections in order under
     their titles. Without one, it shows every readable field in declaration
     order. Every value is read-only and formatted as a table cell shows it. The

@@ -38,6 +38,7 @@ function kpiWidget(kpi: KpiMetadata): WidgetMetadata {
     toolbarActions: [],
     parameters: {},
     access: null,
+    detail: null,
     kpi,
     dataSource: {
       name: 'NoteTotals',

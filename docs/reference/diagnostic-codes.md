@@ -237,3 +237,4 @@ sorted by file and then path.
 | `AXC0236` | A page whose widget is a form declares `parameters`. A navigate action opens the form's record with `record`. Reported at `/parameters`. |
 | `AXC0237` | A `kpi` widget names a data source without an `aggregate`, or one whose `groupBy` is not empty, so that it has no single total row. Reported at the widget's `dataSource`. |
 | `AXC0238` | A `kpi` widget names a `measure` or a `comparison.measure` that its data source's `aggregate` does not declare, ignoring letter case. Reported at that property. |
+| `AXC0239` | A `detail` widget's `record` names no page parameter, or a parameter that is optional, not a `reference`, or whose `target` is not the widget's entity, ignoring letter case. Reported at `/widgets/{i}/record`. |

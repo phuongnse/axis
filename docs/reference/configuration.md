@@ -95,7 +95,7 @@ flowchart LR
      page parameter with `parameters`, otherwise it is `AXC0060` at
      `/widgets/{i}/dataSource`. It must name a loaded data source
      (`AXC0059`). It may be `<module id>/<name>`, to name a data source of a
-     [module](modules-and-templates.md#modules). A `form` is allowed only on a `form` widget (`AXC0060` at
+     [module](modules-and-templates.md#modules). A `form` is allowed only on a `form` or `detail` widget (`AXC0060` at
      `/widgets/{i}/form`), and must name a loaded form (`AXC0077`). A `form` widget
      that names a form is over the form's entity. A table has no link to a form
      page: it opens and creates records through `navigate` actions, and the
@@ -119,7 +119,14 @@ flowchart LR
      as the only names in its expressions. The page schema requires `measure` and
      `label` on a `kpi` and does not allow them, or `comparison` and
      `navigate`, on any other widget (`AXC0004`).
-     `actions` are allowed only on a `form` widget
+     A `detail` widget names exactly one of `form` and `entity` (`AXC0060`) and
+     no `dataSource`, `rowActions`, `toolbarActions` or `parameters`
+     (`AXC0060` at that property). Its `record` must name a required `reference`
+     parameter of the page whose `target` is the widget's entity, ignoring
+     letter case, otherwise it is `AXC0239` at `/widgets/{i}/record`. The page
+     schema requires `record` on a `detail` and does not allow it on any other
+     widget (`AXC0004`).
+     `actions` are allowed only on a `form` or `detail` widget
      (`AXC0060` at `/widgets/{i}/actions`). An action's `process` must name a
      loaded process (`AXC0087`) over the entity of the form's records
      (`AXC0088`), both at `/widgets/{i}/actions/{j}/process`. A `startProcess`
