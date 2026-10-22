@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Server.Tests;
+using static Axis.Integration.Tests.Polling;
 using static Axis.Integration.Tests.RecordApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -29,7 +30,7 @@ public sealed class ProcessStartLockTests(ProcessStartFixture fixture) : IClassF
 
         using var request = Request(HttpMethod.Post, "/api/apps/ProcessApp/processes/Submit/instances", ProcessStartFixture.Host, $$"""{ "subjectId": "{{subject:D}}" }""");
         var starting = client.SendAsync(request, CancellationToken);
-        await WaitUntilAsync(async () => starting.IsCompleted || await fixture.CountWaitingAdvisoryLocksAsync() > 0);
+        await WaitUntilAsync(async () => starting.IsCompleted || await fixture.CountWaitingAdvisoryLocksAsync() > 0, "The start did not finish or wait on a lock.");
 
         // The start has not ended and the old release is still active, so the start is waiting.
         Assert.False(starting.IsCompleted);
@@ -47,15 +48,5 @@ public sealed class ProcessStartLockTests(ProcessStartFixture fixture) : IClassF
         Assert.Equal(1L, await fixture.CountAsync(
             "SELECT count(*) FROM axis.process_instances WHERE id = @id AND subject_id = @subject AND release_id = @release",
             ("id", instance), ("subject", subject), ("release", newRelease)));
-    }
-
-    private static async Task WaitUntilAsync(Func<Task<bool>> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (!await condition())
-        {
-            Assert.True(DateTime.UtcNow < deadline, "The condition did not hold in time.");
-            await Task.Delay(50, CancellationToken);
-        }
     }
 }

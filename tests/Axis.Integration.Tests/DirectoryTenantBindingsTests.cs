@@ -18,6 +18,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
@@ -69,7 +70,8 @@ public sealed class DirectoryTenantBindingsTests(PostgreSqlFixture database) : I
                     && await fixtureB.ScalarAsync("SELECT id FROM axis.connector_calls WHERE process_instance_id = @id", ("id", instanceB)) is not null
                     && stub.Requests.Any(request => request.Path == "/tenant-a/orders")
                     && stub.Requests.Any(request => request.Path == "/tenant-b/orders"),
-                "The connector calls did not reach the stub.");
+                "The connector calls did not reach the stub.",
+                TimeSpan.FromSeconds(60));
 
             var requestA = stub.Requests.First(request => request.Path == "/tenant-a/orders");
             var requestB = stub.Requests.First(request => request.Path == "/tenant-b/orders");
@@ -196,16 +198,6 @@ public sealed class DirectoryTenantBindingsTests(PostgreSqlFixture database) : I
         await using var connection = new NpgsqlConnection(platform);
         await connection.OpenAsync(CancellationToken);
         await PlatformRoleGrants.ApplyAsync(connection, PostgreSqlServer.RuntimeRole, CancellationToken);
-    }
-
-    private static async Task WaitUntilAsync(Func<Task<bool>> condition, string failure)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(60);
-        while (!await condition())
-        {
-            Assert.True(DateTime.UtcNow < deadline, failure);
-            await Task.Delay(TimeSpan.FromMilliseconds(50), CancellationToken);
-        }
     }
 
     private static bool Contains(byte[] haystack, byte[] needle) => haystack.AsSpan().IndexOf(needle) >= 0;
