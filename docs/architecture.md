@@ -718,7 +718,7 @@ Moved to [reference/frontend.md](reference/frontend.md).
 
 Ant Design is a detail of the SPA. It never shows in configuration, page
 metadata, theme tokens or the custom widget API, see
-[D57](decisions/d57-ant-design-is-a-detail-of-the-spa-without-procomponents.md).
+[D58](decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md).
 
 ## Testing
 

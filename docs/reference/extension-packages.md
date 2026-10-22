@@ -36,7 +36,7 @@ custom code out of configuration is in
   ([D8](../decisions/d8-custom-ui-widgets-are-packaged-react-components.md)).
   When they come, a custom widget builds on Axis widgets and Axis tokens, never
   on Ant Design directly
-  ([D57](../decisions/d57-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
+  ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
 
 ## Manifest
 
