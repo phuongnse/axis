@@ -498,14 +498,24 @@ Run and the Test results list, the read-only view of a module entity, and the re
       panel exists, navigate actions and page parameters are edited in the JSON
       view ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md))
       *(planned for M12)*.
-    - **Widgets.** A page holds one widget today, so the list has no add,
-      remove or reorder.
-    - **Widget tree** *(planned for M12)*. The editor shows the page's widgets
-      as nested rows. The author can add and remove a widget, move it up or
-      down and move it into a container. Each container type has a panel. A
-      `columns` panel edits the column widths. A `tabs` panel edits the tab
-      labels, with one text box per locale. A `section` panel edits the title
-      and the collapsed state. See [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+    - **Widget tree** *(built)*. The editor shows the page's widgets as
+      nested rows. A container shows its columns, tabs or section body as
+      nested lists, and a row opens that widget's panel at its own pointer,
+      such as `/widgets/0/columns/1/widgets/0`. Every list has an Add widget
+      picker with all seven types. A new `columns` starts with two columns of
+      width 6, a new `tabs` with one tab and a new `section` empty. Every row
+      has Move up, Move down and Remove, which replace only the list that holds
+      the widget, and a Move to picker. Move to lists every other widget list
+      as a path such as `Page › columns 1 › Column 2`, leaves out the widget's
+      own list and the lists inside it, and replaces the page's `widgets` in
+      one change. A container's type is fixed, and its panel points to the JSON
+      view. The editor does not check the depth limit or an empty list, so the
+      compiler reports them after the save. A widget keeps every key the editor
+      does not know when it moves.
+    - **Container panels** *(planned for M12)*. Each container type has a
+      panel. A `columns` panel edits the column widths. A `tabs` panel edits
+      the tab labels, with one text box per locale. A `section` panel edits the
+      title and the collapsed state. See [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
     - **Unknown keys.** A key the editor does not show, on the page or on a
       widget, is saved unchanged. A widget of a type with no panel, such as one
       M12 adds, shows its type and points to the JSON view.
