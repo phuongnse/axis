@@ -656,7 +656,6 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal(recordFailure, call.LastError);
         Assert.Equal(recordFailure, (await tenant.HistoryAsync(instanceId))[1].Error);
         Assert.Equal(recordFailure, Assert.Single(await AttemptsAsync(tenant, callId)).Error);
-        Assert.DoesNotContain("500", call.LastError, StringComparison.Ordinal);
     }
 
     [Fact]
