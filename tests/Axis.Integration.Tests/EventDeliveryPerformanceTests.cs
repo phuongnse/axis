@@ -9,6 +9,7 @@ namespace Axis.Integration.Tests;
 /// each within the time limit. StepApp's <c>ApproveNotedRequests</c> starts <c>RoleApprove</c> for
 /// each of them, and <c>DecideHugeNotedRequests</c> skips each.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class EventDeliveryPerformanceTests(ProcessStepFixture fixture) : IClassFixture<ProcessStepFixture>
 {
     private const int Events = 1_000;

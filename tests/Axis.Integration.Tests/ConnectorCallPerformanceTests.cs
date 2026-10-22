@@ -8,6 +8,7 @@ namespace Axis.Integration.Tests;
 /// A thousand staged connector calls against a fast stub are all sent by one worker within the
 /// time limit, and each ends <c>succeeded</c>.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class ConnectorCallPerformanceTests(ConnectorCallFixture fixture) : IClassFixture<ConnectorCallFixture>
 {
     private const int Calls = 1_000;

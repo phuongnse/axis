@@ -120,8 +120,11 @@ models, are not copied here. Look them up where they live.
   - The integration performance tests never run under that variable. Their class
     names end in `PerformanceTests`, and a new one must follow that rule. They
     take about a third of the integration tests' time and depend on the load of
-    the runner. CI on `main` runs them, so a slowdown shows after the merge, and
-    autopilot opens a bug issue for it as for any CI failure on `main`.
+    the runner. Each test project keeps them in one collection that does not run
+    in parallel, so xUnit runs them one class at a time, after the other tests. A
+    guard test fails when a `*PerformanceTests` class is outside that collection.
+    CI on `main` runs them, so a slowdown shows after the merge, and autopilot
+    opens a bug issue for it as for any CI failure on `main`.
 
   The lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs). Any
   doubt runs the suite. A missing base, a git error or an empty change list runs

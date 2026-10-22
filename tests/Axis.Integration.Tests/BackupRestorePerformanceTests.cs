@@ -9,6 +9,7 @@ namespace Axis.Integration.Tests;
 /// <c>tenant backup</c> and <c>tenant restore</c> of a tenant with 100,000 purchase requests, two line items each, finish within
 /// their time limits, and the restored database holds every row.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class BackupRestorePerformanceTests(AdminBackupFixture fixture) : IClassFixture<AdminBackupFixture>
 {
     private const int Requests = 100_000;

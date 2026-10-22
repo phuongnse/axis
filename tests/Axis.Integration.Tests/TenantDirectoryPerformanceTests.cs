@@ -18,6 +18,7 @@ namespace Axis.Integration.Tests;
 /// A directory of 200 tenants resolves a thousand requests within the time limit and runs no platform database query for
 /// them. A refresh that admits 199 new tenants, and a refresh that changes nothing, each finish within their time limit.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class TenantDirectoryPerformanceTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const int NewTenants = 199;

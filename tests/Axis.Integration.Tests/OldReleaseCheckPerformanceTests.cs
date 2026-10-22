@@ -12,6 +12,7 @@ namespace Axis.Integration.Tests;
 /// The check for open work on older releases answers within the time limit with 20 releases and
 /// ten thousand waiting instances among a hundred thousand, and its query reads an index.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class OldReleaseCheckPerformanceTests(DataDatabaseFixture database) : IClassFixture<DataDatabaseFixture>
 {
     private const int Releases = 20;

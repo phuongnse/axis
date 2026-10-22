@@ -17,6 +17,7 @@ namespace Axis.Integration.Tests;
 /// thousand rows inline, and the worker's batches backfill a hundred thousand rows. The query that picks each
 /// batch uses the primary key.
 /// </summary>
+[Collection(PerformanceTiming.Name)]
 public sealed class ComputedRecomputePerformanceTests(DataDatabaseFixture database) : IClassFixture<DataDatabaseFixture>
 {
     private const int InlineRows = 10_000;
