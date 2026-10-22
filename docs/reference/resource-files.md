@@ -82,7 +82,8 @@ site, and its widgets are its content:
 }
 ```
 
-- A page holds exactly one widget. The widget `type` is `table` or
+- A page holds one widget today, and one or more *(planned for M12)*. The
+  widget `type` is `table` or
   `form`. A `form` names a `form` resource, which lays out the fields of
   one entity in sections (see [frontend.md](frontend.md)), or an `entity`, as
   shorthand for all its fields in one section. A `table` names an `entity`, as
@@ -94,11 +95,75 @@ site, and its widgets are its content:
   a button that starts the process for the form's record. See
   [frontend.md](frontend.md).
 - The page has no entity or template of its own, so more widgets and a
-  layout can be added later without a format change.
+  layout can be added without a format change.
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
   `{ "type": "table", "dataSource": "PurchaseRequestList", "formPage": "PurchaseRequestForm" }`.
   Its columns are the data source's projected fields. See
   [widget binding](data-sources.md#widget-binding).
+
+*(Planned for M12.)* A page may hold a tree of widgets. The container
+widgets `columns`, `tabs` and `section` hold other widgets, see
+[D58](../decisions/d58-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md):
+
+```json
+{
+  "id": "d6f9e3b2-8c4a-4d0f-8e2b-3a4c5d6e7f09",
+  "kind": "page",
+  "name": "PurchaseRequestsOverview",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.overview.title" },
+  "widgets": [
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "width": 8,
+          "widgets": [
+            { "type": "table", "entity": "PurchaseRequest", "formPage": "PurchaseRequestForm" }
+          ]
+        },
+        {
+          "width": 4,
+          "widgets": [
+            {
+              "type": "tabs",
+              "tabs": [
+                {
+                  "label": { "textKey": "pages.overview.tasks" },
+                  "widgets": [{ "type": "taskInbox" }]
+                },
+                {
+                  "label": { "textKey": "pages.overview.help" },
+                  "widgets": [
+                    {
+                      "type": "section",
+                      "title": { "textKey": "pages.overview.helpTitle" },
+                      "collapsed": true,
+                      "widgets": [{ "type": "form", "entity": "PurchaseRequest" }]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+- A `columns` widget lists `columns`. Each has a `width`, a whole number from
+  1 to 12, and its `widgets`. The widths of one `columns` widget add up to 12.
+- A `tabs` widget lists `tabs`. Each has a `label` and its `widgets`.
+- A `section` widget has a `title`, its `widgets` and an optional `collapsed`,
+  which defaults to `false`.
+- A label and a title are `{ "textKey": ... }`, like a page title.
+- Containers nest to at most 4 levels. The page's own `widgets` list is
+  level 1.
+- A page holds at most one `table` of any kind, and at most one `form`,
+  `taskInbox` or `processInspector`, so the URL state stays unambiguous.
+- `formatVersion` stays 1. Today's pages stay valid.
 
 A `seed` holds records with fixed ids for one entity:
 

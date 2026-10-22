@@ -450,7 +450,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
   | `application` | Generic form                          | Nothing                                                               |
   | `entity`      | Entity designer                       | Nothing                                                               |
-  | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives it a panel          |
+  | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives each container a panel |
   | `form`        | Generic form                          | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
   | `process`     | Typed editor with the process graph   | Nothing                                                               |
@@ -494,6 +494,12 @@ Run and the Test results list, the read-only view of a module entity, and the re
       save.
     - **Widgets.** A page holds one widget today, so the list has no add,
       remove or reorder.
+    - **Widget tree** *(planned for M12)*. The editor shows the page's widgets
+      as nested rows. The author can add and remove a widget, move it up or
+      down and move it into a container. Each container type has a panel. A
+      `columns` panel edits the column widths. A `tabs` panel edits the tab
+      labels, with one text box per locale. A `section` panel edits the title
+      and the collapsed state. See [D58](../decisions/d58-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
     - **Unknown keys.** A key the editor does not show, on the page or on a
       widget, is saved unchanged. A widget of a type with no panel, such as one
       M12 adds, shows its type and points to the JSON view.
@@ -638,7 +644,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     file, and a value that is not an object is left to the JSON view.
   - **Page editor and M12.** M12 adds layouts and widgets while this editor is
     built, see
-    [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
+    [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
+    and [D58](../decisions/d58-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
     The page editor changes again then.
 - **Process graph** *(built)*. A process shows a
   drawn graph of its steps and transitions above its editor, see
