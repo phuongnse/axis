@@ -117,6 +117,18 @@ flowchart LR
      resolve ignoring letter case, and a name whose file was not loaded
      because of its own errors is not reported again. Site titles, navigation labels, page titles and action labels join the
      `AXC0028` check.
+
+     *(Planned for M12.)* Page parameters and `navigate` actions
+     ([D61](../decisions/d61-navigate-actions-and-page-parameters.md)) add
+     these checks. Each code is assigned when the check is built:
+     - an unknown target `page`,
+     - an unknown parameter,
+     - a missing required parameter,
+     - an expression of the wrong type,
+     - `record` on a page that is not a form page, or over another entity,
+     - a duplicate page parameter name, or one of `page`, `pageSize` and
+       `sort`,
+     - an unknown parameter type, or an unknown `reference` target.
    - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded
@@ -698,7 +710,7 @@ to show where a resource is used and what it uses.
 | `text entry` | Text | `/texts/{key}` | Text key |
 | `package` | Application | `/packages/{i}` | Extension package |
 | `module` | Application | `/modules/{i}` | Module |
-| `field target` | Entity, data source | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
+| `field target` | Entity, data source, page *(planned for M12)* | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
 | `field target` | Endpoint | `/input/{i}/target` | Entity |
 | `field sequence` | Entity | `/fields/{i}/sequence` | Sequence |
 | `rule call` | Entity, data source, rule, process, policy | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter` | Rule |
@@ -707,7 +719,8 @@ to show where a resource is used and what it uses.
 | `widget entity` | Page | `/widgets/{i}/entity` | Entity |
 | `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
 | `widget form` | Page | `/widgets/{i}/form` | Form |
-| `widget form page` | Page | `/widgets/{i}/formPage` | Page |
+| `widget form page` | Page | `/widgets/{i}/formPage` (removed in M12) | Page |
+| `navigate page` *(planned for M12)* | Page | `/widgets/{i}/rowActions/{j}/page`, `/widgets/{i}/toolbarActions/{j}/page`, `/widgets/{i}/actions/{j}/page` | Page |
 | `widget process` | Page | `/widgets/{i}/process` | Process |
 | `action process` | Page | `/widgets/{i}/actions/{j}/process` | Process |
 | `form entity` | Form | `/entity` | Entity |

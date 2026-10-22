@@ -41,10 +41,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   and the `startProcess` action are agreed in
   [D20](../decisions/d20-human-tasks-task-inbox-and-forms.md). The
   `form` resource, the task inbox, the task page and the `startProcess` action
-  are built. Navigate actions are expected to replace the table's
-  `formPage` link; see
-  [D15](../decisions/d15-presentation-model.md), where that part is
-  still **Proposed**.
+  are built. Navigate actions and page parameters replace the table's
+  `formPage` link in M12 *(planned for M12)*; see [D61](../decisions/d61-navigate-actions-and-page-parameters.md).
 - **Text.** All UI strings come from text resources.
 - **Sites and texts.** The server describes sites to the SPA through
   read-only endpoints. Like every other `/api` path, they need a known tenant
@@ -227,7 +225,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - **Actions.** A `startProcess` action is left out of `actions` when the
       user has no `start` grant on its process. The same holds for a `table`
       row action *(planned for M12)*, and its `delete` row action is left out
-      when `access.actions` lacks `delete`.
+      when `access.actions` lacks `delete`. A `navigate` action whose target
+      page the user cannot read is left out too *(planned for M12)*.
     - **Access.** Every `table` and `form` widget gets an `access` object.
       It says which entity actions the user may take, and which fields each
       write action covers:
@@ -265,6 +264,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values |
+  | `/{site}/{page}?ticket=<id>` | *(planned for M12)* a page with parameters: the values sit in the query under the parameter names |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
   | `/{site}/{inboxpage}/{taskId}` | the task page of the task with that id, under the page of a task inbox |
@@ -272,6 +272,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   - `{site}` is the site path. `{page}` is the page name in lower case, as
     navigation links write it. The server matches both ignoring letter case.
+  - A required page parameter that is missing from the URL, or has the wrong
+    form, shows the not-found page inside the site shell *(planned for M12)*.
   - An unknown site shows the not-found page inside the platform shell. An
     unknown page shows it inside the site shell.
     An address with more than three segments, such as `/e2e/notes/42/edit`,
@@ -420,7 +422,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     button is a link: a click with a modifier key or the middle button opens
     the form in a new tab or window. Both pass the table's address, with
     its paging and sorting, to the form in history state. Without a form
-    page there is no create button and no open column.
+    page there is no create button and no open column. In M12 the open link
+    becomes a `rowActions` navigate with `record: id`, and the create button a
+    `toolbarActions` navigate without `record`, still gated by `access`
+    `create` *(planned for M12)*.
   - **Row and toolbar actions** *(planned for M12)*. See
     [D59](../decisions/d59-table-row-and-toolbar-actions.md).
     - **Where.** Toolbar actions sit next to the create button. Row actions
@@ -428,6 +433,20 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `navigate` action may sit in either list. `startProcess` and `delete`
       are row actions only. A row of a data source acts on its root record,
       and a group row has no actions.
+    - **Navigate.** A button that opens another page and sets its
+      parameters. A My tickets row opens a TicketDetail page and sets its
+      `ticket` parameter:
+
+      ```json
+      { "type": "table", "entity": "Ticket", "rowActions": [
+        { "type": "navigate", "page": "TicketDetail",
+          "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }
+      ] }
+      ```
+
+      The target page declares
+      `"parameters": [{ "name": "ticket", "type": "reference", "target": "Ticket", "required": true }]`.
+      The click goes to `/{site}/ticketdetail?ticket=<id>`. See [D61](../decisions/d61-navigate-actions-and-page-parameters.md).
     - **`visibleWhen`.** An action hides when its expression over the row is
       `false`, `null` or fails. It only shapes the UI. The server decides, as
       in [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).

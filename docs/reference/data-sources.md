@@ -437,7 +437,8 @@ data sources.
   shorthand for all records of an entity. A `dataSource` that names no
   loaded data source is `AXC0059`.
 - **Parameters.** A bound table needs every parameter of its data source to be
-  optional, otherwise it is `AXC0060`. It shows one filter input per
+  optional, otherwise it is `AXC0060`, unless it is bound to a required page
+  parameter *(planned for M12)*. It shows one filter input per
   parameter and sends their values from the URL. See
   [Table widget](frontend.md) for the details.
 - **Grouped data sources.** A table may bind a data source with an
@@ -447,10 +448,14 @@ data sources.
 - **Form page.** A `formPage` must be a form over the root entity
   (`AXC0022`), because each row carries the id of its root record. A
   `formPage` on a table over a data source with an `aggregate` is also
-  `AXC0022`, because a group is not a record.
-- **Page parameters.** Values that come from navigation wait for the
-  navigation bullet of
-  [D15](../decisions/d15-presentation-model.md), which is still
-  **Proposed**.
+  `AXC0022`, because a group is not a record. M12 replaces `formPage` by the
+  `record` rule of a navigate action *(planned for M12)*.
+- **Page parameters** *(planned for M12)*. A table binds a page parameter to a
+  data source parameter with a name map on the widget:
+  `"parameters": { "<data source parameter>": "<page parameter>" }`. The two
+  types must match. A required data source parameter is allowed only when it
+  is bound to a required page parameter. A bound parameter has no filter
+  input, and its value comes from the page parameter in the URL. See
+  [D61](../decisions/d61-navigate-actions-and-page-parameters.md).
 - **Schema.** The data source's schema reaches the SPA in page metadata, in
   the widget's `dataSource` object. There is no separate schema endpoint.

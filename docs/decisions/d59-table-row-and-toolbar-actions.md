@@ -27,9 +27,10 @@ issue #932 on 2026-10-21.
 - **Bulk actions:** actions on selected rows come after M12. M12 acts on one
   row at a time.
 
-The `navigate` action keeps the shape of
-[D15](d15-presentation-model.md). A row of a table bound to a data source acts
-on its root record, and a group row has no actions.
+The `navigate` action has the shape that
+[D61](d61-navigate-actions-and-page-parameters.md) defines. A row of a table
+bound to a data source acts on its root record, and a group row has no
+actions.
 
 _Why:_ a delete can remove stored data that should stay, so the user confirms
 it and the server checks it again. The UI can hide a button, but only the

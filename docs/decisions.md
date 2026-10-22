@@ -71,3 +71,4 @@ files agree, title and status included.
 | [D58](decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md) | Ant Design is a detail of the SPA, without ProComponents | **Agreed** |
 | [D59](decisions/d59-table-row-and-toolbar-actions.md) | Table row and toolbar actions | **Agreed** |
 | [D60](decisions/d60-the-service-desk-dashboard-ticket-detail-page-and-guided-form.md) | The service desk dashboard, ticket detail page and guided form | **Agreed** |
+| [D61](decisions/d61-navigate-actions-and-page-parameters.md) | Navigate actions and page parameters | **Agreed** |
