@@ -1,5 +1,4 @@
-import { Alert, Button, Checkbox, Flex, Input, Select, Table, Tag, Typography } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
+import { Alert, Button, Checkbox, Flex, Input, Select, Table, type TableColumnsType, Tag, Typography } from 'antd'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { diffPatch, setAt } from '../platform/jsonPatch'
 import {
@@ -73,7 +72,7 @@ export function StudioPolicyMatrixTable({
   const target = selection === undefined ? undefined : matrix.targets[selection.index]
   const cell = selection === undefined ? undefined : role?.cells[selection.index]
 
-  const columns: ColumnsType<StudioMatrixRole> = [
+  const columns: TableColumnsType<StudioMatrixRole> = [
     {
       key: 'role',
       title: t('shell.studio.matrix.role'),
