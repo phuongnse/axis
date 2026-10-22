@@ -112,7 +112,7 @@ site, and its widgets are its content:
 
 *(Planned for M12.)* A page may hold a tree of widgets. The container
 widgets `columns`, `tabs` and `section` hold other widgets, see
-[D60](../decisions/d60-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md):
+[D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md):
 
 ```json
 {

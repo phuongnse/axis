@@ -37,7 +37,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   or a `form` resource, which lays the entity's fields out in sections, and a
   table binds an entity or a data source. The container widgets `columns`,
   `tabs` and `section` hold other widgets, see
-  [D60](../decisions/d60-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+  [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
   Data sources are agreed in
   [D18](../decisions/d18-data-sources.md) and described in
   [data-sources.md](data-sources.md). Shared `form` resources, the task inbox
@@ -941,7 +941,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   Design's `md`, columns stack in file order, tab headers scroll and a table
   scrolls sideways inside its widget. The site shell's navigation collapses
   into a menu. There is no per-widget setting until a sample needs one, see
-  [D60](../decisions/d60-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+  [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
 
 ## Studio
 

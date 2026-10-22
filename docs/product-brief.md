@@ -170,7 +170,9 @@ two, is a sample that a Playwright journey builds only through Studio. It lives 
 configuration in `samples/apps/service-desk/`. It is not platform code. It is
 thin on purpose: SLAs, escalation, loops that hold a task and notifications
 wait for M14. See
-[D56](decisions/d56-a-service-desk-as-the-third-sample-application.md).
+[D56](decisions/d56-a-service-desk-as-the-third-sample-application.md) and, for
+the parts planned for M12,
+[D60](decisions/d60-the-service-desk-dashboard-ticket-detail-page-and-guided-form.md).
 
 ### Data
 
@@ -200,6 +202,8 @@ wait for M14. See
 - A requester reads and edits only their own tickets. An agent reads the
   tickets assigned to them. The lead reads every ticket.
 - The requester cannot edit the resolution.
+- _(planned for M12)_ A requester may delete their own ticket while its status
+  is `draft`. An agent and the lead may not delete.
 - Everything else is denied by default.
 
 ### Pages
@@ -207,12 +211,24 @@ wait for M14. See
 My tickets, the ticket form, the task inbox and All tickets for the lead, in
 a site at path `service-desk`. Texts are in `en` and `vi`.
 
+- _(planned for M12)_ A dashboard page for the service desk lead. It has
+  KPIs (key figures) for open and urgent tickets and a chart of open tickets
+  by category, above All tickets, in columns.
+- _(planned for M12)_ A ticket detail page with one detail widget that shows
+  the ticket. My tickets and All tickets open it through a navigate action
+  with a `ticket` parameter.
+- _(planned for M12)_ The ticket form has two steps. Step 1 is the title and
+  description. Step 2 is the category and priority. The resolution shows, and
+  is required, only when the status is `resolved`.
+
 ### Scenarios the application must pass
 
 - The happy path, a rejection, and a reopen then resubmit.
 - Denied access for each role. A requester cannot see another requester's
   ticket, an agent cannot see a ticket assigned to someone else, and a user
   cannot act on a task that is not theirs.
+- _(planned for M12)_ A requester deletes a draft ticket. An agent's delete
+  is refused.
 
 ### Built through Studio
 
@@ -233,5 +249,10 @@ Studio, publishes it and takes one ticket through the process on the site.
 - Then the journey runs the scenarios from Studio and publishes. Then the
   requester, the service desk lead and the agent take one ticket through the
   process on the site.
+- _(planned for M12)_ The main journey also builds the dashboard, the ticket
+  detail page and the two-step ticket form. The comparison with the committed
+  sample covers them.
+- _(planned for M12)_ Another Playwright journey uses the sample at phone
+  width.
 - _(planned for M13)_ A second, smaller journey starts from the
   `request-approval` template.

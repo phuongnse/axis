@@ -499,7 +499,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
       down and move it into a container. Each container type has a panel. A
       `columns` panel edits the column widths. A `tabs` panel edits the tab
       labels, with one text box per locale. A `section` panel edits the title
-      and the collapsed state. See [D60](../decisions/d60-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+      and the collapsed state. See [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
     - **Unknown keys.** A key the editor does not show, on the page or on a
       widget, is saved unchanged. A widget of a type with no panel, such as one
       M12 adds, shows its type and points to the JSON view.
@@ -645,7 +645,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Page editor and M12.** M12 adds layouts and widgets while this editor is
     built, see
     [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
-    and [D60](../decisions/d60-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+    and [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
     The page editor changes again then.
 - **Process graph** *(built)*. A process shows a
   drawn graph of its steps and transitions above its editor, see
