@@ -1,4 +1,4 @@
-import { Button, Card, Flex, Input, Radio, Select, Typography } from 'antd'
+import { Button, Card, ConfigProvider, Flex, Input, Radio, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import type { JsonSchema } from '../platform/studioSchemas'
@@ -137,54 +137,58 @@ export function ProcessEditor({
   }
 
   return (
-    <Flex vertical gap="middle" data-testid="studio-process-editor">
-      <SchemaForm schema={schema} value={value} onChange={onChange} />
-      <div data-testid="studio-field-/start">
-        <div>{t('shell.studio.process.start')}</div>
-        <ReferencePicker
-          name={t('shell.studio.process.start')}
-          value={text(value.start)}
-          required
-          options={names}
-          onChange={(next) => onChange('/start', next ?? '')}
-        />
-      </div>
-      <div data-testid="studio-field-/steps">
-        <Flex vertical gap="small">
-          {steps.map((step, index) => (
-            <Step
-              key={index}
-              index={index}
-              step={isContent(step) ? step : {}}
-              entity={text(value.entity)}
-              names={names}
-              last={index === steps.length - 1}
-              onMove={(offset) => move(index, offset)}
-              onRemove={() =>
-                onChange(
-                  '/steps',
-                  steps.filter((_, position) => position !== index),
-                )
-              }
-              onChange={onChange}
-            />
-          ))}
-          <div>
-            <Select
-              aria-label={t('shell.studio.process.addStep')}
-              placeholder={t('shell.studio.process.addStep')}
-              style={{ minWidth: 240 }}
-              virtual={false}
-              value={null}
-              options={stepTypes.map((type) => ({ value: type, label: type }))}
-              onChange={(type: string) =>
-                onChange('/steps', [...steps, { name: '', type, ...structuredClone(requiredStepKeys[type]) }])
-              }
-            />
-          </div>
-        </Flex>
-      </div>
-    </Flex>
+    // Adding a step moves the cards, so a list in the page body keeps the place it opened at while its select moves,
+    // and a click on its option can miss. Inside the editor, the list moves with its select.
+    <ConfigProvider getPopupContainer={(trigger) => trigger?.parentElement ?? document.body}>
+      <Flex vertical gap="middle" data-testid="studio-process-editor">
+        <SchemaForm schema={schema} value={value} onChange={onChange} />
+        <div data-testid="studio-field-/start">
+          <div>{t('shell.studio.process.start')}</div>
+          <ReferencePicker
+            name={t('shell.studio.process.start')}
+            value={text(value.start)}
+            required
+            options={names}
+            onChange={(next) => onChange('/start', next ?? '')}
+          />
+        </div>
+        <div data-testid="studio-field-/steps">
+          <Flex vertical gap="small">
+            {steps.map((step, index) => (
+              <Step
+                key={index}
+                index={index}
+                step={isContent(step) ? step : {}}
+                entity={text(value.entity)}
+                names={names}
+                last={index === steps.length - 1}
+                onMove={(offset) => move(index, offset)}
+                onRemove={() =>
+                  onChange(
+                    '/steps',
+                    steps.filter((_, position) => position !== index),
+                  )
+                }
+                onChange={onChange}
+              />
+            ))}
+            <div>
+              <Select
+                aria-label={t('shell.studio.process.addStep')}
+                placeholder={t('shell.studio.process.addStep')}
+                style={{ minWidth: 240 }}
+                virtual={false}
+                value={null}
+                options={stepTypes.map((type) => ({ value: type, label: type }))}
+                onChange={(type: string) =>
+                  onChange('/steps', [...steps, { name: '', type, ...structuredClone(requiredStepKeys[type]) }])
+                }
+              />
+            </div>
+          </Flex>
+        </div>
+      </Flex>
+    </ConfigProvider>
   )
 }
 
