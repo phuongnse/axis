@@ -15,6 +15,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   templates. Those components and a single token-based theme with light and
   dark modes live in `web/src/platform/`. Feature code assembles them and
   adds no styling of its own.
+- **The UI library is a detail of the SPA.** The SPA builds on Ant Design for
+  its base components
+  ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
+  Configuration, page metadata, configurable theme tokens and the custom widget
+  API never name an Ant Design component, prop or token. A custom widget builds
+  on Axis widgets and Axis tokens and never imports the UI library directly.
+  Specialised libraries such as React Flow and CodeMirror follow the same rule.
+  No layer renders UI from a schema on top of Ant Design. The shell and the page
+  containers still use ProComponents until it is removed _(planned for M12)_.
 - **Design tokens and previews** *(planned for M12)*. An Axis token file in
   `web/src/platform/` holds the colours for light and dark mode, type, spacing
   and radius, and the theme reads it. It replaces `sharedTokens` in
@@ -413,7 +422,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     its paging and sorting, to the form in history state. Without a form
     page there is no create button and no open column.
   - **Row and toolbar actions** *(planned for M12)*. See
-    [D58](../decisions/d58-table-row-and-toolbar-actions.md).
+    [D59](../decisions/d59-table-row-and-toolbar-actions.md).
     - **Where.** Toolbar actions sit next to the create button. Row actions
       are buttons in the row, and fold into a menu at phone width. A
       `navigate` action may sit in either list. `startProcess` and `delete`

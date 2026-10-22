@@ -101,7 +101,7 @@ site, and its widgets are its content:
   `rowActions` only, and the row is their subject. An entry may have a
   `visibleWhen`, a boolean expression over the row's fields. See
   [frontend.md](frontend.md) and
-  [D58](../decisions/d58-table-row-and-toolbar-actions.md).
+  [D59](../decisions/d59-table-row-and-toolbar-actions.md).
 - The page has no entity or template of its own, so more widgets and a
   layout can be added later without a format change.
 - A `table` widget may name a `dataSource` instead of an `entity`, such as

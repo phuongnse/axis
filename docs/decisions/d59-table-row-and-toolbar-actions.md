@@ -1,4 +1,4 @@
-# D58. Table row and toolbar actions
+# D59. Table row and toolbar actions
 
 Status: **Agreed**
 
