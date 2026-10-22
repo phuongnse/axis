@@ -1,5 +1,5 @@
 import { Button, Card, Flex, Input, InputNumber, Select, Switch, Typography } from 'antd'
-import { useContext, useState } from 'react'
+import { lazy, Suspense, useContext, useState } from 'react'
 import { getAt } from '../platform/jsonPatch'
 import {
   addableTypes,
@@ -17,14 +17,26 @@ import {
   widgetTypes,
 } from '../platform/pageWidgets'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
+import type { StudioNamePage, StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
+import { ExpressionCheckContext } from './expressionCheckContext'
+import { expressionScope } from './expressionScope'
 import { LabelTextsContext } from './labelTextsContext'
 import { MappingRows } from './MappingRows'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 
+const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
+
 type Content = Record<string, unknown>
+
+/** The types a page parameter takes. */
+const parameterTypes = ['text', 'integer', 'decimal', 'boolean', 'date', 'date-time', 'enum', 'reference']
+
+function escapeSegment(segment: string): string {
+  return segment.replaceAll('~', '~0').replaceAll('/', '~1')
+}
 
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -41,8 +53,10 @@ function JsonOnly() {
 }
 
 /**
- * The editor of a page. It shows the page's name and title, its widgets as a tree, and a panel for the selected
- * widget. The tree nests the widgets inside `columns`, `tabs` and `section`. Every list has an Add widget picker,
+ * The editor of a page. It shows the page's name and title, its parameters, its widgets as a tree, and a panel for
+ * the selected widget. Each parameter has a name, a type, a Required switch and Remove. A `reference` parameter also
+ * has a target entity and an `enum` parameter has its values, and a type change removes the one the new type does not
+ * take. The tree nests the widgets inside `columns`, `tabs` and `section`. Every list has an Add widget picker,
  * and every widget has Move up, Move down, Remove and a Move to picker that lists the other widget lists. A new
  * container starts with two columns of width 6, one tab, or an empty section. A container's type is fixed. Its panel
  * edits the width of each column, the label of each tab and the title and collapsed state of a section, and adds
@@ -50,7 +64,9 @@ function JsonOnly() {
  * `processInspector` widget shows its type with every property that type takes. A `form` panel also lists its
  * `actions`, which are `startProcess` or `navigate`, and a `table` panel lists its `rowActions` and `toolbarActions`,
  * which are `navigate`. A navigate action has a target page, a label, a `record` expression and parameter
- * expressions. A property is a name picked from the application's names, and a table's data source and
+ * expressions. When the names list the target page, the action shows one expression for each parameter the page
+ * declares, and an empty expression leaves the parameter out. Picking another page removes the values the new page
+ * does not declare. A property is a name picked from the application's names, and a table's data source and
  * entity, like a form's entity and form, exclude each other, so a pick clears the other. The editor edits the
  * draft through `onChange`, so a key it does not show, on the page or on a widget, stays as it is. A widget of a
  * type it has no panel for shows its type and points to the JSON view.
@@ -87,6 +103,7 @@ export function PageEditor({ value, onChange }: { value: Content; onChange: Chan
           </div>
         )}
       </div>
+      <PageParameters value={value.parameters} onChange={onChange} />
       <div data-testid="studio-field-/widgets">
         <Flex vertical gap="small">
           <Typography.Text strong>{t('shell.studio.page.widgets')}</Typography.Text>
@@ -105,6 +122,122 @@ export function PageEditor({ value, onChange }: { value: Content; onChange: Chan
             </>
           )}
         </Flex>
+      </div>
+    </Flex>
+  )
+}
+
+/** The parameters a page declares, each as a card of a name, a type, a Required switch and the fields its type takes. */
+function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeHandler }) {
+  const t = useText()
+  const list = Array.isArray(value) ? value : []
+
+  return (
+    <div data-testid="studio-field-/parameters">
+      <Flex vertical gap="small">
+        <Typography.Text strong>{t('shell.studio.page.parameters')}</Typography.Text>
+        {value !== undefined && !Array.isArray(value) ? (
+          <JsonOnly />
+        ) : (
+          <>
+            {list.map((parameter, index) => {
+              const base = `/parameters/${index}`
+              if (!isContent(parameter)) {
+                return (
+                  <Card size="small" key={index} data-testid={`studio-field-${base}`}>
+                    <JsonOnly />
+                  </Card>
+                )
+              }
+              return (
+                <Card size="small" key={index} data-testid={`studio-field-${base}`}>
+                  <PageParameter base={base} parameter={parameter} onChange={onChange} />
+                </Card>
+              )
+            })}
+            <div>
+              <Button onClick={() => onChange('/parameters', [...list, { name: '', type: 'text' }])}>
+                {t('shell.studio.page.addParameter')}
+              </Button>
+            </div>
+          </>
+        )}
+      </Flex>
+    </div>
+  )
+}
+
+function PageParameter({ base, parameter, onChange }: { base: string; parameter: Content; onChange: ChangeHandler }) {
+  const t = useText()
+  const type = typeof parameter.type === 'string' ? parameter.type : undefined
+  const values = Array.isArray(parameter.values) ? parameter.values.filter((item) => typeof item === 'string') : []
+
+  return (
+    <Flex vertical gap="small">
+      <Flex gap="small" align="flex-start" wrap>
+        <div data-testid={`studio-field-${base}/name`}>
+          <Input
+            aria-label={t('shell.studio.page.parameterNameLabel')}
+            value={text(parameter.name)}
+            onChange={(event) => onChange(`${base}/name`, event.target.value)}
+          />
+        </div>
+        <div data-testid={`studio-field-${base}/type`}>
+          <Select
+            aria-label={t('shell.studio.page.parameterType')}
+            virtual={false}
+            style={{ minWidth: 160 }}
+            value={type}
+            options={parameterTypes.map((option) => ({ value: option, label: option }))}
+            onChange={(next: string) => {
+              onChange(`${base}/type`, next)
+              if (next !== 'reference' && parameter.target !== undefined) {
+                onChange(`${base}/target`, undefined)
+              }
+              if (next !== 'enum' && parameter.values !== undefined) {
+                onChange(`${base}/values`, undefined)
+              }
+            }}
+          />
+        </div>
+        <div data-testid={`studio-field-${base}/required`}>
+          <Flex gap="small" align="center">
+            <Switch
+              aria-label={t('shell.studio.page.parameterRequired')}
+              checked={parameter.required === true}
+              onChange={(checked) => onChange(`${base}/required`, checked ? true : undefined)}
+            />
+            <span>{t('shell.studio.page.parameterRequired')}</span>
+          </Flex>
+        </div>
+      </Flex>
+      {type === 'reference' && (
+        <NameField
+          pointer={`${base}/target`}
+          label={t('shell.studio.page.parameterTarget')}
+          kind="entity"
+          current={parameter.target}
+          required={false}
+          onPick={(next) => onChange(`${base}/target`, next)}
+        />
+      )}
+      {type === 'enum' && (
+        <div data-testid={`studio-field-${base}/values`}>
+          <div>{t('shell.studio.page.parameterValues')}</div>
+          <Select
+            mode="tags"
+            aria-label={t('shell.studio.page.parameterValues')}
+            style={{ minWidth: 240 }}
+            open={false}
+            value={values}
+            onChange={(next: string[]) => onChange(`${base}/values`, next.length === 0 ? undefined : next)}
+          />
+        </div>
+      )}
+      <div>
+        <Button danger onClick={() => onChange(base, undefined)}>
+          {t('shell.studio.page.removeParameter')}
+        </Button>
       </div>
     </Flex>
   )
@@ -651,6 +784,18 @@ function ActionLabel({ pointer, value, onChange }: { pointer: string; value: unk
 /** The fields of a `navigate` action: its page, label, optional `record` expression and parameter expressions. */
 function NavigateFields({ pointer, action, onChange }: { pointer: string; action: Content; onChange: ChangeHandler }) {
   const t = useText()
+  const names = useContext(StudioNamesContext)
+  const page = pageNamed(names, action.page)
+
+  function pick(next: string | undefined) {
+    onChange(`${pointer}/page`, next)
+    const picked = pageNamed(names, next)
+    if (picked !== undefined && isContent(action.parameters)) {
+      const declared = picked.parameters.map((parameter) => parameter.name.toLowerCase())
+      const kept = Object.entries(action.parameters).filter(([key]) => declared.includes(key.toLowerCase()))
+      onChange(`${pointer}/parameters`, kept.length === 0 ? undefined : Object.fromEntries(kept))
+    }
+  }
 
   return (
     <>
@@ -660,7 +805,7 @@ function NavigateFields({ pointer, action, onChange }: { pointer: string; action
         kind="page"
         current={action.page}
         required
-        onPick={(next) => onChange(`${pointer}/page`, next)}
+        onPick={pick}
       />
       <ActionLabel pointer={`${pointer}/label`} value={action.label} onChange={onChange} />
       <div data-testid={`studio-field-${pointer}/record`}>
@@ -673,15 +818,130 @@ function NavigateFields({ pointer, action, onChange }: { pointer: string; action
           }
         />
       </div>
-      <MappingRows
-        pointer={`${pointer}/parameters`}
-        title={t('shell.studio.page.actionParameters')}
-        value={action.parameters}
-        keyLabel={t('shell.studio.page.parameterName')}
-        target={{ kind: 'expression' }}
-        onChange={onChange}
-      />
+      {page === undefined ? (
+        <MappingRows
+          pointer={`${pointer}/parameters`}
+          title={t('shell.studio.page.actionParameters')}
+          value={action.parameters}
+          keyLabel={t('shell.studio.page.parameterName')}
+          target={{ kind: 'expression' }}
+          onChange={onChange}
+        />
+      ) : (
+        <ParameterExpressions
+          pointer={`${pointer}/parameters`}
+          page={page}
+          value={action.parameters}
+          onChange={onChange}
+        />
+      )}
     </>
+  )
+}
+
+/** The page a name picks from the names, ignoring letter case, or `undefined` while the names are unknown. */
+function pageNamed(names: StudioNames | undefined, name: unknown): StudioNamePage | undefined {
+  if (names === undefined || typeof name !== 'string') {
+    return undefined
+  }
+  return names.pages.find((page) => page.name.toLowerCase() === name.toLowerCase())
+}
+
+/**
+ * One expression for each parameter the target page declares, and nothing for a parameter left empty. A value the
+ * page does not declare stays visible with a note and Remove, because the compiler refuses it.
+ */
+function ParameterExpressions({
+  pointer,
+  page,
+  value,
+  onChange,
+}: {
+  pointer: string
+  page: StudioNamePage
+  value: unknown
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const check = useContext(ExpressionCheckContext)
+
+  if (value !== undefined && !isContent(value)) {
+    return (
+      <div data-testid={`studio-field-${pointer}`}>
+        <div>{t('shell.studio.page.actionParameters')}</div>
+        <JsonOnly />
+      </div>
+    )
+  }
+
+  const entries = Object.entries(value ?? {})
+  const declared = page.parameters.map((parameter) => parameter.name.toLowerCase())
+  const undeclared = entries.filter(([key]) => !declared.includes(key.toLowerCase()))
+  const expressionName = t('shell.studio.process.expression')
+
+  function expression(rowPointer: string, current: string) {
+    if (check) {
+      return (
+        <Suspense fallback={<Input aria-label={expressionName} value={current} readOnly />}>
+          <LazyExpressionEditor
+            application={check.application}
+            resourceId={check.resourceId}
+            path={rowPointer}
+            name={expressionName}
+            value={current}
+            required={false}
+            options={expressionScope(check.kind, check.draft, rowPointer, check.names)}
+            onChange={onChange}
+          />
+        </Suspense>
+      )
+    }
+    return (
+      <Input
+        aria-label={expressionName}
+        value={current}
+        onChange={(event) => onChange(rowPointer, event.target.value === '' ? undefined : event.target.value)}
+      />
+    )
+  }
+
+  return (
+    <div data-testid={`studio-field-${pointer}`}>
+      <Flex vertical gap="small">
+        <Typography.Text strong>{t('shell.studio.page.actionParameters')}</Typography.Text>
+        {page.parameters.map((parameter) => {
+          const key =
+            entries.find(([name]) => name.toLowerCase() === parameter.name.toLowerCase())?.[0] ?? parameter.name
+          const rowPointer = `${pointer}/${escapeSegment(key)}`
+          const current = value?.[key]
+          return (
+            <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
+              <Typography.Text type="secondary">
+                {`${parameter.name} · ${parameter.type}${parameter.required ? ` · ${t('shell.studio.page.parameterRequired').toLowerCase()}` : ''}`}
+              </Typography.Text>
+              {expression(rowPointer, typeof current === 'string' ? current : '')}
+            </div>
+          )
+        })}
+        {undeclared.map(([key, entry]) => {
+          const rowPointer = `${pointer}/${escapeSegment(key)}`
+          return (
+            <Flex key={key} gap="small" align="flex-start" wrap data-testid={`studio-field-${rowPointer}`}>
+              <div>
+                <Typography.Text>{key}</Typography.Text>
+                <div>
+                  <Typography.Text type="warning">{t('shell.studio.page.undeclaredParameter')}</Typography.Text>
+                </div>
+              </div>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                {expression(rowPointer, typeof entry === 'string' ? entry : '')}
+              </div>
+              <Button onClick={() => onChange(rowPointer, undefined)}>{t('shell.studio.process.removeMapping')}</Button>
+            </Flex>
+          )
+        })}
+      </Flex>
+    </div>
   )
 }
 

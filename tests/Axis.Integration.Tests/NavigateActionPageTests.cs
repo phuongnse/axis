@@ -13,6 +13,8 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
 
     private const string OpenRequestForm = """{"type":"navigate","page":"RequestForm","labelKey":"pages.requestForm.title","parameters":{},"record":"id","opensForm":true}""";
 
+    private const string StartSubmit = """{"type":"startProcess","process":"Submit","labelKey":"request.submit","instancesPath":"/api/apps/ProcessApp/processes/Submit/instances"}""";
+
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -20,7 +22,7 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
     {
         var table = await TableOfOverviewAsync("anna");
 
-        Assert.Equal([ShowSubmissionsOfRow, OpenRequestForm], RawItems(table.GetProperty("rowActions")));
+        Assert.Equal([ShowSubmissionsOfRow, OpenRequestForm, StartSubmit], RawItems(table.GetProperty("rowActions")));
         Assert.Equal([ShowSubmissions], RawItems(table.GetProperty("toolbarActions")));
         Assert.Equal(0, table.GetProperty("actions").GetArrayLength());
     }
@@ -30,9 +32,22 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
     {
         var table = await TableOfOverviewAsync("olga");
 
-        // Olga reads requests, so the form page stays. She cannot read the submissions page.
+        // Olga reads requests, so the form page stays. She cannot read the submissions page, and she holds
+        // no start grant, so the row start is left out too.
         Assert.Equal([OpenRequestForm], RawItems(table.GetProperty("rowActions")));
         Assert.Equal(0, table.GetProperty("toolbarActions").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Table_lists_a_row_start_process_action_only_for_a_role_with_the_start_grant()
+    {
+        var withGrant = await TableOfOverviewAsync("anna");
+        var withoutGrant = await TableOfOverviewAsync("olga");
+
+        Assert.Contains(StartSubmit, RawItems(withGrant.GetProperty("rowActions")));
+        Assert.DoesNotContain(StartSubmit, RawItems(withoutGrant.GetProperty("rowActions")));
+        // A row start is no toolbar action.
+        Assert.DoesNotContain(StartSubmit, RawItems(withGrant.GetProperty("toolbarActions")));
     }
 
     [Fact]

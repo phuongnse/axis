@@ -25,7 +25,7 @@ public sealed record WidgetDefinition
     /// <summary>The buttons a <c>form</c> widget shows on a saved record, or null when it has none.</summary>
     public IReadOnlyList<WidgetActionDefinition>? Actions { get; init; }
 
-    /// <summary>The <c>navigate</c> buttons a <c>table</c> widget shows on each row, or null when it has none.</summary>
+    /// <summary>The <c>startProcess</c> and <c>navigate</c> buttons a <c>table</c> widget shows on each row, or null when it has none.</summary>
     public IReadOnlyList<WidgetActionDefinition>? RowActions { get; init; }
 
     /// <summary>The <c>navigate</c> buttons a <c>table</c> widget shows above its rows, or null when it has none.</summary>

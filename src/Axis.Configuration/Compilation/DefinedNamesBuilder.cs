@@ -48,7 +48,11 @@ internal static class DefinedNamesBuilder
             [.. loaded.Roles.Select(role => new DefinedResource(role.Id, role.Name))],
             [.. sequences.Select(sequence => new DefinedResource(sequence.Id, sequence.Name))],
             [.. loaded.Forms.Select(form => new DefinedResource(form.Id, form.Name))],
-            [.. loaded.Pages.Select(page => new DefinedResource(page.Id, page.Name))],
+            [.. loaded.Pages.Select(page => new DefinedPage(
+                page.Id,
+                page.Name,
+                [.. page.Parameters.Select(parameter => new DefinedPageParameter(
+                    parameter.Name, parameter.Type, parameter.Required ?? false))]))],
             Texts(texts, index));
     }
 

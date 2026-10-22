@@ -1,12 +1,20 @@
 import { Alert, Button, Dropdown, Flex, Table, type TableColumnsType, type TableProps } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { FilterBar } from './FilterBar'
 import { formatValue } from './formatValue'
 import { navigatePath } from './navigateAction'
 import { markCurrentPage } from './pagination'
+import { newIdempotencyKey, startProcess } from './processes'
 import { fetchRecords, RecordQueryProblem, type RecordItem, type RecordPage, type RecordValue } from './records'
-import type { DataSourceColumn, DataSourceParameter, FieldMetadata, WidgetMetadata } from './site'
+import type {
+  DataSourceColumn,
+  DataSourceParameter,
+  FieldMetadata,
+  StartProcessAction,
+  WidgetAction,
+  WidgetMetadata,
+} from './site'
 import {
   parseTableQuery,
   recordPageSize,
@@ -88,7 +96,10 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * carries the id of its root record, so a row action can open a form for it. A row of a grouped
  * data source is a group with no id, so it has no row action buttons. Each `navigate` row action is
  * a button on every row with an id, and each toolbar action a button above the table. Both open
- * the target page with the parameter values in the URL query. A toolbar action to a form page
+ * the target page with the parameter values in the URL query. Each `startProcess` row action is a
+ * button on every row with an id that starts the process with that row's record as subject, with an
+ * `Idempotency-Key` kept until the start has a final answer. A `201` loads the current page of rows
+ * again, and a failure shows above the table. A toolbar action to a form page
  * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
  * a button whose expressions the SPA cannot work out is hidden. Below 768 px, a row's actions fold
  * into one "Actions" menu.
@@ -141,6 +152,12 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   }, [allParameters, widget.parameters, pageValues, query, defaultPageSize])
   const requestUrl = `${path}?${requestQuery}`
   const [state, setState] = useState<LoadState>({ failed: false })
+  // Bumped after a row start, so the same URL is requested again.
+  const [reloads, setReloads] = useState(0)
+  // A key is kept per process and row while its start has no final answer: a network error or a 5xx.
+  const startKeys = useRef<Record<string, string>>({})
+  const [starting, setStarting] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
   const loading = state.url !== requestUrl
   const failed = state.failed && !loading
   const parameterErrors = loading ? undefined : state.parameterErrors
@@ -191,7 +208,47 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         setState({ url, failed: true })
       })
     return () => controller.abort()
-  }, [path, name, requestQuery, parameterNames])
+  }, [path, name, requestQuery, parameterNames, reloads])
+
+  const runStart = useCallback(
+    async (action: StartProcessAction, rowId: string) => {
+      if (starting) {
+        return
+      }
+      setStarting(true)
+      setActionError(null)
+      const keyName = `${action.instancesPath} ${rowId}`
+      try {
+        const key = (startKeys.current[keyName] ??= newIdempotencyKey())
+        let result
+        try {
+          result = await startProcess(action.instancesPath, rowId, key)
+        } catch (error) {
+          console.warn(`Starting the process '${action.process}' for '${rowId}' failed`, error)
+          setActionError(t('shell.form.startFailed'))
+          return
+        }
+        delete startKeys.current[keyName]
+        if (result.ok) {
+          setReloads((count) => count + 1)
+          return
+        }
+        const { problem } = result
+        const messages = Object.values(problem.errors).flat()
+        if (messages.length > 0) {
+          // A start condition's message is a text key. A fixed message is no key, so it shows as is.
+          setActionError(messages.map((message) => t(message)).join(' '))
+        } else if (problem.status === 409) {
+          setActionError(t('shell.form.processRunning'))
+        } else {
+          setActionError(t('shell.form.startFailed'))
+        }
+      } finally {
+        setStarting(false)
+      }
+    },
+    [starting, t],
+  )
 
   const columns = useMemo<TableColumnsType<TableRow>>(() => {
     const sortOrder = (field: string) =>
@@ -216,10 +273,16 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
             return null
           }
           const scope = { id: record.id, values: record.values }
-          const list = rowActions.flatMap((action, index) => {
-            const path = navigatePath(sitePath, action, scope)
-            return path ? [{ action, path, index }] : []
-          })
+          // A start action runs for the row. A navigate action opens its page, or is dropped when its path is unknown.
+          const list = rowActions.flatMap(
+            (action, index): { action: WidgetAction; index: number; run: () => void }[] => {
+              if (action.type === 'startProcess') {
+                return [{ action, index, run: () => void runStart(action, record.id!) }]
+              }
+              const path = navigatePath(sitePath, action, scope)
+              return path ? [{ action, index, run: () => navigate(path, { state: { from } }) }] : []
+            },
+          )
           if (list.length === 0) {
             return null
           }
@@ -229,10 +292,11 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
                 trigger={['click']}
                 autoFocus
                 menu={{
-                  items: list.map(({ action, path, index }) => ({
+                  items: list.map(({ action, index, run }) => ({
                     key: String(index),
                     label: t(action.labelKey),
-                    onClick: () => navigate(path, { state: { from } }),
+                    disabled: action.type === 'startProcess' && starting,
+                    onClick: run,
                   })),
                   'aria-label': t('shell.table.rowActions'),
                 }}
@@ -243,8 +307,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           }
           return (
             <Flex gap="small">
-              {list.map(({ action, path, index }) => (
-                <Button key={index} size="small" onClick={() => navigate(path, { state: { from } })}>
+              {list.map(({ action, index, run }) => (
+                <Button key={index} size="small" disabled={action.type === 'startProcess' && starting} onClick={run}>
                   {t(action.labelKey)}
                 </Button>
               ))}
@@ -254,7 +318,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       })
     }
     return result
-  }, [fields, from, locale, navigate, phone, query.sort, rowActions, sitePath, t])
+  }, [fields, from, locale, navigate, phone, query.sort, rowActions, runStart, sitePath, starting, t])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
@@ -313,6 +377,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           onChange={onFilter}
         />
       )}
+      {actionError !== null && <Alert data-testid="table-action-error" type="error" message={actionError} />}
       {failed ? (
         <Alert data-testid="records-error" type="error" message={t('shell.table.loadFailed')} />
       ) : (

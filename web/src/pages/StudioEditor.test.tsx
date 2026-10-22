@@ -1030,7 +1030,7 @@ const pageNames = {
     { id: 'd1', name: 'PurchaseRequestList', module: null },
     { id: 'd2', name: 'SupplierList', module: null },
   ],
-  pages: [{ id: 'g1', name: 'ReviewForm' }],
+  pages: [{ id: 'g1', name: 'ReviewForm', parameters: [] }],
   forms: [{ id: 'f1', name: 'RequestForm' }],
   texts: [{ key: 'pages.home.title', texts: { en: 'Home', vi: 'Trang chủ' }, usedBy: 1 }],
 } as unknown as StudioNames

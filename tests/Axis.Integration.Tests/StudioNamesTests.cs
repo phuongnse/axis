@@ -39,6 +39,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
         CopyDirectory(Path.Combine(samples, "purchase-requests"), _broken.Path);
         RenameApplication(Path.Combine(_broken.Path, "application.json"), "BrokenRequests");
         BreakProcess(Path.Combine(_broken.Path, "processes", "purchase-request-approval.json"));
+        AddPageWithParameter(Path.Combine(_broken.Path, "pages", "request-detail.json"));
 
         var connectionString = await _database.CreateDatabaseAsync("studio_names", CancellationToken);
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -126,6 +127,19 @@ public sealed class StudioNamesTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Names_list_the_parameters_of_each_page()
+    {
+        var names = await NamesAsync("BrokenRequests");
+
+        var page = Named(names, "pages", "RequestDetail");
+        var parameter = Assert.Single(page.GetProperty("parameters").EnumerateArray());
+        Assert.Equal("request", parameter.GetProperty("name").GetString());
+        Assert.Equal("reference", parameter.GetProperty("type").GetString());
+        Assert.True(parameter.GetProperty("required").GetBoolean());
+        Assert.Empty(Named(names, "pages", "Approvals").GetProperty("parameters").EnumerateArray());
+    }
+
+    [Fact]
     public async Task Names_list_the_locales_and_each_text_key_with_its_label_uses()
     {
         var names = await NamesAsync("PurchaseRequests");
@@ -177,6 +191,27 @@ public sealed class StudioNamesTests : IAsyncLifetime
         var process = JsonNode.Parse(File.ReadAllText(file))!.AsObject();
         process["steps"] = "broken";
         File.WriteAllText(file, process.ToJsonString());
+    }
+
+    private static void AddPageWithParameter(string file)
+    {
+        var page = new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString(),
+            ["kind"] = "page",
+            ["name"] = "RequestDetail",
+            ["formatVersion"] = 1,
+            ["title"] = new JsonObject { ["textKey"] = "pages.approvals.title" },
+            ["parameters"] = new JsonArray(new JsonObject
+            {
+                ["name"] = "request",
+                ["type"] = "reference",
+                ["target"] = "PurchaseRequest",
+                ["required"] = true,
+            }),
+            ["widgets"] = new JsonArray(new JsonObject { ["type"] = "taskInbox" }),
+        };
+        File.WriteAllText(file, page.ToJsonString());
     }
 
     private static void CopyDirectory(string source, string target)

@@ -176,7 +176,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     apply to. A table's `startProcess` row actions are left out without
     `start`, and its `delete` row action without `delete` *(planned for M12)*.
   - Every widget also has `rowActions` and `toolbarActions`, never left out.
-    A table lists its `navigate` actions in them. They are `[]` elsewhere.
+    A table lists its `navigate` and `startProcess` row actions and its
+    `navigate` toolbar actions in them. They are `[]` elsewhere.
   - Every widget also has `parameters`, never left out: on a table over a data
     source, the name of the page parameter that gives each data source
     parameter its value, as `{ "<data source parameter>": "<page parameter>" }`,
@@ -308,8 +309,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       does the same.
     - **Actions.** A `startProcess` action is left out of `actions` when the
       user has no `start` grant on its process. The same holds for a `table`
-      row action *(planned for M12)*, and its `delete` row action is left out
-      when `access.actions` lacks `delete`. A `navigate` action whose target
+      row `startProcess` action, and its `delete` row action *(planned for
+      M12)* is left out when `access.actions` lacks `delete`. A `navigate` action whose target
       page the user cannot read is left out too. A
       `kpi`'s `navigate` to such a page is `null`.
     - **Access.** Every `table` and `form` widget, and every `detail`
@@ -528,9 +529,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     [D59](../decisions/d59-table-row-and-toolbar-actions.md). Page metadata
     lists the `navigate` actions in `rowActions` and `toolbarActions`,
     without those to pages the user cannot read, each with its `parameters`,
-    `record` and `opensForm`. The `navigate` buttons and the phone
-    menu are built. The `visibleWhen` condition and the delete and
-    `startProcess` row actions are _(planned for M12)_.
+    `record` and `opensForm`. It lists a `startProcess` in `rowActions` only
+    with a `start` grant on its process. The `navigate` and `startProcess`
+    buttons and the phone menu are built. The `visibleWhen` condition and the
+    delete row action are _(planned for M12)_.
     - **Where.** Toolbar actions sit above the table. Row actions
       are buttons in the row. Below 768 px, a row's actions fold into one
       menu button labelled by the platform text `shell.table.rowActions`. A
@@ -591,7 +593,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - **Start process.** A row `startProcess` follows the rules of the form
       widget's **Start process action**, with the row as the subject and
       the same `Idempotency-Key` and `409` text. On `201` it loads the
-      current page of rows again.
+      current page of rows again, with no success message. A failure shows
+      above the table.
     - **Later.** Actions on selected rows come after M12.
   - **States.** Loading, empty and error states use the shared table and
     alert with platform texts. While the next page loads, the current rows
