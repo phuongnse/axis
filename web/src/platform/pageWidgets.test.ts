@@ -86,6 +86,52 @@ describe('typeChanges', () => {
     ])
   })
 
+  it('adds the keys a KPI requires and keeps the data source when a table becomes a KPI', () => {
+    expect(
+      typeChanges({ type: 'table', dataSource: 'List', entity: 'Order', rowActions: [], toolbarActions: [] }, 'kpi'),
+    ).toEqual([
+      ['/type', 'kpi'],
+      ['/entity', undefined],
+      ['/rowActions', undefined],
+      ['/toolbarActions', undefined],
+      ['/measure', ''],
+      ['/label', { textKey: '' }],
+    ])
+  })
+
+  it('adds the keys a chart requires to a task inbox', () => {
+    expect(typeChanges({ type: 'taskInbox' }, 'chart')).toEqual([
+      ['/type', 'chart'],
+      ['/dataSource', ''],
+      ['/kind', 'bar'],
+      ['/category', ''],
+      ['/measures', [{ name: '', label: { textKey: '' } }]],
+      ['/title', { textKey: '' }],
+    ])
+  })
+
+  it('removes the chart keys when a chart becomes a table', () => {
+    expect(
+      typeChanges(
+        {
+          type: 'chart',
+          dataSource: 'D',
+          kind: 'pie',
+          category: 'c',
+          measures: [{ name: 'm' }],
+          title: { textKey: 't' },
+        },
+        'table',
+      ),
+    ).toEqual([
+      ['/type', 'table'],
+      ['/kind', undefined],
+      ['/category', undefined],
+      ['/measures', undefined],
+      ['/title', undefined],
+    ])
+  })
+
   it('removes the record when a detail becomes a table', () => {
     expect(typeChanges({ type: 'detail', entity: 'Order', form: 'F', record: 'order' }, 'table')).toEqual([
       ['/type', 'table'],
@@ -100,12 +146,20 @@ describe('widget keys', () => {
     expect(Object.keys(widgetKeys)).toEqual(widgetTypes)
     expect([...knownWidgetKeys].sort()).toEqual([
       'actions',
+      'category',
+      'comparison',
       'dataSource',
       'entity',
       'form',
+      'kind',
+      'label',
+      'measure',
+      'measures',
+      'navigate',
       'process',
       'record',
       'rowActions',
+      'title',
       'toolbarActions',
     ])
   })
@@ -141,13 +195,28 @@ describe('newWidget', () => {
     expect(newWidget('table')).toEqual({ type: 'table' })
   })
 
+  it('gives a KPI and a chart the keys the schema requires, left empty', () => {
+    expect(newWidget('kpi')).toEqual({ type: 'kpi', dataSource: '', measure: '', label: { textKey: '' } })
+    expect(newWidget('chart')).toEqual({
+      type: 'chart',
+      dataSource: '',
+      kind: 'bar',
+      category: '',
+      measures: [{ name: '', label: { textKey: '' } }],
+      title: { textKey: '' },
+    })
+  })
+
   it('gives a detail an empty record', () => {
     expect(newWidget('detail')).toEqual({ type: 'detail', record: '' })
   })
 
   it('adds the containers to the addable types and keeps the types with a panel apart', () => {
     expect(addableTypes).toEqual([...widgetTypes, ...containerTypes])
-    expect(widgetTypes).toEqual(['table', 'form', 'taskInbox', 'processInspector', 'detail'])
+    expect(widgetTypes).toEqual(['table', 'form', 'taskInbox', 'processInspector', 'kpi', 'chart', 'detail'])
+    expect(addableTypes).toHaveLength(10)
+    expect(addableTypes).toContain('kpi')
+    expect(addableTypes).toContain('chart')
   })
 })
 

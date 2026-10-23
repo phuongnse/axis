@@ -22,6 +22,30 @@ const names = {
   dataSources: [
     { id: 'd1', name: 'PurchaseRequestList', module: null, parameters: [], columns: [], groupBy: null },
     { id: 'd2', name: 'SupplierList', module: null, parameters: [], columns: [], groupBy: null },
+    {
+      id: 'd3',
+      name: 'OpenTotals',
+      module: null,
+      parameters: [],
+      columns: [
+        { name: 'openCount', type: 'integer' },
+        { name: 'urgentCount', type: 'integer' },
+      ],
+      groupBy: [],
+    },
+    {
+      id: 'd4',
+      name: 'RequestsByCategory',
+      module: null,
+      parameters: [],
+      columns: [
+        { name: 'category', type: 'text' },
+        { name: 'openCount', type: 'integer' },
+        { name: 'total', type: 'decimal' },
+        { name: 'firstOpened', type: 'date' },
+      ],
+      groupBy: ['category'],
+    },
   ],
   processes: [
     { id: 'p1', name: 'PurchaseRequestApproval', steps: [] },
@@ -166,9 +190,9 @@ describe('PageEditor page', () => {
   })
 
   it('shows the type of an unknown widget and points to the JSON view', () => {
-    renderEditor(page({ type: 'chart', series: [] }))
+    renderEditor(page({ type: 'gauge', series: [] }))
 
-    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('chart')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('gauge')
     const panel = screen.getByTestId('studio-field-/widgets/0')
     expect(panel.querySelector(':scope > [data-testid="studio-json-only"]')).not.toBeNull()
     expect(screen.queryByRole('combobox', { name: 'Widget type' })).not.toBeInTheDocument()
@@ -936,14 +960,147 @@ describe('PageEditor widget tree', () => {
     expect(within(panel).getByTestId('studio-json-only')).toBeVisible()
   })
 
-  it('keeps the type picker of a leaf widget to the five types with a panel', async () => {
+  it('keeps the type picker of a leaf widget to the seven types with a panel', async () => {
     renderEditor(tree())
 
     await userEvent.click(screen.getByTestId('studio-widget-/widgets/1'))
     await userEvent.click(screen.getByRole('combobox', { name: 'Widget type' }))
     await waitFor(() =>
-      expect(optionTexts(shownDropdown()!)).toEqual(['table', 'form', 'taskInbox', 'processInspector', 'detail']),
+      expect(optionTexts(shownDropdown()!)).toEqual([
+        'table',
+        'form',
+        'taskInbox',
+        'processInspector',
+        'kpi',
+        'chart',
+        'detail',
+      ]),
     )
+  })
+})
+
+describe('PageEditor kpi and chart panels', () => {
+  /** Renders the editor over a draft that applies every change, so a test can read the JSON as it would be saved. */
+  function renderStateful(initial: Record<string, unknown>) {
+    let draft = initial
+    function Harness() {
+      const [value, setValue] = useState(initial)
+      return (
+        <PageEditor
+          value={value}
+          onChange={(pointer, next) => {
+            draft = setAt(draft, pointer, next) as Record<string, unknown>
+            setValue(draft)
+          }}
+        />
+      )
+    }
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioNamesContext.Provider value={names}>
+            <LabelTextsContext.Provider value={labelContext}>
+              <Harness />
+            </LabelTextsContext.Provider>
+          </StudioNamesContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+    return () => draft
+  }
+
+  const kpi = { type: 'kpi', dataSource: '', measure: '', label: { textKey: '' } }
+  const chart = {
+    type: 'chart',
+    dataSource: '',
+    kind: 'bar',
+    category: '',
+    measures: [{ name: '', label: { textKey: '' } }],
+    title: { textKey: '' },
+  }
+
+  /** The names a picker lists once it is open. */
+  async function listed(testId: string) {
+    await userEvent.click(within(screen.getByTestId(testId)).getByRole('combobox'))
+    return optionTexts(await waitFor(() => shownDropdown()!))
+  }
+
+  it('lists only data sources with a total row on a KPI and only the one group field kind on a chart', async () => {
+    const saved = renderStateful(page(kpi))
+    expect(await listed('studio-field-/widgets/0/dataSource')).toEqual(['OpenTotals'])
+    await chooseOption('OpenTotals')
+    expect(saved()).toMatchObject({ widgets: [{ dataSource: 'OpenTotals' }] })
+
+    cleanup()
+    renderStateful(page(chart))
+    expect(await listed('studio-field-/widgets/0/dataSource')).toEqual(['RequestsByCategory'])
+  })
+
+  it('lists only the measures of the chosen data source for a KPI measure and its comparison', async () => {
+    const saved = renderStateful(page(kpi))
+
+    expect(await listed('studio-field-/widgets/0/measure')).toEqual([])
+    await userEvent.keyboard('{Escape}')
+    await chooseOption('OpenTotals', screen.getByTestId('studio-field-/widgets/0/dataSource'))
+    expect(await listed('studio-field-/widgets/0/measure')).toEqual(['openCount', 'urgentCount'])
+    await chooseOption('urgentCount')
+    expect(saved()).toMatchObject({ widgets: [{ dataSource: 'OpenTotals', measure: 'urgentCount' }] })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add comparison' }))
+    expect(saved()).toMatchObject({ widgets: [{ comparison: { measure: '', label: { textKey: '' } } }] })
+    expect(await listed('studio-field-/widgets/0/comparison/measure')).toEqual(['openCount', 'urgentCount'])
+    await chooseOption('openCount')
+    expect(saved()).toMatchObject({ widgets: [{ comparison: { measure: 'openCount' } }] })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove comparison' }))
+    expect(saved()).not.toHaveProperty('widgets.0.comparison')
+  })
+
+  it('adds and removes the navigate action of a KPI', async () => {
+    const saved = renderStateful(page(kpi))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add navigate action' }))
+    expect(saved()).toMatchObject({ widgets: [{ navigate: { type: 'navigate', page: '' } }] })
+    expect(screen.getByTestId('studio-field-/widgets/0/navigate/page')).toBeVisible()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove navigate action' }))
+    expect(saved()).not.toHaveProperty('widgets.0.navigate')
+  })
+
+  it('lists only the group field as the category and only number measures on a chart', async () => {
+    const saved = renderStateful(page({ ...chart, dataSource: 'RequestsByCategory' }))
+
+    expect(await listed('studio-field-/widgets/0/category')).toEqual(['category'])
+    await chooseOption('category')
+    await userEvent.keyboard('{Escape}')
+    expect(await listed('studio-field-/widgets/0/measures/0/name')).toEqual(['openCount', 'total'])
+    await chooseOption('total')
+    expect(saved()).toMatchObject({ widgets: [{ category: 'category', measures: [{ name: 'total' }] }] })
+  })
+
+  it('adds and removes chart measures but keeps one', async () => {
+    const saved = renderStateful(page(chart))
+
+    expect(screen.getByRole('button', { name: 'Remove measure' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Add measure' }))
+    expect(saved()).toMatchObject({ widgets: [{ measures: [{ name: '' }, { name: '', label: { textKey: '' } }] }] })
+    await userEvent.click(screen.getAllByRole('button', { name: 'Remove measure' })[0])
+    expect(saved()).toMatchObject({ widgets: [{ measures: [{ name: '' }] }] })
+  })
+
+  it('keeps a measure the data source does not project and tags it unknown', () => {
+    renderEditor(page({ ...kpi, dataSource: 'OpenTotals', measure: 'gone' }))
+
+    expect(
+      within(screen.getByTestId('studio-field-/widgets/0/measure')).getByTestId('studio-reference-unknown'),
+    ).toHaveTextContent('gone')
+  })
+
+  it('gives a new KPI and a new chart the keys the schema requires on a type switch', async () => {
+    const saved = renderStateful(page({ type: 'taskInbox' }))
+
+    await chooseOption('chart', screen.getByTestId('studio-field-/widgets/0/type'))
+    expect(saved()).toMatchObject({ widgets: [chart] })
   })
 })
 

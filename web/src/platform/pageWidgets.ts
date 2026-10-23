@@ -1,7 +1,8 @@
 import { getAt } from './jsonPatch'
+import type { StudioNames } from './studio'
 
 /** The widget types the page editor has a panel for. */
-export const widgetTypes = ['table', 'form', 'taskInbox', 'processInspector', 'detail']
+export const widgetTypes = ['table', 'form', 'taskInbox', 'processInspector', 'kpi', 'chart', 'detail']
 
 /** The widget types that hold lists of widgets. The editor shows their lists and fixes their type. */
 export const containerTypes = ['columns', 'tabs', 'section']
@@ -15,6 +16,8 @@ export const widgetKeys: Record<string, string[]> = {
   form: ['entity', 'form', 'actions'],
   taskInbox: [],
   processInspector: ['process'],
+  kpi: ['dataSource', 'measure', 'label', 'comparison', 'navigate'],
+  chart: ['dataSource', 'kind', 'category', 'measures', 'title'],
   detail: ['entity', 'form', 'record', 'actions'],
 }
 
@@ -33,9 +36,9 @@ export function widgetSummary(widget: Record<string, unknown>): string {
 
 /**
  * The changes that give a widget another type, as pointers inside the widget and their new values. The type comes
- * first. A known property the new type does not take is removed, because the compiler rejects it. A switch to
- * `processInspector` adds an empty `process` and a switch to `detail` an empty `record` when there is none, because the
- * schema requires them. A key the editor does not know is never touched.
+ * first. A known property the new type does not take is removed, because the compiler rejects it. A key that
+ * `newWidget` gives the new type and the widget does not have is added empty, because the schema requires it. A key
+ * the editor does not know is never touched.
  */
 export function typeChanges(widget: Record<string, unknown>, next: string): [string, unknown][] {
   const changes: [string, unknown][] = [['/type', next]]
@@ -45,11 +48,10 @@ export function typeChanges(widget: Record<string, unknown>, next: string): [str
       changes.push([`/${key}`, undefined])
     }
   }
-  if (next === 'processInspector' && widget.process === undefined) {
-    changes.push(['/process', ''])
-  }
-  if (next === 'detail' && widget.record === undefined) {
-    changes.push(['/record', ''])
+  for (const [key, value] of Object.entries(newWidget(next))) {
+    if (key !== 'type' && widget[key] === undefined) {
+      changes.push([`/${key}`, value])
+    }
   }
   return changes
 }
@@ -74,7 +76,9 @@ export function newTab(): Record<string, unknown> {
 
 /**
  * A new widget of a type. A container starts with the shape the page schema requires and empty lists. A process
- * inspector starts with an empty process, and a detail with an empty record, which the schema requires.
+ * inspector starts with an empty process, a detail with an empty record, a KPI with an empty data source, measure and
+ * label, and a chart with an empty data source and category, the `bar` kind, one empty measure and an empty title,
+ * which the schema requires.
  */
 export function newWidget(type: string): Record<string, unknown> {
   switch (type) {
@@ -92,6 +96,17 @@ export function newWidget(type: string): Record<string, unknown> {
       return { type, title: { textKey: '' }, widgets: [] }
     case 'processInspector':
       return { type, process: '' }
+    case 'kpi':
+      return { type, dataSource: '', measure: '', label: { textKey: '' } }
+    case 'chart':
+      return {
+        type,
+        dataSource: '',
+        kind: 'bar',
+        category: '',
+        measures: [{ name: '', label: { textKey: '' } }],
+        title: { textKey: '' },
+      }
     case 'detail':
       return { type, record: '' }
     default:
@@ -202,4 +217,37 @@ export function moveTo(
     targetPointer = `${sourcePointer}/${rest.join('/')}`
   }
   return { widgets: root.widgets, pointer: `${targetPointer}/${target.length - 1}` }
+}
+
+/** A column a data source projects, with its type as Studio's names give it. */
+export interface DataSourceMeasure {
+  name: string
+  type: string | null
+}
+
+/**
+ * The group fields and measures of the data source a widget names, found in Studio's names ignoring letter case.
+ * The group fields are the data source's `groupBy`, and the measures are its other columns. It is `undefined` when
+ * the names do not list the data source.
+ */
+export function dataSourceColumns(
+  names: StudioNames,
+  dataSource: unknown,
+): { groupFields: string[]; measures: DataSourceMeasure[] } | undefined {
+  if (typeof dataSource !== 'string') {
+    return undefined
+  }
+  const wanted = dataSource.toLowerCase()
+  const found = names.dataSources.find((item) => item.name.toLowerCase() === wanted)
+  if (found === undefined) {
+    return undefined
+  }
+  const groupFields = found.groupBy ?? []
+  const grouped = groupFields.map((field) => field.toLowerCase())
+  return { groupFields, measures: found.columns.filter((column) => !grouped.includes(column.name.toLowerCase())) }
+}
+
+/** Whether a column type is a number, which a chart measure must be. */
+export function isNumberType(type: string | null): boolean {
+  return type === 'integer' || type === 'decimal'
 }
