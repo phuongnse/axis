@@ -1,0 +1,54 @@
+{
+  "id": "5b7e0c4a-2d93-4f1e-8a46-c3d9e1f27b50",
+  "kind": "scenario",
+  "name": "RequesterDeletesADraftTicket",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": ["requester"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Ticket",
+      "as": "anna",
+      "save": "draft",
+      "values": {
+        "title": "Laptop will not start",
+        "description": "It shows a black screen.",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "deleteRecord",
+      "record": "draft",
+      "as": "anna"
+    },
+    {
+      "type": "updateRecord",
+      "record": "draft",
+      "as": "anna",
+      "values": {
+        "title": "x"
+      },
+      "expect": "notFound"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Ticket",
+      "as": "anna",
+      "save": "reopened",
+      "values": {
+        "title": "Laptop will not start",
+        "description": "It shows a black screen.",
+        "status": "reopened"
+      }
+    },
+    {
+      "type": "deleteRecord",
+      "record": "reopened",
+      "as": "anna",
+      "expect": "denied"
+    }
+  ]
+}

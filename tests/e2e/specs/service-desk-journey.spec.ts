@@ -38,6 +38,8 @@ const scenarios = [
   ['AgentCannotActOnAnotherAgentsTicket', 'scenarios/agent-cannot-act-on-another-agents-ticket.json'],
   ['LeadCannotActForTheRequester', 'scenarios/lead-cannot-act-for-the-requester.json'],
   ['RequesterCannotReachAnotherTicket', 'scenarios/requester-cannot-reach-another-ticket.json'],
+  ['RequesterDeletesADraftTicket', 'scenarios/requester-deletes-a-draft-ticket.json'],
+  ['AgentCannotDeleteATicket', 'scenarios/agent-cannot-delete-a-ticket.json'],
 ] as const
 
 test.describe('the author builds the service desk with Studio only', () => {
@@ -829,6 +831,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         filter: "requester == currentUser() and status in ('draft', 'reopened')",
         fields: ['title', 'description', 'status'],
       },
+      { actions: ['delete'], filter: "requester == currentUser() and status == 'draft'" },
     ])
     await grantIn(page, 'requester', 'entity', 'Category', [{ actions: ['read'] }])
     await grantIn(page, 'requester', 'dataSource', 'MyTicketList', [{ actions: ['read'] }])
@@ -899,7 +902,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await checkBuilt(page)
   })
 
-  test('the author runs the six test scenarios from Studio', async ({ page }) => {
+  test('the author runs the eight test scenarios from Studio', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
     await page.getByTestId('studio-run-tests').click()

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { ConfigProvider } from 'antd'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
+import { isBlurred } from '../test/antd'
 import { RecordHistory } from './RecordHistory'
 import type { HistoryItem } from './records'
 import type { FieldMetadata, FieldType, PageMetadata } from './site'
@@ -150,6 +151,15 @@ function stubRoutes(history: string, pages: Record<string, string | null>) {
   return () => fetchMock.mock.calls.map(([url]) => url)
 }
 
+/** The paging button titled `title`, once the spin area around it is no longer blurred. */
+function pageButton(title: string): Promise<HTMLElement> {
+  return waitFor(() => {
+    const button = screen.getByTitle(title)
+    expect(isBlurred(button)).toBe(false)
+    return button
+  })
+}
+
 describe('RecordHistory', () => {
   it('lists the entries in the order the server gives, newest first, with their action, actor and time', async () => {
     const requests = stubFetch({
@@ -224,8 +234,7 @@ describe('RecordHistory', () => {
     renderHistory()
 
     expect(await screen.findAllByTestId('history-entry')).toHaveLength(20)
-    await waitFor(() => expect(screen.getByTestId('record-history')).toHaveAttribute('aria-busy', 'false'))
-    await userEvent.click(screen.getByTitle('2'))
+    await userEvent.click(await pageButton('2'))
 
     expect(await screen.findByText('Created')).toBeInTheDocument()
     expect(screen.getAllByTestId('history-entry')).toHaveLength(1)
@@ -247,7 +256,7 @@ describe('RecordHistory', () => {
     expect(panel).toHaveAttribute('aria-busy', 'false')
     expect(panel.querySelector('[aria-current="page"]')).toHaveTextContent('1')
 
-    await userEvent.click(screen.getByTitle('2'))
+    await userEvent.click(await pageButton('2'))
 
     await screen.findByText('Created')
     expect(panel).toHaveAttribute('aria-busy', 'false')

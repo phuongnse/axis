@@ -202,8 +202,8 @@ the parts planned for M12,
 - A requester reads and edits only their own tickets. An agent reads the
   tickets assigned to them. The lead reads every ticket.
 - The requester cannot edit the resolution.
-- _(planned for M12)_ A requester may delete their own ticket while its status
-  is `draft`. An agent and the lead may not delete.
+- A requester may delete their own ticket while its status is `draft`. An
+  agent and the lead may not delete.
 - Everything else is denied by default.
 
 ### Pages
@@ -227,8 +227,7 @@ the lead, in a site at path `service-desk`. Texts are in `en` and `vi`.
 - Denied access for each role. A requester cannot see another requester's
   ticket, an agent cannot see a ticket assigned to someone else, and a user
   cannot act on a task that is not theirs.
-- _(planned for M12)_ A requester deletes a draft ticket. An agent's delete
-  is refused.
+- A requester deletes a draft ticket. An agent's delete is refused.
 
 ### Built through Studio
 
