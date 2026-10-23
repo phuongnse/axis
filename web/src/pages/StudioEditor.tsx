@@ -362,9 +362,7 @@ export function StudioEditor({
   })
 
   if (loadFailed) {
-    return (
-      <Alert data-testid="studio-resource-load-error" type="error" message={t('shell.studio.loadResourceFailed')} />
-    )
+    return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
   }
   if (!loaded) {
     return null
@@ -671,7 +669,7 @@ export function StudioEditor({
                       onChange={(event) => changeJson(event.target.value)}
                     />
                     {jsonInvalid && (
-                      <Alert data-testid="studio-json-error" type="error" message={t('shell.studio.invalidJson')} />
+                      <Alert data-testid="studio-json-error" type="error" title={t('shell.studio.invalidJson')} />
                     )}
                   </Flex>
                 ),
@@ -684,14 +682,12 @@ export function StudioEditor({
         <Alert
           data-testid="studio-conflict"
           type="warning"
-          message={t('shell.studio.conflict')}
+          title={t('shell.studio.conflict')}
           action={<Button onClick={reload}>{t('shell.studio.reload')}</Button>}
         />
       )}
-      {saveFailed && <Alert data-testid="studio-save-error" type="error" message={t('shell.studio.saveFailed')} />}
-      {deleteFailed && (
-        <Alert data-testid="studio-delete-error" type="error" message={t('shell.studio.deleteFailed')} />
-      )}
+      {saveFailed && <Alert data-testid="studio-save-error" type="error" title={t('shell.studio.saveFailed')} />}
+      {deleteFailed && <Alert data-testid="studio-delete-error" type="error" title={t('shell.studio.deleteFailed')} />}
       <Flex gap="small" align="center">
         <Button
           type="primary"
@@ -728,7 +724,7 @@ export function StudioEditor({
           <Alert
             data-testid="studio-delete-warning"
             type="warning"
-            message={
+            title={
               <>
                 {t('shell.studio.deleteUsedBy')} <strong>{item.usedBy}</strong>
               </>

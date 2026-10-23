@@ -76,7 +76,7 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
   if (loading) {
     content = t('shell.kpi.loading')
   } else if (failed) {
-    content = <Alert data-testid="kpi-error" type="error" message={t('shell.kpi.loadFailed')} />
+    content = <Alert data-testid="kpi-error" type="error" title={t('shell.kpi.loadFailed')} />
   } else {
     content = (
       <Flex vertical gap="small">

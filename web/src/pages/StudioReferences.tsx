@@ -51,7 +51,7 @@ export function StudioReferences({
   }, [application, resourceId, generation, lost])
 
   if (failed) {
-    return <Alert type="error" message={t('shell.studio.referencesFailed')} />
+    return <Alert type="error" title={t('shell.studio.referencesFailed')} />
   }
   if (!references) {
     return null
@@ -156,7 +156,7 @@ function ReferenceEntry({
         <Typography.Text type="secondary">{`${entry.file} · ${t('shell.studio.path')}: ${entry.path}`}</Typography.Text>
         {expanded && (
           <Flex vertical gap="small" style={{ paddingLeft: 16 }}>
-            {failed && <Alert type="error" message={t('shell.studio.referencesFailed')} />}
+            {failed && <Alert type="error" title={t('shell.studio.referencesFailed')} />}
             {details && (
               <>
                 {node.type === 'resource' && (

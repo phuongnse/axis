@@ -9,7 +9,7 @@ export function LocaleLoadFailed({ onClose }: { onClose: () => void }) {
       type="error"
       banner
       closable
-      message={t('shell.locale.loadFailed')}
+      title={t('shell.locale.loadFailed')}
       onClose={onClose}
     />
   )
@@ -17,5 +17,5 @@ export function LocaleLoadFailed({ onClose }: { onClose: () => void }) {
 
 /** Shown when the site cannot be loaded. There may be no texts to render, so the string is fixed. */
 export function ShellError() {
-  return <Alert data-testid="shell-error" type="error" banner message="Could not load the site." />
+  return <Alert data-testid="shell-error" type="error" banner title="Could not load the site." />
 }

@@ -53,18 +53,19 @@ async function chooseOption(combobox: Locator, list: Locator, option: string, fi
 
 /**
  * Picks the option `option` of a select that keeps the chosen value. A searchable select gets `filter`, which defaults
- * to the option, typed first so the option shows at the top of the list, and takes the pick from the keyboard. A pick that did not land fails at once,
- * naming the select and the option. A page that renders again just after the select opened closes it, so the pick
- * starts again then. A select that acts and then clears itself needs `pickAction`.
+ * to the option, typed first so the option shows at the top of the list, and takes the pick from the keyboard. A pick
+ * that did not land is made again, since choosing the same option twice is harmless. A page that moves or renders
+ * again while the list is open can take a click elsewhere, so the check is part of each try. The pick fails after 20
+ * seconds, naming the select and the option. A select that acts and then clears itself needs `pickAction`.
  */
 export async function pickOption(combobox: Locator, option: string, filter = option) {
   const name = await selectName(combobox)
-  await expect(async () => {
-    const list = await openSelect(combobox)
-    await chooseOption(combobox, list, option, filter)
-  }).toPass({ timeout: 20_000 })
   try {
-    await expectChosen(combobox, option, { timeout: 5_000 })
+    await expect(async () => {
+      const list = await openSelect(combobox)
+      await chooseOption(combobox, list, option, filter)
+      await expectChosen(combobox, option, { timeout: 2_000 })
+    }).toPass({ timeout: 20_000 })
   } catch (cause) {
     throw new Error(`Picking '${option}' in the select ${name} left it unchosen.`, { cause })
   }

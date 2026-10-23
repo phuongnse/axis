@@ -114,7 +114,7 @@ function LookupList({ field, onPick }: Pick<ReferenceLookupProps, 'field' | 'onP
         style={{ marginBottom: 12 }}
       />
       {failed ? (
-        <Alert data-testid="reference-lookup-error" type="error" message={t('shell.table.loadFailed')} />
+        <Alert data-testid="reference-lookup-error" type="error" title={t('shell.table.loadFailed')} />
       ) : (
         <Table<RecordItem>
           rowKey="id"

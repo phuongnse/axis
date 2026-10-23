@@ -119,7 +119,7 @@ export function StudioNewApplication({ onCreated }: { onCreated: (name: string) 
           </Form.Item>
           <Form.Item label={t('shell.studio.newApplication.template')}>
             {templates === 'failed' && (
-              <Alert type="warning" showIcon message={t('shell.studio.newApplication.templatesFailed')} />
+              <Alert type="warning" showIcon title={t('shell.studio.newApplication.templatesFailed')} />
             )}
             <Radio.Group
               aria-label={t('shell.studio.newApplication.template')}

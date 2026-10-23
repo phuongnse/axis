@@ -38,9 +38,7 @@ export function StudioModuleEntity({ application, module, id }: { application: s
   }, [application, module, id, generation, lost])
 
   if (loadFailed) {
-    return (
-      <Alert data-testid="studio-resource-load-error" type="error" message={t('shell.studio.loadResourceFailed')} />
-    )
+    return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
   }
   if (!content) {
     return null
@@ -48,7 +46,7 @@ export function StudioModuleEntity({ application, module, id }: { application: s
 
   return (
     <Flex vertical gap="middle">
-      <Alert data-testid="studio-module-read-only" type="info" message={t('shell.studio.moduleReadOnly')} />
+      <Alert data-testid="studio-module-read-only" type="info" title={t('shell.studio.moduleReadOnly')} />
       <EntityDesigner value={content} onChange={() => {}} readOnly />
     </Flex>
   )

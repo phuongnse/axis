@@ -89,7 +89,7 @@ function JsonValues({ pointer, values, onChange }: { pointer: string; values: un
           }
         }}
       />
-      {invalid && <Alert type="error" message={t('shell.studio.scenario.notJson')} />}
+      {invalid && <Alert type="error" title={t('shell.studio.scenario.notJson')} />}
     </Flex>
   )
 }

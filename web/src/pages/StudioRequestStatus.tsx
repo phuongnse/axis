@@ -69,7 +69,7 @@ export function StudioRequestStatus({
       type={pending ? 'info' : request.status === 'succeeded' ? 'success' : 'error'}
       showIcon={!pending}
       icon={pending ? <Spin size="small" /> : undefined}
-      message={message}
+      title={message}
     />
   )
 }

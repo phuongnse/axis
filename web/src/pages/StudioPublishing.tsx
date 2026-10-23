@@ -259,7 +259,7 @@ export function StudioPublishing({
         )}
       </Flex>
       {sendFailed && (
-        <Alert data-testid="studio-request-error" type="error" message={t('shell.studio.request.sendFailed')} />
+        <Alert data-testid="studio-request-error" type="error" title={t('shell.studio.request.sendFailed')} />
       )}
       {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
       {request?.kind === 'test' && <StudioTestResults request={request} onSelect={onOpenScenario} />}
@@ -273,7 +273,7 @@ export function StudioPublishing({
         </Flex>
       )}
       {history === 'failed' && (
-        <Alert data-testid="studio-releases-error" type="error" message={t('shell.studio.releases.loadFailed')} />
+        <Alert data-testid="studio-releases-error" type="error" title={t('shell.studio.releases.loadFailed')} />
       )}
       {history && history !== 'failed' && (
         <>
@@ -281,7 +281,7 @@ export function StudioPublishing({
             <Alert
               data-testid="studio-folder-differs"
               type="warning"
-              message={t('shell.studio.releases.folderDiffers')}
+              title={t('shell.studio.releases.folderDiffers')}
             />
           )}
           <StudioReleasesList

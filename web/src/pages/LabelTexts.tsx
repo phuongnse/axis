@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Input } from 'antd'
+import { Alert, Button, Flex, Input, Space } from 'antd'
 import { useContext, useState } from 'react'
 import { getAt } from '../platform/jsonPatch'
 import { labelKey } from '../platform/labelKeys'
@@ -84,19 +84,20 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
     <Flex vertical gap="small" data-testid="studio-label">
       <Input aria-label={t('shell.studio.labelKey')} value={key} onChange={(event) => changeKey(event.target.value)} />
       {names.locales.map((locale) => (
-        <Input
-          key={locale}
-          addonBefore={locale}
-          aria-label={locale}
-          value={texts[locale] ?? ''}
-          onChange={(event) => changeText(locale, event.target.value)}
-        />
+        <Space.Compact key={locale} block>
+          <Space.Addon>{locale}</Space.Addon>
+          <Input
+            aria-label={locale}
+            value={texts[locale] ?? ''}
+            onChange={(event) => changeText(locale, event.target.value)}
+          />
+        </Space.Compact>
       ))}
       {others > 0 && (
         <Alert
           data-testid="studio-label-used-by"
           type="warning"
-          message={
+          title={
             <>
               {t('shell.studio.labelUsedBy')} <strong>{others}</strong>
             </>
@@ -104,7 +105,7 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
         />
       )}
       {failed && (
-        <Alert data-testid="studio-label-write-error" type="error" message={t('shell.studio.writeTextsFailed')} />
+        <Alert data-testid="studio-label-write-error" type="error" title={t('shell.studio.writeTextsFailed')} />
       )}
       <Flex gap="small" align="center">
         <Button disabled={writing || reconnecting || key === '' || key.includes('/')} onClick={write}>
