@@ -95,8 +95,10 @@ models, are not copied here. Look them up where they live.
   `bug` issue in the milestone with the failed jobs and the run link, mentions
   the owner, and plans it before every other issue. A run that passes only when
   its failed jobs run again, and an older failed run that a newer run overtook,
-  are recorded on one `bug` issue per workflow for flaky runs, planned right
-  after those, so a failure that passed on a second attempt is not lost.
+  are recorded too, planned right after those, so a failure that passed on a
+  second attempt is not lost. Each failure gets a `bug` issue of its own, named
+  by the failing test from the job's error annotation, or by the job and its
+  first failed step; the same failure later adds a comment to its open issue.
 - **Every merge to `main` gets a CI result.** A run on `main` always finishes.
   A newer merge replaces only a run that is still waiting to start, so the next
   run tests both merges. On any other branch a newer push stops the older run.
