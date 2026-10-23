@@ -20,6 +20,7 @@ export const locale = 'en'
 const apiPath = `/api/apps/${application}`
 const requestsPath = `${apiPath}/entities/Request/records`
 const categoriesPath = `${apiPath}/entities/Category/records`
+const formStatePath = `${apiPath}/forms/RequestForm/state`
 const tasksPath = `${apiPath}/tasks`
 const instancesPath = `${apiPath}/processes/Approve/instances`
 
@@ -337,6 +338,7 @@ export const routes: Record<string, () => unknown> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
   [`${requestsPath}/${requestId}/history`]: () => history,
+  [formStatePath]: () => ({ sections: [], fields: {}, errors: {} }),
   [categoriesPath]: () => categoryPage,
   [tasksPath]: () => taskPage,
   [instancesPath]: () => instancePage,
