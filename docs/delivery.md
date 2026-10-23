@@ -60,7 +60,12 @@ models, are not copied here. Look them up where they live.
 - **NexKit merges a pull request once it passes, while `merge.auto` is on.**
   With NexKit's [`merge.auto` setting][nexkit-auto-merge] on, NexKit
   squash-merges a pull request as soon as every check passes and the AI review
-  approves. Then it closes the issue the pull request implements. The owner
+  approves. Then it closes the issue the pull request implements. The review
+  marks each acceptance criterion met, unmet or unverifiable. An unmet
+  criterion counts as changes requested. An approved pull request with an
+  unverifiable criterion, one that the diff, its tests and the check results
+  show neither way, never merges by itself: the owner confirms the criteria
+  that the review comment lists, then merges. The owner
   turns the setting off to decide each merge again, and then only the owner
   merges. The switch is in `.nexkit/`, so changing it is a hand-made pull
   request.
@@ -68,8 +73,9 @@ models, are not copied here. Look them up where they live.
   in NexKit's [`notify` setting][nexkit-config]. NexKit mentions it when a run
   ends in a state that needs a person: a plan with a question that has no
   recommended option, a blocked round with such a question, a failed run, a
-  second time-out, no automatic fix rounds left, a refused automatic merge, a
-  CI failure on `main`, or the last issue of the milestone closed. Every other
+  second time-out, no automatic fix rounds left, a refused automatic merge, an
+  approved pull request with an unverifiable criterion, a CI failure on
+  `main`, or the last issue of the milestone closed. Every other
   run needs nobody, and a plan that autopilot answers or splits mentions
   nobody either.
 - **NexKit resolves conflicts with `main` by itself.** With
@@ -242,8 +248,8 @@ them.
    cause with evidence before it changes code, or stops as `blocked` with what
    it found. Beyond that, a person comments `/nexkit fix <instructions>`.
 8. **Merge.** NexKit squash-merges, starts CI on `main` and closes the issue.
-   With `merge.auto` off, the owner squash-merges instead, and GitHub closes
-   the issue.
+   With `merge.auto` off, or when the review left a criterion unverifiable,
+   the owner squash-merges instead, and GitHub closes the issue.
 9. **Exceptions.** Changes whose purpose is to edit paths NexKit may not change
    are hand-made pull requests, as described under Decisions. A conflict in
    those paths, or a merge that brings workflow changes, is one that NexKit
