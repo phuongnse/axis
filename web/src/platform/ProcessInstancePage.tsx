@@ -264,6 +264,7 @@ function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBo
         <Table<PathEntry>
           rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
           columns={historyColumns}
+          scroll={{ x: 'max-content' }}
           dataSource={instance.path}
           pagination={false}
           locale={{ emptyText: t('shell.inspector.noHistory') }}
@@ -274,6 +275,7 @@ function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBo
         <Table<InstanceTask>
           rowKey="id"
           columns={taskColumns}
+          scroll={{ x: 'max-content' }}
           dataSource={instance.tasks}
           pagination={false}
           locale={{ emptyText: t('shell.inspector.noTasks') }}
@@ -479,6 +481,7 @@ function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attem
         size="small"
         rowKey={(row) => `${row.kind}|${row.number}|${row.startedAt}`}
         columns={attemptColumns}
+        scroll={{ x: 'max-content' }}
         dataSource={call.attempts}
         pagination={false}
       />

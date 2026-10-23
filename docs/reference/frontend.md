@@ -939,10 +939,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Process inspector widget**. A page whose widget is a `processInspector` lists the instances of
   one process and opens one. See [process-inspector-widget.md](process-inspector-widget.md).
 - **Locale.** The shell header has a locale switch next to the light/dark
-  toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
-  like the theme mode under `axis.themeMode`. One key serves every site: a
-  site starts in the stored locale when it offers it, and in its default
-  locale otherwise. The shell keeps the current texts until the chosen
+  toggle, in the Menu panel at phone width. The chosen locale is kept in `localStorage` under `axis.locale`,
+  like the theme mode under `axis.themeMode`. One key serves every site: a site starts in the stored locale
+  when it offers it, and in its default locale otherwise. The shell keeps the current texts until the chosen
   locale's texts have loaded. If they fail to load, it stays in the current
   locale and shows an error message.
   - Ant Design components, such as picker placeholders, follow the UI
@@ -986,11 +985,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     catalog has the same keys, so the development rule never hides a
     platform text behind a site that lacks it.
 
-- **Phone width** *(planned for M12)*. Below a fixed 768 px breakpoint, Ant
-  Design's `md`, columns stack in file order, which is built. Tab headers scroll
-  and a table scrolls sideways inside its widget. A table's row actions fold
-  into one menu per row, which is built. The site shell's navigation collapses
-  into a menu. There is no per-widget setting until a sample needs one, see
+- **Phone width.** Below a fixed 768 px breakpoint, Ant Design's `md`, columns stack in file order, tab headers scroll and a row's
+  actions fold into one menu. Every platform table, including form line items and the reference lookup,
+  scrolls sideways inside its widget, so the page never does. The shell header keeps the site title, the
+  account button and a **Menu** button (`shell.navigation.menu`) with `aria-expanded`. It opens a panel with
+  the navigation, locale switch and theme toggle. Escape or following a link closes it, and Escape returns
+  focus to the button. There is no per-widget setting until a sample needs one, see
   [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
 
 ## Studio
