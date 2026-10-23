@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:design-system": "vite build --config vite.design-system.config.ts",
     "lint": "oxlint --deny-warnings && tsc -b --noEmit && prettier --check .",
     "preview": "vite preview",
     "test": "vitest run",

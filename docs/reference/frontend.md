@@ -38,9 +38,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   tokens. A component that needs a theme value reads Axis tokens through
   `useDesignTokens`, never through Ant Design's `theme.useToken`. A Vitest test
   scans `web/src` and fails on a hard-coded colour, font family or radius
-  outside those two files. Preview pages show the tokens and each widget,
-  named in Axis terms *(planned for M12)*. The local agent session publishes
-  them as the Design System artifact. See
+  outside those two files. Widget previews draw the `table`, `form`, `taskInbox`
+  and `processInspector` widgets and the input of each field type, from fixture
+  metadata, in light and dark mode. They are at `/design-system.html` on the
+  development server only, and `scripts/design-system.sh` saves each as static
+  HTML, see [Development](../development.md#widget-previews). Previews of the
+  tokens and of the M12 widgets are still *(planned for M12)*. The local agent
+  session publishes the saved files as the Design System artifact. See
   [D57](../decisions/d57-a-design-system-published-from-the-repository.md)
   and [Design changes](../delivery.md#design-changes).
 - **How pages and widgets grow.** A page has one widget today, and a tree of
