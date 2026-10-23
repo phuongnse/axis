@@ -858,8 +858,10 @@ migration in Studio, because the sample has no migration and release 1 is the fi
 application are not in the sample. So the journey deletes the starter `en` text resource and creates it again.
 The journey then builds the `MyTicketList` and `AllTicketList` data sources, the `TicketEdit` form with its `visibleWhen`
 on `resolution`, the `TicketTriage`, `TicketResolution` and `TicketConfirmation` forms, and the `TicketHandling` process
-in the process editor. Every expression is typed in the expression editor. It then builds the four pages in the page
-editor. The form widget of the `TicketForm` page names `TicketEdit`. The journey then finishes the site that the blank
+in the process editor. Every expression is typed in the expression editor. It then builds the five pages in the page
+editor. The form widget of the `TicketForm` page names `TicketEdit`. The `TicketDetail` page has a required `ticket`
+reference parameter and a detail widget, built with the parameter editor and the detail panel. The View row actions of
+the two table pages set `ticket` to `id`. The journey then finishes the site that the blank
 application already has: the `vi` locale and three navigation entries. It deletes the starter `Home` page, because the sample has
 none. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
 the requester from editing `resolution`. It then writes the six test scenarios in the scenario editor, each with its users, time and steps. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.

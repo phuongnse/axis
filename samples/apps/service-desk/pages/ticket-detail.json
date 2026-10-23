@@ -1,0 +1,24 @@
+{
+  "id": "e6a7b810-39ed-4751-a0cc-b761ffc812e5",
+  "kind": "page",
+  "name": "TicketDetail",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "pages.ticketDetail.title"
+  },
+  "parameters": [
+    {
+      "name": "ticket",
+      "type": "reference",
+      "target": "Ticket",
+      "required": true
+    }
+  ],
+  "widgets": [
+    {
+      "type": "detail",
+      "entity": "Ticket",
+      "record": "ticket"
+    }
+  ]
+}
