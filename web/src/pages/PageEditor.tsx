@@ -5,6 +5,8 @@ import {
   addableTypes,
   childLists,
   containerTypes,
+  dataSourceColumns,
+  isNumberType,
   type ListPart,
   moveTo,
   newColumn,
@@ -60,14 +62,17 @@ function JsonOnly() {
  * and every widget has Move up, Move down, Remove and a Move to picker that lists the other widget lists. A new
  * container starts with two columns of width 6, one tab, or an empty section. A container's type is fixed. Its panel
  * edits the width of each column, the label of each tab and the title and collapsed state of a section, and adds
- * or removes columns and tabs. The panel of a `table`, `form`, `taskInbox`, `processInspector` or `detail` widget
+ * or removes columns and tabs. The panel of a `table`, `form`, `taskInbox`, `processInspector`, `kpi`, `chart` or `detail` widget
  * shows its type with every property that type takes. A `detail` panel has a record picker over the page's required
  * `reference` parameters, narrowed to the widget's entity when it names one. A `form` and a `detail` panel also list
  * their `actions`, which are `startProcess` or `navigate`, and a `table` panel lists its `rowActions` and
  * `toolbarActions`, which are `navigate`. A navigate action has a target page, a label, a `record` expression and
  * parameter expressions. When the names list the target page, the action shows one expression for each parameter the
  * page declares, and an empty expression leaves the parameter out. Picking another page removes the values the new
- * page does not declare. A property is a name picked from the application's names, and a table's data source and
+ * page does not declare. A `kpi` panel has a data source with a total row, a measure, a label, and an optional comparison
+ * and navigate action. A `chart` panel has a data source with one group field, a kind, a category, a title and a list of
+ * measures. Their column pickers list only what the chosen data source projects, and a chart's measures only the
+ * numbers. A property is a name picked from the application's names, and a table's data source and
  * entity, like a form's or a detail's entity and form, exclude each other, so a pick clears the other. The editor edits
  * the draft through `onChange`, so a key it does not show, on the page or on a widget, stays as it is. A widget of a
  * type it has no panel for shows its type and points to the JSON view.
@@ -434,6 +439,7 @@ function NameField({
   current,
   required,
   without,
+  choices,
   onPick,
 }: {
   pointer: string
@@ -443,6 +449,8 @@ function NameField({
   required: boolean
   /** A name the picker leaves out, ignoring letter case. */
   without?: string
+  /** The names the picker lists instead of every name of the kind. */
+  choices?: string[]
   onPick: (next: string | undefined) => void
 }) {
   const names = useContext(StudioNamesContext)
@@ -450,7 +458,7 @@ function NameField({
   const options =
     names === undefined
       ? []
-      : referenceOptions(names, kind, undefined, pointer).filter(
+      : (choices ?? referenceOptions(names, kind, undefined, pointer)).filter(
           (option) => without === undefined || without === '' || option.toLowerCase() !== without.toLowerCase(),
         )
 
@@ -615,7 +623,267 @@ function WidgetPanel({
           onPick={(next) => pick('process', next)}
         />
       )}
+      {type === 'kpi' && <KpiPanel base={base} widget={widget} onChange={onChange} />}
+      {type === 'chart' && <ChartPanel base={base} widget={widget} onChange={onChange} />}
     </Flex>
+  )
+}
+
+/**
+ * The picker of a column of the data source a widget names, or a plain box while the names have not loaded. A value
+ * the data source does not project stays visible and is tagged unknown.
+ */
+function ColumnField({
+  pointer,
+  label,
+  current,
+  options,
+  onPick,
+}: {
+  pointer: string
+  label: string
+  current: unknown
+  /** The columns the picker lists, or `undefined` while the application's names have not loaded. */
+  options: string[] | undefined
+  onPick: (next: string) => void
+}) {
+  const value = typeof current === 'string' ? current : undefined
+
+  return (
+    <div data-testid={`studio-field-${pointer}`}>
+      <div>{label}</div>
+      {options === undefined ? (
+        <Input aria-label={label} value={text(value)} onChange={(event) => onPick(event.target.value)} />
+      ) : (
+        <ReferencePicker
+          name={label}
+          value={value}
+          required
+          options={options}
+          onChange={(next) => onPick(next ?? '')}
+        />
+      )}
+    </div>
+  )
+}
+
+/** The names of the data sources whose `groupBy` has the given length, or `undefined` while the names have not loaded. */
+function dataSourcesGroupedBy(names: StudioNames | undefined, count: number): string[] | undefined {
+  return names?.dataSources.filter((item) => item.groupBy?.length === count).map((item) => item.name)
+}
+
+/**
+ * The panel of a KPI: a data source with a total row, a measure of it and a label. It can add a comparison with its
+ * own measure and label, and a navigate action. Picking another data source keeps the names already set, which the
+ * pickers tag unknown when the new data source does not project them.
+ */
+function KpiPanel({ base, widget, onChange }: { base: string; widget: Content; onChange: ChangeHandler }) {
+  const t = useText()
+  const names = useContext(StudioNamesContext)
+  const measures =
+    names === undefined
+      ? undefined
+      : (dataSourceColumns(names, widget.dataSource)?.measures.map((measure) => measure.name) ?? [])
+  const { comparison, navigate } = widget
+
+  return (
+    <>
+      <NameField
+        pointer={`${base}/dataSource`}
+        label={t('shell.studio.page.dataSource')}
+        kind="dataSource"
+        choices={dataSourcesGroupedBy(names, 0)}
+        current={widget.dataSource}
+        required
+        onPick={(next) => onChange(`${base}/dataSource`, next)}
+      />
+      <ColumnField
+        pointer={`${base}/measure`}
+        label={t('shell.studio.page.measure')}
+        current={widget.measure}
+        options={measures}
+        onPick={(next) => onChange(`${base}/measure`, next)}
+      />
+      <div data-testid={`studio-field-${base}/label`}>
+        <div>{t('shell.studio.page.kpiLabel')}</div>
+        <TextReferenceField pointer={`${base}/label`} value={widget.label} onChange={onChange} />
+      </div>
+      <div data-testid={`studio-field-${base}/comparison`}>
+        <Flex vertical gap="small">
+          {comparison === undefined ? (
+            <div>
+              <Button onClick={() => onChange(`${base}/comparison`, { measure: '', label: { textKey: '' } })}>
+                {t('shell.studio.page.addComparison')}
+              </Button>
+            </div>
+          ) : isContent(comparison) ? (
+            <>
+              <Typography.Text strong>{t('shell.studio.page.comparison')}</Typography.Text>
+              <ColumnField
+                pointer={`${base}/comparison/measure`}
+                label={t('shell.studio.page.measure')}
+                current={comparison.measure}
+                options={measures}
+                onPick={(next) => onChange(`${base}/comparison/measure`, next)}
+              />
+              <div data-testid={`studio-field-${base}/comparison/label`}>
+                <div>{t('shell.studio.page.kpiLabel')}</div>
+                <TextReferenceField pointer={`${base}/comparison/label`} value={comparison.label} onChange={onChange} />
+              </div>
+              <div>
+                <Button danger onClick={() => onChange(`${base}/comparison`, undefined)}>
+                  {t('shell.studio.page.removeComparison')}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <JsonOnly />
+          )}
+        </Flex>
+      </div>
+      <div data-testid={`studio-field-${base}/navigate`}>
+        <Flex vertical gap="small">
+          {navigate === undefined ? (
+            <div>
+              <Button
+                onClick={() => onChange(`${base}/navigate`, { type: 'navigate', page: '', label: { textKey: '' } })}
+              >
+                {t('shell.studio.page.addNavigateAction')}
+              </Button>
+            </div>
+          ) : isContent(navigate) ? (
+            <>
+              <Typography.Text strong>{t('shell.studio.page.navigate')}</Typography.Text>
+              <NavigateFields pointer={`${base}/navigate`} action={navigate} onChange={onChange} />
+              <div>
+                <Button danger onClick={() => onChange(`${base}/navigate`, undefined)}>
+                  {t('shell.studio.page.removeNavigate')}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <JsonOnly />
+          )}
+        </Flex>
+      </div>
+    </>
+  )
+}
+
+/** The kinds of a chart. */
+const chartKinds = ['bar', 'line', 'pie']
+
+/**
+ * The panel of a chart: a data source with one group field, a kind, the category from that field, a title and a list
+ * of measures of the data source that are numbers, each with a label. The list keeps at least one measure.
+ */
+function ChartPanel({ base, widget, onChange }: { base: string; widget: Content; onChange: ChangeHandler }) {
+  const t = useText()
+  const names = useContext(StudioNamesContext)
+  const columns = names === undefined ? undefined : dataSourceColumns(names, widget.dataSource)
+  const categories = names === undefined ? undefined : (columns?.groupFields ?? [])
+  const numbers =
+    names === undefined
+      ? undefined
+      : (columns?.measures.filter((measure) => isNumberType(measure.type)).map((measure) => measure.name) ?? [])
+  const { measures } = widget
+
+  return (
+    <>
+      <NameField
+        pointer={`${base}/dataSource`}
+        label={t('shell.studio.page.dataSource')}
+        kind="dataSource"
+        choices={dataSourcesGroupedBy(names, 1)}
+        current={widget.dataSource}
+        required
+        onPick={(next) => onChange(`${base}/dataSource`, next)}
+      />
+      <div data-testid={`studio-field-${base}/kind`}>
+        <div>{t('shell.studio.page.chartKind')}</div>
+        <Select
+          aria-label={t('shell.studio.page.chartKind')}
+          virtual={false}
+          style={{ minWidth: 240 }}
+          value={typeof widget.kind === 'string' ? widget.kind : undefined}
+          options={chartKinds.map((kind) => ({ value: kind, label: kind }))}
+          onChange={(next: string) => onChange(`${base}/kind`, next)}
+        />
+      </div>
+      <ColumnField
+        pointer={`${base}/category`}
+        label={t('shell.studio.page.category')}
+        current={widget.category}
+        options={categories}
+        onPick={(next) => onChange(`${base}/category`, next)}
+      />
+      <div data-testid={`studio-field-${base}/title`}>
+        <div>{t('shell.studio.page.chartTitle')}</div>
+        <TextReferenceField pointer={`${base}/title`} value={widget.title} onChange={onChange} />
+      </div>
+      <div data-testid={`studio-field-${base}/measures`}>
+        <Flex vertical gap="small">
+          <Typography.Text strong>{t('shell.studio.page.measures')}</Typography.Text>
+          {!Array.isArray(measures) ? (
+            <JsonOnly />
+          ) : (
+            <>
+              {measures.map((measure, index) => (
+                <Card size="small" key={index} data-testid={`studio-measure-${index}`}>
+                  <Flex vertical gap="small">
+                    {isContent(measure) ? (
+                      <>
+                        <ColumnField
+                          pointer={`${base}/measures/${index}/name`}
+                          label={t('shell.studio.page.measure')}
+                          current={measure.name}
+                          options={numbers}
+                          onPick={(next) => onChange(`${base}/measures/${index}/name`, next)}
+                        />
+                        <div data-testid={`studio-field-${base}/measures/${index}/label`}>
+                          <div>{t('shell.studio.page.measureLabel')}</div>
+                          <TextReferenceField
+                            // The label editors keep their state by position, so they remount when a measure is
+                            // added or removed.
+                            key={`${index}:${measures.length}`}
+                            pointer={`${base}/measures/${index}/label`}
+                            value={measure.label}
+                            onChange={onChange}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <JsonOnly />
+                    )}
+                    <div>
+                      <Button
+                        danger
+                        disabled={measures.length === 1}
+                        onClick={() =>
+                          onChange(
+                            `${base}/measures`,
+                            measures.filter((_, at) => at !== index),
+                          )
+                        }
+                      >
+                        {t('shell.studio.page.removeMeasure')}
+                      </Button>
+                    </div>
+                  </Flex>
+                </Card>
+              ))}
+              <div>
+                <Button
+                  onClick={() => onChange(`${base}/measures`, [...measures, { name: '', label: { textKey: '' } }])}
+                >
+                  {t('shell.studio.page.addMeasure')}
+                </Button>
+              </div>
+            </>
+          )}
+        </Flex>
+      </div>
+    </>
   )
 }
 
