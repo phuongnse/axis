@@ -208,15 +208,15 @@ the parts planned for M12,
 
 ### Pages
 
-My tickets, the ticket form, the task inbox, All tickets and the dashboard for
-the lead, in a site at path `service-desk`. Texts are in `en` and `vi`.
+My tickets, the ticket form, the task inbox, the ticket detail page, All
+tickets and the dashboard for the lead, in a site at path `service-desk`. Texts are in `en` and `vi`.
 
 - A dashboard page for the service desk lead. It has KPIs (key figures) for
   open and urgent tickets and a chart of open tickets by category, above All
   tickets, in columns.
-- _(planned for M12)_ A ticket detail page with one detail widget that shows
-  the ticket. My tickets and All tickets open it through a navigate action
-  with a `ticket` parameter.
+- A ticket detail page with one detail widget that shows the ticket. My
+  tickets and All tickets open it through a navigate action with a `ticket`
+  parameter.
 - _(planned for M12)_ The ticket form has two steps. Step 1 is the title and
   description. Step 2 is the category and priority. The resolution shows, and
   is required, only when the status is `resolved`.
@@ -248,10 +248,10 @@ Studio, publishes it and takes one ticket through the process on the site.
 - Then the journey runs the scenarios from Studio and publishes. Then the
   requester, the service desk lead and the agent take one ticket through the
   process on the site.
-- The main journey also builds the dashboard. The comparison with the
-  committed sample covers it.
-- _(planned for M12)_ The main journey also builds the ticket detail page and
-  the two-step ticket form. The comparison covers them.
+- The main journey also builds the dashboard and the ticket detail page. The
+  comparison with the committed sample covers them.
+- _(planned for M12)_ The main journey also builds the two-step ticket form.
+  The comparison covers it.
 - _(planned for M12)_ Another Playwright journey uses the sample at phone
   width.
 - _(planned for M13)_ A second, smaller journey starts from the

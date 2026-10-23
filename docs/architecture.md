@@ -861,9 +861,11 @@ The journey then builds the `MyTicketList` and `AllTicketList` data sources and 
 `filter` and the `aggregate`, and it writes the empty `groupBy` of the two totals when the author adds an entry and removes it.
 The journey then builds the `TicketEdit` form with its `visibleWhen`
 on `resolution`, the `TicketTriage`, `TicketResolution` and `TicketConfirmation` forms, and the `TicketHandling` process
-in the process editor. Every expression is typed in the expression editor. It then builds the five pages in the page
+in the process editor. Every expression is typed in the expression editor. It then builds the six pages in the page
 editor, which include the `Dashboard` page: a `columns` widget with the two `kpi` tiles in a column of 4 and the `chart`
-in a column of 8, and the `AllTicketList` table below it. The form widget of the `TicketForm` page names `TicketEdit`. The journey then finishes the site that the blank
+in a column of 8, and the `AllTicketList` table below it. The form widget of the `TicketForm` page names `TicketEdit`. The `TicketDetail` page has a required `ticket`
+reference parameter and a detail widget, built with the parameter editor and the detail panel. The View row actions of
+the two table pages set `ticket` to `id`. The journey then finishes the site that the blank
 application already has: the `vi` locale and four navigation entries, the last one for `Dashboard`. It deletes the starter `Home` page, because the sample has
 none. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
 the requester from editing `resolution`, and the read grants of the lead on the three aggregate data sources. It then writes the eight test scenarios in the scenario editor, each with its users, time and steps. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.

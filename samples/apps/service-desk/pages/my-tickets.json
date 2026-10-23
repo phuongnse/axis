@@ -18,6 +18,16 @@
             "textKey": "actions.open"
           },
           "record": "id"
+        },
+        {
+          "type": "navigate",
+          "page": "TicketDetail",
+          "label": {
+            "textKey": "actions.view"
+          },
+          "parameters": {
+            "ticket": "id"
+          }
         }
       ],
       "toolbarActions": [

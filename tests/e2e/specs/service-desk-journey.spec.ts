@@ -667,7 +667,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expectForm(page)
   })
 
-  test('the author builds the ticket form and the task inbox pages', async ({ page }) => {
+  test('the author builds the ticket form, the task inbox and the ticket detail pages', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
@@ -685,6 +685,19 @@ test.describe('the author builds the service desk with Studio only', () => {
     await createPage(page, 'MyTasks')
     await writeLabel(page, 'studio-field-/title', 'pages.myTasks.title', en['pages.myTasks.title'])
     await save(page)
+
+    // The detail page takes the ticket as a required parameter, and its detail widget shows that ticket.
+    await createPage(page, 'TicketDetail')
+    await writeLabel(page, 'studio-field-/title', 'pages.ticketDetail.title', en['pages.ticketDetail.title'])
+    await page.getByRole('button', { name: 'Add parameter', exact: true }).click()
+    await page.getByRole('textbox', { name: 'Parameter name', exact: true }).fill('ticket')
+    await pick(page, 'studio-field-/parameters/0/type', 'reference')
+    await pick(page, 'studio-field-/parameters/0/target', 'Ticket')
+    await page.getByRole('switch', { name: 'Required', exact: true }).click()
+    await pick(page, 'studio-field-/widgets/0/type', 'detail')
+    await pick(page, 'studio-field-/widgets/0/entity', 'Ticket')
+    await pick(page, 'studio-field-/widgets/0/record', 'ticket')
+    await save(page)
   })
 
   test('the author builds the two ticket table pages', async ({ page }) => {
@@ -701,20 +714,25 @@ test.describe('the author builds the service desk with Studio only', () => {
       await writeLabel(page, 'studio-field-/title', titleKey, en[titleKey])
       await pick(page, 'studio-field-/widgets/0/type', 'table')
       await pick(page, 'studio-field-/widgets/0/dataSource', list)
-      // A row action opens the ticket, and a toolbar action starts a new one.
-      for (const [kind, key, record] of [
-        ['rowActions', 'actions.open', 'id'],
-        ['toolbarActions', 'actions.new', undefined],
+      // The row actions open the ticket in its form and show it on the detail page, and a toolbar action starts a new
+      // one. The detail page gets the ticket through its parameter. The page names load with the application, so
+      // TicketDetail and its parameter are offered here.
+      for (const [kind, index, target, key, parameter] of [
+        ['rowActions', 0, 'TicketForm', 'actions.open', undefined],
+        ['rowActions', 1, 'TicketDetail', 'actions.view', 'ticket'],
+        ['toolbarActions', 0, 'TicketForm', 'actions.new', undefined],
       ] as const) {
-        const action = `studio-field-/widgets/0/${kind}/0`
+        const action = `studio-field-/widgets/0/${kind}/${index}`
         await page
           .getByTestId(`studio-field-/widgets/0/${kind}`)
           .getByRole('button', { name: 'Add navigate action', exact: true })
           .click()
-        await pick(page, `${action}/page`, 'TicketForm')
+        await pick(page, `${action}/page`, target)
         await writeLabel(page, `${action}/label`, key, en[key])
-        if (record) {
-          await page.getByTestId(`${action}/record`).getByRole('textbox').fill(record)
+        if (kind === 'rowActions') {
+          // The record of the form link and the ticket parameter of the detail link both take the id of the row.
+          const input = parameter ? `${action}/parameters/${parameter}` : `${action}/record`
+          await page.getByTestId(input).getByRole('textbox').fill('id')
         }
       }
       await save(page)
