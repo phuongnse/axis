@@ -1,0 +1,28 @@
+{
+  "id": "7af97470-6031-4d7a-953a-931a0600d96f",
+  "kind": "page",
+  "name": "ItemChartOverview",
+  "formatVersion": 1,
+  "title": { "textKey": "itemChartOverview.title" },
+  "widgets": [
+    {
+      "type": "columns",
+      "columns": [
+        { "width": 8, "widgets": [{ "type": "table", "entity": "Item" }] },
+        {
+          "width": 4,
+          "widgets": [
+            {
+              "type": "chart",
+              "kind": "pie",
+              "dataSource": "ItemCountsByDepartment",
+              "category": "departmentName",
+              "title": { "textKey": "itemChart.title" },
+              "measures": [{ "name": "items", "label": { "textKey": "itemChart.items" } }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

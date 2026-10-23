@@ -53,6 +53,7 @@ const inboxWidget: WidgetMetadata = {
   access: null,
   detail: null,
   kpi: null,
+  chart: null,
 }
 
 // The task read example of the processes reference, with a read-only title and an editable comment.

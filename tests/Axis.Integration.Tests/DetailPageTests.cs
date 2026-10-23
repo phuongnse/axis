@@ -28,7 +28,7 @@ public sealed class DetailPageTests(RecordApiFixture fixture) : IClassFixture<Re
         Assert.Equal(JsonValueKind.Object, widget.GetProperty("access").ValueKind);
         Assert.Equal(0, widget.GetProperty("actions").GetArrayLength());
         Assert.Equal("detail", widget.EnumerateObject().SkipWhile(property => property.Name != "access").ElementAt(1).Name);
-        Assert.Equal("kpi", widget.EnumerateObject().Last().Name);
+        Assert.Equal("chart", widget.EnumerateObject().Last().Name);
 
         var parameter = Assert.Single(page.RootElement.GetProperty("parameters").EnumerateArray().ToList());
         Assert.Equal(

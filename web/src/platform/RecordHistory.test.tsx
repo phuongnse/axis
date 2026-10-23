@@ -125,6 +125,7 @@ function pageBody(name: string, process: string | null) {
     access: null,
     detail: null,
     kpi: null,
+    chart: null,
   }
   return JSON.stringify({ name, titleKey: `${name}.title`, widgets: [widget] } as unknown as PageMetadata)
 }

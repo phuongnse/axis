@@ -68,7 +68,7 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["table", "form", "taskInbox", "processInspector", "kpi", "detail", "columns", "tabs", "section"] },
+        "type": { "enum": ["table", "form", "taskInbox", "processInspector", "kpi", "chart", "detail", "columns", "tabs", "section"] },
         "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
         "dataSource": { "$ref": "#/$defs/dataSourceName", "x-axis-reference": "dataSource" },
         "form": { "$ref": "#/$defs/name", "x-axis-reference": "form" },
@@ -115,7 +115,22 @@
             "label": { "$ref": "#/$defs/textReference" }
           }
         },
-        "navigate": { "$ref": "#/$defs/navigateAction" }
+        "navigate": { "$ref": "#/$defs/navigateAction" },
+        "kind": { "enum": ["bar", "line", "pie"] },
+        "category": { "$ref": "#/$defs/name" },
+        "measures": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "label"],
+            "properties": {
+              "name": { "$ref": "#/$defs/name" },
+              "label": { "$ref": "#/$defs/textReference" }
+            }
+          }
+        }
       },
       "allOf": [
         {
@@ -127,6 +142,11 @@
           "if": { "required": ["type"], "properties": { "type": { "const": "kpi" } } },
           "then": { "required": ["dataSource", "measure", "label"], "properties": { "parameters": false } },
           "else": { "properties": { "measure": false, "label": false, "comparison": false, "navigate": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "chart" } } },
+          "then": { "required": ["dataSource", "kind", "category", "measures", "title"], "properties": { "parameters": false } },
+          "else": { "properties": { "kind": false, "category": false, "measures": false } }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "detail" } } },
@@ -146,12 +166,16 @@
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "section" } } },
           "then": { "required": ["title", "widgets"] },
-          "else": { "properties": { "title": false, "collapsed": false, "widgets": false } }
+          "else": { "properties": { "collapsed": false, "widgets": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "enum": ["section", "chart"] } } },
+          "else": { "properties": { "title": false } }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "enum": ["columns", "tabs", "section"] } } },
           "then": {
-            "properties": { "entity": false, "dataSource": false, "form": false, "actions": false, "rowActions": false, "toolbarActions": false, "parameters": false, "record": false, "measure": false, "label": false, "comparison": false, "navigate": false }
+            "properties": { "entity": false, "dataSource": false, "form": false, "actions": false, "rowActions": false, "toolbarActions": false, "parameters": false, "record": false, "measure": false, "label": false, "comparison": false, "navigate": false, "kind": false, "category": false, "measures": false }
           }
         }
       ]

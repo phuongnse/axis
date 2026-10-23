@@ -104,6 +104,13 @@ public static class ApplicationSites
                     kpi.Label.TextKey,
                     kpi.Comparison is { } comparison ? new KpiComparisonMetadata(comparison.Measure, comparison.Label.TextKey) : null,
                     kpi.Navigate is { } navigate ? (NavigateActionMetadata)Action(application, navigate, null) : null)
+                : null,
+            widget.Chart is { } chart
+                ? new ChartMetadata(
+                    chart.Kind.ToString().ToLowerInvariant(),
+                    chart.Title.TextKey,
+                    chart.Category,
+                    [.. chart.Measures.Select(measure => new ChartMeasureMetadata(measure.Name, measure.Label.TextKey))])
                 : null);
     }
 
@@ -158,10 +165,10 @@ public static class ApplicationSites
     }
 
     // Without a user to shape it, access lists every entity action and every field. A kpi reads a total
-    // row of its data source, not records, so it has none.
+    // row of its data source, not records, and a chart reads its groups, so neither has any.
     private static WidgetAccess? FullAccess(ApplicationModel application, WidgetModel widget)
     {
-        if (widget.Type == WidgetType.Kpi || WidgetEntity(application, widget) is not { } entity)
+        if (widget.Type is WidgetType.Kpi or WidgetType.Chart || WidgetEntity(application, widget) is not { } entity)
         {
             return null;
         }

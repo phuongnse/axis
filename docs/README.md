@@ -41,7 +41,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Process inspection](reference/process-inspection.md)                  | Inspecting instances and the operator commands retry, cancel and resolve              |
 | [Process inspector widget](reference/process-inspector-widget.md)      | The SPA widget that lists and shows the instances of one process                      |
 | [Task inbox widget](reference/task-inbox-widget.md)                    | The SPA widget that lists the user's open tasks, and the task page                    |
-| [Detail, chart and KPI widgets](reference/detail-chart-kpi-widgets.md) | The planned SPA widgets that show one record, a chart and a KPI tile                  |
+| [Detail, chart and KPI widgets](reference/detail-chart-kpi-widgets.md) | The SPA widgets that show one record, a chart and a KPI tile                          |
 | [Storage](reference/storage.md)                                        | Physical names, column types, database roles, schema planning, audit, release history |
 | [Migrations](reference/migrations.md)                                  | `migration` resources and recomputing stored computed fields                          |
 | [Security](reference/security.md)                                      | Sign-in and the session, machine callers, authorization, development users            |

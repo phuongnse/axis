@@ -40,6 +40,7 @@ function kpiWidget(kpi: KpiMetadata): WidgetMetadata {
     access: null,
     detail: null,
     kpi,
+    chart: null,
     dataSource: {
       name: 'NoteTotals',
       rowsPath,

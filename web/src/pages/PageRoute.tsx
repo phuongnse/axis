@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
+import { ChartWidget } from '../platform/ChartWidget'
 import { DetailWidget } from '../platform/DetailWidget'
 import { FormWidget } from '../platform/FormWidget'
 import { KpiWidget } from '../platform/KpiWidget'
@@ -180,6 +181,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       {widget?.type === 'kpi' && (
         <KpiWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
       )}
+      {widget?.type === 'chart' && <ChartWidget widget={widget} locale={locale} />}
     </PageLayout>
   )
 }

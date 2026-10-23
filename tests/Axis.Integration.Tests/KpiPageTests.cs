@@ -26,7 +26,7 @@ public sealed class KpiPageTests(RecordApiFixture fixture) : IClassFixture<Recor
         Assert.Equal(
             $$"""{"measure":"items","labelKey":"itemKpi.items","comparison":{"measure":"priceSum","labelKey":"itemKpi.priceSum"},"navigate":{{ShowDepartments}}}""",
             widget.GetProperty("kpi").GetRawText());
-        Assert.Equal("kpi", widget.EnumerateObject().Last().Name);
+        Assert.Equal("chart", widget.EnumerateObject().Last().Name);
     }
 
     [Fact]

@@ -91,7 +91,7 @@ internal static class PageAccess
             Actions = [.. described.Actions.Where(action => Allows(application, roles, entity, action))],
             RowActions = [.. described.RowActions.Where(action => Allows(application, roles, entity, action))],
             ToolbarActions = [.. described.ToolbarActions.Where(action => Allows(application, roles, entity, action))],
-            Access = widget.Type == WidgetType.Kpi || entity is null ? null : Access(application, roles, entity),
+            Access = widget.Type is WidgetType.Kpi or WidgetType.Chart || entity is null ? null : Access(application, roles, entity),
             Kpi = described.Kpi is { Navigate: { } navigate } kpi && !Allows(application, roles, null, navigate) ? kpi with { Navigate = null } : described.Kpi,
         };
     }
