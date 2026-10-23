@@ -1,5 +1,6 @@
 import { Button, ConfigProvider, Flex, Form, Input, Table, type TableColumnsType } from 'antd'
 import { useMemo, useRef } from 'react'
+import { compactFormTheme } from './antTheme'
 import { FieldInput } from './FieldInput'
 import { formatValue } from './formatValue'
 import type { RecordRow, RecordValue } from './records'
@@ -107,7 +108,7 @@ export function ChildCollectionTable({
   return (
     <Flex vertical gap="small">
       {/* A cell's item needs no space below it, as the table rows already space the inputs. */}
-      <ConfigProvider theme={{ components: { Form: { itemMarginBottom: 0 } } }}>
+      <ConfigProvider theme={compactFormTheme}>
         <Table<RecordRow> rowKey={keyOf} columns={columns} dataSource={rows} pagination={false} />
       </ConfigProvider>
       {!readOnly && (

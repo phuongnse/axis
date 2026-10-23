@@ -9,11 +9,12 @@ import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { theme, Typography } from 'antd'
+import { Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { checkStudioExpression, type ExpressionCheck } from '../platform/studio'
 import { useText } from '../platform/texts'
-import { useThemeMode } from '../platform/themeMode'
+import type { designTokensFor } from '../platform/designTokens'
+import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { expressionLanguage } from './expressionLanguage'
 import type { ScopeOption } from './expressionScope'
 
@@ -54,15 +55,15 @@ export default function ExpressionEditor({
 }: ExpressionEditorProps) {
   const t = useText()
   const { mode } = useThemeMode()
-  const { token } = theme.useToken()
+  const tokens = useDesignTokens()
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [themeCompartment] = useState(() => new Compartment())
   const [result, setResult] = useState<Result>({ type: null, error: null })
-  const latest = useRef({ onChange, required, options, value, theme: editorTheme(token, mode), themeCompartment })
+  const latest = useRef({ onChange, required, options, value, theme: editorTheme(tokens, mode), themeCompartment })
 
   useEffect(() => {
-    latest.current = { onChange, required, options, value, theme: editorTheme(token, mode), themeCompartment }
+    latest.current = { onChange, required, options, value, theme: editorTheme(tokens, mode), themeCompartment }
   })
 
   useEffect(() => {
@@ -128,8 +129,8 @@ export default function ExpressionEditor({
   }, [application, resourceId, path, name])
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(editorTheme(token, mode)) })
-  }, [themeCompartment, token, mode])
+    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(editorTheme(tokens, mode)) })
+  }, [themeCompartment, tokens, mode])
 
   useEffect(() => {
     const view = viewRef.current
@@ -205,19 +206,19 @@ function toCompletion(option: ScopeOption): Completion {
   }
 }
 
-function editorTheme(token: ReturnType<typeof theme.useToken>['token'], mode: 'light' | 'dark') {
+function editorTheme({ colour, radius, type }: ReturnType<typeof designTokensFor>, mode: 'light' | 'dark') {
   return EditorView.theme(
     {
       '&': {
-        color: token.colorText,
-        backgroundColor: token.colorBgContainer,
-        border: `1px solid ${token.colorBorder}`,
-        borderRadius: `${token.borderRadius}px`,
-        fontFamily: token.fontFamilyCode,
-        fontSize: `${token.fontSize}px`,
+        color: colour.text,
+        backgroundColor: colour.surface,
+        border: `1px solid ${colour.border}`,
+        borderRadius: `${radius.base}px`,
+        fontFamily: type.codeFontFamily,
+        fontSize: `${type.fontSize}px`,
       },
-      '&.cm-focused': { outline: 'none', borderColor: token.colorPrimary },
-      '.cm-content': { caretColor: token.colorText, padding: '4px 0' },
+      '&.cm-focused': { outline: 'none', borderColor: colour.primary },
+      '.cm-content': { caretColor: colour.text, padding: '4px 0' },
       '.cm-scroller': { fontFamily: 'inherit' },
     },
     { dark: mode === 'dark' },

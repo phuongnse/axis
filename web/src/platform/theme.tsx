@@ -1,15 +1,9 @@
-import { ConfigProvider, theme, type ThemeConfig } from 'antd'
+import { ConfigProvider } from 'antd'
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { antThemeFor } from './antTheme'
 import { ThemeModeContext, type ThemeMode } from './themeMode'
 
 const storageKey = 'axis.themeMode'
-
-// Shared design tokens. Feature code never sets colours, spacing or typography itself.
-const sharedTokens: ThemeConfig['token'] = {
-  colorPrimary: '#2f54eb',
-  borderRadius: 6,
-  fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-}
 
 function initialMode(): ThemeMode {
   try {
@@ -39,13 +33,7 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(() => ({ mode, toggleMode }), [mode, toggleMode])
-  const config = useMemo<ThemeConfig>(
-    () => ({
-      algorithm: mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
-      token: sharedTokens,
-    }),
-    [mode],
-  )
+  const config = useMemo(() => antThemeFor(mode), [mode])
 
   return (
     <ThemeModeContext.Provider value={value}>

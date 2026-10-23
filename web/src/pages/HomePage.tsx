@@ -1,10 +1,11 @@
-import { Alert, Badge, Card, Empty, Flex, Spin, theme } from 'antd'
+import { Alert, Badge, Card, Empty, Flex, Spin } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { PageLayout } from '../platform/PageLayout'
 import { useServerStatus, type ServerStatus } from '../platform/serverStatus'
 import { fetchSites, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { usePlatform } from './context'
 
 const statusBadge: Record<ServerStatus, 'processing' | 'success' | 'error'> = {
@@ -20,7 +21,7 @@ function siteTitle(site: SiteListItem, locale: string): string {
 
 function SiteList() {
   const t = useText()
-  const { token } = theme.useToken()
+  const { colour, spacing } = useDesignTokens()
   const { locale } = usePlatform().current
   // `null` when nobody is signed in.
   const [sites, setSites] = useState<SiteListItem[] | null>()
@@ -52,10 +53,7 @@ function SiteList() {
       ) : (
         <Flex vertical>
           {sites.map((site) => (
-            <Flex
-              key={site.path}
-              style={{ paddingBlock: token.paddingSM, borderBlockEnd: `1px solid ${token.colorSplit}` }}
-            >
+            <Flex key={site.path} style={{ paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }}>
               <Link to={`/${site.path}`}>{siteTitle(site, locale)}</Link>
             </Flex>
           ))}

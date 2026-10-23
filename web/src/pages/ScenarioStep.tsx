@@ -25,6 +25,7 @@ import {
 import type { SeedField } from '../platform/seedValues'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import type { ChangeHandler } from './SchemaForm'
 import { FieldCell } from './SeedGrid'
 import { ReferencePicker } from './ReferencePicker'
@@ -61,6 +62,7 @@ export function Field({ pointer, name, children }: { pointer: string; name: stri
 /** The values of a step whose entity is not in the folder. The text is JSON and is saved only when it is an object. */
 function JsonValues({ pointer, values, onChange }: { pointer: string; values: unknown; onChange: ChangeHandler }) {
   const t = useText()
+  const { type } = useDesignTokens()
   const formatted = JSON.stringify(values ?? {}, null, 2)
   const [text, setText] = useState(formatted)
   const [synced, setSynced] = useState(formatted)
@@ -76,7 +78,7 @@ function JsonValues({ pointer, values, onChange }: { pointer: string; values: un
         aria-label="values"
         autoSize={{ minRows: 3, maxRows: 12 }}
         spellCheck={false}
-        style={{ fontFamily: 'monospace' }}
+        style={{ fontFamily: type.codeFontFamily }}
         value={text}
         onChange={(event) => {
           setText(event.target.value)
