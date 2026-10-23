@@ -208,21 +208,24 @@ conflict with `main`, the Claude usage limit, failing checks and requested
 changes within the automatic fix limit, a CI failure on `main`, which it runs
 again and then turns into a `bug` issue that it plans first, a run on `main`
 that passed only when run again, which it records on a `bug` issue for each
-failure, named by the failing test, and a missed dependency cache. Its troubleshooting doc at the pinned ref has the mechanics.
+failure, named by the failing test, a missed dependency cache, a first stop on
+a transient error, which it runs once more, shown as `(retry)`, and a merge
+refused because `main` moved, which it tries again. Its troubleshooting doc at the pinned ref has the mechanics.
 
 | Failure | What you do |
 | --- | --- |
 | Publish fails after `/nexkit go` | Read the run log. If the base branch was force-pushed, the same `/nexkit go` fixes it. Otherwise diagnose first, and ask the owner before posting `/nexkit go` again. |
-| A plan or a `blocked` round has a question with no recommended option | Ask the owner when the choice is theirs. Answer a plan's question in a comment on the issue, so the next sweep plans again, and a round's question with `/nexkit fix <decision>`. |
+| A plan or a `blocked` round has a question with no recommended option, or asks again after autopilot answered it | Ask the owner when the choice is theirs. Answer a plan's question in a comment on the issue, so the next sweep plans again, and a round's question with `/nexkit fix <decision>`. |
+| A run stopped twice on a transient error | The comment shows both errors. Read them; when the cause has passed, repeat the command, otherwise tell the owner. |
 | No automatic fix rounds left, for failing checks or requested changes | Read the failing check's log or the review, ask the owner, then post `/nexkit fix <instructions>`. |
 | `conflicts.max_rounds` conflict rounds ran | Comment `/nexkit fix` yourself. |
-| A conflict in a path NexKit may not change, or a merge that brings workflow changes | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
+| A conflict in a path NexKit may not change, or a merge that brings workflow changes (`needs_merge`) | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
 | An implement or fix round ran out of time twice, in the issue or in one of its parts | Autopilot has already planned once with a note to split, and parts inherit that time-out. Read the plan, the run logs and the result files in the round's `nexkit-checks` artifact. When the cause is not known, find it first; then split the issue by hand or comment a smaller plan. |
 | A diagnosis round stopped as `blocked` | It found no cause in the evidence. Read what it found and the result files, ask the owner when the choice is theirs, then answer with `/nexkit fix <instructions>`. |
 | The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
 | A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
 | A run paused at the usage limit stops again with an unknown reset time | Repeat the command. |
 | Every run misses a dependency cache | Compare the `cache` entries with the CI cache steps, and check that CI on `main` succeeds, because `actions/cache` saves only after a successful job. |
-| The review job errored | The round's comment says why. Comment `/nexkit review` to retry, unless it names an authentication error: then tell the owner, because a retry stops the same way. |
+| The review job errored | NexKit has already run it once more. The round's comment says why. Comment `/nexkit review` to retry, unless it names an authentication error: then tell the owner, because a retry stops the same way. |
 | NexKit's automatic merge was refused (`merge_refused`) for a reason other than a conflict | The round's comment says why, usually a rule on `main`. NexKit has mentioned the owner; tell them what you found. |
-| Autopilot leaves an issue alone | `nexkit status` gives the reason. A command that never ran is not started again; after six hours it waits for a person, so post the command yourself. An issue opened without write access is never taken; open it again from the owner's account. |
+| Autopilot leaves an issue alone | `nexkit status` gives the reason. A command that has not run after six hours starts once more, then waits for a person, so post the command yourself. An issue opened without write access is never taken; open it again from the owner's account. |
