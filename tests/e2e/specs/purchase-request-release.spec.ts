@@ -3,6 +3,7 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test, type Browser, type Page, type TestInfo } from '@playwright/test'
 import { activateFolder, startServer } from '../activate'
+import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
@@ -49,7 +50,8 @@ async function studioServer(testInfo: TestInfo) {
 
 /**
  * Edits the JSON of the resource in `file` through Studio's JSON view and saves it. `change` edits the content
- * as it is in the copy `folder`.
+ * as it is in the copy `folder`. A click here once waited for the browser until the test timeout ran out, so the
+ * edit gets a limit of its own, and a hang leaves a screenshot, the console and the machine state in the report.
  */
 async function editInStudio(
   page: Page,
@@ -58,17 +60,19 @@ async function editInStudio(
   file: string,
   change: (content: Record<string, any>) => void,
 ) {
-  const list = await page.request.get(`${serverUrl}/api/studio/apps/PurchaseRequests/resources`)
-  const { items } = (await list.json()) as { items: { id: string; file: string }[] }
-  const resource = items.find((item) => item.file === file)!
-  const content = JSON.parse(await readFile(path.join(folder, file), 'utf8'))
-  change(content)
+  await guardStep(page, test.info(), `The Studio edit of ${file}`, 60_000, async () => {
+    const list = await page.request.get(`${serverUrl}/api/studio/apps/PurchaseRequests/resources`)
+    const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+    const resource = items.find((item) => item.file === file)!
+    const content = JSON.parse(await readFile(path.join(folder, file), 'utf8'))
+    change(content)
 
-  await page.goto(`${serverUrl}/studio?app=PurchaseRequests&resource=${resource.id}`)
-  await page.getByRole('tab', { name: 'JSON', exact: true }).click()
-  await page.getByRole('textbox', { name: 'JSON', exact: true }).fill(JSON.stringify(content, null, 2))
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page.getByTestId('studio-saved')).toBeVisible()
+    await page.goto(`${serverUrl}/studio?app=PurchaseRequests&resource=${resource.id}`)
+    await page.getByRole('tab', { name: 'JSON', exact: true }).click()
+    await page.getByRole('textbox', { name: 'JSON', exact: true }).fill(JSON.stringify(content, null, 2))
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+  })
 }
 
 /**

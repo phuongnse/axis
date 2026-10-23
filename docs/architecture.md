@@ -826,6 +826,12 @@ the new release at once. The helper throws an error with the server output when
 the folder does not activate. Only the spec that needs it uses
 `tests/e2e/fixtures/release-app`, so the other specs see no change.
 
+A step that once hung the browser until the test timeout can run through `guardStep` in
+`tests/e2e/hang-guard.ts`. It fails the step after its own limit, and attaches a screenshot and a
+text to the test. The text holds the page URL, the console output, the page errors and the failed
+requests since the step began, the load of the machine and its busiest processes.
+`editInStudio` in `purchase-request-release.spec.ts` uses it with a limit of 60 seconds.
+
 The E2E run also starts the worker against the same database, with a 5 second
 lease. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart
 the worker: it writes the restart file that `scripts/e2e.sh` names, then stops
@@ -859,7 +865,7 @@ application are not in the sample. So the journey deletes the starter `en` text 
 The journey then builds the `MyTicketList` and `AllTicketList` data sources and the three aggregate data sources of the dashboard,
 `OpenTicketTotals`, `UrgentTicketTotals` and `OpenTicketsByCategory`, in the generic data source form. The form writes the
 `filter` and the `aggregate`, and it writes the empty `groupBy` of the two totals when the author adds an entry and removes it.
-The journey then builds the `TicketEdit` form with its `visibleWhen`
+The journey then builds the `TicketEdit` form with its two named sections, its two steps, and `visibleWhen` and `requiredWhen`
 on `resolution`, the `TicketTriage`, `TicketResolution` and `TicketConfirmation` forms, and the `TicketHandling` process
 in the process editor. Every expression is typed in the expression editor. It then builds the six pages in the page
 editor, which include the `Dashboard` page: a `columns` widget with the two `kpi` tiles in a column of 4 and the `chart`
@@ -868,8 +874,8 @@ reference parameter and a detail widget, built with the parameter editor and the
 the two table pages set `ticket` to `id`. The journey then finishes the site that the blank
 application already has: the `vi` locale and four navigation entries, the last one for `Dashboard`. It deletes the starter `Home` page, because the sample has
 none. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
-the requester from editing `resolution`, and the read grants of the lead on the three aggregate data sources. It then writes the eight test scenarios in the scenario editor, each with its users, time and steps. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
-The journey then runs the eight scenarios with Run tests, and every one must pass. It publishes release 1, and the release history must show that one row, active. On the `service-desk` site of the journey tenant, anna creates and submits a ticket, linh assigns it to khoa, khoa resolves it and anna confirms it, until the ticket's status is `closed`.
+the requester from editing `resolution`, and the read grants of the lead on the three aggregate data sources. That list adds `category` and `priority`, so the requester fills step 2 too. It then writes the eight test scenarios in the scenario editor, each with its users, time and steps. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
+The journey then runs the eight scenarios with Run tests, and every one must pass. It publishes release 1, and the release history must show that one row, active. On the `service-desk` site of the journey tenant, anna creates and submits a ticket, pressing Next to reach step 2, linh assigns it to khoa, khoa resolves it and anna confirms it, until the ticket's status is `closed`.
 
 The E2E run also starts the purchasing system stub from the build output, and
 fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its
