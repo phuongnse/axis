@@ -2,13 +2,14 @@ import {
   Alert,
   Button,
   Descriptions,
+  Empty,
   Flex,
   Form,
   Input,
-  List,
   Modal,
   Table,
   Tag,
+  theme,
   Typography,
   type TableColumnsType,
 } from 'antd'
@@ -22,7 +23,6 @@ import {
   sendCommand,
   stateText,
   type CallAttempt,
-  type GraphStep,
   type InstanceCommand,
   type InstanceCall,
   type InstanceDetail,
@@ -154,6 +154,8 @@ interface InstanceBodyProps {
 /** The sections of an instance. It reads the release texts. */
 function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBodyProps) {
   const t = useText()
+  const { token } = theme.useToken()
+  const rowStyle = { paddingBlock: token.paddingSM, borderBlockEnd: `1px solid ${token.colorSplit}` }
   const stepsByName = useMemo(
     () => new Map(instance.graph.steps.map((step) => [step.name, step])),
     [instance.graph.steps],
@@ -239,27 +241,23 @@ function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBo
       />
       <section>
         <Typography.Title level={5}>{t('shell.inspector.steps')}</Typography.Title>
-        <List<GraphStep>
-          bordered
-          dataSource={instance.graph.steps}
-          renderItem={(step) => (
-            <List.Item data-testid={`inspector-step-${step.name}`}>
-              <Flex vertical gap="small">
-                <Flex gap="small" align="center">
-                  <Typography.Text strong>{stepLabel(step.name)}</Typography.Text>
-                  <Typography.Text type="secondary">{step.type}</Typography.Text>
-                  {taken.has(step.name) && <Tag color="green">{t('shell.inspector.taken')}</Tag>}
-                  {step.name === instance.step && <Tag color="blue">{t('shell.inspector.current')}</Tag>}
-                </Flex>
-                {step.transitions.map((transition) => (
-                  <Typography.Text key={`${transition.next}|${transition.on ?? ''}`} type="secondary">
-                    {`→ ${stepLabel(transition.next)}${transition.on === null ? '' : ` (${transition.on})`}`}
-                  </Typography.Text>
-                ))}
+        <Flex vertical>
+          {instance.graph.steps.map((step) => (
+            <Flex key={step.name} vertical gap="small" data-testid={`inspector-step-${step.name}`} style={rowStyle}>
+              <Flex gap="small" align="center">
+                <Typography.Text strong>{stepLabel(step.name)}</Typography.Text>
+                <Typography.Text type="secondary">{step.type}</Typography.Text>
+                {taken.has(step.name) && <Tag color="green">{t('shell.inspector.taken')}</Tag>}
+                {step.name === instance.step && <Tag color="blue">{t('shell.inspector.current')}</Tag>}
               </Flex>
-            </List.Item>
-          )}
-        />
+              {step.transitions.map((transition) => (
+                <Typography.Text key={`${transition.next}|${transition.on ?? ''}`} type="secondary">
+                  {`→ ${stepLabel(transition.next)}${transition.on === null ? '' : ` (${transition.on})`}`}
+                </Typography.Text>
+              ))}
+            </Flex>
+          ))}
+        </Flex>
       </section>
       <section>
         <Typography.Title level={5}>{t('shell.inspector.history')}</Typography.Title>
@@ -283,21 +281,23 @@ function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBo
       </section>
       <section>
         <Typography.Title level={5}>{t('shell.inspector.calls')}</Typography.Title>
-        <List<InstanceCall>
-          bordered
-          dataSource={instance.calls}
-          locale={{ emptyText: t('shell.inspector.noCalls') }}
-          renderItem={(call) => (
-            <CallItem
-              call={call}
-              instanceId={instance.id}
-              instancesPath={instancesPath}
-              onChanged={onChanged}
-              stepLabel={stepLabel}
-              attemptColumns={attemptColumns}
-            />
-          )}
-        />
+        {instance.calls.length === 0 ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.inspector.noCalls')} />
+        ) : (
+          <Flex vertical>
+            {instance.calls.map((call) => (
+              <CallItem
+                key={call.id}
+                call={call}
+                instanceId={instance.id}
+                instancesPath={instancesPath}
+                onChanged={onChanged}
+                stepLabel={stepLabel}
+                attemptColumns={attemptColumns}
+              />
+            ))}
+          </Flex>
+        )}
       </section>
     </Flex>
   )
@@ -431,53 +431,57 @@ interface CallItemProps {
  */
 function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attemptColumns }: CallItemProps) {
   const t = useText()
+  const { token } = theme.useToken()
   const [resolving, setResolving] = useState(false)
   const target = call.connector ?? `${call.package}@${call.version}`
   const input = call.inputHidden ? null : inputEntries(call.input)
   return (
-    <List.Item data-testid={`inspector-call-${call.id}`}>
-      <Flex vertical gap="small" style={{ width: '100%' }}>
-        <Flex gap="small" align="center" wrap>
-          <Tag>{call.kind}</Tag>
-          <Typography.Text strong>{stepLabel(call.step)}</Typography.Text>
-          <Typography.Text>{`${target} · ${call.operation}`}</Typography.Text>
-          <Tag>{call.state}</Tag>
-          {call.resolvable && call.outputs && (
-            <Button size="small" data-testid={`inspector-resolve-${call.id}`} onClick={() => setResolving(true)}>
-              {t('shell.inspector.commands.resolve')}
-            </Button>
-          )}
-        </Flex>
-        {resolving && call.outputs && (
-          <ResolveDialog
-            call={call}
-            outputs={call.outputs}
-            instanceId={instanceId}
-            instancesPath={instancesPath}
-            onClose={() => setResolving(false)}
-            onChanged={onChanged}
-          />
+    <Flex
+      vertical
+      gap="small"
+      data-testid={`inspector-call-${call.id}`}
+      style={{ width: '100%', paddingBlock: token.paddingSM, borderBlockEnd: `1px solid ${token.colorSplit}` }}
+    >
+      <Flex gap="small" align="center" wrap>
+        <Tag>{call.kind}</Tag>
+        <Typography.Text strong>{stepLabel(call.step)}</Typography.Text>
+        <Typography.Text>{`${target} · ${call.operation}`}</Typography.Text>
+        <Tag>{call.state}</Tag>
+        {call.resolvable && call.outputs && (
+          <Button size="small" data-testid={`inspector-resolve-${call.id}`} onClick={() => setResolving(true)}>
+            {t('shell.inspector.commands.resolve')}
+          </Button>
         )}
-        {call.inputHidden && (
-          <Typography.Text type="secondary">{`${t('shell.inspector.input')}: ${t('shell.inspector.hidden')}`}</Typography.Text>
-        )}
-        {input !== null && input.length > 0 && (
-          <Descriptions
-            size="small"
-            column={1}
-            title={t('shell.inspector.input')}
-            items={input.map(([key, value]) => ({ key, label: key, children: value }))}
-          />
-        )}
-        <Typography.Text type="secondary">{t('shell.inspector.attempts')}</Typography.Text>
-        <Table<CallAttempt>
-          size="small"
-          rowKey={(row) => `${row.kind}|${row.number}|${row.startedAt}`}
-          columns={attemptColumns}
-          dataSource={call.attempts}
-          pagination={false}
-        />
       </Flex>
-    </List.Item>
+      {resolving && call.outputs && (
+        <ResolveDialog
+          call={call}
+          outputs={call.outputs}
+          instanceId={instanceId}
+          instancesPath={instancesPath}
+          onClose={() => setResolving(false)}
+          onChanged={onChanged}
+        />
+      )}
+      {call.inputHidden && (
+        <Typography.Text type="secondary">{`${t('shell.inspector.input')}: ${t('shell.inspector.hidden')}`}</Typography.Text>
+      )}
+      {input !== null && input.length > 0 && (
+        <Descriptions
+          size="small"
+          column={1}
+          title={t('shell.inspector.input')}
+          items={input.map(([key, value]) => ({ key, label: key, children: value }))}
+        />
+      )}
+      <Typography.Text type="secondary">{t('shell.inspector.attempts')}</Typography.Text>
+      <Table<CallAttempt>
+        size="small"
+        rowKey={(row) => `${row.kind}|${row.number}|${row.startedAt}`}
+        columns={attemptColumns}
+        dataSource={call.attempts}
+        pagination={false}
+      />
+    </Flex>
   )
 }

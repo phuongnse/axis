@@ -1,4 +1,4 @@
-import { Alert, Badge, Card, List } from 'antd'
+import { Alert, Badge, Card, Empty, Flex, Spin, theme } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { PageLayout } from '../platform/PageLayout'
@@ -20,6 +20,7 @@ function siteTitle(site: SiteListItem, locale: string): string {
 
 function SiteList() {
   const t = useText()
+  const { token } = theme.useToken()
   const { locale } = usePlatform().current
   // `null` when nobody is signed in.
   const [sites, setSites] = useState<SiteListItem[] | null>()
@@ -44,17 +45,21 @@ function SiteList() {
         <Alert data-testid="sites-error" type="error" title={t('shell.home.sites.loadFailed')} />
       ) : sites === null ? (
         <Alert data-testid="sites-sign-in" type="info" title={t('shell.home.sites.signIn')} />
+      ) : sites === undefined ? (
+        <Spin />
+      ) : sites.length === 0 ? (
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.home.sites.empty')} />
       ) : (
-        <List
-          loading={!sites}
-          dataSource={sites ?? []}
-          locale={{ emptyText: t('shell.home.sites.empty') }}
-          renderItem={(site) => (
-            <List.Item key={site.path}>
+        <Flex vertical>
+          {sites.map((site) => (
+            <Flex
+              key={site.path}
+              style={{ paddingBlock: token.paddingSM, borderBlockEnd: `1px solid ${token.colorSplit}` }}
+            >
               <Link to={`/${site.path}`}>{siteTitle(site, locale)}</Link>
-            </List.Item>
-          )}
-        />
+            </Flex>
+          ))}
+        </Flex>
       )}
     </Card>
   )

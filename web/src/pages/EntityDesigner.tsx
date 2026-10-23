@@ -282,7 +282,7 @@ function Fields({
           pagination={false}
           scroll={{ x: 'max-content' }}
           dataSource={fields}
-          rowKey={(_, index) => index!}
+          rowKey={(row) => fields!.indexOf(row)}
           onRow={(_, index) =>
             ({ 'data-testid': `studio-field-/fields/${index}` }) as React.HTMLAttributes<HTMLElement>
           }
