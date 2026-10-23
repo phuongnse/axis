@@ -16,6 +16,8 @@
     "select.ts",
     "sessions.ts",
     "folder-comparison.ts",
+    "hang-guard.ts",
+    "hang-guard.test.ts",
     "folder-comparison.test.ts",
     "specs"
   ]
