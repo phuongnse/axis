@@ -1,4 +1,4 @@
-import { Alert, Card, Flex, List, Space, Typography } from 'antd'
+import { Alert, Card, Empty, Flex, Pagination, Space, Spin, theme, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { historySummary } from './historySummary'
@@ -56,6 +56,7 @@ function actorOf({ actor, actorName }: HistoryItem, t: (key: string) => string):
  */
 export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, locale }: RecordHistoryProps) {
   const t = useText()
+  const { token } = theme.useToken()
   const [page, setPage] = useState(1)
   const [state, setState] = useState<LoadState>({ failed: false })
   // The inspector page of each process, once loaded.
@@ -105,6 +106,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   }, [wantsLinks, inspectorsLoaded, sitePath, pages])
 
   const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' })
+  const items = state.result?.items ?? []
   const totalCount = state.result?.totalCount ?? 0
 
   return (
@@ -112,50 +114,59 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
       {failed ? (
         <Alert data-testid="record-history-error" type="error" title={t('shell.history.loadFailed')} />
       ) : (
-        <List<HistoryItem>
-          loading={loading}
-          dataSource={state.result?.items ?? []}
-          locale={{ emptyText: t('shell.history.empty') }}
-          pagination={
-            totalCount > historyPageSize && {
-              current: page,
-              pageSize: historyPageSize,
-              total: totalCount,
-              showSizeChanger: false,
-              itemRender: markCurrentPage(page),
-              onChange: setPage,
-            }
-          }
-          renderItem={(item) => {
-            const summary = historySummary(item, fields, t)
-            const target = typeof item.inspectPath === 'string' ? inspectTarget(item.inspectPath) : null
-            const inspectorPage = target === null ? undefined : inspectors?.get(target.process)
-            return (
-              <List.Item key={item.id} data-testid="history-entry">
-                <Flex vertical gap={2}>
-                  <Space wrap size="small">
-                    <Typography.Text strong>
-                      {textOr(t, `shell.history.action.${item.action}`, item.action)}
-                    </Typography.Text>
-                    <Typography.Text>{actorOf(item, t)}</Typography.Text>
-                    <Typography.Text type="secondary">
-                      <time dateTime={item.occurredAt}>{time.format(new Date(item.occurredAt))}</time>
-                    </Typography.Text>
-                    {target !== null && inspectorPage !== undefined && (
-                      <Link
-                        to={`/${sitePath}/${inspectorPage.toLowerCase()}/${target.instanceId}`}
-                        data-testid="history-inspect-link"
-                      >
-                        {t('shell.history.openInstance')}
-                      </Link>
-                    )}
-                  </Space>
-                  {summary !== null && <Typography.Text type="secondary">{summary}</Typography.Text>}
-                </Flex>
-              </List.Item>
-            )
-          }}
-        />
+        <Spin spinning={loading}>
+          {!loading && items.length === 0 ? (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.history.empty')} />
+          ) : (
+            <Flex vertical>
+              {items.map((item) => {
+                const summary = historySummary(item, fields, t)
+                const target = typeof item.inspectPath === 'string' ? inspectTarget(item.inspectPath) : null
+                const inspectorPage = target === null ? undefined : inspectors?.get(target.process)
+                return (
+                  <Flex
+                    key={item.id}
+                    vertical
+                    gap={2}
+                    data-testid="history-entry"
+                    style={{ paddingBlock: token.paddingSM, borderBlockEnd: `1px solid ${token.colorSplit}` }}
+                  >
+                    <Space wrap size="small">
+                      <Typography.Text strong>
+                        {textOr(t, `shell.history.action.${item.action}`, item.action)}
+                      </Typography.Text>
+                      <Typography.Text>{actorOf(item, t)}</Typography.Text>
+                      <Typography.Text type="secondary">
+                        <time dateTime={item.occurredAt}>{time.format(new Date(item.occurredAt))}</time>
+                      </Typography.Text>
+                      {target !== null && inspectorPage !== undefined && (
+                        <Link
+                          to={`/${sitePath}/${inspectorPage.toLowerCase()}/${target.instanceId}`}
+                          data-testid="history-inspect-link"
+                        >
+                          {t('shell.history.openInstance')}
+                        </Link>
+                      )}
+                    </Space>
+                    {summary !== null && <Typography.Text type="secondary">{summary}</Typography.Text>}
+                  </Flex>
+                )
+              })}
+            </Flex>
+          )}
+          {totalCount > historyPageSize && (
+            <Flex justify="end" style={{ marginTop: token.marginLG }}>
+              <Pagination
+                current={page}
+                pageSize={historyPageSize}
+                total={totalCount}
+                showSizeChanger={false}
+                itemRender={markCurrentPage(page)}
+                onChange={setPage}
+              />
+            </Flex>
+          )}
+        </Spin>
       )}
     </Card>
   )

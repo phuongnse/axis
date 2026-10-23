@@ -1,11 +1,20 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterAll, afterEach, vi } from 'vitest'
+import { afterAll, afterEach, expect, vi } from 'vitest'
+import { recordAntdDeprecation, takeAntdDeprecations } from './antdDeprecations'
+
+// Ant Design 6 keeps deprecated props in its types, so only its runtime warning shows them. Record it to fail the test.
+const consoleError = console.error.bind(console)
+console.error = (...args: unknown[]) => {
+  recordAntdDeprecation(args)
+  consoleError(...args)
+}
 
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   localStorage.clear()
+  expect(takeAntdDeprecations(), 'Ant Design deprecation warnings').toEqual([])
 })
 
 // Components can leave timers pending when they unmount: the Ant Design menu starts a 400 ms one
