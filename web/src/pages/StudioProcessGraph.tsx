@@ -1,10 +1,9 @@
 import dagre from '@dagrejs/dagre'
 import { type Edge, Handle, MarkerType, type Node, type NodeProps, Position, ReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { theme } from 'antd'
 import { useMemo } from 'react'
 import { useText } from '../platform/texts'
-import { useThemeMode } from '../platform/themeMode'
+import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { buildProcessGraph, type ProcessGraph } from './processGraph'
 
 const nodeWidth = 200
@@ -40,7 +39,7 @@ function placeSteps(graph: ProcessGraph): (index: number) => { x: number; y: num
 
 function StepNodeView({ data }: NodeProps<StepNode>) {
   const t = useText()
-  const { token } = theme.useToken()
+  const { colour, radius } = useDesignTokens()
   const label = `${data.name} · ${data.type}`
   return (
     <>
@@ -60,10 +59,10 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
           font: 'inherit',
-          color: token.colorText,
-          background: token.colorBgContainer,
-          border: `${data.start ? 3 : 1}px solid ${data.marked ? token.colorError : data.current ? token.colorPrimary : token.colorBorder}`,
-          borderRadius: token.borderRadius,
+          color: colour.text,
+          background: colour.surface,
+          border: `${data.start ? 3 : 1}px solid ${data.marked ? colour.danger : data.current ? colour.primary : colour.border}`,
+          borderRadius: radius.base,
           cursor: 'pointer',
         }}
       >
@@ -93,7 +92,7 @@ export default function StudioProcessGraph({
 }) {
   const t = useText()
   const { mode } = useThemeMode()
-  const { token } = theme.useToken()
+  const { colour } = useDesignTokens()
 
   const { nodes, edges } = useMemo(() => {
     const graph = buildProcessGraph(draft, diagnosticPaths)
@@ -123,13 +122,13 @@ export default function StudioProcessGraph({
         source: String(transition.source),
         target: String(transition.target),
         label: transition.label ?? transition.kind,
-        style: { stroke: token.colorTextTertiary },
-        markerEnd: { type: MarkerType.ArrowClosed, color: token.colorTextTertiary },
-        labelStyle: { fill: token.colorText },
-        labelBgStyle: { fill: token.colorBgContainer },
+        style: { stroke: colour.textMuted },
+        markerEnd: { type: MarkerType.ArrowClosed, color: colour.textMuted },
+        labelStyle: { fill: colour.text },
+        labelBgStyle: { fill: colour.surface },
       })),
     }
-  }, [draft, diagnosticPaths, path, token])
+  }, [draft, diagnosticPaths, path, colour])
 
   return (
     <section data-testid="studio-process-graph" aria-label={t('shell.studio.processGraph')} style={{ height: 320 }}>

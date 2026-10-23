@@ -1,11 +1,11 @@
-import { ConfigProvider, Layout, Menu, Segmented, Space, Switch, theme, Typography } from 'antd'
+import { ConfigProvider, Layout, Menu, Segmented, Space, Switch, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useEffect, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import type { NavigationItem } from './site'
 import { useText } from './texts'
-import { useThemeMode } from './themeMode'
+import { useDesignTokens, useThemeMode } from './themeMode'
 import { UserMenu } from './UserMenu'
 
 interface ShellProps {
@@ -44,7 +44,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, c
   const t = useText()
   const { mode, toggleMode } = useThemeMode()
   const { pathname } = useLocation()
-  const { token } = theme.useToken()
+  const { colour, spacing } = useDesignTokens()
   const activeKey = activeNavigationKey(navigation, pathname)
 
   useEffect(() => {
@@ -60,10 +60,10 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, c
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: token.paddingLG,
-              paddingInline: token.paddingLG,
-              background: token.colorBgContainer,
-              borderBottom: `1px solid ${token.colorBorderSecondary}`,
+              gap: spacing.lg,
+              paddingInline: spacing.lg,
+              background: colour.surface,
+              borderBottom: `1px solid ${colour.borderSubtle}`,
             }}
           >
             <Typography.Text strong>{t(titleKey)}</Typography.Text>
@@ -100,7 +100,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, c
               />
             </Space>
           </Layout.Header>
-          <Layout.Content style={{ padding: token.paddingLG }}>{children}</Layout.Content>
+          <Layout.Content style={{ padding: spacing.lg }}>{children}</Layout.Content>
         </Layout>
       </ConfigProvider>
     </div>

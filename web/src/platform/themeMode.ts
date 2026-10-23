@@ -1,4 +1,5 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useMemo } from 'react'
+import { designTokensFor } from './designTokens'
 
 export type ThemeMode = 'light' | 'dark'
 
@@ -15,4 +16,10 @@ export function useThemeMode(): ThemeModeContextValue {
     throw new Error('useThemeMode must be used inside ThemeModeProvider.')
   }
   return context
+}
+
+/** The Axis tokens of the current mode. Outside the provider it gives the light tokens. */
+export function useDesignTokens() {
+  const mode = useContext(ThemeModeContext)?.mode ?? 'light'
+  return useMemo(() => designTokensFor(mode), [mode])
 }

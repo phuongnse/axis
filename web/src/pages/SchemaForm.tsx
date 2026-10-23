@@ -3,6 +3,7 @@ import { lazy, Suspense, useContext } from 'react'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { resolveSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
@@ -99,6 +100,7 @@ function SchemaNode({
   onChange,
 }: NodeProps & { name: string; required: boolean; readOnly?: boolean; item?: boolean }) {
   const t = useText()
+  const { colour, radius, spacing } = useDesignTokens()
   const names = useContext(StudioNamesContext)
   const check = useContext(ExpressionCheckContext)
   const label = useContext(LabelTextsContext)
@@ -221,7 +223,7 @@ function SchemaNode({
             key={index}
             gap="small"
             align="flex-start"
-            style={{ border: '1px solid #d9d9d9', borderRadius: 6, padding: 8 }}
+            style={{ border: `1px solid ${colour.border}`, borderRadius: radius.base, padding: spacing.xs }}
           >
             <div style={{ flex: 1 }}>
               <SchemaNode

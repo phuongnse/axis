@@ -30,6 +30,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointValues } from './EndpointValues'
 import { FormSteps } from './FormSteps'
@@ -139,6 +140,7 @@ export function StudioEditor({
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
+  const { type } = useDesignTokens()
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -664,7 +666,7 @@ export function StudioEditor({
                       aria-label={t('shell.studio.json')}
                       autoSize={{ minRows: 10, maxRows: 40 }}
                       spellCheck={false}
-                      style={{ fontFamily: 'monospace' }}
+                      style={{ fontFamily: type.codeFontFamily }}
                       value={jsonText ?? JSON.stringify(draft, null, 2)}
                       onChange={(event) => changeJson(event.target.value)}
                     />

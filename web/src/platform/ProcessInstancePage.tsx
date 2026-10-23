@@ -9,7 +9,6 @@ import {
   Modal,
   Table,
   Tag,
-  theme,
   Typography,
   type TableColumnsType,
 } from 'antd'
@@ -33,6 +32,7 @@ import { ResolveDialog } from './ResolveDialog'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
+import { useDesignTokens } from './themeMode'
 import { useReleaseTexts } from './useReleaseTexts'
 
 interface ProcessInstancePageProps {
@@ -154,8 +154,8 @@ interface InstanceBodyProps {
 /** The sections of an instance. It reads the release texts. */
 function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBodyProps) {
   const t = useText()
-  const { token } = theme.useToken()
-  const rowStyle = { paddingBlock: token.paddingSM, borderBlockEnd: `1px solid ${token.colorSplit}` }
+  const { colour, spacing } = useDesignTokens()
+  const rowStyle = { paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }
   const stepsByName = useMemo(
     () => new Map(instance.graph.steps.map((step) => [step.name, step])),
     [instance.graph.steps],
@@ -431,7 +431,7 @@ interface CallItemProps {
  */
 function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attemptColumns }: CallItemProps) {
   const t = useText()
-  const { token } = theme.useToken()
+  const { colour, spacing } = useDesignTokens()
   const [resolving, setResolving] = useState(false)
   const target = call.connector ?? `${call.package}@${call.version}`
   const input = call.inputHidden ? null : inputEntries(call.input)
@@ -440,7 +440,7 @@ function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attem
       vertical
       gap="small"
       data-testid={`inspector-call-${call.id}`}
-      style={{ width: '100%', paddingBlock: token.paddingSM, borderBlockEnd: `1px solid ${token.colorSplit}` }}
+      style={{ width: '100%', paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }}
     >
       <Flex gap="small" align="center" wrap>
         <Tag>{call.kind}</Tag>

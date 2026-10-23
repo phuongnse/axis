@@ -28,12 +28,19 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   library. Where the library leaves a state out, such as loading (`aria-busy`)
   or the current page (`aria-current`, as on the active navigation entry), the
   widget adds it.
-- **Design tokens and previews** *(planned for M12)*. An Axis token file in
-  `web/src/platform/` holds the colours for light and dark mode, type, spacing
-  and radius, and the theme reads it. It replaces `sharedTokens` in
-  `web/src/platform/theme.tsx`. Preview pages show the tokens and each widget,
-  named in Axis terms. The local agent session publishes them as the Design
-  System artifact. See
+- **Design tokens and previews.** The token file `web/src/platform/designTokens.ts`
+  holds every colour, type, spacing and radius value of the theme, in Axis
+  names. The colours are primary, success, warning, danger, info, canvas,
+  surface, text, textMuted, border, borderSubtle and divider, each with a light
+  and a dark value. Type has the body and code fonts and the font size, spacing
+  runs from xs to xl, and radius has the base corner radius.
+  `web/src/platform/antTheme.ts` is the only file that maps them to Ant Design
+  tokens. A component that needs a theme value reads Axis tokens through
+  `useDesignTokens`, never through Ant Design's `theme.useToken`. A Vitest test
+  scans `web/src` and fails on a hard-coded colour, font family or radius
+  outside those two files. Preview pages show the tokens and each widget,
+  named in Axis terms *(planned for M12)*. The local agent session publishes
+  them as the Design System artifact. See
   [D57](../decisions/d57-a-design-system-published-from-the-repository.md)
   and [Design changes](../delivery.md#design-changes).
 - **How pages and widgets grow.** A page has one widget today, and a tree of

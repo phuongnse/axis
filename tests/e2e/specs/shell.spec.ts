@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator } from '@playwright/test'
 import { useSession } from '../sessions'
 
 test('the home page loads and reports a ready server', async ({ page }) => {
@@ -41,6 +41,47 @@ test('the shell renders in light and dark mode', async ({ page }) => {
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     await expect(shell.getByRole('menuitem', { name: 'Home', exact: true })).toBeVisible()
     await expect(shell.getByRole('main').getByText('Welcome to Axis', { exact: true })).toBeVisible()
+  }
+})
+
+// The colours below were recorded before the theme moved to the Axis token file. They show the shell is unchanged.
+const shellColours = {
+  light: {
+    header: 'rgb(255, 255, 255)',
+    page: 'rgb(245, 245, 245)',
+    title: 'rgba(0, 0, 0, 0.88)',
+    selectedItem: 'rgb(47, 84, 235)',
+  },
+  dark: {
+    header: 'rgb(20, 20, 20)',
+    page: 'rgb(0, 0, 0)',
+    title: 'rgba(255, 255, 255, 0.85)',
+    selectedItem: 'rgb(43, 74, 203)',
+  },
+}
+
+test('the shell keeps its colours in light and dark mode', async ({ page }) => {
+  await page.goto('/')
+
+  for (const mode of ['light', 'dark'] as const) {
+    if (mode === 'dark') {
+      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+    }
+    const shell = page.locator(`[data-theme-mode="${mode}"]`)
+    const banner = shell.getByRole('banner')
+    const selectedItem = banner.getByRole('menuitem', { name: 'Home', exact: true })
+    await expect(selectedItem).toBeVisible()
+
+    // The page function runs in the browser, so the CSS property goes in as its argument.
+    const style = (target: Locator, property: string) =>
+      target.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name), property)
+    const expected = shellColours[mode]
+    expect(await style(banner, 'background-color')).toBe(expected.header)
+    expect(await shell.getByRole('main').evaluate((main) => getComputedStyle(main.parentElement!).backgroundColor)).toBe(
+      expected.page,
+    )
+    expect(await style(banner.getByText('Axis', { exact: true }), 'color')).toBe(expected.title)
+    expect(await style(selectedItem, 'color')).toBe(expected.selectedItem)
   }
 })
 

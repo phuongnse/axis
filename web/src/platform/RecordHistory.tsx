@@ -1,4 +1,4 @@
-import { Alert, Card, Empty, Flex, Pagination, Space, Spin, theme, Typography } from 'antd'
+import { Alert, Card, Empty, Flex, Pagination, Space, Spin, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { historySummary } from './historySummary'
@@ -7,6 +7,7 @@ import { markCurrentPage } from './pagination'
 import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } from './records'
 import { fetchPage, type FieldMetadata } from './site'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 
 interface RecordHistoryProps {
   /** The path of the application site the form is on, for the links to its inspector pages. */
@@ -56,7 +57,7 @@ function actorOf({ actor, actorName }: HistoryItem, t: (key: string) => string):
  */
 export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, locale }: RecordHistoryProps) {
   const t = useText()
-  const { token } = theme.useToken()
+  const { colour, spacing } = useDesignTokens()
   const [page, setPage] = useState(1)
   const [state, setState] = useState<LoadState>({ failed: false })
   // The inspector page of each process, once loaded.
@@ -129,7 +130,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
                     vertical
                     gap={2}
                     data-testid="history-entry"
-                    style={{ paddingBlock: token.paddingSM, borderBlockEnd: `1px solid ${token.colorSplit}` }}
+                    style={{ paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }}
                   >
                     <Space wrap size="small">
                       <Typography.Text strong>
@@ -155,7 +156,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
             </Flex>
           )}
           {totalCount > historyPageSize && (
-            <Flex justify="end" style={{ marginTop: token.marginLG }}>
+            <Flex justify="end" style={{ marginTop: spacing.lg }}>
               <Pagination
                 current={page}
                 pageSize={historyPageSize}
