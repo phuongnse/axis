@@ -120,16 +120,19 @@ export async function deleteRecord(recordsPath: string, id: string, signal?: Abo
 
 /**
  * Creates a record when `id` is `null`, and updates the record otherwise. `body` is the prepared
- * body text, so number text reaches the server unchanged. A 400 or 409 comes back as the problem;
- * any other failure throws.
+ * body text, so number text reaches the server unchanged. With `form`, the request names that form
+ * in `?form=`, so the server also enforces the form's `requiredWhen`. A 400 or 409 comes back as
+ * the problem; any other failure throws.
  */
 export async function saveRecord(
   recordsPath: string,
   id: string | null,
   body: string,
+  form?: string,
   signal?: AbortSignal,
 ): Promise<SaveResult> {
-  const response = await apiFetch(id === null ? recordsPath : `${recordsPath}/${id}`, {
+  const path = id === null ? recordsPath : `${recordsPath}/${id}`
+  const response = await apiFetch(form === undefined ? path : `${path}?form=${encodeURIComponent(form)}`, {
     method: id === null ? 'POST' : 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body,
