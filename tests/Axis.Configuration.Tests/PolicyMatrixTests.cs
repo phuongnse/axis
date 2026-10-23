@@ -198,6 +198,22 @@ public sealed class PolicyMatrixTests
         Assert.Single(cell.Grants);
     }
 
+    [Fact]
+    public void In_the_service_desk_only_the_requester_may_delete_a_ticket()
+    {
+        var result = ApplicationCompiler.Compile(
+            Path.Combine(AppContext.BaseDirectory, "Samples", "service-desk"), SamplePackages.Versions, SampleModules.Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var matrix = result.PolicyMatrix;
+
+        var requester = Cell(Role(matrix, "requester"), "entity", "Ticket");
+        Assert.Contains("delete", requester.Actions);
+        Assert.Contains(requester.Grants, grant => grant.Filter == "requester == currentUser() and status == 'draft'");
+        Assert.DoesNotContain("delete", Cell(Role(matrix, "agent"), "entity", "Ticket").Actions);
+        Assert.DoesNotContain("delete", Cell(Role(matrix, "service-desk-lead"), "entity", "Ticket").Actions);
+    }
+
     private static string Name(PolicyAction action) => action.ToString().ToLowerInvariant();
 
     private static PolicyMatrixRole Role(PolicyMatrix matrix, string name) => Assert.Single(matrix.Roles, role => role.Name == name);
