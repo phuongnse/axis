@@ -826,6 +826,12 @@ the new release at once. The helper throws an error with the server output when
 the folder does not activate. Only the spec that needs it uses
 `tests/e2e/fixtures/release-app`, so the other specs see no change.
 
+A step that once hung the browser until the test timeout can run through `guardStep` in
+`tests/e2e/hang-guard.ts`. It fails the step after its own limit, and attaches a screenshot and a
+text to the test. The text holds the page URL, the console output, the page errors and the failed
+requests since the step began, the load of the machine and its busiest processes.
+`editInStudio` in `purchase-request-release.spec.ts` uses it with a limit of 60 seconds.
+
 The E2E run also starts the worker against the same database, with a 5 second
 lease. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart
 the worker: it writes the restart file that `scripts/e2e.sh` names, then stops
