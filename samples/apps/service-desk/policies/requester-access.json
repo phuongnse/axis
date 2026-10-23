@@ -14,7 +14,7 @@
       "entity": "Ticket",
       "actions": ["create", "update"],
       "filter": "requester == currentUser() and status in ('draft', 'reopened')",
-      "fields": ["title", "description", "status"]
+      "fields": ["title", "description", "category", "priority", "status"]
     },
     {
       "entity": "Category",

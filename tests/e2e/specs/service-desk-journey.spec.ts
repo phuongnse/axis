@@ -19,7 +19,12 @@ interface SampleDataSource {
 
 interface SampleForm {
   entity: string
-  sections: { title: { textKey: string }; fields: { field: string; readOnly?: boolean; visibleWhen?: string }[] }[]
+  sections: {
+    name?: string
+    title: { textKey: string }
+    fields: { field: string; readOnly?: boolean; visibleWhen?: string; requiredWhen?: string }[]
+  }[]
+  steps?: { title: { textKey: string }; sections: string[] }[]
 }
 
 interface SampleScenario {
@@ -469,6 +474,9 @@ test.describe('the author builds the service desk with Studio only', () => {
         }
         const titleKey = section.title.textKey
         await writeLabel(page, `studio-field-/sections/${sectionIndex}/title`, titleKey, en[titleKey])
+        if (section.name) {
+          await page.getByTestId(`studio-field-/sections/${sectionIndex}/name`).getByRole('textbox').fill(section.name)
+        }
         for (const [fieldIndex, field] of section.fields.entries()) {
           // A new section starts with no fields. The starter section has its first field already.
           if (sectionIndex > 0 || fieldIndex > 0) {
@@ -489,7 +497,20 @@ test.describe('the author builds the service desk with Studio only', () => {
             await expect(condition.locator('.cm-editor')).toBeVisible()
             await condition.getByRole('textbox').fill(field.visibleWhen)
           }
+          if (field.requiredWhen) {
+            const condition = page.getByTestId(`studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/requiredWhen`)
+            await expect(condition.locator('.cm-editor')).toBeVisible()
+            await condition.getByRole('textbox').fill(field.requiredWhen)
+          }
         }
+      }
+      for (const [stepIndex, step] of (form.steps ?? []).entries()) {
+        await page
+          .getByTestId('studio-field-/steps')
+          .getByRole('button', { name: 'Add step', exact: true })
+          .click()
+        await writeLabel(page, `studio-field-/steps/${stepIndex}/title`, step.title.textKey, en[step.title.textKey])
+        await pickOptions(page.getByTestId(`studio-field-/steps/${stepIndex}/sections`).getByRole('combobox'), step.sections)
       }
       await save(page)
       await expectForm(page)
@@ -719,7 +740,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       {
         actions: ['create', 'update'],
         filter: "requester == currentUser() and status in ('draft', 'reopened')",
-        fields: ['title', 'description', 'status'],
+        fields: ['title', 'description', 'category', 'priority', 'status'],
       },
     ])
     await grantIn(page, 'requester', 'entity', 'Category', [{ actions: ['read'] }])
@@ -840,6 +861,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page).toHaveURL(/\/service-desk\/ticketform\/new$/)
     await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
     await page.getByRole('textbox', { name: 'Description', exact: true }).fill('It shows a black screen.')
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
     // The requester's create grant only allows the statuses draft and reopened.
     await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'draft')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
@@ -849,6 +871,8 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page).toHaveURL(/\/service-desk\/ticketform\/[^/]+$/)
     const id = page.url().split('/').pop()
     await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+    // Submit shows on the last step only.
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
     await page.getByRole('button', { name: 'Submit', exact: true }).click()
     await expect(page.getByTestId('form-started')).toBeVisible()
 
@@ -874,6 +898,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     // The worker ends the process some time after the decision.
     await expect(async () => {
       await page.goto(`${journeyURL}/service-desk/ticketform/${id}`)
+      await page.getByRole('button', { name: 'Next', exact: true }).click()
       await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), 'closed', { timeout: 1_000 })
     }).toPass({ timeout: 30_000 })
   })
