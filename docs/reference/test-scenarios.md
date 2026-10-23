@@ -290,7 +290,8 @@ What runs now:
   ignoring letter case.
 - **Process steps.** After each action, the runner runs the `process.step` work
   items of the scenario's tenant in-process, until none is due. So the process
-  reaches its next wait: an open task, or its end. If one action makes more than
+  reaches its next wait: an open task, or its end. The runner runs the due items
+  in the order they were queued, so a clock change cannot reorder them. If one action makes more than
   1,000 items run, of any kind, the scenario fails at that step.
 - **Connector and package calls.** The same loop runs the `connector.call` and
   `package.call` items. They are the real handlers, so output mapping, resume,

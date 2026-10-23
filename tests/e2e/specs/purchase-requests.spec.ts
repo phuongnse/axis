@@ -361,7 +361,8 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
   const dark = page.locator('[data-theme-mode="dark"]')
   await dark.getByLabel('Quantity 1', { exact: true }).fill('1')
   await dark.getByLabel('Unit price 2', { exact: true }).fill('0')
-  await dark.getByRole('button', { name: 'Save', exact: true }).click()
+  // Ant Design adds "loading" to the name while the button is busy, and for a moment after the failed save.
+  await dark.getByRole('button', { name: /^(loading )?Save$/ }).click()
   await expect(page).toHaveURL(tablePath)
   await expect(page.getByRole('row', { name: new RegExp(`${title} `) })).toContainText('10.00')
 })

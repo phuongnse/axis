@@ -307,6 +307,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.Id).HasColumnName("id").ValueGeneratedNever();
             item.Property(i => i.TenantId).HasColumnName("tenant_id");
             item.Property(i => i.Kind).HasColumnName("kind");
+            item.Property(i => i.Seq).HasColumnName("seq").UseIdentityAlwaysColumn();
             item.Property(i => i.DueAt).HasColumnName("due_at");
             item.Property(i => i.LeaseExpiresAt).HasColumnName("lease_expires_at");
             item.Property(i => i.ClaimToken).HasColumnName("claim_token");

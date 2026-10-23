@@ -204,8 +204,8 @@ NexKit handles these by itself, so do nothing until it mentions the owner: a
 conflict with `main`, the Claude usage limit, failing checks and requested
 changes within the automatic fix limit, a CI failure on `main`, which it runs
 again and then turns into a `bug` issue that it plans first, a run on `main`
-that passed only when run again, which it records on the flaky-runs `bug` issue
-of that workflow, and a missed dependency cache. Its troubleshooting doc at the pinned ref has the mechanics.
+that passed only when run again, which it records on a `bug` issue for each
+failure, named by the failing test, and a missed dependency cache. Its troubleshooting doc at the pinned ref has the mechanics.
 
 | Failure | What you do |
 | --- | --- |

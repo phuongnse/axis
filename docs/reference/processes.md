@@ -612,6 +612,10 @@ database, with history in `axis.__processes_migrations` (see
   `process_instance_id` of its instance. A worker claims only items of the
   tenant it polls and only kinds it has a handler for. The claim compares
   `due_at` with the transaction time, which a test scenario's `axis.now` fixes.
+  A worker claims the earliest due item first. Each item also has a `seq`, its
+  queue position. The database sets it when the item is queued, it only grows
+  and never changes. The test scenario runner claims the due item with the
+  lowest `seq`, so a clock that steps back cannot reorder its work.
   Lease times use the database clock. Completed and failed items are deleted. A `connector.call`
   item sends or reconciles one connector call. It has the
   `process_instance_id` of the call's instance and the `connector_call_id` of

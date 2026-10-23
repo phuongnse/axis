@@ -55,6 +55,12 @@ public sealed partial class WorkItemRunner
         _kinds = [.. _handlers.Keys.Concat(_externalHandlers.Keys).Order(StringComparer.Ordinal)];
     }
 
+    /// <summary>
+    /// Whether the runner claims the item queued first of those that are due, not the one due first.
+    /// A test scenario sets it, so a clock that steps back cannot reorder the work.
+    /// </summary>
+    internal bool InQueueOrder { get; init; }
+
     /// <summary>The kinds this runner has a handler for, in ordinal order.</summary>
     public IReadOnlyList<string> Kinds => _kinds;
 
@@ -94,7 +100,7 @@ public sealed partial class WorkItemRunner
         try
         {
             await using var connection = await _connections.OpenConnectionAsync(cancellationToken);
-            return await WorkItemQueue.ClaimAsync(connection, tenantId, _kinds, lease, cancellationToken);
+            return await WorkItemQueue.ClaimAsync(connection, tenantId, _kinds, lease, cancellationToken, InQueueOrder);
         }
         finally
         {

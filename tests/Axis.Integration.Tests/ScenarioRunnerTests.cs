@@ -6,6 +6,7 @@ using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data.Storage;
 using Axis.Processes.Storage;
+using Axis.Processes.Work;
 using Axis.Scenarios;
 using Axis.Scenarios.Runner;
 using Microsoft.EntityFrameworkCore;
@@ -702,6 +703,57 @@ public sealed class ScenarioRunnerTests
             await check.OpenAsync(CancellationToken);
             await using var query = new NpgsqlCommand("SELECT count(*) FROM axis.process_work_items WHERE kind = 'trigger.schedule' AND claim_token IS NULL", check);
             Assert.Equal(1L, await query.ExecuteScalarAsync(CancellationToken));
+        }
+        finally
+        {
+            await ExecuteAsync(server, $"""DROP DATABASE IF EXISTS "{database}" WITH (FORCE)""");
+        }
+    }
+
+    [Fact]
+    public async Task The_scenario_runner_claims_ready_work_items_in_queue_order_even_when_a_later_one_is_due_earlier()
+    {
+        var server = await PostgreSqlServer.AdminConnectionStringAsync();
+        var database = $"axis_scenario_{Guid.NewGuid():N}";
+        await ExecuteAsync(server, $"""CREATE DATABASE "{database}" """);
+        try
+        {
+            var connectionString = new NpgsqlConnectionStringBuilder(server) { Database = database, Pooling = false }.ConnectionString;
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(CancellationToken);
+            await using (var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connection).Options))
+            await using (var data = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connection).Options))
+            await using (var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connection).Options))
+            {
+                await configuration.Database.MigrateAsync(CancellationToken);
+                await data.Database.MigrateAsync(CancellationToken);
+                await processes.Database.MigrateAsync(CancellationToken);
+            }
+
+            // The item queued second is due earlier, as when the clock stepped back between the two.
+            var first = Guid.NewGuid();
+            var second = Guid.NewGuid();
+            foreach (var (id, age) in new[] { (first, "1 second"), (second, "2 seconds") })
+            {
+                await using var insert = new NpgsqlCommand(
+                    $"INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at) VALUES (@id, @tenant, 'event.deliver', now() - interval '{age}')",
+                    connection);
+                insert.Parameters.AddWithValue("id", id);
+                insert.Parameters.AddWithValue("tenant", ScenarioRunner.TenantId);
+                await insert.ExecuteNonQueryAsync(CancellationToken);
+            }
+
+            string[] kinds = ["event.deliver"];
+            var inQueueOrder = await WorkItemQueue.ClaimAsync(connection, ScenarioRunner.TenantId, kinds, TimeSpan.FromMinutes(5), CancellationToken, inQueueOrder: true);
+            await using (var release = new NpgsqlCommand("UPDATE axis.process_work_items SET claim_token = NULL, lease_expires_at = NULL", connection))
+            {
+                await release.ExecuteNonQueryAsync(CancellationToken);
+            }
+
+            var earliestDue = await WorkItemQueue.ClaimAsync(connection, ScenarioRunner.TenantId, kinds, TimeSpan.FromMinutes(5), CancellationToken);
+
+            Assert.Equal(first, inQueueOrder?.Id);
+            Assert.Equal(second, earliestDue?.Id);
         }
         finally
         {
