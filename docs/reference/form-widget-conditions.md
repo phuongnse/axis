@@ -43,7 +43,9 @@ widget, is in [frontend.md](frontend.md).
   - **Save.** The widget always sends `?form=` with the form's name on
     create, on update and on the save before a `startProcess` action, so
     the server enforces `requiredWhen`. A widget that names an `entity`
-    sends no `?form=`. The task page has no conditions yet.
+    sends no `?form=`. The task page follows the conditions through the
+    [task form state route](task-api.md#form-state-of-a-task), with no
+    `recordId` and no `?form=`.
   - **Steps.** A form with `steps` shows one step at a time, with Back and
     Next. Next sends every visible field of the step as touched and stays
     on the step when any key of `errors` names one of them. Back never

@@ -67,15 +67,17 @@ export function buildCompleteBody(
 
 /**
  * Writes the body of a form state call: the record's id or `null`, the draft values as
- * {@link buildRecordBody} writes them, and the touched field names.
+ * {@link buildRecordBody} writes them, and the touched field names. With no `recordId` the key is
+ * left out, for an endpoint that knows its record and rejects the key, such as a task's.
  */
 export function buildFormStateBody(
   fields: readonly FieldMetadata[],
   values: Record<string, FieldValue>,
-  recordId: string | null,
+  recordId: string | null | undefined,
   touched: readonly string[],
 ): string {
-  return `{"recordId":${JSON.stringify(recordId)},${buildRecordBody(fields, values).slice(1, -1)},"touched":${JSON.stringify(touched)}}`
+  const head = recordId === undefined ? '' : `"recordId":${JSON.stringify(recordId)},`
+  return `{${head}${buildRecordBody(fields, values).slice(1, -1)},"touched":${JSON.stringify(touched)}}`
 }
 
 /**

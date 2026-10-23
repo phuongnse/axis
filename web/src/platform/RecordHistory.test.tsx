@@ -224,6 +224,7 @@ describe('RecordHistory', () => {
     renderHistory()
 
     expect(await screen.findAllByTestId('history-entry')).toHaveLength(20)
+    await waitFor(() => expect(screen.getByTestId('record-history')).toHaveAttribute('aria-busy', 'false'))
     await userEvent.click(screen.getByTitle('2'))
 
     expect(await screen.findByText('Created')).toBeInTheDocument()
