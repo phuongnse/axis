@@ -133,9 +133,10 @@ models, are not copied here. Look them up where they live.
   next fix round gets those files.
 - **A round gets the evidence of the CI runs its issue names.** Agents hold no
   GitHub token, so before an implement or fix round NexKit downloads, for each
-  failed run that the issue records or links, the end of each failed job's log,
-  its annotations and the CI workflow's `test-results-e2e`,
-  `test-results-integration` and `test-results-unit` artifacts, which hold the
+  failed run that the issue records, or that its description or a person's
+  comment links, the end of each failed job's log, its annotations and the CI
+  workflow's `test-results-e2e`, `test-results-integration` and
+  `test-results-unit` artifacts, which hold the
   Playwright traces and `error-context.md` files. The names are in NexKit's
   [`evidence` setting][nexkit-evidence]. So a `bug` issue about a flaky run is
   answered from that run's own traces, and a person never has to attach them.
