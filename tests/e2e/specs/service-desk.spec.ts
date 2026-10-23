@@ -114,6 +114,8 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
   await useSession(page, "anna");
   await page.goto(`/service-desk/ticketform/${id}`);
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(title);
+  // Submit shows on the last step only.
+  await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Submit", exact: true }).click();
   await expect(page.getByTestId("form-started")).toBeVisible();
 
@@ -141,6 +143,7 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
   // The worker ends the process some time after the decision.
   await expect(async () => {
     await page.goto(`/service-desk/ticketform/${id}`);
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), "closed", { timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
 });
@@ -185,19 +188,41 @@ test("an agent cannot open a ticket that is assigned to another agent, by its fo
   expect((await page.request.get(`${recordsPath}/${id}`)).status()).toBe(404);
 });
 
-test("the ticket form shows the resolution only while the status is resolved", async ({ page }) => {
+test("the ticket form guides the requester through two steps", async ({ page }) => {
   await useSession(page, "anna");
   await page.goto("/service-desk/ticketform/new");
   await expect(page.getByLabel("Title", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Description", { exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Status", exact: true })).toHaveCount(0);
+  const steps = page.getByTestId("form-steps");
+  await expect(steps).toContainText("Describe the problem");
+  await expect(steps).toContainText("Add details");
+
+  await page.getByLabel("Title", { exact: true }).fill(`Zz Steps ${runId()}`);
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  for (const name of ["Category", "Priority", "Status"]) {
+    const control = page.getByLabel(name, { exact: true });
+    await expect(control).toBeVisible();
+    await expect(control).toBeEnabled();
+  }
+  await expect(page.getByLabel("Title", { exact: true })).toHaveCount(0);
+});
+
+test("the ticket form shows the resolution, marked required, only while the status is resolved", async ({ page }) => {
+  await useSession(page, "anna");
+  await page.goto("/service-desk/ticketform/new");
+  await page.getByLabel("Title", { exact: true }).fill(`Zz Resolution ${runId()}`);
+  await page.getByRole("button", { name: "Next", exact: true }).click();
 
   const status = page.getByRole("combobox", { name: "Status", exact: true });
-  const resolution = page.getByLabel("Resolution", { exact: true });
+  // The required mark is CSS content in the accessible name, as with the title.
+  const resolution = page.getByRole("textbox", { name: "* Resolution", exact: true });
   await pickOption(status, "draft");
-  await expect(resolution).toBeHidden();
+  await expect(page.getByLabel("Resolution", { exact: true })).toBeHidden();
   await pickOption(status, "resolved");
   await expect(resolution).toBeVisible();
   await pickOption(status, "draft");
-  await expect(resolution).toBeHidden();
+  await expect(page.getByLabel("Resolution", { exact: true })).toBeHidden();
 });
 
 test("anna presses View on her ticket in My tickets and sees it read-only on the detail page", async ({

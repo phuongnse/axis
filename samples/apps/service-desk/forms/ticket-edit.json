@@ -6,8 +6,9 @@
   "entity": "Ticket",
   "sections": [
     {
+      "name": "problem",
       "title": {
-        "textKey": "ticket.sections.ticket"
+        "textKey": "ticket.sections.problem"
       },
       "fields": [
         {
@@ -18,7 +19,15 @@
         },
         {
           "field": "description"
-        },
+        }
+      ]
+    },
+    {
+      "name": "details",
+      "title": {
+        "textKey": "ticket.sections.details"
+      },
+      "fields": [
         {
           "field": "category"
         },
@@ -36,9 +45,24 @@
         },
         {
           "field": "resolution",
-          "visibleWhen": "status == 'resolved'"
+          "visibleWhen": "status == 'resolved'",
+          "requiredWhen": "status == 'resolved'"
         }
       ]
+    }
+  ],
+  "steps": [
+    {
+      "title": {
+        "textKey": "ticket.steps.problem"
+      },
+      "sections": ["problem"]
+    },
+    {
+      "title": {
+        "textKey": "ticket.steps.details"
+      },
+      "sections": ["details"]
     }
   ]
 }
