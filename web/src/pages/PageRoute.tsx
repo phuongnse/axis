@@ -13,6 +13,8 @@ import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { TaskPage } from '../platform/TaskPage'
 import { useText } from '../platform/texts'
+import { WidgetTree } from '../platform/WidgetTree'
+import { leafWidgets } from '../platform/widgetTree'
 import { useApplicationSite, useSiteLocale } from './context'
 import { ShellError } from './LocaleLoadFailed'
 import { NotFoundPage } from './NotFoundPage'
@@ -102,9 +104,13 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
     return <NotFoundPage />
   }
 
-  const widget = page.widgets[0]
+  // A route check finds its widget anywhere in the tree, not only as the first widget.
+  const leaves = leafWidgets(page.widgets)
+  const taskInbox = leaves.find((widget) => widget.type === 'taskInbox')
+  const processInspector = leaves.find((widget) => widget.type === 'processInspector')
+  const details = leaves.filter((widget) => widget.type === 'detail')
   // A task's address is under its inbox page. `new` and an id in the wrong form are no task.
-  if (widget?.type === 'taskInbox' && form !== undefined) {
+  if (taskInbox && form !== undefined) {
     if (recordId === null || !recordIdPattern.test(recordId)) {
       return <NotFoundPage />
     }
@@ -113,7 +119,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
         <TaskPage
           sitePath={sitePath}
           pageName={page.name}
-          widget={widget}
+          widget={taskInbox}
           taskId={recordId}
           locale={locale}
           fallbackLocale={fallbackLocale}
@@ -122,7 +128,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
     )
   }
   // An instance's address is under its inspector page. `new` and an id in the wrong form are no instance.
-  if (widget?.type === 'processInspector' && form !== undefined) {
+  if (processInspector && form !== undefined) {
     if (recordId === null || !recordIdPattern.test(recordId)) {
       return <NotFoundPage />
     }
@@ -130,7 +136,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       <PageLayout title={t(page.titleKey)}>
         <ProcessInstancePage
           sitePath={sitePath}
-          widget={widget}
+          widget={processInspector}
           instanceId={recordId}
           locale={locale}
           fallbackLocale={fallbackLocale}
@@ -139,49 +145,63 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
     )
   }
   // A detail shows the record its page parameter names. A value that is no record id names no record, so none is requested.
-  const detailId = widget?.type === 'detail' && widget.detail ? pageValues[widget.detail.record] : undefined
-  if (widget?.type === 'detail' && (detailId === undefined || !recordIdPattern.test(detailId))) {
+  const detailIdOf = (widget: WidgetMetadata) => (widget.detail ? pageValues[widget.detail.record] : undefined)
+  if (details.some((widget) => !recordIdPattern.test(detailIdOf(widget) ?? ''))) {
     return <NotFoundPage />
   }
   // A table page has no record segment, and a form page always has one.
-  const isForm = widget?.type === 'form'
+  const isForm = leaves.some((widget) => widget.type === 'form')
   if (isForm !== (form !== undefined) || (recordId !== null && !recordIdPattern.test(recordId))) {
     return <NotFoundPage />
   }
+
+  const renderLeaf = (widget: WidgetMetadata) => {
+    const detailId = detailIdOf(widget)
+    switch (widget.type) {
+      case 'table':
+        return <TableWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
+      case 'form':
+        return (
+          hasEntity(widget) && (
+            <FormWidget
+              widget={widget}
+              sitePath={sitePath}
+              pages={pages}
+              recordId={recordId}
+              returnTo={returnTo}
+              locale={locale}
+            />
+          )
+        )
+      case 'detail':
+        return (
+          hasEntity(widget) &&
+          detailId !== undefined && (
+            <DetailWidget key={detailId} widget={widget} sitePath={sitePath} recordId={detailId} locale={locale} />
+          )
+        )
+      case 'taskInbox':
+        return (
+          <TaskInboxWidget
+            sitePath={sitePath}
+            pageName={page.name}
+            widget={widget}
+            locale={locale}
+            fallbackLocale={fallbackLocale}
+          />
+        )
+      case 'processInspector':
+        return <ProcessInspectorWidget sitePath={sitePath} pageName={page.name} widget={widget} locale={locale} />
+      case 'kpi':
+        return <KpiWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
+      case 'chart':
+        return <ChartWidget widget={widget} locale={locale} />
+    }
+  }
+
   return (
     <PageLayout title={t(page.titleKey)}>
-      {widget?.type === 'table' && (
-        <TableWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
-      )}
-      {widget?.type === 'form' && hasEntity(widget) && (
-        <FormWidget
-          widget={widget}
-          sitePath={sitePath}
-          pages={pages}
-          recordId={recordId}
-          returnTo={returnTo}
-          locale={locale}
-        />
-      )}
-      {widget?.type === 'detail' && hasEntity(widget) && detailId !== undefined && (
-        <DetailWidget key={detailId} widget={widget} sitePath={sitePath} recordId={detailId} locale={locale} />
-      )}
-      {widget?.type === 'taskInbox' && (
-        <TaskInboxWidget
-          sitePath={sitePath}
-          pageName={page.name}
-          widget={widget}
-          locale={locale}
-          fallbackLocale={fallbackLocale}
-        />
-      )}
-      {widget?.type === 'processInspector' && (
-        <ProcessInspectorWidget sitePath={sitePath} pageName={page.name} widget={widget} locale={locale} />
-      )}
-      {widget?.type === 'kpi' && (
-        <KpiWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
-      )}
-      {widget?.type === 'chart' && <ChartWidget widget={widget} locale={locale} />}
+      <WidgetTree widgets={page.widgets} renderLeaf={renderLeaf} />
     </PageLayout>
   )
 }

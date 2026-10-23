@@ -1,0 +1,38 @@
+{
+  "id": "6457242b-e2d6-4903-9d72-a3039c7924d4",
+  "kind": "page",
+  "name": "NoteTabs",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.noteTabs.title" },
+  "widgets": [
+    {
+      "type": "tabs",
+      "tabs": [
+        {
+          "label": { "textKey": "pages.noteTabs.notes" },
+          "widgets": [{ "type": "table", "entity": "Note" }]
+        },
+        {
+          "label": { "textKey": "pages.noteTabs.totals" },
+          "widgets": [
+            {
+              "type": "kpi",
+              "dataSource": "NoteTotals",
+              "measure": "notes",
+              "label": { "textKey": "kpi.notes" },
+              "comparison": {
+                "measure": "amountSum",
+                "label": { "textKey": "kpi.amountSum" }
+              },
+              "navigate": {
+                "type": "navigate",
+                "page": "Notes",
+                "label": { "textKey": "kpi.showNotes" }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

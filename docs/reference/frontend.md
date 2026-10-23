@@ -42,17 +42,18 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   outside those two files. The shared chart component in
   `web/src/platform/Chart.tsx` maps the Axis tokens to chart colours, font and
   grid, and loads the library in its own chunk. Widget previews draw the
-  `table`, `form`, `taskInbox` and `processInspector` widgets and the input of
+  `table`, `form`, `taskInbox` and `processInspector` widgets, the `columns`,
+  `tabs` and `section` containers and the input of
   each field type, from fixture metadata, in light and dark mode. They are at
   `/design-system.html` on the development server only, and
   `scripts/design-system.sh` saves each as static HTML, see
   [Development](../development.md#widget-previews). Previews of the tokens and
-  of the M12 widgets are still *(planned for M12)*. The local agent session
+  of the other M12 widgets are still *(planned for M12)*. The local agent session
   publishes the saved files as the Design System artifact. See
   [D57](../decisions/d57-a-design-system-published-from-the-repository.md)
   and [Design changes](../delivery.md#design-changes).
-- **How pages and widgets grow.** A page has one widget today, and a tree of
-  widgets *(planned for M12)*. A form binds an entity
+- **How pages and widgets grow.** A page draws its whole tree of widgets.
+  Containers show their widgets in file order and can nest. A form binds an entity
   or a `form` resource, which lays the entity's fields out in sections, and a
   table binds an entity or a data source. The container widgets `columns`,
   `tabs` and `section` hold other widgets, see
@@ -66,6 +67,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   are built. The `navigate` buttons on table rows, the table toolbar and saved
   forms are built. A table opens and creates records through them: the table's
   `formPage` link is removed; see [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+- **Container widgets.** `columns` stack below 768 px, `tabs` keep the
+  selected tab in `?tab=`, and a `section` can start collapsed. See
+  [container widgets](container-widgets.md).
 - **Text.** All UI strings come from text resources.
 - **Sites and texts.** The server describes sites to the SPA through
   read-only endpoints. Like every other `/api` path, they need a known tenant
@@ -369,7 +373,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | --- | --- |
   | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in |
   | `/{site}` | the site's first navigation entry, by redirect |
-  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values |
+  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on |
   | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
@@ -983,10 +987,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     platform text behind a site that lacks it.
 
 - **Phone width** *(planned for M12)*. Below a fixed 768 px breakpoint, Ant
-  Design's `md`, columns stack in file order, tab headers scroll and a table
-  scrolls sideways inside its widget. A table's row actions fold into one
-  menu per row, which is built. The site shell's navigation collapses into a
-  menu. There is no per-widget setting until a sample needs one, see
+  Design's `md`, columns stack in file order, which is built. Tab headers scroll
+  and a table scrolls sideways inside its widget. A table's row actions fold
+  into one menu per row, which is built. The site shell's navigation collapses
+  into a menu. There is no per-widget setting until a sample needs one, see
   [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
 
 ## Studio

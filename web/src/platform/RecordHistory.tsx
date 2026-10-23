@@ -8,6 +8,7 @@ import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } fro
 import { fetchPage, type FieldMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { leafWidgets } from './widgetTree'
 
 interface RecordHistoryProps {
   /** The path of the application site the form is on, for the links to its inspector pages. */
@@ -96,8 +97,8 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
           console.warn(`Loading the page '${pages[index]}' for the history links failed`, result.reason)
           return
         }
-        const widget = result.value?.widgets[0]
-        if (widget?.type === 'processInspector' && widget.process !== null && !found.has(widget.process)) {
+        const widget = leafWidgets(result.value?.widgets ?? []).find((leaf) => leaf.type === 'processInspector')
+        if (widget?.process && !found.has(widget.process)) {
           found.set(widget.process, pages[index])
         }
       })

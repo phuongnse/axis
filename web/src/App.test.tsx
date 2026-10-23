@@ -81,6 +81,7 @@ const siteTexts: Record<string, Record<string, string>> = {
     'pages.notes.title': 'All notes',
     'pages.noteForm.title': 'Note',
     'notes.new': 'New',
+    'pages.nestedForm.section': 'Nested note',
     'shell.theme.dark': 'Night mode',
   },
   vi: {
@@ -268,6 +269,16 @@ const pages: Record<string, PageMetadata> = {
       },
     ],
   },
+}
+
+// A form nested in a section: the page's route checks find it anywhere in the tree.
+pages.nestedform = {
+  name: 'NestedForm',
+  titleKey: 'pages.noteForm.title',
+  parameters: [],
+  widgets: [
+    { type: 'section', titleKey: 'pages.nestedForm.section', collapsed: false, widgets: pages.noteform.widgets },
+  ],
 }
 
 function json(body: unknown, status = 200) {
@@ -574,6 +585,16 @@ describe('App', () => {
     await userEvent.click(screen.getByRole('button', { name: 'New' }))
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/noteform/new')
     expect(fetch).toHaveBeenCalledWith('/api/apps/E2eApp/entities/Note/records', expect.anything())
+  })
+
+  it('opens a form nested in a section at the new-record address of its page', async () => {
+    stubServer()
+
+    renderApp('/e2e/nestedform/new')
+
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Nested note' })).toBeInTheDocument()
+    expect(screen.queryByTestId('not-found')).not.toBeInTheDocument()
   })
 
   it('shows the form of a form page to create a record', async () => {

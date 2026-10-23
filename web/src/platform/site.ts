@@ -275,6 +275,32 @@ export interface KpiMetadata {
   navigate: NavigateAction | null
 }
 
+/** A `columns` widget: columns side by side, each `width` twelfths of the row wide. */
+export interface ColumnsWidgetMetadata {
+  type: 'columns'
+  columns: { width: number; widgets: PageWidgetMetadata[] }[]
+}
+
+/** A `tabs` widget: one tab per entry, each with the text key of its label. */
+export interface TabsWidgetMetadata {
+  type: 'tabs'
+  tabs: { labelKey: string; widgets: PageWidgetMetadata[] }[]
+}
+
+/** A `section` widget: a titled group of widgets that may start closed. */
+export interface SectionWidgetMetadata {
+  type: 'section'
+  titleKey: string
+  collapsed: boolean
+  widgets: PageWidgetMetadata[]
+}
+
+/** A container widget, which holds lists of other widgets. */
+export type ContainerWidgetMetadata = ColumnsWidgetMetadata | TabsWidgetMetadata | SectionWidgetMetadata
+
+/** One entry of a page's widget tree: a widget that shows something, or a container around other widgets. */
+export type PageWidgetMetadata = WidgetMetadata | ContainerWidgetMetadata
+
 /** A widget over an entity. A form widget is always one: it is never bound to a data source. */
 export type EntityWidgetMetadata = WidgetMetadata & { entity: EntityMetadata }
 
@@ -292,7 +318,7 @@ export interface PageMetadata {
   name: string
   titleKey: string
   parameters: PageParameter[]
-  widgets: WidgetMetadata[]
+  widgets: PageWidgetMetadata[]
 }
 
 export async function fetchSite(signal?: AbortSignal): Promise<SiteMetadata> {
