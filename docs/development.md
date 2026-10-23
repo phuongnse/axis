@@ -249,7 +249,7 @@ calls from fixtures in `web/src/designSystem/`. It needs no server, database or 
 
 - On the Vite dev server (`scripts/dev.sh` or `npm run dev --prefix web`), open `/design-system.html`
   for the index. `/design-system.html?preview=<name>&mode=light|dark` draws one preview. The names are
-  `table`, `form`, `taskInbox`, `processInspector` and `field-<type>` for each field type.
+  `table`, `form`, `taskInbox`, `processInspector`, `columns`, `tabs`, `section` and `field-<type>` for each field type.
 - `npm run build:design-system --prefix web` builds the page into `artifacts/design-system-app`. The
   server's web root never gets it, because `vite build` builds only `index.html`.
 - `scripts/design-system.sh` builds the page, draws every preview in Chromium and writes

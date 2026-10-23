@@ -5,21 +5,25 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { FormWidget } from '../platform/FormWidget'
 import { PageLayout } from '../platform/PageLayout'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
-import type { FieldType } from '../platform/site'
+import type { FieldType, WidgetMetadata } from '../platform/site'
 import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { useDesignTokens, type ThemeMode } from '../platform/themeMode'
+import { WidgetTree } from '../platform/WidgetTree'
 import {
+  columnsWidget,
   fieldWidget,
   formWidget,
   locale,
   processInspectorWidget,
   requestId,
+  sectionWidget,
   siteTexts,
   sitePath,
   tableWidget,
+  tabsWidget,
   taskInboxWidget,
 } from './fixtures'
 
@@ -36,6 +40,15 @@ const fieldTypes: readonly FieldType[] = [
   'reference',
   'child-collection',
 ]
+
+/** Draws the table or the task inbox of a container preview, with the same fixtures as their own previews. */
+function renderLeaf(widget: WidgetMetadata): ReactNode {
+  return widget.type === 'table' ? (
+    <TableWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={{}} />
+  ) : (
+    <TaskInboxWidget sitePath={sitePath} pageName="Tasks" widget={widget} locale={locale} fallbackLocale={locale} />
+  )
+}
 
 /** What a preview draws: the shared widget component over fixture metadata. */
 const previews: Record<string, () => ReactNode> = {
@@ -62,6 +75,9 @@ const previews: Record<string, () => ReactNode> = {
   processInspector: () => (
     <ProcessInspectorWidget sitePath={sitePath} pageName="Instances" widget={processInspectorWidget} locale={locale} />
   ),
+  columns: () => <WidgetTree widgets={[columnsWidget]} renderLeaf={renderLeaf} />,
+  tabs: () => <WidgetTree widgets={[tabsWidget]} renderLeaf={renderLeaf} />,
+  section: () => <WidgetTree widgets={[sectionWidget]} renderLeaf={renderLeaf} />,
   ...Object.fromEntries(
     fieldTypes.map((type) => [
       `field-${type}`,

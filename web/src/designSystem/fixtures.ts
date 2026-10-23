@@ -6,6 +6,7 @@ import type {
   FieldMetadata,
   FieldType,
   FormMetadata,
+  PageWidgetMetadata,
   WidgetMetadata,
 } from '../platform/site'
 import type { TaskPage } from '../platform/tasks'
@@ -178,6 +179,35 @@ export const processInspectorWidget: WidgetMetadata = {
   instancesPath,
 }
 
+/** A columns widget: the request table at width 8 and a section with the task inbox at width 4. */
+export const columnsWidget: PageWidgetMetadata = {
+  type: 'columns',
+  columns: [
+    { width: 8, widgets: [tableWidget] },
+    {
+      width: 4,
+      widgets: [{ type: 'section', titleKey: 'preview.tasks', collapsed: false, widgets: [taskInboxWidget] }],
+    },
+  ],
+}
+
+/** A tabs widget: the request table in one tab and the task inbox in another. */
+export const tabsWidget: PageWidgetMetadata = {
+  type: 'tabs',
+  tabs: [
+    { labelKey: 'preview.requests', widgets: [tableWidget] },
+    { labelKey: 'preview.tasks', widgets: [taskInboxWidget] },
+  ],
+}
+
+/** A section widget around the task inbox. */
+export const sectionWidget: PageWidgetMetadata = {
+  type: 'section',
+  titleKey: 'preview.tasks',
+  collapsed: false,
+  widgets: [taskInboxWidget],
+}
+
 const savedRequest = (id: string, title: string, status: string): RecordItem => ({
   id,
   version: 1,
@@ -295,6 +325,8 @@ export const siteTexts: Record<string, string> = {
   'request.delete': 'Delete',
   'request.submit': 'Submit for approval',
   'request.task.review': 'Review the request',
+  'preview.requests': 'Requests',
+  'preview.tasks': 'Tasks',
 }
 
 /**

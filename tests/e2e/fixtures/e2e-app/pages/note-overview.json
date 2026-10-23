@@ -1,0 +1,41 @@
+{
+  "id": "03646ae5-b541-4b2a-8b04-2c84a905ee25",
+  "kind": "page",
+  "name": "NoteOverview",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.noteOverview.title" },
+  "widgets": [
+    {
+      "type": "columns",
+      "columns": [
+        { "width": 8, "widgets": [{ "type": "table", "entity": "Note" }] },
+        {
+          "width": 4,
+          "widgets": [
+            {
+              "type": "section",
+              "title": { "textKey": "pages.noteOverview.totals" },
+              "widgets": [
+                {
+                  "type": "kpi",
+                  "dataSource": "NoteTotals",
+                  "measure": "notes",
+                  "label": { "textKey": "kpi.notes" },
+                  "comparison": {
+                    "measure": "amountSum",
+                    "label": { "textKey": "kpi.amountSum" }
+                  },
+                  "navigate": {
+                    "type": "navigate",
+                    "page": "Notes",
+                    "label": { "textKey": "kpi.showNotes" }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
