@@ -695,10 +695,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - A form over a child entity is not checked yet.
   - Fields get `visibleWhen`, `requiredWhen` and `readOnlyWhen`, sections get
     `visibleWhen` and a `name`, and a form may have `steps`. The compiler
-    checks them. The form widget follows their conditions through the server,
-    see [form widget conditions](form-widget-conditions.md). The SPA does not
-    use `steps` yet, and the
-    task page uses no condition yet *(planned for M12)*. See
+    checks them. The form widget and the task page follow their conditions
+    through the server, see
+    [form widget conditions](form-widget-conditions.md). The SPA does not
+    use `steps` yet *(planned for M12)*. See
     [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 - **Form widget.** A page whose widget is a `form` creates a record at
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the

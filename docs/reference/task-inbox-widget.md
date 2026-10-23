@@ -54,10 +54,13 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     form's sections over the subject record. The layout and the field types
     come from the task read's `form`, and the values from the subject
     record, read through the record API.
-  - *(Planned for M12.)* The form behaves as the form widget does in
-    its **Conditions and steps**, using the task's
-    [form state route](task-api.md#form-state-of-a-task). Outcome buttons are
-    on the last step.
+  - The form follows the form widget's conditions, see
+    [form widget conditions](form-widget-conditions.md), through the task's
+    [form state route](task-api.md#form-state-of-a-task). The call sends
+    `values` and `touched` and no `recordId`. A field the answer hides or
+    locks is not sent with the completion.
+  - *(Planned for M12.)* The form's steps, with the outcome buttons on the
+    last step.
   - It has one button per outcome, with the outcome's label.
   - A click sends the outcome, the changed editable values and the record's
     `version` to the complete endpoint. On success it returns to the inbox.

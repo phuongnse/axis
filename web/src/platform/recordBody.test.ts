@@ -151,6 +151,12 @@ describe('buildFormStateBody', () => {
       '{"recordId":"0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b","values":{},"touched":[]}',
     )
   })
+
+  it('leaves the record id key out when there is none', () => {
+    expect(buildFormStateBody(fields, { title: 'Fine' }, undefined, ['title'])).toBe(
+      '{"values":{"title":"Fine"},"touched":["title"]}',
+    )
+  })
 })
 
 describe('buildResolveBody', () => {

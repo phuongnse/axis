@@ -34,7 +34,8 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * Shows one task under the page of its task inbox: the step's label, the subject's label, the due
  * date and the step's form over the subject record, with one button per outcome. A click completes
  * the task with the outcome, the changed editable values and the record's `version`, then returns
- * to the inbox. A task that is not open, or that another completion decided first, shows that it is
+ * to the inbox. The form follows the task's form state endpoint: a field the answer hides or locks
+ * is not sent. A task that is not open, or that another completion decided first, shows that it is
  * already completed, with no form or buttons. A task assigned to someone else shows only that.
  *
  * The page shows the texts of the release the task started on, for the current and the fallback
@@ -175,7 +176,8 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
   const t = useText()
   const { entity } = task.form
   const sections = useMemo(() => sectionsOf(entity, task.form), [entity, task.form])
-  const form = useRecordForm(entity, sections, locale)
+  const conditions = useMemo(() => ({ statePath: `${tasksPath}/${task.id}/form-state` }), [tasksPath, task.id])
+  const form = useRecordForm(entity, sections, locale, conditions)
   const { start, setFormErrors } = form
   const [ready, setReady] = useState<boolean | 'failed'>(false)
   // The outcome being sent, so every button waits for its answer.

@@ -56,11 +56,12 @@ export function sectionsOf(
 
 /**
  * Where a form asks the server for its states: the form state endpoint, and the id of the record
- * being edited, or `null` for a new one.
+ * being edited, or `null` for a new one. It is left out for an endpoint that knows its record, such
+ * as a task's, which rejects the key.
  */
 export interface FormConditions {
   statePath: string
-  recordId: string | null
+  recordId?: string | null
 }
 
 /** A call to the form state endpoint waits `delay` ms. A new `n` replaces the call that waits. */
@@ -119,6 +120,7 @@ function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValu
  * choice or the first blur of a field, and 300 ms after typing stops. It keeps the last answered
  * states while a call is pending and drops an answer that a newer call has overtaken. It never
  * sends a field the answer hides or locks, and shows the answer's messages under touched fields.
+ * A task's conditions have no `recordId`, so the hook asks when the task's subject record starts.
  */
 export function useRecordForm(
   entity: EntityMetadata,

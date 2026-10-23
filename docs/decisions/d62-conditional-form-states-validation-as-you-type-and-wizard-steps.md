@@ -4,12 +4,12 @@ Status: **Agreed**
 
 A form can show, require and lock fields depending on the record, can check the draft as the
 user types, and can split its sections into wizard steps. The schema, the compile checks, the
-compiled model, the page and task metadata, the record form state endpoint and server-side
-validation as you type are built. Enforcing `requiredWhen` on write is built, in the record API
+compiled model, the page and task metadata, the record and task form state endpoints and
+server-side validation as you type are built. Enforcing `requiredWhen` on write is built, in the record API
 and the task API. The form widget in the SPA follows the record form state endpoint: it hides,
-requires and locks fields as the answer says, and shows the messages under touched fields. The
-task form state endpoint, refusing a value for a hidden or `readOnlyWhen` field in the task API,
-the SPA's wizard steps and the task page's conditions are _(planned for M12)_. The server
+requires and locks fields as the answer says, and shows the messages under touched fields. The task page
+does the same through the task form state endpoint. Refusing a value for a hidden or
+`readOnlyWhen` field in the task API and the SPA's wizard steps are _(planned for M12)_. The server
 evaluates every condition.
 NexKit autopilot confirmed these points for the owner on
 issue #934 on 2026-10-21. The reference text is in

@@ -143,15 +143,18 @@ function answer({ status, body }: Answer) {
 /**
  * Stubs `fetch` with the task read, the subject record read, the complete endpoint and the texts of
  * the task's release. Each read of the task takes the next answer of `reads`, and the last one
- * repeats. Returns the requests.
+ * repeats. Each form state call takes the next answer of `states`, and the last one repeats, with
+ * every field shown when `states` is empty. Returns the requests.
  */
 function stubTaskApi({
   reads = [{ status: 200, body: openTask }],
   complete = { status: 200, body: completedTask },
   releaseTexts = { status: 200, body: { locale: 'en', texts: {} } },
-}: { reads?: Answer[]; complete?: Answer; releaseTexts?: Answer } = {}) {
+  states = [{ sections: [], fields: {}, errors: {} }],
+}: { reads?: Answer[]; complete?: Answer; releaseTexts?: Answer; states?: unknown[] } = {}) {
   const requests: { method: string; url: string; body?: string }[] = []
   let taskReads = 0
+  let stateCalls = 0
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -166,6 +169,9 @@ function stubTaskApi({
       if (method === 'POST' && url === `${tasksPath}/${taskId}/complete`) {
         return answer(complete)
       }
+      if (method === 'POST' && url === `${tasksPath}/${taskId}/form-state`) {
+        return answer({ status: 200, body: states[Math.min(stateCalls++, states.length - 1)] })
+      }
       if (method === 'GET' && url === `/api/sites/e2e/texts/en?release=${releaseId}`) {
         return answer(releaseTexts)
       }
@@ -174,7 +180,11 @@ function stubTaskApi({
   )
   return {
     taskReads: () => requests.filter(({ method, url }) => method === 'GET' && url === `${tasksPath}/${taskId}`),
-    completions: () => requests.filter(({ method }) => method === 'POST'),
+    completions: () => requests.filter(({ method, url }) => method === 'POST' && url.endsWith('/complete')),
+    stateRequests: () =>
+      requests
+        .filter(({ method, url }) => method === 'POST' && url.endsWith('/form-state'))
+        .map(({ url, body }) => ({ url, body: JSON.parse(body ?? '{}') as Record<string, unknown> })),
   }
 }
 
@@ -252,6 +262,44 @@ describe('TaskPage', () => {
     expect(api.completions().map(({ body }) => body)).toEqual([
       '{"outcome":"approve","version":3,"values":{"decisionComments":"Fine"}}',
     ])
+  })
+
+  it("asks the task's form state endpoint with the values and touched names and no record id", async () => {
+    const api = stubTaskApi()
+    renderPage()
+
+    await screen.findByLabelText('Title')
+    await waitFor(() => expect(api.stateRequests()).toHaveLength(1))
+    const [first] = api.stateRequests()
+    expect(first.url).toBe(`${tasksPath}/${taskId}/form-state`)
+    expect(first.body).toEqual({ values: {}, touched: [] })
+    expect(first.body).not.toHaveProperty('recordId')
+
+    await userEvent.type(screen.getByLabelText('Comments'), 'Fine')
+
+    await waitFor(() => {
+      const newest = api.stateRequests().at(-1)
+      expect(newest?.body).toEqual({ values: { decisionComments: 'Fine' }, touched: ['decisionComments'] })
+    })
+  })
+
+  it('does not show a field the form state hides and leaves it out of the completion', async () => {
+    const shown = { sections: [], fields: {}, errors: {} }
+    const hidden = {
+      sections: [],
+      fields: { decisionComments: { visible: false, required: false, readOnly: false } },
+      errors: {},
+    }
+    const api = stubTaskApi({ states: [shown, hidden] })
+    renderPage()
+
+    await userEvent.type(await screen.findByLabelText('Comments'), 'Fine')
+
+    await waitFor(() => expect(screen.queryByLabelText('Comments')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: 'Approve' }))
+
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/e2e/tasks'))
+    expect(api.completions().map(({ body }) => body)).toEqual(['{"outcome":"approve","version":3,"values":{}}'])
   })
 
   it('sends the version with no values when nothing changed', async () => {
