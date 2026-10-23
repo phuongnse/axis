@@ -1,0 +1,70 @@
+{
+  "id": "8ae8ab97-77c5-48e9-a798-a912b5bb3cf3",
+  "kind": "page",
+  "name": "Dashboard",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "pages.dashboard.title"
+  },
+  "widgets": [
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "width": 4,
+          "widgets": [
+            {
+              "type": "kpi",
+              "dataSource": "OpenTicketTotals",
+              "measure": "openCount",
+              "label": {
+                "textKey": "dashboard.open.label"
+              },
+              "navigate": {
+                "type": "navigate",
+                "page": "AllTickets",
+                "label": {
+                  "textKey": "dashboard.open.show"
+                }
+              }
+            },
+            {
+              "type": "kpi",
+              "dataSource": "UrgentTicketTotals",
+              "measure": "urgentCount",
+              "label": {
+                "textKey": "dashboard.urgent.label"
+              }
+            }
+          ]
+        },
+        {
+          "width": 8,
+          "widgets": [
+            {
+              "type": "chart",
+              "kind": "bar",
+              "dataSource": "OpenTicketsByCategory",
+              "category": "category",
+              "measures": [
+                {
+                  "name": "openCount",
+                  "label": {
+                    "textKey": "dashboard.byCategory.open"
+                  }
+                }
+              ],
+              "title": {
+                "textKey": "dashboard.byCategory.title"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "dataSource": "AllTicketList"
+    }
+  ]
+}

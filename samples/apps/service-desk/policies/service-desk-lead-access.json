@@ -16,6 +16,18 @@
     {
       "dataSource": "AllTicketList",
       "actions": ["read"]
+    },
+    {
+      "dataSource": "OpenTicketTotals",
+      "actions": ["read"]
+    },
+    {
+      "dataSource": "UrgentTicketTotals",
+      "actions": ["read"]
+    },
+    {
+      "dataSource": "OpenTicketsByCategory",
+      "actions": ["read"]
     }
   ]
 }

@@ -1,0 +1,23 @@
+{
+  "id": "15c44e30-d15d-41d8-b20f-fd4e3bbfb657",
+  "kind": "dataSource",
+  "name": "OpenTicketTotals",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "fields": [
+    {
+      "name": "status",
+      "path": "status"
+    }
+  ],
+  "filter": "status in ('submitted', 'assigned', 'resolved', 'reopened')",
+  "aggregate": {
+    "groupBy": [],
+    "measures": [
+      {
+        "name": "openCount",
+        "function": "count"
+      }
+    ]
+  }
+}

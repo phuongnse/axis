@@ -15,6 +15,8 @@ const built = path.join(journeyApplications, 'service-desk')
 interface SampleDataSource {
   entity: string
   fields: { name: string; path: string }[]
+  filter?: string
+  aggregate?: { groupBy: string[]; measures: { name: string; function: string; field?: string }[] }
 }
 
 interface SampleForm {
@@ -105,6 +107,19 @@ test.describe('the author builds the service desk with Studio only', () => {
     }).toPass({ timeout: 20_000 })
     await label.getByRole('button', { name: 'Write texts', exact: true }).click()
     await expect(label.getByTestId('studio-label-written')).toBeVisible()
+  }
+
+  /** Adds a widget of the type to the end of the widget list at `listPointer`, and expects it at `target`. */
+  async function addWidget(page: Page, listPointer: string, type: string, target: string) {
+    await pickAction(
+      page
+        .getByTestId(`studio-widget-list-${listPointer}`)
+        .locator('xpath=..')
+        .locator('xpath=./div[not(@data-testid)]')
+        .getByRole('combobox'),
+      type,
+      page.getByTestId(`studio-widget-${target}`),
+    )
   }
 
   async function grantIn(
@@ -426,13 +441,16 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(migrations).toHaveCount(0)
   })
 
-  test('the author builds the two ticket lists as data sources', async ({ page }) => {
+  test('the author builds the ticket lists and the open ticket counts as data sources', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     for (const [name, file] of [
       ['MyTicketList', 'data-sources/my-ticket-list.json'],
       ['AllTicketList', 'data-sources/all-ticket-list.json'],
+      ['OpenTicketTotals', 'data-sources/open-ticket-totals.json'],
+      ['UrgentTicketTotals', 'data-sources/urgent-ticket-totals.json'],
+      ['OpenTicketsByCategory', 'data-sources/open-tickets-by-category.json'],
     ]) {
       const list = await sample<SampleDataSource>(file)
       await createResource(page, 'dataSource', name)
@@ -445,6 +463,35 @@ test.describe('the author builds the service desk with Studio only', () => {
         }
         await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(field.name)
         await page.getByTestId(`studio-field-/fields/${index}/path`).getByRole('textbox').fill(field.path)
+      }
+      if (list.filter !== undefined) {
+        const filter = page.getByTestId('studio-field-/filter')
+        await expect(filter.locator('.cm-editor')).toBeVisible()
+        await filter.getByRole('textbox').fill(list.filter)
+      }
+      if (list.aggregate !== undefined) {
+        const groupBy = page.getByTestId('studio-field-/aggregate/groupBy')
+        for (const [index, column] of list.aggregate.groupBy.entries()) {
+          await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
+          await page.getByTestId(`studio-field-/aggregate/groupBy/${index}`).getByRole('textbox').fill(column)
+        }
+        if (list.aggregate.groupBy.length === 0) {
+          // The form has no empty array to start from, so the author adds an entry and removes it to write `[]`.
+          await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
+          await groupBy.getByRole('button', { name: 'Remove', exact: true }).click()
+        }
+        for (const [index, measure] of list.aggregate.measures.entries()) {
+          const at = `studio-field-/aggregate/measures/${index}`
+          await page
+            .getByTestId('studio-field-/aggregate/measures')
+            .getByRole('button', { name: 'Add', exact: true })
+            .click()
+          await page.getByTestId(`${at}/name`).getByRole('textbox').fill(measure.name)
+          await pick(page, `${at}/function`, measure.function)
+          if (measure.field !== undefined) {
+            await page.getByTestId(`${at}/field`).getByRole('textbox').fill(measure.field)
+          }
+        }
       }
       await save(page)
       await expectForm(page)
@@ -713,6 +760,66 @@ test.describe('the author builds the service desk with Studio only', () => {
     }
   })
 
+  test('the author builds the Dashboard page with two tiles, a chart and the ticket table', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    // The names load with the application, so the new data sources and AllTickets are offered below.
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    await createPage(page, 'Dashboard')
+    await writeLabel(page, 'studio-field-/title', 'pages.dashboard.title', en['pages.dashboard.title'])
+
+    // The starter widget becomes the table, which the columns widget then moves above.
+    await pick(page, 'studio-field-/widgets/0/type', 'table')
+    await pick(page, 'studio-field-/widgets/0/dataSource', 'AllTicketList')
+    await addWidget(page, '/widgets', 'columns', '/widgets/1')
+    await page
+      .getByTestId('studio-widget-row-/widgets/1')
+      .getByRole('button', { name: 'Move up', exact: true })
+      .click()
+    await page.getByTestId('studio-widget-/widgets/0').click()
+    await page.getByTestId('studio-field-/widgets/0/columns/0/width').getByRole('spinbutton').fill('4')
+    await page.getByTestId('studio-field-/widgets/0/columns/1/width').getByRole('spinbutton').fill('8')
+
+    const tiles = '/widgets/0/columns/0/widgets'
+    for (const [index, tile] of [
+      { dataSource: 'OpenTicketTotals', measure: 'openCount', label: 'dashboard.open.label', show: 'dashboard.open.show' },
+      { dataSource: 'UrgentTicketTotals', measure: 'urgentCount', label: 'dashboard.urgent.label' },
+    ].entries()) {
+      const base = `${tiles}/${index}`
+      await addWidget(page, tiles, 'kpi', base)
+      await page.getByTestId(`studio-widget-${base}`).click()
+      await pick(page, `studio-field-${base}/dataSource`, tile.dataSource)
+      await pick(page, `studio-field-${base}/measure`, tile.measure)
+      await writeLabel(page, `studio-field-${base}/label`, tile.label, en[tile.label])
+      if (tile.show) {
+        // The open tile links to the table of every ticket.
+        await page
+          .getByTestId(`studio-field-${base}/navigate`)
+          .getByRole('button', { name: 'Add navigate action', exact: true })
+          .click()
+        await pick(page, `studio-field-${base}/navigate/page`, 'AllTickets')
+        await writeLabel(page, `studio-field-${base}/navigate/label`, tile.show, en[tile.show])
+      }
+    }
+
+    // A new chart is a bar chart with one measure.
+    const chart = '/widgets/0/columns/1/widgets/0'
+    await addWidget(page, '/widgets/0/columns/1/widgets', 'chart', chart)
+    await page.getByTestId(`studio-widget-${chart}`).click()
+    await pick(page, `studio-field-${chart}/dataSource`, 'OpenTicketsByCategory')
+    await pick(page, `studio-field-${chart}/category`, 'category')
+    await pick(page, `studio-field-${chart}/measures/0/name`, 'openCount')
+    await writeLabel(
+      page,
+      `studio-field-${chart}/measures/0/label`,
+      'dashboard.byCategory.open',
+      en['dashboard.byCategory.open'],
+    )
+    await writeLabel(page, `studio-field-${chart}/title`, 'dashboard.byCategory.title', en['dashboard.byCategory.title'])
+    await save(page)
+  })
+
   test('the author finishes the site and deletes the Home page', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
@@ -729,6 +836,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['MyTickets', 'nav.myTickets'],
       ['MyTasks', 'nav.myTasks'],
       ['AllTickets', 'nav.allTickets'],
+      ['Dashboard', 'nav.dashboard'],
     ]
     for (const [index, [target, key]] of navigation.entries()) {
       if (index > 0) {
@@ -775,6 +883,9 @@ test.describe('the author builds the service desk with Studio only', () => {
     await grantIn(page, 'service-desk-lead', 'entity', 'Ticket', [{ actions: ['read'] }])
     await grantIn(page, 'service-desk-lead', 'entity', 'Category', [{ actions: ['read'] }])
     await grantIn(page, 'service-desk-lead', 'dataSource', 'AllTicketList', [{ actions: ['read'] }])
+    await grantIn(page, 'service-desk-lead', 'dataSource', 'OpenTicketTotals', [{ actions: ['read'] }])
+    await grantIn(page, 'service-desk-lead', 'dataSource', 'UrgentTicketTotals', [{ actions: ['read'] }])
+    await grantIn(page, 'service-desk-lead', 'dataSource', 'OpenTicketsByCategory', [{ actions: ['read'] }])
   })
 
   for (const [name, file] of scenarios) {

@@ -862,15 +862,19 @@ because the starter field `name` is renamed to `number`. The journey answers Dro
 migration in Studio, because the sample has no migration and release 1 is the first release, so it needs none. The built
 `migrations` folder must be empty at the end. Studio cannot remove a text key yet, and the starter keys of a blank
 application are not in the sample. So the journey deletes the starter `en` text resource and creates it again.
-The journey then builds the `MyTicketList` and `AllTicketList` data sources, the `TicketEdit` form with its two named sections, its two steps, and `visibleWhen` and `requiredWhen`
+The journey then builds the `MyTicketList` and `AllTicketList` data sources and the three aggregate data sources of the dashboard,
+`OpenTicketTotals`, `UrgentTicketTotals` and `OpenTicketsByCategory`, in the generic data source form. The form writes the
+`filter` and the `aggregate`, and it writes the empty `groupBy` of the two totals when the author adds an entry and removes it.
+The journey then builds the `TicketEdit` form with its two named sections, its two steps, and `visibleWhen` and `requiredWhen`
 on `resolution`, the `TicketTriage`, `TicketResolution` and `TicketConfirmation` forms, and the `TicketHandling` process
-in the process editor. Every expression is typed in the expression editor. It then builds the five pages in the page
-editor. The form widget of the `TicketForm` page names `TicketEdit`. The `TicketDetail` page has a required `ticket`
+in the process editor. Every expression is typed in the expression editor. It then builds the six pages in the page
+editor, which include the `Dashboard` page: a `columns` widget with the two `kpi` tiles in a column of 4 and the `chart`
+in a column of 8, and the `AllTicketList` table below it. The form widget of the `TicketForm` page names `TicketEdit`. The `TicketDetail` page has a required `ticket`
 reference parameter and a detail widget, built with the parameter editor and the detail panel. The View row actions of
 the two table pages set `ticket` to `id`. The journey then finishes the site that the blank
-application already has: the `vi` locale and three navigation entries. It deletes the starter `Home` page, because the sample has
+application already has: the `vi` locale and four navigation entries, the last one for `Dashboard`. It deletes the starter `Home` page, because the sample has
 none. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
-the requester from editing `resolution`. That list adds `category` and `priority`, so the requester fills step 2 too. It then writes the eight test scenarios in the scenario editor, each with its users, time and steps. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
+the requester from editing `resolution`, and the read grants of the lead on the three aggregate data sources. That list adds `category` and `priority`, so the requester fills step 2 too. It then writes the eight test scenarios in the scenario editor, each with its users, time and steps. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
 The journey then runs the eight scenarios with Run tests, and every one must pass. It publishes release 1, and the release history must show that one row, active. On the `service-desk` site of the journey tenant, anna creates and submits a ticket, pressing Next to reach step 2, linh assigns it to khoa, khoa resolves it and anna confirms it, until the ticket's status is `closed`.
 
 The E2E run also starts the purchasing system stub from the build output, and

@@ -1,0 +1,23 @@
+{
+  "id": "0d7304bd-0ca2-4ca5-851a-7f38b0c35f97",
+  "kind": "dataSource",
+  "name": "UrgentTicketTotals",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "fields": [
+    {
+      "name": "status",
+      "path": "status"
+    }
+  ],
+  "filter": "status in ('submitted', 'assigned', 'resolved', 'reopened') and priority == 'urgent'",
+  "aggregate": {
+    "groupBy": [],
+    "measures": [
+      {
+        "name": "urgentCount",
+        "function": "count"
+      }
+    ]
+  }
+}

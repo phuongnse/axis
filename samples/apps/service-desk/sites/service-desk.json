@@ -30,6 +30,12 @@
       "label": {
         "textKey": "nav.allTickets"
       }
+    },
+    {
+      "page": "Dashboard",
+      "label": {
+        "textKey": "nav.dashboard"
+      }
     }
   ]
 }
