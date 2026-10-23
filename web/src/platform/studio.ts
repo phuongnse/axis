@@ -194,6 +194,19 @@ export interface StudioNameEntity {
   fields: StudioNameField[]
 }
 
+/**
+ * A data source in `GET .../names`. `groupBy` lists the group fields of a grouped data source, and is `null` for a plain
+ * one. A grouped data source's `columns` are its group fields, then its measures.
+ */
+export interface StudioNameDataSource {
+  id: string
+  name: string
+  module: string | null
+  parameters: { name: string; type: string }[]
+  columns: { name: string; type: string | null }[]
+  groupBy: string[] | null
+}
+
 /** A process step in `GET .../names`. `outcomes` is empty for a step that is not a task. */
 export interface StudioNameStep {
   name: string
@@ -225,7 +238,7 @@ export interface StudioNameText {
 export interface StudioNames {
   locales: string[]
   entities: StudioNameEntity[]
-  dataSources: { id: string; name: string; module: string | null }[]
+  dataSources: StudioNameDataSource[]
   processes: { id: string; name: string; steps: StudioNameStep[] }[]
   rules: {
     id: string

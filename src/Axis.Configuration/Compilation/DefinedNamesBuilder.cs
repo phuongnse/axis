@@ -65,7 +65,7 @@ internal static class DefinedNamesBuilder
     private static DefinedDataSource DataSource(DataSourceResource dataSource, Func<string, EntityResource?> findEntity)
     {
         var entity = findEntity(dataSource.Entity);
-        var columns = new List<DefinedColumn>();
+        var fields = new List<DefinedColumn>();
         foreach (var field in dataSource.Fields)
         {
             string? type = null;
@@ -76,26 +76,36 @@ internal static class DefinedNamesBuilder
                 type = hops[^1].Type;
             }
 
-            columns.Add(new DefinedColumn(field.Name, type));
+            fields.Add(new DefinedColumn(field.Name, type));
         }
 
-        if (dataSource.Aggregate is { } aggregate)
+        var parameters = dataSource.Parameters.Select(parameter => new DefinedTyped(parameter.Name, parameter.Type));
+        if (dataSource.Aggregate is not { } aggregate)
         {
-            foreach (var measure in aggregate.Measures)
-            {
-                var type = measure.Function == "count"
-                    ? "integer"
-                    : columns.Find(column => column.Name == measure.Field)?.Type;
-                columns.Add(new DefinedColumn(measure.Name, type));
-            }
+            return new DefinedDataSource(dataSource.Id, dataSource.Name, ModuleOf(dataSource), [.. parameters], fields, null);
+        }
+
+        var columns = new List<DefinedColumn>();
+        foreach (var name in aggregate.GroupBy)
+        {
+            columns.Add(fields.Find(field => field.Name == name) ?? new DefinedColumn(name, null));
+        }
+
+        foreach (var measure in aggregate.Measures)
+        {
+            var type = measure.Function == "count"
+                ? "integer"
+                : fields.Find(field => field.Name == measure.Field)?.Type;
+            columns.Add(new DefinedColumn(measure.Name, type));
         }
 
         return new DefinedDataSource(
             dataSource.Id,
             dataSource.Name,
             ModuleOf(dataSource),
-            [.. dataSource.Parameters.Select(parameter => new DefinedTyped(parameter.Name, parameter.Type))],
-            columns);
+            [.. parameters],
+            columns,
+            [.. aggregate.GroupBy]);
     }
 
     private static List<DefinedText> Texts(IReadOnlyList<TextResource> texts, ReferenceIndex index)
