@@ -93,7 +93,10 @@ models, are not copied here. Look them up where they live.
   can still break `main` together. When one of those workflows fails on `main`,
   autopilot runs its failed jobs once more. When they fail again, it opens a
   `bug` issue in the milestone with the failed jobs and the run link, mentions
-  the owner, and plans it before every other issue.
+  the owner, and plans it before every other issue. A run that passes only when
+  its failed jobs run again, and an older failed run that a newer run overtook,
+  are recorded on one `bug` issue per workflow for flaky runs, planned right
+  after those, so a failure that passed on a second attempt is not lost.
 - **Every merge to `main` gets a CI result.** A run on `main` always finishes.
   A newer merge replaces only a run that is still waiting to start, so the next
   run tests both merges. On any other branch a newer push stops the older run.
@@ -103,6 +106,13 @@ models, are not copied here. Look them up where they live.
   NexKit's [`checks` setting][nexkit-config]. When a check takes more than half
   its limit, a hand-made pull request raises the limit or makes the suite
   faster, before rounds start to stop on it.
+- **The slow checks run in full only in NexKit's checks.** The integration and
+  E2E checks are marked `slow`, so an agent runs only the tests in them that
+  cover its change or that failed, and leaves the full suites to the checks
+  after its round. The test, integration and E2E checks name their `results`:
+  `artifacts/test-results`, and for E2E also `artifacts/logs` and the
+  Playwright traces in `tests/e2e/test-results`. When such a check fails, the
+  next fix round gets those files.
 - **NexKit's checks skip suites that a change cannot affect.** A check round
   takes about 25 minutes, of which the integration tests take about 7 and
   Playwright about 10. So under NexKit's `NEXKIT_BASE_SHA`, a suite that no
@@ -214,14 +224,21 @@ them.
    no open question, is not too large and no comment came after it. NexKit
    implements that plan and opens a pull request. When an implement or fix
    round runs out of time, autopilot plans once more with a note to split the
-   issue. A second time-out waits for a person.
+   issue, and the plan says why the round did not finish. A cause that was not
+   found makes the first part a diagnosis. A part inherits its parent's
+   time-outs, so a second time-out anywhere below waits for a person, and parts
+   go at most three levels deep.
 6. **Pull request.** Every round runs NexKit's checks and the AI review on the
    new commit. Merging needs both to pass.
 7. **Fix.** NexKit starts fix rounds by itself for a conflict with `main`,
    which it merges and never rebases, and for failing checks or a review that
    requests changes, up to the automatic fix limit in its configuration. A
    conflict that needs a choice stops the round as `blocked`, with a
-   question. Beyond that, a person comments `/nexkit fix <instructions>`.
+   question. A fix round reads the result files of the checks that failed and
+   what earlier fix rounds tried. When a check fails the same way before and
+   after a fix round, the next automatic round is a diagnosis: it names the
+   cause with evidence before it changes code, or stops as `blocked` with what
+   it found. Beyond that, a person comments `/nexkit fix <instructions>`.
 8. **Merge.** NexKit squash-merges, starts CI on `main` and closes the issue.
    With `merge.auto` off, the owner squash-merges instead, and GitHub closes
    the issue.

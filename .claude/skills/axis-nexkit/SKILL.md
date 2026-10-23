@@ -203,8 +203,9 @@ mentions the owner when a pull request is ready.
 NexKit handles these by itself, so do nothing until it mentions the owner: a
 conflict with `main`, the Claude usage limit, failing checks and requested
 changes within the automatic fix limit, a CI failure on `main`, which it runs
-again and then turns into a `bug` issue that it plans first, and a missed
-dependency cache. Its troubleshooting doc at the pinned ref has the mechanics.
+again and then turns into a `bug` issue that it plans first, a run on `main`
+that passed only when run again, which it records on the flaky-runs `bug` issue
+of that workflow, and a missed dependency cache. Its troubleshooting doc at the pinned ref has the mechanics.
 
 | Failure | What you do |
 | --- | --- |
@@ -213,7 +214,8 @@ dependency cache. Its troubleshooting doc at the pinned ref has the mechanics.
 | No automatic fix rounds left, for failing checks or requested changes | Read the failing check's log or the review, ask the owner, then post `/nexkit fix <instructions>`. |
 | `conflicts.max_rounds` conflict rounds ran | Comment `/nexkit fix` yourself. |
 | A conflict in a path NexKit may not change, or a merge that brings workflow changes | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
-| An implement or fix round ran out of time twice | Autopilot has already planned once with a note to split. Read the plan and the run logs, then split the issue by hand or comment a smaller plan. |
+| An implement or fix round ran out of time twice, in the issue or in one of its parts | Autopilot has already planned once with a note to split, and parts inherit that time-out. Read the plan, the run logs and the result files in the round's `nexkit-checks` artifact. When the cause is not known, find it first; then split the issue by hand or comment a smaller plan. |
+| A diagnosis round stopped as `blocked` | It found no cause in the evidence. Read what it found and the result files, ask the owner when the choice is theirs, then answer with `/nexkit fix <instructions>`. |
 | The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
 | A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
 | A run paused at the usage limit stops again with an unknown reset time | Repeat the command. |
