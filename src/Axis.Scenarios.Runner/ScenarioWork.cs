@@ -10,7 +10,8 @@ namespace Axis.Scenarios.Runner;
 
 /// <summary>
 /// Runs the due process step, connector call, package call and event delivery work items of the
-/// scenario's tenant in-process, as the worker would, until none is due. The handlers are the real
+/// scenario's tenant in-process, as the worker would, until none is due. The items run in the order
+/// they were queued, so a clock that steps back during a run cannot reorder them. The handlers are the real
 /// ones, with the scenario's placeholder bindings, so an <c>async</c> event trigger starts its process
 /// here. The scenario's stubs take the place of the HTTP request of a connector call and of the
 /// package operation. A call that no stub answers fails the scenario before it runs. After an action,
@@ -65,7 +66,10 @@ internal sealed class ScenarioWork : IDisposable
             new TenantContextAccessor(),
             [handler],
             loggerFactory.CreateLogger<WorkItemRunner>(),
-            externalHandlers);
+            externalHandlers)
+        {
+            InQueueOrder = true,
+        };
 
     public void Dispose()
     {

@@ -20,12 +20,30 @@ public static class WorkItemQueue
         UPDATE axis.process_work_items w
         SET claim_token = gen_random_uuid(), lease_expires_at = now() + @lease
         FROM (SELECT id FROM axis.process_work_items
-              WHERE tenant_id = @tenant AND kind = ANY(@kinds) AND due_at <= {SqlTranslator.NowSql}
-                AND (lease_expires_at IS NULL OR lease_expires_at <= now())
+              WHERE {ClaimFilterSql}
               ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED) c
         WHERE w.id = c.id
-        RETURNING w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor, w.entity_id, w.trace_id, w.span_id
+        RETURNING {ClaimedColumnsSql}
         """;
+
+    // The scenario runner claims in queue order. A due time comes from the clock, which can step back
+    // during a run, and then an item queued later would run before an earlier one.
+    internal const string ClaimInQueueOrderSql = $"""
+        UPDATE axis.process_work_items w
+        SET claim_token = gen_random_uuid(), lease_expires_at = now() + @lease
+        FROM (SELECT id FROM axis.process_work_items
+              WHERE {ClaimFilterSql}
+              ORDER BY seq LIMIT 1 FOR UPDATE SKIP LOCKED) c
+        WHERE w.id = c.id
+        RETURNING {ClaimedColumnsSql}
+        """;
+
+    private const string ClaimFilterSql = $"""
+        tenant_id = @tenant AND kind = ANY(@kinds) AND due_at <= {SqlTranslator.NowSql}
+                AND (lease_expires_at IS NULL OR lease_expires_at <= now())
+        """;
+
+    private const string ClaimedColumnsSql = "w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor, w.entity_id, w.trace_id, w.span_id";
 
     internal const string ReadDueSql = $"""
         SELECT kind, count(*), extract(epoch FROM {SqlTranslator.NowSql} - min(due_at))::double precision
@@ -86,18 +104,21 @@ public static class WorkItemQueue
     /// <summary>
     /// Claims the earliest due item of the tenant and of one of the kinds that is not held by a live
     /// lease. The claim gets a new token and a lease of <paramref name="lease"/>. Concurrent callers
-    /// never claim the same item. Returns <see langword="null"/> when no item is ready.
+    /// never claim the same item. Returns <see langword="null"/> when no item is ready. With
+    /// <paramref name="inQueueOrder"/> the claim is the item queued first of those that are due, not
+    /// the one due first.
     /// </summary>
     public static async Task<ClaimedWorkItem?> ClaimAsync(
         NpgsqlConnection connection,
         string tenantId,
         IReadOnlyCollection<string> kinds,
         TimeSpan lease,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool inQueueOrder = false)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(kinds);
-        await using var command = new NpgsqlCommand(ClaimSql, connection);
+        await using var command = new NpgsqlCommand(inQueueOrder ? ClaimInQueueOrderSql : ClaimSql, connection);
         command.Parameters.AddWithValue("lease", NpgsqlDbType.Interval, lease);
         command.Parameters.AddWithValue("tenant", tenantId);
         command.Parameters.AddWithValue("kinds", NpgsqlDbType.Array | NpgsqlDbType.Text, kinds.ToArray());
