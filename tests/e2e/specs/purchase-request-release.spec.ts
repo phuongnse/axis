@@ -3,6 +3,7 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test, type Browser, type Page, type TestInfo } from '@playwright/test'
 import { activateFolder, startServer } from '../activate'
+import { confirmDialog } from '../dialogs'
 import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
@@ -98,7 +99,7 @@ async function publishWithLabel(page: Page, label: string) {
   await page.getByRole('button', { name: 'Publish', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('textbox', { name: 'Label (optional)', exact: true }).fill(label)
-  await dialog.getByRole('button', { name: 'Publish', exact: true }).click()
+  await confirmDialog(page, 'Publish')
 }
 
 /**
@@ -307,7 +308,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await first.getByRole('button', { name: 'Roll back', exact: true }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toContainText(`Release ${number} First ${stamp}`)
-      await dialog.getByRole('button', { name: 'Roll back', exact: true }).click()
+      await confirmDialog(page, 'Roll back')
 
       await expect(status).toContainText('Rolled back', { timeout: 60_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
@@ -390,7 +391,7 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       const earlier = page.locator('[data-testid="studio-release-row"][data-number="1"]')
       await earlier.getByRole('button', { name: 'Roll back', exact: true }).click()
-      await page.getByRole('dialog').getByRole('button', { name: 'Roll back', exact: true }).click()
+      await confirmDialog(page, 'Roll back')
 
       await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed', {
         timeout: 60_000,
@@ -498,7 +499,7 @@ test.describe('the active release of the purchase request sample changes', () =>
         .first()
         .getByRole('button', { name: 'Roll back', exact: true })
         .click()
-      await page.getByRole('dialog').getByRole('button', { name: 'Roll back', exact: true }).click()
+      await confirmDialog(page, 'Roll back')
       await expect(status).toContainText('Rolled back', { timeout: 60_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
       await useSession(page, 'anna')
