@@ -66,6 +66,19 @@ export function buildCompleteBody(
 }
 
 /**
+ * Writes the body of a form state call: the record's id or `null`, the draft values as
+ * {@link buildRecordBody} writes them, and the touched field names.
+ */
+export function buildFormStateBody(
+  fields: readonly FieldMetadata[],
+  values: Record<string, FieldValue>,
+  recordId: string | null,
+  touched: readonly string[],
+): string {
+  return `{"recordId":${JSON.stringify(recordId)},${buildRecordBody(fields, values).slice(1, -1)},"touched":${JSON.stringify(touched)}}`
+}
+
+/**
  * Writes the body of a call resolve: the reason, the outcome and, for `succeeded`, the outputs in
  * declared order. Integer and decimal text that is a JSON number goes out as written, with every
  * digit, and other text as a JSON string. A boolean goes out as `true` or `false`. A value that is

@@ -99,6 +99,22 @@ describe('saveRecord', () => {
     expect(new Headers(update?.headers).get('X-Axis-Csrf')).toBe('1')
   })
 
+  it('names the form in ?form= on create and update', async () => {
+    const fetchMock = vi.fn(
+      async (_input: string, _init?: RequestInit) =>
+        new Response('{"id":"a","version":1,"values":{},"labels":{}}', { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await saveRecord(recordsPath, null, '{"values":{}}', 'Note Sections')
+    await saveRecord(recordsPath, 'a', '{"version":1,"values":{}}', 'NoteSections')
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      `${recordsPath}?form=Note%20Sections`,
+      `${recordsPath}/a?form=NoteSections`,
+    ])
+  })
+
   it('returns a 400 or 409 problem with its errors, which default to none', async () => {
     vi.stubGlobal(
       'fetch',

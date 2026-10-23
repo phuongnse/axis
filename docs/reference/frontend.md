@@ -695,7 +695,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - A form over a child entity is not checked yet.
   - Fields get `visibleWhen`, `requiredWhen` and `readOnlyWhen`, sections get
     `visibleWhen` and a `name`, and a form may have `steps`. The compiler
-    checks them. The SPA does not use them yet *(planned for M12)*. See
+    checks them. The form widget follows their conditions through the server,
+    see [form widget conditions](form-widget-conditions.md). The SPA does not
+    use `steps` yet, and the
+    task page uses no condition yet *(planned for M12)*. See
     [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 - **Form widget.** A page whose widget is a `form` creates a record at
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
@@ -874,31 +877,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       text saying the record is already in a running process. Any other
       answer shows a generic platform error.
     - The button is disabled while the save and the start run.
-  - **Conditions and steps** *(planned for M12)*. The widget asks the server
-    which fields to show, require and lock, and which messages to show. It
-    has no evaluator of its own
-    ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
-    - **Calls.** It calls the [form state endpoint](record-api.md#form-state)
-      with the draft values and the touched fields. The call goes out at once
-      after a choice: a select, a checkbox, a date or a picked record. It goes
-      out 300 ms after typing stops in a text or number input.
-    - **Pending answers.** While an answer is pending, the widget keeps the
-      last answered states. It drops an answer that a newer call has
-      overtaken.
-    - **States.** Per the answer, a field is hidden, marked required or made
-      read-only. A hidden field is not sent. The messages in `errors` show
-      under the touched fields.
-    - **Touched.** A field becomes touched when it loses focus or changes.
-    - **Save.** The widget always sends `?form=` with the form's name on
-      create and update, so the server enforces `requiredWhen`.
-    - **Steps.** A form with `steps` shows one step at a time, with Back and
-      Next. Next sends every visible field of the step as touched and stays
-      on the step when any key of `errors` names one of them. Back never
-      checks. A step whose sections are all hidden is skipped.
-    - **Last step.** Save and the `startProcess` actions are on the last
-      step. After a failed save, the form opens the first step that has an
-      error. The current step stays out of the URL, because a draft does not
-      survive a reload.
+  - **Conditions and steps**. The widget asks the server which fields to
+    show, require and lock, and which messages to show. The conditions are
+    built and the steps are *(planned for M12)*. See
+    [form-widget-conditions.md](form-widget-conditions.md).
   - **Form metadata**. Page metadata gives the widget's
     `entity` with all its fields, so the SPA knows every field's type. It
     adds:

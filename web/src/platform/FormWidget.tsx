@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { antLocaleFor } from './antLocale'
+import { formStatePath } from './formState'
 import { navigatePath } from './navigateAction'
 import { buildRecordBody } from './recordBody'
 import { RecordHistory } from './RecordHistory'
@@ -46,6 +47,11 @@ type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
  * process for the record. A saved record also shows a button for each `navigate` action, after the
  * start buttons. It opens the target page with the record as it was loaded, so unsaved edits are not
  * used, and it is hidden when the SPA cannot work out an expression. A new record has no action buttons.
+ *
+ * A widget that names a form and lets the user save follows the server's form state endpoint as the
+ * user edits: a field the answer hides is not shown or sent, a field it requires is marked required,
+ * a field it locks is read-only, and its messages show under the fields the user touched. Create and
+ * update send the form's name in `?form=`, so the server enforces the form's `requiredWhen`.
  */
 export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
@@ -65,7 +71,16 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     return new Set(writeAction === 'create' ? access.createFields : access.updateFields)
   }, [access, writeAction])
   const sections = useMemo(() => sectionsOf(entity, widget.form, writable), [entity, widget.form, writable])
-  const form = useRecordForm(entity, sections, locale)
+  const formName = widget.form?.name
+  // The server answers a form state call only to a user who can save the record.
+  const conditions = useMemo(
+    () =>
+      formName !== undefined && canSave
+        ? { statePath: formStatePath(entity.recordsPath, formName), recordId }
+        : undefined,
+    [formName, canSave, entity.recordsPath, recordId],
+  )
+  const form = useRecordForm(entity, sections, locale, conditions)
   const { start: startForm, setFormErrors } = form
   const [load, setLoad] = useState<LoadState>(recordId === null ? 'ready' : 'loading')
   const [conflict, setConflict] = useState(false)
@@ -145,7 +160,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     form.clearErrors()
     setConflict(false)
     try {
-      const result = await saveRecord(entity.recordsPath, recordId, body)
+      const result = await saveRecord(entity.recordsPath, recordId, body, formName)
       if (result.ok) {
         navigate(returnTo)
         return
@@ -168,7 +183,12 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
       return true
     }
     try {
-      const result = await saveRecord(entity.recordsPath, id, buildRecordBody(entity.fields, changed, form.version))
+      const result = await saveRecord(
+        entity.recordsPath,
+        id,
+        buildRecordBody(entity.fields, changed, form.version),
+        formName,
+      )
       if (result.ok) {
         start(result.record)
         return true

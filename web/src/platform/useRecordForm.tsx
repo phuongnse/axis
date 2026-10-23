@@ -1,8 +1,10 @@
 import { Button, Form, Input, Space, Typography } from 'antd'
-import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
+import { fetchFormState, type FormStateAnswer } from './formState'
 import { formatValue } from './formatValue'
+import { buildFormStateBody } from './recordBody'
 import type { FieldValue, RecordItem, RecordProblem, RecordRow, RecordValue } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
@@ -52,7 +54,28 @@ export function sectionsOf(
   }))
 }
 
+/**
+ * Where a form asks the server for its states: the form state endpoint, and the id of the record
+ * being edited, or `null` for a new one.
+ */
+export interface FormConditions {
+  statePath: string
+  recordId: string | null
+}
+
+/** A call to the form state endpoint waits `delay` ms. A new `n` replaces the call that waits. */
+interface StateRequest {
+  delay: 0 | 300
+  n: number
+}
+
 const fieldPointer = '/values/'
+
+// Typing sends many changes, so a text or number input and a child collection wait for a pause. A
+// choice is one change, so it asks at once.
+function delayOf(type: FieldMetadata['type'] | undefined): StateRequest['delay'] {
+  return type === 'text' || type === 'integer' || type === 'decimal' || type === 'child-collection' ? 300 : 0
+}
 
 function emptySnapshot(fields: readonly FieldMetadata[]): Snapshot {
   return {
@@ -90,8 +113,19 @@ function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValu
  * the form started from and the edited ones, renders the sections with their inputs and reference
  * lookups, tells which editable fields changed, and puts a problem's messages on the shown fields
  * their JSON Pointer names, on child collection cells, or above the form.
+ *
+ * With `conditions`, it also asks the server's form state endpoint which fields to show, require
+ * and lock, and which messages to show. It asks once when a record is started, at once after a
+ * choice or the first blur of a field, and 300 ms after typing stops. It keeps the last answered
+ * states while a call is pending and drops an answer that a newer call has overtaken. It never
+ * sends a field the answer hides or locks, and shows the answer's messages under touched fields.
  */
-export function useRecordForm(entity: EntityMetadata, sections: readonly Section[], locale: string) {
+export function useRecordForm(
+  entity: EntityMetadata,
+  sections: readonly Section[],
+  locale: string,
+  conditions?: FormConditions,
+) {
   const t = useText()
   const shown = useMemo(() => sections.flatMap((section) => section.fields), [sections])
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
@@ -104,6 +138,21 @@ export function useRecordForm(entity: EntityMetadata, sections: readonly Section
   // The errors of each child collection's cells, keyed by collection, then by `<index>/<field>`.
   const [cellErrors, setCellErrors] = useState<Record<string, Record<string, string[]>>>({})
   const [formErrors, setFormErrors] = useState<string[]>([])
+  const asking = conditions !== undefined
+  // The fields the user has changed or left.
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
+  const [answer, setAnswer] = useState<FormStateAnswer | null>(null)
+  // A new record has nothing to wait for, so it asks when it opens. A saved one asks when it starts.
+  const [request, setRequest] = useState<StateRequest>({ delay: 0, n: asking && conditions.recordId === null ? 1 : 0 })
+  // The number of the newest call sent. An answer that is not for it is dropped.
+  const sequence = useRef(0)
+  // The call the timer sends, read when it fires so it uses the newest values.
+  const draft = useRef<(() => { statePath: string; body: string }) | null>(null)
+
+  const ask = useCallback(
+    (delay: StateRequest['delay']) => setRequest((previous) => ({ delay, n: previous.n + 1 })),
+    [],
+  )
 
   const clearErrors = useCallback(() => {
     setFieldErrors({})
@@ -118,15 +167,28 @@ export function useRecordForm(entity: EntityMetadata, sections: readonly Section
       setValues(next.initial)
       setLabels(next.labels)
       clearErrors()
+      if (asking) {
+        // An answer for the record that was open before is no answer for this one.
+        sequence.current++
+        setTouched(new Set())
+        setAnswer(null)
+        ask(0)
+      }
     },
-    [clearErrors],
+    [clearErrors, asking, ask],
   )
 
-  // A read-only field is shown but never sent, so a hand edit of its input changes nothing.
+  const stateOf = (name: string) => answer?.fields[name]
+  // A field the form or the answer locks is shown but never sent.
+  const lockedOf = ({ field, readOnly }: ShownField) => readOnly || stateOf(field.name)?.readOnly === true
+  const hiddenOf = (field: FieldMetadata) => stateOf(field.name)?.visible === false
+
+  // A read-only field is shown but never sent, so a hand edit of its input changes nothing. A field
+  // the answer hides is not sent either.
   const changed = (): Record<string, FieldValue> =>
     Object.fromEntries(
       shown
-        .filter(({ readOnly }) => !readOnly)
+        .filter((entry) => !lockedOf(entry) && !hiddenOf(entry.field))
         .map(({ field }) => field)
         .filter(
           (field) =>
@@ -177,7 +239,25 @@ export function useRecordForm(entity: EntityMetadata, sections: readonly Section
     setFormErrors(onForm)
   }
 
-  const set = (name: string, value: FieldValue) => setValues((previous) => ({ ...previous, [name]: value }))
+  // The field becomes touched, and the form asks for its states: at once, or after typing pauses.
+  const touch = (name: string, delay: StateRequest['delay']) => {
+    if (asking) {
+      setTouched((previous) => (previous.has(name) ? previous : new Set(previous).add(name)))
+      ask(delay)
+    }
+  }
+
+  const set = (name: string, value: FieldValue) => {
+    setValues((previous) => ({ ...previous, [name]: value }))
+    touch(name, delayOf(entity.fields.find((field) => field.name === name)?.type))
+  }
+
+  // Leaving a field touches it, so its messages show. A field that is touched already asked.
+  const leave = (name: string) => {
+    if (!touched.has(name)) {
+      touch(name, 0)
+    }
+  }
 
   // Error keys use row indexes, so adding or removing a row clears the collection's cell errors.
   const setRows = (field: FieldMetadata, rows: RecordRow[]) => {
@@ -246,31 +326,52 @@ export function useRecordForm(entity: EntityMetadata, sections: readonly Section
     }
   }
 
+  // A save error wins. Otherwise the answer's messages show under a touched field.
+  const errorsOf = (name: string) =>
+    fieldErrors[name] ??
+    (touched.has(name) ? answer?.errors[`${fieldPointer}${name}`]?.map((message) => t(message)) : undefined)
+
   const fields = (
     <>
       {sections.map((section, index) => (
         <Fragment key={index}>
-          {section.titleKey !== null && <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>}
-          {section.fields.map(({ field, readOnly }) => {
-            const errors = fieldErrors[field.name]
-            return (
-              <Form.Item
-                key={field.name}
-                label={labelOf(field)}
-                // A child collection is a table, with no single input for the label to point to.
-                htmlFor={field.type === 'child-collection' ? undefined : field.name}
-                required={field.required}
-                validateStatus={errors ? 'error' : undefined}
-                help={errors && <span data-testid={`field-error-${field.name}`}>{errors.join(' ')}</span>}
-              >
-                {input(field, readOnly)}
-              </Form.Item>
-            )
-          })}
+          {section.titleKey !== null &&
+            !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
+              <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
+            )}
+          {section.fields
+            .filter(({ field }) => !hiddenOf(field))
+            .map((entry) => {
+              const { field } = entry
+              const errors = errorsOf(field.name)
+              const control = input(field, lockedOf(entry))
+              return (
+                <Form.Item
+                  key={field.name}
+                  label={labelOf(field)}
+                  // A child collection is a table, with no single input for the label to point to.
+                  htmlFor={field.type === 'child-collection' ? undefined : field.name}
+                  required={stateOf(field.name)?.required ?? field.required}
+                  validateStatus={errors ? 'error' : undefined}
+                  help={
+                    errors && (
+                      <span role="alert" data-testid={`field-error-${field.name}`}>
+                        {errors.join(' ')}
+                      </span>
+                    )
+                  }
+                >
+                  {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
+                </Form.Item>
+              )
+            })}
         </Fragment>
       ))}
       {shown
-        .filter(({ field, readOnly }) => !readOnly && field.type === 'reference' && field.target)
+        .filter(
+          (entry) =>
+            !lockedOf(entry) && !hiddenOf(entry.field) && entry.field.type === 'reference' && entry.field.target,
+        )
         .map(({ field }) => (
           <ReferenceLookup
             key={field.name}
@@ -282,6 +383,49 @@ export function useRecordForm(entity: EntityMetadata, sections: readonly Section
           />
         ))}
     </>
+  )
+
+  // The newest body is read when the timer fires. A write in an effect keeps the render pure.
+  useEffect(() => {
+    draft.current = conditions
+      ? () => ({
+          statePath: conditions.statePath,
+          body: buildFormStateBody(entity.fields, changed(), conditions.recordId, [...touched]),
+        })
+      : null
+  })
+
+  // One timer for the request that waits: a newer request clears it, which debounces typing.
+  useEffect(() => {
+    if (request.n === 0) {
+      return
+    }
+    const timer = setTimeout(() => {
+      const call = draft.current?.()
+      if (!call) {
+        return
+      }
+      const mine = ++sequence.current
+      fetchFormState(call.statePath, call.body)
+        .then((next) => {
+          if (mine === sequence.current) {
+            setAnswer(next)
+          }
+        })
+        .catch((error: unknown) => {
+          // The server checks a save again, so a lost answer keeps the last states and tells no one.
+          console.warn(`Loading the form state from '${call.statePath}' failed`, error)
+        })
+    }, request.delay)
+    return () => clearTimeout(timer)
+  }, [request])
+
+  // An answer that arrives after the form is gone is dropped.
+  useEffect(
+    () => () => {
+      sequence.current++
+    },
+    [],
   )
 
   return {

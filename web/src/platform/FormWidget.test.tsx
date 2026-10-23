@@ -1,12 +1,12 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfigProvider } from 'antd'
 import dayjs from 'dayjs'
 import { MemoryRouter, useLocation } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
-import { hasFieldError, isRequiredLabel } from '../test/antd'
+import { formItem, hasFieldError, isRequiredLabel } from '../test/antd'
 import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
@@ -151,6 +151,7 @@ const sectionsWidget: EntityWidgetMetadata = {
         titleKey: 'noteSections.main',
         fields: [
           { name: 'title', readOnly: false },
+          { name: 'status', readOnly: false },
           { name: 'code', readOnly: true },
           { name: 'category', readOnly: true },
         ],
@@ -259,14 +260,26 @@ const historyPath = `${recordsPath}/${noteId}/history?page=1&pageSize=20`
 
 const historyJson = `{"items":[{"id":"01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7d","occurredAt":"2026-10-06T02:05:00.123456Z","actor":"anna","actorName":"Anna Admin","action":"record.updated","processInstanceId":null,"details":{"version":2,"fields":["title"]}}],"page":1,"pageSize":20,"totalCount":1}`
 
+const statePath = '/api/apps/E2eApp/forms/NoteSections/state'
+
+const emptyStateJson = '{"sections":[],"fields":{},"errors":{}}'
+
+/** The answers of the form state endpoint in order. A deferred answer is a promise the test resolves. */
+let stateAnswers: (string | Promise<string>)[] = []
+
 /**
- * Stubs `fetch` with answers in order, and returns the requests made. The history panel loads on
- * its own, so a history request takes no answer and is not listed: it gets one entry.
+ * Stubs `fetch` with answers in order, and returns the requests made. The history panel and the
+ * form state calls load on their own, so a history or state request takes no answer from the queue
+ * and is not listed: a history request gets one entry, and a state request the next of
+ * `stateAnswers`, or an empty answer.
  */
 function stubFetch(...answers: Answer[]) {
   const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
     if (input.includes('/history?')) {
       return new Response(historyJson, { status: 200 })
+    }
+    if (input.endsWith('/state')) {
+      return new Response(await (stateAnswers.shift() ?? emptyStateJson), { status: 200 })
     }
     const answer = answers.shift() ?? { status: 500, body: '{}' }
     if (answer === networkError) {
@@ -277,7 +290,7 @@ function stubFetch(...answers: Answer[]) {
   vi.stubGlobal('fetch', fetchMock)
   return () =>
     fetchMock.mock.calls
-      .filter(([url]) => !url.includes('/history?'))
+      .filter(([url]) => !url.includes('/history?') && !url.endsWith('/state'))
       .map(([url, init]) => ({ url, method: init?.method ?? 'GET', body: init?.body }))
 }
 
@@ -287,6 +300,19 @@ function startKeys() {
     .mocked(fetch)
     .mock.calls.filter(([url]) => String(url) === instancesPath)
     .map(([, init]) => new Headers(init?.headers).get('Idempotency-Key'))
+}
+
+/** The form state requests made, with the parsed body of each. */
+function stateRequests() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(([url]) => String(url).endsWith('/state'))
+    .map(([url, init]) => ({
+      url: String(url),
+      method: init?.method,
+      csrf: new Headers(init?.headers).get('X-Axis-Csrf'),
+      body: JSON.parse(String(init?.body)) as unknown,
+    }))
 }
 
 /** The URLs of the history requests made. */
@@ -331,6 +357,14 @@ function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata
 }
 
 describe('FormWidget', () => {
+  beforeEach(() => {
+    stateAnswers = []
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('shows one input per field with its label, and the reference label read-only', async () => {
     stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
 
@@ -864,7 +898,7 @@ describe('FormWidget', () => {
 
     await waitFor(() => expect(requests()).toHaveLength(2))
     expect(requests()[1]).toEqual({
-      url: `${recordsPath}/${noteId}`,
+      url: `${recordsPath}/${noteId}?form=NoteSections`,
       method: 'PATCH',
       body: '{"version":1,"values":{"priority":3}}',
     })
@@ -931,6 +965,188 @@ describe('FormWidget', () => {
 
     expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Too long.')
     expect(screen.getByTestId('form-error')).toHaveTextContent('Required.')
+  })
+
+  describe('form state', () => {
+    const hidePriority =
+      '{"sections":[],"fields":{"priority":{"visible":false,"required":false,"readOnly":false}},"errors":{}}'
+
+    function renderWithTimers(recordId: string | null = null) {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderForm(recordId, sectionsWidget)
+      return user
+    }
+
+    async function chooseStatus(user: ReturnType<typeof userEvent.setup>, option: string) {
+      await user.click(screen.getByRole('combobox', { name: 'Status' }))
+      await user.click(await screen.findByRole('option', { name: option }))
+    }
+
+    it('asks at once after a choice, and 300 ms after typing stops', async () => {
+      stubFetch()
+      const user = renderWithTimers()
+      await waitFor(() => expect(stateRequests()).toHaveLength(1))
+      expect(stateRequests()[0]).toEqual({
+        url: statePath,
+        method: 'POST',
+        csrf: '1',
+        body: { recordId: null, values: {}, touched: [] },
+      })
+
+      await chooseStatus(user, 'closed')
+      await waitFor(() => expect(stateRequests()).toHaveLength(2))
+      expect(stateRequests()[1].body).toEqual({ recordId: null, values: { status: 'closed' }, touched: ['status'] })
+
+      await user.type(screen.getByLabelText('Priority'), '123')
+      expect(stateRequests()).toHaveLength(2)
+      // The clock also follows real time, so the checks keep a margin around 300 ms.
+      await act(() => vi.advanceTimersByTimeAsync(200))
+      expect(stateRequests()).toHaveLength(2)
+      await act(() => vi.advanceTimersByTimeAsync(100))
+      await waitFor(() => expect(stateRequests()).toHaveLength(3))
+      expect(stateRequests()[2].body).toEqual({
+        recordId: null,
+        values: { status: 'closed', priority: 123 },
+        touched: ['status', 'priority'],
+      })
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      expect(stateRequests()).toHaveLength(3)
+    })
+
+    it('hides, requires and locks fields as the answer says, and drops an answer that a newer call overtook', async () => {
+      let answerLate: (answer: string) => void = () => {}
+      const late = new Promise<string>((resolve) => (answerLate = resolve))
+      stateAnswers = [
+        emptyStateJson,
+        late,
+        '{"sections":[],"fields":{"priority":{"visible":false,"required":false,"readOnly":false},"status":{"visible":true,"required":true,"readOnly":false},"title":{"visible":true,"required":true,"readOnly":true}},"errors":{}}',
+      ]
+      stubFetch()
+      const user = renderWithTimers()
+      await waitFor(() => expect(stateRequests()).toHaveLength(1))
+      expect(screen.getByLabelText('Priority')).toBeInTheDocument()
+      expect(isRequiredLabel(screen.getByText('Status'))).toBe(false)
+      expect(screen.getByLabelText('Title')).not.toHaveAttribute('readonly')
+
+      await chooseStatus(user, 'closed')
+      await waitFor(() => expect(stateRequests()).toHaveLength(2))
+      // The answer to the second call is pending, so the states stay.
+      expect(screen.getByLabelText('Priority')).toBeInTheDocument()
+
+      await chooseStatus(user, 'open')
+      await waitFor(() => expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument())
+      expect(isRequiredLabel(screen.getByText('Status'))).toBe(true)
+      expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+
+      await act(async () => {
+        answerLate('{"sections":[],"fields":{"status":{"visible":true,"required":false,"readOnly":false}},"errors":{}}')
+        await vi.advanceTimersByTimeAsync(50)
+      })
+      expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
+      expect(isRequiredLabel(screen.getByText('Status'))).toBe(true)
+      expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+    })
+
+    it('never sends a hidden field, and names the form on save', async () => {
+      stateAnswers = [emptyStateJson, hidePriority, hidePriority]
+      const requests = stubFetch({ status: 201, body: noteJson('Pen', 1) })
+      const user = renderWithTimers()
+      await waitFor(() => expect(stateRequests()).toHaveLength(1))
+
+      await user.type(screen.getByLabelText('Priority'), '5')
+      await act(() => vi.advanceTimersByTimeAsync(300))
+      await waitFor(() => expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument())
+      expect(stateRequests()[1].body).toMatchObject({ values: { priority: 5 } })
+
+      await user.type(screen.getByLabelText('Title'), 'Pen')
+      await act(() => vi.advanceTimersByTimeAsync(300))
+      await waitFor(() => expect(stateRequests()).toHaveLength(3))
+      expect(stateRequests()[2].body).toEqual({
+        recordId: null,
+        values: { title: 'Pen' },
+        touched: ['priority', 'title'],
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() => expect(requests()).toHaveLength(1))
+      expect(requests()[0]).toEqual({
+        url: `${recordsPath}?form=NoteSections`,
+        method: 'POST',
+        body: '{"values":{"title":"Pen"}}',
+      })
+    })
+
+    it('shows a message under a touched field inside an alert, and none under an untouched field', async () => {
+      const errors =
+        '{"sections":[],"fields":{},"errors":{"/values/priority":["note.amountPositive"],"/values/title":["Required."]}}'
+      stateAnswers = [emptyStateJson, errors, errors]
+      stubFetch()
+      const user = renderWithTimers()
+      await waitFor(() => expect(stateRequests()).toHaveLength(1))
+
+      await user.type(screen.getByLabelText('Priority'), '0')
+      await act(() => vi.advanceTimersByTimeAsync(300))
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Amount must be positive.')
+      expect(formItem(screen.getByLabelText('Priority'))).toContainElement(alert)
+      expect(hasFieldError(screen.getByLabelText('Priority'))).toBe(true)
+      expect(screen.queryByText('Required.')).not.toBeInTheDocument()
+      expect(screen.getAllByRole('alert')).toHaveLength(1)
+
+      // Leaving a field touches it, and asks at once.
+      await user.click(screen.getByLabelText('Title'))
+      await user.tab()
+      await waitFor(() => expect(stateRequests()).toHaveLength(3))
+      expect(stateRequests()[2].body).toMatchObject({ touched: ['priority', 'title'] })
+      expect(await screen.findByText('Required.')).toBeInTheDocument()
+      expect(formItem(screen.getByLabelText('Title'))).toContainElement(screen.getByText('Required.'))
+    })
+
+    it('asks when a saved record is loaded', async () => {
+      stubFetch({ status: 200, body: sectionsJson(1) })
+      renderForm(noteId, sectionsWidget)
+      await screen.findByLabelText('Title')
+      await waitFor(() => expect(stateRequests()).toHaveLength(1))
+      expect(stateRequests()[0].body).toEqual({ recordId: noteId, values: {}, touched: [] })
+    })
+
+    it('makes no state call for a widget that names an entity, or when the user cannot save', async () => {
+      stubFetch()
+      renderForm(null, noteWidget)
+      await userEvent.type(screen.getByLabelText('Title'), 'Pen')
+      await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
+      expect(stateRequests()).toEqual([])
+      cleanup()
+
+      renderForm(null, {
+        ...sectionsWidget,
+        access: { actions: ['read', 'update'], createFields: [], updateFields: ['title'] },
+      })
+      await userEvent.click(screen.getByLabelText('Title'))
+      await userEvent.tab()
+      await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
+      expect(stateRequests()).toEqual([])
+    })
+
+    it('keeps the last states when a state call fails', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      stateAnswers = [emptyStateJson]
+      stubFetch()
+      vi.mocked(fetch).mockImplementation(async (input) => {
+        if (String(input).endsWith('/state')) {
+          return new Response('{}', { status: 500 })
+        }
+        return new Response(historyJson, { status: 200 })
+      })
+      renderForm(null, sectionsWidget)
+
+      await waitFor(() => expect(warn).toHaveBeenCalled())
+      expect(screen.getByLabelText('Priority')).toBeInTheDocument()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      warn.mockRestore()
+    })
   })
 
   it('has the add-row and remove-row texts in every platform locale', () => {

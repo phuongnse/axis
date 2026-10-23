@@ -574,9 +574,8 @@ A failure is keyed `/values/<field>` or by a row path such as
 `/values/lineItems/1/quantity`. Each key holds one message. When several
 validations fail on one key, it reports the first in declaration order. Every
 other key is reported in the same response. The message is the validation's
-text key, and the client shows the text in the user's locale. Validation on
-the client as the user types comes later
-([D20](../decisions/d20-human-tasks-task-inbox-and-forms.md)).
+text key, and the client shows the text in the user's locale. The client gets
+validation as the user types from the [form state endpoint](#form-state).
 
 A run-time error in an expression, or a computed value that does not fit its
 field, such as one with more fraction digits than `scale`, rejects the write
