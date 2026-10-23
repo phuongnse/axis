@@ -12,6 +12,7 @@
     { "dataSource": "ActiveItems", "actions": ["read"] },
     { "dataSource": "ItemTotalsByDepartment", "actions": ["read"] },
     { "dataSource": "ItemTotals", "actions": ["read"] },
+    { "dataSource": "ItemCountsByDepartment", "actions": ["read"] },
     { "dataSource": "ItemsByDepartment", "actions": ["read"] },
     { "dataSource": "ItemsByName", "actions": ["read"] },
     { "dataSource": "ItemsMatching", "actions": ["read"] },

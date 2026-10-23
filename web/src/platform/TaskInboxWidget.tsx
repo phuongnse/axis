@@ -140,6 +140,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
       <Table<TaskListItem>
         rowKey="id"
         columns={columns}
+        scroll={{ x: 'max-content' }}
         dataSource={state.page?.items}
         loading={loading || textsLoading}
         locale={{ emptyText: t('shell.tasks.empty') }}

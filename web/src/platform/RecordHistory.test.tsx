@@ -128,6 +128,7 @@ function pageBody(name: string, process: string | null, nested = false) {
     access: null,
     detail: null,
     kpi: null,
+    chart: null,
   }
   const widgets = nested
     ? [{ type: 'section', titleKey: 'section.title', collapsed: false, widgets: [widget] }]

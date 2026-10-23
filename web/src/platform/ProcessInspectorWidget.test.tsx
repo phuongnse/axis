@@ -27,6 +27,7 @@ const inspectorWidget: WidgetMetadata = {
   access: null,
   detail: null,
   kpi: null,
+  chart: null,
 }
 
 const waitingId = '0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7b'

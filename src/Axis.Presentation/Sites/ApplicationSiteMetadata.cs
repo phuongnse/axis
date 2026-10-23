@@ -94,9 +94,10 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <see cref="Actions"/> is empty on every widget but a form or detail widget that declares actions.
 /// <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table that declares them.
 /// <see cref="Parameters"/> is empty on every widget but a table over a data source that binds page parameters.
-/// <see cref="Access"/> is set on a table, form or detail widget and null on a task inbox, a process inspector and a kpi.
+/// <see cref="Access"/> is set on a table, form or detail widget and null on a task inbox, a process inspector, a kpi and a chart.
 /// <see cref="Detail"/> is set only on a detail widget, which has an <see cref="Entity"/> and optionally a <see cref="Form"/>.
 /// <see cref="Kpi"/> is set only on a kpi widget, which has a <see cref="DataSource"/> and no entity.
+/// <see cref="Chart"/> is set only on a chart widget, which has a <see cref="DataSource"/> and no entity.
 /// </summary>
 /// <param name="TasksPath">The path of the application's task API, which lists the signed-in user's open tasks.</param>
 /// <param name="Process">The process an inspector inspects, by its declared name.</param>
@@ -110,6 +111,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// </param>
 /// <param name="Detail">What a detail widget shows, or null on any other widget.</param>
 /// <param name="Kpi">What a kpi widget shows, or null on any other widget.</param>
+/// <param name="Chart">What a chart widget draws, or null on any other widget.</param>
 public sealed record WidgetMetadata(
     string Type,
     EntityMetadata? Entity,
@@ -124,7 +126,8 @@ public sealed record WidgetMetadata(
     IReadOnlyDictionary<string, string> Parameters,
     WidgetAccess? Access,
     DetailMetadata? Detail,
-    KpiMetadata? Kpi) : PageWidgetMetadata;
+    KpiMetadata? Kpi,
+    ChartMetadata? Chart) : PageWidgetMetadata;
 
 /// <summary>What a detail widget shows: the record that one page parameter picks.</summary>
 /// <param name="Record">The page parameter whose value is the id of the record, by the name the page declares.</param>
@@ -136,6 +139,18 @@ public sealed record DetailMetadata(string Record);
 /// <param name="Comparison">A second measure shown next to the first, or null when the widget has none.</param>
 /// <param name="Navigate">The action a click opens, or null when the widget has none or the user may not read its page.</param>
 public sealed record KpiMetadata(string Measure, string LabelKey, KpiComparisonMetadata? Comparison, NavigateActionMetadata? Navigate);
+
+/// <summary>What a chart widget draws of the groups of its data source.</summary>
+/// <param name="Kind">The kind of chart: <c>bar</c>, <c>line</c> or <c>pie</c>.</param>
+/// <param name="TitleKey">The text key of the chart's title, which is also its accessible name.</param>
+/// <param name="Category">The group field of the data source that names each group, by the name the data source declares.</param>
+/// <param name="Measures">The measures to draw, one series each, in page file order.</param>
+public sealed record ChartMetadata(string Kind, string TitleKey, string Category, IReadOnlyList<ChartMeasureMetadata> Measures);
+
+/// <summary>One series of a chart widget.</summary>
+/// <param name="Name">The measure, by the name the data source declares.</param>
+/// <param name="LabelKey">The text key of its label.</param>
+public sealed record ChartMeasureMetadata(string Name, string LabelKey);
 
 /// <summary>The second measure of a kpi widget.</summary>
 /// <param name="Measure">The measure, by the name the data source declares.</param>

@@ -1,0 +1,18 @@
+{
+  "id": "91cc84a4-6df2-4a12-9873-c61a256b0a93",
+  "kind": "dataSource",
+  "name": "NotesByCategory",
+  "formatVersion": 1,
+  "entity": "Note",
+  "fields": [
+    { "name": "category", "path": "category" },
+    { "name": "amount", "path": "amount" }
+  ],
+  "aggregate": {
+    "groupBy": ["category"],
+    "measures": [
+      { "name": "notes", "function": "count" },
+      { "name": "amountSum", "function": "sum", "field": "amount" }
+    ]
+  }
+}

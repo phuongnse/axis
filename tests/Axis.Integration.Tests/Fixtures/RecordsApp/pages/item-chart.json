@@ -1,0 +1,20 @@
+{
+  "id": "d02a9e4b-f21b-4bbe-93de-e1caab898772",
+  "kind": "page",
+  "name": "ItemChart",
+  "formatVersion": 1,
+  "title": { "textKey": "itemChart.title" },
+  "widgets": [
+    {
+      "type": "chart",
+      "kind": "bar",
+      "dataSource": "ItemCountsByDepartment",
+      "category": "departmentName",
+      "title": { "textKey": "itemChart.title" },
+      "measures": [
+        { "name": "items", "label": { "textKey": "itemChart.items" } },
+        { "name": "quantitySum", "label": { "textKey": "itemChart.quantitySum" } }
+      ]
+    }
+  ]
+}

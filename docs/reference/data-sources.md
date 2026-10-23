@@ -27,8 +27,8 @@ of denormalize is in
 
 A data source is a read-only, named query over one root entity. It projects
 fields, filters rows with typed parameters, sorts, pages and can group. A
-table widget shows its rows. A chart or KPI widget shows its groups
-*(planned for M12)*. Filters use the expression language of
+table widget shows its rows. A chart or KPI widget shows its groups.
+Filters use the expression language of
 [expressions.md](expressions.md) and become parameterized SQL.
 
 ## Resource shape
@@ -435,7 +435,7 @@ The table binding and its filter inputs are built, for plain and grouped
 data sources.
 
 - **Widgets.** The `table` widget binds to a data source, and so does the
-  `kpi` widget. The `chart` widget will *(planned for M12)*. A `form` that
+  `kpi` widget, and so does the `chart` widget. A `form` that
   names a `dataSource` is `AXC0060`. A table names an `entity` or a
   `dataSource`, never both and never neither (`AXC0060`). `entity` stays as
   shorthand for all records of an entity. A `dataSource` that names no
@@ -478,18 +478,24 @@ data sources.
     live in the same URL query.
   - `parameters` on any widget that is not a table over a data source is
     `AXC0060` at `/widgets/{i}/parameters`.
-- **Chart binding** *(planned for M12)*. A `chart` names a `dataSource` and
+- **Chart binding.** A `chart` names a `dataSource` and
   reads only grouped data. See
   [D64](../decisions/d64-detail-chart-and-kpi-widgets.md). The compile checks:
   - A `dataSource` that names no loaded data source is `AXC0059`.
   - The data source has an `aggregate` with exactly one `groupBy` entry, and
-    the chart's `category` equals it.
-  - Each chart measure names a measure of the data source, and its column is
-    numeric. A `pie` has exactly one measure.
-  - `parameters` binds page parameters with the table's name map, under the
-    same type and required rules as above.
-  - Every data source parameter that is not bound must be optional
-    (`AXC0060`, as for a table), because a chart has no filter bar.
+    the chart's `category` equals it, ignoring letter case, otherwise it is
+    `AXC0240` at `/widgets/{i}/dataSource` or `/widgets/{i}/category`.
+  - Each chart measure names a measure of the data source, ignoring letter
+    case, and it is numeric, otherwise it is `AXC0241` at
+    `/widgets/{i}/measures/{j}/name`. A `count` and a `sum` are numeric. A
+    `min` or `max` is numeric over an integer or a decimal, not over a date or
+    a date-time. A `pie` has exactly one measure, otherwise it is `AXC0241` at
+    `/widgets/{i}/measures`.
+  - `parameters` will bind page parameters with the table's name map, under
+    the same type and required rules as above *(planned for M12)*. The page
+    schema rejects `parameters` on a chart (`AXC0004`), as on a KPI.
+  - Every data source parameter must be optional (`AXC0060`, as for a KPI),
+    because a chart has no filter bar and binds no page parameter yet.
   - The `title` and the measure labels join `AXC0028`.
 - **KPI binding.** A `kpi` names a `dataSource` and reads
   its one total row. The compile checks:

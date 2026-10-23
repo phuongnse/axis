@@ -24,6 +24,7 @@ function leaf(type: WidgetMetadata['type'], extra: Partial<WidgetMetadata> = {})
     access: null,
     detail: null,
     kpi: null,
+    chart: null,
     ...extra,
   }
 }

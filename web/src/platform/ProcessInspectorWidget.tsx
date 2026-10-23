@@ -191,6 +191,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
       <Table<InstanceListItem>
         rowKey="id"
         columns={columns}
+        scroll={{ x: 'max-content' }}
         dataSource={load.page?.items}
         loading={loading}
         locale={{ emptyText: t('shell.inspector.empty') }}

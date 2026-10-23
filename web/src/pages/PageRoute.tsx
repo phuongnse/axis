@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
+import { ChartWidget } from '../platform/ChartWidget'
 import { DetailWidget } from '../platform/DetailWidget'
 import { FormWidget } from '../platform/FormWidget'
 import { KpiWidget } from '../platform/KpiWidget'
@@ -193,6 +194,8 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
         return <ProcessInspectorWidget sitePath={sitePath} pageName={page.name} widget={widget} locale={locale} />
       case 'kpi':
         return <KpiWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
+      case 'chart':
+        return <ChartWidget widget={widget} locale={locale} />
     }
   }
 

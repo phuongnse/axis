@@ -97,6 +97,7 @@ const widgetBase: WidgetMetadata = {
   access: null,
   detail: null,
   kpi: null,
+  chart: null,
 }
 
 const access = {

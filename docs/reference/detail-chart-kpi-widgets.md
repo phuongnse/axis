@@ -1,9 +1,9 @@
 # Detail, chart and KPI widgets
 
-Detailed reference for the `detail`, `chart` and `kpi` widgets of the SPA. The `chart` widget is
-_(planned for M12)_. The conventions of [architecture.md](../architecture.md) apply: sections
-marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md). The
-rest of the frontend is in [frontend.md](frontend.md).
+Detailed reference for the `detail`, `chart` and `kpi` widgets of the SPA. The conventions of
+[architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_ are not built yet,
+and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
+[frontend.md](frontend.md).
 
 - **Detail widget**. A page whose widget is a `detail`
   shows one record read-only, read through the record API. It writes
@@ -22,11 +22,11 @@ rest of the frontend is in [frontend.md](frontend.md).
     widget, so a missing `record` is `AXC0004`. `actions` follow the form widget's rules, with
     `navigate` allowed. The labels join `AXC0028`.
   - **Metadata.** It reuses `entity`, `form`, `actions` and `access` of the
-    form widget, with `"dataSource": null` and `"kpi": null`, and adds
-    `detail`, written after `access` and before `kpi`:
+    form widget, with `"dataSource": null`, `"kpi": null` and `"chart": null`,
+    and adds `detail`, written after `access` and before `kpi`:
 
     ```json
-    { "type": "detail", "entity": { "name": "Ticket", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [{ "type": "startProcess", "process": "TicketHandling", "labelKey": "tickets.handle", "instancesPath": "/api/apps/ServiceDesk/processes/TicketHandling/instances", "visibleWhen": null }], "access": { "actions": ["read"], "createFields": [], "updateFields": [] }, "detail": { "record": "ticket" }, "kpi": null }
+    { "type": "detail", "entity": { "name": "Ticket", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [{ "type": "startProcess", "process": "TicketHandling", "labelKey": "tickets.handle", "instancesPath": "/api/apps/ServiceDesk/processes/TicketHandling/instances", "visibleWhen": null }], "access": { "actions": ["read"], "createFields": [], "updateFields": [] }, "detail": { "record": "ticket" }, "kpi": null, "chart": null }
     ```
 
   - **Record.** The SPA reads the record that the page parameter `record`
@@ -42,8 +42,10 @@ rest of the frontend is in [frontend.md](frontend.md).
     process action**, without a save first. A `navigate` action sees the
     record's fields and `id`, as on a form
     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)).
-- **Chart widget** *(planned for M12)*. A page whose widget is a `chart` draws
-  the groups of a grouped data source as a `bar`, a `line` or a `pie`. See
+- **Chart widget**. A page whose widget is a `chart` draws
+  the groups of a grouped data source as a `bar`, a `line` or a `pie`. The
+  compile checks, the page metadata and the chart in the SPA are built, except
+  binding page parameters. See
   [D64](../decisions/d64-detail-chart-and-kpi-widgets.md) and the
   [widget binding](data-sources.md#widget-binding).
 
@@ -53,16 +55,28 @@ rest of the frontend is in [frontend.md](frontend.md).
 
   - **Compile.** The binding checks are in
     [data-sources.md](data-sources.md#widget-binding). `kind` is `bar`, `line`
-    or `pie`. A `pie` has exactly one measure. The `title` and the measure
-    labels join `AXC0028`. A chart has no `entity`, `form` or `actions`
-    (`AXC0060`). Configuration names no chart library and no library option.
+    or `pie`. A `pie` has exactly one measure (`AXC0241`). A data source
+    without exactly one `groupBy` field, or a `category` that is not that
+    field, is `AXC0240`. A measure that the data source lacks, or that is not a
+    number, is `AXC0241`. A measure is a number when it is a `count` or a `sum`,
+    or a `min` or `max` over an integer or a decimal, because `min` and `max`
+    keep the type of their field and a chart cannot plot a date. The `title`
+    and the measure labels join `AXC0028`. A chart has no `entity`, `form` or
+    `actions` (`AXC0060`). Configuration names no chart library and no library
+    option. The page schema requires `dataSource`, `kind`, `category`,
+    `measures` and `title`, so a missing one is `AXC0004`. Names match the data
+    source ignoring letter case, and the compiled chart keeps the names the data
+    source declares. A chart cannot bind page parameters yet *(planned for
+    M12)*. The schema rejects `parameters` on a chart (`AXC0004`), as on a
+    KPI, and every data source parameter must be optional (`AXC0060`).
   - **Metadata.** The widget has the `dataSource` object of the table
     binding, `"entity": null`, `"form": null`, `"actions": []` and
-    `"access": null`, and adds `chart`. A measure's `labelKey` is a text key,
-    because a data source measure has no label:
+    `"access": null`, and adds `chart`, written after `kpi`. A measure's
+    `labelKey` is a text key, because a data source measure has no label. A
+    user who cannot run the data source gets no widget, as with a table:
 
     ```json
-    { "type": "chart", "entity": null, "dataSource": { "name": "OpenTicketsByCategory", "rowsPath": "/api/apps/ServiceDesk/data-sources/OpenTicketsByCategory/rows", "entity": "Ticket", "parameters": [], "pageSize": 20, "columns": [] }, "chart": { "kind": "bar", "titleKey": "dashboard.byCategory.title", "category": "category", "measures": [{ "name": "openCount", "labelKey": "dashboard.byCategory.open" }] }, "detail": null, "kpi": null, "access": null }
+    { "type": "chart", "entity": null, "dataSource": { "name": "OpenTicketsByCategory", "rowsPath": "/api/apps/ServiceDesk/data-sources/OpenTicketsByCategory/rows", "entity": "Ticket", "parameters": [], "pageSize": 20, "columns": [] }, "access": null, "detail": null, "kpi": null, "chart": { "kind": "bar", "titleKey": "dashboard.byCategory.title", "category": "category", "measures": [{ "name": "openCount", "labelKey": "dashboard.byCategory.open" }] } }
     ```
 
     The example leaves `columns` empty and the keys that stay `null` or `[]`
@@ -79,11 +93,12 @@ rest of the frontend is in [frontend.md](frontend.md).
     mode. The SPA loads the library lazily in its own chunk, as it loads React
     Flow, so a page without a chart never loads it. The shared chart component
     in `web/src/platform/Chart.tsx` is built and draws bar, line and pie charts
-    from categories and labelled series. The widget that reads a data source is
-    still planned.
+    from categories and labelled series. The widget that reads a data source
+    draws a card with the chart's title above the chart.
   - **Accessibility.** The title is the chart's accessible name. Screen readers
-    get the data as a table, with the category and each measure as columns.
-    Loading, empty and error states use platform texts.
+    get the data as a table that only they reach, with the category and each
+    measure as columns. The loading, empty, error, null category and
+    more-than-100-groups texts are platform texts.
 - **KPI widget**. A page whose widget is a `kpi` shows one
   measure of a data source as a tile, with its label. The compile checks, the
   page metadata and the tile in the SPA are built. See

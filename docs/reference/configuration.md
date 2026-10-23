@@ -119,6 +119,20 @@ flowchart LR
      as the only names in its expressions. The page schema requires `measure` and
      `label` on a `kpi` and does not allow them, or `comparison` and
      `navigate`, on any other widget (`AXC0004`).
+     A `chart` widget needs a `dataSource` that names a loaded data source
+     (`AXC0059`) with an `aggregate` that has exactly one `groupBy` field
+     (`AXC0240` at `/widgets/{i}/dataSource`), a `kind` of `bar`, `line` or
+     `pie`, a `category` that is that field (`AXC0240` at
+     `/widgets/{i}/category`), a `title` and a list of `measures`, each with a
+     `name` and a `label`. A measure that the aggregate does not declare, or
+     that is not a number, is `AXC0241` at `/widgets/{i}/measures/{j}/name`,
+     and a `pie` with more than one measure is `AXC0241` at
+     `/widgets/{i}/measures`. A `chart` names no `entity`, `form` or
+     `actions` (`AXC0060` at that property), and its data source has no
+     required parameter (`AXC0060` at `/widgets/{i}/dataSource`). The page
+     schema requires `dataSource`, `kind`, `category`, `measures` and `title`
+     on a `chart` and does not allow `parameters` on it, or `kind`, `category`
+     and `measures` on any other widget (`AXC0004`).
      A `detail` widget names exactly one of `form` and `entity` (`AXC0060`) and
      no `dataSource`, `rowActions`, `toolbarActions` or `parameters`
      (`AXC0060` at that property). Its `record` must name a required `reference`

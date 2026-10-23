@@ -60,6 +60,7 @@ const noteWidget: EntityWidgetMetadata = {
   access: everyAction,
   detail: null,
   kpi: null,
+  chart: null,
   entity: {
     name: 'Note',
     labelKey: 'note.label',
@@ -98,6 +99,7 @@ const noteListWidget: WidgetMetadata = {
   access: everyAction,
   detail: null,
   kpi: null,
+  chart: null,
   dataSource: {
     name: 'NoteList',
     rowsPath,
@@ -275,6 +277,7 @@ describe('TableWidget', () => {
       access: everyAction,
       detail: null,
       kpi: null,
+      chart: null,
       dataSource: {
         name: 'NotesByDepartment',
         rowsPath,
@@ -495,7 +498,8 @@ describe('TableWidget', () => {
     await screen.findByRole('row', { name: /Buy paper/ })
     expect(requests()).toEqual([`${recordsPath}?page=2`])
 
-    await userEvent.click(screen.getByText('Title'))
+    // Ant Design draws the header twice when the table scrolls sideways, so ask for the accessible one.
+    await userEvent.click(screen.getByRole('columnheader', { name: 'Title' }))
 
     await waitFor(() => expect(search()).toBe('?x=1&sort=title'))
     await waitFor(() => expect(requests()).toHaveLength(2))
@@ -614,6 +618,7 @@ describe('TableWidget', () => {
       access: everyAction,
       detail: null,
       kpi: null,
+      chart: null,
     })
 
     const cell = await screen.findByRole('cell', { name: '1250.50' })

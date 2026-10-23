@@ -46,6 +46,7 @@ const noteWidget: EntityWidgetMetadata = {
   access: null,
   detail: { record: 'note' },
   kpi: null,
+  chart: null,
   entity: {
     name: 'Note',
     labelKey: 'note.label',

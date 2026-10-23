@@ -164,7 +164,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     from the locale as the site declares it to the title text. The home page
     can show each site without one more request per site.
   - `type` of a widget is `table`, `form`, `taskInbox`,
-    `processInspector`, `kpi` or `detail`, or `chart` *(planned for M12)*.
+    `processInspector`, `kpi`, `chart` or `detail`.
     On a `table` or `form`, exactly one of `entity` and `dataSource` is set, and
     the other is `null`. A `taskInbox` has both `null`, and so does a
     `processInspector`. The data source
@@ -173,7 +173,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `"actions": []` and `"access": null`.
   - A `detail` sets `entity`, `form` when it names a form, `actions` and
     `access`, and has `"dataSource": null`.
-  - *(Planned for M12.)* A `chart` sets `dataSource`, and has
+  - A `chart` sets `dataSource`, and has
     `"entity": null`, `"form": null`, `"actions": []` and `"access": null`.
   - Every widget also has `form`, never left out. It is the widget's form
     resource on a `form` widget that names one, and `null` otherwise. It is
@@ -183,12 +183,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - Every widget also has `process` and `instancesPath`,
     never left out. They are described under the process inspector widget, and
     are `null` on every other widget.
-  - Every widget also has `detail` and `kpi`, never left out. Each is
+  - Every widget also has `detail`, `kpi` and `chart`, never left out. Each is
     described under its widget, and is `null` on every other widget. `detail`
-    is written after `access`, and `kpi` after `detail`. The examples on this
-    page leave out both, which are `null` on all of them.
-  - Every widget will also have `chart` *(planned for M12)*, never left out,
-    and `null` on every other widget.
+    is written after `access`, `kpi` after `detail` and `chart` after `kpi`. The
+    examples on this page leave out all three, which are `null` on all of them.
   - Every widget also has `actions`, never left out. It
     is described under the form widget, and is `[]` on a widget it does not
     apply to. A table's `startProcess` row actions are left out without
@@ -215,7 +213,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     SPA reads them to check the values in the address.
   - Every widget also has `access`, never left out. It is described under
     **Policies** below, and is `null` on a `taskInbox`, on a
-    `processInspector` and on a `kpi`, and on a `chart` *(planned for M12)*.
+    `processInspector`, on a `kpi` and on a `chart`.
   - A page may hold a tree of widgets. A container widget
     carries only `type` and its own keys. A leaf widget keeps every key above.
     A tab carries `labelKey`, and a `section` carries `titleKey` and
@@ -311,7 +309,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `processInspector` is readable when the user holds an `inspect` grant on
       its process. A `kpi` whose data source the user cannot run is left out
       of the page, as a table is. A `detail` needs a `read` grant on its
-      entity. *(Planned for M12.)* A `chart` whose data source the user cannot
+      entity. A `chart` whose data source the user cannot
       run is left out too.
     - **Pages with a tree.** An unreadable widget is
       left out. A column or tab whose widgets are all left out is left out,
@@ -329,7 +327,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       [policies on tasks](task-api.md). A `detail` leaves out unreadable fields
       as its form metadata does, and an empty section too. A `kpi` measure over
       a field the user may not read follows the data source's field check,
-      which leaves the widget out. *(Planned for M12.)* A `chart` does the
+      which leaves the widget out. A `chart` does the
       same.
     - **Actions.** A `startProcess` action is left out of `actions` when the
       user has no `start` grant on its process. The same holds for a `table`
@@ -385,8 +383,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - A page holds at most one `table` and at most one
     `form`, `taskInbox` or `processInspector`, so every part of the address
     has one owner. A `kpi` owns no part of the address and reads only page
-    parameters, so it does not count. A `detail` owns none either, and a `chart`
-    will own none *(planned for M12)*. The compiler checks this. `?page=&pageSize=&sort=` and the data source parameter
+    parameters, so it does not count. A `detail` owns none either, and so does a
+    `chart`. The compiler checks this. `?page=&pageSize=&sort=` and the data source parameter
     values belong to the page's one `table`. `/new` and `/{id}` belong to its
     one `form`. `/{taskId}` and `/{instanceId}` belong to its one `taskInbox`
     or `processInspector`.
@@ -912,7 +910,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       left out of the steps. A step left with no section is left out.
 - **Detail widget**. A page whose widget is a `detail` shows one record
   read-only. See [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md).
-- **Chart widget** *(planned for M12)*. A page whose widget is a `chart` draws a data source.
+- **Chart widget**. A page whose widget is a `chart` draws a data source.
   See [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md).
 - **KPI widget**. A page whose widget is a `kpi` shows one value. See
   [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md).
@@ -923,10 +921,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Process inspector widget**. A page whose widget is a `processInspector` lists the instances of
   one process and opens one. See [process-inspector-widget.md](process-inspector-widget.md).
 - **Locale.** The shell header has a locale switch next to the light/dark
-  toggle. The chosen locale is kept in `localStorage` under `axis.locale`,
-  like the theme mode under `axis.themeMode`. One key serves every site: a
-  site starts in the stored locale when it offers it, and in its default
-  locale otherwise. The shell keeps the current texts until the chosen
+  toggle, in the Menu panel at phone width. The chosen locale is kept in `localStorage` under `axis.locale`,
+  like the theme mode under `axis.themeMode`. One key serves every site: a site starts in the stored locale
+  when it offers it, and in its default locale otherwise. The shell keeps the current texts until the chosen
   locale's texts have loaded. If they fail to load, it stays in the current
   locale and shows an error message.
   - Ant Design components, such as picker placeholders, follow the UI
@@ -970,11 +967,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     catalog has the same keys, so the development rule never hides a
     platform text behind a site that lacks it.
 
-- **Phone width** *(planned for M12)*. Below a fixed 768 px breakpoint, Ant
-  Design's `md`, columns stack in file order, which is built. Tab headers scroll
-  and a table scrolls sideways inside its widget. A table's row actions fold
-  into one menu per row, which is built. The site shell's navigation collapses
-  into a menu. There is no per-widget setting until a sample needs one, see
+- **Phone width.** Below a fixed 768 px breakpoint, Ant Design's `md`, columns stack in file order, tab headers scroll and a row's
+  actions fold into one menu. Every platform table, including form line items and the reference lookup,
+  scrolls sideways inside its widget, so the page never does. The shell header keeps the site title, the
+  account button and a **Menu** button (`shell.navigation.menu`) with `aria-expanded`. It opens a panel with
+  the navigation, locale switch and theme toggle. Escape or following a link closes it, and Escape returns
+  focus to the button. There is no per-widget setting until a sample needs one, see
   [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
 
 ## Studio

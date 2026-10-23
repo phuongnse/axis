@@ -10,6 +10,7 @@ public static class WidgetTypes
         ["taskInbox"] = WidgetType.TaskInbox,
         ["processInspector"] = WidgetType.ProcessInspector,
         ["kpi"] = WidgetType.Kpi,
+        ["chart"] = WidgetType.Chart,
         ["detail"] = WidgetType.Detail,
         ["columns"] = WidgetType.Columns,
         ["tabs"] = WidgetType.Tabs,
