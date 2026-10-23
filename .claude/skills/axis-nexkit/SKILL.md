@@ -185,7 +185,10 @@ Before the owner closes the current milestone:
 
 While `merge.auto` is on, NexKit has merged by the time you look: review the
 merged pull request and raise problems with the owner. While it is off, NexKit
-mentions the owner when a pull request is ready.
+mentions the owner when a pull request is ready. An approved pull request
+whose review marked a criterion ❔ unverifiable does not merge by itself, even
+with `merge.auto` on: check each listed criterion against the diff and the
+check results, and tell the owner which ones hold before they merge.
 
 - The behaviour change matches the issue and the approved plan.
 - When agreed behaviour changes, the docs change in the same pull request.
