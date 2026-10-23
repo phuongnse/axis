@@ -199,3 +199,42 @@ test("the ticket form shows the resolution only while the status is resolved", a
   await pickOption(status, "draft");
   await expect(resolution).toBeHidden();
 });
+
+test("anna presses View on her ticket in My tickets and sees it read-only on the detail page", async ({
+  page,
+  playwright,
+  baseURL,
+}) => {
+  const title = `Zz View ${runId()}`;
+  const id = await asUser(playwright.request, baseURL, "anna", (anna) =>
+    createTicket(anna, title),
+  );
+
+  await useSession(page, "anna");
+  await page.goto("/service-desk/mytickets?pageSize=100");
+  await page
+    .getByRole("row", { name: new RegExp(title) })
+    .getByRole("button", { name: "View", exact: true })
+    .click();
+
+  await expect(page).toHaveURL(`/service-desk/ticketdetail?ticket=${id}`);
+  await expect(page.getByTestId("detail")).toContainText(title);
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+});
+
+test("an agent opening the detail page of a ticket that is not assigned to them gets the not-found page", async ({
+  page,
+  playwright,
+  baseURL,
+}) => {
+  // The draft ticket is never started, so no agent is assigned to it.
+  const id = await asUser(playwright.request, baseURL, "anna", (anna) =>
+    createTicket(anna, `Zz Unassigned ${runId()}`),
+  );
+
+  await useSession(page, "khoa");
+  await page.goto(`/service-desk/ticketdetail?ticket=${id}`);
+
+  await expect(page.getByTestId("not-found")).toBeVisible();
+  await expect(page.getByTestId("detail")).toHaveCount(0);
+});
