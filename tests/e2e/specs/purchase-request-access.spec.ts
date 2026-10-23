@@ -20,7 +20,7 @@ const recordsPath = `${appPath}/entities/PurchaseRequest/records`;
 const tasksPath = `${appPath}/tasks`;
 const listAddress = "/purchasing/purchaserequests?pageSize=100&sort=-title";
 
-/** A unique part for the titles of this run, so retries and parallel specs never share a title. */
+/** A unique part for the titles of this run, so runs and parallel specs never share a title. */
 function runId() {
   return `${Date.now()}-${test.info().retry}`;
 }

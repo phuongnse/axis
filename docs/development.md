@@ -34,17 +34,18 @@ doubt runs the suite: a missing base, a git error or an empty change list. A per
 class name ends in `PerformanceTests`, so it stays out of NexKit's checks, and the class joins its
 project's performance collection, which runs alone after the other tests. A guard test fails when
 a `*PerformanceTests` class is outside that collection. A skipped suite is listed
-as skipped. Without `NEXKIT_BASE_SHA`, as in CI and local runs, every suite runs. Each suite writes a JUnit file to `artifacts/test-results/`. Playwright also writes `playwright.json`, a JSON report that marks the tests which failed and then passed on their retry. The E2E server output
+as skipped. Without `NEXKIT_BASE_SHA`, as in CI and local runs, every suite runs. Each suite writes a JUnit file to `artifacts/test-results/`. The E2E server output
 goes to `artifacts/logs/e2e-server.log`, the E2E worker output to
 `artifacts/logs/e2e-worker.log`, the E2E journey server output to `artifacts/logs/e2e-journey-server.log`, the E2E publisher output to `artifacts/logs/e2e-publisher.log`, and the
 purchasing system stub output to `artifacts/logs/e2e-purchasing.log`. `scripts/test-report.mjs` then prints a
 summary per suite and the failed tests with their `file:line`. On GitHub Actions
 the summary goes to the job summary, and each failed test becomes an error
 annotation. The failed tests are also listed at the end of the job log, with each
-message cut to 20 lines. A test that failed and then passed on its retry is listed under
-"Passed on a retry" in the job summary and the job log, with its spec file, title and first
-failure message. Such a test does not fail the run. The Playwright row shows how many of its
-passed tests passed on a retry, for example `41 (2 on retry)`.
+message cut to 20 lines.
+
+Playwright does not retry a failed test, on CI or locally, so a flaky test fails its job. The
+trace of a failed test is kept. On `main`, NexKit runs a failed job once more. A run that passes
+only on that second attempt is recorded on a `bug` issue.
 
 Each application's test scenarios are a suite of their own, named `scenarios-<application name>`.
 The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.
