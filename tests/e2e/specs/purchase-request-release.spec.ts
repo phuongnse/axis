@@ -127,7 +127,7 @@ test.describe('the active release of the purchase request sample changes', () =>
   })
 
   test('a waiting request finishes on the release it started on', async ({ page }, testInfo) => {
-    // A retry starts on the committed sample, not on release B of the failed attempt.
+    // Starts on the committed sample, whatever an earlier test left active.
     await activateFolder(purchaseRequests)
     await useSession(page, 'anna')
     const { title, id } = await createRequest(page, 'Pinned release', 5000)

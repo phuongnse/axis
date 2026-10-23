@@ -80,7 +80,7 @@ test.describe('Studio on a copy of its own', () => {
     const file = path.join(copy, 'entities/purchase-request.json')
     const before = JSON.parse(await readFile(file, 'utf8')) as { fields: { name: string; maxLength: number }[] }
     const index = before.fields.findIndex((field) => field.name === 'title')
-    // One more than the file holds, so a retry after a failed run still changes the value.
+    // One more than the file holds, so the value always changes.
     const next = before.fields[index].maxLength + 1
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${entity.id}`)

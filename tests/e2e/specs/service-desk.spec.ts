@@ -18,7 +18,7 @@ const appPath = "/api/apps/ServiceDesk";
 const recordsPath = `${appPath}/entities/Ticket/records`;
 const tasksPath = `${appPath}/tasks`;
 
-/** A unique part for the titles of this run, so retries and parallel specs never share a title. */
+/** A unique part for the titles of this run, so runs and parallel specs never share a title. */
 function runId() {
   return `${Date.now()}-${test.info().retry}`;
 }

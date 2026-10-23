@@ -39,9 +39,8 @@ const scenarios = [
 ] as const
 
 test.describe('the author builds the service desk with Studio only', () => {
-  // CI retries once, but a retry would meet the ServiceDesk folder from the first attempt and get 409, and removing
-  // that folder would be a file write. So retries are off.
-  test.describe.configure({ mode: 'serial', retries: 0 })
+  // Each step builds on the folder the one before created, so they run in order.
+  test.describe.configure({ mode: 'serial' })
 
   async function createPage(page: Page, name: string) {
     await createResource(page, 'page', name)

@@ -135,7 +135,7 @@ test('the purchase request list reads a data source, shows department names, and
   request,
 }) => {
   // Other specs title their requests in Latin letters. Titles that start with the Greek Ω sort
-  // after those under any collation, and titles of this run sort after those of earlier retries.
+  // after those under any collation, and titles of this run sort after those of earlier runs.
   // So with sort=-title the first ten are on page 1 and the eleventh opens page 2. A later spec
   // that titles requests in a script sorting after Greek, such as CJK, would break this.
   const run = `${Date.now()}-${test.info().retry}`
@@ -241,8 +241,7 @@ test('the per-department page shows one row per department with its total, sorts
   request,
 }) => {
   // anna submits one request in each department, so the finance reviewer dung reads them all.
-  // Engineering < Finance < Operations by total, even with retries and other tests adding Operations
-  // requests in parallel.
+  // Engineering < Finance < Operations by total, even with other tests adding Operations requests in parallel.
   const prices = { Engineering: 1, Finance: 100, Operations: 9000000 }
   const ids: string[] = []
   for (const [name, unitPrice] of Object.entries(prices)) {

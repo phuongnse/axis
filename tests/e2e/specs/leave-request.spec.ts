@@ -19,7 +19,7 @@ const appPath = "/api/apps/LeaveRequests";
 const recordsPath = `${appPath}/entities/LeaveRequest/records`;
 const tasksPath = `${appPath}/tasks`;
 
-/** A unique part for the reasons of this run, so retries and parallel specs never share a reason. */
+/** A unique part for the reasons of this run, so runs and parallel specs never share a reason. */
 function runId() {
   return `${Date.now()}-${test.info().retry}`;
 }
