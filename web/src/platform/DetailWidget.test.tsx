@@ -78,6 +78,7 @@ const sectionsWidget: EntityWidgetMetadata = {
     name: 'NoteSections',
     sections: [
       {
+        name: 'main',
         titleKey: 'noteSections.main',
         fields: [
           { name: 'title', readOnly: false },
@@ -85,6 +86,7 @@ const sectionsWidget: EntityWidgetMetadata = {
         ],
       },
       {
+        name: 'details',
         titleKey: 'noteSections.details',
         fields: [
           { name: 'done', readOnly: false },
@@ -92,6 +94,7 @@ const sectionsWidget: EntityWidgetMetadata = {
         ],
       },
     ],
+    steps: [],
   },
 }
 

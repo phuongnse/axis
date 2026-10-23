@@ -69,8 +69,10 @@ const openTask = {
   subject: { entity: 'PurchaseRequest', id: subjectId, label: 'PR-2026-00042' },
   form: {
     name: 'PurchaseRequestReview',
+    steps: [],
     sections: [
       {
+        name: 'decision',
         titleKey: 'purchaseRequest.sections.decision',
         fields: [
           { name: 'title', readOnly: true },
@@ -101,6 +103,26 @@ const openTask = {
   outcome: null,
 }
 
+// The same task with a form of two steps: the editable comments, then the read-only title.
+const stepsTask = {
+  ...openTask,
+  form: {
+    ...openTask.form,
+    sections: [
+      {
+        name: 'comments',
+        titleKey: 'purchaseRequest.sections.comments',
+        fields: [{ name: 'decisionComments', readOnly: false }],
+      },
+      { name: 'summary', titleKey: 'purchaseRequest.sections.summary', fields: [{ name: 'title', readOnly: true }] },
+    ],
+    steps: [
+      { titleKey: 'purchaseRequest.steps.comments', sections: ['comments'] },
+      { titleKey: 'purchaseRequest.steps.summary', sections: ['summary'] },
+    ],
+  },
+}
+
 const completedTask = {
   ...openTask,
   state: 'completed',
@@ -122,6 +144,10 @@ const texts = {
   'purchaseRequest.sections.decision': 'Decision',
   'purchaseRequest.title': 'Title',
   'purchaseRequest.decisionComments': 'Comments',
+  'purchaseRequest.sections.comments': 'Remarks',
+  'purchaseRequest.sections.summary': 'Summary',
+  'purchaseRequest.steps.comments': 'Step one',
+  'purchaseRequest.steps.summary': 'Step two',
   'task.approve': 'Approve',
   'task.return': 'Return',
   'task.reject': 'Reject',
@@ -442,5 +468,61 @@ describe('TaskPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Approve' }))
 
     expect(await screen.findByTestId('form-error')).toHaveTextContent('The decision could not be saved.')
+  })
+
+  describe('a form with steps', () => {
+    const commentsRequired = {
+      sections: [],
+      fields: {},
+      errors: { '/values/decisionComments': ['Required.'] },
+    }
+    const noErrors = { sections: [], fields: {}, errors: {} }
+
+    it('shows the outcomes only on the last step, and Next stays on a step with an error', async () => {
+      const api = stubTaskApi({
+        reads: [{ status: 200, body: stepsTask }],
+        states: [noErrors, commentsRequired, noErrors],
+      })
+      renderPage()
+
+      expect(await screen.findByLabelText('Comments')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Title')).not.toBeInTheDocument()
+      expect(screen.getByTestId('form-steps')).toHaveTextContent('Step one')
+      expect(screen.getByTestId('form-steps')).toHaveTextContent('Step two')
+      expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Next'])
+      await waitFor(() => expect(api.stateRequests()).toHaveLength(1))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(await screen.findByTestId('field-error-decisionComments')).toHaveTextContent('Required.')
+      expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument()
+      expect(api.stateRequests()[1].body).toEqual({ values: {}, touched: ['decisionComments'] })
+
+      await userEvent.type(screen.getByLabelText('Comments'), 'Fine')
+      await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(await screen.findByLabelText('Title')).toHaveAttribute('readonly')
+      expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+        'Back',
+        'Approve',
+        'Return',
+        'Reject',
+      ])
+
+      await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(await screen.findByLabelText('Comments')).toHaveValue('Fine')
+    })
+
+    it('completes with the changes from every step', async () => {
+      const api = stubTaskApi({ reads: [{ status: 200, body: stepsTask }] })
+      renderPage()
+
+      await userEvent.type(await screen.findByLabelText('Comments'), 'Fine')
+      await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+
+      await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/e2e/tasks'))
+      expect(api.completions().map(({ body }) => body)).toEqual([
+        '{"outcome":"approve","version":3,"values":{"decisionComments":"Fine"}}',
+      ])
+    })
   })
 })

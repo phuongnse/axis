@@ -1,5 +1,5 @@
 import { Alert, Button, Descriptions, Flex, Form, Typography } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { formatValue } from './formatValue'
@@ -10,6 +10,7 @@ import { assignedElsewhere, completeTask, fetchTask, type TaskItem } from './tas
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
 import { useReleaseTexts } from './useReleaseTexts'
+import { useFormSteps } from './useFormSteps'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
 interface TaskPageProps {
@@ -178,6 +179,9 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
   const sections = useMemo(() => sectionsOf(entity, task.form), [entity, task.form])
   const conditions = useMemo(() => ({ statePath: `${tasksPath}/${task.id}/form-state` }), [tasksPath, task.id])
   const form = useRecordForm(entity, sections, locale, conditions)
+  const steps = useFormSteps(task.form, sections, form)
+  // The Next button is outside the form, so it names the form it submits.
+  const formId = useId()
   const { start, setFormErrors } = form
   const [ready, setReady] = useState<boolean | 'failed'>(false)
   // The outcome being sent, so every button waits for its answer.
@@ -223,7 +227,7 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
         // The task API answers a task that is no longer open with a 409 that names no field.
         onDecided()
       } else {
-        form.showProblem(problem)
+        steps.openFirstWith(form.showProblem(problem))
       }
     } catch (error) {
       console.warn(`Completing the task '${task.id}' failed`, error)
@@ -242,19 +246,35 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
   return (
     <Flex vertical gap="middle">
       {form.formErrors.length > 0 && <Alert data-testid="form-error" type="error" title={form.formErrors.join(' ')} />}
-      <Form layout="vertical">{form.fields}</Form>
+      {steps.progress}
+      {/* Enter acts as Next on a step before the last, and does nothing on the last. */}
+      <Form id={formId} layout="vertical" onFinish={() => void steps.next()}>
+        {steps.fields}
+      </Form>
       <Flex gap="small">
-        {task.outcomes.map((outcome, index) => (
-          <Button
-            key={outcome.name}
-            type={index === 0 ? 'primary' : 'default'}
-            loading={sending === outcome.name}
-            disabled={sending !== null && sending !== outcome.name}
-            onClick={() => void complete(outcome.name)}
-          >
-            {t(outcome.labelKey)}
+        {!steps.first && (
+          <Button onClick={steps.back} disabled={steps.checking || sending !== null}>
+            {t('shell.form.back')}
           </Button>
-        ))}
+        )}
+        {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
+        {!steps.last && (
+          <Button htmlType="submit" form={formId} type="primary" loading={steps.checking && { delay: 200 }}>
+            {t('shell.form.next')}
+          </Button>
+        )}
+        {steps.last &&
+          task.outcomes.map((outcome, index) => (
+            <Button
+              key={outcome.name}
+              type={index === 0 ? 'primary' : 'default'}
+              loading={sending === outcome.name}
+              disabled={sending !== null && sending !== outcome.name}
+              onClick={() => void complete(outcome.name)}
+            >
+              {t(outcome.labelKey)}
+            </Button>
+          ))}
       </Flex>
     </Flex>
   )

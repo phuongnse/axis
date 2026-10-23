@@ -696,9 +696,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - Fields get `visibleWhen`, `requiredWhen` and `readOnlyWhen`, sections get
     `visibleWhen` and a `name`, and a form may have `steps`. The compiler
     checks them. The form widget and the task page follow their conditions
-    through the server, see
-    [form widget conditions](form-widget-conditions.md). The SPA does not
-    use `steps` yet *(planned for M12)*. See
+    through the server, and show `steps` as a wizard, see
+    [form widget conditions](form-widget-conditions.md). See
     [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 - **Form widget.** A page whose widget is a `form` creates a record at
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
@@ -878,8 +877,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       answer shows a generic platform error.
     - The button is disabled while the save and the start run.
   - **Conditions and steps**. The widget asks the server which fields to
-    show, require and lock, and which messages to show. The conditions are
-    built and the steps are *(planned for M12)*. See
+    show, require and lock, and which messages to show. The conditions and the
+    steps are built. See
     [form-widget-conditions.md](form-widget-conditions.md).
   - **Form metadata**. Page metadata gives the widget's
     `entity` with all its fields, so the SPA knows every field's type. It

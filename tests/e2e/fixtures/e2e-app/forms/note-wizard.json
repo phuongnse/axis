@@ -1,0 +1,23 @@
+{
+  "id": "5c8e1a42-9d3b-4f70-a6e5-2b4c6d8e0f13",
+  "kind": "form",
+  "name": "NoteWizard",
+  "formatVersion": 1,
+  "entity": "Note",
+  "sections": [
+    {
+      "name": "main",
+      "title": { "textKey": "noteWizard.main" },
+      "fields": [{ "field": "title" }, { "field": "code" }]
+    },
+    {
+      "name": "details",
+      "title": { "textKey": "noteWizard.details" },
+      "fields": [{ "field": "priority" }]
+    }
+  ],
+  "steps": [
+    { "title": { "textKey": "noteWizard.steps.main" }, "sections": ["main"] },
+    { "title": { "textKey": "noteWizard.steps.details" }, "sections": ["details"] }
+  ]
+}

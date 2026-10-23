@@ -125,14 +125,26 @@ export interface FormFieldMetadata {
 
 /** One section of a form: the text key of its title and its fields in display order. */
 export interface FormSectionMetadata {
+  /** The section's name, which a step lists, or `null` when it has none. */
+  name: string | null
   titleKey: string
   fields: FormFieldMetadata[]
 }
 
-/** The form a form widget lays its entity's fields out with: its sections in display order. */
+/** One wizard step of a form: the text key of its title and the names of its sections. */
+export interface FormStepMetadata {
+  titleKey: string
+  sections: string[]
+}
+
+/**
+ * The form a form widget lays its entity's fields out with: its sections in display order, and its
+ * wizard steps in order, which are empty when the form declares none.
+ */
 export interface FormMetadata {
   name: string
   sections: FormSectionMetadata[]
+  steps: FormStepMetadata[]
 }
 
 /**

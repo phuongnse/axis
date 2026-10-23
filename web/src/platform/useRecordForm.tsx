@@ -25,6 +25,8 @@ interface ShownField {
 
 /** A titled group of shown fields. The entity shorthand has one section without a title. */
 export interface Section {
+  /** The name a wizard step lists, or `null` when the section has none, as the entity shorthand's. */
+  name: string | null
   titleKey: string | null
   fields: ShownField[]
 }
@@ -43,9 +45,10 @@ export function sectionsOf(
   const fixed = (field: FieldMetadata) =>
     field.computed || field.sequence || field.creator || (writable !== undefined && !writable.has(field.name))
   if (form === null) {
-    return [{ titleKey: null, fields: entity.fields.map((field) => ({ field, readOnly: fixed(field) })) }]
+    return [{ name: null, titleKey: null, fields: entity.fields.map((field) => ({ field, readOnly: fixed(field) })) }]
   }
   return form.sections.map((section) => ({
+    name: section.name,
     titleKey: section.titleKey,
     fields: section.fields.flatMap((entry) => {
       const field = entity.fields.find((candidate) => candidate.name === entry.name)
@@ -202,6 +205,18 @@ export function useRecordForm(
         .map((field) => [field.name, values[field.name]]),
     )
 
+  // Whether the form or the answer locks the shown field of that name.
+  const locked = (name: string) => {
+    const entry = shown.find(({ field }) => field.name === name)
+    return entry !== undefined && lockedOf(entry)
+  }
+
+  // Whether the answer hides the shown field of that name.
+  const hidden = (name: string) => {
+    const entry = shown.find(({ field }) => field.name === name)
+    return entry !== undefined && hiddenOf(entry.field)
+  }
+
   // A pointer such as `lines/1/quantity` names a cell when the collection, its row and the child
   // field all exist.
   const cellOf = (name: string) => {
@@ -219,10 +234,13 @@ export function useRecordForm(
     return { collection, key: `${index}/${child}` }
   }
 
-  const showProblem = (problem: RecordProblem) => {
+  // Returns the names of the fields and collections that got a message, so a wizard can open the
+  // step that has them.
+  const showProblem = (problem: RecordProblem): string[] => {
     const onFields: Record<string, string[]> = {}
     const onCells: Record<string, Record<string, string[]>> = {}
     const onForm: string[] = []
+    const named = new Set<string>()
     for (const pointer of Object.keys(problem.errors)) {
       const name = pointer.startsWith(fieldPointer) ? pointer.slice(fieldPointer.length) : null
       const cell = name === null ? null : cellOf(name)
@@ -230,8 +248,10 @@ export function useRecordForm(
       const messages = problem.errors[pointer].map((message) => t(message))
       if (cell) {
         onCells[cell.collection] = { ...onCells[cell.collection], [cell.key]: messages }
+        named.add(cell.collection)
       } else if (name !== null && shown.some(({ field }) => field.name === name)) {
         onFields[name] = messages
+        named.add(name)
       } else {
         onForm.push(...messages)
       }
@@ -239,6 +259,7 @@ export function useRecordForm(
     setFieldErrors(onFields)
     setCellErrors(onCells)
     setFormErrors(onForm)
+    return [...named]
   }
 
   // The field becomes touched, and the form asks for its states: at once, or after typing pauses.
@@ -258,6 +279,33 @@ export function useRecordForm(
   const leave = (name: string) => {
     if (!touched.has(name)) {
       touch(name, 0)
+    }
+  }
+
+  /**
+   * Touches the fields and asks the state endpoint at once, without the timer. Resolves `false`
+   * when the newest answer has an error for one of them. Without `conditions`, or when the call
+   * fails, it resolves `true`, because the server checks the save again.
+   */
+  const check = async (names: readonly string[]): Promise<boolean> => {
+    if (!conditions) {
+      return true
+    }
+    const all = new Set([...touched, ...names])
+    setTouched(all)
+    const mine = ++sequence.current
+    try {
+      const next = await fetchFormState(
+        conditions.statePath,
+        buildFormStateBody(entity.fields, changed(), conditions.recordId, [...all]),
+      )
+      if (mine === sequence.current) {
+        setAnswer(next)
+      }
+      return !names.some((name) => `${fieldPointer}${name}` in next.errors)
+    } catch (error) {
+      console.warn(`Loading the form state from '${conditions.statePath}' failed`, error)
+      return true
     }
   }
 
@@ -333,42 +381,45 @@ export function useRecordForm(
     fieldErrors[name] ??
     (touched.has(name) ? answer?.errors[`${fieldPointer}${name}`]?.map((message) => t(message)) : undefined)
 
-  const fields = (
+  // The inputs of the sections a wizard step lists, or of every section with `null`.
+  const fieldsFor = (names: readonly string[] | null): ReactNode => (
     <>
-      {sections.map((section, index) => (
-        <Fragment key={index}>
-          {section.titleKey !== null &&
-            !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
-              <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
-            )}
-          {section.fields
-            .filter(({ field }) => !hiddenOf(field))
-            .map((entry) => {
-              const { field } = entry
-              const errors = errorsOf(field.name)
-              const control = input(field, lockedOf(entry))
-              return (
-                <Form.Item
-                  key={field.name}
-                  label={labelOf(field)}
-                  // A child collection is a table, with no single input for the label to point to.
-                  htmlFor={field.type === 'child-collection' ? undefined : field.name}
-                  required={stateOf(field.name)?.required ?? field.required}
-                  validateStatus={errors ? 'error' : undefined}
-                  help={
-                    errors && (
-                      <span role="alert" data-testid={`field-error-${field.name}`}>
-                        {errors.join(' ')}
-                      </span>
-                    )
-                  }
-                >
-                  {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
-                </Form.Item>
-              )
-            })}
-        </Fragment>
-      ))}
+      {sections.map((section, index) =>
+        names !== null && !(section.name !== null && names.includes(section.name)) ? null : (
+          <Fragment key={index}>
+            {section.titleKey !== null &&
+              !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
+                <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
+              )}
+            {section.fields
+              .filter(({ field }) => !hiddenOf(field))
+              .map((entry) => {
+                const { field } = entry
+                const errors = errorsOf(field.name)
+                const control = input(field, lockedOf(entry))
+                return (
+                  <Form.Item
+                    key={field.name}
+                    label={labelOf(field)}
+                    // A child collection is a table, with no single input for the label to point to.
+                    htmlFor={field.type === 'child-collection' ? undefined : field.name}
+                    required={stateOf(field.name)?.required ?? field.required}
+                    validateStatus={errors ? 'error' : undefined}
+                    help={
+                      errors && (
+                        <span role="alert" data-testid={`field-error-${field.name}`}>
+                          {errors.join(' ')}
+                        </span>
+                      )
+                    }
+                  >
+                    {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
+                  </Form.Item>
+                )
+              })}
+          </Fragment>
+        ),
+      )}
       {shown
         .filter(
           (entry) =>
@@ -386,6 +437,8 @@ export function useRecordForm(
         ))}
     </>
   )
+
+  const fields = fieldsFor(null)
 
   // The newest body is read when the timer fires. A write in an effect keeps the render pure.
   useEffect(() => {
@@ -432,6 +485,10 @@ export function useRecordForm(
 
   return {
     fields,
+    fieldsFor,
+    hidden,
+    locked,
+    check,
     start,
     changed,
     version: snapshot.version,

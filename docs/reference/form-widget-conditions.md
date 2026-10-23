@@ -9,7 +9,7 @@ widget, is in [frontend.md](frontend.md).
   show, require and lock, and which messages to show. It has no evaluator of
   its own
   ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
-  The conditions are built. The steps are *(planned for M12)*.
+  The conditions and the steps are built.
   - **Calls.** It calls the [form state endpoint](record-api.md#form-state)
     with the draft values and the touched fields. The call goes out at once
     after a choice: a select, a checkbox, a date or a picked or cleared
@@ -46,11 +46,27 @@ widget, is in [frontend.md](frontend.md).
     sends no `?form=`. The task page follows the conditions through the
     [task form state route](task-api.md#form-state-of-a-task), with no
     `recordId` and no `?form=`.
-  - **Steps.** A form with `steps` shows one step at a time, with Back and
-    Next. Next sends every visible field of the step as touched and stays
-    on the step when any key of `errors` names one of them. Back never
-    checks. A step whose sections are all hidden is skipped.
+  - **Steps.** A form with `steps` shows one step at a time, under a
+    progress bar of the step titles that marks the current step. The bar is
+    not clickable, so the user moves only with Back and Next. Next sends
+    every visible field of the step that the form does not lock as touched,
+    in one call at once, and stays on the step when any key of `errors`
+    names one of them. Back never checks. A step whose sections are all
+    hidden is skipped and left out of the bar. Moving between steps keeps
+    every typed value, and a save sends the changes from all steps. A form
+    without `steps` looks as before.
+  - **Failed check.** When the call for Next fails, by a network error or
+    any answer but `200`, the form logs a warning and moves on to the next
+    step, because the server checks the save again.
+  - **Focus.** After Next or Back, focus moves to the first input of the new
+    step, so a keyboard user types on at once. Nothing is focused when the
+    form first opens. Enter on a step before the last acts as Next.
   - **Last step.** Save and the `startProcess` actions are on the last
-    step. After a failed save, the form opens the first step that has an
-    error. The current step stays out of the URL, because a draft does not
-    survive a reload.
+    step. Cancel and the `navigate` actions are on every step, because a
+    navigate action uses the record as loaded and not the draft. After a
+    failed save, the form opens the first step that has an error. The
+    current step stays out of the URL, because a draft does not survive a
+    reload.
+  - **Task page.** The task page shows the steps of the task's form the same
+    way. The outcome buttons are on the last step, and Enter on the last
+    step does nothing.

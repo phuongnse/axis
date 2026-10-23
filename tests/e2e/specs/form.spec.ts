@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
@@ -17,6 +17,17 @@ async function createRecord(request: APIRequestContext, entity: string, values: 
   })
   expect(response.status()).toBe(201)
   return (await response.json()) as { id: string }
+}
+
+/** Presses Tab, or Shift+Tab with `back`, until the control has focus, as a keyboard user reaches it. */
+async function tabTo(page: Page, control: Locator, back = false) {
+  for (let presses = 0; presses < 40; presses++) {
+    if (await control.evaluate((element) => element === document.activeElement)) {
+      return
+    }
+    await page.keyboard.press(back ? 'Shift+Tab' : 'Tab')
+  }
+  await expect(control).toBeFocused()
 }
 
 /** Types a value into a date or date-time picker and confirms it with Enter, as a user does. */
@@ -284,4 +295,68 @@ test('a form in two sections shows both titles, and saving keeps its read-only f
   expect(record.version).toBe(2)
   expect(record.values.code).toBe(`S-${run}`)
   expect(record.values.priority).toBe(4)
+})
+
+test('a wizard is filled with the keyboard only: Next checks the step, Back keeps the values', async ({ page }) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  const title = page.getByRole('textbox', { name: '* Title', exact: true })
+  const code = page.getByLabel('Code', { exact: true })
+  const priority = page.getByLabel('Priority', { exact: true })
+  const next = page.getByRole('button', { name: 'Next', exact: true })
+  const back = page.getByRole('button', { name: 'Back', exact: true })
+  const save = page.getByRole('button', { name: 'Save', exact: true })
+
+  await page.goto('/e2e/notewizard/new')
+  await expect(page.getByTestId('form-steps')).toContainText('Basics')
+  await expect(page.getByTestId('form-steps')).toContainText('Extras')
+  await expect(save).toBeHidden()
+
+  // An empty title blocks Next, so the form stays on the first step with the message.
+  await tabTo(page, next)
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('field-error-title')).toBeVisible()
+  await expect(priority).toBeHidden()
+  await expect(save).toBeHidden()
+
+  await tabTo(page, title, true)
+  await page.keyboard.type(`Wizard ${run}`)
+  await page.keyboard.press('Tab')
+  await expect(code).toBeFocused()
+  await page.keyboard.type(`W-${run}`)
+  await page.keyboard.press('Tab')
+  await expect(next).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(priority).toBeFocused()
+  await expect(title).toBeHidden()
+  await page.keyboard.type('5')
+
+  // Back keeps what was typed on both steps.
+  await page.keyboard.press('Tab')
+  await expect(back).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(title).toBeFocused()
+  await expect(title).toHaveValue(`Wizard ${run}`)
+  await expect(code).toHaveValue(`W-${run}`)
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Tab')
+  await expect(next).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(priority).toBeFocused()
+  await expect(priority).toHaveValue('5')
+
+  await page.keyboard.press('Tab')
+  await expect(back).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(save).toBeFocused()
+  const created = page.waitForResponse(
+    (response) => response.url().includes('/entities/Note/records') && response.request().method() === 'POST',
+  )
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/e2e\/notes$/)
+
+  const { id } = (await (await created).json()) as { id: string }
+  const record = await (await page.request.get(`${notesPath}/${id}`)).json()
+  expect(record.values.title).toBe(`Wizard ${run}`)
+  expect(record.values.code).toBe(`W-${run}`)
+  expect(record.values.priority).toBe(5)
 })
