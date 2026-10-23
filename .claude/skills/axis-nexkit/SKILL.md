@@ -201,6 +201,25 @@ check results, and tell the owner which ones hold before they merge.
   Those are in paths NexKit may not change, so tell the owner and propose that
   hand-made pull request.
 
+## Upgrading NexKit
+
+An upgrade is one hand-made pull request. Read the release notes and the
+changelog of every release after the pinned ref, not only the latest.
+
+1. Pin both the `uses:` ref and `nexkit_ref` in the workflow file to the new
+   tag.
+2. Compare the key tables and sections of NexKit's configuration doc at the old
+   and new refs. Set every new key, or new value of a key, that Axis has a
+   value for, such as the names of its own CI artifacts or workflows. A key
+   left at its default is named in the pull request with the reason.
+3. Check that the workflow file grants every permission the release asks for.
+4. Change `docs/delivery.md` and this runbook wherever the release changes
+   what NexKit does by itself, when it waits for a person, or what you do
+   then.
+5. Say in the pull request what changes, what the release brings that needs
+   nothing here, and what the owner does: merge with the admin bypass, and any
+   secret or setting only the owner can add.
+
 ## When something fails
 
 NexKit handles these by itself, so do nothing until it mentions the owner: a
