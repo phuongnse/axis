@@ -158,6 +158,13 @@
     "enabled": true,
     "answer": "recommended"
   },
+  "evidence": {
+    "artifacts": [
+      "test-results-e2e",
+      "test-results-integration",
+      "test-results-unit"
+    ]
+  },
   "notify": [
     "phuongnse"
   ]

@@ -201,6 +201,25 @@ check results, and tell the owner which ones hold before they merge.
   Those are in paths NexKit may not change, so tell the owner and propose that
   hand-made pull request.
 
+## Upgrading NexKit
+
+An upgrade is one hand-made pull request. Read the release notes and the
+changelog of every release after the pinned ref, not only the latest.
+
+1. Pin both the `uses:` ref and `nexkit_ref` in the workflow file to the new
+   tag.
+2. Compare the key tables and sections of NexKit's configuration doc at the old
+   and new refs. Set every new key, or new value of a key, that Axis has a
+   value for, such as the names of its own CI artifacts or workflows. A key
+   left at its default is named in the pull request with the reason.
+3. Check that the workflow file grants every permission the release asks for.
+4. Change `docs/delivery.md` and this runbook wherever the release changes
+   what NexKit does by itself, when it waits for a person, or what you do
+   then.
+5. Say in the pull request what changes, what the release brings that needs
+   nothing here, and what the owner does: merge with the admin bypass, and any
+   secret or setting only the owner can add.
+
 ## When something fails
 
 NexKit handles these by itself, so do nothing until it mentions the owner: a
@@ -221,7 +240,7 @@ refused because `main` moved, which it tries again. Its troubleshooting doc at t
 | `conflicts.max_rounds` conflict rounds ran | Comment `/nexkit fix` yourself. |
 | A conflict in a path NexKit may not change, or a merge that brings workflow changes (`needs_merge`) | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
 | An implement or fix round ran out of time twice, in the issue or in one of its parts | Autopilot has already planned once with a note to split, and parts inherit that time-out. Read the plan, the run logs and the result files in the round's `nexkit-checks` artifact. When the cause is not known, find it first; then split the issue by hand or comment a smaller plan. |
-| A diagnosis round stopped as `blocked` | It found no cause in the evidence. Read what it found and the result files, ask the owner when the choice is theirs, then answer with `/nexkit fix <instructions>`. |
+| A diagnosis round stopped as `blocked` | It found no cause in the evidence. Read what it found, the result files and the CI evidence the round downloaded (its *Collect issue context* log lists it), ask the owner when the choice is theirs, then answer with `/nexkit fix <instructions>`. |
 | The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
 | A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
 | A run paused at the usage limit stops again with an unknown reset time | Repeat the command. |
