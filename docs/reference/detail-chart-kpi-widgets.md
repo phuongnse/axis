@@ -32,9 +32,8 @@ rest of the frontend is in [frontend.md](frontend.md).
   - **Record.** The SPA reads the record that the page parameter `record`
     names, from the entity's `recordsPath`. A missing or malformed parameter
     and a record that is missing or unreadable show the not-found page inside
-    the site shell. The SPA shows only a page's first widget, so a `detail`
-    inside `columns`, `tabs` or a `section` has correct metadata but is not
-    rendered yet.
+    the site shell. A `detail` inside `columns`, `tabs` or a `section` is
+    drawn too, see [container widgets](container-widgets.md).
   - **Fields.** With a `form`, the widget shows its sections in order under
     their titles. Without one, it shows every readable field in declaration
     order. Every value is read-only and formatted as a table cell shows it. The

@@ -109,8 +109,11 @@ function inspectPath(process: string) {
   return `/api/apps/StepApp/processes/${process}/instances/${instanceId}`
 }
 
-/** The metadata of a page with one widget: an inspector of `process`, or a table when it is `null`. */
-function pageBody(name: string, process: string | null) {
+/**
+ * The metadata of a page with one widget: an inspector of `process`, or a table when it is `null`.
+ * The widget is inside a section when `nested` is true.
+ */
+function pageBody(name: string, process: string | null, nested = false) {
   const widget = {
     type: process === null ? 'table' : 'processInspector',
     entity: null,
@@ -126,7 +129,10 @@ function pageBody(name: string, process: string | null) {
     detail: null,
     kpi: null,
   }
-  return JSON.stringify({ name, titleKey: `${name}.title`, widgets: [widget] } as unknown as PageMetadata)
+  const widgets = nested
+    ? [{ type: 'section', titleKey: 'section.title', collapsed: false, widgets: [widget] }]
+    : [widget]
+  return JSON.stringify({ name, titleKey: `${name}.title`, widgets } as unknown as PageMetadata)
 }
 
 /** Stubs `fetch` by URL: the history answers `history`, and a page answers its metadata or a 404. */
@@ -273,6 +279,19 @@ describe('RecordHistory', () => {
     expect(requests()).toContain('/api/sites/steps/pages/Requests')
     expect(requests()).toContain('/api/sites/steps/pages/Approvals')
     expect(requests()).toContain('/api/sites/steps/pages/Audit')
+  })
+
+  it('links an entry to an inspector nested in a container on a navigation page', async () => {
+    stubRoutes(page([item('record.updated', { processInstanceId: instanceId, inspectPath: inspectPath('Submit') })]), {
+      Requests: pageBody('Requests', null),
+      Approvals: pageBody('Approvals', 'Submit', true),
+      Audit: null,
+    })
+
+    renderHistory()
+
+    const link = await screen.findByTestId('history-inspect-link')
+    expect(link).toHaveAttribute('href', `/steps/approvals/${instanceId}`)
   })
 
   it('shows no link when no navigation page inspects the entry’s process', async () => {
