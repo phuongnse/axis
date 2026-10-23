@@ -1,7 +1,7 @@
 import { getAt } from './jsonPatch'
 
 /** The widget types the page editor has a panel for. */
-export const widgetTypes = ['table', 'form', 'taskInbox', 'processInspector']
+export const widgetTypes = ['table', 'form', 'taskInbox', 'processInspector', 'detail']
 
 /** The widget types that hold lists of widgets. The editor shows their lists and fixes their type. */
 export const containerTypes = ['columns', 'tabs', 'section']
@@ -15,6 +15,7 @@ export const widgetKeys: Record<string, string[]> = {
   form: ['entity', 'form', 'actions'],
   taskInbox: [],
   processInspector: ['process'],
+  detail: ['entity', 'form', 'record', 'actions'],
 }
 
 /** Every property the editor knows on a widget. A key outside this set is never touched. */
@@ -33,8 +34,8 @@ export function widgetSummary(widget: Record<string, unknown>): string {
 /**
  * The changes that give a widget another type, as pointers inside the widget and their new values. The type comes
  * first. A known property the new type does not take is removed, because the compiler rejects it. A switch to
- * `processInspector` adds an empty `process` when there is none, because the schema requires it. A key the editor
- * does not know is never touched.
+ * `processInspector` adds an empty `process` and a switch to `detail` an empty `record` when there is none, because the
+ * schema requires them. A key the editor does not know is never touched.
  */
 export function typeChanges(widget: Record<string, unknown>, next: string): [string, unknown][] {
   const changes: [string, unknown][] = [['/type', next]]
@@ -46,6 +47,9 @@ export function typeChanges(widget: Record<string, unknown>, next: string): [str
   }
   if (next === 'processInspector' && widget.process === undefined) {
     changes.push(['/process', ''])
+  }
+  if (next === 'detail' && widget.record === undefined) {
+    changes.push(['/record', ''])
   }
   return changes
 }
@@ -68,7 +72,10 @@ export function newTab(): Record<string, unknown> {
   return { label: { textKey: '' }, widgets: [] }
 }
 
-/** A new widget of a type. A container starts with the shape the page schema requires and empty lists. */
+/**
+ * A new widget of a type. A container starts with the shape the page schema requires and empty lists. A process
+ * inspector starts with an empty process, and a detail with an empty record, which the schema requires.
+ */
 export function newWidget(type: string): Record<string, unknown> {
   switch (type) {
     case 'columns':
@@ -85,6 +92,8 @@ export function newWidget(type: string): Record<string, unknown> {
       return { type, title: { textKey: '' }, widgets: [] }
     case 'processInspector':
       return { type, process: '' }
+    case 'detail':
+      return { type, record: '' }
     default:
       return { type }
   }

@@ -60,15 +60,16 @@ function JsonOnly() {
  * and every widget has Move up, Move down, Remove and a Move to picker that lists the other widget lists. A new
  * container starts with two columns of width 6, one tab, or an empty section. A container's type is fixed. Its panel
  * edits the width of each column, the label of each tab and the title and collapsed state of a section, and adds
- * or removes columns and tabs. The panel of a `table`, `form`, `taskInbox` or
- * `processInspector` widget shows its type with every property that type takes. A `form` panel also lists its
- * `actions`, which are `startProcess` or `navigate`, and a `table` panel lists its `rowActions` and `toolbarActions`,
- * which are `navigate`. A navigate action has a target page, a label, a `record` expression and parameter
- * expressions. When the names list the target page, the action shows one expression for each parameter the page
- * declares, and an empty expression leaves the parameter out. Picking another page removes the values the new page
- * does not declare. A property is a name picked from the application's names, and a table's data source and
- * entity, like a form's entity and form, exclude each other, so a pick clears the other. The editor edits the
- * draft through `onChange`, so a key it does not show, on the page or on a widget, stays as it is. A widget of a
+ * or removes columns and tabs. The panel of a `table`, `form`, `taskInbox`, `processInspector` or `detail` widget
+ * shows its type with every property that type takes. A `detail` panel has a record picker over the page's required
+ * `reference` parameters, narrowed to the widget's entity when it names one. A `form` and a `detail` panel also list
+ * their `actions`, which are `startProcess` or `navigate`, and a `table` panel lists its `rowActions` and
+ * `toolbarActions`, which are `navigate`. A navigate action has a target page, a label, a `record` expression and
+ * parameter expressions. When the names list the target page, the action shows one expression for each parameter the
+ * page declares, and an empty expression leaves the parameter out. Picking another page removes the values the new
+ * page does not declare. A property is a name picked from the application's names, and a table's data source and
+ * entity, like a form's or a detail's entity and form, exclude each other, so a pick clears the other. The editor edits
+ * the draft through `onChange`, so a key it does not show, on the page or on a widget, stays as it is. A widget of a
  * type it has no panel for shows its type and points to the JSON view.
  */
 export function PageEditor({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
@@ -117,7 +118,13 @@ export function PageEditor({ value, onChange }: { value: Content; onChange: Chan
                 tree={{ widgets, selected, onSelect: setPicked, onChange }}
               />
               {widgets.length > 0 && (
-                <WidgetPanel key={selected} base={selected} widget={getAt(value, selected)} onChange={onChange} />
+                <WidgetPanel
+                  key={selected}
+                  base={selected}
+                  widget={getAt(value, selected)}
+                  parameters={value.parameters}
+                  onChange={onChange}
+                />
               )}
             </>
           )}
@@ -466,11 +473,14 @@ function NameField({
 function WidgetPanel({
   base,
   widget,
+  parameters,
   onChange,
 }: {
   /** The pointer of the selected widget. */
   base: string
   widget: unknown
+  /** The page's parameters, which a detail's record names. */
+  parameters: unknown
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -559,7 +569,7 @@ function WidgetPanel({
           />
         </>
       )}
-      {type === 'form' && (
+      {(type === 'form' || type === 'detail') && (
         <>
           <NameField
             pointer={`${base}/entity`}
@@ -577,6 +587,15 @@ function WidgetPanel({
             required={false}
             onPick={(next) => pick('form', next, 'entity')}
           />
+          {type === 'detail' && (
+            <RecordField
+              pointer={`${base}/record`}
+              current={widget.record}
+              entity={widget.entity}
+              parameters={parameters}
+              onPick={(next) => onChange(`${base}/record`, next)}
+            />
+          )}
           <Actions
             pointer={`${base}/actions`}
             title={t('shell.studio.page.actions')}
@@ -597,6 +616,49 @@ function WidgetPanel({
         />
       )}
     </Flex>
+  )
+}
+
+/**
+ * The picker of a detail's record, which lists the page's required `reference` parameters. When the widget names an
+ * entity, it lists only the parameters whose target is that entity, ignoring letter case.
+ */
+function RecordField({
+  pointer,
+  current,
+  entity,
+  parameters,
+  onPick,
+}: {
+  pointer: string
+  current: unknown
+  entity: unknown
+  parameters: unknown
+  onPick: (next: string | undefined) => void
+}) {
+  const t = useText()
+  const wanted = typeof entity === 'string' && entity !== '' ? entity.toLowerCase() : undefined
+  const options = (Array.isArray(parameters) ? parameters : []).flatMap((parameter) => {
+    if (!isContent(parameter) || typeof parameter.name !== 'string') {
+      return []
+    }
+    const target = typeof parameter.target === 'string' ? parameter.target.toLowerCase() : undefined
+    const fits =
+      parameter.required === true && parameter.type === 'reference' && (wanted === undefined || target === wanted)
+    return fits ? [parameter.name] : []
+  })
+
+  return (
+    <div data-testid={`studio-field-${pointer}`}>
+      <div>{t('shell.studio.page.record')}</div>
+      <ReferencePicker
+        name={t('shell.studio.page.record')}
+        value={typeof current === 'string' ? current : undefined}
+        required
+        options={options}
+        onChange={onPick}
+      />
+    </div>
   )
 }
 

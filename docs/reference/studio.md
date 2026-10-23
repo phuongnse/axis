@@ -479,8 +479,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Page editor** *(built)*. The Form tab shows the page's name, its title
     with a text box for each locale, and a list of its widgets, each with its
     type and a summary such as `table · PurchaseRequestList`. A panel per
-    widget type, `table`, `form`, `taskInbox` and `processInspector`, shows the
-    properties the widget has today. A `table` panel has entity and data source
+    widget type, `table`, `form`, `taskInbox`, `processInspector` and `detail`,
+    shows the properties the widget has today. A `table` panel has entity and data source
     pickers, then `rowActions` and `toolbarActions` lists of
     navigate actions. A `form` panel has entity and form pickers and its
     `actions`, each a `startProcess` action with a process picker and a label,
@@ -488,13 +488,23 @@ Run and the Test results list, the read-only view of a module entity, and the re
     It shows the action as JSON only, which the JSON view edits, and Remove
     action removes it. A
     `taskInbox` panel has no properties. A `processInspector` panel has a
-    process picker. The JSON view stays as a second view of the same draft.
+    process picker. A `detail` panel has the entity and form pickers and the
+    actions of a form, and a record picker between them. The widget is described
+    in [detail, chart and KPI widgets](detail-chart-kpi-widgets.md), per
+    [D64](../decisions/d64-detail-chart-and-kpi-widgets.md). The record picker
+    lists the page's parameters that are required and of type `reference`. When
+    the widget names an entity, it lists only the parameters whose `target` is
+    that entity, ignoring letter case. When it names a form, it lists every such
+    parameter. Picking another entity keeps the record, and the picker shows a
+    record that matches no listed parameter as unknown. The compiler reports it
+    after the save. The JSON view stays as a second view of the same draft.
     - **Type change.** Choosing another type removes the known properties the
       new type does not take, because the compiler rejects them. A switch to
-      `processInspector` adds an empty `process`, which the schema requires.
+      `processInspector` adds an empty `process`, which the schema requires. A
+      switch to `detail` adds an empty `record`, which the schema also requires.
     - **Exclusive bindings.** The compiler accepts exactly one of a table's
-      entity and data source, and one of a form's entity and form. Picking one
-      clears the other.
+      entity and data source, and one of a form's or a detail's entity and form.
+      Picking one clears the other.
     - **Navigate actions.** A navigate action
       ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)) has a
       page picker, a label with a text box for each locale, an optional
@@ -530,7 +540,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
       nested rows. A container shows its columns, tabs or section body as
       nested lists, and a row opens that widget's panel at its own pointer,
       such as `/widgets/0/columns/1/widgets/0`. Every list has an Add widget
-      picker with all seven types. A new `columns` starts with two columns of
+      picker with all eight types. A new `columns` starts with two columns of
       width 6, a new `tabs` with one tab and a new `section` empty. Every row
       has Move up, Move down and Remove, which replace only the list that holds
       the widget, and a Move to picker. Move to lists every other widget list
