@@ -20,8 +20,8 @@ const names = {
     { id: 'e2', name: 'Supplier', module: null, fields: [] },
   ],
   dataSources: [
-    { id: 'd1', name: 'PurchaseRequestList', module: null },
-    { id: 'd2', name: 'SupplierList', module: null },
+    { id: 'd1', name: 'PurchaseRequestList', module: null, parameters: [], columns: [], groupBy: null },
+    { id: 'd2', name: 'SupplierList', module: null, parameters: [], columns: [], groupBy: null },
   ],
   processes: [
     { id: 'p1', name: 'PurchaseRequestApproval', steps: [] },

@@ -1027,8 +1027,8 @@ describe('StudioEditor for a label', () => {
 const pageNames = {
   ...namesWithTexts,
   dataSources: [
-    { id: 'd1', name: 'PurchaseRequestList', module: null },
-    { id: 'd2', name: 'SupplierList', module: null },
+    { id: 'd1', name: 'PurchaseRequestList', module: null, parameters: [], columns: [], groupBy: null },
+    { id: 'd2', name: 'SupplierList', module: null, parameters: [], columns: [], groupBy: null },
   ],
   pages: [{ id: 'g1', name: 'ReviewForm', parameters: [] }],
   forms: [{ id: 'f1', name: 'RequestForm' }],

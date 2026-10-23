@@ -28,13 +28,17 @@ public sealed record DefinedEntity(Guid Id, string Name, string? Module, IReadOn
 /// <summary>A field as written. <paramref name="Target"/> and <paramref name="Values"/> are null when the field has none.</summary>
 public sealed record DefinedField(string Name, string Type, string? Target, IReadOnlyList<string>? Values);
 
-/// <summary>A data source with its parameters and the columns a row of it carries.</summary>
+/// <summary>
+/// A data source with its parameters and the columns a row of it carries. <paramref name="GroupBy"/> is the group
+/// field list of a grouped data source, and null for a plain one.
+/// </summary>
 public sealed record DefinedDataSource(
     Guid Id,
     string Name,
     string? Module,
     IReadOnlyList<DefinedTyped> Parameters,
-    IReadOnlyList<DefinedColumn> Columns);
+    IReadOnlyList<DefinedColumn> Columns,
+    IReadOnlyList<string>? GroupBy);
 
 /// <summary>A name with a type: a rule or data source parameter, or an event field.</summary>
 public sealed record DefinedTyped(string Name, string Type);
