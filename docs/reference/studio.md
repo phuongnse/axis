@@ -479,8 +479,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Page editor** *(built)*. The Form tab shows the page's name, its title
     with a text box for each locale, and a list of its widgets, each with its
     type and a summary such as `table · PurchaseRequestList`. A panel per
-    widget type, `table`, `form`, `taskInbox`, `processInspector` and `detail`,
-    shows the properties the widget has today. A `table` panel has entity and data source
+    widget type, `table`, `form`, `taskInbox`, `processInspector`, `kpi`,
+    `chart` and `detail`, shows the properties the widget has today. A `table` panel has entity and data source
     pickers, then `rowActions` and `toolbarActions` lists of
     navigate actions. A `form` panel has entity and form pickers and its
     `actions`, each a `startProcess` action with a process picker and a label,
@@ -502,6 +502,32 @@ Run and the Test results list, the read-only view of a module entity, and the re
       new type does not take, because the compiler rejects them. A switch to
       `processInspector` adds an empty `process`, which the schema requires. A
       switch to `detail` adds an empty `record`, which the schema also requires.
+      A switch to `kpi` or `chart` adds the empty keys its type requires. A new
+      chart starts with the `bar` kind and one measure with an empty name and
+      label, because the schema accepts only `bar`, `line` or `pie` and needs
+      at least one measure.
+    - **KPI and chart panels.** A `kpi` panel has a data source picker, a
+      measure picker and a label with a text box for each locale. Add
+      comparison adds a comparison with its own measure picker and label, and
+      Add navigate action adds a navigate action with the fields above. Each
+      has a Remove button. A `chart` panel has a data source picker, a kind
+      picker over `bar`, `line` and `pie`, a category picker, a title, and a
+      list of measures, each with a picker and a label, with Add measure and
+      Remove measure. Remove measure is disabled when one is left. The data
+      source picker of a KPI lists only data sources with a total row, and the
+      one of a chart lists only data sources with exactly one group field,
+      which are the only choices the compiler accepts. The column pickers read
+      the chosen data source from the names. The category lists its group
+      field, and the measure pickers list its measures. A chart's measure
+      pickers list only measures of type `integer` or `decimal`, because the
+      names give a `count` the type `integer` and a `sum`, `min` or `max` the
+      type of its field. Picking another data source keeps the names already
+      set, and a name the new data source does not project shows as unknown.
+      The compiler reports it after the save. While the names have not loaded,
+      the column pickers are plain boxes. The editor does not check that a
+      `pie` has exactly one measure. See [widget
+      binding](data-sources.md#widget-binding) and
+      [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
     - **Exclusive bindings.** The compiler accepts exactly one of a table's
       entity and data source, and one of a form's or a detail's entity and form.
       Picking one clears the other.
@@ -540,7 +566,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
       nested rows. A container shows its columns, tabs or section body as
       nested lists, and a row opens that widget's panel at its own pointer,
       such as `/widgets/0/columns/1/widgets/0`. Every list has an Add widget
-      picker with all eight types. A new `columns` starts with two columns of
+      picker with all ten types. A new `columns` starts with two columns of
       width 6, a new `tabs` with one tab and a new `section` empty. Every row
       has Move up, Move down and Remove, which replace only the list that holds
       the widget, and a Move to picker. Move to lists every other widget list
