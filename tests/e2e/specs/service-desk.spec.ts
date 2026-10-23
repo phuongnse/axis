@@ -6,7 +6,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
-import { expectChosen } from "../select";
+import { expectChosen, pickOption } from "../select";
 import { sessionFile, useSession, type SampleUser } from "../sessions";
 
 // The service desk sample runs on the same platform as the other samples, with no platform code of its
@@ -183,4 +183,19 @@ test("an agent cannot open a ticket that is assigned to another agent, by its fo
   await expect(page.getByLabel(/Title/i)).toHaveCount(0);
 
   expect((await page.request.get(`${recordsPath}/${id}`)).status()).toBe(404);
+});
+
+test("the ticket form shows the resolution only while the status is resolved", async ({ page }) => {
+  await useSession(page, "anna");
+  await page.goto("/service-desk/ticketform/new");
+  await expect(page.getByLabel("Title", { exact: true })).toBeVisible();
+
+  const status = page.getByRole("combobox", { name: "Status", exact: true });
+  const resolution = page.getByLabel("Resolution", { exact: true });
+  await pickOption(status, "draft");
+  await expect(resolution).toBeHidden();
+  await pickOption(status, "resolved");
+  await expect(resolution).toBeVisible();
+  await pickOption(status, "draft");
+  await expect(resolution).toBeHidden();
 });

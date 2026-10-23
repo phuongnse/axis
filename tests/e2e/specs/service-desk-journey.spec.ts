@@ -19,7 +19,7 @@ interface SampleDataSource {
 
 interface SampleForm {
   entity: string
-  sections: { title: { textKey: string }; fields: { field: string; readOnly?: boolean }[] }[]
+  sections: { title: { textKey: string }; fields: { field: string; readOnly?: boolean; visibleWhen?: string }[] }[]
 }
 
 interface SampleScenario {
@@ -444,12 +444,13 @@ test.describe('the author builds the service desk with Studio only', () => {
     }
   })
 
-  test('the author builds the three task forms', async ({ page }) => {
+  test('the author builds the ticket form and the three task forms', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
     for (const [name, file] of [
+      ['TicketEdit', 'forms/ticket-edit.json'],
       ['TicketTriage', 'forms/ticket-triage.json'],
       ['TicketResolution', 'forms/ticket-resolution.json'],
       ['TicketConfirmation', 'forms/ticket-confirmation.json'],
@@ -482,6 +483,11 @@ test.describe('the author builds the service desk with Studio only', () => {
               .getByTestId(`studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/readOnly`)
               .getByRole('checkbox')
               .check()
+          }
+          if (field.visibleWhen) {
+            const condition = page.getByTestId(`studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/visibleWhen`)
+            await expect(condition.locator('.cm-editor')).toBeVisible()
+            await condition.getByRole('textbox').fill(field.visibleWhen)
           }
         }
       }
@@ -620,7 +626,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await createPage(page, 'TicketForm')
     await writeLabel(page, 'studio-field-/title', 'pages.ticketForm.title', en['pages.ticketForm.title'])
     await pick(page, 'studio-field-/widgets/0/type', 'form')
-    await pick(page, 'studio-field-/widgets/0/entity', 'Ticket')
+    await pick(page, 'studio-field-/widgets/0/form', 'TicketEdit')
     await page.getByRole('button', { name: 'Add action', exact: true }).click()
     await pick(page, 'studio-field-/widgets/0/actions/0/process', 'TicketHandling')
     await writeLabel(page, 'studio-field-/widgets/0/actions/0/label', 'ticket.submit', en['ticket.submit'])

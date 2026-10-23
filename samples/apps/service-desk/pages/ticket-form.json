@@ -9,7 +9,7 @@
   "widgets": [
     {
       "type": "form",
-      "entity": "Ticket",
+      "form": "TicketEdit",
       "actions": [
         {
           "type": "startProcess",
