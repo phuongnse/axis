@@ -11,6 +11,12 @@ public sealed class WorkItemRow
     /// <summary>The tenant the work runs for. A worker claims only items of the tenant it polls.</summary>
     public required string TenantId { get; init; }
 
+    /// <summary>
+    /// The queue position, set by the database when the item is queued. It only grows and never
+    /// changes, so it keeps the order of queuing whatever the clock does.
+    /// </summary>
+    public long Seq { get; set; }
+
     /// <summary>Selects the handler that runs the item.</summary>
     public required string Kind { get; init; }
 
