@@ -112,6 +112,8 @@
   "shell.inspector.commands.outputRequired": "Enter a value.",
   "shell.form.save": "Save",
   "shell.form.cancel": "Cancel",
+  "shell.form.next": "Next",
+  "shell.form.back": "Back",
   "shell.form.reload": "Reload",
   "shell.form.conflict": "This record was changed since you opened it. Reload it to see the current values.",
   "shell.form.saveFailed": "The record could not be saved.",

@@ -59,8 +59,9 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     [form state route](task-api.md#form-state-of-a-task). The call sends
     `values` and `touched` and no `recordId`. A field the answer hides or
     locks is not sent with the completion.
-  - *(Planned for M12.)* The form's steps, with the outcome buttons on the
-    last step.
+  - A form with `steps` is a wizard, see
+    [form widget conditions](form-widget-conditions.md#form-widget-conditions-and-steps).
+    The outcome buttons are on the last step.
   - It has one button per outcome, with the outcome's label.
   - A click sends the outcome, the changed editable values and the record's
     `version` to the complete endpoint. On success it returns to the inbox.

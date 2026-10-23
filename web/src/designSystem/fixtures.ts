@@ -140,14 +140,17 @@ const form: FormMetadata = {
   name: 'RequestForm',
   sections: [
     {
+      name: 'general',
       titleKey: 'request.section.general',
       fields: ['title', 'category', 'status', 'urgent'].map((name) => ({ name, readOnly: false })),
     },
     {
+      name: 'details',
       titleKey: 'request.section.details',
       fields: ['quantity', 'amount', 'neededOn', 'submittedAt', 'lines'].map((name) => ({ name, readOnly: false })),
     },
   ],
+  steps: [],
 }
 
 export const formWidget: EntityWidgetMetadata = {

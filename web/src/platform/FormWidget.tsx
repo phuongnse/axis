@@ -11,6 +11,7 @@ import { newIdempotencyKey, startProcess } from './processes'
 import { fetchRecord, saveRecord, type RecordItem, type RecordProblem } from './records'
 import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
+import { useFormSteps } from './useFormSteps'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
 interface FormWidgetProps {
@@ -81,6 +82,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     [formName, canSave, entity.recordsPath, recordId],
   )
   const form = useRecordForm(entity, sections, locale, conditions)
+  const steps = useFormSteps(widget.form, sections, form)
   const { start: startForm, setFormErrors } = form
   const [load, setLoad] = useState<LoadState>(recordId === null ? 'ready' : 'loading')
   const [conflict, setConflict] = useState(false)
@@ -147,7 +149,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
       }
       return
     }
-    form.showProblem(problem)
+    steps.openFirstWith(form.showProblem(problem))
   }
 
   const save = async () => {
@@ -269,16 +271,30 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
         {form.formErrors.length > 0 && (
           <Alert data-testid="form-error" type="error" title={form.formErrors.join(' ')} />
         )}
-        <Form layout="vertical" onFinish={save}>
-          {form.fields}
+        {steps.progress}
+        {/* Enter acts as Next on a step before the last, and saves on the last. */}
+        <Form layout="vertical" onFinish={steps.last ? save : steps.next}>
+          {steps.fields}
           <Flex gap="small">
-            {canSave && (
+            {!steps.first && (
+              <Button onClick={steps.back} disabled={steps.checking}>
+                {t('shell.form.back')}
+              </Button>
+            )}
+            {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
+            {!steps.last && (
+              <Button htmlType="submit" type="primary" loading={steps.checking && { delay: 200 }}>
+                {t('shell.form.next')}
+              </Button>
+            )}
+            {steps.last && canSave && (
               <Button htmlType="submit" type="primary" loading={saving} disabled={starting}>
                 {t('shell.form.save')}
               </Button>
             )}
             <Button onClick={() => navigate(returnTo)}>{t('shell.form.cancel')}</Button>
-            {recordId !== null &&
+            {steps.last &&
+              recordId !== null &&
               widget.actions
                 .filter((action): action is StartProcessAction => action.type === 'startProcess')
                 .map((action) => (

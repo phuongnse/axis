@@ -148,6 +148,7 @@ const sectionsWidget: EntityWidgetMetadata = {
     name: 'NoteSections',
     sections: [
       {
+        name: 'main',
         titleKey: 'noteSections.main',
         fields: [
           { name: 'title', readOnly: false },
@@ -157,12 +158,37 @@ const sectionsWidget: EntityWidgetMetadata = {
         ],
       },
       {
+        name: 'details',
         titleKey: 'noteSections.details',
         fields: [
           { name: 'priority', readOnly: false },
           { name: 'lines', readOnly: true },
         ],
       },
+    ],
+    steps: [],
+  },
+}
+
+// A note laid out as a wizard of two steps: the title and code, then the priority.
+const stepsWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  form: {
+    name: 'NoteSteps',
+    sections: [
+      {
+        name: 'main',
+        titleKey: 'noteSections.main',
+        fields: [
+          { name: 'title', readOnly: false },
+          { name: 'code', readOnly: false },
+        ],
+      },
+      { name: 'details', titleKey: 'noteSections.details', fields: [{ name: 'priority', readOnly: false }] },
+    ],
+    steps: [
+      { titleKey: 'noteSteps.main', sections: ['main'] },
+      { titleKey: 'noteSteps.details', sections: ['details'] },
     ],
   },
 }
@@ -208,6 +234,8 @@ const categoryPageJson = `{"items":[{"id":"${categoryId}","version":1,"values":{
 const texts = {
   'shell.form.save': 'Save',
   'shell.form.cancel': 'Cancel',
+  'shell.form.next': 'Next',
+  'shell.form.back': 'Back',
   'shell.form.reload': 'Reload',
   'shell.form.conflict': 'This record was changed since you opened it.',
   'shell.form.saveFailed': 'The record could not be saved.',
@@ -243,6 +271,8 @@ const texts = {
   'note.amountPositive': 'Amount must be positive.',
   'noteSections.main': 'Main',
   'noteSections.details': 'Details',
+  'noteSteps.main': 'Step one',
+  'noteSteps.details': 'Step two',
   'shell.form.processStarted': 'The process has started.',
   'shell.form.processRunning': 'This record is already in a running process.',
   'shell.form.startFailed': 'The process could not be started.',
@@ -1187,6 +1217,145 @@ describe('FormWidget', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByTestId('form-error')).toHaveTextContent('The record could not be saved.')
+  })
+
+  describe('steps', () => {
+    const titleRequired = '{"sections":[],"fields":{},"errors":{"/values/title":["Required."]}}'
+
+    async function renderSteps() {
+      const user = userEvent.setup()
+      renderForm(null, stepsWidget)
+      await waitFor(() => expect(stateRequests()).toHaveLength(1))
+      return user
+    }
+
+    it('shows the first step with its progress, and no Save until the last step', async () => {
+      stubFetch()
+      await renderSteps()
+
+      expect(screen.getByLabelText('Title')).toBeInTheDocument()
+      expect(screen.getByLabelText('Code')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
+      const progress = screen.getByTestId('form-steps')
+      expect(within(progress).getByText('Step one')).toBeInTheDocument()
+      expect(within(progress).getByText('Step two')).toBeInTheDocument()
+      expect(progress.querySelector('.ant-steps-item-active')).toHaveTextContent('Step one')
+      expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    })
+
+    it('moves on with Next and shows Save and Back on the last step', async () => {
+      stateAnswers = [emptyStateJson, emptyStateJson]
+      stubFetch()
+      const user = await renderSteps()
+
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(await screen.findByLabelText('Priority')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Title')).not.toBeInTheDocument()
+      expect(screen.getByTestId('form-steps').querySelector('.ant-steps-item-active')).toHaveTextContent('Step two')
+      expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+      // The check sends the step's fields as touched, at once.
+      expect(stateRequests()[1].body).toMatchObject({ touched: ['title', 'code'] })
+    })
+
+    it('stays on the step when the answer has an error for one of its fields, and Back keeps the values', async () => {
+      stateAnswers = [emptyStateJson, titleRequired, emptyStateJson]
+      stubFetch()
+      const user = await renderSteps()
+
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Required.')
+      expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
+
+      await user.type(screen.getByLabelText('Title'), 'Pen')
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      await user.type(await screen.findByLabelText('Priority'), '5')
+      await user.click(screen.getByRole('button', { name: 'Back' }))
+
+      expect(await screen.findByLabelText('Title')).toHaveValue('Pen')
+      expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      expect(await screen.findByLabelText('Priority')).toHaveValue('5')
+    })
+
+    it('acts as Next when Enter is pressed on a step before the last', async () => {
+      stateAnswers = [emptyStateJson, emptyStateJson]
+      stubFetch()
+      const user = await renderSteps()
+
+      await user.type(screen.getByLabelText('Title'), 'Pen{Enter}')
+
+      expect(await screen.findByLabelText('Priority')).toBeInTheDocument()
+    })
+
+    it('moves to the next step when the check fails', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      stateAnswers = [emptyStateJson]
+      stubFetch()
+      const user = await renderSteps()
+      vi.mocked(fetch).mockImplementation(async (input) => {
+        if (String(input).endsWith('/state')) {
+          return new Response('{}', { status: 500 })
+        }
+        return new Response(historyJson, { status: 200 })
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(await screen.findByLabelText('Priority')).toBeInTheDocument()
+      expect(warn).toHaveBeenCalled()
+      warn.mockRestore()
+    })
+
+    it('saves the changes of every step', async () => {
+      stateAnswers = [emptyStateJson, emptyStateJson]
+      const requests = stubFetch({ status: 201, body: noteJson('Pen', 1) })
+      const user = await renderSteps()
+
+      await user.type(screen.getByLabelText('Title'), 'Pen')
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      await user.type(await screen.findByLabelText('Priority'), '5')
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+
+      await waitFor(() => expect(requests()).toHaveLength(1))
+      expect(requests()[0]).toEqual({
+        url: `${recordsPath}?form=NoteSteps`,
+        method: 'POST',
+        body: '{"values":{"title":"Pen","priority":5}}',
+      })
+    })
+
+    it('opens the first step with an error after a failed save', async () => {
+      stateAnswers = [emptyStateJson, emptyStateJson]
+      stubFetch({
+        status: 400,
+        body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Too long."]}}',
+      })
+      const user = await renderSteps()
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      await user.click(await screen.findByRole('button', { name: 'Save' }))
+
+      expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Too long.')
+      expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
+      expect(screen.getByTestId('form-steps').querySelector('.ant-steps-item-active')).toHaveTextContent('Step one')
+    })
+
+    it('skips a step whose fields the answer hides', async () => {
+      stateAnswers = [
+        '{"sections":[],"fields":{"priority":{"visible":false,"required":false,"readOnly":false}},"errors":{}}',
+      ]
+      stubFetch()
+      await renderSteps()
+
+      expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+      expect(screen.queryByText('Step two')).not.toBeInTheDocument()
+    })
   })
 
   describe('start process action', () => {

@@ -112,6 +112,8 @@
   "shell.inspector.commands.outputRequired": "Nhập giá trị.",
   "shell.form.save": "Lưu",
   "shell.form.cancel": "Hủy",
+  "shell.form.next": "Tiếp",
+  "shell.form.back": "Quay lại",
   "shell.form.reload": "Tải lại",
   "shell.form.conflict": "Bản ghi này đã thay đổi kể từ khi bạn mở. Tải lại để xem giá trị hiện tại.",
   "shell.form.saveFailed": "Không thể lưu bản ghi.",
