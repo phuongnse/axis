@@ -131,6 +131,15 @@ models, are not copied here. Look them up where they live.
   `artifacts/test-results`, and for E2E also `artifacts/logs` and the
   Playwright traces in `tests/e2e/test-results`. When such a check fails, the
   next fix round gets those files.
+- **A round gets the evidence of the CI runs its issue names.** Agents hold no
+  GitHub token, so before an implement or fix round NexKit downloads, for each
+  failed run that the issue records or links, the end of each failed job's log,
+  its annotations and the CI workflow's `test-results-e2e`,
+  `test-results-integration` and `test-results-unit` artifacts, which hold the
+  Playwright traces and `error-context.md` files. The names are in NexKit's
+  [`evidence` setting][nexkit-evidence]. So a `bug` issue about a flaky run is
+  answered from that run's own traces, and a person never has to attach them.
+  The artifacts expire 14 days after their run.
 - **NexKit's checks skip suites that a change cannot affect.** A check round
   takes about 25 minutes, of which the integration tests take about 7 and
   Playwright about 10. So under NexKit's `NEXKIT_BASE_SHA`, a suite that no
@@ -403,3 +412,4 @@ issues, pull requests and sub-issues.
 [nexkit-auto-merge]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#automatic-merge
 [nexkit-caches]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#caches
 [nexkit-autopilot]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#autopilot
+[nexkit-evidence]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#evidence-from-ci-runs
