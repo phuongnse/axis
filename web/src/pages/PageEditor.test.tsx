@@ -20,8 +20,8 @@ const names = {
     { id: 'e2', name: 'Supplier', module: null, fields: [] },
   ],
   dataSources: [
-    { id: 'd1', name: 'PurchaseRequestList', module: null },
-    { id: 'd2', name: 'SupplierList', module: null },
+    { id: 'd1', name: 'PurchaseRequestList', module: null, parameters: [], columns: [], groupBy: null },
+    { id: 'd2', name: 'SupplierList', module: null, parameters: [], columns: [], groupBy: null },
   ],
   processes: [
     { id: 'p1', name: 'PurchaseRequestApproval', steps: [] },
@@ -619,6 +619,91 @@ describe('PageEditor processInspector panel', () => {
   })
 })
 
+describe('PageEditor detail panel', () => {
+  const detailParameters = [
+    { name: 'request', type: 'reference', target: 'purchaserequest', required: true },
+    { name: 'previous', type: 'reference', target: 'PurchaseRequest' },
+    { name: 'note', type: 'text', required: true },
+    { name: 'supplier', type: 'reference', target: 'Supplier', required: true },
+  ]
+
+  it('shows the entity, the form, the record and the actions', () => {
+    renderEditor(page({ type: 'detail', entity: 'PurchaseRequest', record: 'request', actions: [] }))
+
+    expect(screen.getByTestId('studio-field-/widgets/0/entity')).toBeVisible()
+    expect(screen.getByTestId('studio-field-/widgets/0/form')).toBeVisible()
+    expect(screen.getByTestId('studio-field-/widgets/0/record')).toHaveTextContent('request')
+    expect(screen.getByTestId('studio-field-/widgets/0/actions')).toBeVisible()
+  })
+
+  it('picking a form clears the entity', async () => {
+    const onChange = renderEditor(page({ type: 'detail', entity: 'PurchaseRequest', record: 'request' }))
+
+    await chooseOption('RequestForm', screen.getByTestId('studio-field-/widgets/0/form'))
+    expect(onChange.mock.calls).toEqual([
+      ['/widgets/0/form', 'RequestForm'],
+      ['/widgets/0/entity', undefined],
+    ])
+  })
+
+  it('picking an entity clears the form', async () => {
+    const onChange = renderEditor(page({ type: 'detail', form: 'RequestForm', record: '' }))
+
+    await chooseOption('Supplier', screen.getByTestId('studio-field-/widgets/0/entity'))
+    expect(onChange.mock.calls).toEqual([
+      ['/widgets/0/entity', 'Supplier'],
+      ['/widgets/0/form', undefined],
+    ])
+  })
+
+  it('lists only the required reference parameters whose target is the entity, ignoring letter case', async () => {
+    renderEditor(page({ type: 'detail', entity: 'PurchaseRequest', record: '' }, { parameters: detailParameters }))
+
+    await userEvent.click(within(screen.getByTestId('studio-field-/widgets/0/record')).getByRole('combobox'))
+    await waitFor(() => expect(optionTexts(shownDropdown()!)).toEqual(['request']))
+  })
+
+  it('lists every required reference parameter when the widget names a form', async () => {
+    renderEditor(page({ type: 'detail', form: 'RequestForm', record: '' }, { parameters: detailParameters }))
+
+    await userEvent.click(within(screen.getByTestId('studio-field-/widgets/0/record')).getByRole('combobox'))
+    await waitFor(() => expect(optionTexts(shownDropdown()!)).toEqual(['request', 'supplier']))
+  })
+
+  it('picks a record and writes it at its pointer', async () => {
+    const onChange = renderEditor(
+      page({ type: 'detail', entity: 'PurchaseRequest', record: '' }, { parameters: detailParameters }),
+    )
+
+    await chooseOption('request', screen.getByTestId('studio-field-/widgets/0/record'))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/record', 'request')
+  })
+
+  it('offers Add action and Add navigate action', () => {
+    renderEditor(page({ type: 'detail', entity: 'PurchaseRequest', record: 'request', actions: [] }))
+
+    expect(screen.getByRole('button', { name: 'Add action' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Add navigate action' })).toBeVisible()
+  })
+
+  it('adds a new detail with an empty record', async () => {
+    const onChange = renderEditor(page(table))
+
+    await chooseOption('detail', selectRoot(screen.getByRole('combobox', { name: 'Add widget' })))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [table, { type: 'detail', record: '' }])
+  })
+
+  it('adds an empty record when a taskInbox becomes a detail', async () => {
+    const onChange = renderEditor(page({ type: 'taskInbox' }))
+
+    await chooseOption('detail', screen.getByTestId('studio-field-/widgets/0/type'))
+    expect(onChange.mock.calls).toEqual([
+      ['/widgets/0/type', 'detail'],
+      ['/widgets/0/record', ''],
+    ])
+  })
+})
+
 describe('PageEditor widget type', () => {
   it('drops the known keys the new type does not take and keeps the others', async () => {
     const onChange = renderEditor(page({ ...form, form: 'RequestForm', 'x-note': 'keep' }))
@@ -851,13 +936,13 @@ describe('PageEditor widget tree', () => {
     expect(within(panel).getByTestId('studio-json-only')).toBeVisible()
   })
 
-  it('keeps the type picker of a leaf widget to the four types with a panel', async () => {
+  it('keeps the type picker of a leaf widget to the five types with a panel', async () => {
     renderEditor(tree())
 
     await userEvent.click(screen.getByTestId('studio-widget-/widgets/1'))
     await userEvent.click(screen.getByRole('combobox', { name: 'Widget type' }))
     await waitFor(() =>
-      expect(optionTexts(shownDropdown()!)).toEqual(['table', 'form', 'taskInbox', 'processInspector']),
+      expect(optionTexts(shownDropdown()!)).toEqual(['table', 'form', 'taskInbox', 'processInspector', 'detail']),
     )
   })
 })

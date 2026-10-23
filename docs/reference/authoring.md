@@ -304,7 +304,7 @@ agrees it. The answer is:
 ```
 { locales: ["en", "vi"],
   entities: [{ id, name, module, fields: [{ name, type, target, values }] }],
-  dataSources: [{ id, name, module, parameters: [{ name, type }], columns: [{ name, type }] }],
+  dataSources: [{ id, name, module, parameters: [{ name, type }], columns: [{ name, type }], groupBy }],
   processes: [{ id, name, steps: [{ name, type, outcomes: [...] }] }],
   rules: [{ id, name, module, parameters: [{ name, type }], resultType }],
   connectors: [{ id, name, operations: [{ name }] }],
@@ -321,11 +321,16 @@ agrees it. The answer is:
   under their `<module id>/<name>` names too, but only entities, data sources
   and rules carry `module`. A module resource's `id` is the id written in its
   module file.
-- **`columns`.** The projected fields of a data source, in order. A column's
+- **`columns`.** A plain data source lists its fields in order. A column's
   `type` is the type of the field at the end of its path, or null when the path
-  does not resolve. A grouped data source also lists its measures. A `count`
-  measure is an `integer`, and any other measure has the type of the field it
-  measures.
+  does not resolve. A grouped data source lists its group fields in `groupBy`
+  order, then its measures, as a grouped row holds them. See
+  [data sources](data-sources.md#aggregates). A `count` measure is an `integer`.
+  Any other measure has the type of the field it measures, even when that field
+  is not a group field.
+- **`groupBy`.** The group field list of a grouped data source. It is `[]` for
+  one total row, and null for a plain data source. A group field that names no
+  field is still listed as a column, with a null type.
 - **Order.** Each list holds the module resources first, then the
   application's own in file path order. A step that is not a task has
   `outcomes: []`. Text keys are sorted ordinally.

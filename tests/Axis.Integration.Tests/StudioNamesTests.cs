@@ -40,6 +40,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
         RenameApplication(Path.Combine(_broken.Path, "application.json"), "BrokenRequests");
         BreakProcess(Path.Combine(_broken.Path, "processes", "purchase-request-approval.json"));
         AddPageWithParameter(Path.Combine(_broken.Path, "pages", "request-detail.json"));
+        AddGroupField(Path.Combine(_broken.Path, "data-sources", "requests-by-department.json"), "missingField");
 
         var connectionString = await _database.CreateDatabaseAsync("studio_names", CancellationToken);
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -98,6 +99,37 @@ public sealed class StudioNamesTests : IAsyncLifetime
         var step = Named(process, "steps", "managerApproval");
         Assert.Equal("task", step.GetProperty("type").GetString());
         Assert.Equal(["approve", "return", "reject"], step.GetProperty("outcomes").EnumerateArray().Select(outcome => outcome.GetString()));
+    }
+
+    [Fact]
+    public async Task Names_list_the_group_fields_and_measures_of_a_grouped_data_source()
+    {
+        var names = await NamesAsync("PurchaseRequests");
+
+        var grouped = Named(names, "dataSources", "RequestsByDepartment");
+        Assert.Equal(["department"], grouped.GetProperty("groupBy").EnumerateArray().Select(field => field.GetString()));
+        var groupedColumns = grouped.GetProperty("columns").EnumerateArray().ToList();
+        Assert.Equal(["department", "requests", "total"], groupedColumns.Select(column => column.GetProperty("name").GetString()));
+        Assert.Equal("integer", groupedColumns[1].GetProperty("type").GetString());
+        Assert.Equal("decimal", groupedColumns[2].GetProperty("type").GetString());
+
+        var plain = Named(names, "dataSources", "PurchaseRequestList");
+        Assert.Equal(JsonValueKind.Null, plain.GetProperty("groupBy").ValueKind);
+        Assert.Equal(
+            ["title", "requester", "department", "supplier", "currency", "totalAmount", "status", "submittedAt"],
+            plain.GetProperty("columns").EnumerateArray().Select(column => column.GetProperty("name").GetString()));
+    }
+
+    [Fact]
+    public async Task Names_list_a_group_field_that_names_no_field_with_a_null_type()
+    {
+        var names = await NamesAsync("BrokenRequests");
+
+        var grouped = Named(names, "dataSources", "RequestsByDepartment");
+        Assert.Equal(["department", "missingField"], grouped.GetProperty("groupBy").EnumerateArray().Select(field => field.GetString()));
+        var columns = grouped.GetProperty("columns").EnumerateArray().ToList();
+        Assert.Equal(["department", "missingField", "requests", "total"], columns.Select(column => column.GetProperty("name").GetString()));
+        Assert.Equal(JsonValueKind.Null, columns[1].GetProperty("type").ValueKind);
     }
 
     [Fact]
@@ -191,6 +223,13 @@ public sealed class StudioNamesTests : IAsyncLifetime
         var process = JsonNode.Parse(File.ReadAllText(file))!.AsObject();
         process["steps"] = "broken";
         File.WriteAllText(file, process.ToJsonString());
+    }
+
+    private static void AddGroupField(string file, string field)
+    {
+        var dataSource = JsonNode.Parse(File.ReadAllText(file))!.AsObject();
+        dataSource["aggregate"]!["groupBy"]!.AsArray().Add(field);
+        File.WriteAllText(file, dataSource.ToJsonString());
     }
 
     private static void AddPageWithParameter(string file)

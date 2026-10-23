@@ -78,6 +78,21 @@ describe('typeChanges', () => {
     const changes = typeChanges({ type: 'form', 'x-note': 'keep', layout: {} }, 'taskInbox')
     expect(changes.map(([pointer]) => pointer)).toEqual(['/type'])
   })
+
+  it('adds an empty record when a form becomes a detail and keeps its entity and actions', () => {
+    expect(typeChanges({ type: 'form', entity: 'Order', actions: [] }, 'detail')).toEqual([
+      ['/type', 'detail'],
+      ['/record', ''],
+    ])
+  })
+
+  it('removes the record when a detail becomes a table', () => {
+    expect(typeChanges({ type: 'detail', entity: 'Order', form: 'F', record: 'order' }, 'table')).toEqual([
+      ['/type', 'table'],
+      ['/form', undefined],
+      ['/record', undefined],
+    ])
+  })
 })
 
 describe('widget keys', () => {
@@ -89,6 +104,7 @@ describe('widget keys', () => {
       'entity',
       'form',
       'process',
+      'record',
       'rowActions',
       'toolbarActions',
     ])
@@ -125,9 +141,13 @@ describe('newWidget', () => {
     expect(newWidget('table')).toEqual({ type: 'table' })
   })
 
+  it('gives a detail an empty record', () => {
+    expect(newWidget('detail')).toEqual({ type: 'detail', record: '' })
+  })
+
   it('adds the containers to the addable types and keeps the types with a panel apart', () => {
     expect(addableTypes).toEqual([...widgetTypes, ...containerTypes])
-    expect(widgetTypes).toEqual(['table', 'form', 'taskInbox', 'processInspector'])
+    expect(widgetTypes).toEqual(['table', 'form', 'taskInbox', 'processInspector', 'detail'])
   })
 })
 
