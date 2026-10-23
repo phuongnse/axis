@@ -15,6 +15,14 @@ async function noSideways(page: Page) {
 async function choose(page: Page, field: string, label: string, name: string) {
   await page.getByTestId(`reference-${field}`).getByRole('button', { name: 'Choose', exact: true }).click()
   const dialog = page.getByRole('dialog')
+  // The dialog zooms in. A click that lands while it still grows can miss the row, so wait until it has settled.
+  await expect
+    .poll(async () => {
+      const before = await dialog.boundingBox()
+      await page.waitForTimeout(100)
+      return JSON.stringify(before) === JSON.stringify(await dialog.boundingBox())
+    })
+    .toBe(true)
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
   await expect(dialog).toBeHidden()
   await expect(page.getByLabel(label, { exact: true })).toHaveValue(name)
