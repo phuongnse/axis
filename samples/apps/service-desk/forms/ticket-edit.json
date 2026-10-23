@@ -1,0 +1,44 @@
+{
+  "id": "1db765b0-483d-456b-9939-17e2a36de3b6",
+  "kind": "form",
+  "name": "TicketEdit",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "sections": [
+    {
+      "title": {
+        "textKey": "ticket.sections.ticket"
+      },
+      "fields": [
+        {
+          "field": "number"
+        },
+        {
+          "field": "title"
+        },
+        {
+          "field": "description"
+        },
+        {
+          "field": "category"
+        },
+        {
+          "field": "priority"
+        },
+        {
+          "field": "requester"
+        },
+        {
+          "field": "assignedAgent"
+        },
+        {
+          "field": "status"
+        },
+        {
+          "field": "resolution",
+          "visibleWhen": "status == 'resolved'"
+        }
+      ]
+    }
+  ]
+}
