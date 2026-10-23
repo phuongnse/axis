@@ -134,7 +134,12 @@ test.describe('Studio builds a page with two columns', () => {
     ])
 
     await page.getByRole('button', { name: 'Publish', exact: true }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Publish', exact: true }).click()
+    // A click that lands while the dialog is still opening is lost and the dialog stays open, so click again until it closes.
+    const publishDialog = page.getByRole('dialog')
+    await expect(async () => {
+      await publishDialog.getByRole('button', { name: 'Publish', exact: true }).click({ timeout: 5_000 })
+      await expect(publishDialog).toBeHidden({ timeout: 5_000 })
+    }).toPass({ timeout: 30_000 })
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 60_000,
     })
