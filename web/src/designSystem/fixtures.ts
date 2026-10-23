@@ -1,0 +1,312 @@
+import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
+import type { InstancePage } from '../platform/inspection'
+import type {
+  EntityMetadata,
+  EntityWidgetMetadata,
+  FieldMetadata,
+  FieldType,
+  FormMetadata,
+  WidgetMetadata,
+} from '../platform/site'
+import type { TaskPage } from '../platform/tasks'
+
+/** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
+export const application = 'DesignSystemSample'
+/** The path of the fixture application's site. */
+export const sitePath = 'sample'
+export const locale = 'en'
+
+const apiPath = `/api/apps/${application}`
+const requestsPath = `${apiPath}/entities/Request/records`
+const categoriesPath = `${apiPath}/entities/Category/records`
+const tasksPath = `${apiPath}/tasks`
+const instancesPath = `${apiPath}/processes/Approve/instances`
+
+export const requestId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
+const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
+const releaseId = '3d2c1b0a-9f8e-4d7c-8b6a-5f4e3d2c1b0a'
+
+function field(name: string, type: FieldType, labelKey: string): FieldMetadata {
+  return {
+    name,
+    type,
+    labelKey,
+    required: false,
+    unique: false,
+    computed: false,
+    sequence: false,
+    creator: false,
+    maxLength: null,
+    precision: null,
+    scale: null,
+    values: null,
+    target: null,
+    fields: null,
+  }
+}
+
+/** One field of each type. The names are the labels' keys without their prefix. */
+export const fields: Record<FieldType, FieldMetadata> = {
+  text: { ...field('title', 'text', 'request.title'), maxLength: 200 },
+  integer: field('quantity', 'integer', 'request.quantity'),
+  decimal: { ...field('amount', 'decimal', 'request.amount'), precision: 18, scale: 2 },
+  boolean: field('urgent', 'boolean', 'request.urgent'),
+  date: field('neededOn', 'date', 'request.neededOn'),
+  'date-time': field('submittedAt', 'date-time', 'request.submittedAt'),
+  enum: { ...field('status', 'enum', 'request.status'), values: ['draft', 'submitted', 'approved'] },
+  reference: {
+    ...field('category', 'reference', 'request.category'),
+    target: { entity: 'Category', displayField: 'name', recordsPath: categoriesPath },
+  },
+  'child-collection': {
+    ...field('lines', 'child-collection', 'request.lines'),
+    fields: [
+      { ...field('description', 'text', 'requestLine.description'), maxLength: 100 },
+      field('count', 'integer', 'requestLine.count'),
+    ],
+  },
+}
+
+export const entity: EntityMetadata = {
+  name: 'Request',
+  labelKey: 'request.label',
+  displayField: 'title',
+  recordsPath: requestsPath,
+  fields: Object.values(fields),
+}
+
+/** The entity cut down to one field, so a preview shows only that field's input. */
+export function entityWithField(type: FieldType): EntityMetadata {
+  return { ...entity, fields: [fields[type]] }
+}
+
+const widgetBase: WidgetMetadata = {
+  type: 'table',
+  entity: null,
+  dataSource: null,
+  form: null,
+  tasksPath: null,
+  process: null,
+  instancesPath: null,
+  actions: [],
+  rowActions: [],
+  toolbarActions: [],
+  parameters: {},
+  access: null,
+  detail: null,
+  kpi: null,
+}
+
+const access = {
+  actions: ['read', 'create', 'update', 'delete'] as ('read' | 'create' | 'update' | 'delete')[],
+  createFields: entity.fields.map(({ name }) => name),
+  updateFields: entity.fields.map(({ name }) => name),
+}
+
+export const tableWidget: WidgetMetadata = {
+  ...widgetBase,
+  type: 'table',
+  entity,
+  access,
+  toolbarActions: [
+    {
+      type: 'navigate',
+      page: 'Request',
+      labelKey: 'request.new',
+      parameters: {},
+      record: null,
+      opensForm: true,
+      visibleWhen: null,
+    },
+  ],
+  rowActions: [
+    {
+      type: 'navigate',
+      page: 'Request',
+      labelKey: 'request.open',
+      parameters: {},
+      record: 'id',
+      opensForm: true,
+      visibleWhen: null,
+    },
+    { type: 'delete', labelKey: 'request.delete', recordsPath: requestsPath, visibleWhen: null },
+  ],
+}
+
+const form: FormMetadata = {
+  name: 'RequestForm',
+  sections: [
+    {
+      titleKey: 'request.section.general',
+      fields: ['title', 'category', 'status', 'urgent'].map((name) => ({ name, readOnly: false })),
+    },
+    {
+      titleKey: 'request.section.details',
+      fields: ['quantity', 'amount', 'neededOn', 'submittedAt', 'lines'].map((name) => ({ name, readOnly: false })),
+    },
+  ],
+}
+
+export const formWidget: EntityWidgetMetadata = {
+  ...widgetBase,
+  type: 'form',
+  entity,
+  form,
+  access,
+  actions: [
+    {
+      type: 'startProcess',
+      process: 'Approve',
+      labelKey: 'request.submit',
+      instancesPath,
+      visibleWhen: null,
+    },
+  ],
+}
+
+/** A form over a one-field entity, for the preview of that field type's input. */
+export function fieldWidget(type: FieldType): EntityWidgetMetadata {
+  return { ...formWidget, entity: entityWithField(type), form: null, actions: [] }
+}
+
+export const taskInboxWidget: WidgetMetadata = { ...widgetBase, type: 'taskInbox', tasksPath }
+
+export const processInspectorWidget: WidgetMetadata = {
+  ...widgetBase,
+  type: 'processInspector',
+  process: 'Approve',
+  instancesPath,
+}
+
+const savedRequest = (id: string, title: string, status: string): RecordItem => ({
+  id,
+  version: 1,
+  values: {
+    title,
+    quantity: '12',
+    amount: '1250.50',
+    urgent: true,
+    neededOn: '2026-03-18',
+    submittedAt: '2026-03-04T09:30:00.000000Z',
+    status,
+    category: categoryId,
+    lines: [
+      { description: 'Standing desk', count: '2' },
+      { description: 'Desk lamp', count: '10' },
+    ],
+  },
+  labels: { category: 'Office furniture' },
+})
+
+export const savedRecord = savedRequest(requestId, 'Standing desks for the new office', 'submitted')
+
+const recordPage: RecordPage = {
+  items: [
+    savedRecord,
+    savedRequest('7a2d3b4c-5e6f-4a71-9b82-a3c4d5e6f708', 'Replacement laptop chargers', 'approved'),
+    savedRequest('8b3e4c5d-6f70-4b82-8c93-b4d5e6f70819', 'Whiteboard markers', 'draft'),
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 3,
+}
+
+const history: HistoryPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
+
+const taskPage: TaskPage = {
+  items: [
+    {
+      id: '9c4f5d6e-7081-4c93-9da4-c5e6f708192a',
+      releaseId,
+      process: 'Approve',
+      step: 'Review',
+      labelKey: 'request.task.review',
+      subject: { entity: 'Request', id: requestId, label: 'Standing desks for the new office' },
+      dueAt: '2026-03-20T17:00:00.000000Z',
+      createdAt: '2026-03-04T09:31:00.000000Z',
+    },
+    {
+      id: 'ad5a6e7f-8192-4da4-aeb5-d6f708192a3b',
+      releaseId,
+      process: 'Approve',
+      step: 'Review',
+      labelKey: 'request.task.review',
+      subject: { entity: 'Request', id: '8b3e4c5d-6f70-4b82-8c93-b4d5e6f70819', label: 'Whiteboard markers' },
+      dueAt: null,
+      createdAt: '2026-03-05T14:02:00.000000Z',
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 2,
+}
+
+const instancePage: InstancePage = {
+  items: [
+    {
+      id: 'be6b7f80-92a3-4eb5-bfc6-e708192a3b4c',
+      subjectId: requestId,
+      state: 'waiting',
+      step: 'Review',
+      releaseId,
+      createdAt: '2026-03-04T09:31:00.000000Z',
+      endedAt: null,
+    },
+    {
+      id: 'cf7c8091-a3b4-4fc6-80d7-f8192a3b4c5d',
+      subjectId: '7a2d3b4c-5e6f-4a71-9b82-a3c4d5e6f708',
+      state: 'completed',
+      step: 'Done',
+      releaseId,
+      createdAt: '2026-03-02T11:15:00.000000Z',
+      endedAt: '2026-03-03T08:40:00.000000Z',
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 2,
+}
+
+const categoryPage: RecordPage = {
+  items: [{ id: categoryId, version: 1, values: { name: 'Office furniture' }, labels: {} }],
+  page: 1,
+  pageSize: 20,
+  totalCount: 1,
+}
+
+/** The site texts, in English. */
+export const siteTexts: Record<string, string> = {
+  'request.label': 'Request',
+  'request.title': 'Title',
+  'request.quantity': 'Quantity',
+  'request.amount': 'Amount',
+  'request.urgent': 'Urgent',
+  'request.neededOn': 'Needed on',
+  'request.submittedAt': 'Submitted at',
+  'request.status': 'Status',
+  'request.category': 'Category',
+  'request.lines': 'Lines',
+  'requestLine.description': 'Description',
+  'requestLine.count': 'Count',
+  'request.section.general': 'General',
+  'request.section.details': 'Details',
+  'request.new': 'New request',
+  'request.open': 'Open',
+  'request.delete': 'Delete',
+  'request.submit': 'Submit for approval',
+  'request.task.review': 'Review the request',
+}
+
+/**
+ * The answers of the fixture application's APIs, by path or by path and query. The page's own
+ * queries (paging, sorting) are answered by the path alone.
+ */
+export const routes: Record<string, () => unknown> = {
+  [requestsPath]: () => recordPage,
+  [`${requestsPath}/${requestId}`]: () => savedRecord,
+  [`${requestsPath}/${requestId}/history`]: () => history,
+  [categoriesPath]: () => categoryPage,
+  [tasksPath]: () => taskPage,
+  [instancesPath]: () => instancePage,
+  [`/api/sites/${sitePath}/texts/${locale}`]: () => ({ texts: siteTexts }),
+}

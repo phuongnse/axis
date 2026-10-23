@@ -5,7 +5,7 @@ import { ThemeModeContext, type ThemeMode } from './themeMode'
 
 const storageKey = 'axis.themeMode'
 
-function initialMode(): ThemeMode {
+function storedMode(): ThemeMode {
   try {
     const stored = localStorage.getItem(storageKey)
     if (stored === 'light' || stored === 'dark') {
@@ -17,8 +17,14 @@ function initialMode(): ThemeMode {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-export function ThemeModeProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>(initialMode)
+interface ThemeModeProviderProps {
+  /** Starts in this mode, ignoring the stored choice and the system setting. Design-system previews fix it. */
+  initialMode?: ThemeMode
+  children: ReactNode
+}
+
+export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderProps) {
+  const [mode, setMode] = useState<ThemeMode>(() => initialMode ?? storedMode())
 
   const toggleMode = useCallback(() => {
     setMode((current) => {
