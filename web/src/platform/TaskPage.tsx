@@ -89,10 +89,10 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
     return <NotFoundPage />
   }
   if (task === assignedElsewhere) {
-    return <Alert data-testid="task-assigned-elsewhere" type="warning" message={t('shell.task.assignedElsewhere')} />
+    return <Alert data-testid="task-assigned-elsewhere" type="warning" title={t('shell.task.assignedElsewhere')} />
   }
   if (task === 'failed' || releaseTexts.failed) {
-    return <Alert data-testid="task-load-error" type="error" message={t('shell.task.loadFailed')} />
+    return <Alert data-testid="task-load-error" type="error" title={t('shell.task.loadFailed')} />
   }
   // The previous release texts stay on screen while a new locale loads, so the form is not remounted.
   if (!releaseCatalog) {
@@ -155,7 +155,7 @@ function TaskBody({ task, tasksPath, locale, open, onDone, onAssignedElsewhere, 
           onDecided={onDecided}
         />
       ) : (
-        <Alert data-testid="task-completed" type="info" message={t('shell.task.completed')} />
+        <Alert data-testid="task-completed" type="info" title={t('shell.task.completed')} />
       )}
     </Flex>
   )
@@ -235,13 +235,11 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
     return null
   }
   if (ready === 'failed') {
-    return <Alert data-testid="task-load-error" type="error" message={t('shell.task.loadFailed')} />
+    return <Alert data-testid="task-load-error" type="error" title={t('shell.task.loadFailed')} />
   }
   return (
     <Flex vertical gap="middle">
-      {form.formErrors.length > 0 && (
-        <Alert data-testid="form-error" type="error" message={form.formErrors.join(' ')} />
-      )}
+      {form.formErrors.length > 0 && <Alert data-testid="form-error" type="error" title={form.formErrors.join(' ')} />}
       <Form layout="vertical">{form.fields}</Form>
       <Flex gap="small">
         {task.outcomes.map((outcome, index) => (

@@ -122,7 +122,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     return <div data-testid="detail" aria-busy="true" />
   }
   if (load === 'failed') {
-    return <Alert data-testid="detail-load-error" type="error" message={t('shell.form.loadFailed')} />
+    return <Alert data-testid="detail-load-error" type="error" title={t('shell.form.loadFailed')} />
   }
   if (load === 'missing' || record === null) {
     return <NotFoundPage />
@@ -154,8 +154,8 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
 
   return (
     <Flex vertical gap="middle" data-testid="detail" aria-busy="false">
-      {started && <Alert data-testid="detail-started" type="success" message={t('shell.form.processStarted')} />}
-      {errors.length > 0 && <Alert data-testid="detail-error" type="error" message={errors.join(' ')} />}
+      {started && <Alert data-testid="detail-started" type="success" title={t('shell.form.processStarted')} />}
+      {errors.length > 0 && <Alert data-testid="detail-error" type="error" title={errors.join(' ')} />}
       {sections.map((section, index) => (
         <Fragment key={index}>
           {section.titleKey !== null && <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>}

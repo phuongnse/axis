@@ -110,7 +110,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   return (
     <Card data-testid="record-history" aria-busy={loading} title={t('shell.history.title')} size="small">
       {failed ? (
-        <Alert data-testid="record-history-error" type="error" message={t('shell.history.loadFailed')} />
+        <Alert data-testid="record-history-error" type="error" title={t('shell.history.loadFailed')} />
       ) : (
         <List<HistoryItem>
           loading={loading}

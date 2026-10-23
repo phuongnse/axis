@@ -108,13 +108,13 @@ export function ProcessInstancePage({
     return null
   }
   if (instance === null) {
-    return <Alert data-testid="inspector-not-found" type="warning" message={t('shell.inspector.notFound')} />
+    return <Alert data-testid="inspector-not-found" type="warning" title={t('shell.inspector.notFound')} />
   }
   if (instance === forbidden) {
-    return <Alert data-testid="inspector-forbidden" type="warning" message={t('shell.inspector.forbidden')} />
+    return <Alert data-testid="inspector-forbidden" type="warning" title={t('shell.inspector.forbidden')} />
   }
   if (instance === 'failed' || releaseTexts.failed) {
-    return <Alert data-testid="inspector-error" type="error" message={t('shell.inspector.loadFailed')} />
+    return <Alert data-testid="inspector-error" type="error" title={t('shell.inspector.loadFailed')} />
   }
   // The previous release texts stay on screen while a new locale loads.
   if (!releaseCatalog) {
@@ -394,7 +394,7 @@ function CommandDialog({ command, instance, instancesPath, onClose, onChanged }:
           <Alert
             data-testid="inspector-retry-warning"
             type="warning"
-            message={t('shell.inspector.commands.retryWarning')}
+            title={t('shell.inspector.commands.retryWarning')}
           />
         )}
         <Form form={form} layout="vertical">
@@ -409,7 +409,7 @@ function CommandDialog({ command, instance, instancesPath, onClose, onChanged }:
             <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
           </Form.Item>
         </Form>
-        {error !== undefined && <Alert data-testid="inspector-command-error" type="error" message={error} />}
+        {error !== undefined && <Alert data-testid="inspector-command-error" type="error" title={error} />}
       </Flex>
     </Modal>
   )

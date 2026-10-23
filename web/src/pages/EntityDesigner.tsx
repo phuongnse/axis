@@ -355,7 +355,7 @@ function Fields({
                     <Alert
                       type="warning"
                       data-testid={`studio-migration-warning-/fields/${index}`}
-                      message={t(
+                      title={t(
                         warnings.get(index) === 'enum'
                           ? 'shell.studio.entity.migration.enumWarning'
                           : 'shell.studio.entity.migration.uniqueWarning',

@@ -133,7 +133,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
   }
 
   if (failed || releaseTexts.failed) {
-    return <Alert data-testid="tasks-error" type="error" message={t('shell.tasks.loadFailed')} />
+    return <Alert data-testid="tasks-error" type="error" title={t('shell.tasks.loadFailed')} />
   }
   return (
     <div aria-busy={loading || textsLoading}>

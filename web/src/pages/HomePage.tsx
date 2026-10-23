@@ -41,9 +41,9 @@ function SiteList() {
   return (
     <Card title={t('shell.home.sites.title')}>
       {failed ? (
-        <Alert data-testid="sites-error" type="error" message={t('shell.home.sites.loadFailed')} />
+        <Alert data-testid="sites-error" type="error" title={t('shell.home.sites.loadFailed')} />
       ) : sites === null ? (
-        <Alert data-testid="sites-sign-in" type="info" message={t('shell.home.sites.signIn')} />
+        <Alert data-testid="sites-sign-in" type="info" title={t('shell.home.sites.signIn')} />
       ) : (
         <List
           loading={!sites}

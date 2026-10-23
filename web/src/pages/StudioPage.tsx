@@ -96,7 +96,7 @@ export function StudioPage() {
 
   return (
     <StudioConnectionContext.Provider value={connection}>
-      {reconnecting && <Alert data-testid="studio-reconnecting" type="info" message={t('shell.studio.reconnecting')} />}
+      {reconnecting && <Alert data-testid="studio-reconnecting" type="info" title={t('shell.studio.reconnecting')} />}
       <StudioWorkspace />
     </StudioConnectionContext.Provider>
   )
@@ -296,12 +296,12 @@ function StudioWorkspace() {
     )
   }
   if (apps === 'failed') {
-    return <Alert data-testid="studio-load-error" type="error" message={t('shell.studio.loadFailed')} />
+    return <Alert data-testid="studio-load-error" type="error" title={t('shell.studio.loadFailed')} />
   }
   if (apps.length === 0) {
     return (
       <Flex vertical gap="middle">
-        <Alert data-testid="studio-no-applications" type="info" message={t('shell.studio.noApplications')} />
+        <Alert data-testid="studio-no-applications" type="info" title={t('shell.studio.noApplications')} />
         {canCreate && <StudioNewApplication onCreated={onApplicationCreated} />}
       </Flex>
     )
@@ -358,7 +358,7 @@ function StudioWorkspace() {
         />
       )}
       {application !== null && loaded && 'failed' in loaded && (
-        <Alert data-testid="studio-load-error" type="error" message={t('shell.studio.loadFailed')} />
+        <Alert data-testid="studio-load-error" type="error" title={t('shell.studio.loadFailed')} />
       )}
       {loaded && 'resources' in loaded && (
         <>

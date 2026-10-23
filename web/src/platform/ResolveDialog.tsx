@@ -148,7 +148,7 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
             </fieldset>
           )}
         </Form>
-        {error !== undefined && <Alert data-testid="inspector-command-error" type="error" message={error} />}
+        {error !== undefined && <Alert data-testid="inspector-command-error" type="error" title={error} />}
       </Flex>
     </Modal>
   )

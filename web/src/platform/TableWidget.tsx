@@ -440,8 +440,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           onChange={onFilter}
         />
       )}
-      {actionError !== null && <Alert data-testid="table-action-error" type="error" message={actionError} />}
-      {actionDone !== null && <Alert data-testid="table-action-done" type="success" message={actionDone} />}
+      {actionError !== null && <Alert data-testid="table-action-error" type="error" title={actionError} />}
+      {actionDone !== null && <Alert data-testid="table-action-done" type="success" title={actionDone} />}
       {confirming !== null && (
         <Modal
           open
@@ -455,7 +455,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         />
       )}
       {failed ? (
-        <Alert data-testid="records-error" type="error" message={t('shell.table.loadFailed')} />
+        <Alert data-testid="records-error" type="error" title={t('shell.table.loadFailed')} />
       ) : (
         <Table<TableRow>
           // The group values are unique per group row.

@@ -231,7 +231,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     return <NotFoundPage />
   }
   if (load === 'failed') {
-    return <Alert data-testid="form-load-error" type="error" message={t('shell.form.loadFailed')} />
+    return <Alert data-testid="form-load-error" type="error" title={t('shell.form.loadFailed')} />
   }
 
   return (
@@ -241,13 +241,13 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
           <Alert
             data-testid="form-conflict"
             type="warning"
-            message={t('shell.form.conflict')}
+            title={t('shell.form.conflict')}
             action={<Button onClick={reload}>{t('shell.form.reload')}</Button>}
           />
         )}
-        {started && <Alert data-testid="form-started" type="success" message={t('shell.form.processStarted')} />}
+        {started && <Alert data-testid="form-started" type="success" title={t('shell.form.processStarted')} />}
         {form.formErrors.length > 0 && (
-          <Alert data-testid="form-error" type="error" message={form.formErrors.join(' ')} />
+          <Alert data-testid="form-error" type="error" title={form.formErrors.join(' ')} />
         )}
         <Form layout="vertical" onFinish={save}>
           {form.fields}
