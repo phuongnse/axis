@@ -228,4 +228,6 @@ public static class DiagnosticCodes
     public const string KpiDataSourceNotTotal = "AXC0237";
     public const string UnknownKpiMeasure = "AXC0238";
     public const string InvalidDetailRecord = "AXC0239";
+    public const string ChartDataSourceNotGrouped = "AXC0240";
+    public const string InvalidChartMeasure = "AXC0241";
 }

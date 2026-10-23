@@ -611,6 +611,12 @@ internal static class PresentationChecker
             return;
         }
 
+        if (type == WidgetType.Chart)
+        {
+            CheckChart(widget, path, page, loaded, findEntity, findDataSource, moduleReferences, references, diagnostics);
+            return;
+        }
+
         if (!isRecordLike && widget.Actions is not null)
         {
             // An action starts a process for one record, which only a form or a detail shows.
@@ -909,6 +915,161 @@ internal static class PresentationChecker
                 $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A kpi has no filter input, so every parameter of its data source must be optional.",
                 $"{path}/dataSource");
         }
+    }
+
+    /// <summary>
+    /// Checks a <c>chart</c> widget. It draws the groups of a data source, so it binds no entity or form and has no
+    /// actions. The data source has an aggregate grouped by exactly one field, the category is that field, each
+    /// measure is a number of the aggregate, a <c>pie</c> has one measure and no data source parameter is required,
+    /// because a chart has no filter input.
+    /// </summary>
+    private static void CheckChart(
+        WidgetDefinition widget,
+        string path,
+        PageResource page,
+        ApplicationLoadResult loaded,
+        Func<string, EntityResource?> findEntity,
+        Func<string, DataSourceResource?> findDataSource,
+        ModuleReferences moduleReferences,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics)
+    {
+        void Report(string code, string message, string path) =>
+            diagnostics.Add(new Diagnostic(code, message, page.File, path, page.Id));
+
+        foreach (var (property, value) in new[] { ("entity", widget.Entity), ("form", widget.Form) })
+        {
+            if (value is not null)
+            {
+                Report(DiagnosticCodes.InvalidWidgetBinding, $"'{property}' does not apply to chart widgets.", $"{path}/{property}");
+            }
+        }
+
+        if (widget.Actions is not null)
+        {
+            Report(DiagnosticCodes.InvalidWidgetBinding, "'actions' applies only to form and detail widgets.", $"{path}/actions");
+        }
+
+        ReportTableActions(widget, path, Report);
+
+        // The page schema requires the data source, the kind, the category, the measures and the title on a chart.
+        ApplicationCompiler.CheckTextKey(widget.Title!, page, $"{path}/title", references, diagnostics);
+        for (var index = 0; index < widget.Measures!.Count; index++)
+        {
+            ApplicationCompiler.CheckTextKey(widget.Measures[index].Label, page, $"{path}/measures/{index}/label", references, diagnostics);
+        }
+
+        var dataSourceName = widget.DataSource!;
+        if (findDataSource(dataSourceName) is { } dataSource)
+        {
+            references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
+            CheckChartDataSource(widget, path, dataSource, findEntity, Report);
+        }
+        else if (!loaded.UnloadedDataSourceNames.Contains(dataSourceName)
+            && !moduleReferences.ReportUndeclared(dataSourceName, $"{path}/dataSource", Report))
+        {
+            Report(
+                DiagnosticCodes.UnknownWidgetDataSource,
+                $"The data source '{dataSourceName}' was not found. No loaded data source has that name.",
+                $"{path}/dataSource");
+        }
+    }
+
+    /// <summary>
+    /// Checks the data source of a <c>chart</c> widget: one group field that is the category, numeric measures that the
+    /// aggregate declares, one measure on a <c>pie</c> and no required parameter.
+    /// </summary>
+    private static void CheckChartDataSource(
+        WidgetDefinition widget,
+        string path,
+        DataSourceResource dataSource,
+        Func<string, EntityResource?> findEntity,
+        Action<string, string, string> report)
+    {
+        if (dataSource.Aggregate is not { } aggregate)
+        {
+            report(
+                DiagnosticCodes.ChartDataSourceNotGrouped,
+                $"The data source '{dataSource.Name}' must have an 'aggregate' with exactly one 'groupBy' field. A chart draws its groups.",
+                $"{path}/dataSource");
+            return;
+        }
+
+        if (aggregate.GroupBy.Count != 1)
+        {
+            report(
+                DiagnosticCodes.ChartDataSourceNotGrouped,
+                $"The data source '{dataSource.Name}' must have an 'aggregate' with exactly one 'groupBy' field, not {aggregate.GroupBy.Count}. A chart draws its groups.",
+                $"{path}/dataSource");
+        }
+        else if (!string.Equals(aggregate.GroupBy[0], widget.Category, StringComparison.OrdinalIgnoreCase))
+        {
+            report(
+                DiagnosticCodes.ChartDataSourceNotGrouped,
+                $"The category '{widget.Category}' must be the group field '{aggregate.GroupBy[0]}' of the data source '{dataSource.Name}'.",
+                $"{path}/category");
+        }
+
+        var measures = widget.Measures!;
+        for (var index = 0; index < measures.Count; index++)
+        {
+            var name = measures[index].Name;
+            var measure = aggregate.Measures.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (measure is null)
+            {
+                report(
+                    DiagnosticCodes.InvalidChartMeasure,
+                    $"The measure '{name}' was not found. The data source '{dataSource.Name}' has no measure with that name.",
+                    $"{path}/measures/{index}/name");
+            }
+            else if (!IsNumericMeasure(measure, dataSource, findEntity))
+            {
+                report(
+                    DiagnosticCodes.InvalidChartMeasure,
+                    $"The measure '{measure.Name}' is not a number. A chart draws a 'count' or a 'sum', or a 'min' or 'max' of an integer or a decimal.",
+                    $"{path}/measures/{index}/name");
+            }
+        }
+
+        if (string.Equals(widget.Kind, "pie", StringComparison.Ordinal) && measures.Count > 1)
+        {
+            report(
+                DiagnosticCodes.InvalidChartMeasure,
+                $"A pie chart draws one measure, not {measures.Count}.",
+                $"{path}/measures");
+        }
+
+        // A chart has no filter input and binds no page parameter, so a required parameter would fail every request.
+        foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true))
+        {
+            report(
+                DiagnosticCodes.InvalidWidgetBinding,
+                $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A chart has no filter input, so every parameter of its data source must be optional.",
+                $"{path}/dataSource");
+        }
+    }
+
+    /// <summary>
+    /// Whether a measure is a number. A <c>count</c> and a <c>sum</c> are. A <c>min</c> or <c>max</c> keeps the type of
+    /// its field, so it is a number only over an integer or a decimal. A field whose path does not resolve is not
+    /// reported again.
+    /// </summary>
+    private static bool IsNumericMeasure(DataSourceMeasureDefinition measure, DataSourceResource dataSource, Func<string, EntityResource?> findEntity)
+    {
+        if (measure.Function is "count" or "sum")
+        {
+            return true;
+        }
+
+        var field = dataSource.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, measure.Field, StringComparison.Ordinal));
+        if (field is null || findEntity(dataSource.Entity) is not { } root
+            || ApplicationCompiler.ResolvePath(root, field.Path, findEntity, _ => { }, out var hops) is not null
+            || hops.Count == 0)
+        {
+            return true;
+        }
+
+        return FieldTypes.Parse(hops[^1].Type) is FieldType.Integer or FieldType.Decimal;
     }
 
     /// <summary>Reports <c>parameters</c> on a widget that has no data source parameter to bind.</summary>

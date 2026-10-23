@@ -10,6 +10,7 @@
     { "dataSource": "NoteRows", "actions": ["read"] },
     { "dataSource": "CategoryNotes", "actions": ["read"] },
     { "dataSource": "NoteTotals", "actions": ["read"] },
+    { "dataSource": "NotesByCategory", "actions": ["read"] },
     { "process": "NoteReview", "actions": ["start"] },
     { "process": "NoteClose", "actions": ["start"] }
   ]

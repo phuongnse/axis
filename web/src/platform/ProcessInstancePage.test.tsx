@@ -30,6 +30,7 @@ const inspectorWidget: WidgetMetadata = {
   access: null,
   detail: null,
   kpi: null,
+  chart: null,
 }
 
 // The instance detail example of the processes reference, with an open task and two calls. The

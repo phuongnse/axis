@@ -13,7 +13,8 @@ namespace Axis.Configuration.Model;
 /// page parameters. <see cref="Process"/> is set only on a process inspector, which has no other reference.
 /// A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container with no reference of its own: it holds
 /// <see cref="Columns"/>, <see cref="Tabs"/> or <see cref="Widgets"/>, and every other widget leaves those empty.
-/// A <c>kpi</c> widget sets <see cref="DataSource"/> and <see cref="Kpi"/>, and no other reference. A <c>detail</c>
+/// A <c>kpi</c> widget sets <see cref="DataSource"/> and <see cref="Kpi"/>, and no other reference. A <c>chart</c> widget
+/// sets <see cref="DataSource"/> and <see cref="Chart"/>, and no other reference. A <c>detail</c>
 /// widget sets <see cref="Entity"/>, or <see cref="Form"/> and its entity, and <see cref="Detail"/>, and can hold
 /// <see cref="Actions"/>, as a form widget does.
 /// Records compare lists by reference, so two widgets with containers are equal only when they share those lists.
@@ -46,7 +47,7 @@ public sealed record WidgetModel(
     /// <summary>The tabs of a <c>tabs</c> widget, in page file order.</summary>
     public IReadOnlyList<WidgetTabModel> Tabs { get; init; } = [];
 
-    /// <summary>The title of a <c>section</c> widget, or null on any other widget.</summary>
+    /// <summary>The title of a <c>section</c> widget, or null on any other widget. A chart keeps its title in <see cref="Chart"/>.</summary>
     public TextReference? Title { get; init; }
 
     /// <summary>Whether a <c>section</c> widget starts collapsed.</summary>
@@ -57,6 +58,9 @@ public sealed record WidgetModel(
 
     /// <summary>What a <c>kpi</c> widget shows of its data source, or null on any other widget.</summary>
     public KpiModel? Kpi { get; init; }
+
+    /// <summary>What a <c>chart</c> widget draws of its data source, or null on any other widget.</summary>
+    public ChartModel? Chart { get; init; }
 
     /// <summary>What a <c>detail</c> widget shows, or null on any other widget.</summary>
     public DetailModel? Detail { get; init; }
@@ -77,6 +81,24 @@ public sealed record KpiModel(string Measure, TextReference Label, KpiComparison
 
 /// <summary>The second measure of a <c>kpi</c> widget, as its data source declares the name, and its label.</summary>
 public sealed record KpiComparisonModel(string Measure, TextReference Label);
+
+/// <summary>The kind of a <c>chart</c> widget.</summary>
+public enum ChartKind
+{
+    Bar,
+    Line,
+    Pie,
+}
+
+/// <summary>
+/// What a <c>chart</c> widget draws: the groups of its grouped data source, with the group field <paramref name="Category"/>
+/// and the <paramref name="Measures"/> as the data source declares their names. The title is the chart's accessible name.
+/// Records compare lists by reference, so two charts are equal only when they share the list.
+/// </summary>
+public sealed record ChartModel(ChartKind Kind, TextReference Title, string Category, IReadOnlyList<ChartMeasureModel> Measures);
+
+/// <summary>One series of a <c>chart</c> widget: a measure, as its data source declares the name, and its label.</summary>
+public sealed record ChartMeasureModel(string Name, TextReference Label);
 
 /// <summary>One column of a <c>columns</c> widget. The widths of a widget's columns add up to 12.</summary>
 public sealed record WidgetColumnModel(int Width, IReadOnlyList<WidgetModel> Widgets);

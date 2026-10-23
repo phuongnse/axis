@@ -1,0 +1,19 @@
+{
+  "id": "bf5a2bf2-0de4-4bd4-b79c-549c4af186f5",
+  "kind": "dataSource",
+  "name": "ItemCountsByDepartment",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "departmentName", "path": "department.name" },
+    { "name": "quantity", "path": "quantity" }
+  ],
+  "aggregate": {
+    "groupBy": ["departmentName"],
+    "measures": [
+      { "name": "items", "function": "count" },
+      { "name": "quantitySum", "function": "sum", "field": "quantity" }
+    ]
+  },
+  "sort": "departmentName"
+}

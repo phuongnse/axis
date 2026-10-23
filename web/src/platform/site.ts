@@ -1,4 +1,5 @@
 import { apiFetch } from './api'
+import type { ChartKind } from './chartOption'
 
 /** One navigation entry. The label is a text key. */
 export interface NavigationItem {
@@ -204,7 +205,7 @@ export interface WidgetAccess {
  * inspector has neither, and lists the instances of its `process` from `instancesPath`.
  */
 export interface WidgetMetadata {
-  type: 'table' | 'form' | 'taskInbox' | 'processInspector' | 'kpi' | 'detail'
+  type: 'table' | 'form' | 'taskInbox' | 'processInspector' | 'kpi' | 'chart' | 'detail'
   entity: EntityMetadata | null
   dataSource: DataSourceMetadata | null
   form: FormMetadata | null
@@ -231,6 +232,25 @@ export interface WidgetMetadata {
   detail: DetailMetadata | null
   /** What a kpi widget shows, and `null` on every other widget. A kpi also has a `dataSource` and no entity. */
   kpi: KpiMetadata | null
+  /** What a chart widget draws, and `null` on every other widget. A chart also has a `dataSource` and no entity. */
+  chart: ChartMetadata | null
+}
+
+/** One series of a chart widget: a measure of its data source and the text key of its label. */
+export interface ChartMeasureMetadata {
+  name: string
+  labelKey: string
+}
+
+/**
+ * What a chart widget draws of the groups of its data source: the group field `category` names each group, and
+ * every measure is one series. `titleKey` is the chart's title and accessible name.
+ */
+export interface ChartMetadata {
+  kind: ChartKind
+  titleKey: string
+  category: string
+  measures: ChartMeasureMetadata[]
 }
 
 /** What a detail widget shows: `record` names the page parameter whose value is the id of the record. */

@@ -2,7 +2,7 @@ namespace Axis.Configuration.Resources;
 
 /// <summary>
 /// A widget as written in the page file. It names an entity, a data source or, for a form widget, a
-/// form. A <c>kpi</c> widget names a data source and one of its measures. A <c>detail</c> widget names an entity
+/// form. A <c>kpi</c> widget names a data source and one of its measures. A <c>chart</c> widget names a data source, its category and its measures. A <c>detail</c> widget names an entity
 /// or a form, like a form widget, and the page parameter that picks its record. A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container: it holds other widgets
 /// and binds nothing. Whether that binding, its entity, data source, form and form page exist is checked by
 /// <see cref="Compilation.ApplicationCompiler"/>, not by the loader.
@@ -44,7 +44,7 @@ public sealed record WidgetDefinition
     /// <summary>The tabs of a <c>tabs</c> widget, or null on any other widget.</summary>
     public IReadOnlyList<WidgetTabDefinition>? Tabs { get; init; }
 
-    /// <summary>The title of a <c>section</c> widget, or null on any other widget.</summary>
+    /// <summary>The title of a <c>section</c> or <c>chart</c> widget, or null on any other widget.</summary>
     public TextReference? Title { get; init; }
 
     /// <summary>Whether a <c>section</c> widget starts collapsed. Null when the file does not say, which means no.</summary>
@@ -67,6 +67,23 @@ public sealed record WidgetDefinition
 
     /// <summary>The <c>navigate</c> action a <c>kpi</c> widget opens when clicked, or null when it has none.</summary>
     public WidgetActionDefinition? Navigate { get; init; }
+
+    /// <summary>The kind of a <c>chart</c> widget: <c>bar</c>, <c>line</c> or <c>pie</c>. Null on any other widget.</summary>
+    public string? Kind { get; init; }
+
+    /// <summary>The group field of its data source that a <c>chart</c> widget draws on its category axis, or null on any other widget.</summary>
+    public string? Category { get; init; }
+
+    /// <summary>The measures of its data source that a <c>chart</c> widget draws, or null on any other widget.</summary>
+    public IReadOnlyList<ChartMeasureDefinition>? Measures { get; init; }
+}
+
+/// <summary>One measure of a <c>chart</c> widget: a measure of its data source and the label of its series.</summary>
+public sealed record ChartMeasureDefinition
+{
+    public required string Name { get; init; }
+
+    public required TextReference Label { get; init; }
 }
 
 /// <summary>The comparison of a <c>kpi</c> widget: a second measure of the same data source and its label.</summary>

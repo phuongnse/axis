@@ -100,8 +100,10 @@ site, and its widgets are its content:
   [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md). A `detail` names
   an `entity` or a `form`, as a form does, and a `record`, the required
   `reference` page parameter that picks the record it shows. It may list
-  `actions`. M12 adds the leaf widget `chart` *(planned for M12)*, see
-  [frontend.md](frontend.md).
+  `actions`. A `chart` names a `dataSource` grouped by one field, its `kind`
+  (`bar`, `line` or `pie`), the `category` that is that field, one or more
+  `measures` with a `label` each, and a `title`, see
+  [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md).
 - A `table` widget opens and creates records through `navigate` actions, see
   below. It has no link to a form page of its own.
 - A `form` or `detail` widget may list `actions`. Each is

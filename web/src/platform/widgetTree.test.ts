@@ -18,6 +18,7 @@ function leaf(type: WidgetMetadata['type'], process: string | null = null): Widg
     access: null,
     detail: null,
     kpi: null,
+    chart: null,
   }
 }
 

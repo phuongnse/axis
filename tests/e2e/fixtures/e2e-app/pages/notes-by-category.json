@@ -1,0 +1,20 @@
+{
+  "id": "fbae36ef-e23d-4b90-bb78-e843a48511a6",
+  "kind": "page",
+  "name": "NotesByCategory",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.notesByCategory.title" },
+  "widgets": [
+    {
+      "type": "chart",
+      "kind": "bar",
+      "dataSource": "NotesByCategory",
+      "category": "category",
+      "title": { "textKey": "chart.notesByCategory" },
+      "measures": [
+        { "name": "notes", "label": { "textKey": "chart.notes" } },
+        { "name": "amountSum", "label": { "textKey": "chart.amountSum" } }
+      ]
+    }
+  ]
+}

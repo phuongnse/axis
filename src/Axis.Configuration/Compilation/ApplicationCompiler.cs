@@ -1767,6 +1767,7 @@ public static class ApplicationCompiler
                 ToolbarActions = BuildActions(widget.ToolbarActions),
                 Parameters = BuildParameters(widget),
                 Kpi = BuildKpi(widget, dataSource),
+                Chart = BuildChart(widget, dataSource),
                 Detail = BuildDetail(widget),
             };
         }
@@ -1795,6 +1796,25 @@ public static class ApplicationCompiler
                 widget.Label!,
                 widget.Comparison is { } comparison ? new KpiComparisonModel(Declared(comparison.Measure), comparison.Label) : null,
                 widget.Navigate is { } navigate ? (NavigateActionModel)BuildAction(navigate) : null);
+        }
+
+        // The checker has matched the category and each measure to the data source's, ignoring letter case. The model
+        // keeps the declared names, so a client never fixes the case itself.
+        ChartModel? BuildChart(WidgetDefinition widget, DataSourceResource? source)
+        {
+            if (widget.Measures is not { } measures || source is null)
+            {
+                return null;
+            }
+
+            var aggregate = source.Aggregate!;
+            return new ChartModel(
+                Enum.Parse<ChartKind>(widget.Kind!, ignoreCase: true),
+                widget.Title!,
+                aggregate.GroupBy[0],
+                [.. measures.Select(measure => new ChartMeasureModel(
+                    aggregate.Measures.First(candidate => string.Equals(candidate.Name, measure.Name, StringComparison.OrdinalIgnoreCase)).Name,
+                    measure.Label))]);
         }
 
         return new()
