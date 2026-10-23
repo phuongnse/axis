@@ -127,6 +127,7 @@ function SchemaNode({
         aria-label={name}
         showSearch
         optionFilterProp="label"
+        virtual={false}
         style={{ minWidth: 240 }}
         allowClear={!required}
         value={value as string | number | undefined}

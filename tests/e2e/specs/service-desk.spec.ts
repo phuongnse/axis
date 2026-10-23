@@ -199,3 +199,48 @@ test("the ticket form shows the resolution only while the status is resolved", a
   await pickOption(status, "draft");
   await expect(resolution).toBeHidden();
 });
+
+test("the service desk lead sees the open and urgent tiles and the chart by category on the Dashboard", async ({
+  page,
+  playwright,
+  baseURL,
+}) => {
+  // The lead's navigation has four entries, which the default window would fold into the overflow menu.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // One open ticket, so the tile and the chart have something to count.
+  await asUser(playwright.request, baseURL, "anna", async (anna) => {
+    await start(anna, await createTicket(anna, `Zz Dashboard ${runId()}`));
+  });
+
+  await useSession(page, "linh");
+  await page.goto("/service-desk/dashboard");
+
+  await expect(page.getByRole("menuitem", { name: "Dashboard", exact: true })).toBeVisible();
+  // Specs create tickets in parallel, so the numbers change from run to run. The test checks that they load.
+  const tiles = page.getByTestId("kpi-tile");
+  await expect(tiles).toHaveCount(2);
+  await expect(tiles.nth(0)).toContainText("Open tickets");
+  await expect(tiles.nth(1)).toContainText("Urgent tickets");
+  await expect(page.getByTestId("kpi-value")).toHaveCount(2);
+  await expect(page.getByTestId("kpi-error")).toHaveCount(0);
+  await expect(page.getByTestId("chart-widget")).toContainText("Open tickets by category");
+  await expect(page.getByTestId("chart-error")).toHaveCount(0);
+
+  // The link wraps the tile.
+  await page.getByRole("link", { name: /Show all tickets/ }).click();
+  await expect(page).toHaveURL(/\/service-desk\/alltickets$/);
+});
+
+test("a requester has no Dashboard entry, and the page endpoint answers 403", async ({ page }) => {
+  await useSession(page, "anna");
+  await page.goto("/service-desk/mytickets");
+  await expect(page.getByRole("menuitem", { name: "My tickets", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Dashboard", exact: true })).toHaveCount(0);
+
+  const site = await page.request.get("/api/sites/service-desk");
+  expect(site.status()).toBe(200);
+  const { navigation } = (await site.json()) as { navigation: { page: string }[] };
+  expect(navigation.map((entry) => entry.page)).not.toContain("Dashboard");
+
+  expect((await page.request.get("/api/sites/service-desk/pages/Dashboard")).status()).toBe(403);
+});
