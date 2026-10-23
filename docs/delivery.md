@@ -53,10 +53,16 @@ models, are not copied here. Look them up where they live.
   every question has a recommendation, even one that rests on a **Proposed**
   decision, and nobody is mentioned. The owner sees the answers on the issue
   and can change one with a comment, before `/nexkit go`, or with
-  `/nexkit fix` on the pull request.
+  `/nexkit fix` on the pull request. Autopilot answers only once in a row:
+  when the plan or round its answers started asks again, and no person has
+  commented since, the issue waits for a person.
 - **People stay in charge.** A person's command, a plan's question without a
-  recommendation, a failed run, a second time-out and a refused merge all stop
-  autopilot on that issue until a person acts. Other issues go on.
+  recommendation, a question asked again after autopilot answered it, a failed
+  run, a second time-out and a refused merge all stop autopilot on that issue
+  until a person acts. Other issues go on, and an issue that waits for a person
+  does not hold up the others. A run that stops on a transient error, such as
+  an overloaded API or a lost connection, before it published anything, runs
+  once more by itself; a second such stop waits for a person.
 - **NexKit merges a pull request once it passes, while `merge.auto` is on.**
   With NexKit's [`merge.auto` setting][nexkit-auto-merge] on, NexKit
   squash-merges a pull request as soon as every check passes and the AI review
@@ -65,17 +71,21 @@ models, are not copied here. Look them up where they live.
   criterion counts as changes requested. An approved pull request with an
   unverifiable criterion, one that the diff, its tests and the check results
   show neither way, never merges by itself: the owner confirms the criteria
-  that the review comment lists, then merges. The owner
+  that the review comment lists, then merges. A merge that GitHub refuses
+  because `main` moved meanwhile is tried again, and one that waits for
+  required checks happens on a later sweep once they pass. The owner
   turns the setting off to decide each merge again, and then only the owner
   merges. The switch is in `.nexkit/`, so changing it is a hand-made pull
   request.
 - **NexKit mentions the owner when a person is needed.** The owner's login is
   in NexKit's [`notify` setting][nexkit-config]. NexKit mentions it when a run
   ends in a state that needs a person: a plan with a question that has no
-  recommended option, a blocked round with such a question, a failed run, a
-  second time-out, no automatic fix rounds left, a refused automatic merge, an
-  approved pull request with an unverifiable criterion, a CI failure on
-  `main`, or the last issue of the milestone closed. Every other
+  recommended option, a blocked round with such a question, a question asked
+  again after autopilot answered it, a failed run, a second time-out, no
+  automatic fix rounds left, a refused automatic merge, an approved pull
+  request with an unverifiable criterion, a CI failure on `main`, or the last
+  issue of the milestone closed. It mentions the owner once for each issue
+  that waits. Every other
   run needs nobody, and a plan that autopilot answers or splits mentions
   nobody either.
 - **NexKit resolves conflicts with `main` by itself.** With
