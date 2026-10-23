@@ -251,7 +251,7 @@ Studio, publishes it and takes one ticket through the process on the site.
 - The main journey also builds the two-step ticket form, the dashboard and
   the ticket detail page. The comparison with the committed sample covers
   them.
-- _(planned for M12)_ Another Playwright journey uses the sample at phone
+- Another Playwright journey uses the sample at phone
   width.
 - _(planned for M13)_ A second, smaller journey starts from the
   `request-approval` template.

@@ -1,15 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
+import { noSideways, phoneWidth } from '../phone'
 import { pickOption } from '../select'
 import { sessionFile } from '../sessions'
 
-// A phone is 375 px wide. anna saves a new request as a draft, because she may write only draft and returned requests.
-const phoneWidth = 375
+// anna saves a new request as a draft, because she may write only draft and returned requests.
 test.use({ storageState: sessionFile('anna'), viewport: { width: phoneWidth, height: 812 } })
-
-/** Expects the page not to scroll sideways: the document is never wider than the window. */
-async function noSideways(page: Page) {
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phoneWidth)
-}
 
 /** Opens the lookup of the reference field `field`, labelled `label`, and picks the row named `name`. */
 async function choose(page: Page, field: string, label: string, name: string) {
