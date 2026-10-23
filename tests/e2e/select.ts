@@ -126,7 +126,8 @@ export async function expectChosen(combobox: Locator, option: string, options?: 
   try {
     await expect(list.getByRole('option', { name: option, exact: true })).toHaveAttribute('aria-selected', 'true', options)
   } finally {
-    await combobox.press('Escape')
+    // Escape can also close a modal that holds the select, so the select closes on blur instead.
+    await combobox.blur()
   }
   await expect(list).toBeHidden()
 }
