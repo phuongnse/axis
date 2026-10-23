@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { DatePicker, Table, theme } from 'antd'
 import viVN from 'antd/locale/vi_VN'
 import dayjs from 'dayjs'
@@ -10,6 +11,7 @@ import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { Shell } from './Shell'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
+import { phoneWidthQuery } from './usePhoneWidth'
 
 const catalogs = [{ texts: {}, fallbackTexts: {} }]
 
@@ -19,7 +21,15 @@ const notesNavigation = [
   { key: 'categories', path: '/e2e/categories', labelKey: 'nav.categories' },
 ]
 const navigationTexts = [
-  { texts: { 'nav.home': 'Home', 'nav.notes': 'Notes', 'nav.categories': 'Categories' }, fallbackTexts: {} },
+  {
+    texts: {
+      'nav.home': 'Home',
+      'nav.notes': 'Notes',
+      'nav.categories': 'Categories',
+      'shell.navigation.menu': 'Menu',
+    },
+    fallbackTexts: {},
+  },
 ]
 
 /** Shows the container background token the theme gives components inside the shell. */
@@ -132,6 +142,87 @@ describe('Shell navigation', () => {
     renderShell('en', ['/'], notesNavigation)
 
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+  })
+})
+
+describe('Shell at phone width', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === phoneWidthQuery,
+      media: query,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent: () => false,
+    }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('hides the navigation behind a closed Menu button', () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: 'Notes' })).not.toBeInTheDocument()
+  })
+
+  it('opens the navigation with Enter and closes it with Escape, returning focus to the button', async () => {
+    renderShell('en', ['/'], notesNavigation)
+    const button = screen.getByRole('button', { name: 'Menu' })
+
+    button.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'Notes' })).toBeVisible()
+
+    await userEvent.keyboard('{Escape}')
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: 'Notes' })).not.toBeInTheDocument()
+    expect(button).toHaveFocus()
+  })
+
+  it('closes the navigation with Escape from inside the panel', async () => {
+    renderShell('en', ['/'], notesNavigation)
+    const button = screen.getByRole('button', { name: 'Menu' })
+    await userEvent.click(button)
+
+    screen.getByRole('link', { name: 'Notes' }).focus()
+    await userEvent.keyboard('{Escape}')
+
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(button).toHaveFocus()
+  })
+
+  it('closes the navigation after a link is followed', async () => {
+    renderShell('en', ['/'], notesNavigation)
+    const button = screen.getByRole('button', { name: 'Menu' })
+    await userEvent.click(button)
+
+    await userEvent.click(screen.getByRole('link', { name: 'Notes' }))
+
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('moves the locale switch and the theme toggle into the panel', async () => {
+    renderShell('en', ['/'], notesNavigation)
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+
+    expect(screen.getByRole('switch')).toBeVisible()
+  })
+})
+
+describe('Shell above phone width', () => {
+  it('shows the navigation in the header without a Menu button', () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Notes' })).toBeVisible()
   })
 })
 

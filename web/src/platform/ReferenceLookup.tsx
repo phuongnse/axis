@@ -119,6 +119,7 @@ function LookupList({ field, onPick }: Pick<ReferenceLookupProps, 'field' | 'onP
         <Table<RecordItem>
           rowKey="id"
           columns={columns}
+          scroll={{ x: 'max-content' }}
           dataSource={state.page?.items}
           loading={loading}
           locale={{ emptyText: t('shell.table.empty') }}

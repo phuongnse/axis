@@ -461,6 +461,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           // The group values are unique per group row.
           rowKey={(row) => row.id ?? JSON.stringify(row.values)}
           columns={columns}
+          scroll={{ x: 'max-content' }}
           dataSource={parameterErrors ? [] : state.page?.items}
           loading={loading}
           locale={{ emptyText: t('shell.table.empty') }}

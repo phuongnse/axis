@@ -65,6 +65,8 @@ export function ChildCollectionTable({
       return {
         key: child.name,
         title: label,
+        // The inputs keep a usable width when the table scrolls sideways.
+        width: 160,
         render: (_value: unknown, row: RecordRow, index: number) => {
           const cellErrors = errors[`${index}/${child.name}`]
           return (
@@ -109,7 +111,13 @@ export function ChildCollectionTable({
     <Flex vertical gap="small">
       {/* A cell's item needs no space below it, as the table rows already space the inputs. */}
       <ConfigProvider theme={compactFormTheme}>
-        <Table<RecordRow> rowKey={keyOf} columns={columns} dataSource={rows} pagination={false} />
+        <Table<RecordRow>
+          rowKey={keyOf}
+          columns={columns}
+          scroll={{ x: 'max-content' }}
+          dataSource={rows}
+          pagination={false}
+        />
       </ConfigProvider>
       {!readOnly && (
         <Flex>

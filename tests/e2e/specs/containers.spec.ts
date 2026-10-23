@@ -28,6 +28,38 @@ test("a columns widget shows a table and a titled section side by side, in the r
   expect(tableBox!.width / sectionBox!.width).toBeLessThan(2.3);
 });
 
+test("a columns widget stacks its table and its section in file order at phone width", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/e2e/noteoverview");
+
+  const column = page
+    .getByTestId("column")
+    .filter({ has: page.getByRole("table") });
+  const section = page.getByRole("region", { name: "Totals", exact: true });
+  await expect(column.getByRole("table").first()).toBeVisible();
+  await expect(section.getByTestId("kpi-tile")).toBeVisible();
+  const columnBox = await column.boundingBox();
+  // The columns have the same padding, so the left edges of the two columns are compared.
+  const sectionColumn = page
+    .getByTestId("column")
+    .filter({ has: section });
+  const sectionBox = await sectionColumn.boundingBox();
+  expect(columnBox).not.toBeNull();
+  expect(sectionBox).not.toBeNull();
+
+  // The section is below the table's column and starts at the same left edge.
+  expect(sectionBox!.y).toBeGreaterThanOrEqual(
+    columnBox!.y + columnBox!.height - 1,
+  );
+  expect(Math.abs(sectionBox!.x - columnBox!.x)).toBeLessThan(2);
+  // The page does not scroll sideways.
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(375);
+});
+
 test("a tabs widget keeps the selected tab in the URL, across a reload and the back button", async ({
   page,
 }) => {
