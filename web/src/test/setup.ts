@@ -89,3 +89,6 @@ const svgPrototype = SVGElement.prototype as SVGElement & { getBBox?: () => DOMR
 if (!svgPrototype.getBBox) {
   svgPrototype.getBBox = () => ({ x: 0, y: 0, width: 0, height: 0 }) as DOMRect
 }
+
+// ECharts measures text on a canvas. jsdom has none, so return no context and let it estimate the width.
+HTMLCanvasElement.prototype.getContext = (() => null) as unknown as HTMLCanvasElement['getContext']
