@@ -735,7 +735,7 @@ are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
 
 Playwright specs find elements by role, accessible name and ARIA state, and never
 select a class of the UI library. `scripts/lint.sh` fails when a file under
-`tests/` names a class that starts with `ant-`. Specs pick select options only through the helpers in `tests/e2e/select.ts`. The helpers type the option into a searchable select, so it shows at the top of the list and needs no scroll. A pick that did not land fails at once, naming the select and the option. Specs use `pickAction` for selects that act and then clear themselves.
+`tests/` names a class that starts with `ant-`. Specs pick select options only through the helpers in `tests/e2e/select.ts`. The helpers type the option into a searchable select, so it shows at the top of the list and needs no scroll. `pickOption` makes a pick that did not land again, for up to 20 seconds. Then it fails, naming the select and the option. `pickOptions` makes its picks again only when a click throws, for up to 20 seconds. It then waits up to 5 seconds for each option to show as chosen, and it does not pick again. A pick that did not land fails, naming the select and the option. Specs use `pickAction` for selects that act and then clear themselves.
 
 Playwright specs match accessible names and texts exactly. A string name or text passed to
 `getByRole`, `getByLabel`, `getByText` or `getByTitle` comes with `exact: true`. Only a regular
