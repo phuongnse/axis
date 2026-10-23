@@ -208,15 +208,15 @@ the parts planned for M12,
 
 ### Pages
 
-My tickets, the ticket form, the task inbox and All tickets for the lead, in
-a site at path `service-desk`. Texts are in `en` and `vi`.
+My tickets, the ticket form, the task inbox, the ticket detail page and All
+tickets for the lead, in a site at path `service-desk`. Texts are in `en` and `vi`.
 
 - _(planned for M12)_ A dashboard page for the service desk lead. It has
   KPIs (key figures) for open and urgent tickets and a chart of open tickets
   by category, above All tickets, in columns.
-- _(planned for M12)_ A ticket detail page with one detail widget that shows
-  the ticket. My tickets and All tickets open it through a navigate action
-  with a `ticket` parameter.
+- A ticket detail page with one detail widget that shows the ticket. My
+  tickets and All tickets open it through a navigate action with a `ticket`
+  parameter.
 - The ticket form has two steps. Step 1 is the title and description. Step 2 is
   the category, the priority and the ticket's other fields. The resolution
   shows, and is required, only when the status is `resolved`.
