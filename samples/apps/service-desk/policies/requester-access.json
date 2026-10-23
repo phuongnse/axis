@@ -17,6 +17,11 @@
       "fields": ["title", "description", "category", "priority", "status"]
     },
     {
+      "entity": "Ticket",
+      "actions": ["delete"],
+      "filter": "requester == currentUser() and status == 'draft'"
+    },
+    {
       "entity": "Category",
       "actions": ["read"]
     },
