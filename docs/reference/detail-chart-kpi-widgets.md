@@ -78,7 +78,10 @@ rest of the frontend is in [frontend.md](frontend.md).
     data table keep the source text.
   - **Look.** Series colours come from the theme tokens, in light and dark
     mode. The SPA loads the library lazily in its own chunk, as it loads React
-    Flow, so a page without a chart never loads it.
+    Flow, so a page without a chart never loads it. The shared chart component
+    in `web/src/platform/Chart.tsx` is built and draws bar, line and pie charts
+    from categories and labelled series. The widget that reads a data source is
+    still planned.
   - **Accessibility.** The title is the chart's accessible name. Screen readers
     get the data as a table, with the category and each measure as columns.
     Loading, empty and error states use platform texts.
