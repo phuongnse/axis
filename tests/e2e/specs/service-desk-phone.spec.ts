@@ -78,19 +78,22 @@ test('linh sees the KPI tiles and the chart stacked below them on the Dashboard 
 
   const tiles = page.getByTestId('kpi-tile')
   const chart = page.getByTestId('chart-widget')
-  // The worker moves the ticket to submitted some time after the start, so the chart can show its empty state first.
+  // The chart shows its title while it loads, so wait for its data. The worker moves the ticket to
+  // submitted some time after the start, so the chart can show its empty state first and needs a reload.
   await expect(async () => {
     await page.reload()
-    await expect(page.getByTestId('chart-empty')).toHaveCount(0, { timeout: 1_000 })
-    await expect(chart).toContainText('Open tickets by category', { timeout: 1_000 })
+    await expect(chart).toHaveAttribute('aria-busy', 'false', { timeout: 5_000 })
+    await expect(page.getByTestId('chart-empty')).toHaveCount(0)
   }).toPass({ timeout: 30_000 })
+  await expect(chart).toContainText('Open tickets by category')
+  await expect(page.getByTestId('chart-empty')).toHaveCount(0)
+  await expect(page.getByTestId('chart-error')).toHaveCount(0)
   // Specs create tickets in parallel, so the numbers change from run to run. The test checks that they load.
   await expect(tiles).toHaveCount(2)
   await expect(tiles.nth(0)).toContainText('Open tickets')
   await expect(tiles.nth(1)).toContainText('Urgent tickets')
   await expect(page.getByTestId('kpi-value')).toHaveCount(2)
   await expect(page.getByTestId('kpi-error')).toHaveCount(0)
-  await expect(page.getByTestId('chart-error')).toHaveCount(0)
 
   const kpiColumn = await page.getByTestId('column').filter({ has: tiles.first() }).boundingBox()
   const chartColumn = await page.getByTestId('column').filter({ has: chart }).boundingBox()
