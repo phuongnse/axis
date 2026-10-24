@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dropPlace, insertionPlace, outline, paletteFields } from './formLayout'
+import { addSection, addStep, dropPlace, insertionPlace, outline, paletteFields } from './formLayout'
 import type { StudioNames } from './studio'
 
 const draft = {
@@ -71,5 +71,104 @@ describe('paletteFields', () => {
     const names = { entities: [] } as unknown as StudioNames
     expect(paletteFields(draft, undefined)).toEqual([])
     expect(paletteFields(draft, names)).toEqual([])
+  })
+})
+
+describe('addSection', () => {
+  const keys = { file: 'forms/ticket.json', name: 'Ticket', texts: new Set<string>() }
+  const flat = {
+    sections: [
+      { name: 'Section1', fields: [{ field: 'title' }] },
+      { name: 'details', title: { textKey: 'forms.ticket.sections.1.title' }, fields: [] },
+    ],
+  }
+  const stepped = {
+    sections: [
+      { name: 'a', fields: [{ field: 'title' }] },
+      { name: 'b', fields: [] },
+      { name: 'c', fields: [] },
+    ],
+    steps: [
+      { title: { textKey: 's.one' }, sections: ['a'] },
+      { title: { textKey: 's.two' }, sections: ['B'] },
+      { title: { textKey: 's.three' }, sections: ['c'] },
+    ],
+  }
+
+  it('appends an empty section with the lowest unused name, ignoring letter case', () => {
+    const add = addSection(flat, null, keys)
+    expect(add.sections).toHaveLength(3)
+    expect(add.sections[2]).toEqual({
+      name: 'section2',
+      title: { textKey: 'forms.ticket.sections.2.title' },
+      fields: [],
+    })
+    expect(add.steps).toBeUndefined()
+    expect(add.select).toBe('/sections/2')
+    expect(add.name).toBe('section2')
+    expect(flat.sections).toHaveLength(2)
+  })
+
+  it('gives a title key that no text and no title of the draft owns', () => {
+    const taken = { ...keys, texts: new Set(['forms.ticket.sections.2.title']) }
+    expect((addSection(flat, null, taken).sections[2] as { title: unknown }).title).toEqual({
+      textKey: 'forms.ticket.sections.2.title2',
+    })
+    const used = { sections: [{ name: 'a', title: { textKey: 'forms.ticket.sections.1.title' }, fields: [] }] }
+    expect((addSection(used, null, keys).sections[1] as { title: unknown }).title).toEqual({
+      textKey: 'forms.ticket.sections.1.title2',
+    })
+  })
+
+  it('joins the selected step, the step of the selected section or field, or the last step', () => {
+    expect(
+      addSection(stepped, '/steps/0', keys).steps?.map((step) => (step as { sections: string[] }).sections),
+    ).toEqual([['a', 'section1'], ['B'], ['c']])
+    expect(
+      addSection(stepped, '/sections/1', keys).steps?.map((step) => (step as { sections: string[] }).sections),
+    ).toEqual([['a'], ['B', 'section1'], ['c']])
+    expect(
+      addSection(stepped, '/sections/0/fields/0', keys).steps?.map((step) => (step as { sections: string[] }).sections),
+    ).toEqual([['a', 'section1'], ['B'], ['c']])
+    expect(addSection(stepped, null, keys).steps?.map((step) => (step as { sections: string[] }).sections)).toEqual([
+      ['a'],
+      ['B'],
+      ['c', 'section1'],
+    ])
+    expect(stepped.steps[0].sections).toEqual(['a'])
+  })
+})
+
+describe('addStep', () => {
+  const keys = { file: 'forms/ticket.json', name: 'Ticket', texts: new Set<string>() }
+
+  it('names every unnamed section and lists all sections in the first step', () => {
+    const add = addStep(
+      { sections: [{ fields: [] }, { name: 'Section1', fields: [] }, { name: 'details', fields: [] }, { fields: [] }] },
+      keys,
+    )
+    expect((add.sections as { name: string }[]).map((section) => section.name)).toEqual([
+      'section2',
+      'Section1',
+      'details',
+      'section3',
+    ])
+    expect(add.steps).toEqual([
+      { title: { textKey: 'forms.ticket.steps.0.title' }, sections: ['section2', 'Section1', 'details', 'section3'] },
+    ])
+    expect(add.select).toBe('/steps/0')
+  })
+
+  it('adds an empty step to a form that has steps and selects it', () => {
+    const add = addStep(
+      {
+        sections: [{ name: 'a', fields: [] }],
+        steps: [{ title: { textKey: 'forms.ticket.steps.0.title' }, sections: ['a'] }],
+      },
+      keys,
+    )
+    expect(add.sections).toEqual([{ name: 'a', fields: [] }])
+    expect(add.steps?.[1]).toEqual({ title: { textKey: 'forms.ticket.steps.1.title' }, sections: [] })
+    expect(add.select).toBe('/steps/1')
   })
 })

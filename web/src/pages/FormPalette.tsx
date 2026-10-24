@@ -1,11 +1,13 @@
 import { useDraggable } from '@dnd-kit/core'
 import { Button, Flex, Typography } from 'antd'
 import { useContext } from 'react'
-import { insertionPlace, paletteFields } from '../platform/formLayout'
+import { addSection, addStep, insertionPlace, paletteFields } from '../platform/formLayout'
+import type { LayoutAdd } from '../platform/formLayout'
 import type { StudioNameField } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { insertField } from './formPaletteSupport'
+import { LabelTextsContext } from './labelTextsContext'
 import { visuallyHidden } from './pagePaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -15,7 +17,9 @@ import type { ChangeHandler } from './SchemaForm'
  * selected field, or at the end of the selected step's first section. With nothing selected it goes to the end of the
  * first section. The new field is selected and leaves the palette. A pointer drag from a field to the outline is
  * handled by the form designer around it. A hidden live region shows `announcement`, which names the field, its
- * section and its position.
+ * section and its position. Add section and Add step sit below the field list. A new section is selected and joins the
+ * selected step, and the first step takes every section. Each add changes `sections` and `steps` in one click, which
+ * is one undo step, and the live region names what was added.
  */
 export function FormPalette({
   draft,
@@ -34,8 +38,22 @@ export function FormPalette({
 }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
+  const label = useContext(LabelTextsContext)
   const fields = paletteFields(draft, names)
   const place = insertionPlace(draft, selected)
+  const keys = {
+    file: label?.file ?? 'forms/',
+    name: label?.name ?? (typeof draft.name === 'string' ? draft.name : null),
+    texts: new Set((names?.texts ?? []).map((text) => text.key)),
+  }
+  const apply = (add: LayoutAdd) => {
+    onChange('/sections', add.sections)
+    if (add.steps !== undefined) {
+      onChange('/steps', add.steps)
+    }
+    onSelect(add.select)
+    onAnnounce(`${t('shell.studio.design.added')} ${add.name}`)
+  }
 
   return (
     <div data-testid="studio-form-palette" role="group" aria-label={t('shell.studio.design.fields')}>
@@ -59,6 +77,14 @@ export function FormPalette({
             ))}
           </Flex>
         )}
+        <Flex gap="small" wrap>
+          <Button data-testid="studio-form-add-section" onClick={() => apply(addSection(draft, selected, keys))}>
+            {t('shell.studio.design.addSection')}
+          </Button>
+          <Button data-testid="studio-form-add-step" onClick={() => apply(addStep(draft, keys))}>
+            {t('shell.studio.design.addStep')}
+          </Button>
+        </Flex>
         <div role="status" aria-live="polite" data-testid="studio-form-palette-announcement" style={visuallyHidden}>
           {announcement}
         </div>
