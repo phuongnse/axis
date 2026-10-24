@@ -65,8 +65,8 @@ function JsonOnly() {
  * or removes columns and tabs. The panel of a `table`, `form`, `taskInbox`, `processInspector`, `kpi`, `chart` or `detail` widget
  * shows its type with every property that type takes. A `detail` panel has a record picker over the page's required
  * `reference` parameters, narrowed to the widget's entity when it names one. A `form` and a `detail` panel also list
- * their `actions`, which are `startProcess` or `navigate`, and a `table` panel lists its `rowActions` and
- * `toolbarActions`, which are `navigate`. A navigate action has a target page, a label, a `record` expression and
+ * their `actions`, which are `startProcess` or `navigate`, and a `table` panel lists its `rowActions`, which are
+ * `navigate` or `delete`, and its `toolbarActions`, which are `navigate`. A navigate action has a target page, a label, a `record` expression and
  * parameter expressions. When the names list the target page, the action shows one expression for each parameter the
  * page declares, and an empty expression leaves the parameter out. Picking another page removes the values the new
  * page does not declare. A `kpi` panel has a data source with a total row, a measure, a label, and an optional comparison
@@ -566,6 +566,7 @@ function WidgetPanel({
             title={t('shell.studio.page.rowActions')}
             actions={widget.rowActions}
             startProcess={false}
+            deleteAction
             onChange={onChange}
           />
           <Actions
@@ -573,6 +574,7 @@ function WidgetPanel({
             title={t('shell.studio.page.toolbarActions')}
             actions={widget.toolbarActions}
             startProcess={false}
+            deleteAction={false}
             onChange={onChange}
           />
         </>
@@ -609,6 +611,7 @@ function WidgetPanel({
             title={t('shell.studio.page.actions')}
             actions={widget.actions}
             startProcess
+            deleteAction={false}
             onChange={onChange}
           />
         </>
@@ -1277,21 +1280,23 @@ function ParameterExpressions({
 
 /**
  * A list of actions of a widget, each with its fields. A `navigate` action has a page, a label, a `record` and
- * parameters. A `startProcess` action has a process and a label. Any other action, such as `delete`, is JSON only,
- * and can be removed. The list always offers Add navigate action, and offers Add action for `startProcess` only
- * when `startProcess` is set.
+ * parameters. A `startProcess` action has a process and a label. A `delete` action has a label and a `visibleWhen`.
+ * Any other action is JSON only, and can be removed. The list always offers Add navigate action, offers Add action
+ * for `startProcess` only when `startProcess` is set and offers Add delete action only when `deleteAction` is set.
  */
 function Actions({
   pointer,
   title,
   actions,
   startProcess,
+  deleteAction,
   onChange,
 }: {
   pointer: string
   title: string
   actions: unknown
   startProcess: boolean
+  deleteAction: boolean
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -1334,6 +1339,23 @@ function Actions({
                         />
                         <ActionLabel pointer={`${actionPointer}/label`} value={action.label} onChange={onChange} />
                       </>
+                    ) : action.type === 'delete' ? (
+                      <>
+                        <ActionLabel pointer={`${actionPointer}/label`} value={action.label} onChange={onChange} />
+                        <div data-testid={`studio-field-${actionPointer}/visibleWhen`}>
+                          <div>{t('shell.studio.page.actionVisibleWhen')}</div>
+                          <Input
+                            aria-label={t('shell.studio.page.actionVisibleWhen')}
+                            value={text(action.visibleWhen)}
+                            onChange={(event) =>
+                              onChange(
+                                `${actionPointer}/visibleWhen`,
+                                event.target.value === '' ? undefined : event.target.value,
+                              )
+                            }
+                          />
+                        </div>
+                      </>
                     ) : (
                       <div data-testid={`studio-field-${actionPointer}`}>
                         <JsonOnly />
@@ -1363,6 +1385,11 @@ function Actions({
               >
                 {t('shell.studio.page.addNavigateAction')}
               </Button>
+              {deleteAction && (
+                <Button onClick={() => onChange(pointer, [...list, { type: 'delete', label: { textKey: '' } }])}>
+                  {t('shell.studio.page.addDeleteAction')}
+                </Button>
+              )}
             </Flex>
           </>
         )}
