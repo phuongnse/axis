@@ -894,6 +894,13 @@ Run and the Test results list, the read-only view of a module entity, and the re
     memory, up to 100 steps, with one step for each box. It is cleared by a
     reload, a conflict reload or opening another resource. A save keeps it.
     Studio's undo replaces the browser's own inside the editor's boxes.
+    _Built:_ it covers pages. The buttons sit beside Save and are off when
+    there is nothing to undo or redo, and while a save runs. A step ends when
+    the author edits another property or leaves the box, and a pick in a
+    dropdown or a button action is always a step of its own. The keys also work
+    when nothing has focus, but not when the focus is outside the editor. A
+    reload after a reconnect clears the history too. Other kinds of resource
+    have no undo yet.
   - **Library.** Drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
     `@dnd-kit/utilities`. The core package, which brings `@dnd-kit/accessibility`
     and `@dnd-kit/utilities` with it, measures 12.7 KB gzipped in the lazy chunk
