@@ -78,7 +78,7 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/policy-matrix` | `200` with what each role may do on each target, see [Policy matrix](#policy-matrix) |
 | `PUT /api/studio/apps/{application}/texts/{key}` | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes) |
 | `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
-| `POST /api/studio/apps/{application}/resources/{id}/page-metadata` *(planned for M13)* | `200` with `{ page, diagnostics }`. The body is the full draft page as `application/json`, see [Draft page metadata](#draft-page-metadata) |
+| `POST /api/studio/apps/{application}/resources/{id}/page-metadata` *(planned for M13)* | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [Draft page metadata](#draft-page-metadata) |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
@@ -176,7 +176,7 @@ check 6 or a later numbered check, except where a line says so:
   the id is in it. Then `400` for a `path` that holds no expression place. It
   takes no lock, so it has no `503`.
 - **Draft page metadata** *(planned for M13)*. Checks 1, 2, 3, 5 and 6, then
-  `404` for a resource that is not a page, then `415`, then `400` for a body
+  `404` for a resource that is neither a page nor a form, then `415`, then `400` for a body
   that is not a JSON object or whose `id` or `kind` differs from the saved
   file. It takes no lock, so it has no `503`.
 
@@ -242,7 +242,7 @@ Text write, Resource references, Text key references, Release history, Validate,
 | Names | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Text write | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | A text resource whose `texts` is not an object |
 | Expression check | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or an unknown `resourceId` | Not used |
-| Draft page metadata *(planned for M13)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or a resource that is not a page | Not used |
+| Draft page metadata *(planned for M13)* | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or a resource that is neither a page nor a form | Not used |
 | Validate | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Publish | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Request status | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
@@ -498,7 +498,8 @@ Studio's expression editor can show errors as the author types. The body is
 *(planned for M13)* `POST .../resources/{id}/page-metadata` answers the metadata
 that an unsaved page would have, so the page designer's canvas can draw the
 draft ([D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)).
-The `{id}` names the saved page.
+It also answers an unsaved form, see **A draft form**. The `{id}` names the
+saved page or form.
 
 - **The body.** The full draft page, as the file would hold it. Its `id` and
   `kind` must equal those of the saved file, or the answer is `400`.
@@ -511,6 +512,17 @@ The `{id}` names the saved page.
   action the target accepts and every field a user may write. The record paths
   are as the compiled page has them, but the canvas answers the widgets' data
   calls from placeholder data.
+- **A draft form.** A form body is the full draft form with the saved `id` and
+  `kind`
+  ([D66](../decisions/d66-a-visual-form-designer-for-form-resources.md)). The
+  answer is `{ widget, diagnostics }`. `widget` has the shape of a `form`
+  widget that names this form, see **Form metadata** in
+  [frontend.md](frontend.md): `entity` with all its fields, `form`,
+  `actions: []`, and an `access` that lists every action and writable field.
+  Each section, field and step also carries `path`, such as `/sections/0`,
+  `/sections/0/fields/1` and `/steps/0`. It has no expressions, and its
+  diagnostics are those of the form. A form that cannot be read answers
+  `widget: null`.
 - **Widget paths.** Each widget also carries `path`, its JSON Pointer in the
   draft, such as `/widgets/0/columns/1/widgets/0`.
 - **Diagnostics.** Only those whose `resourceId` is the page, shaped as in
@@ -522,8 +534,8 @@ The `{id}` names the saved page.
 - **A denied caller.** A caller with no session gets `401`. A caller with no
   author role, no `Studio:Folders` or no CSRF header gets `403`, before any
   lookup, so the answer says nothing about which applications or resources
-  exist. An unknown application, an unknown resource or a resource that is not
-  a page gets `404`.
+  exist. An unknown application, an unknown resource or a resource that is
+  neither a page nor a form gets `404`.
 - **Speed.** It answers within 500 ms on a typical application.
 
 ## Writes
