@@ -9,10 +9,23 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { Button, Flex } from 'antd'
-import { useState } from 'react'
+import { useContext, useState } from 'react'
 import { getAt } from '../platform/jsonPatch'
-import { addableTypes, dropPlace, innermostPointer, newWidget, type DropTarget } from '../platform/pageWidgets'
+import {
+  addableTypes,
+  boundWidget,
+  dropPlace,
+  innermostPointer,
+  insertionPlace,
+  newWidget,
+  targetPlace,
+  widgetPointerOf,
+  type DataBinding,
+  type DropTarget,
+} from '../platform/pageWidgets'
+import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { BindingChoice, PageDataPanel } from './PageDataPanel'
 import { PageWidgets } from './PageEditor'
 import { PagePalette } from './PagePalette'
 import { landedText, paletteReasons, usePartLabel } from './pagePaletteSupport'
@@ -42,13 +55,25 @@ const silent = {
   onDragCancel: () => undefined,
 }
 
+/** The binding that a draggable of the data panel carries, or `undefined` for any other draggable. */
+function bindingOf(data: unknown): DataBinding | undefined {
+  const binding = (data as { binding?: Partial<DataBinding> } | undefined)?.binding
+  return (binding?.kind === 'entity' || binding?.kind === 'dataSource') && typeof binding.name === 'string'
+    ? { kind: binding.kind, name: binding.name }
+    : undefined
+}
+
 /**
- * The Design tab of a page: the canvas, and beside it the palette and the widget tree. A palette type that is dragged
+ * The Design tab of a page: the canvas, and beside it the palette, the data panel and the widget tree. A palette type that is dragged
  * with the pointer onto the canvas is inserted where it is dropped: before a widget on its upper half, after it on its
  * lower half, or at the end of a list when it is dropped on the list. The innermost target wins. A drop that a page
  * limit forbids inserts nothing, and the live region gives the reason. An allowed drop selects the new widget, and
  * the live region names the list and position where it landed. The canvas, the palette and the drag library are
  * one lazy chunk, which loads when the tab opens.
+ *
+ * An entity or data source of the data panel is dropped the same way, or picked with the keyboard, which places it
+ * after the selected widget as the palette does. Either opens a choice of the widgets that can show it. The chosen
+ * widget is inserted bound, selected, and announced like a palette insert.
  */
 export default function StudioPageDesign({
   application,
@@ -70,17 +95,19 @@ export default function StudioPageDesign({
   const partLabel = usePartLabel()
   const [announcement, setAnnouncement] = useState('')
   const [dragging, setDragging] = useState<string>()
+  const [pending, setPending] = useState<{ binding: DataBinding; place: { list: string; index: number } }>()
+  const names = useContext(StudioNamesContext)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   function drop({ active, over, delta, activatorEvent }: DragEndEvent) {
     setDragging(undefined)
     const type = (active.data.current as { type?: unknown } | undefined)?.type
+    const binding = bindingOf(active.data.current)
     const data = over?.data.current as { kind?: unknown; pointer?: unknown } | undefined
     const widgets = draft.widgets
     if (
       over === null ||
-      typeof type !== 'string' ||
-      !addableTypes.includes(type) ||
+      (binding === undefined && (typeof type !== 'string' || !addableTypes.includes(type))) ||
       typeof data?.pointer !== 'string' ||
       !Array.isArray(widgets)
     ) {
@@ -99,7 +126,14 @@ export default function StudioPageDesign({
     } else {
       return
     }
-    const place = dropPlace(widgets, type, target)
+    if (binding !== undefined) {
+      const place = targetPlace(widgets, target)
+      if (place !== undefined) {
+        setPending({ binding, place })
+      }
+      return
+    }
+    const place = dropPlace(widgets, type as string, target)
     if (place === undefined) {
       return
     }
@@ -108,7 +142,40 @@ export default function StudioPageDesign({
       return
     }
     const items = getAt({ widgets }, place.list) as unknown[]
-    onChange(place.list, [...items.slice(0, place.index), newWidget(type), ...items.slice(place.index)])
+    onChange(place.list, [...items.slice(0, place.index), newWidget(type as string), ...items.slice(place.index)])
+    onSelect(`${place.list}/${place.index}`)
+    setAnnouncement(landedText(t, partLabel, widgets, place.list, place.index, type as string))
+  }
+
+  /** Opens the choice for a binding picked with the keyboard, at the place after the selected widget. */
+  function pick(binding: DataBinding) {
+    const widgets = draft.widgets
+    if (!Array.isArray(widgets)) {
+      return
+    }
+    const widgetPointer = widgetPointerOf(selected)
+    setPending({
+      binding,
+      place: insertionPlace(widgets, getAt(draft, widgetPointer) === undefined ? '/widgets/0' : widgetPointer),
+    })
+  }
+
+  function choose(type: string) {
+    const widgets = draft.widgets
+    setPending(undefined)
+    if (pending === undefined || names === undefined || !Array.isArray(widgets)) {
+      return
+    }
+    const { binding, place } = pending
+    const items = getAt({ widgets }, place.list)
+    if (!Array.isArray(items)) {
+      return
+    }
+    onChange(place.list, [
+      ...items.slice(0, place.index),
+      boundWidget(names, draft, binding, type),
+      ...items.slice(place.index),
+    ])
     onSelect(`${place.list}/${place.index}`)
     setAnnouncement(landedText(t, partLabel, widgets, place.list, place.index, type))
   }
@@ -118,7 +185,11 @@ export default function StudioPageDesign({
       sensors={sensors}
       collisionDetection={innermostCollision}
       accessibility={{ announcements: silent }}
-      onDragStart={({ active }) => setDragging(String((active.data.current as { type?: unknown })?.type ?? ''))}
+      onDragStart={({ active }) =>
+        setDragging(
+          bindingOf(active.data.current)?.name ?? String((active.data.current as { type?: unknown })?.type ?? ''),
+        )
+      }
       onDragCancel={() => setDragging(undefined)}
       onDragEnd={drop}
     >
@@ -141,9 +212,17 @@ export default function StudioPageDesign({
             onSelect={onSelect}
             onChange={onChange}
           />
+          <PageDataPanel onPick={pick} />
           <PageWidgets value={draft} selected={selected} onSelect={onSelect} onChange={onChange} />
         </div>
       </Flex>
+      <BindingChoice
+        binding={pending?.binding}
+        widgets={Array.isArray(draft.widgets) ? draft.widgets : []}
+        list={pending?.place.list ?? '/widgets'}
+        onChoose={choose}
+        onCancel={() => setPending(undefined)}
+      />
       <DragOverlay dropAnimation={null}>{dragging === undefined ? null : <Button>{dragging}</Button>}</DragOverlay>
     </DndContext>
   )

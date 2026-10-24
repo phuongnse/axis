@@ -884,6 +884,27 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Data panel.** It lists the entities and the data sources. Dropping an
     entity offers a table, a form or a detail. Dropping a data source offers a
     table, and a chart with one group field or a KPI with a total row.
+    _Partly built:_ the side pane of the Design tab lists every entity and every
+    data source, module ones too, in two groups between the palette and the
+    widget tree. A drop on the canvas lands where a palette drop lands, and then
+    opens a small dialog with one button for each widget that can show the
+    name. An entity offers a table, a form and a detail. A data source offers a
+    table, a chart when it has exactly one group field, and a KPI when its group
+    by is empty. A button is disabled, with the palette's reason, when a page
+    limit forbids that type in the list where the widget would land. Enter,
+    Space or a click on a name opens the same dialog, and the widget is then
+    inserted after the selected widget as the palette does. The chosen widget is
+    inserted already bound, selected, and the live region names where it landed.
+    A table or a form takes the entity or data source. A detail takes the first
+    required `reference` parameter of the page that targets the entity as its
+    record, and its record stays empty when there is none, because the designer
+    adds no page parameter and the canvas then shows the compiler's own
+    diagnostic. A chart takes the data source's group field as its category,
+    the `bar` kind and its first numeric measure. A KPI takes the first
+    measure. A data source measure has no label, so a chart's title and measure
+    label and a KPI's label are written with empty text keys, as the palette
+    does for a new chart or KPI. The canvas draws such a chart or KPI as a
+    placeholder until the author writes the texts in the property panel.
   - **Width switch.** It draws the canvas at desktop width, which fills the
     canvas area, or at phone width, which is 375 px. At phone width the columns
     stack to full width and tables use their phone layout, even in a wide
@@ -897,7 +918,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Library.** Drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
     `@dnd-kit/utilities`. The core package, which brings `@dnd-kit/accessibility`
     and `@dnd-kit/utilities` with it, measures 12.7 KB gzipped in the lazy chunk
-    `StudioPageDesign`. The chunk holds the canvas, the palette and the library,
+    `StudioPageDesign`. The chunk holds the canvas, the palette, the data panel and the library,
     and loads when the Design tab opens. The build fails when the chunk is
     missing or is part of the main bundle. `@dnd-kit/sortable` comes with the
     moves of existing widgets.
