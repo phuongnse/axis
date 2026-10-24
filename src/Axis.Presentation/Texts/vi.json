@@ -187,6 +187,8 @@
   "shell.studio.design.title": "Tiêu đề",
   "shell.studio.design.formCannotDraw": "Biểu mẫu chưa thể được vẽ cho đến khi các lỗi của nó được sửa.",
   "shell.studio.design.formLoadFailed": "Không thể vẽ biểu mẫu.",
+  "shell.studio.design.usedOn": "Được dùng trên",
+  "shell.studio.design.usedOnNone": "Không có trang hay bước quy trình nào dùng biểu mẫu này.",
   "shell.studio.palette": "Bảng widget",
   "shell.studio.palette.inserted": "Đã chèn",
   "shell.studio.palette.position": "vị trí",

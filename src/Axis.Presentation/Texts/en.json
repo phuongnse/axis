@@ -187,6 +187,8 @@
   "shell.studio.design.title": "Title",
   "shell.studio.design.formCannotDraw": "The form cannot be drawn until its errors are fixed.",
   "shell.studio.design.formLoadFailed": "The form could not be drawn.",
+  "shell.studio.design.usedOn": "Used on",
+  "shell.studio.design.usedOnNone": "No page or process step uses this form.",
   "shell.studio.palette": "Widget palette",
   "shell.studio.palette.inserted": "Inserted",
   "shell.studio.palette.position": "position",

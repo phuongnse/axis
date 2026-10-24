@@ -5,12 +5,19 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from '../platform/site'
-import type { StudioDiagnostic, StudioNames, StudioResourceItem } from '../platform/studio'
+import type {
+  StudioDiagnostic,
+  StudioNames,
+  StudioReference,
+  StudioResourceItem,
+  StudioResourceReferences,
+} from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioEditor } from './StudioEditor'
+import type { OpenResource } from './StudioReferences'
 
 const folder = '/api/studio/apps/Desk'
 const formId = '1db765b0-483d-456b-9939-17e2a36de3b6'
@@ -187,11 +194,21 @@ function respond(answer: EntityWidgetMetadata | null, diagnostics: StudioDiagnos
   })
 }
 
-/** Serves the resource and answers each page-metadata post. */
-function stub(answer: () => Response = () => respond(widget), content: object = draft) {
+/** Serves the resource, its references and answers each page-metadata post. */
+function stub(
+  answer: () => Response = () => respond(widget),
+  content: object = draft,
+  references: StudioResourceReferences = { uses: [], usedBy: [] },
+) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     if (input === `${folder}/resources/${formId}/page-metadata` && init?.method === 'POST') {
       return answer()
+    }
+    if (input === `${folder}/resources/${formId}/references`) {
+      return new Response(JSON.stringify(references), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
     if (input === `${folder}/resources/${formId}`) {
       return new Response(JSON.stringify({ ...item, content }), {
@@ -205,7 +222,7 @@ function stub(answer: () => Response = () => respond(widget), content: object = 
   return fetchMock
 }
 
-function renderEditor() {
+function renderEditor(onOpen: OpenResource = vi.fn()) {
   render(
     <MemoryRouter initialEntries={['/studio?app=Desk&resource=ticket-edit']}>
       <ThemeModeProvider>
@@ -218,6 +235,7 @@ function renderEditor() {
               path={null}
               diagnosticPaths={[]}
               onOpenPath={vi.fn()}
+              onOpen={onOpen}
               onSaved={vi.fn()}
               onTextsWritten={vi.fn()}
               onDeleted={vi.fn()}
@@ -227,6 +245,7 @@ function renderEditor() {
       </ThemeModeProvider>
     </MemoryRouter>,
   )
+  return onOpen
 }
 
 const slow = { timeout: 5000 }
@@ -442,6 +461,27 @@ describe('the Design tab of a form', () => {
     expect(await within(canvas).findByRole('textbox', { name: 'Resolution' }, slow)).toBeInTheDocument()
   })
 
+  it('selects the step already shown when its label is clicked', async () => {
+    stub()
+    renderEditor()
+
+    const canvas = await openDesign()
+    const steps = await screen.findByTestId('studio-form-steps', {}, slow)
+    const first = within(steps).getByText('Describe the problem')
+    expect(first).not.toHaveAttribute('aria-current')
+    await userEvent.click(first)
+
+    expect(first).toHaveAttribute('aria-current', 'true')
+    const title = within(screen.getByTestId('studio-design-panel')).getByTestId('studio-field-/steps/0/title')
+    expect(within(title).getByRole('textbox', { name: 'Text key' })).toBeInTheDocument()
+
+    // A field inside the shown step takes the selection. A click on the step takes it back.
+    await userEvent.click(await within(canvas).findByRole('group', { name: 'title' }, slow))
+    expect(first).not.toHaveAttribute('aria-current')
+    await userEvent.click(first)
+    expect(first).toHaveAttribute('aria-current', 'true')
+  })
+
   it('selects a section and shows its title and visibleWhen', async () => {
     stub()
     renderEditor()
@@ -470,5 +510,66 @@ describe('the Design tab of a form', () => {
 
     const again = await screen.findByTestId('studio-form-canvas', {}, slow)
     expect(await within(again).findByRole('group', { name: 'title' }, slow)).toHaveAttribute('aria-current', 'true')
+  })
+})
+
+describe('the Used on list of a form', () => {
+  const pageUse: StudioReference = {
+    relation: 'widget form',
+    file: 'pages/tickets.json',
+    path: '/widgets/0/form',
+    node: { type: 'resource', id: 'tickets-page', kind: 'page', name: 'Tickets', file: 'pages/tickets.json' },
+  }
+  const processUse: StudioReference = {
+    relation: 'task form',
+    file: 'processes/triage.json',
+    path: '/steps/1/form',
+    node: { type: 'resource', id: 'triage-process', kind: 'process', name: 'Triage', file: 'processes/triage.json' },
+  }
+  const otherUse: StudioReference = {
+    relation: 'widget action',
+    file: 'pages/tickets.json',
+    path: '/widgets/0/actions/0',
+    node: { type: 'resource', id: 'tickets-page', kind: 'page', name: 'Tickets', file: 'pages/tickets.json' },
+  }
+  const entityUse: StudioReference = {
+    relation: 'form entity',
+    file: 'forms/ticket-edit.json',
+    path: '/entity',
+    node: { type: 'resource', id: 'ticket', kind: 'entity', name: 'Ticket', file: 'entities/ticket.json' },
+  }
+
+  it('lists only the widget form and task form entries', async () => {
+    stub(undefined, undefined, { uses: [entityUse], usedBy: [pageUse, otherUse, processUse] })
+    renderEditor()
+
+    await openDesign()
+    const section = await screen.findByTestId('studio-form-used-on', {}, slow)
+    const entries = await within(section).findAllByTestId('studio-form-used-on-entry')
+    expect(entries).toHaveLength(2)
+    expect(within(entries[0]).getByText('widget form')).toBeInTheDocument()
+    expect(within(entries[0]).getByText('/widgets/0/form', { exact: false })).toBeInTheDocument()
+    expect(within(entries[1]).getByText('task form')).toBeInTheDocument()
+    expect(within(entries[1]).getByText('/steps/1/form', { exact: false })).toBeInTheDocument()
+  })
+
+  it('opens the process at the path of its entry when the entry is clicked', async () => {
+    stub(undefined, undefined, { uses: [], usedBy: [processUse] })
+    const onOpen = renderEditor()
+
+    await openDesign()
+    const section = await screen.findByTestId('studio-form-used-on', {}, slow)
+    await userEvent.click(await within(section).findByRole('button', { name: 'Triage' }))
+    expect(onOpen).toHaveBeenCalledWith('triage-process', '/steps/1/form')
+  })
+
+  it('says that no page or process uses the form when no entry is a widget or task form', async () => {
+    stub(undefined, undefined, { uses: [], usedBy: [otherUse] })
+    renderEditor()
+
+    await openDesign()
+    const section = await screen.findByTestId('studio-form-used-on', {}, slow)
+    expect(within(section).getByText(platformEnglish['shell.studio.design.usedOnNone'])).toBeInTheDocument()
+    expect(within(section).queryByTestId('studio-form-used-on-entry')).not.toBeInTheDocument()
   })
 })

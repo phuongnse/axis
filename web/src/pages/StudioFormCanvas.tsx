@@ -246,6 +246,8 @@ function StepSwitch({
             data-path={step.path}
             data-marked={step.marked ? 'true' : undefined}
             aria-current={step.path !== undefined && step.path === selected ? 'true' : undefined}
+            // The switch fires onChange only when the value changes, so a click on the step already shown needs this.
+            onClick={() => onChange(index)}
           >
             {step.marked ? `${t(step.titleKey)} · ${t('shell.studio.design.hasDiagnostics')}` : t(step.titleKey)}
           </span>
