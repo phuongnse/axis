@@ -4,11 +4,14 @@ import {
   addableTypes,
   childLists,
   containerTypes,
+  insertionPlace,
   knownWidgetKeys,
+  listLevel,
   moveTo,
   newColumn,
   newTab,
   newWidget,
+  paletteLimit,
   typeChanges,
   widgetKeys,
   widgetLists,
@@ -341,4 +344,86 @@ describe('action pointers', () => {
       expect(actionKeyOf(pointer)).toBeUndefined()
     },
   )
+})
+
+describe('listLevel', () => {
+  it('counts the widgets segments of the pointer', () => {
+    expect(listLevel('/widgets')).toBe(1)
+    expect(listLevel('/widgets/0/widgets')).toBe(2)
+    expect(listLevel('/widgets/0/columns/1/widgets')).toBe(2)
+    expect(listLevel('/widgets/0/tabs/0/widgets/1/widgets/2/widgets')).toBe(4)
+  })
+})
+
+describe('insertionPlace', () => {
+  const page = [
+    { type: 'kpi' },
+    { type: 'section', title: { textKey: '' }, widgets: [{ type: 'chart' }, { type: 'kpi' }] },
+    {
+      type: 'columns',
+      columns: [
+        { width: 6, widgets: [{ type: 'kpi' }] },
+        { width: 6, widgets: [] },
+      ],
+    },
+    {
+      type: 'tabs',
+      tabs: [
+        { label: { textKey: '' }, widgets: [] },
+        { label: { textKey: '' }, widgets: [{ type: 'kpi' }] },
+      ],
+    },
+    { type: 'columns' },
+  ]
+
+  it('puts the widget right after a leaf', () => {
+    expect(insertionPlace(page, '/widgets/0')).toEqual({ list: '/widgets', index: 1 })
+    expect(insertionPlace(page, '/widgets/1/widgets/0')).toEqual({ list: '/widgets/1/widgets', index: 1 })
+  })
+
+  it('puts the widget at the end of a section', () => {
+    expect(insertionPlace(page, '/widgets/1')).toEqual({ list: '/widgets/1/widgets', index: 2 })
+  })
+
+  it('puts the widget at the end of the first column or tab', () => {
+    expect(insertionPlace(page, '/widgets/2')).toEqual({ list: '/widgets/2/columns/0/widgets', index: 1 })
+    expect(insertionPlace(page, '/widgets/3')).toEqual({ list: '/widgets/3/tabs/0/widgets', index: 0 })
+  })
+
+  it('puts the widget after a container that has no list the editor can show', () => {
+    expect(insertionPlace(page, '/widgets/4')).toEqual({ list: '/widgets', index: 5 })
+  })
+
+  it('puts the widget at the end of the page when nothing is selected', () => {
+    expect(insertionPlace([], '/widgets/0')).toEqual({ list: '/widgets', index: 0 })
+    expect(insertionPlace(page, '/widgets/9')).toEqual({ list: '/widgets', index: 5 })
+  })
+})
+
+describe('paletteLimit', () => {
+  const section = (widgets: unknown[]) => ({ type: 'section', title: { textKey: '' }, widgets })
+
+  it('refuses a second table, also one nested in a container', () => {
+    expect(paletteLimit([{ type: 'kpi' }], '/widgets', 'table')).toBeUndefined()
+    expect(paletteLimit([section([{ type: 'table' }])], '/widgets', 'table')).toBe('table')
+  })
+
+  it('refuses a second form, task inbox or process inspector', () => {
+    const page = [section([{ type: 'taskInbox' }])]
+    expect(paletteLimit(page, '/widgets', 'form')).toBe('recordWidget')
+    expect(paletteLimit(page, '/widgets', 'taskInbox')).toBe('recordWidget')
+    expect(paletteLimit(page, '/widgets', 'processInspector')).toBe('recordWidget')
+    expect(paletteLimit(page, '/widgets', 'table')).toBeUndefined()
+    expect(paletteLimit([{ type: 'table' }], '/widgets', 'form')).toBeUndefined()
+  })
+
+  it('refuses a container in a list on level 4 and takes other types', () => {
+    const deep = '/widgets/0/widgets/0/widgets/0/widgets'
+    const page = [section([section([section([{ type: 'kpi' }])])])]
+    for (const type of containerTypes) {
+      expect(paletteLimit(page, deep, type)).toBe('depth')
+      expect(paletteLimit(page, '/widgets/0/widgets/0/widgets', type)).toBeUndefined()
+    }
+    expect(paletteLimit(page, deep, 'kpi')).toBeUndefined()
+  })
 })
