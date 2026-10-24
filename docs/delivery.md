@@ -17,8 +17,9 @@ Three roles take part:
   in where autopilot stops and a person is needed. It also publishes the
   Design System artifact in Claude from the repository, as
   [Design changes](#design-changes) describes. How it does each of these,
-  with the commands and checklists, is in its runbook, the
-  [`axis-nexkit` skill](../.claude/skills/axis-nexkit/SKILL.md).
+  with the commands and checklists, is in its runbooks, the
+  [`axis-nexkit` skill](../.claude/skills/axis-nexkit/SKILL.md) and, for the
+  design system, the [`axis-design` skill](../.claude/skills/axis-design/SKILL.md).
 - **NexKit's agents** plan, implement, fix and review inside the NexKit
   pipeline. They read [AGENTS.md](../AGENTS.md). They do not read or write
   Claude Design.
@@ -323,18 +324,37 @@ The repository is the source of truth for the Axis design system, and the
 local agent session publishes it to Claude as a Design System artifact, as
 [D57](decisions/d57-a-design-system-published-from-the-repository.md) agrees.
 The token file and the preview pages are in the
-[frontend reference](reference/frontend.md).
+[frontend reference](reference/frontend.md). The Design System artifact is at
+<https://claude.ai/artifact/N1E4ohLThxhhYtnCCsJgyc>. It is private to the
+owner.
 
 - **A design change is a NexKit issue.** It links the artifact and follows the
   [life of an issue](#the-life-of-an-issue). It is never a hand-made pull
   request, because the token file and the widgets are not paths NexKit may
   not change.
-- **The published design follows the repository.** After a merged change to
-  the tokens or a widget, the local session publishes the design system again.
+- **A design change starts with the owner.** The owner asks the local session
+  in words, for example "make the primary colour darker". The session changes
+  the artifact first, so the owner sees the result. Then it writes a NexKit
+  issue that links the artifact and states the change in Axis terms: tokens
+  such as `primary` and `spacing-md`, and widgets such as `table`, `form` and
+  `section`. The docs stay the source of behaviour.
+- **The design runs ahead of the repository only by open issues.** While such
+  an issue is open, the artifact holds the change and its last change note
+  names the issue. Nothing else in the artifact differs from the repository.
+- **A sync follows the repository.** After a merged change to the tokens or a
+  widget, or whenever the owner asks, the session renders the previews again
+  with `scripts/design-system.sh`, reads the tokens from
+  `web/src/platform/designTokens.ts` and publishes both to the same artifact.
+  It keeps the changes of open design issues. Before it removes anything, it
+  lists every other difference it overwrote and every token the code no longer
+  defines.
 - **Only the owner and Claude edit in Claude Design.** NexKit's agents neither
   read nor write it. New screens may be drawn as Design artifacts, and an
   issue may link one as a picture, while the docs stay the source of
   behaviour.
+
+The steps for a requested change and for a sync are in the
+[`axis-design` skill](../.claude/skills/axis-design/SKILL.md).
 
 ## Keeping the docs current
 
