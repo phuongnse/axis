@@ -17,9 +17,10 @@ const ticketDetailId = "e6a7b810-39ed-4751-a0cc-b761ffc812e5";
 const ticketTriageId = "e5650c79-b0cb-449b-a5c2-1bd8d9acd452";
 
 /**
- * Drags `source` with the mouse to the point of `target` that is `fraction` of its height down: a small move starts
- * the drag, then steps reach the point. The designer is scrolled to the top of the window first, and both points are
- * measured after that, because the page scrolls while it loads and a mouse outside the window hits nothing.
+ * Drags `source`, a palette type or a data panel name, with the mouse to the point of `target` that is `fraction` of its height
+ * down: a small move starts the drag, then steps reach the point. The designer is scrolled to the top of the window first,
+ * and both points are measured after that, because the page scrolls while it loads and a mouse outside the window hits
+ * nothing.
  */
 async function dragFrom(
   page: Page,
@@ -66,14 +67,9 @@ async function dragField(page: Page, name: string, target: Locator) {
   await page.mouse.up();
 }
 
-/** Drags a palette type to the point of `target` that is `fraction` of its height down. */
-function dragType(page: Page, type: string, target: Locator, fraction = 0.5) {
-  return dragFrom(
-    page,
-    page.getByTestId(`studio-palette-${type}`),
-    target,
-    fraction,
-  );
+/** Drags a palette type or a data panel name, by its test id, to the point of `target` that is `fraction` of its height down. */
+function dragType(page: Page, testId: string, target: Locator, fraction = 0.5) {
+  return dragFrom(page, page.getByTestId(testId), target, fraction);
 }
 
 // The main server's Studio edits the purchase request copy only. This server's Studio folder is a copy of the service
@@ -172,14 +168,14 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       '[data-testid="studio-canvas-widget"][data-path="/widgets/0"]',
     );
     await expect(detail).toBeVisible();
-    await dragType(page, "section", detail, 0.75);
+    await dragType(page, "studio-palette-section", detail, 0.75);
 
     // A section without a widget does not compile, so the canvas draws it as a placeholder with a drop area.
     const list = page.locator(
       '[data-testid="studio-canvas-list"][data-list="/widgets/1/widgets"]',
     );
     await expect(list).toBeVisible();
-    await dragType(page, "table", list);
+    await dragType(page, "studio-palette-table", list);
 
     await expect(page.getByTestId("studio-palette-announcement")).toContainText(
       "Inserted table",
@@ -201,6 +197,84 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     } finally {
       // The saved table has no data source and does not compile. The page metadata route answers no page while any file
       // has an error, so the next journeys, which share this folder, would find no canvas.
+      await cp(path.join(serviceDesk, "pages", "ticket-detail.json"), file);
+    }
+  });
+
+  test("an author binds a table to the Ticket entity with the keyboard, and the canvas draws its columns", async ({
+    page,
+  }) => {
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketDetailId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+    await expect(
+      page.locator(
+        '[data-testid="studio-canvas-widget"][data-path="/widgets/0"]',
+      ),
+    ).toBeVisible();
+
+    await page.getByTestId("studio-data-entity-Ticket").focus();
+    await page.keyboard.press("Enter");
+    const choice = page.getByTestId("studio-binding-choice");
+    await expect(choice).toBeVisible();
+    await choice.getByTestId("studio-binding-table").focus();
+    await page.keyboard.press("Enter");
+
+    await expect(page.getByTestId("studio-palette-announcement")).toContainText(
+      "Inserted table",
+    );
+    const table = page.locator(
+      '[data-testid="studio-canvas-widget"][data-path="/widgets/1"]',
+    );
+    await expect(
+      table.getByRole("columnheader", { name: "Title", exact: true }),
+    ).toBeVisible();
+  });
+
+  test("an author drags a grouped data source onto the canvas, picks a chart and saves the bound chart", async ({
+    page,
+  }) => {
+    // A tall window keeps the data panel and the drop areas in view together, away from the edges where a drag scrolls.
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketDetailId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    const detail = page.locator(
+      '[data-testid="studio-canvas-widget"][data-path="/widgets/0"]',
+    );
+    await expect(detail).toBeVisible();
+    await dragType(
+      page,
+      "studio-data-dataSource-OpenTicketsByCategory",
+      detail,
+      0.75,
+    );
+    await page.getByTestId("studio-binding-chart").click();
+    await expect(page.getByTestId("studio-palette-announcement")).toContainText(
+      "Inserted chart",
+    );
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+
+    const file = path.join(copy, "pages", "ticket-detail.json");
+    try {
+      await expect
+        .poll(async () => JSON.parse(await readFile(file, "utf8")).widgets[1])
+        .toEqual({
+          type: "chart",
+          dataSource: "OpenTicketsByCategory",
+          kind: "bar",
+          category: "category",
+          measures: [{ name: "openCount", label: { textKey: "" } }],
+          title: { textKey: "" },
+        });
+    } finally {
+      // The saved chart has empty text keys and does not compile. The page metadata route answers no page while any
+      // file has an error, so the next journeys, which share this folder, would find no canvas.
       await cp(path.join(serviceDesk, "pages", "ticket-detail.json"), file);
     }
   });
@@ -258,14 +332,17 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       '[data-testid="studio-canvas-widget"][data-path="/widgets/0"]',
     );
     await expect(detail).toBeVisible();
-    await dragType(page, "section", detail, 0.75);
+    await dragType(page, "studio-palette-section", detail, 0.75);
     const save = page.getByRole("button", { name: "Save", exact: true });
     await save.click();
     await expect(page.getByTestId("studio-saved")).toBeVisible();
 
     const file = path.join(copy, "pages", "ticket-detail.json");
     const original = JSON.parse(
-      await readFile(path.join(serviceDesk, "pages", "ticket-detail.json"), "utf8"),
+      await readFile(
+        path.join(serviceDesk, "pages", "ticket-detail.json"),
+        "utf8",
+      ),
     );
     try {
       await expect

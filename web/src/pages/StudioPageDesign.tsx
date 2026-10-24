@@ -9,11 +9,25 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { Button, Flex, Typography } from 'antd'
-import { useState } from 'react'
+import { useContext, useState } from 'react'
 import { getAt } from '../platform/jsonPatch'
-import { addableTypes, dropPlace, movePlace, moveTo, newWidget, type DropTarget } from '../platform/pageWidgets'
+import {
+  addableTypes,
+  boundWidget,
+  dropPlace,
+  insertionPlace,
+  movePlace,
+  moveTo,
+  newWidget,
+  targetPlace,
+  widgetPointerOf,
+  type DataBinding,
+  type DropTarget,
+} from '../platform/pageWidgets'
+import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { innermostCollision, silent } from './designDrag'
+import { BindingChoice, PageDataPanel } from './PageDataPanel'
 import { PageWidgets } from './PageEditor'
 import { PagePalette } from './PagePalette'
 import { landedText, paletteReasons, usePartLabel } from './pagePaletteSupport'
@@ -25,18 +39,30 @@ function parentList(pointer: string): string {
   return pointer.slice(0, pointer.lastIndexOf('/'))
 }
 
+/** The binding that a draggable of the data panel carries, or `undefined` for any other draggable. */
+function bindingOf(data: unknown): DataBinding | undefined {
+  const binding = (data as { binding?: Partial<DataBinding> } | undefined)?.binding
+  return (binding?.kind === 'entity' || binding?.kind === 'dataSource') && typeof binding.name === 'string'
+    ? { kind: binding.kind, name: binding.name }
+    : undefined
+}
+
 /**
- * The Design tab of a page: the canvas, and beside it the palette and the widget tree. A palette type that is dragged
+ * The Design tab of a page: the canvas, and beside it the palette, the data panel and the widget tree. A palette type that is dragged
  * with the pointer onto the canvas is inserted where it is dropped: before a widget on its upper half, after it on its
  * lower half, or at the end of a list when it is dropped on the list. The innermost target wins. A drop that a page
  * limit forbids inserts nothing, and the live region gives the reason. An allowed drop selects the new widget, and
  * the live region names the list and position where it landed.
  *
+ * An entity or data source of the data panel is dropped the same way, or picked with the keyboard, which places it
+ * after the selected widget as the palette does. Either opens a choice of the widgets that can show it. The chosen
+ * widget is inserted bound, selected, and announced like a palette insert.
+ *
  * A widget of the canvas that is dragged moves to the same targets, as one edit of the draft, and stays selected. A
  * move the format refuses is flagged while it is dragged: the drag overlay and the live region give the reason, and a
  * drop there changes nothing. These are a widget inside itself, and a container whose lists would go past level 4. A
- * drop on the widget itself or where it already is changes nothing and says nothing. The canvas, the palette and the
- * drag library are one lazy chunk, which loads when the tab opens.
+ * drop on the widget itself or where it already is changes nothing and says nothing. The canvas, the palette, the data
+ * panel and the drag library are one lazy chunk, which loads when the tab opens.
  */
 export default function StudioPageDesign({
   application,
@@ -58,6 +84,8 @@ export default function StudioPageDesign({
   const partLabel = usePartLabel()
   const [announcement, setAnnouncement] = useState('')
   const [dragging, setDragging] = useState<{ label: string; refusal?: string }>()
+  const [pending, setPending] = useState<{ binding: DataBinding; place: { list: string; index: number } }>()
+  const names = useContext(StudioNamesContext)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   /** What the pointer is over as a drop target, or undefined. The half is only read for a widget. */
@@ -88,7 +116,10 @@ export default function StudioPageDesign({
 
   function start({ active }: DragStartEvent) {
     const data = active.data.current as { type?: unknown; label?: unknown } | undefined
-    setDragging({ label: String(movedFrom(active) === undefined ? (data?.type ?? '') : (data?.label ?? '')) })
+    const binding = bindingOf(active.data.current)
+    setDragging({
+      label: binding?.name ?? String(movedFrom(active) === undefined ? (data?.type ?? '') : (data?.label ?? '')),
+    })
   }
 
   function dragOver(event: DragOverEvent) {
@@ -148,17 +179,24 @@ export default function StudioPageDesign({
       return
     }
     const type = (active.data.current as { type?: unknown } | undefined)?.type
+    const binding = bindingOf(active.data.current)
     const target = targetOf(event)
     if (
       over === null ||
-      typeof type !== 'string' ||
-      !addableTypes.includes(type) ||
+      (binding === undefined && (typeof type !== 'string' || !addableTypes.includes(type))) ||
       target === undefined ||
       !Array.isArray(widgets)
     ) {
       return
     }
-    const place = dropPlace(widgets, type, target)
+    if (binding !== undefined) {
+      const place = targetPlace(widgets, target)
+      if (place !== undefined) {
+        setPending({ binding, place })
+      }
+      return
+    }
+    const place = dropPlace(widgets, type as string, target)
     if (place === undefined) {
       return
     }
@@ -167,7 +205,40 @@ export default function StudioPageDesign({
       return
     }
     const items = getAt({ widgets }, place.list) as unknown[]
-    onChange(place.list, [...items.slice(0, place.index), newWidget(type), ...items.slice(place.index)])
+    onChange(place.list, [...items.slice(0, place.index), newWidget(type as string), ...items.slice(place.index)])
+    onSelect(`${place.list}/${place.index}`)
+    setAnnouncement(landedText(t, partLabel, widgets, place.list, place.index, type as string))
+  }
+
+  /** Opens the choice for a binding picked with the keyboard, at the place after the selected widget. */
+  function pick(binding: DataBinding) {
+    const widgets = draft.widgets
+    if (!Array.isArray(widgets)) {
+      return
+    }
+    const widgetPointer = widgetPointerOf(selected)
+    setPending({
+      binding,
+      place: insertionPlace(widgets, getAt(draft, widgetPointer) === undefined ? '/widgets/0' : widgetPointer),
+    })
+  }
+
+  function choose(type: string) {
+    const widgets = draft.widgets
+    setPending(undefined)
+    if (pending === undefined || names === undefined || !Array.isArray(widgets)) {
+      return
+    }
+    const { binding, place } = pending
+    const items = getAt({ widgets }, place.list)
+    if (!Array.isArray(items)) {
+      return
+    }
+    onChange(place.list, [
+      ...items.slice(0, place.index),
+      boundWidget(names, draft, binding, type),
+      ...items.slice(place.index),
+    ])
     onSelect(`${place.list}/${place.index}`)
     setAnnouncement(landedText(t, partLabel, widgets, place.list, place.index, type))
   }
@@ -201,9 +272,17 @@ export default function StudioPageDesign({
             onSelect={onSelect}
             onChange={onChange}
           />
+          <PageDataPanel onPick={pick} />
           <PageWidgets value={draft} selected={selected} onSelect={onSelect} onChange={onChange} />
         </div>
       </Flex>
+      <BindingChoice
+        binding={pending?.binding}
+        widgets={Array.isArray(draft.widgets) ? draft.widgets : []}
+        list={pending?.place.list ?? '/widgets'}
+        onChoose={choose}
+        onCancel={() => setPending(undefined)}
+      />
       <DragOverlay dropAnimation={null}>
         {dragging === undefined ? null : (
           <Flex vertical align="flex-start">

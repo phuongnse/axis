@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   actionKeyOf,
   addableTypes,
+  bindingTypes,
+  boundWidget,
   childLists,
   containerTypes,
   dropPlace,
@@ -15,6 +17,7 @@ import {
   newTab,
   newWidget,
   paletteLimit,
+  targetPlace,
   typeChanges,
   widgetKeys,
   widgetLists,
@@ -22,6 +25,7 @@ import {
   widgetSummary,
   widgetTypes,
 } from './pageWidgets'
+import type { StudioNames } from './studio'
 
 describe('widgetSummary', () => {
   it('names the type and the first name the widget binds', () => {
@@ -586,5 +590,154 @@ describe('innermostPointer', () => {
 
   it('picks nothing from no pointers', () => {
     expect(innermostPointer([])).toBeUndefined()
+  })
+})
+
+describe('targetPlace', () => {
+  const section = (widgets: unknown[]) => ({ type: 'section', title: { textKey: '' }, widgets })
+  const page = [{ type: 'table' }, section([{ type: 'chart' }])]
+
+  it('gives the place of a drop whatever the page limits say', () => {
+    expect(targetPlace(page, { kind: 'widget', pointer: '/widgets/0', half: 'lower' })).toEqual({
+      list: '/widgets',
+      index: 1,
+    })
+    expect(targetPlace(page, { kind: 'widget', pointer: '/widgets/1/widgets/0', half: 'upper' })).toEqual({
+      list: '/widgets/1/widgets',
+      index: 0,
+    })
+    expect(targetPlace(page, { kind: 'list', pointer: '/widgets/1/widgets' })).toEqual({
+      list: '/widgets/1/widgets',
+      index: 1,
+    })
+  })
+
+  it('gives nothing when the draft has no such widget or list', () => {
+    expect(targetPlace(page, { kind: 'widget', pointer: '/widgets/5', half: 'upper' })).toBeUndefined()
+    expect(targetPlace(page, { kind: 'list', pointer: '/widgets/0/widgets' })).toBeUndefined()
+  })
+})
+
+describe('data bindings', () => {
+  const names = {
+    entities: [{ id: 'e1', name: 'Ticket', module: null, fields: [] }],
+    dataSources: [
+      {
+        id: 'd1',
+        name: 'ByStatus',
+        module: null,
+        parameters: [],
+        columns: [
+          { name: 'status', type: 'text' },
+          { name: 'label', type: 'text' },
+          { name: 'count', type: 'integer' },
+        ],
+        groupBy: ['status'],
+      },
+      {
+        id: 'd2',
+        name: 'Totals',
+        module: null,
+        parameters: [],
+        columns: [
+          { name: 'open', type: 'integer' },
+          { name: 'all', type: 'integer' },
+        ],
+        groupBy: [],
+      },
+      {
+        id: 'd3',
+        name: 'AllTickets',
+        module: null,
+        parameters: [],
+        columns: [{ name: 'title', type: 'text' }],
+        groupBy: null,
+      },
+      {
+        id: 'd4',
+        name: 'ByTwo',
+        module: null,
+        parameters: [],
+        columns: [{ name: 'a', type: 'text' }],
+        groupBy: ['a', 'b'],
+      },
+    ],
+  } as unknown as StudioNames
+  const entity = { kind: 'entity', name: 'Ticket' } as const
+  const dataSource = (name: string) => ({ kind: 'dataSource', name }) as const
+
+  describe('bindingTypes', () => {
+    it('offers a table, a form and a detail for an entity', () => {
+      expect(bindingTypes(names, entity)).toEqual(['table', 'form', 'detail'])
+    })
+
+    it('offers a chart for exactly one group field', () => {
+      expect(bindingTypes(names, dataSource('ByStatus'))).toEqual(['table', 'chart'])
+      expect(bindingTypes(names, dataSource('bystatus'))).toEqual(['table', 'chart'])
+    })
+
+    it('offers a KPI for an empty group by, and a table only for a plain or other grouped data source', () => {
+      expect(bindingTypes(names, dataSource('Totals'))).toEqual(['table', 'kpi'])
+      expect(bindingTypes(names, dataSource('AllTickets'))).toEqual(['table'])
+      expect(bindingTypes(names, dataSource('ByTwo'))).toEqual(['table'])
+      expect(bindingTypes(names, dataSource('Missing'))).toEqual(['table'])
+    })
+  })
+
+  describe('boundWidget', () => {
+    const page = {
+      parameters: [
+        { name: 'other', type: 'reference', required: true, target: 'Order' },
+        { name: 'optional', type: 'reference', required: false, target: 'Ticket' },
+        { name: 'text', type: 'text', required: true },
+        { name: 'ticket', type: 'reference', required: true, target: 'ticket' },
+        { name: 'second', type: 'reference', required: true, target: 'Ticket' },
+      ],
+    }
+
+    it('binds a table or a form to an entity', () => {
+      expect(boundWidget(names, {}, entity, 'table')).toEqual({ type: 'table', entity: 'Ticket' })
+      expect(boundWidget(names, {}, entity, 'form')).toEqual({ type: 'form', entity: 'Ticket' })
+    })
+
+    it('takes the first required reference parameter that targets the entity as the record of a detail', () => {
+      expect(boundWidget(names, page, entity, 'detail')).toEqual({ type: 'detail', entity: 'Ticket', record: 'ticket' })
+    })
+
+    it('leaves the record of a detail empty when no parameter fits', () => {
+      expect(boundWidget(names, {}, entity, 'detail')).toEqual({ type: 'detail', entity: 'Ticket', record: '' })
+      expect(boundWidget(names, { parameters: [page.parameters[0]!, page.parameters[1]!] }, entity, 'detail')).toEqual({
+        type: 'detail',
+        entity: 'Ticket',
+        record: '',
+      })
+    })
+
+    it('binds a table to a data source', () => {
+      expect(boundWidget(names, {}, dataSource('ByStatus'), 'table')).toEqual({
+        type: 'table',
+        dataSource: 'ByStatus',
+      })
+    })
+
+    it('gives a chart its group field and first numeric measure, with empty text keys', () => {
+      expect(boundWidget(names, {}, dataSource('ByStatus'), 'chart')).toEqual({
+        type: 'chart',
+        dataSource: 'ByStatus',
+        kind: 'bar',
+        category: 'status',
+        measures: [{ name: 'count', label: { textKey: '' } }],
+        title: { textKey: '' },
+      })
+    })
+
+    it('gives a KPI the first measure, with an empty label', () => {
+      expect(boundWidget(names, {}, dataSource('Totals'), 'kpi')).toEqual({
+        type: 'kpi',
+        dataSource: 'Totals',
+        measure: 'open',
+        label: { textKey: '' },
+      })
+    })
   })
 })

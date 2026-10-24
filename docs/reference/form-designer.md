@@ -14,8 +14,7 @@ Dn refers to [decisions.md](../decisions.md).
   a reload; built for forms) and `@dnd-kit` drag and drop of the page designer.
   - **Canvas.** It draws the unsaved draft with the site's form widget, in its
     sections and steps. Fields get placeholder values made from the field
-    types, and a child collection gets placeholder rows. The Save button does
-    nothing. The canvas asks
+    types, and a child collection gets placeholder rows. The canvas asks
     [the draft page metadata route](authoring.md#draft-page-metadata) 300 ms
     after the last edit. For a form it answers the metadata of a form widget,
     with a `path` on each section, field and step.
@@ -26,9 +25,8 @@ Dn refers to [decisions.md](../decisions.md).
     click and form submit. A click only selects. A form the route cannot draw
     shows a short notice. The tab shows the Used on list above the step switch
     and the canvas, with the field palette, the layout outline and a property
-    panel beside the canvas, and no width switch.
-    The canvas is mounted only while the Design tab is active. The tab's code is
-    the lazy chunk `StudioFormDesign`, which loads when the tab first opens.
+    panel beside the canvas, and no width switch. The canvas is mounted only while the Design tab is active.
+    The tab's code is the lazy chunk `StudioFormDesign`, which loads when the tab first opens.
   - **Step switch.** It lists the steps in order and shows the sections of one
     step. A form without `steps` has no switch.
     _Partly built:_ the switch is a segmented control above the canvas, with
