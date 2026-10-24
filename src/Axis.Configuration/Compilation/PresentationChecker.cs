@@ -709,7 +709,7 @@ internal static class PresentationChecker
             grouped = dataSource.Aggregate is not null;
             source = dataSource;
 
-            CheckParameterBinding(widget, path, page, dataSource, Report);
+            CheckParameterBinding(widget, path, page, dataSource, "table", true, Report);
         }
         else if (!loaded.UnloadedDataSourceNames.Contains(widget.DataSource!)
             && !moduleReferences.ReportUndeclared(widget.DataSource!, $"{path}/dataSource", Report))
@@ -818,7 +818,7 @@ internal static class PresentationChecker
     /// <summary>
     /// Checks a <c>kpi</c> widget. It shows one measure of the single total row of a data source, so it binds no
     /// entity or form and has no actions. The data source has an aggregate with no <c>groupBy</c>, each measure
-    /// is one of the aggregate's, and no data source parameter is required, because a tile has no filter input.
+    /// is one of the aggregate's, and a data source parameter that the widget leaves unbound is optional, because a tile has no filter input.
     /// The expressions of its <c>navigate</c> action see only the page's parameters.
     /// </summary>
     private static void CheckKpi(
@@ -862,6 +862,7 @@ internal static class PresentationChecker
         if (findDataSource(dataSourceName) is { } dataSource)
         {
             references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
+            CheckParameterBinding(widget, path, page, dataSource, "kpi", false, Report);
             CheckKpiDataSource(widget, path, dataSource, Report);
         }
         else if (!loaded.UnloadedDataSourceNames.Contains(dataSourceName)
@@ -880,7 +881,7 @@ internal static class PresentationChecker
         }
     }
 
-    /// <summary>Checks the data source of a <c>kpi</c> widget: one total row, the named measures and no required parameter.</summary>
+    /// <summary>Checks the data source of a <c>kpi</c> widget: one total row and the named measures.</summary>
     private static void CheckKpiDataSource(WidgetDefinition widget, string path, DataSourceResource dataSource, Action<string, string, string> report)
     {
         if (dataSource.Aggregate is not { GroupBy.Count: 0 } aggregate)
@@ -909,22 +910,12 @@ internal static class PresentationChecker
                 CheckMeasure(comparison.Measure, $"{path}/comparison/measure");
             }
         }
-
-        // A kpi has no filter input and binds no page parameter, so a required parameter would fail every request.
-        foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true))
-        {
-            report(
-                DiagnosticCodes.InvalidWidgetBinding,
-                $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A kpi has no filter input, so every parameter of its data source must be optional.",
-                $"{path}/dataSource");
-        }
     }
 
     /// <summary>
     /// Checks a <c>chart</c> widget. It draws the groups of a data source, so it binds no entity or form and has no
     /// actions. The data source has an aggregate grouped by exactly one field, the category is that field, each
-    /// measure is a number of the aggregate, a <c>pie</c> has one measure and no data source parameter is required,
-    /// because a chart has no filter input.
+    /// measure is a number of the aggregate and a <c>pie</c> has one measure.
     /// </summary>
     private static void CheckChart(
         WidgetDefinition widget,
@@ -966,6 +957,7 @@ internal static class PresentationChecker
         if (findDataSource(dataSourceName) is { } dataSource)
         {
             references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
+            CheckParameterBinding(widget, path, page, dataSource, "chart", false, Report);
             CheckChartDataSource(widget, path, dataSource, findEntity, Report);
         }
         else if (!loaded.UnloadedDataSourceNames.Contains(dataSourceName)
@@ -980,7 +972,7 @@ internal static class PresentationChecker
 
     /// <summary>
     /// Checks the data source of a <c>chart</c> widget: one group field that is the category, numeric measures that the
-    /// aggregate declares, one measure on a <c>pie</c> and no required parameter.
+    /// aggregate declares and one measure on a <c>pie</c>.
     /// </summary>
     private static void CheckChartDataSource(
         WidgetDefinition widget,
@@ -1041,15 +1033,6 @@ internal static class PresentationChecker
                 $"A pie chart draws one measure, not {measures.Count}.",
                 $"{path}/measures");
         }
-
-        // A chart has no filter input and binds no page parameter, so a required parameter would fail every request.
-        foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true))
-        {
-            report(
-                DiagnosticCodes.InvalidWidgetBinding,
-                $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A chart has no filter input, so every parameter of its data source must be optional.",
-                $"{path}/dataSource");
-        }
     }
 
     /// <summary>
@@ -1080,21 +1063,24 @@ internal static class PresentationChecker
     {
         if (widget.Parameters is not null)
         {
-            report(DiagnosticCodes.InvalidWidgetBinding, $"'parameters' applies only to table widgets over a data source, not to a {kind}.", $"{path}/parameters");
+            report(DiagnosticCodes.InvalidWidgetBinding, $"'parameters' applies only to table, chart and kpi widgets over a data source, not to a {kind}.", $"{path}/parameters");
         }
     }
 
     /// <summary>
-    /// Checks how a table gives the parameters of its data source their values from the parameters of its page. Each
-    /// entry names a parameter of each, with the same type. A required parameter is bound to a required page
-    /// parameter. A page parameter does not share its name with a parameter the table leaves unbound, because both
-    /// are in the URL query as filter inputs.
+    /// Checks how a table, a chart or a kpi gives the parameters of its data source their values from the parameters
+    /// of its page. Each entry names a parameter of each, with the same type. A required parameter is bound to a
+    /// required page parameter, and a parameter the widget leaves unbound is optional. A table also has a filter input
+    /// for each unbound parameter, so a page parameter does not share its name with one, because both are in the URL
+    /// query. A chart and a kpi have no filter input, so <paramref name="hasFilterInputs"/> is false for them.
     /// </summary>
     private static void CheckParameterBinding(
         WidgetDefinition widget,
         string path,
         PageResource page,
         DataSourceResource dataSource,
+        string kind,
+        bool hasFilterInputs,
         Action<string, string, string> report)
     {
         var binding = widget.Parameters ?? new Dictionary<string, string>();
@@ -1150,14 +1136,20 @@ internal static class PresentationChecker
             }
         }
 
-        // A table has an input for each parameter it leaves unbound, so a required one would make every request
-        // for its rows fail unless a page parameter gives it a value.
+        // A required parameter that no page parameter gives a value would make every request for the rows fail.
         foreach (var parameter in dataSource.Parameters.Where(parameter => parameter.Required == true && !bound.Contains(parameter.Name)))
         {
             report(
                 DiagnosticCodes.InvalidWidgetBinding,
-                $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A table can only show it when the parameter is bound to a required page parameter with 'parameters'.",
+                hasFilterInputs
+                    ? $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A {kind} can only show it when the parameter is bound to a required page parameter with 'parameters'."
+                    : $"The data source '{dataSource.Name}' has the required parameter '{parameter.Name}'. A {kind} has no filter input, so a parameter that 'parameters' leaves unbound must be optional.",
                 $"{path}/dataSource");
+        }
+
+        if (!hasFilterInputs)
+        {
+            return;
         }
 
         var unbound = new HashSet<string>(

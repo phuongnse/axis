@@ -81,11 +81,27 @@ function CurrentLocation() {
   return <output data-testid="path">{location.pathname + location.search}</output>
 }
 
-function renderKpi(kpi: KpiMetadata, pageValues?: Record<string, string>) {
+/** A kpi widget whose data source has two parameters, of which `parameters` binds only `inRegion`. */
+function boundKpiWidget(kpi: KpiMetadata): WidgetMetadata {
+  const widget = kpiWidget(kpi)
+  const parameter = (name: string) => ({
+    name,
+    type: 'text' as const,
+    required: false,
+    labelKey: null,
+    values: null,
+    target: null,
+  })
+  widget.dataSource!.parameters = [parameter('inRegion'), parameter('other')]
+  widget.parameters = { inRegion: 'region' }
+  return widget
+}
+
+function renderKpi(kpi: KpiMetadata, pageValues?: Record<string, string>, widget = kpiWidget(kpi)) {
   return render(
     <MemoryRouter initialEntries={['/e2e/notetotals']}>
       <TextProvider catalogs={catalogs} development={false}>
-        <KpiWidget sitePath="e2e" widget={kpiWidget(kpi)} locale="en" pageValues={pageValues} />
+        <KpiWidget sitePath="e2e" widget={widget} locale="en" pageValues={pageValues} />
       </TextProvider>
       <CurrentLocation />
     </MemoryRouter>,
@@ -101,6 +117,42 @@ describe('KpiWidget', () => {
     await waitFor(() => expect(screen.getByTestId('kpi-value')).toHaveTextContent(/^Open: 12\.50$/))
     expect(screen.getByTestId('kpi-comparison')).toHaveTextContent(/^Urgent: 3$/)
     expect(requested()).toEqual([rowsPath])
+  })
+
+  it('asks for the row with the value of each bound page parameter under the data source parameter name', async () => {
+    const requested = stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
+
+    renderKpi(withComparison, { region: 'north', other: 'ignored' }, boundKpiWidget(withComparison))
+
+    await waitFor(() => expect(screen.getByTestId('kpi-value')).toBeInTheDocument())
+    expect(requested()).toEqual([`${rowsPath}?inRegion=north`])
+  })
+
+  it('leaves out a bound parameter whose page parameter has no value', async () => {
+    const requested = stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
+
+    renderKpi(withComparison, {}, boundKpiWidget(withComparison))
+
+    await waitFor(() => expect(screen.getByTestId('kpi-value')).toBeInTheDocument())
+    expect(requested()).toEqual([rowsPath])
+  })
+
+  it('asks again when the page parameter value changes', async () => {
+    const requested = stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
+    const widget = boundKpiWidget(withComparison)
+    const view = renderKpi(withComparison, { region: 'north' }, widget)
+    await waitFor(() => expect(screen.getByTestId('kpi-value')).toBeInTheDocument())
+
+    view.rerender(
+      <MemoryRouter initialEntries={['/e2e/notetotals']}>
+        <TextProvider catalogs={catalogs} development={false}>
+          <KpiWidget sitePath="e2e" widget={widget} locale="en" pageValues={{ region: 'south' }} />
+        </TextProvider>
+        <CurrentLocation />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(requested()).toEqual([`${rowsPath}?inRegion=north`, `${rowsPath}?inRegion=south`]))
   })
 
   it('shows one line without a comparison', async () => {

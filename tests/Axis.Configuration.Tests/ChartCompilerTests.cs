@@ -248,6 +248,88 @@ public sealed class ChartCompilerTests
         Assert.Null(result.Model);
     }
 
+    private const string NumberParameter = """{ "name": "number", "type": "text", "required": true }""";
+
+    private static string BoundChart(string dataSource, string parameters) =>
+        Chart(dataSource: dataSource)[..^1] + $$""", "parameters": {{parameters}} }""";
+
+    [Fact]
+    public void Chart_binding_a_required_parameter_to_a_required_page_parameter_compiles_with_the_declared_names()
+    {
+        using var folder = Folder(
+            BoundChart("FilteredStats", """{ "NUMBERFILTER": "NUMBER" }"""),
+            pageParameters: NumberParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Equal(new Dictionary<string, string> { ["numberFilter"] = "number" }, widget.Parameters);
+    }
+
+    [Theory]
+    [InlineData("""{ "missing": "number" }""", """{ "name": "number", "type": "text" }""")]
+    [InlineData("""{ "numberFilter": "missing" }""", """{ "name": "number", "type": "text" }""")]
+    [InlineData("""{ "numberFilter": "number" }""", """{ "name": "number", "type": "integer" }""")]
+    [InlineData("""{ "numberFilter": "number", "NUMBERFILTER": "number" }""", """{ "name": "number", "type": "text" }""")]
+    public void Chart_binding_an_unknown_name_or_a_mismatched_type_is_reported_at_the_binding(string parameters, string pageParameter)
+    {
+        using var folder = Folder(BoundChart("OptionalStats", parameters), pageParameters: pageParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.InvalidWidgetBinding, diagnostic.Code);
+        Assert.Equal(OrdersFile, diagnostic.File);
+        Assert.StartsWith("/widgets/0/parameters/", diagnostic.Path, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Chart_binding_a_required_parameter_to_an_optional_page_parameter_is_reported_at_the_binding()
+    {
+        using var folder = Folder(
+            BoundChart("FilteredStats", """{ "numberFilter": "number" }"""),
+            pageParameters: """{ "name": "number", "type": "text" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, OrdersFile, "/widgets/0/parameters/numberFilter"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Chart_leaving_a_required_parameter_unbound_is_reported_at_its_data_source_naming_the_parameter()
+    {
+        using var folder = Folder(
+            BoundChart("FilteredStats", "{}"),
+            pageParameters: NumberParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, OrdersFile, "/widgets/0/dataSource"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'numberFilter'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Page_parameter_named_like_an_unbound_parameter_of_its_chart_compiles()
+    {
+        using var folder = Folder(
+            Chart(dataSource: "OptionalStats"),
+            pageParameters: """{ "name": "numberFilter", "type": "text" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
     [Fact]
     public void Chart_over_a_data_source_with_an_optional_parameter_compiles()
     {
@@ -304,7 +386,6 @@ public sealed class ChartCompilerTests
     [InlineData("""{ "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [] }""")]
     [InlineData("""{ "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders" } ] }""")]
     [InlineData("""{ "type": "chart", "kind": "area", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
-    [InlineData("""{ "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ], "parameters": {} }""")]
     [InlineData("""{ "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ], "measure": "orders" }""")]
     [InlineData("""{ "type": "table", "entity": "Order", "kind": "bar" }""")]
     [InlineData("""{ "type": "table", "entity": "Order", "category": "status" }""")]
@@ -322,9 +403,9 @@ public sealed class ChartCompilerTests
     }
 
     /// <summary>
-    /// The presentation folder with data sources over orders and the page <c>Orders</c> holding <paramref name="widgets"/>.
+    /// The presentation folder with data sources over orders and the page <c>Orders</c> holding <paramref name="widgets"/>, with the given page parameters.
     /// </summary>
-    private static TemporaryFolder Folder(string widgets) =>
+    private static TemporaryFolder Folder(string widgets, string? pageParameters = null) =>
         PresentationCompilerTests.Folder()
             .With("texts/en.json", TextsEn)
             .With("entities/order.json", OrderEntity)
@@ -366,5 +447,5 @@ public sealed class ChartCompilerTests
                   "parameters": [ { "name": "numberFilter", "type": "text" } ],
                   "aggregate": { "groupBy": ["status"], "measures": [ { "name": "orders", "function": "count" } ] } }
                 """)
-            .With(OrdersFile, Page("Orders", widgets));
+            .With(OrdersFile, Page("Orders", widgets, parameters: pageParameters));
 }

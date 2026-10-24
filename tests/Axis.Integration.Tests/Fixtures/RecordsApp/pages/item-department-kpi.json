@@ -1,0 +1,17 @@
+{
+  "id": "d7a2e913-6c40-4b5f-9e8d-1a3f5c7b9d24",
+  "kind": "page",
+  "name": "ItemDepartmentKpi",
+  "formatVersion": 1,
+  "title": { "textKey": "itemDepartmentKpi.title" },
+  "parameters": [{ "name": "department", "type": "reference", "target": "Department", "required": true }],
+  "widgets": [
+    {
+      "type": "kpi",
+      "dataSource": "ItemTotalsInDepartment",
+      "parameters": { "inDepartment": "department" },
+      "measure": "items",
+      "label": { "textKey": "itemDepartmentKpi.items" }
+    }
+  ]
+}

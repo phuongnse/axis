@@ -454,12 +454,15 @@ data sources.
   `navigate` action with `record: id` opens a form over the root entity, and the
   `record` rule of the action checks it (`AXC0235`). A table over a data source
   with an `aggregate` has no row actions, because a group is not a record.
-- **Page parameters.** A table binds a page parameter to a data source
-  parameter with a name map on the widget:
+- **Page parameters.** A table, a chart or a KPI binds a page parameter to a
+  data source parameter with a name map on the widget:
   `"parameters": { "<data source parameter>": "<page parameter>" }`. The two
   types must match. A required data source parameter is allowed only when it
   is bound to a required page parameter. A bound parameter has no filter
-  input, and its value comes from the page parameter in the URL. See
+  input, and its value comes from the page parameter in the URL. A chart or a
+  KPI sends the value with its request for the rows, and reads again when the
+  value changes. The data source's read grant and record filters apply as
+  they do to a table. See
   [D63](../decisions/d63-navigate-actions-and-page-parameters.md). The compile
   checks:
   - Each entry is checked at `/widgets/{i}/parameters/{key}` and every problem
@@ -472,12 +475,14 @@ data sources.
     same target. For an `enum`, every value of the page parameter must also be
     a value of the data source parameter.
   - A required data source parameter that is not bound is `AXC0060` at
-    `/widgets/{i}/dataSource`.
+    `/widgets/{i}/dataSource`. A chart or a KPI has no filter input, so every
+    parameter that its `parameters` leaves unbound must be optional.
   - A page parameter with the same name as an unbound parameter of its table,
     ignoring letter case, is `AXC0231` at `/parameters/{i}/name`, because both
-    live in the same URL query.
-  - `parameters` on any widget that is not a table over a data source is
-    `AXC0060` at `/widgets/{i}/parameters`.
+    live in the same URL query. A chart and a KPI have no filter input, so this
+    check applies only to a table.
+  - `parameters` on any widget that is not a table, a chart or a KPI over a
+    data source is `AXC0060` at `/widgets/{i}/parameters`.
 - **Chart binding.** A `chart` names a `dataSource` and
   reads only grouped data. See
   [D64](../decisions/d64-detail-chart-and-kpi-widgets.md). The compile checks:
@@ -491,11 +496,11 @@ data sources.
     `min` or `max` is numeric over an integer or a decimal, not over a date or
     a date-time. A `pie` has exactly one measure, otherwise it is `AXC0241` at
     `/widgets/{i}/measures`.
-  - `parameters` will bind page parameters with the table's name map, under
-    the same type and required rules as above *(planned for M13)*. The page
-    schema rejects `parameters` on a chart (`AXC0004`), as on a KPI.
-  - Every data source parameter must be optional (`AXC0060`, as for a KPI),
-    because a chart has no filter bar and binds no page parameter yet.
+  - `parameters` binds page parameters with the table's name map, under the
+    same type and required rules as above.
+  - A data source parameter that `parameters` leaves unbound must be optional
+    (`AXC0060` at `/widgets/{i}/dataSource`, naming the parameter), because a
+    chart has no filter bar.
   - The `title` and the measure labels join `AXC0028`.
 - **KPI binding.** A `kpi` names a `dataSource` and reads
   its one total row. The compile checks:
@@ -504,11 +509,11 @@ data sources.
     is `AXC0237` at `/widgets/{i}/dataSource`.
   - `measure` and `comparison.measure` each name a measure of the data source,
     ignoring letter case, otherwise it is `AXC0238` at that property.
-  - Every parameter of the data source must be optional (`AXC0060` at
-    `/widgets/{i}/dataSource`, naming the parameter), because a KPI has no
-    filter bar. A KPI cannot bind page parameters with `parameters` yet
-    *(planned for M13)*, and the page schema does not allow it on a `kpi`
-    (`AXC0004`).
+  - `parameters` binds page parameters with the table's name map, under the
+    same type and required rules as above.
+  - A data source parameter that `parameters` leaves unbound must be optional
+    (`AXC0060` at `/widgets/{i}/dataSource`, naming the parameter), because a
+    KPI has no filter bar.
   - The `label` and the `comparison` label join `AXC0028`. A `navigate`
     follows the checks of
     [D63](../decisions/d63-navigate-actions-and-page-parameters.md).

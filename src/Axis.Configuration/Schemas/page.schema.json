@@ -140,12 +140,12 @@
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "kpi" } } },
-          "then": { "required": ["dataSource", "measure", "label"], "properties": { "parameters": false } },
+          "then": { "required": ["dataSource", "measure", "label"] },
           "else": { "properties": { "measure": false, "label": false, "comparison": false, "navigate": false } }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "chart" } } },
-          "then": { "required": ["dataSource", "kind", "category", "measures", "title"], "properties": { "parameters": false } },
+          "then": { "required": ["dataSource", "kind", "category", "measures", "title"] },
           "else": { "properties": { "kind": false, "category": false, "measures": false } }
         },
         {

@@ -91,11 +91,27 @@ function stubRows(body: string, status = 200) {
   return () => fetchMock.mock.calls.map(([url]) => url)
 }
 
-function renderChart(chart: ChartMetadata = bar) {
+/** A chart widget whose data source has two parameters, of which `parameters` binds only `inCategory`. */
+function boundChartWidget(): WidgetMetadata {
+  const widget = chartWidget(bar)
+  const parameter = (name: string) => ({
+    name,
+    type: 'text' as const,
+    required: false,
+    labelKey: null,
+    values: null,
+    target: null,
+  })
+  widget.dataSource!.parameters = [parameter('inCategory'), parameter('other')]
+  widget.parameters = { inCategory: 'category' }
+  return widget
+}
+
+function renderChart(chart: ChartMetadata = bar, widget = chartWidget(chart), pageValues?: Record<string, string>) {
   return render(
     <MemoryRouter>
       <TextProvider catalogs={catalogs} development={false}>
-        <ChartWidget widget={chartWidget(chart)} locale="en" />
+        <ChartWidget widget={widget} locale="en" pageValues={pageValues} />
       </TextProvider>
     </MemoryRouter>,
   )
@@ -126,6 +142,46 @@ describe('ChartWidget', () => {
       ],
     })
     expect(requested()).toEqual([`${rowsPath}?pageSize=100`])
+  })
+
+  it('asks for the groups with the value of each bound page parameter under the data source parameter name', async () => {
+    const requested = stubRows(twoGroups)
+
+    renderChart(bar, boundChartWidget(), { category: 'idea', other: 'ignored' })
+
+    await screen.findByRole('img', { name: 'Notes by category' })
+    expect(requested()).toEqual([`${rowsPath}?inCategory=idea&pageSize=100`])
+  })
+
+  it('leaves out a bound parameter whose page parameter has no value', async () => {
+    const requested = stubRows(twoGroups)
+
+    renderChart(bar, boundChartWidget(), {})
+
+    await screen.findByRole('img', { name: 'Notes by category' })
+    expect(requested()).toEqual([`${rowsPath}?pageSize=100`])
+  })
+
+  it('asks again when the page parameter value changes', async () => {
+    const requested = stubRows(twoGroups)
+    const widget = boundChartWidget()
+    const view = renderChart(bar, widget, { category: 'idea' })
+    await screen.findByRole('img', { name: 'Notes by category' })
+
+    view.rerender(
+      <MemoryRouter>
+        <TextProvider catalogs={catalogs} development={false}>
+          <ChartWidget widget={widget} locale="en" pageValues={{ category: 'todo' }} />
+        </TextProvider>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() =>
+      expect(requested()).toEqual([
+        `${rowsPath}?inCategory=idea&pageSize=100`,
+        `${rowsPath}?inCategory=todo&pageSize=100`,
+      ]),
+    )
   })
 
   it('passes the kind of the chart on', async () => {
