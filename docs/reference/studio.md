@@ -886,25 +886,18 @@ Run and the Test results list, the read-only view of a module entity, and the re
     table, and a chart with one group field or a KPI with a total row.
     _Partly built:_ the side pane of the Design tab lists every entity and every
     data source, module ones too, in two groups between the palette and the
-    widget tree. A drop on the canvas lands where a palette drop lands, and then
-    opens a small dialog with one button for each widget that can show the
-    name. An entity offers a table, a form and a detail. A data source offers a
-    table, a chart when it has exactly one group field, and a KPI when its group
-    by is empty. A button is disabled, with the palette's reason, when a page
-    limit forbids that type in the list where the widget would land. Enter,
-    Space or a click on a name opens the same dialog, and the widget is then
-    inserted after the selected widget as the palette does. The chosen widget is
-    inserted already bound, selected, and the live region names where it landed.
-    A table or a form takes the entity or data source. A detail takes the first
-    required `reference` parameter of the page that targets the entity as its
-    record, and its record stays empty when there is none, because the designer
-    adds no page parameter and the canvas then shows the compiler's own
-    diagnostic. A chart takes the data source's group field as its category,
-    the `bar` kind and its first numeric measure. A KPI takes the first
-    measure. A data source measure has no label, so a chart's title and measure
-    label and a KPI's label are written with empty text keys, as the palette
-    does for a new chart or KPI. The canvas draws such a chart or KPI as a
-    placeholder until the author writes the texts in the property panel.
+    widget tree. A drop lands where a palette drop lands, and opens a dialog
+    with one button for each widget that can show the name. A button is
+    disabled, with the palette's reason, when a page limit forbids that type
+    there. Enter, Space or a click on a name opens the same dialog, and the
+    widget goes after the selected widget. It is inserted already bound and
+    selected, and the live region names where it landed. A detail takes the first required `reference` parameter that
+    targets the entity as its record, and it stays empty when there is none,
+    because the designer adds no page parameter. A chart takes the group field
+    as its category, the `bar` kind and the first numeric measure. A KPI takes
+    the first measure. A measure has no label, so a chart's and a KPI's labels
+    and titles are written with empty text keys, as the palette does, and the
+    canvas draws them as placeholders until the author writes the texts.
   - **Width switch.** It draws the canvas at desktop width, which fills the
     canvas area, or at phone width, which is 375 px. At phone width the columns
     stack to full width and tables use their phone layout, even in a wide
@@ -915,6 +908,13 @@ Run and the Test results list, the read-only view of a module entity, and the re
     memory, up to 100 steps, with one step for each box. It is cleared by a
     reload, a conflict reload or opening another resource. A save keeps it.
     Studio's undo replaces the browser's own inside the editor's boxes.
+    _Built:_ it covers pages. The buttons sit beside Save and are off when
+    there is nothing to undo or redo, and while a save runs. A step ends when
+    the author edits another property or leaves the box, and a pick in a
+    dropdown or a button action is always a step of its own. The keys also work
+    when nothing has focus, but not when the focus is outside the editor. A
+    reload after a reconnect clears the history too. Other kinds of resource
+    have no undo yet.
   - **Library.** Drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
     `@dnd-kit/utilities`. The core package, which brings `@dnd-kit/accessibility`
     and `@dnd-kit/utilities` with it, measures 12.7 KB gzipped in the lazy chunk
@@ -942,9 +942,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
     until the designer is complete. The canvas opens the placeholder record, so
     each field shows a placeholder value, and no request goes to `/api/apps/`.
     Save, Next, Back and Cancel do nothing, because the canvas cancels every
-    click and form submit. A form the route cannot draw shows a short notice.
-    The tab shows the Used on list above the step switch and the canvas, and
-    still has no side pane, selection or width switch.
+    click and form submit. A click only selects. A form the route cannot draw
+    shows a short notice. The tab shows the Used on list above the step switch
+    and the canvas, with a property panel beside the canvas, and no palette or
+    width switch.
     The canvas is mounted only while the Design tab is active.
   - **Step switch.** It lists the steps in order and shows the sections of one
     step. A form without `steps` has no switch.
@@ -980,6 +981,15 @@ Run and the Test results list, the read-only view of a module entity, and the re
     that the entity marks `required` has no `visibleWhen` box. A computed,
     sequence or creator field shows `readOnly` on and locked. A section shows
     its title and `visibleWhen`. A step shows its title.
+    _Partly built:_ a click, Enter or Space selects a field or a section. A
+    click on a step selects it and shows its sections. The selected element has
+    `aria-current` and an outline in the primary colour. The panel asks the
+    author to select something when nothing is selected. The selection is kept
+    across the Design, Form and JSON tabs while the resource stays open. The
+    panel reads the entity flags from the canvas's latest answer, so it shows
+    nothing about a field until the form is drawn. A required field that
+    already has a `visibleWhen` shows no box for it. Remove it in the Form or
+    JSON tab.
   - **Used on.** A list of the pages and process steps that use the form. It is
     the Used by list filtered to the `widget form` and `task form` relations,
     loads with the resource, and can be stale like the `usedBy` counts. An
