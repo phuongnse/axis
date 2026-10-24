@@ -228,8 +228,13 @@ changes within the automatic fix limit, a CI failure on `main`, which it runs
 again and then turns into a `bug` issue that it plans first, a run on `main`
 that passed only when run again, which it records on a `bug` issue for each
 failure, named by the failing test, a missed dependency cache, a first stop on
-a transient error, which it runs once more, shown as `(retry)`, and a merge
-refused because `main` moved, which it tries again. Its troubleshooting doc at the pinned ref has the mechanics.
+a transient error, which it runs once more, shown as `(retry)`, a merge
+refused because `main` moved, which it tries again, a merge refused because
+the pull request branch moved, which it reviews again on the new head
+(`head_moved`), a fix round that changed nothing and named a cause outside the
+code, such as a failed package registry, which runs the checks and the review
+once more, and a conflict round that waits until the `/nexkit go` run that
+opened the pull request ends. Its troubleshooting doc at the pinned ref has the mechanics.
 
 | Failure | What you do |
 | --- | --- |
@@ -237,6 +242,9 @@ refused because `main` moved, which it tries again. Its troubleshooting doc at t
 | A plan or a `blocked` round has a question with no recommended option, or asks again after autopilot answered it | Ask the owner when the choice is theirs. Answer a plan's question in a comment on the issue, so the next sweep plans again, and a round's question with `/nexkit fix <decision>`. |
 | A run stopped twice on a transient error | The comment shows both errors. Read them; when the cause has passed, repeat the command, otherwise tell the owner. |
 | No automatic fix rounds left, for failing checks or requested changes | Read the failing check's log or the review, ask the owner, then post `/nexkit fix <instructions>`. |
+| A fix round ended as `recheck_failed` | The checks failed again after the agent named a cause outside the code. Check that service or registry; when it works again, comment `/nexkit review`, and when the failure comes from the code after all, ask the owner, then post `/nexkit fix <instructions>`. |
+| NexKit replied that the `/nexkit go` run that opened the pull request still runs | Your command or *Request changes* review did not run. Post it again once that run has ended. |
+| A round closed an issue as `no_change` | The run's comment holds the finding and its evidence. Check it; when it is wrong, reopen the issue, comment what still needs changing and tell the owner. |
 | `conflicts.max_rounds` conflict rounds ran | Comment `/nexkit fix` yourself. |
 | A conflict in a path NexKit may not change, or a merge that brings workflow changes (`needs_merge`) | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
 | An implement or fix round ran out of time twice, in the issue or in one of its parts | Autopilot has already planned once with a note to split, and parts inherit that time-out. Read the plan, the run logs and the result files in the round's `nexkit-checks` artifact. When the cause is not known, find it first; then split the issue by hand or comment a smaller plan. |
