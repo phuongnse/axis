@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiFetch } from './api'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { apiFetch, setApiGuard } from './api'
 import { fetchCurrentUser } from './currentUser'
 import { assignLocation } from './navigation'
 
@@ -95,6 +95,53 @@ describe('apiFetch', () => {
     await apiFetch('/api/x')
 
     expect(assignLocation).not.toHaveBeenCalled()
+  })
+})
+
+describe('setApiGuard', () => {
+  afterEach(() => setApiGuard(null))
+
+  it('answers an /api/apps/ request with the guard and never calls fetch', async () => {
+    const fetchMock = stubFetch()
+    const guard = vi.fn(() => new Response('guarded', { status: 200 }))
+    setApiGuard(guard)
+
+    const response = await apiFetch('/api/apps/A/entities/B/records?page=1', { method: 'POST' })
+
+    expect(await response.text()).toBe('guarded')
+    expect(guard).toHaveBeenCalledExactlyOnceWith('/api/apps/A/entities/B/records?page=1', { method: 'POST' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('does not start sign-in on a guarded 401', async () => {
+    setApiGuard(() => new Response(null, { status: 401 }))
+
+    const response = await apiFetch('/api/apps/A/entities/B/records')
+
+    expect(response.status).toBe(401)
+    expect(assignLocation).not.toHaveBeenCalled()
+  })
+
+  it('sends other paths to fetch while the guard is set', async () => {
+    const fetchMock = stubFetch()
+    const guard = vi.fn(() => new Response(null, { status: 200 }))
+    setApiGuard(guard)
+
+    await apiFetch('/api/site')
+    await apiFetch('/api/studio/apps')
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/site', '/api/studio/apps'])
+    expect(guard).not.toHaveBeenCalled()
+  })
+
+  it('sends /api/apps/ requests to fetch once the guard is cleared', async () => {
+    const fetchMock = stubFetch()
+    setApiGuard(() => new Response(null, { status: 200 }))
+    setApiGuard(null)
+
+    await apiFetch('/api/apps/A/entities/B/records')
+
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith('/api/apps/A/entities/B/records', undefined)
   })
 })
 
