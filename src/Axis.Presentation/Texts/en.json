@@ -196,6 +196,8 @@
   "shell.studio.palette.oneRecordWidget": "The page already holds a form, task inbox or process inspector. A page holds at most one of them.",
   "shell.studio.palette.tooDeep": "A container here would hold a list past level 4.",
   "shell.studio.save": "Save",
+  "shell.studio.undo": "Undo",
+  "shell.studio.redo": "Redo",
   "shell.studio.saved": "Saved.",
   "shell.studio.saveFailed": "The resource could not be saved.",
   "shell.studio.conflict": "Someone else changed this file. Reload it to see their change. Reloading discards your unsaved change.",

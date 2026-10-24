@@ -172,6 +172,47 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     }
   });
 
+  test("an author drops a section, saves, undoes the drop and saves again", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketDetailId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    const detail = page.locator(
+      '[data-testid="studio-canvas-widget"][data-path="/widgets/0"]',
+    );
+    await expect(detail).toBeVisible();
+    await dragType(page, "section", detail, 0.75);
+    const save = page.getByRole("button", { name: "Save", exact: true });
+    await save.click();
+    await expect(page.getByTestId("studio-saved")).toBeVisible();
+
+    const file = path.join(copy, "pages", "ticket-detail.json");
+    const original = JSON.parse(
+      await readFile(path.join(serviceDesk, "pages", "ticket-detail.json"), "utf8"),
+    );
+    try {
+      await expect
+        .poll(async () => JSON.parse(await readFile(file, "utf8")).widgets)
+        .toHaveLength(original.widgets.length + 1);
+
+      await page.getByRole("button", { name: "Undo", exact: true }).click();
+      await expect(save).toBeEnabled();
+      await save.click();
+
+      await expect
+        .poll(async () => JSON.parse(await readFile(file, "utf8")))
+        .toEqual(original);
+    } finally {
+      // The saved empty section does not compile, so the file goes back even when the test fails half way.
+      await cp(path.join(serviceDesk, "pages", "ticket-detail.json"), file);
+    }
+  });
+
   test("an author sees both steps of the ticket form, and the condition of the Resolution field after picking the second", async ({
     page,
   }) => {

@@ -36,6 +36,7 @@ import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointValues } from './EndpointValues'
 import { FormSteps } from './FormSteps'
 import { EntityDesigner } from './EntityDesigner'
+import { emptyHistory, endStep, recordStep, redoStep, undoStep, type DraftSnapshot } from './draftHistory'
 import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
@@ -81,6 +82,30 @@ function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** The draft a text parses to, or `null` when it is not valid JSON. */
+function tryParse(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+/** The step key of an edit made while a text box has focus, so typing in one box is one step. Else `null`. */
+function typingStep(key: string): string | null {
+  const active = document.activeElement
+  if (!(active instanceof HTMLElement)) {
+    return null
+  }
+  const text =
+    active instanceof HTMLTextAreaElement ||
+    (active instanceof HTMLInputElement &&
+      !['checkbox', 'radio', 'button', 'submit'].includes(active.type) &&
+      active.getAttribute('role') !== 'combobox') ||
+    active.closest('[contenteditable="true"]') !== null
+  return text ? key : null
+}
+
 /** The form field of the longest prefix of `path` that the form shows, so a path inside a field lands on that field. */
 function fieldElement(root: HTMLElement, path: string): HTMLElement | undefined {
   const fields = new Map<string, HTMLElement>()
@@ -118,6 +143,8 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
  * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data, beside a palette
  * of the ten widget types and the same widget tree and panel as the Form tab. The two tabs share the selected widget, which is not written to the URL.
+ * A page also has Undo and Redo, as buttons beside Save and as Ctrl+Z and Ctrl+Shift+Z (Cmd on macOS), for up to 100 steps of
+ * its draft on all three tabs. Typing in one box is one step, and a load of the file clears the history.
  * A form's Design tab shows a Used on list above its canvas, with the pages and process steps that use the form, and an entry calls `onOpen`.
  * Form stays the tab that opens first. A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
  * calls `onOpenPath`. A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
@@ -181,6 +208,8 @@ export function StudioEditor({
   const [questions, setQuestions] = useState<FieldQuestion[]>()
   // The pages and process steps that use a form, or `failed` when their references did not load.
   const [usedOn, setUsedOn] = useState<FormUse[] | 'failed'>()
+  const [history, setHistory] = useState(emptyHistory)
+  const undoable = item.kind === 'page'
   const handledPath = useRef<string | null>(null)
   // A field to scroll to once the form tab is shown, because a hidden field cannot be scrolled to.
   const pendingField = useRef<HTMLElement | null>(null)
@@ -195,7 +224,76 @@ export function StudioEditor({
     setConflict(false)
     setSaved(false)
     setSaveFailed(false)
+    setHistory(emptyHistory)
   }
+
+  /** Steps through the history. It restores the snapshot, and it does nothing while a save runs. */
+  function step(move: typeof undoStep) {
+    const current: DraftSnapshot = { draft, jsonText }
+    const result = saving ? null : move(history, current)
+    if (!result) {
+      return
+    }
+    const { history: next, snapshot } = result
+    setHistory(next)
+    setDraft(snapshot.draft)
+    setJsonText(snapshot.jsonText)
+    setJsonInvalid(snapshot.jsonText !== null && !isContent(tryParse(snapshot.jsonText)))
+    setSaved(false)
+    setSaveFailed(false)
+  }
+
+  const undo = () => step(undoStep)
+  const redo = () => step(redoStep)
+  const latest = useRef({ undo, redo })
+
+  useEffect(() => {
+    latest.current = { undo, redo }
+  })
+
+  // Studio takes the undo keys before the browser's own undo and CodeMirror's. They work inside the editor and when
+  // nothing has focus, which is where a mouse drop leaves it.
+  useEffect(() => {
+    if (!undoable) {
+      return
+    }
+    const inside = (target: EventTarget | null) =>
+      target === document.body || (target instanceof Node && rootRef.current?.contains(target) === true)
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        !(event.ctrlKey || event.metaKey) ||
+        event.altKey ||
+        event.key.toLowerCase() !== 'z' ||
+        !inside(event.target)
+      ) {
+        return
+      }
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.shiftKey) {
+        latest.current.redo()
+      } else {
+        latest.current.undo()
+      }
+    }
+    const onBeforeInput = (event: InputEvent) => {
+      if ((event.inputType !== 'historyUndo' && event.inputType !== 'historyRedo') || !inside(event.target)) {
+        return
+      }
+      event.preventDefault()
+      if (event.inputType === 'historyRedo') {
+        latest.current.redo()
+      } else {
+        latest.current.undo()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    document.addEventListener('beforeinput', onBeforeInput, true)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true)
+      document.removeEventListener('beforeinput', onBeforeInput, true)
+    }
+  }, [undoable])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -433,6 +531,9 @@ export function StudioEditor({
 
   /** Sets the draft's value at the pointer as it is. A seed cell that picks `false` must keep it. */
   function update(pointer: string, value: unknown) {
+    if (undoable) {
+      setHistory((h) => recordStep(h, { draft, jsonText }, typingStep(pointer)))
+    }
     setDraft((current) => setAt(current, pointer, value) as Content)
     setJsonText(null)
     setJsonInvalid(false)
@@ -441,6 +542,9 @@ export function StudioEditor({
   }
 
   function changeJson(text: string) {
+    if (undoable) {
+      setHistory((h) => recordStep(h, { draft, jsonText }, typingStep('#json')))
+    }
     setJsonText(text)
     setSaved(false)
     setSaveFailed(false)
@@ -619,7 +723,13 @@ export function StudioEditor({
   }
 
   return (
-    <Flex vertical gap="small" data-testid="studio-editor" ref={rootRef}>
+    <Flex
+      vertical
+      gap="small"
+      data-testid="studio-editor"
+      ref={rootRef}
+      onBlur={undoable ? () => setHistory(endStep) : undefined}
+    >
       <ExpressionCheckContext.Provider value={checkContext}>
         <LabelTextsContext.Provider value={labelContext}>
           {item.kind === 'process' && (
@@ -779,6 +889,20 @@ export function StudioEditor({
       {saveFailed && <Alert data-testid="studio-save-error" type="error" title={t('shell.studio.saveFailed')} />}
       {deleteFailed && <Alert data-testid="studio-delete-error" type="error" title={t('shell.studio.deleteFailed')} />}
       <Flex gap="small" align="center">
+        {undoable && (
+          <>
+            <Button aria-keyshortcuts="Control+Z Meta+Z" disabled={history.past.length === 0 || saving} onClick={undo}>
+              {t('shell.studio.undo')}
+            </Button>
+            <Button
+              aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
+              disabled={history.future.length === 0 || saving}
+              onClick={redo}
+            >
+              {t('shell.studio.redo')}
+            </Button>
+          </>
+        )}
         <Button
           type="primary"
           disabled={patch.length === 0 || jsonInvalid || problems.size > 0 || conflict || saving || reconnecting}
