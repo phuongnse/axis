@@ -14,7 +14,9 @@ preview pages.
   themselves.
 - **Published design system:** the owner's local agent session publishes a
   Design System artifact in Claude from the repository. It shows the tokens
-  and a preview of each widget, named in Axis terms.
+  and a preview of each widget, named in Axis terms. The widget previews are
+  drawn live from one bundle that the repository builds, as
+  [D67](d67-live-widget-previews-in-the-design-system.md) agrees.
 - **Who edits the design:** only the owner and Claude. A design change goes
   back into the repository as a NexKit issue that links the artifact. It is
   never a hand-made pull request.

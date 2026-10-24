@@ -54,8 +54,8 @@
 # nothing it covers changed. Playwright and the services it starts are skipped when every changed path
 # is under docs/ or is a Markdown file. The sample modules are still installed then, for the on-premises
 # smoke test.
-# The design-system preview page is built into artifacts/design-system-app before Playwright runs. Its spec serves
-# that build from disk and needs no server.
+# The design-system bundle is built and checked into artifacts/design-system before Playwright runs. Its spec
+# serves the harness page and the bundle from disk and needs no server.
 # Arguments go to Playwright, for example tests/e2e/specs/studio.spec.ts or --grep 'publishes'. A spec path
 # is relative to the repository root. With arguments only the matching specs run, after the setup project,
 # and the three smoke tests do not run. A change is checked in minutes, and the full run stays the check.
@@ -167,8 +167,8 @@ if affected playwright; then
     -c "CREATE DATABASE axis_journey OWNER axis_journey_schema" >/dev/null
 
   scripts/build.sh
-  # The design-system spec draws the preview build, which the server never ships.
-  npm run build:design-system --prefix web
+  # The design-system spec mounts the bundle, which the server never ships.
+  scripts/design-system.sh
 
   mkdir -p artifacts/logs
   purchasing_log="$root/artifacts/logs/e2e-purchasing.log"

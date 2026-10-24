@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="data:," />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axis design system</title>
     <style>
@@ -12,7 +12,26 @@
     </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/designSystem/main.tsx"></script>
+    <main id="previews"></main>
+    <script src="../artifacts/design-system/axis-design-system.js"></script>
+    <script>
+      // The harness of the bundle: it mounts the previews the way the Design System artifact does.
+      // ?preview=<name> mounts one preview and no query mounts all. ?mode=dark|light sets data-theme.
+      const params = new URLSearchParams(window.location.search)
+      document.documentElement.dataset.theme = params.get('mode') === 'dark' ? 'dark' : 'light'
+      const host = document.getElementById('previews')
+      const name = params.get('preview')
+      const names = name === null ? Object.keys(window.Axis) : [name]
+      for (const preview of names) {
+        if (!Object.hasOwn(window.Axis, preview)) {
+          console.error(`No preview named '${preview}'.`)
+          continue
+        }
+        const element = document.createElement('div')
+        element.dataset.preview = preview
+        host.appendChild(element)
+        window.Axis[preview](element)
+      }
+    </script>
   </body>
 </html>
