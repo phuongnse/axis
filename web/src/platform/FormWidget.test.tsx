@@ -276,6 +276,7 @@ const texts = {
   'shell.form.processStarted': 'The process has started.',
   'shell.form.processRunning': 'This record is already in a running process.',
   'shell.form.startFailed': 'The process could not be started.',
+  'shell.navigate.failed': 'The page could not be opened.',
   'noteClose.action': 'Close note',
   'noteClose.cannotClose': 'Only an open note can be closed.',
 }
@@ -1384,6 +1385,7 @@ describe('FormWidget', () => {
             parameters: { note: 'id', title: 'Title', category: 'category' },
             record: null,
             opensForm: false,
+            paths: {},
             visibleWhen: null,
           },
           ...actionWidget.actions,
@@ -1392,10 +1394,44 @@ describe('FormWidget', () => {
 
       await userEvent.click(await screen.findByRole('button', { name: 'note.open' }))
 
-      expect(screen.getByTestId('location')).toHaveTextContent(
-        `/e2e/notes?note=${noteId}&title=Buy+paper&category=${categoryId}`,
+      await waitFor(() =>
+        expect(screen.getByTestId('location')).toHaveTextContent(
+          `/e2e/notes?note=${noteId}&title=Buy+paper&category=${categoryId}`,
+        ),
       )
       expect(screen.getByTestId('from')).toHaveTextContent(`/e2e/noteform/${noteId}`)
+    })
+
+    it('shows one message and opens no page when a field along a path is missing', async () => {
+      const categoryPath = '/api/apps/E2eApp/entities/Category/records'
+      const requests = stubFetch(
+        { status: 200, body: noteJson('Buy paper', 1) },
+        { status: 200, body: `{"id":"${categoryId}","version":1,"values":{"code":"OFF"},"labels":{}}` },
+      )
+      renderForm(noteId, {
+        ...actionWidget,
+        actions: [
+          {
+            type: 'navigate',
+            page: 'Notes',
+            labelKey: 'note.open',
+            parameters: { name: 'category.name' },
+            record: null,
+            opensForm: false,
+            paths: { category: categoryPath },
+            visibleWhen: null,
+          },
+        ],
+      })
+
+      await userEvent.click(await screen.findByRole('button', { name: 'note.open' }))
+
+      expect(await screen.findByTestId('form-error')).toHaveTextContent('The page could not be opened.')
+      expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/noteform/${noteId}`)
+      expect(requests().map((request) => request.url)).toEqual([
+        `${recordsPath}/${noteId}`,
+        `${categoryPath}/${categoryId}`,
+      ])
     })
 
     it('shows no navigate button on a new record, and hides one it cannot work out', async () => {
@@ -1406,6 +1442,7 @@ describe('FormWidget', () => {
         parameters: {},
         record: null,
         opensForm: false,
+        paths: {},
         visibleWhen: null,
       }
       stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
@@ -1538,6 +1575,7 @@ describe('FormWidget', () => {
         expect(catalog).toHaveProperty(['shell.form.processStarted'])
         expect(catalog).toHaveProperty(['shell.form.processRunning'])
         expect(catalog).toHaveProperty(['shell.form.startFailed'])
+        expect(catalog).toHaveProperty(['shell.navigate.failed'])
       }
     })
   })

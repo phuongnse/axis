@@ -12,7 +12,9 @@ rule. Page metadata lists them with their `parameters` and `record`, gives each 
 reference paths such as `department.name` in the parameters and `record` of an action on a table
 over an entity, a form and a detail. Page metadata gives each action a `paths` map, and leaves out
 an action whose path the user may not read. The SPA buttons are
-built on table rows, the table toolbar and saved forms, and put the values in the URL query.
+built on table rows, the table toolbar, saved forms and details, and put the values in the URL
+query. On click they follow a reference path through the record API, one record at a time, and
+open no page and show a platform message when a read is refused or a field is missing.
 `formPage` is removed from the schema, the compiler, page metadata, the SPA and Studio, and the
 samples, the template, the scenarios and the test fixtures use navigate actions. The
 table binding is built: the compiler checks a table's name map, page metadata gives each table its

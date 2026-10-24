@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -112,6 +112,7 @@ const openAction = {
   parameters: { note: 'id', title: 'title' },
   record: null,
   opensForm: false,
+  paths: {},
   visibleWhen: null,
 }
 
@@ -129,6 +130,7 @@ const texts = {
   'shell.form.processStarted': 'The process has started.',
   'shell.form.processRunning': 'This record is already in a running process.',
   'shell.form.startFailed': 'The process could not be started.',
+  'shell.navigate.failed': 'The page could not be opened.',
   'note.title': 'Title',
   'note.done': 'Done',
   'note.category': 'Category',
@@ -296,7 +298,9 @@ describe('DetailWidget', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Open notes' }))
 
-    expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/notes?note=${noteId}&title=Buy+paper`)
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/notes?note=${noteId}&title=Buy+paper`),
+    )
     expect(screen.getByTestId('from')).toHaveTextContent(`/e2e/notedetail?note=${noteId}`)
   })
 
@@ -306,5 +310,23 @@ describe('DetailWidget', () => {
 
     await screen.findByText('Title')
     expect(screen.queryByRole('button', { name: 'Open notes' })).toBeNull()
+  })
+
+  it('shows one message and stays on the detail when a read along a path is refused', async () => {
+    const categoryPath = '/api/apps/E2eApp/entities/Category/records'
+    const requests = stubFetch({ status: 200, body: noteJson('Buy paper') }, { status: 403, body: '{}' })
+    renderDetail({
+      ...noteWidget,
+      actions: [{ ...openAction, parameters: { name: 'category.name' }, paths: { category: categoryPath } }],
+    })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Open notes' }))
+
+    expect(await screen.findByTestId('detail-error')).toHaveTextContent('The page could not be opened.')
+    expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/notedetail?note=${noteId}`)
+    expect(requests().map((request) => request.url)).toEqual([
+      `${recordsPath}/${noteId}`,
+      `${categoryPath}/${categoryId}`,
+    ])
   })
 })

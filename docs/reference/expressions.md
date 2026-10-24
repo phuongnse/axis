@@ -291,7 +291,8 @@ Paths in validations and computed fields are not built. There a path is
   field it ends at. An unknown field on the path is `AXC0046` and a path of 4
   hops is `AXC0058`. A path stays `AXC0046` in a row action's `visibleWhen`
   and in an action on a table over a data source, whose columns hold no
-  reference to follow. See
+  reference to follow. The browser follows the path through the record API on
+  click, see [frontend.md](frontend.md). See
   [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Child collection.** A child collection field gives a `list<Entity>`,
   which only aggregates accept. Inside an aggregate's item expression, names

@@ -159,6 +159,7 @@ const texts = {
   'shell.table.deleteMissing': 'This record no longer exists.',
   'shell.table.deleteInUse': 'This record is in use and cannot be deleted.',
   'shell.table.deleteFailed': 'The record could not be deleted.',
+  'shell.navigate.failed': 'The page could not be opened.',
   'shell.form.cancel': 'Cancel',
   'note.delete': 'Delete note',
   'note.title': 'Title',
@@ -322,6 +323,7 @@ describe('TableWidget', () => {
       parameters: { ticket: 'id' },
       record: null,
       opensForm: false,
+      paths: {},
       visibleWhen: null,
     }
     const createNote: NavigateAction = {
@@ -331,6 +333,7 @@ describe('TableWidget', () => {
       parameters: {},
       record: null,
       opensForm: true,
+      paths: {},
       visibleWhen: null,
     }
 
@@ -341,7 +344,7 @@ describe('TableWidget', () => {
 
       await userEvent.click(within(row).getByRole('button', { name: 'Details' }))
 
-      expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail')
+      await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail'))
       expect(search()).toBe(`?ticket=${noteId}`)
       expect(screen.getByTestId('from')).toHaveTextContent('/e2e/notes?page=2')
     })
@@ -353,8 +356,55 @@ describe('TableWidget', () => {
 
       await userEvent.click(within(row).getByRole('button', { name: 'Edit' }))
 
-      expect(screen.getByTestId('path')).toHaveTextContent(`/e2e/noteform/${noteId}`)
+      await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(`/e2e/noteform/${noteId}`))
       expect(search()).toBe('')
+    })
+
+    describe('with a reference path', () => {
+      const categoryPath = '/api/apps/E2eApp/entities/Category/records'
+      const named: NavigateAction = {
+        ...detail,
+        parameters: { category: 'category.name' },
+        paths: { category: categoryPath },
+      }
+      const categoryAnswer = (url: string, answer: Response) =>
+        url.startsWith(categoryPath) ? answer : new Response(notePage)
+
+      it('reads the record along the path on click and puts the value in the query', async () => {
+        const requested = stubFetch((url) =>
+          categoryAnswer(
+            url,
+            new Response(`{"id":"${categoryId}","version":1,"values":{"name":"Office"},"labels":{}}`),
+          ),
+        )
+        renderWidget('', { ...noteWidget, rowActions: [named] })
+        const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+        await userEvent.click(within(row).getByRole('button', { name: 'Details' }))
+
+        await waitFor(() => expect(search()).toBe('?category=Office'))
+        expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail')
+        expect(requested()).toContain(`${categoryPath}/${categoryId}`)
+      })
+
+      it('shows one message and opens no page when the record is missing', async () => {
+        stubFetch((url) => categoryAnswer(url, new Response('{}', { status: 404 })))
+        renderWidget('', { ...noteWidget, rowActions: [named] })
+        const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+        await userEvent.click(within(row).getByRole('button', { name: 'Details' }))
+
+        expect(await screen.findByTestId('table-action-error')).toHaveTextContent('The page could not be opened.')
+        expect(screen.getByTestId('path')).toHaveTextContent('/e2e/notes')
+      })
+
+      it('hides the button when paths has no entry for a hop', async () => {
+        stubRecords()
+        renderWidget('', { ...noteWidget, rowActions: [{ ...named, paths: {} }] })
+        const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+        expect(within(row).queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
+      })
     })
 
     describe('at phone width', () => {
@@ -397,7 +447,7 @@ describe('TableWidget', () => {
         await userEvent.click(within(row).getByRole('button', { name: 'Actions' }))
         await userEvent.click(await screen.findByRole('menuitem', { name: 'Details' }))
 
-        expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail')
+        await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail'))
         expect(search()).toBe(`?ticket=${noteId}`)
         expect(screen.getByTestId('from')).toHaveTextContent('/e2e/notes?page=2')
       })

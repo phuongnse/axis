@@ -15,6 +15,7 @@ const showNotes: NavigateAction = {
   parameters: {},
   record: null,
   opensForm: false,
+  paths: {},
   visibleWhen: null,
 }
 
