@@ -13,7 +13,8 @@ type Content = Record<string, unknown>
  * click on a step, section or field selects it, and the selected one has `aria-current`. A section or a field is a
  * drop target for a palette field, and shows an outline in the primary colour while one is over it. A field row lies
  * inside its section's row, so the innermost row under the pointer wins. A section is named by its `name`, or `Section
- * N`, because the translated titles load only inside the canvas.
+ * N`, because the translated titles load only inside the canvas. A section with no fields shows a dashed drop area
+ * inside its row, so a drop on it lands in that section.
  */
 export function FormOutline({
   draft,
@@ -89,11 +90,20 @@ function SectionRow({
   onSelect: (pointer: string) => void
 }) {
   const t = useText()
+  const { colour, radius } = useDesignTokens()
   const path = `/sections/${index}`
   return (
     <Row testId="studio-outline-section" path={path} selected={selected === path} onSelect={onSelect} droppable>
       <Typography.Text>{sectionLabel(t, draft, index)}</Typography.Text>
       <ul style={{ listStyle: 'none', margin: 0, paddingLeft: 16 }}>
+        {fields.length === 0 && (
+          <li
+            data-testid="studio-outline-empty-section"
+            style={{ border: `1px dashed ${colour.border}`, borderRadius: radius.base, padding: '4px 8px' }}
+          >
+            <Typography.Text type="secondary">{t('shell.studio.design.dropFieldHere')}</Typography.Text>
+          </li>
+        )}
         {fields.map((field, position) => {
           const fieldPath = `${path}/fields/${position}`
           const name = typeof field === 'object' && field !== null ? (field as { field?: unknown }).field : undefined

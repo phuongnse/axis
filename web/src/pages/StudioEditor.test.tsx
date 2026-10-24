@@ -1377,6 +1377,36 @@ describe('StudioEditor for a form', () => {
     const view = screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement
     expect(JSON.parse(view.value).sections[0].fields).toEqual([{ field: 'title' }, { field: 'resolution' }])
   })
+
+  it('undoes an Add step in one step, restoring sections and steps', async () => {
+    stubForm()
+    renderForm()
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Design' }, slow))
+    await userEvent.click(await screen.findByRole('button', { name: 'Add step' }, slow))
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    const draft = JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)
+    expect(draft.sections).toEqual(formContent.sections)
+    expect(draft.steps).toBeUndefined()
+  })
+
+  it('undoes an Add section in one step', async () => {
+    stubForm()
+    renderForm()
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Design' }, slow))
+    await userEvent.click(await screen.findByRole('button', { name: 'Add section' }, slow))
+    expect(screen.getAllByTestId('studio-outline-section')).toHaveLength(2)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getAllByTestId('studio-outline-section')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
+  })
 })
 
 describe('StudioEditor for an entity', () => {

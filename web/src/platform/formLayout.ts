@@ -1,3 +1,4 @@
+import { labelKey } from './labelKeys'
 import type { StudioNameField, StudioNames } from './studio'
 
 type Content = Record<string, unknown>
@@ -136,4 +137,135 @@ export function outline(draft: Content): OutlineGroup[] {
   const listed = new Set(groups.flatMap((group) => group.sections))
   const rest = Array.from({ length: total }, (_, index) => index).filter((index) => !listed.has(index))
   return rest.length > 0 || groups.length === 0 ? [...groups, { step: null, sections: rest }] : groups
+}
+
+/** What a new title key needs: the resource's file and name, and the keys that texts already own. */
+export interface TitleKeys {
+  file: string
+  name: string | null
+  texts: ReadonlySet<string>
+}
+
+/**
+ * The result of an add: the new `sections` and `steps` lists, the pointer to select and a name for the live region.
+ * `steps` is `undefined` when the draft has none and the add does not create them.
+ */
+export interface LayoutAdd {
+  sections: unknown[]
+  steps: unknown[] | undefined
+  select: string
+  name: string
+}
+
+/** The lowest `section{n}` from 1 whose lower case is not in `used`. */
+function unusedSectionName(used: ReadonlySet<string>): string {
+  for (let number = 1; ; number++) {
+    if (!used.has(`section${number}`)) {
+      return `section${number}`
+    }
+  }
+}
+
+function sectionNames(sections: unknown[]): Set<string> {
+  return new Set(
+    sections.flatMap((section) =>
+      isContent(section) && typeof section.name === 'string' ? [section.name.toLowerCase()] : [],
+    ),
+  )
+}
+
+/** The texts' keys plus every title key that the draft's sections and steps hold. */
+function takenKeys(draft: Content, keys: TitleKeys): Set<string> {
+  const taken = new Set(keys.texts)
+  for (const item of [
+    ...(Array.isArray(draft.sections) ? draft.sections : []),
+    ...(Array.isArray(draft.steps) ? draft.steps : []),
+  ]) {
+    if (isContent(item) && isContent(item.title) && typeof item.title.textKey === 'string') {
+      taken.add(item.title.textKey)
+    }
+  }
+  return taken
+}
+
+/** The index of the step that the selected step, section or field belongs to, or `undefined`. */
+function selectedStep(draft: Content, selected: string | null): number | undefined {
+  const steps = Array.isArray(draft.steps) ? draft.steps : []
+  const step = selected === null ? null : /^\/steps\/(\d+)$/.exec(selected)
+  if (step !== null) {
+    return Number(step[1]) < steps.length ? Number(step[1]) : undefined
+  }
+  const section = selected === null ? null : /^\/sections\/(\d+)(?:\/fields\/\d+)?$/.exec(selected)
+  const sections = Array.isArray(draft.sections) ? draft.sections : []
+  const named = section === null ? undefined : sections[Number(section[1])]
+  if (!isContent(named) || typeof named.name !== 'string') {
+    return undefined
+  }
+  const wanted = named.name.toLowerCase()
+  const index = steps.findIndex(
+    (item) =>
+      isContent(item) &&
+      Array.isArray(item.sections) &&
+      item.sections.some((name) => typeof name === 'string' && name.toLowerCase() === wanted),
+  )
+  return index >= 0 ? index : undefined
+}
+
+/**
+ * Appends an empty section with the lowest unused name `section{n}` and a new title key. With steps, it joins the
+ * selected step, or the step of the selected section or field, or the last step. The new section is selected.
+ */
+export function addSection(draft: Content, selected: string | null, keys: TitleKeys): LayoutAdd {
+  const sections = Array.isArray(draft.sections) ? draft.sections : []
+  const name = unusedSectionName(sectionNames(sections))
+  const textKey = labelKey(keys.file, keys.name, `/sections/${sections.length}/title/textKey`, takenKeys(draft, keys))
+  const steps = Array.isArray(draft.steps) ? draft.steps : undefined
+  const target =
+    steps === undefined || steps.length === 0 ? undefined : (selectedStep(draft, selected) ?? steps.length - 1)
+  return {
+    sections: [...sections, { name, title: { textKey }, fields: [] }],
+    steps:
+      steps === undefined
+        ? undefined
+        : steps.map((step, index) =>
+            index === target && isContent(step)
+              ? { ...step, sections: [...(Array.isArray(step.sections) ? step.sections : []), name] }
+              : step,
+          ),
+    select: `/sections/${sections.length}`,
+    name,
+  }
+}
+
+/**
+ * Adds a step. The first step names every unnamed section and lists all sections in order. A later step is empty.
+ * The new step is selected, and its title key names the add in the live region.
+ */
+export function addStep(draft: Content, keys: TitleKeys): LayoutAdd {
+  const sections = Array.isArray(draft.sections) ? draft.sections : []
+  const steps = Array.isArray(draft.steps) ? draft.steps : []
+  const textKey = labelKey(keys.file, keys.name, `/steps/${steps.length}/title/textKey`, takenKeys(draft, keys))
+  if (steps.length > 0) {
+    return {
+      sections,
+      steps: [...steps, { title: { textKey }, sections: [] }],
+      select: `/steps/${steps.length}`,
+      name: textKey,
+    }
+  }
+  const used = sectionNames(sections)
+  const named = sections.map((section) => {
+    if (isContent(section) && typeof section.name === 'string' && section.name !== '') {
+      return section
+    }
+    const name = unusedSectionName(used)
+    used.add(name)
+    return { ...(isContent(section) ? section : {}), name }
+  })
+  return {
+    sections: named,
+    steps: [{ title: { textKey }, sections: named.map((section) => section.name as string) }],
+    select: '/steps/0',
+    name: textKey,
+  }
 }

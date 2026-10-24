@@ -48,8 +48,9 @@ Dn refers to [decisions.md](../decisions.md).
     puts it back in the palette. The palette never offers a field already on
     the form, and a drop never copies one.
     _Partly built:_ the panel column lists the fields above the layout outline
-    and the property panel. The names come from Studio's names list, so an
-    unsaved edit of the entity shows only after a save. Enter, Space or a click
+    and the property panel. Add section and Add step sit below the field list.
+    The names come from Studio's names list, so an unsaved edit of the entity
+    shows only after a save. Enter, Space or a click
     inserts a field at the end of the selected section, after the selected
     field, or at the end of the selected step's first section. With no usable
     selection it goes to the end of the first section. The new field is
@@ -68,6 +69,18 @@ Dn refers to [decisions.md](../decisions.md).
     joins the selected step. Adding the first step names every unnamed section
     and puts all sections into it, so the form stays valid (`AXC0230`).
     Removing the last step removes `steps`.
+    _Partly built:_ the palette has Add section and Add step below the field
+    list. Add section appends a section named with the lowest unused
+    `section{n}`, ignoring letter case, and a title key such as
+    `forms.ticketResolution.sections.1.title`. The new section is selected. It
+    joins the selected step, the step of the selected section or field, or the
+    last step. The first Add step names every unnamed section and puts all
+    sections into one step. A later Add step adds an empty, selected step. A
+    section with no fields shows a "Drop a field here" area in the outline,
+    where a palette field can land. Each add is one undo step, and a live
+    region names what was added. Until a field goes into an empty section or
+    step and the texts are written, the canvas shows its cannot-be-drawn
+    notice. Removing a section or a step is not built yet.
   - **Property panel.** A field shows `readOnly` and its three conditions in
     the expression editor, which offers only the fields the form lists. A field
     that the entity marks `required` has no `visibleWhen` box. A computed,
