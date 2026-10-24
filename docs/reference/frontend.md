@@ -207,10 +207,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     also has `visibleWhen`, never left out: the expression text of a row
     action's condition, or `null` when it has none. It is always `null` outside
     `rowActions`.
-  - Every widget also has `parameters`, never left out: on a table over a data
-    source, the name of the page parameter that gives each data source
-    parameter its value, as `{ "<data source parameter>": "<page parameter>" }`,
-    in the declared names. It is `{}` elsewhere and on a table that binds none.
+  - Every widget also has `parameters`, never left out: on a table, a chart or a
+    KPI over a data source, the name of the page parameter that gives each data
+    source parameter its value, as `{ "<data source parameter>": "<page parameter>" }`,
+    in the declared names. It is `{}` elsewhere and on a widget that binds none.
   - A page also has `parameters`, never left out: the typed values it reads
     from its URL, in file order, or `[]`. Each is
     `{ "name", "type", "required", "values", "target" }`. `type` is the type

@@ -70,6 +70,9 @@ public enum RecordConflict
 
     /// <summary>The stored schema does not match the active model.</summary>
     Schema,
+
+    /// <summary>A running or waiting process instance has the record as its subject.</summary>
+    RunningProcess,
 }
 
 /// <summary>
@@ -113,7 +116,9 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// A create or update takes the application's start lock shared, as the first statement of its write
 /// transaction. When the active release is no longer the given release, it writes nothing and the
 /// outcome is <see cref="RecordCommandOutcome.ReleaseChanged"/>, so the caller can run it again on the
-/// new release. A delete never starts a process and takes no lock.
+/// new release. A delete never starts a process. It takes the start lock shared first and then the record's
+/// row lock. It is refused as a conflict when a running or waiting process instance has the record as its
+/// subject, checked after the record filters.
 /// A create or update may name a form of the entity. The form is checked after the grant and the
 /// record checks and before the content type: a name that is no form of the entity is invalid.
 /// A body is checked in order: content type, then body, then a field that no grant for the action
@@ -439,26 +444,29 @@ public static class RecordCommand
         RecordDeleteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
-            // The row is locked first, so the filters see the version that is deleted.
-            if (read.Filters is not null || access.Filters is not null)
+            // A delete pins no release, so the released id is ignored. The lock keeps the lock order with a
+            // migrating activation, and the record's row lock below orders the delete with a start.
+            await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken);
+
+            // The row is locked first, so the filters and the instance check see the version that is deleted.
+            if (read.Filters is { } pendingRead
+                && await ReadsPendingAsync(connection, transaction, application, model, pendingRead, loggerFactory, cancellationToken))
             {
-                if (read.Filters is { } pendingRead
-                    && await ReadsPendingAsync(connection, transaction, application, model, pendingRead, loggerFactory, cancellationToken))
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    return new RecordCommandResult(RecordCommandOutcome.PendingFilter);
-                }
+                await transaction.RollbackAsync(cancellationToken);
+                return new RecordCommandResult(RecordCommandOutcome.PendingFilter);
+            }
 
-                if (!await RecordCommands.LockAsync(connection, model, recordId, cancellationToken)
-                    || (read.Filters is { } readFilters
-                        && await MatchAsync(connection, transaction, application, model, recordId, readFilters, actor.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true }))
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    return new RecordCommandResult(RecordCommandOutcome.NotFound);
-                }
+            if (!await RecordCommands.LockAsync(connection, model, recordId, cancellationToken)
+                || (read.Filters is { } readFilters
+                    && await MatchAsync(connection, transaction, application, model, recordId, readFilters, actor.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true }))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new RecordCommandResult(RecordCommandOutcome.NotFound);
+            }
 
-                if (access.Filters is { } pendingDelete
-                    && await ReadsPendingAsync(connection, transaction, application, model, pendingDelete, loggerFactory, cancellationToken))
+            if (access.Filters is { } pendingDelete)
+            {
+                if (await ReadsPendingAsync(connection, transaction, application, model, pendingDelete, loggerFactory, cancellationToken))
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     return new RecordCommandResult(RecordCommandOutcome.PendingFilter);
@@ -469,6 +477,14 @@ public static class RecordCommand
                     await transaction.RollbackAsync(cancellationToken);
                     return new RecordCommandResult(RecordCommandOutcome.OutsideFilters);
                 }
+            }
+
+            // After the filters, so the refusal never shows a record the actor cannot reach. A separate
+            // statement after the row lock, so it sees an instance that a start committed while this waited.
+            if (await ProcessStarts.HasOpenInstanceAsync(transaction, application.Manifest.Id, model.Id, recordId, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new RecordCommandResult(RecordCommandOutcome.Conflict, Conflict: RecordConflict.RunningProcess);
             }
 
             result = await RecordCommands.DeleteAsync(connection, model, recordId, cancellationToken);

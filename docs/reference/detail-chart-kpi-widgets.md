@@ -44,8 +44,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)).
 - **Chart widget**. A page whose widget is a `chart` draws
   the groups of a grouped data source as a `bar`, a `line` or a `pie`. The
-  compile checks, the page metadata and the chart in the SPA are built, except
-  binding page parameters. See
+  compile checks, the page metadata and the chart in the SPA are built, and
+  the chart binds page parameters. See
   [D64](../decisions/d64-detail-chart-and-kpi-widgets.md) and the
   [widget binding](data-sources.md#widget-binding).
 
@@ -66,12 +66,13 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     option. The page schema requires `dataSource`, `kind`, `category`,
     `measures` and `title`, so a missing one is `AXC0004`. Names match the data
     source ignoring letter case, and the compiled chart keeps the names the data
-    source declares. A chart cannot bind page parameters yet *(planned for
-    M13)*. The schema rejects `parameters` on a chart (`AXC0004`), as on a
-    KPI, and every data source parameter must be optional (`AXC0060`).
+    source declares. A chart binds page parameters into its data source with
+    `parameters`, the name map of a table, and a data source parameter that it
+    leaves unbound must be optional (`AXC0060`).
   - **Metadata.** The widget has the `dataSource` object of the table
     binding, `"entity": null`, `"form": null`, `"actions": []` and
-    `"access": null`, and adds `chart`, written after `kpi`. A measure's
+    `"access": null`, and adds `chart`, written after `kpi`. `parameters` holds the widget's name
+    map, as on a table. A measure's
     `labelKey` is a text key, because a data source measure has no label. A
     user who cannot run the data source gets no widget, as with a table:
 
@@ -82,7 +83,10 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     The example leaves `columns` empty and the keys that stay `null` or `[]`
     out. A widget carries them all.
   - **Rows.** The chart sends one request to `rowsPath` with `pageSize=100`,
-    the largest page size, and never pages. When `totalCount` is over 100, a
+    the largest page size, and never pages. The request carries each bound
+    page parameter's value under the data source parameter's name, and a
+    parameter whose page parameter has no value is left out. The chart asks
+    again when a page parameter changes. When `totalCount` is over 100, a
     note under the chart says that only the first 100 groups show. Each row is
     one category. A `reference` category shows its label from `labels`, and a
     `null` category shows a platform text.
@@ -113,12 +117,15 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **Compile.** The binding checks are in
     [data-sources.md](data-sources.md#widget-binding). `comparison` and
     `navigate` are optional. A navigate action follows D63's checks, and its
-    expressions see only the page's parameters. The labels join `AXC0028`. A
-    KPI has no `entity`, `form` or `actions` (`AXC0060`). The page schema
+    expressions see only the page's parameters. A KPI binds page parameters
+    into its data source with `parameters`, the name map of a table, and a data
+    source parameter that it leaves unbound must be optional (`AXC0060`). The
+    labels join `AXC0028`. A KPI has no `entity`, `form` or `actions` (`AXC0060`). The page schema
     requires `dataSource`, `measure` and `label`, and `comparison` has both a
     `measure` and a `label`.
   - **Metadata.** The widget has the `dataSource` object, `"entity": null`,
-    `"form": null`, `"actions": []` and `"access": null`, and adds `kpi`:
+    `"form": null`, `"actions": []` and `"access": null`, and adds `kpi`.
+    `parameters` holds the widget's name map, as on a table:
 
     ```json
     "kpi": {
@@ -135,7 +142,10 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     the keys of every `navigate` action, see
     [frontend.md](frontend.md). A user who cannot run the data source gets no
     widget, as with a table.
-  - **Value**. The SPA reads the one total row of the data source. The value
+  - **Value**. The SPA reads the one total row of the data source. The request
+    carries each bound page parameter's value under the data source
+    parameter's name, and the tile reads again when a page parameter changes.
+    The value
     is formatted as a table cell shows it, and a `null` measure shows a
     platform text for an empty value. The comparison is a second labelled
     value. The SPA computes no difference and no percentage.

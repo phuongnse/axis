@@ -1,0 +1,17 @@
+{
+  "id": "c41f6a52-3b7e-4d08-8a19-5e2d9b0c7f16",
+  "kind": "dataSource",
+  "name": "ItemTotalsInDepartment",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [{ "name": "quantity", "path": "quantity" }],
+  "parameters": [{ "name": "inDepartment", "type": "reference", "target": "Department", "required": true }],
+  "filter": "department == inDepartment",
+  "aggregate": {
+    "groupBy": [],
+    "measures": [
+      { "name": "items", "function": "count" },
+      { "name": "quantitySum", "function": "sum", "field": "quantity" }
+    ]
+  }
+}

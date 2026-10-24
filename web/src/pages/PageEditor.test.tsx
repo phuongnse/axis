@@ -307,54 +307,96 @@ describe('PageEditor form panel', () => {
   })
 })
 
+/** Renders the editor over a draft that applies every change, so a test can read the JSON as it would be saved. */
+function renderStateful(initial: Record<string, unknown>, loaded: StudioNames | null = names) {
+  let draft = initial
+  function Harness() {
+    const [value, setValue] = useState(initial)
+    return (
+      <PageEditor
+        value={value}
+        onChange={(pointer, next) => {
+          draft = setAt(draft, pointer, next) as Record<string, unknown>
+          setValue(draft)
+        }}
+      />
+    )
+  }
+  render(
+    <ThemeModeProvider>
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <StudioNamesContext.Provider value={loaded ?? undefined}>
+          <LabelTextsContext.Provider value={labelContext}>
+            <Harness />
+          </LabelTextsContext.Provider>
+        </StudioNamesContext.Provider>
+      </TextProvider>
+    </ThemeModeProvider>,
+  )
+  return () => draft
+}
+
 describe('PageEditor delete actions', () => {
   const deleteAction = { type: 'delete', label: { textKey: 'notes.delete' } }
+  const rows = 'studio-field-/widgets/0/rowActions'
 
-  it('shows a delete row action as JSON only and still removes it', async () => {
+  it('adds a delete action to the row actions and not to the toolbar', async () => {
+    const existing = { type: 'navigate', page: 'ReviewForm', label: { textKey: 'pages.review.title' } }
+    const onChange = renderEditor(page({ ...table, rowActions: [existing] }))
+    const toolbar = within(screen.getByTestId('studio-field-/widgets/0/toolbarActions'))
+    expect(toolbar.queryByRole('button', { name: 'Add delete action' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(screen.getByTestId(rows)).getByRole('button', { name: 'Add delete action' }))
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions', [
+      existing,
+      { type: 'delete', label: { textKey: '' } },
+    ])
+  })
+
+  it('shows the label and visibleWhen of a delete action and edits them', async () => {
+    const onChange = renderEditor(
+      page({ ...table, rowActions: [{ ...deleteAction, visibleWhen: 'done' }] }),
+      vi.fn(),
+      null,
+    )
+
+    expect(screen.getByTestId(`${rows}/0/label`)).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'Visible when' })).toHaveValue('done')
+    expect(screen.getByTestId('studio-action-0').querySelector('[data-testid="studio-json-only"]')).toBeNull()
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Visible when' }), '!')
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions/0/visibleWhen', 'done!')
+    await userEvent.type(within(screen.getByTestId(`${rows}/0/label`)).getByRole('textbox', { name: 'Text key' }), 'x')
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions/0/label/textKey', 'notes.deletex')
+  })
+
+  it('keeps the keys the panel does not show and removes visibleWhen when cleared', async () => {
+    const saved = renderStateful(
+      page({
+        ...table,
+        rowActions: [{ ...deleteAction, visibleWhen: 'done == false', note: 'kept' }],
+      }),
+      null,
+    )
+
+    await userEvent.type(within(screen.getByTestId(`${rows}/0/label`)).getByRole('textbox', { name: 'Text key' }), 'x')
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Visible when' }))
+
+    const action = ((saved().widgets as Record<string, unknown>[])[0].rowActions as Record<string, unknown>[])[0]
+    expect(action.note).toBe('kept')
+    expect(action.label).toEqual({ textKey: 'notes.deletex' })
+    expect('visibleWhen' in action).toBe(false)
+  })
+
+  it('removes a delete action', async () => {
     const onChange = renderEditor(page({ ...table, rowActions: [deleteAction] }))
 
-    const action = within(screen.getByTestId('studio-action-0'))
-    expect(action.getByText('delete')).toBeVisible()
-    expect(
-      screen.getByTestId('studio-field-/widgets/0/rowActions/0').querySelector('[data-testid="studio-json-only"]'),
-    ).not.toBeNull()
-    expect(screen.queryByTestId('studio-field-/widgets/0/rowActions/0/process')).not.toBeInTheDocument()
-
-    await userEvent.click(action.getByRole('button', { name: 'Remove action' }))
+    await userEvent.click(within(screen.getByTestId('studio-action-0')).getByRole('button', { name: 'Remove action' }))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions/0', undefined)
   })
 })
 
 describe('PageEditor navigate actions', () => {
-  /** Renders the editor over a draft that applies every change, so a test can read the JSON as it would be saved. */
-  function renderStateful(initial: Record<string, unknown>) {
-    let draft = initial
-    function Harness() {
-      const [value, setValue] = useState(initial)
-      return (
-        <PageEditor
-          value={value}
-          onChange={(pointer, next) => {
-            draft = setAt(draft, pointer, next) as Record<string, unknown>
-            setValue(draft)
-          }}
-        />
-      )
-    }
-    render(
-      <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioNamesContext.Provider value={names}>
-            <LabelTextsContext.Provider value={labelContext}>
-              <Harness />
-            </LabelTextsContext.Provider>
-          </StudioNamesContext.Provider>
-        </TextProvider>
-      </ThemeModeProvider>,
-    )
-    return () => draft
-  }
-
   const rows = 'studio-field-/widgets/0/rowActions'
   const navigate = { type: 'navigate', page: 'ReviewForm', label: { textKey: 'pages.review.title' } }
 

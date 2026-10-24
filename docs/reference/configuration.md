@@ -113,8 +113,9 @@ flowchart LR
      `measure` and a `label`. A measure that the aggregate does not declare is
      `AXC0238` at `/widgets/{i}/measure` or `/widgets/{i}/comparison/measure`.
      A `kpi` names no `entity`, `form` or `actions` (`AXC0060` at that
-     property), and its data source has no
-     required parameter (`AXC0060` at `/widgets/{i}/dataSource`). Its optional
+     property). It may bind page parameters with `parameters`, as a table does,
+     and a data source parameter that it leaves unbound must be optional
+     (`AXC0060` at `/widgets/{i}/dataSource`). Its optional
      `navigate` is checked as any `navigate` action is, with page parameters
      as the only names in its expressions. The page schema requires `measure` and
      `label` on a `kpi` and does not allow them, or `comparison` and
@@ -128,11 +129,12 @@ flowchart LR
      that is not a number, is `AXC0241` at `/widgets/{i}/measures/{j}/name`,
      and a `pie` with more than one measure is `AXC0241` at
      `/widgets/{i}/measures`. A `chart` names no `entity`, `form` or
-     `actions` (`AXC0060` at that property), and its data source has no
-     required parameter (`AXC0060` at `/widgets/{i}/dataSource`). The page
+     `actions` (`AXC0060` at that property). It may bind page parameters with
+     `parameters`, as a table does, and a data source parameter that it leaves
+     unbound must be optional (`AXC0060` at `/widgets/{i}/dataSource`). The page
      schema requires `dataSource`, `kind`, `category`, `measures` and `title`
-     on a `chart` and does not allow `parameters` on it, or `kind`, `category`
-     and `measures` on any other widget (`AXC0004`).
+     on a `chart` and does not allow `kind`, `category` and `measures` on any
+     other widget (`AXC0004`).
      A `detail` widget names exactly one of `form` and `entity` (`AXC0060`) and
      no `dataSource`, `rowActions`, `toolbarActions` or `parameters`
      (`AXC0060` at that property). Its `record` must name a required `reference`

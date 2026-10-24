@@ -316,7 +316,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     When there is no answer, or the check answers `400` or
     `401`, the last result stays on screen. A `401` does not start sign-in, so
     the draft is kept. The editor never blocks Save.
-- **Entity designer** *(built)*. An `entity` resource opens in a designer on
+- **Entity designer** _(built)_. An `entity` resource opens in a designer on
   the Form tab in place of the generic form. The JSON tab stays and edits the
   same draft. See
   [D54](../decisions/d54-the-entity-designer-and-the-policy-matrix.md).
@@ -348,22 +348,21 @@ Run and the Test results list, the read-only view of a module entity, and the re
     read-only, from the [module resource route](authoring.md#routes). Every input is
     off, and it has no Add field, Remove, Move, Add validation, Save or Delete
     button, no JSON tab and no Uses or Used by lists. A label shows its text key.
-- **Migrations from the designer** *(built)*. The designer compares
+- **Migrations from the designer** _(built)_. The designer compares
   with the entity as Studio loaded it. "Loaded" means as Studio read the
   entity, not the active release. It asks a question for a change to a loaded
   field and adds the migration change that goes with the answer:
 
-  | Change to a loaded field | Question | Migration added |
-  | --- | --- | --- |
-  | Rename | Keep its data? | `renameField` with `from` and `to`. |
-  | Remove | Drop its data? | `dropField`. Answering No keeps the field. |
-  | Type change | A `convert` expression | `convert` with the author's expression. |
-  | Narrower `maxLength` | A `convert` expression | `convert`. |
-  | Removed enum values | A `convert` expression that maps them to kept values | `convert`. |
-  | Now required, or a new required field | Fill the nulls? A `fill` expression | `fill`. |
-  | To or from `enum`, or `unique` added | None | None. The designer warns, and Validate reports `AXC0016`. |
-  | Rename or remove of a `child-collection` field | None | None, because it has no column. |
-
+  | Change to a loaded field                       | Question                                             | Migration added                                           |
+  | ---------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------- |
+  | Rename                                         | Keep its data?                                       | `renameField` with `from` and `to`.                       |
+  | Remove                                         | Drop its data?                                       | `dropField`. Answering No keeps the field.                |
+  | Type change                                    | A `convert` expression                               | `convert` with the author's expression.                   |
+  | Narrower `maxLength`                           | A `convert` expression                               | `convert`.                                                |
+  | Removed enum values                            | A `convert` expression that maps them to kept values | `convert`.                                                |
+  | Now required, or a new required field          | Fill the nulls? A `fill` expression                  | `fill`.                                                   |
+  | To or from `enum`, or `unique` added           | None                                                 | None. The designer warns, and Validate reports `AXC0016`. |
+  | Rename or remove of a `child-collection` field | None                                                 | None, because it has no column.                           |
   - The migration resource is named `<Entity>Change<UTC yyyyMMddHHmmss>`, for
     example `PurchaseRequestChange20261020093000` in
     `migrations/purchase-request-change20261020093000.json`. It holds the
@@ -403,7 +402,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     guards the data.
   - See [migrations](migrations.md#migrations) and the
     [resource file shape](resource-files.md#resource-file-shape).
-- **Policy matrix** *(built)*. One view per application shows who
+
+- **Policy matrix** _(built)_. One view per application shows who
   may do what.
   - Roles are the rows. The columns are the entities without child entities,
     the data sources, the processes and the endpoints.
@@ -462,27 +462,27 @@ Run and the Test results list, the read-only view of a module entity, and the re
   editor, the process editor's step list, with its decision, end, task and operation panels, and the entity designer are
   built. The last column lists what still needs the JSON view, because the form cannot show it.
 
-  | Kind          | Editor                                | Still needs the JSON view                                             |
-  | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
-  | `application` | Generic form                          | Nothing                                                               |
-  | `entity`      | Entity designer                       | Nothing                                                               |
-  | `page`        | Typed editor, Design tab (planned for M13) | A `delete` row action, which the editor does not edit yet (planned for M13) |
-  | `form`        | Generic form, typed steps panel       | Nothing                                                               |
-  | `site`        | Generic form                          | Nothing                                                               |
-  | `process`     | Typed editor with the process graph   | Nothing                                                               |
-  | `rule`        | Generic form                          | Nothing                                                               |
-  | `sequence`    | Generic form                          | Nothing                                                               |
-  | `role`        | Generic form                          | Nothing                                                               |
-  | `policy`      | Generic form                          | Nothing                                                               |
-  | `dataSource`  | Generic form                          | Nothing                                                               |
-  | `connector`   | Typed editor                          | Nothing                                                               |
-  | `endpoint`    | Generic form, typed rows for `values` | Nothing                                                               |
-  | `event`       | Generic form                          | Nothing                                                               |
-  | `trigger`     | Generic form                          | Nothing                                                               |
-  | `migration`   | Generic form                          | The `changes` list, because each change's fields depend on its `type` |
-  | `seed`        | Typed editor                          | Nothing                                                               |
-  | `scenario`    | Typed editor                          | Nothing                                                               |
-  | `text`        | Typed editor                          | Nothing                                                               |
+  | Kind          | Editor                                     | Still needs the JSON view                                             |
+  | ------------- | ------------------------------------------ | --------------------------------------------------------------------- |
+  | `application` | Generic form                               | Nothing                                                               |
+  | `entity`      | Entity designer                            | Nothing                                                               |
+  | `page`        | Typed editor, Design tab (planned for M13) | Nothing                                                               |
+  | `form`        | Generic form, typed steps panel            | Nothing                                                               |
+  | `site`        | Generic form                               | Nothing                                                               |
+  | `process`     | Typed editor with the process graph        | Nothing                                                               |
+  | `rule`        | Generic form                               | Nothing                                                               |
+  | `sequence`    | Generic form                               | Nothing                                                               |
+  | `role`        | Generic form                               | Nothing                                                               |
+  | `policy`      | Generic form                               | Nothing                                                               |
+  | `dataSource`  | Generic form                               | Nothing                                                               |
+  | `connector`   | Typed editor                               | Nothing                                                               |
+  | `endpoint`    | Generic form, typed rows for `values`      | Nothing                                                               |
+  | `event`       | Generic form                               | Nothing                                                               |
+  | `trigger`     | Generic form                               | Nothing                                                               |
+  | `migration`   | Generic form                               | The `changes` list, because each change's fields depend on its `type` |
+  | `seed`        | Typed editor                               | Nothing                                                               |
+  | `scenario`    | Typed editor                               | Nothing                                                               |
+  | `text`        | Typed editor                               | Nothing                                                               |
 
   The generic form sends a part to the JSON view when it holds `oneOf` or
   `anyOf`, when it holds `allOf` with an item that has more than `if`, `then`
@@ -490,17 +490,16 @@ Run and the Test results list, the read-only view of a module entity, and the re
   mark is the exception. The last column follows that rule. A new kind or property that the
   form cannot show goes to the JSON view until an editor covers it.
 
-  - **Page editor** *(built)*. The Form tab shows the page's name, its title
+  - **Page editor** _(built)_. The Form tab shows the page's name, its title
     with a text box for each locale, and a list of its widgets, each with its
     type and a summary such as `table · PurchaseRequestList`. A panel per
     widget type, `table`, `form`, `taskInbox`, `processInspector`, `kpi`,
     `chart`, `detail`, `columns`, `tabs` and `section`, shows the properties the widget has today. The `columns`, `tabs` and `section` panels edit the width of each column, the label of each tab, and the title and collapsed state of a section. A `table` panel has entity and data source
-    pickers, then `rowActions` and `toolbarActions` lists of
-    navigate actions. A `form` panel has entity and form pickers and its
-    `actions`, each a `startProcess` action with a process picker and a label,
-    or a navigate action. The editor does not edit a `delete` row action yet.
-    It shows the action as JSON only, which the JSON view edits, and Remove
-    action removes it. A
+    pickers, then a `rowActions` list of navigate or delete actions and a
+    `toolbarActions` list of navigate actions. A delete action has a label and
+    an optional `visibleWhen` expression. A `form` panel has entity and form
+    pickers and its `actions`, each a `startProcess` action with a process
+    picker and a label, or a navigate action. A
     `taskInbox` panel has no properties. A `processInspector` panel has a
     process picker. A `detail` panel has the entity and form pickers and the
     actions of a form, and a record picker between them. The widget is described
@@ -576,7 +575,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
       each page's parameters, which is how a navigate action knows them
       ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md)).
       `parameters` that is not a list points to the JSON view.
-    - **Widget tree** *(built)*. The editor shows the page's widgets as
+    - **Widget tree** _(built)_. The editor shows the page's widgets as
       nested rows. A container shows its columns, tabs or section body as
       nested lists, and a row opens that widget's panel at its own pointer,
       such as `/widgets/0/columns/1/widgets/0`. Every list has an Add widget
@@ -590,7 +589,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
       editor does not check the depth limit or an empty list, so the
       compiler reports them after the save. A widget keeps every key the editor
       does not know when it moves.
-    - **Container panels** *(built)*. Each container type has a panel under
+    - **Container panels** _(built)_. Each container type has a panel under
       its fixed type. A `columns` panel shows one width box from 1 to 12 for
       each column. The editor does not check that the widths add up to 12, so
       the compiler reports it after the save. Add column adds a column that
@@ -610,21 +609,21 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Process step editor.** The Form tab opens the process with its name,
     entity and optional start condition, and its start step. The JSON view
     stays as a second view of the same draft.
-    - **Step list** *(built)*. The steps show as cards in file order. Each card
+    - **Step list** _(built)_. The steps show as cards in file order. Each card
       shows the step's name and type, with move up, move down and remove. Add
       step appends a step of the chosen type, with an empty name.
-    - **Type change** *(built)*. Changing a step's type removes the keys the
+    - **Type change** _(built)_. Changing a step's type removes the keys the
       new type forbids and adds the keys it requires, empty. The other keys,
       including unknown keys, stay.
-    - **Decision and end panels** *(built)*. A decision shows its branches,
+    - **Decision and end panels** _(built)_. A decision shows its branches,
       each with a `when` expression and a target, and its `otherwise`. A branch
       can be added and removed. An end step shows only its name and type.
-    - **Transitions** *(built)*. The start step, `next`, a branch's `next`,
+    - **Transitions** _(built)_. The start step, `next`, a branch's `next`,
       `otherwise` and an outcome's `next` pick their target from the step names
       of the unsaved draft. A target that is not a step stays visible and is
       tagged unknown. Removing a step does not rewrite the transitions that
       name it, so the compiler reports them.
-    - **Task panel** *(built)*. A task shows its label and its form as pickers
+    - **Task panel** _(built)_. A task shows its label and its form as pickers
       over the application's text keys and forms. The assignee has a User and
       Role switch. User shows the expression editor and Role shows a role
       picker. A switch removes the other key, so the step never holds both.
@@ -633,7 +632,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
       panel does not show stays as it is. A diagnostic path inside a task's
       label, assignee, form, `dueIn` or outcomes opens the Form tab at that
       field.
-    - **Operation panel** *(built)*. An `operation` step shows an operation
+    - **Operation panel** _(built)_. An `operation` step shows an operation
       choice, `updateRecord`, `callConnector`, `raiseEvent` or **Package
       operation**, above its transition. Changing the operation removes only
       the keys the new one forbids. It adds no empty key, so the compiler
@@ -656,7 +655,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
         box. A key the step's operation forbids is not shown as rows. It says
         to edit it in the JSON view, and a diagnostic path inside it opens the
         JSON view.
-  - **Connector editor** *(built)*. The Form tab shows the base URL binding,
+  - **Connector editor** _(built)_. The Form tab shows the base URL binding,
     the auth type with its secret binding, `timeout`, `idempotency`, and the
     operations as a list. The JSON view stays as a second view of the same
     draft.
@@ -675,7 +674,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
       shows a hint, and the compiler reports the error.
     - **Unknown keys.** A key the editor does not show, in the file, in an
       operation or in `auth`, is saved unchanged.
-  - **Scenario editor** *(built)*. The Form tab shows the scenario's name and
+  - **Scenario editor** _(built)_. The Form tab shows the scenario's name and
     `now`, then its users with their roles, its stubs, and its steps as a list
     with a panel per step type. The JSON view stays as a second view of the
     same draft.
@@ -690,7 +689,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
       the entity does not name stays as a text row. A step whose entity is not
       in the folder edits its `values` as a JSON object, and the text is saved
       only when it is one.
-  - **Seed editor** *(built)*. The Form tab shows the seed's name, entity and
+  - **Seed editor** _(built)_. The Form tab shows the seed's name, entity and
     `sync`, then its records as a grid, with a row per record and a column per
     field of the seed's `entity`. The JSON view stays as a second view of the
     same draft.
@@ -714,7 +713,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     - **Fallback.** The entity is found by name among the folder's `entity`
       resources, ignoring letter case. When it is not there, for example a
       module entity or a typo, the seed uses the generic form and the JSON view.
-  - **Text editor** *(built)*. A `text` resource opens as one table of keys
+  - **Text editor** _(built)_. A `text` resource opens as one table of keys
     with a column per locale, and a search box.
     - **Columns.** One row per key, sorted by key, and one column per locale in
       the order of the folder's `text` resources. Only the open resource's
@@ -739,14 +738,14 @@ Run and the Test results list, the read-only view of a module entity, and the re
     - **JSON view.** It stays as the second view of the same draft.
     - **Removing a key** is not built. No route removes a key from every
       locale yet.
-  - **Endpoint `values`** *(built)*. The endpoint keeps the generic form for
+  - **Endpoint `values`** _(built)_. The endpoint keeps the generic form for
     its entity, process, input and output. Its `values` show as rows of a field
     and an expression in the expression editor. The field is picked from the
     fields of the endpoint's entity, found by name among the application's
     names, and is typed while those are unknown. **Add mapping** lists the
     fields that have no row. Renaming a row's field keeps its place in the
     file, and a value that is not an object is left to the JSON view.
-  - **Form steps** *(built)*. The form keeps the generic form for its entity,
+  - **Form steps** _(built)_. The form keeps the generic form for its entity,
     sections and fields, which includes an expression editor for each
     `visibleWhen`, `requiredWhen` and `readOnlyWhen`. Its `steps` show as cards
     with a title, a section picker, **Move up**, **Move down** and **Remove**.
@@ -755,7 +754,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     `steps`, and the form goes back to one page. A condition offers the fields
     that the form lists, because a condition reads only those. A `steps` value
     that is not a list is left to the JSON view.
-- **Process graph** *(built)*. A process shows a
+
+- **Process graph** _(built)_. A process shows a
   drawn graph of its steps and transitions above its editor, see
   [D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md).
   It is read-only. The author edits steps in the list.
@@ -781,7 +781,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     error-coloured border, "has diagnostics" in its text label, and
     `data-marked`. The marks come from the panel's last loaded list, so they
     change on a load, a save or a request, not on every edit.
-- **Page designer** *(planned for M13)*. The page editor gets a Design tab
+- **Page designer** _(planned for M13)_. The page editor gets a Design tab
   that builds a page by drag and drop, per
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md).
   Form and process designers are planned for M13 and M14, see

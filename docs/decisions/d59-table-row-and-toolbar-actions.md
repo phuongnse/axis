@@ -22,7 +22,7 @@ included. The owner confirmed these points on issue #932 on 2026-10-21.
 - **Layout:** toolbar actions sit next to the create button. Row actions show
   as buttons and fold into a menu at phone width.
 - **Running process:** a delete of a record that a running process holds is
-  refused with `409`. _(planned for M13)_
+  refused with `409`.
 - **Bulk actions:** actions on selected rows come after M12. M12 acts on one
   row at a time.
 

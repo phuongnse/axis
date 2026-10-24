@@ -29,6 +29,8 @@
     "itemKpi.priceSum": "Total price",
     "itemKpi.showDepartments": "Show departments",
     "itemKpiOverview.title": "Items and totals",
+    "itemDepartmentKpi.title": "Item totals in a department",
+    "itemDepartmentKpi.items": "Items in the department",
     "itemChart.title": "Items by department",
     "itemChart.items": "Items",
     "itemChart.quantitySum": "Quantity",

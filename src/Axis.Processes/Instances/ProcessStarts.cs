@@ -146,6 +146,35 @@ public static class ProcessStarts
         }
     }
 
+    /// <summary>
+    /// Returns whether a running or waiting instance has the record <paramref name="subjectId"/> of the entity
+    /// <paramref name="subjectEntityId"/> as its subject.
+    /// </summary>
+    public static async Task<bool> HasOpenInstanceAsync(
+        NpgsqlTransaction transaction,
+        Guid applicationId,
+        Guid subjectEntityId,
+        Guid subjectId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM axis.process_instances
+                WHERE application_id = @application AND subject_entity_id = @entity AND subject_id = @subject
+                  AND state IN (@running, @waiting))
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("entity", subjectEntityId);
+        command.Parameters.AddWithValue("subject", subjectId);
+        command.Parameters.AddWithValue("running", Running);
+        command.Parameters.AddWithValue("waiting", Waiting);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
     /// <summary>Returns the instance <paramref name="id"/>, or <see langword="null"/> when there is none.</summary>
     public static async Task<ProcessInstanceState?> FindInstanceAsync(
         NpgsqlConnection connection,
