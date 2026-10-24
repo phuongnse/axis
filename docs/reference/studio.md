@@ -904,7 +904,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     each field shows a placeholder value, and no request goes to `/api/apps/`.
     Save, Next, Back and Cancel do nothing, because the canvas cancels every
     click and form submit. A form the route cannot draw shows a short notice.
-    The tab has the canvas only, with no side pane, selection or width switch.
+    The tab shows the Used on list above the step switch and the canvas, and
+    still has no side pane, selection or width switch.
     The canvas is mounted only while the Design tab is active.
   - **Step switch.** It lists the steps in order and shows the sections of one
     step. A form without `steps` has no switch.
@@ -944,5 +945,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     the Used by list filtered to the `widget form` and `task form` relations,
     loads with the resource, and can be stale like the `usedBy` counts. An
     entry opens the resource at its path. One edit changes every one of them.
+    _Built:_ the list sits above the canvas, loads once when the form opens,
+    and shows each entry's relation, name and path.
 - **Texts.** Its texts, including those of the lists above, are the platform
   texts under `shell.studio.*`, in `en` and `vi`, like the other shell texts.
