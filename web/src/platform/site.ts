@@ -121,6 +121,8 @@ export interface DataSourceMetadata {
 export interface FormFieldMetadata {
   name: string
   readOnly: boolean
+  /** The element's JSON Pointer in the draft. Only the draft page metadata route sets it. */
+  path?: string
 }
 
 /** One section of a form: the text key of its title and its fields in display order. */
@@ -129,12 +131,16 @@ export interface FormSectionMetadata {
   name: string | null
   titleKey: string
   fields: FormFieldMetadata[]
+  /** The element's JSON Pointer in the draft. Only the draft page metadata route sets it. */
+  path?: string
 }
 
 /** One wizard step of a form: the text key of its title and the names of its sections. */
 export interface FormStepMetadata {
   titleKey: string
   sections: string[]
+  /** The element's JSON Pointer in the draft. Only the draft page metadata route sets it. */
+  path?: string
 }
 
 /**

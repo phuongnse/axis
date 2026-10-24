@@ -11,6 +11,7 @@ import { useSession } from "../sessions";
 test.setTimeout(180_000);
 
 const dashboardId = "8ae8ab97-77c5-48e9-a798-a912b5bb3cf3";
+const ticketEditId = "1db765b0-483d-456b-9939-17e2a36de3b6";
 const allTicketsId = "4ff52d55-8194-45c4-901b-bdc18e269096";
 const ticketDetailId = "e6a7b810-39ed-4751-a0cc-b761ffc812e5";
 
@@ -44,7 +45,7 @@ async function dragType(
 
 // The main server's Studio edits the purchase request copy only. This server's Studio folder is a copy of the service
 // desk sample, whose Dashboard page has KPIs, a chart and a table.
-test.describe("Studio draws a page on the Design tab", () => {
+test.describe("Studio draws a page and a form on the Design tab", () => {
   let copy: string;
   let server: Awaited<ReturnType<typeof startServer>>;
 
@@ -153,16 +154,58 @@ test.describe("Studio draws a page on the Design tab", () => {
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
     const file = path.join(copy, "pages", "ticket-detail.json");
-    await expect
-      .poll(async () => JSON.parse(await readFile(file, "utf8")).widgets)
-      .toEqual([
-        { type: "detail", entity: "Ticket", record: "ticket" },
-        {
-          type: "section",
-          title: { textKey: "" },
-          widgets: [{ type: "table" }],
-        },
-      ]);
+    try {
+      await expect
+        .poll(async () => JSON.parse(await readFile(file, "utf8")).widgets)
+        .toEqual([
+          { type: "detail", entity: "Ticket", record: "ticket" },
+          {
+            type: "section",
+            title: { textKey: "" },
+            widgets: [{ type: "table" }],
+          },
+        ]);
+    } finally {
+      // The saved table has no data source and does not compile. The page metadata route answers no page while any file
+      // has an error, so the next journeys, which share this folder, would find no canvas.
+      await cp(path.join(serviceDesk, "pages", "ticket-detail.json"), file);
+    }
+  });
+
+  test("an author sees both steps of the ticket form, and the condition of the Resolution field after picking the second", async ({
+    page,
+  }) => {
+    await useSession(page, "hoa");
+    const applicationRequests: string[] = [];
+    page.on("request", (request) => {
+      const { pathname } = new URL(request.url());
+      if (pathname.startsWith("/api/apps/")) {
+        applicationRequests.push(`${request.method()} ${pathname}`);
+      }
+    });
+
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketEditId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    const steps = page.getByTestId("studio-form-steps");
+    await expect(steps).toContainText("Describe the problem");
+    await expect(steps).toContainText("Add details");
+    const canvas = page.getByTestId("studio-form-canvas");
+    await expect(
+      canvas.getByRole("textbox", { name: "* Title", exact: true }),
+    ).toBeVisible();
+
+    await steps.getByText("Add details", { exact: true }).click();
+    await expect(
+      canvas
+        .getByTestId("studio-form-field")
+        .filter({ has: page.getByTestId("studio-condition-mark") })
+        .getByTestId("studio-condition-mark")
+        .first(),
+    ).toContainText("status == 'resolved'");
+    expect(applicationRequests).toEqual([]);
   });
 
   test("an author selects a row action on the canvas and adds a navigate action that maps the record, and no request goes to the application's API", async ({

@@ -1,7 +1,7 @@
 import { apiFetch } from './api'
 import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
-import type { PageMetadata } from './site'
+import type { EntityWidgetMetadata, PageMetadata } from './site'
 
 /** The server did not answer a Studio request, or answered it with 502, 503 or 504. */
 export class ServerUnreachableError extends Error {}
@@ -147,16 +147,18 @@ export interface StudioPageMetadataAnswer {
   diagnostics: StudioDiagnostic[]
 }
 
-/**
- * Asks for the metadata an unsaved page would have, without saving it. Any status other than 200 throws, as does a
- * server that does not answer.
- */
-export async function fetchStudioPageMetadata(
+/** What the draft page metadata route answers for a form: the form widget as the site would serve it, or `null`. */
+export interface StudioFormMetadataAnswer {
+  widget: EntityWidgetMetadata | null
+  diagnostics: StudioDiagnostic[]
+}
+
+async function postDraftMetadata(
   application: string,
   id: string,
   draft: Record<string, unknown>,
   signal?: AbortSignal,
-): Promise<StudioPageMetadataAnswer> {
+): Promise<unknown> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/resources/${encodeURIComponent(id)}/page-metadata`
   const response = await studioFetch(path, {
     method: 'POST',
@@ -167,7 +169,30 @@ export async function fetchStudioPageMetadata(
   if (response.status !== 200) {
     throw new Error(`Posting '${path}' failed with status ${response.status}.`)
   }
-  return (await response.json()) as StudioPageMetadataAnswer
+  return response.json()
+}
+
+/**
+ * Asks for the metadata an unsaved page would have, without saving it. Any status other than 200 throws, as does a
+ * server that does not answer.
+ */
+export async function fetchStudioPageMetadata(
+  application: string,
+  id: string,
+  draft: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<StudioPageMetadataAnswer> {
+  return (await postDraftMetadata(application, id, draft, signal)) as StudioPageMetadataAnswer
+}
+
+/** Asks for the form widget an unsaved form would have, in the same way as {@link fetchStudioPageMetadata}. */
+export async function fetchStudioFormMetadata(
+  application: string,
+  id: string,
+  draft: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<StudioFormMetadataAnswer> {
+  return (await postDraftMetadata(application, id, draft, signal)) as StudioFormMetadataAnswer
 }
 
 /** A compile diagnostic of a Studio folder. `resourceId` is `null` when it belongs to no resource. */

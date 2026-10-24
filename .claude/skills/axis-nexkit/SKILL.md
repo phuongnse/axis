@@ -114,7 +114,7 @@ with the parent's milestone and labels, titled as
 [step 3 of the life of an issue](../../../docs/delivery.md#the-life-of-an-issue)
 says, for example `Connector call steps pass compile checks`, not
 `Call connector step: compile checks and model`. Then add the parts to the
-parent and mark each *blocked by* the parts it needs.
+parent and mark each *blocked by* the parts it needs, as step 4 below says.
 
 ## Writing an issue
 
@@ -130,9 +130,9 @@ The rules are in step 1 of
    fits.
 3. Create it in the current milestone:
    `gh issue create --title "<behaviour>" --milestone "<milestone>" --label "<a>,<b>" --body-file <file>`.
-4. Before the next sweep, mark it *blocked by* every issue it must wait for,
-   or autopilot plans it at once. The milestone's docs sweep is blocked by
-   every other issue of the milestone.
+4. Check it against the milestone's open issues by [the rules](../../../docs/delivery.md#decisions).
+   For each it waits for, add `Depends on #N: <what it uses from #N>` and mark
+   it *blocked by* #N before the next sweep, or autopilot plans it at once.
 
 ## Reviewing a plan
 
