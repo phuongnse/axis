@@ -154,6 +154,7 @@ const pages: Record<string, PageMetadata> = {
             parameters: {},
             record: null,
             opensForm: true,
+            paths: {},
             visibleWhen: null,
           },
         ],

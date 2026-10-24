@@ -608,8 +608,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `visibleWhen`, which works out a larger part of the language, see below.
       A toolbar has no row, so only its literals resolve. A parameter whose
       value is `null` is left out of the query, and a button whose `record` is
-      `null` is hidden. The target page reads its parameters from the URL
-      and binds them.
+      `null` is hidden. The target page reads its parameters from the URL and
+      binds them. A reference path such as `customer.parent.name` is resolved
+      on click: the SPA reads each record along it through the record API,
+      using `paths`. A `null` reference gives `null`. A 403, a 404, a missing
+      field or a failed read opens no page and shows `shell.navigate.failed`.
+      A button whose first name is not in scope or lacks a `paths` entry hides.
     - **`visibleWhen`.** A row action may have a boolean expression over the
       row. The compiler checks it against the row's names, as it checks a
       `navigate` parameter. The SPA works out only part of the language:
@@ -912,7 +916,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `department.name` and `customer` and `customer.parent` for
       `customer.parent.name`, to the record API of that reference's target
       entity, so the SPA never builds it. It is `{}` when the action uses no
-      path. The SPA still hides a button whose expression uses a path. `opensForm` is `true` when the target page holds a
+      path. The SPA resolves a path on click, see **Values**. `opensForm` is `true` when the target page holds a
       form widget, so the SPA opens `/new` without `record`. It follows file
       order. A saved record shows a button for each `navigate` action after
       its `startProcess` buttons, with values from the record as it was

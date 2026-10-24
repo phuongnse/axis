@@ -1,6 +1,7 @@
 {
   "shell.title": "Axis",
   "shell.nav.home": "Home",
+  "shell.navigate.failed": "The page could not be opened.",
   "shell.home.title": "Welcome to Axis",
   "shell.serverStatus.title": "Server status",
   "shell.serverStatus.checking": "Checking",

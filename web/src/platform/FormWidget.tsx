@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { antLocaleFor } from './antLocale'
 import { formStatePath } from './formState'
-import { navigatePath } from './navigateAction'
+import { navigateTarget, type NavigateOpen } from './navigateAction'
 import { buildRecordBody } from './recordBody'
 import { RecordHistory } from './RecordHistory'
 import { newIdempotencyKey, startProcess } from './processes'
@@ -246,6 +246,17 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     }
   }
 
+  // A refused read on the path of an expression opens nothing and shows a message.
+  const runNavigate = async (open: NavigateOpen) => {
+    setFormErrors([])
+    const address = await open()
+    if (address === null) {
+      setFormErrors([t('shell.navigate.failed')])
+    } else {
+      navigate(address, { state: { from: `${location.pathname}${location.search}` } })
+    }
+  }
+
   if (load === 'loading') {
     return null
   }
@@ -312,14 +323,14 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
               widget.actions
                 .filter((action): action is NavigateAction => action.type === 'navigate')
                 .map((action, index) => {
-                  const path = navigatePath(sitePath, action, { id: recordId, values: record.values })
+                  const open = navigateTarget(sitePath, action, { id: recordId, values: record.values })
                   return (
-                    path && (
+                    open && (
                       <Button
                         key={index}
                         htmlType="button"
                         disabled={saving || starting}
-                        onClick={() => navigate(path, { state: { from: `${location.pathname}${location.search}` } })}
+                        onClick={() => void runNavigate(open)}
                       >
                         {t(action.labelKey)}
                       </Button>

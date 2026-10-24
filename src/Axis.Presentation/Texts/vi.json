@@ -1,6 +1,7 @@
 {
   "shell.title": "Axis",
   "shell.nav.home": "Trang chủ",
+  "shell.navigate.failed": "Không thể mở trang.",
   "shell.home.title": "Chào mừng đến với Axis",
   "shell.serverStatus.title": "Trạng thái máy chủ",
   "shell.serverStatus.checking": "Đang kiểm tra",

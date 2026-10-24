@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { navigatePath, navigateValue } from './navigateAction'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { navigatePath, navigateTarget, navigateValue } from './navigateAction'
 import type { NavigateAction } from './site'
 
 const scope = {
@@ -15,6 +15,7 @@ function action(overrides: Partial<NavigateAction> = {}): NavigateAction {
     parameters: {},
     record: null,
     opensForm: false,
+    paths: {},
     visibleWhen: null,
     ...overrides,
   }
@@ -86,5 +87,146 @@ describe('navigatePath', () => {
 
   it('resolves literals without a scope', () => {
     expect(navigatePath('e2e', action({ parameters: { kind: "'open'" } }), null)).toBe('/e2e/ticketdetail?kind=open')
+  })
+})
+
+describe('navigateTarget', () => {
+  const customersPath = '/api/apps/E2eApp/entities/Customer/records'
+  const orderScope = { id: 'order-1', values: { customer: 'c-1', title: 'Hello', missing: null, done: false } }
+  const paths = { customer: customersPath, 'customer.parent': customersPath }
+
+  const customerJson = (id: string, values: Record<string, string | null>) =>
+    JSON.stringify({ id, version: 1, values, labels: {} })
+
+  /** Stubs `fetch` with a handler per URL and returns the requested URLs. */
+  function stubRecords(handler: (url: string) => Response) {
+    const fetchMock = vi.fn(async (input: string) => handler(input))
+    vi.stubGlobal('fetch', fetchMock)
+    return () => fetchMock.mock.calls.map(([url]) => url)
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('reads each record of a two-hop path and puts the value in the query', async () => {
+    const requested = stubRecords((url) =>
+      url === `${customersPath}/c-1`
+        ? new Response(customerJson('c-1', { parent: 'c-2', name: 'Child' }))
+        : new Response(customerJson('c-2', { name: 'Acme' })),
+    )
+    const open = navigateTarget('e2e', action({ parameters: { name: 'customer.parent.name' }, paths }), orderScope)
+
+    expect(await open!()).toBe('/e2e/ticketdetail?name=Acme')
+    expect(requested()).toEqual([`${customersPath}/c-1`, `${customersPath}/c-2`])
+  })
+
+  it('matches the names along a path ignoring case', async () => {
+    stubRecords(() => new Response(customerJson('c-1', { Name: 'Acme' })))
+    const open = navigateTarget('e2e', action({ parameters: { name: 'CUSTOMER.name' }, paths }), orderScope)
+
+    expect(await open!()).toBe('/e2e/ticketdetail?name=Acme')
+  })
+
+  it('uses a path as the record id', async () => {
+    stubRecords(() => new Response(customerJson('c-1', { parent: 'c-2' })))
+    const open = navigateTarget(
+      'e2e',
+      action({ page: 'CustomerForm', opensForm: true, record: 'customer.parent', paths }),
+      orderScope,
+    )
+
+    expect(await open!()).toBe('/e2e/customerform/c-2')
+  })
+
+  it('leaves out a parameter whose reference is null, without a request', async () => {
+    const requested = stubRecords(() => new Response('{}', { status: 500 }))
+    const open = navigateTarget(
+      'e2e',
+      action({ parameters: { name: 'missing.name', title: 'title' }, paths: { missing: customersPath } }),
+      orderScope,
+    )
+
+    expect(await open!()).toBe('/e2e/ticketdetail?title=Hello')
+    expect(requested()).toEqual([])
+  })
+
+  it('leaves out a parameter whose reference is null at a later hop', async () => {
+    stubRecords(() => new Response(customerJson('c-1', { parent: null })))
+    const open = navigateTarget('e2e', action({ parameters: { name: 'customer.parent.name' }, paths }), orderScope)
+
+    expect(await open!()).toBe('/e2e/ticketdetail')
+  })
+
+  it('opens no page when a read is refused, a record is missing or a field is missing', async () => {
+    for (const answer of [
+      () => new Response('{}', { status: 403 }),
+      () => new Response('{}', { status: 404 }),
+      () => new Response('{}', { status: 500 }),
+      () => new Response(customerJson('c-1', { code: 'A' })),
+    ]) {
+      stubRecords(answer)
+      const open = navigateTarget('e2e', action({ parameters: { name: 'customer.name' }, paths }), orderScope)
+
+      expect(await open!()).toBeNull()
+    }
+  })
+
+  it('opens no page when the request fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network')))
+    const open = navigateTarget('e2e', action({ parameters: { name: 'customer.name' }, paths }), orderScope)
+
+    expect(await open!()).toBeNull()
+  })
+
+  it('opens no page when a path used as record ends at null', async () => {
+    stubRecords(() => new Response(customerJson('c-1', { parent: null })))
+    const open = navigateTarget('e2e', action({ record: 'customer.parent', paths }), orderScope)
+
+    expect(await open!()).toBeNull()
+  })
+
+  it('reads a record once when several expressions pass through it', async () => {
+    const requested = stubRecords(() => new Response(customerJson('c-1', { name: 'Acme', code: 'A1' })))
+    const open = navigateTarget(
+      'e2e',
+      action({ parameters: { name: 'customer.name', code: 'customer.code' }, paths }),
+      orderScope,
+    )
+
+    expect(await open!()).toBe('/e2e/ticketdetail?name=Acme&code=A1')
+    expect(requested()).toHaveLength(1)
+  })
+
+  it('hides the button when paths has no entry for a hop', () => {
+    expect(navigateTarget('e2e', action({ parameters: { name: 'customer.name' } }), orderScope)).toBeNull()
+    expect(
+      navigateTarget(
+        'e2e',
+        action({ parameters: { name: 'customer.parent.name' }, paths: { customer: customersPath } }),
+        orderScope,
+      ),
+    ).toBeNull()
+  })
+
+  it('hides the button when the first name is not in the scope, is id, or is not a reference value', () => {
+    const open = (expression: string, scope: typeof orderScope | null = orderScope) =>
+      navigateTarget('e2e', action({ parameters: { name: expression }, paths }), scope)
+
+    expect(open('other.name')).toBeNull()
+    expect(open('id.name')).toBeNull()
+    expect(open('done.name')).toBeNull()
+    expect(open('customer.name', null)).toBeNull()
+  })
+
+  it('hides the button when another expression is unsupported', () => {
+    expect(
+      navigateTarget('e2e', action({ parameters: { name: 'customer.name', a: 'concat(title)' }, paths }), orderScope),
+    ).toBeNull()
+  })
+
+  it('opens an address without a path as navigatePath does, and hides it when it cannot be built', async () => {
+    const open = navigateTarget('e2e', action({ parameters: { title: 'title' } }), orderScope)
+
+    expect(await open!()).toBe('/e2e/ticketdetail?title=Hello')
+    expect(navigateTarget('e2e', action({ record: 'missing' }), orderScope)).toBeNull()
   })
 })
