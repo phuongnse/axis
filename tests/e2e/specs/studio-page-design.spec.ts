@@ -50,12 +50,19 @@ async function dragFrom(
  * starts the drag, then steps reach the point, both measured after the designer is scrolled to the top.
  */
 async function dragField(page: Page, name: string, target: Locator) {
+  await dragPointer(
+    page,
+    page.getByTestId(`studio-form-palette-${name}`),
+    target,
+  );
+}
+
+/** Drags `source` with the mouse to the middle of `target`: a small move starts the drag, then steps reach the point. */
+async function dragPointer(page: Page, source: Locator, target: Locator) {
   await page
     .getByTestId("studio-form-design")
     .evaluate((element) => element.scrollIntoView({ block: "start" }));
-  const from = (await page
-    .getByTestId(`studio-form-palette-${name}`)
-    .boundingBox())!;
+  const from = (await source.boundingBox())!;
   const to = (await target.boundingBox())!;
   const startX = from.x + from.width / 2;
   const startY = from.y + from.height / 2;
@@ -432,6 +439,98 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     const json = page.getByRole("textbox", { name: "JSON", exact: true });
     const draft = JSON.parse(await json.inputValue());
     expect(draft.sections[1].fields.at(-1)).toEqual({ field: "resolution" });
+  });
+
+  test("an author drags the triage form's number field onto the category field by pointer, and one undo restores both sections", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketTriageId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    const row = (path: string) =>
+      page.locator(`[data-testid="studio-outline-field"][data-path="${path}"]`);
+    await expect(row("/sections/1/fields/0")).toBeVisible();
+    await dragPointer(
+      page,
+      row("/sections/0/fields/0"),
+      row("/sections/1/fields/0"),
+    );
+
+    await expect(row("/sections/1/fields/0")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    await expect(
+      page.getByTestId("studio-form-palette-announcement"),
+    ).toContainText("Moved number · Section 2 · position 1");
+
+    const fieldsOf = async () => {
+      await page.getByRole("tab", { name: "JSON", exact: true }).click();
+      const json = page.getByRole("textbox", { name: "JSON", exact: true });
+      const draft = JSON.parse(await json.inputValue());
+      return draft.sections.map((section: { fields: { field: string }[] }) =>
+        section.fields.map((field) => field.field),
+      );
+    };
+    const original = [
+      ["number", "title", "description", "requester", "status"],
+      ["category", "priority", "assignedAgent"],
+    ];
+    expect(await fieldsOf()).toEqual([
+      ["title", "description", "requester", "status"],
+      ["number", "category", "priority", "assignedAgent"],
+    ]);
+    const json = page.getByRole("textbox", { name: "JSON", exact: true });
+    expect(JSON.parse(await json.inputValue()).sections[1].fields[0]).toEqual({
+      field: "number",
+      readOnly: true,
+    });
+
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    expect(await fieldsOf()).toEqual(original);
+  });
+
+  test("an author moves the triage form's status field to the second section with the keyboard, and the live region says where it landed", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketTriageId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    const status = page.locator(
+      '[data-testid="studio-outline-field"][data-path="/sections/0/fields/4"]',
+    );
+    await expect(status).toContainText("status");
+    await status.focus();
+    await page.keyboard.press("Space");
+    await page.keyboard.press("ArrowDown");
+    // The first field of the second section, not the section row, is the target: it shows the drop outline.
+    await expect(
+      page.locator(
+        '[data-testid="studio-outline-field"][data-path="/sections/1/fields/0"]',
+      ),
+    ).toHaveCSS("outline-width", "2px");
+    await page.keyboard.press("Space");
+
+    await expect(
+      page.getByTestId("studio-form-palette-announcement"),
+    ).toContainText("Moved status · Section 2 · position 1");
+
+    await page.getByRole("tab", { name: "JSON", exact: true }).click();
+    const json = page.getByRole("textbox", { name: "JSON", exact: true });
+    const draft = JSON.parse(await json.inputValue());
+    expect(draft.sections[1].fields[0]).toEqual({
+      field: "status",
+      readOnly: true,
+    });
+    expect(draft.sections[0].fields).toHaveLength(4);
   });
 
   test("an author selects a row action on the canvas and adds a navigate action that maps the record, and no request goes to the application's API", async ({

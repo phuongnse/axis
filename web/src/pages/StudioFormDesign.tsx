@@ -1,12 +1,21 @@
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { Button, Flex } from 'antd'
 import { useState } from 'react'
-import { dropPlace } from '../platform/formLayout'
+import { dropPlace, movePlace, type FieldPlace } from '../platform/formLayout'
 import { useText } from '../platform/texts'
-import { innermostCollision, silent } from './designDrag'
+import { outlineCollision, silent } from './designDrag'
 import { FormOutline } from './FormOutline'
 import { FormPalette } from './FormPalette'
-import { insertField } from './formPaletteSupport'
+import { insertField, moveFieldTo } from './formPaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 import { StudioFormCanvas } from './StudioFormCanvas'
 import { type FormUse, StudioFormUsedOn } from './StudioFormUsedOn'
@@ -16,7 +25,9 @@ import type { OpenResource } from './StudioReferences'
  * The Design tab of a form: the list of its uses, the canvas, and beside the canvas the field palette, the layout
  * outline and the properties. A palette field that is dragged with the pointer onto a section or a field of the
  * outline is inserted there: at the end of the section, or after the field. The innermost target wins, and the new
- * field is selected. The live region names the field, its section and its position. The canvas, the palette, the
+ * field is selected. A field row of the outline moves by pointer drag onto another field row or an empty section, or by
+ * Space, the arrow keys and Space, and takes the place of the field it is dropped on. Escape cancels a move. The moved
+ * field stays selected. For both, the live region names the field, its section and its position. The canvas, the palette, the
  * outline and the drag library are one lazy chunk, which loads when the tab opens.
  */
 export default function StudioFormDesign({
@@ -42,13 +53,30 @@ export default function StudioFormDesign({
   const t = useText()
   const [announcement, setAnnouncement] = useState('')
   const [dragging, setDragging] = useState<string>()
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: { start: ['Space'], cancel: ['Escape'], end: ['Space'] },
+    }),
+  )
 
   function drop({ active, over }: DragEndEvent) {
     setDragging(undefined)
-    const field = (active.data.current as { field?: unknown } | undefined)?.field
+    const data = active.data.current as { field?: unknown; move?: FieldPlace } | undefined
     const pointer = (over?.data.current as { pointer?: unknown } | undefined)?.pointer
-    if (typeof field !== 'string' || typeof pointer !== 'string') {
+    if (typeof pointer !== 'string') {
+      return
+    }
+    if (data?.move !== undefined) {
+      const to = movePlace(draft, pointer)
+      if (to !== undefined) {
+        moveFieldTo(t, draft, data.move, to, onChange, onSelect, setAnnouncement)
+      }
+      return
+    }
+    const field = data?.field
+    if (typeof field !== 'string') {
       return
     }
     const place = dropPlace(draft, pointer)
@@ -60,9 +88,12 @@ export default function StudioFormDesign({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={innermostCollision}
+      collisionDetection={outlineCollision}
       accessibility={{ announcements: silent }}
-      onDragStart={({ active }) => setDragging(String((active.data.current as { field?: unknown })?.field ?? ''))}
+      onDragStart={({ active }) => {
+        const data = active.data.current as { field?: unknown; label?: unknown } | undefined
+        setDragging(String(data?.field ?? data?.label ?? ''))
+      }}
       onDragCancel={() => setDragging(undefined)}
       onDragEnd={drop}
     >

@@ -1,4 +1,4 @@
-import { pointerWithin, type CollisionDetection } from '@dnd-kit/core'
+import { closestCorners, pointerWithin, type CollisionDetection } from '@dnd-kit/core'
 import { innermostPointer } from '../platform/pageWidgets'
 
 /** The pointer of the draft that a droppable stands for. */
@@ -15,6 +15,10 @@ export const innermostCollision: CollisionDetection = (args) => {
   )
   return collisions.filter((collision) => pointerOf(collision.data?.droppableContainer.data.current) === wanted)
 }
+
+/** The innermost droppable under the pointer, or the closest ones for a keyboard drag, which has no pointer. */
+export const outlineCollision: CollisionDetection = (args) =>
+  args.pointerCoordinates === null ? closestCorners(args) : innermostCollision(args)
 
 /** What a drag of the library says aloud by itself is off: the palette's live region is the only voice. */
 export const silent = {

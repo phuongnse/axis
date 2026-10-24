@@ -1,6 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import { Button, Flex, Typography } from 'antd'
-import { useContext } from 'react'
+import { useContext, type PointerEventHandler } from 'react'
 import { addSection, addStep, insertionPlace, paletteFields } from '../platform/formLayout'
 import type { LayoutAdd } from '../platform/formLayout'
 import type { StudioNameField } from '../platform/studio'
@@ -94,8 +94,9 @@ export function FormPalette({
 }
 
 /**
- * One field of the palette: a button that inserts it, with its type beside the name. Only the library's listeners are
- * on the button, not its attributes, so the button keeps its own role.
+ * One field of the palette: a button that inserts it, with its type beside the name. Only the library's pointer listener
+ * is on the button, not its attributes or its keyboard listener, so the button keeps its own role and Enter or Space
+ * inserts the field.
  */
 function PaletteField({
   field,
@@ -114,7 +115,7 @@ function PaletteField({
   return (
     <Button
       ref={setNodeRef}
-      {...listeners}
+      onPointerDown={listeners?.onPointerDown as PointerEventHandler<HTMLElement> | undefined}
       disabled={disabled}
       data-testid={`studio-form-palette-${field.name}`}
       onClick={onInsert}
