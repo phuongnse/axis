@@ -10,8 +10,13 @@
       "fields": [
         { "field": "amount", "readOnly": true },
         { "field": "comment", "requiredWhen": "amount > 100" },
-        { "field": "divisor", "visibleWhen": "amount > 1000", "requiredWhen": "amount > 100" }
+        { "field": "divisor", "visibleWhen": "amount > 1000", "requiredWhen": "amount > 100", "readOnlyWhen": "comment == 'final'" }
       ]
+    },
+    {
+      "title": { "textKey": "requestSettlement.extra" },
+      "visibleWhen": "amount > 5000",
+      "fields": [{ "field": "status" }]
     }
   ]
 }

@@ -594,8 +594,8 @@ fields depending on the record, and can split its sections into wizard steps
 The schema, the compile checks, the compiled model, the page and task metadata and the
 evaluation through the [form state endpoint](record-api.md#form-state) and the
 [task form state route](task-api.md#form-state-of-a-task) are built.
-The server enforces `requiredWhen` on write. Refusing a value for a hidden or `readOnlyWhen`
-field stays *(planned for M13)*.
+The server enforces `requiredWhen` on write. On task completion it also refuses a value for a
+hidden or `readOnlyWhen` field.
 
 - **Conditions.** A field entry may have `visibleWhen`, `requiredWhen` and
   `readOnlyWhen`. A section may have `visibleWhen`. Each is a boolean
@@ -621,8 +621,8 @@ field stays *(planned for M13)*.
   own.
 - **On write.** The record API enforces `requiredWhen` only when the write
   names the form in `?form=`. It never enforces `readOnlyWhen`. The task API
-  enforces `requiredWhen` on every completion, and *(planned for M13)* it
-  enforces `readOnlyWhen` and hidden fields too. See
+  enforces `requiredWhen` on every completion, and it refuses a value for a
+  `readOnlyWhen` or hidden field too. See
   [the record API](record-api.md#create-update-and-delete) and
   [the task API](task-api.md#task-api-errors).
 - **Steps.** `steps` is an optional list on the form. Each step has a `title`
