@@ -19,6 +19,8 @@ public sealed class NavigateActionCompilerTests
 
     private const string CodeParameter = """{ "name": "code", "type": "text", "required": true }""";
 
+    private const string IntegerParameter = """{ "name": "code", "type": "integer", "required": true }""";
+
     private const string DetailId = "55555555-5555-4555-8555-555555555554";
 
     private const string OrdersFile = "pages/orders.json";
@@ -468,10 +470,177 @@ public sealed class NavigateActionCompilerTests
         Assert.All(result.Diagnostics, diagnostic => Assert.Equal(OrdersFile, diagnostic.File));
     }
 
+    [Fact]
+    public void Row_action_passing_a_path_to_a_text_parameter_compiles_and_keeps_the_path()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.name" } } ]"""), CodeParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets);
+        var action = Assert.IsType<NavigateActionModel>(Assert.Single(widget.RowActions));
+        Assert.Equal(["customer.name"], action.Paths);
+    }
+
+    [Fact]
+    public void Form_action_passing_a_path_to_a_text_parameter_compiles_and_keeps_the_path()
+    {
+        using var folder = Folder(
+            """{ "type": "form", "entity": "Order", "actions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.name" } } ] }""",
+            CodeParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Equal(["customer.name"], Assert.IsType<NavigateActionModel>(Assert.Single(widget.Actions)).Paths);
+    }
+
+    [Fact]
+    public void Detail_action_passing_a_path_compiles_and_keeps_the_path()
+    {
+        const string Widget = """{ "type": "detail", "entity": "Order", "record": "order", "actions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.parent.name" } } ] }""";
+        using var folder = Folder(Widget, CodeParameter)
+            .With(OrdersFile, Page("Orders", Widget, "55555555-5555-4555-8555-555555555551", "orders.title", OrderParameter));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Equal(["customer.parent.name"], Assert.IsType<NavigateActionModel>(Assert.Single(widget.Actions)).Paths);
+    }
+
+    [Fact]
+    public void Path_passed_to_an_integer_parameter_is_reported_at_the_parameter()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.name" } } ]"""), IntegerParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.ResultTypeMismatch, OrdersFile, "/widgets/0/rowActions/0/parameters/code"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Path_to_an_unknown_field_is_reported_at_the_parameter()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.missing" } } ]"""), CodeParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UnknownName, OrdersFile, "/widgets/0/rowActions/0/parameters/code"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Path_of_four_hops_is_reported_at_the_parameter()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.parent.parent.parent.name" } } ]"""), CodeParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.TooManyHops, OrdersFile, "/widgets/0/rowActions/0/parameters/code"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Path_in_a_record_expression_is_checked_against_the_form_entity()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "order.open" }, "record": "customer.missing" } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UnknownName, OrdersFile, "/widgets/0/rowActions/0/record"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Path_cannot_start_at_the_id()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "id.number" } } ]"""), CodeParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.TypeMismatch, OrdersFile, "/widgets/0/rowActions/0/parameters/code"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Path_in_a_visibleWhen_is_reported_at_the_visibleWhen()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "customer.name == 'a'" } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UnknownName, OrdersFile, "/widgets/0/rowActions/0/visibleWhen"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Path_on_a_table_over_a_data_source_is_reported_at_the_parameter()
+    {
+        using var folder = Folder(
+                """{ "type": "table", "dataSource": "OrderNumbers", "rowActions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "label.name" } } ] }""",
+                CodeParameter)
+            .With("data-sources/order-numbers.json", OrderNumbers);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UnknownName, OrdersFile, "/widgets/0/rowActions/0/parameters/code"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Paths_of_a_compiled_action_keep_the_declared_case_and_have_no_duplicates()
+    {
+        using var folder = Folder(
+            Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "CUSTOMER.Name", "other": "customer.name" } } ]"""),
+            CodeParameter)
+            .With("pages/detail.json", Page("Detail", """{ "type": "table", "entity": "Order" }""", DetailId, "detail.title", CodeParameter + """, { "name": "other", "type": "text" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Equal(["customer.name"], Assert.IsType<NavigateActionModel>(Assert.Single(widget.RowActions)).Paths);
+    }
+
+    [Fact]
+    public void Action_without_a_path_has_no_paths()
+    {
+        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Empty(Assert.IsType<NavigateActionModel>(Assert.Single(widget.RowActions)).Paths);
+    }
+
     // A reference parameter needs a target with a display field.
     private const string OrderEntity = """
         { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1, "displayField": "number",
-          "fields": [ { "name": "number", "type": "text", "required": true }, { "name": "quantity", "type": "integer" } ] }
+          "fields": [ { "name": "number", "type": "text", "required": true }, { "name": "quantity", "type": "integer" },
+                      { "name": "customer", "type": "reference", "target": "Customer" } ] }
+        """;
+
+    private const string CustomerEntity = """
+        { "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "Customer", "formatVersion": 1, "displayField": "name",
+          "fields": [ { "name": "name", "type": "text", "required": true }, { "name": "parent", "type": "reference", "target": "Customer" } ] }
         """;
 
     private const string OrderNumbers = """
@@ -489,6 +658,7 @@ public sealed class NavigateActionCompilerTests
         PresentationCompilerTests.Folder()
             .With("texts/en.json", TextsEn)
             .With("entities/order.json", OrderEntity)
+            .With("entities/customer.json", CustomerEntity)
             .With(OrdersFile, Page("Orders", widget))
             .With("pages/detail.json", Page("Detail", """{ "type": "table", "entity": "Order" }""", DetailId, "detail.title", parameter));
 }

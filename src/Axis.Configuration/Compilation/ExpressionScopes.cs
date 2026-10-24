@@ -18,10 +18,11 @@ namespace Axis.Configuration.Compilation;
 /// data source scope adds the data source's parameters after the fields, has the named
 /// rules it is given, and resolves paths through reference fields to the target entity's fields. A
 /// process scope resolves paths the same way, and a data change trigger's <c>when</c> uses the process
-/// scope. No other scope resolves paths. A rule call qualified with a module id is allowed only
-/// where the scope is given the application's <c>modules</c>. A navigate action's parameter sees
-/// <c>id</c>, as a reference to the root entity, and the names of the row or record. It has no
-/// rules, no collections and resolves no paths.
+/// scope. A navigate action's scope resolves paths when it is given <c>findEntity</c>. No other scope
+/// resolves paths. A rule call qualified with a module id is allowed only where the scope is given
+/// the application's <c>modules</c>. A navigate action's parameter sees <c>id</c>, as a reference
+/// parameter to the root entity, so a path cannot start at it, and the names of the row or record.
+/// It has no rules and no collections.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -184,13 +185,21 @@ public static class ExpressionScopes
             collections: null,
             referenceFields: null);
 
-    /// <summary>The scope of a navigate action's parameter: <c>id</c> as a reference to the root entity, when there is a row or record, then the given names. No rules, collections or paths.</summary>
-    internal static ExpressionScope ForNavigate(string? rootEntity, IEnumerable<(string Name, ExpressionType? Type)> names) =>
+    /// <summary>
+    /// The scope of a navigate action's parameter: <c>id</c> as a reference parameter to the root
+    /// entity, when there is a row or record, then the given names. No rules or collections. A path
+    /// through a reference field resolves when <paramref name="findEntity"/> is given, but never
+    /// starts at <c>id</c>.
+    /// </summary>
+    internal static ExpressionScope ForNavigate(
+        string? rootEntity,
+        IEnumerable<(string Name, ExpressionType? Type)> names,
+        Func<string, EntityResource?>? findEntity = null) =>
         Build(
-            [.. rootEntity is null ? [] : new[] { ("id", (ExpressionType?)ExpressionType.Reference(rootEntity)) }, .. names],
+            [.. rootEntity is null ? [] : new[] { ("id", (ExpressionType?)ExpressionType.ReferenceParameter(rootEntity)) }, .. names],
             rules: null,
             collections: null,
-            referenceFields: null);
+            referenceFields: findEntity is null ? null : ReferenceFieldsOf(findEntity));
 
     /// <summary>The expression type of a field's value, or null for a child collection.</summary>
     public static ExpressionType? TypeOf(FieldModel field)

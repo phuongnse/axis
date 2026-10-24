@@ -125,7 +125,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       "measure": "openCount",
       "labelKey": "dashboard.open.label",
       "comparison": { "measure": "urgentCount", "labelKey": "dashboard.urgent.label" },
-      "navigate": { "type": "navigate", "page": "AllTickets", "labelKey": "dashboard.open.show", "parameters": {}, "record": null, "opensForm": false, "visibleWhen": null }
+      "navigate": { "type": "navigate", "page": "AllTickets", "labelKey": "dashboard.open.show", "parameters": {}, "record": null, "opensForm": false, "paths": {}, "visibleWhen": null }
     }
     ```
 

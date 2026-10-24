@@ -8,7 +8,10 @@ link. This settles the navigation point of
 type checks and their `field target` edge in the reference index. The navigate actions are
 checked by the compiler, with their `navigate page` edge, their `record` and the form page
 rule. Page metadata lists them with their `parameters` and `record`, gives each page its
-`parameters`, and leaves out the actions to pages the user cannot read. The SPA buttons are
+`parameters`, and leaves out the actions to pages the user cannot read. The compiler resolves
+reference paths such as `department.name` in the parameters and `record` of an action on a table
+over an entity, a form and a detail. Page metadata gives each action a `paths` map, and leaves out
+an action whose path the user may not read. The SPA buttons are
 built on table rows, the table toolbar and saved forms, and put the values in the URL query.
 `formPage` is removed from the schema, the compiler, page metadata, the SPA and Studio, and the
 samples, the template, the scenarios and the test fixtures use navigate actions. The
@@ -36,6 +39,12 @@ confirmed these points on issue #931 on 2026-10-21.
   - On a table row, the expression sees the row's columns or the record's
     fields as bare names, plus `id`. On a form it sees the record. `id` is the
     id of the root record, typed as a reference to the root entity.
+  - An expression may use a reference path of up to 3 hops, such as
+    `department.name`, on a table over an entity, a form and a detail, but not
+    in `visibleWhen` or on a table over a data source, and not from `id`. Page
+    metadata maps each reference along a path to the record API of its target
+    in `paths`, and leaves the action out when the user may not read a field or
+    entity along the path.
 - **Form pages:** a page whose widget is a form declares no parameters. A
   navigate action to it may set `record`, a reference to the form's entity.
   With `record` it opens `/{page}/{id}`. Without it, it opens `/{page}/new`.

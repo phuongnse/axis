@@ -207,11 +207,14 @@ flowchart LR
      - each parameter value is an expression, checked against the target
        parameter's type. A parse error, an unknown name or a wrong type is
        reported with the expression's own code at `/parameters/{name}`,
-     - on a form, or a table over an entity, the expression sees the record's
-       fields plus `id`. On a table over a data source it sees the projected
-       columns plus `id`. `id` is a reference to the root entity. In
-       `toolbarActions` it sees no names, because a toolbar has no row. It
-       resolves bare names only, with no paths, rules or aggregates,
+     - on a form, a detail, or a table over an entity, the expression sees the
+       record's fields plus `id`. On a table over a data source it sees the
+       projected columns plus `id`. `id` is a reference to the root entity. In
+       `toolbarActions` it sees no names, because a toolbar has no row. It has
+       no rules or aggregates. On a form, a detail and a table over an entity
+       it resolves paths such as `department.name` of up to 3 hops (`AXC0046`
+       for an unknown field, `AXC0058` for 4 hops), but never from `id`. On a
+       table over a data source it resolves bare names only,
      - `rowActions` on a table over a grouped data source, and `rowActions` or
        `toolbarActions` on a `form`, `taskInbox` or `processInspector` widget,
        are `AXC0060` at that property. `rowActions` accepts `navigate` and

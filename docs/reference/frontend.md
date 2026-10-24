@@ -151,10 +151,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         "instancesPath": null,
         "actions": [],
         "rowActions": [
-          { "type": "navigate", "page": "ItemForm", "labelKey": "items.open", "parameters": {}, "record": "id", "opensForm": true, "visibleWhen": null }
+          { "type": "navigate", "page": "ItemForm", "labelKey": "items.open", "parameters": {}, "record": "id", "opensForm": true, "paths": {}, "visibleWhen": null }
         ],
         "toolbarActions": [
-          { "type": "navigate", "page": "ItemForm", "labelKey": "items.new", "parameters": {}, "record": null, "opensForm": true, "visibleWhen": null }
+          { "type": "navigate", "page": "ItemForm", "labelKey": "items.new", "parameters": {}, "record": null, "opensForm": true, "paths": {}, "visibleWhen": null }
         ],
         "parameters": {},
         "access": {
@@ -342,7 +342,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       the user has no `delete` grant on the table's entity, or on the data
       source's root entity, which is what `access.actions` lacks. A `navigate` action whose target
       page the user cannot read is left out too. A
-      `kpi`'s `navigate` to such a page is `null`.
+      `kpi`'s `navigate` to such a page is `null`. A `navigate` action whose
+      parameters or `record` use a path is also left out when the user may
+      not read a field along the path, the first field on the widget's
+      entity included, or the entity that field belongs to. This is the
+      data source field check applied to a path.
     - **Access.** Every `table`, `form` and `detail` widget gets an `access`
       object.
       It says which entity actions the user may take, and which fields each
@@ -559,7 +563,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     [D59](../decisions/d59-table-row-and-toolbar-actions.md). Page metadata
     lists the `navigate` actions in `rowActions` and `toolbarActions`,
     without those to pages the user cannot read, each with its `parameters`,
-    `record` and `opensForm`. It lists a `startProcess` in `rowActions` only
+    `record`, `opensForm` and `paths`. It lists a `startProcess` in `rowActions` only
     with a `start` grant on its process. The `navigate` and `startProcess`
     buttons, the `visibleWhen` condition, the delete button and the phone menu
     are built.
@@ -898,11 +902,17 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
       so the SPA never builds it itself. A `navigate` action is
-      `{ "type": "navigate", "page", "labelKey", "parameters", "record", "opensForm", "visibleWhen" }`, with
+      `{ "type": "navigate", "page", "labelKey", "parameters", "record", "opensForm", "paths", "visibleWhen" }`, with
       the target page's declared name. `parameters` maps each parameter name,
       as the target page declares it, to its expression, or is `{}`. `record`
       is the expression of the record id, or `null`. The expressions go to the
-      browser as written. `opensForm` is `true` when the target page holds a
+      browser as written. They may use a reference path such as
+      `department.name`. `paths` maps each reference along such a path, by its
+      declared field names up to that reference, such as `department` for
+      `department.name` and `customer` and `customer.parent` for
+      `customer.parent.name`, to the record API of that reference's target
+      entity, so the SPA never builds it. It is `{}` when the action uses no
+      path. The SPA still hides a button whose expression uses a path. `opensForm` is `true` when the target page holds a
       form widget, so the SPA opens `/new` without `record`. It follows file
       order. A saved record shows a button for each `navigate` action after
       its `startProcess` buttons, with values from the record as it was

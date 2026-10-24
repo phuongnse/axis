@@ -30,6 +30,7 @@ internal static class PageAccess
     /// <paramref name="roles"/> may not read, and without the columns, tabs and containers that leave empty. The widgets
     /// that remain have only the fields the roles may read, the <c>startProcess</c> actions they may start, the
     /// <c>delete</c> actions they hold a <c>delete</c> grant for, the <c>navigate</c> actions, and the <c>navigate</c> of a kpi, to pages they may read and the access they hold.
+    /// A <c>navigate</c> action whose paths pass a field the roles may not read, or an entity they may not read, is left out too.
     /// </summary>
     public static PageMetadata Shape(ApplicationModel application, IReadOnlyList<string> roles, PageModel page, PageMetadata metadata) =>
         metadata with { Widgets = ShapeAll(application, roles, page.Widgets, metadata.Widgets) };
@@ -88,12 +89,54 @@ internal static class PageAccess
         {
             Entity = readable is null ? described.Entity : Readable(described.Entity, readable),
             Form = readable is null || described.Form is null ? described.Form : ApplicationSites.Readable(described.Form, readable),
-            Actions = [.. described.Actions.Where(action => Allows(application, roles, entity, action))],
-            RowActions = [.. described.RowActions.Where(action => Allows(application, roles, entity, action))],
-            ToolbarActions = [.. described.ToolbarActions.Where(action => Allows(application, roles, entity, action))],
+            Actions = ShapeActions(application, roles, entity, described.Actions, widget.Actions),
+            RowActions = ShapeActions(application, roles, entity, described.RowActions, widget.RowActions),
+            ToolbarActions = ShapeActions(application, roles, entity, described.ToolbarActions, widget.ToolbarActions),
             Access = widget.Type is WidgetType.Kpi or WidgetType.Chart || entity is null ? null : Access(application, roles, entity),
             Kpi = described.Kpi is { Navigate: { } navigate } kpi && !Allows(application, roles, null, navigate) ? kpi with { Navigate = null } : described.Kpi,
         };
+    }
+
+    // The model and the metadata hold the same actions, so their lists pair up by index. A navigate
+    // action is also left out when the roles may not read a field along one of its paths.
+    private static List<ActionMetadata> ShapeActions(
+        ApplicationModel application,
+        IReadOnlyList<string> roles,
+        EntityModel? entity,
+        IReadOnlyList<ActionMetadata> described,
+        IReadOnlyList<WidgetActionModel> actions) =>
+        [.. described
+            .Zip(actions)
+            .Where(pair => Allows(application, roles, entity, pair.First)
+                && (pair.Second is not NavigateActionModel navigate || ReadsPaths(application, roles, entity, navigate)))
+            .Select(pair => pair.First)];
+
+    // Every field along each path must be readable on the entity it belongs to, the first field on
+    // the widget's entity included, the same check as for a data source's fields. An entity with no
+    // read grant has an empty set, so no field of it is readable.
+    private static bool ReadsPaths(ApplicationModel application, IReadOnlyList<string> roles, EntityModel? entity, NavigateActionModel navigate)
+    {
+        foreach (var path in navigate.Paths)
+        {
+            var current = entity;
+            foreach (var name in path.Split('.'))
+            {
+                // The compiler resolves every path, so the lookups always succeed.
+                if (current is null)
+                {
+                    return false;
+                }
+
+                if (PolicyEvaluator.Fields(application, roles, current, PolicyAction.Read) is { } readable && !readable.Contains(name))
+                {
+                    return false;
+                }
+
+                current = current.TryGetField(name, out var field) && field.Target is { } target ? application.FindEntity(target.Id) : null;
+            }
+        }
+
+        return true;
     }
 
     private static bool Allows(ApplicationModel application, IReadOnlyList<string> roles, EntityModel? entity, ActionMetadata action) =>

@@ -1672,10 +1672,11 @@ public static class ApplicationCompiler
         List<WidgetModel> BuildWidgets(IReadOnlyList<WidgetDefinition> widgets) => [.. widgets.Select(BuildWidget)];
 
         // The checker has resolved every process and page an action names, so the lookups always succeed.
-        IReadOnlyList<WidgetActionModel> BuildActions(IReadOnlyList<WidgetActionDefinition>? actions) =>
-            actions is null || actions.Count == 0 ? [] : [.. actions.Select(BuildAction)];
+        // A navigate action reads paths from the entity of its widget, which is null over a data source, and for a toolbar and a kpi.
+        IReadOnlyList<WidgetActionModel> BuildActions(IReadOnlyList<WidgetActionDefinition>? actions, EntityResource? root) =>
+            actions is null || actions.Count == 0 ? [] : [.. actions.Select(action => BuildAction(action, root))];
 
-        WidgetActionModel BuildAction(WidgetActionDefinition action)
+        WidgetActionModel BuildAction(WidgetActionDefinition action, EntityResource? root)
         {
             if (action.Type == "delete")
             {
@@ -1699,9 +1700,15 @@ public static class ApplicationCompiler
                 : action.Parameters.ToDictionary(
                     pair => target.Parameters.First(parameter => string.Equals(parameter.Name, pair.Key, StringComparison.OrdinalIgnoreCase)).Name,
                     pair => pair.Value);
+            var paths = root is null
+                ? NavigateActionModel.NoPaths
+                : (IReadOnlyList<string>)[.. (action.Parameters?.Values ?? []).Concat(action.Record is null ? [] : [action.Record])
+                    .SelectMany(expression => NavigatePaths.Of(expression, root, entitiesByName.GetValueOrDefault))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)];
             return new NavigateActionModel(PageReferenceTo(target), action.Label)
             {
                 Parameters = parameters,
+                Paths = paths.Count == 0 ? NavigateActionModel.NoPaths : paths,
                 Record = action.Record,
                 VisibleWhen = action.VisibleWhen,
             };
@@ -1762,9 +1769,9 @@ public static class ApplicationCompiler
             {
                 // Each action is named as its process or page declares it. A widget without
                 // actions keeps the shared empty list, so equal widgets stay equal.
-                Actions = BuildActions(widget.Actions),
-                RowActions = BuildActions(widget.RowActions),
-                ToolbarActions = BuildActions(widget.ToolbarActions),
+                Actions = BuildActions(widget.Actions, entity),
+                RowActions = BuildActions(widget.RowActions, entity),
+                ToolbarActions = BuildActions(widget.ToolbarActions, null),
                 Parameters = BuildParameters(widget),
                 Kpi = BuildKpi(widget, dataSource),
                 Chart = BuildChart(widget, dataSource),
@@ -1795,7 +1802,7 @@ public static class ApplicationCompiler
                 Declared(widget.Measure),
                 widget.Label!,
                 widget.Comparison is { } comparison ? new KpiComparisonModel(Declared(comparison.Measure), comparison.Label) : null,
-                widget.Navigate is { } navigate ? (NavigateActionModel)BuildAction(navigate) : null);
+                widget.Navigate is { } navigate ? (NavigateActionModel)BuildAction(navigate, null) : null);
         }
 
         // The checker has matched the category and each measure to the data source's, ignoring letter case. The model

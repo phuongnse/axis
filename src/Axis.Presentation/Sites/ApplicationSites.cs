@@ -83,6 +83,7 @@ public static class ApplicationSites
     private static WidgetMetadata Leaf(ApplicationModel application, WidgetModel widget)
     {
         // A delete row action carries the records path of the table's entity, or of its data source's root entity.
+        // A navigate action reads its paths from that entity too.
         var rowEntity = WidgetEntity(application, widget);
         return new(
             WidgetTypes.Name(widget.Type),
@@ -92,7 +93,7 @@ public static class ApplicationSites
             widget.Type == WidgetType.TaskInbox ? $"/api/apps/{application.Manifest.Name}/tasks" : null,
             widget.Process?.Name,
             widget.Process is { } process ? $"/api/apps/{application.Manifest.Name}/processes/{process.Name}/instances" : null,
-            [.. widget.Actions.Select(action => Action(application, action, null))],
+            [.. widget.Actions.Select(action => Action(application, action, rowEntity))],
             [.. widget.RowActions.Select(action => Action(application, action, rowEntity))],
             [.. widget.ToolbarActions.Select(action => Action(application, action, null))],
             widget.Parameters,
@@ -137,12 +138,47 @@ public static class ApplicationSites
                 navigate.Label.TextKey,
                 navigate.Parameters,
                 navigate.Record,
-                application.Pages.First(page => page.Name == navigate.Page.Name).Leaves().Any(leaf => leaf.Type == WidgetType.Form))
+                application.Pages.First(page => page.Name == navigate.Page.Name).Leaves().Any(leaf => leaf.Type == WidgetType.Form),
+                PathRecords(application, navigate, entity))
             {
                 VisibleWhen = navigate.VisibleWhen,
             },
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
         };
+
+    /// <summary>
+    /// The record API of each reference along the paths of a navigate action, by the dotted declared
+    /// names up to the reference, such as <c>customer</c> and <c>customer.parent</c>. Empty when the
+    /// action uses no path.
+    /// </summary>
+    private static Dictionary<string, string> PathRecords(ApplicationModel application, NavigateActionModel navigate, EntityModel? entity)
+    {
+        var records = new Dictionary<string, string>();
+        if (entity is null)
+        {
+            return records;
+        }
+
+        foreach (var path in navigate.Paths)
+        {
+            // The compiler resolves every path, so the lookups always succeed.
+            var names = path.Split('.');
+            var current = entity;
+            for (var index = 0; index < names.Length - 1; index++)
+            {
+                if (!current.TryGetField(names[index], out var field) || field.Target is not { } target
+                    || application.FindEntity(target.Id) is not { } next)
+                {
+                    break;
+                }
+
+                records[string.Join('.', names[..(index + 1)])] = RecordsPath(application, next.Name);
+                current = next;
+            }
+        }
+
+        return records;
+    }
 
     /// <summary>
     /// The entity a table or form widget is about: its own entity, or the root entity of its data

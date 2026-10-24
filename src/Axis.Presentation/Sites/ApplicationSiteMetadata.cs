@@ -211,12 +211,14 @@ public sealed record StartProcessActionMetadata(string Process, string LabelKey,
 /// <param name="Parameters">The expression of each target page parameter the action gives, by the name the target declares. Empty when it gives none.</param>
 /// <param name="Record">The expression of the record id a form page opens, or null.</param>
 /// <param name="OpensForm">Whether the target page holds a form widget.</param>
+/// <param name="Paths">The record API path of the target entity of each reference along a path the expressions read, by the declared names up to that reference, such as <c>department</c> for <c>department.name</c>. Empty when the action uses no path.</param>
 public sealed record NavigateActionMetadata(
     string Page,
     string LabelKey,
     IReadOnlyDictionary<string, string> Parameters,
     string? Record,
-    bool OpensForm) : ActionMetadata
+    bool OpensForm,
+    IReadOnlyDictionary<string, string> Paths) : ActionMetadata
 {
     [JsonPropertyOrder(-1)]
     public override string Type { get; init; } = "navigate";

@@ -1,0 +1,9 @@
+{
+  "id": "abd5879b-8fa6-47db-8f83-bf4c14e83d1c",
+  "kind": "page",
+  "name": "ItemsInDepartment",
+  "formatVersion": 1,
+  "title": { "textKey": "itemsInDepartment.title" },
+  "parameters": [{ "name": "departmentName", "type": "text" }],
+  "widgets": [{ "type": "table", "entity": "Item" }]
+}

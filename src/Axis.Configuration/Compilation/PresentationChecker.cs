@@ -722,12 +722,15 @@ internal static class PresentationChecker
 
         // What a navigate action's parameter sees on a row or record: the root entity's fields, or
         // the columns of the data source, plus the id. It is null when the entity or data source is
-        // unknown, which has a diagnostic of its own.
-        var rowScope = NavigateScope(recordEntity is null ? null : findEntity(recordEntity), source, findEntity);
+        // unknown, which has a diagnostic of its own. A navigate action over an entity resolves paths
+        // through reference fields. visibleWhen and the columns of a data source do not.
+        var rootEntity = recordEntity is null ? null : findEntity(recordEntity);
+        var rowScope = NavigateScope(rootEntity, source, findEntity);
+        var navigateScope = NavigateScope(rootEntity, source, findEntity, resolvePaths: true);
 
         if (isRecordLike)
         {
-            CheckActions(widget, page, path, recordEntity, rowScope, loaded, findPage, findForm, findProcess, references, diagnostics);
+            CheckActions(widget, page, path, recordEntity, navigateScope, loaded, findPage, findForm, findProcess, references, diagnostics);
             if (type == WidgetType.Detail)
             {
                 CheckDetailRecord(widget, path, page, recordEntity, Report);
@@ -750,7 +753,7 @@ internal static class PresentationChecker
                     var rowActionPath = $"{path}/rowActions/{index}";
                     if (rowActions[index].Type == "navigate")
                     {
-                        NavigateChecker.Check(rowActions[index], rowActionPath, rowScope, page, loaded, findPage, findForm, references, diagnostics);
+                        NavigateChecker.Check(rowActions[index], rowActionPath, navigateScope, page, loaded, findPage, findForm, references, diagnostics);
                     }
                     else if (rowActions[index].Type == "delete")
                     {
@@ -1206,10 +1209,11 @@ internal static class PresentationChecker
     /// <summary>
     /// The scope of a navigate action on a row or record: <c>id</c> and the fields of the root
     /// entity, or, for a data source, the projected columns whose path resolves. Null when the
-    /// root entity is not known.
+    /// root entity is not known. Paths through reference fields resolve only when
+    /// <paramref name="resolvePaths"/> is set.
     /// </summary>
     private static ExpressionScope? NavigateScope(
-        EntityResource? root, DataSourceResource? source, Func<string, EntityResource?> findEntity)
+        EntityResource? root, DataSourceResource? source, Func<string, EntityResource?> findEntity, bool resolvePaths = false)
     {
         if (root is null)
         {
@@ -1218,7 +1222,10 @@ internal static class PresentationChecker
 
         if (source is null)
         {
-            return ExpressionScopes.ForNavigate(root.Name, root.Fields.Select(field => (field.Name, ExpressionScopes.TypeOf(field))));
+            return ExpressionScopes.ForNavigate(
+                root.Name,
+                root.Fields.Select(field => (field.Name, ExpressionScopes.TypeOf(field))),
+                resolvePaths ? findEntity : null);
         }
 
         // A path that does not resolve has a diagnostic on the data source. One that reaches an
