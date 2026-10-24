@@ -3,9 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { chartWidget, kpiWidget } from '../designSystem/fixtures'
+import { chartWidget, detailWidget, formWidget, kpiWidget, tableWidget } from '../designSystem/fixtures'
 import type { ChartProps } from '../platform/Chart'
-import type { NavigateAction, PageMetadata, PageWidgetMetadata } from '../platform/site'
+import type { NavigateAction, PageMetadata, PageParameter, PageWidgetMetadata } from '../platform/site'
 import type { StudioDiagnostic, StudioNames, StudioResourceItem } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { newWidget } from '../platform/pageWidgets'
@@ -229,18 +229,19 @@ describe('the Design tab of a page', () => {
     expect(appRequests(fetchMock)).toEqual([])
   })
 
-  it('leaves the location where it is when a navigate action is clicked', async () => {
+  it('draws a navigate action as a button, not a link, and leaves the location where it is when it is clicked', async () => {
     const { fetchMock } = stub(content([{ type: 'kpi', navigate: { page: 'Tickets' } }]))
     renderEditor()
 
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
-    const link = await within(await screen.findByTestId('studio-page-canvas')).findByRole('link', {}, slow)
-    expect(link).toHaveAttribute('href', '/Shop/tickets')
+    const canvas = await screen.findByTestId('studio-page-canvas')
+    const button = await within(canvas).findByRole('button', { name: 'Show tickets' }, slow)
+    expect(within(canvas).queryByRole('link')).not.toBeInTheDocument()
     const before = screen.getByTestId('location').textContent
     expect(before).toBe('/studio?app=Shop&resource=dashboard')
 
-    await userEvent.click(link)
+    await userEvent.click(button)
 
     expect(screen.getByTestId('location')).toHaveTextContent(before!)
     expect(screen.getByTestId('studio-page-canvas')).toBeInTheDocument()
@@ -442,6 +443,195 @@ describe('the Design tab of a page', () => {
       const again = await screen.findByTestId('studio-page-design', {}, slow)
       await within(again).findByTestId('chart-widget', {}, slow)
       expect(frame(again, '/widgets/1')).toHaveAttribute('aria-current', 'true')
+    })
+  })
+
+  describe('actions', () => {
+    const navigateOpen = (labelKey: string) => ({ ...showTickets, labelKey, record: 'id' })
+    const deleteRow = { type: 'delete', labelKey: 'request.delete', recordsPath: tableWidget.entity!.recordsPath }
+
+    /** A table, a form, a detail and a KPI, each with actions. The delete row action is hidden on placeholder data. */
+    const draftWidgets = [
+      {
+        type: 'table',
+        rowActions: [
+          { type: 'navigate', page: 'Tickets' },
+          { type: 'delete', visibleWhen: 'false' },
+        ],
+        toolbarActions: [{ type: 'navigate', page: 'Tickets' }],
+      },
+      { type: 'form', actions: [{ type: 'startProcess' }, { type: 'navigate', page: 'Tickets' }] },
+      { type: 'detail', record: 'request', actions: [{ type: 'startProcess' }] },
+      { type: 'kpi', navigate: { type: 'navigate', page: 'Tickets' } },
+    ]
+
+    function answer(draft: Draft) {
+      const widgets: PageWidgetMetadata[] = [
+        {
+          ...tableWidget,
+          path: '/widgets/0',
+          rowActions: [navigateOpen('request.open'), { ...deleteRow, type: 'delete', visibleWhen: 'false' }],
+          toolbarActions: [showTickets],
+        } as PageWidgetMetadata,
+        {
+          ...formWidget,
+          path: '/widgets/1',
+          actions: [formWidget.actions[0], showTickets],
+        } as PageWidgetMetadata,
+        { ...detailWidget, path: '/widgets/2' } as PageWidgetMetadata,
+        { ...kpiWidget, path: '/widgets/3', kpi: { ...kpiWidget.kpi!, navigate: showTickets } },
+      ].slice(0, draft.widgets.length)
+      const request: PageParameter = { name: 'request', type: 'reference', required: true, values: null, target: null }
+      return respond({ name: 'Dashboard', titleKey: 'dashboard.title', parameters: [request], widgets }, [])
+    }
+
+    async function openActions() {
+      const stubbed = stub(content(draftWidgets), answer)
+      renderEditor()
+      await screen.findByTestId('studio-page-editor', {}, slow)
+      await openTab('Design')
+      const design = await screen.findByTestId('studio-page-design', {}, slow)
+      await within(design).findByTestId('kpi-tile', {}, slow)
+      await waitFor(() => expect(design.querySelector('[data-action="rowActions/0"]')).not.toBeNull(), slow)
+      await waitFor(() => expect(design.querySelector('[data-action="actions/0"]')).not.toBeNull(), slow)
+      return { ...stubbed, design }
+    }
+
+    /** The button of an action inside the widget at `path`. */
+    function button(design: HTMLElement, path: string, key: string) {
+      const frame = within(design)
+        .getAllByTestId('studio-canvas-widget')
+        .find((element) => element.getAttribute('data-path') === path)!
+      return frame.querySelector<HTMLElement>(`[data-action="${key}"]`)!
+    }
+
+    it.each([
+      ['a row action', '/widgets/0', 'rowActions/1', 'studio-field-/widgets/0/rowActions', 'studio-action-1'],
+      [
+        'a toolbar action',
+        '/widgets/0',
+        'toolbarActions/0',
+        'studio-field-/widgets/0/toolbarActions',
+        'studio-action-0',
+      ],
+      ['a form action', '/widgets/1', 'actions/1', 'studio-field-/widgets/1/actions', 'studio-action-1'],
+      ['a detail action', '/widgets/2', 'actions/0', 'studio-field-/widgets/2/actions', 'studio-action-0'],
+      ['the navigate action of a KPI', '/widgets/3', 'navigate', 'studio-field-/widgets/3/navigate', undefined],
+    ])('selects %s when its button is clicked', async (_name, widget, key, listId, card) => {
+      const { design } = await openActions()
+
+      await userEvent.click(button(design, widget, key))
+
+      const list = within(design).getByTestId(listId)
+      expect(card === undefined ? list : within(list).getByTestId(card)).toHaveAttribute('aria-current', 'true')
+      expect(button(design, widget, key)).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId(`studio-widget-${widget}`)).toHaveAttribute('aria-current', 'true')
+      // The widget itself is not the selection, so its frame is not outlined.
+      expect(
+        within(design)
+          .getAllByTestId('studio-canvas-widget')
+          .find((element) => element.getAttribute('data-path') === widget),
+      ).not.toHaveAttribute('aria-current')
+      // A table draws the action on every row, and only the selected action's buttons are marked.
+      const marked = [...design.querySelectorAll('[data-action][aria-current="true"]')]
+      expect(marked.length).toBeGreaterThan(0)
+      expect(marked.map((element) => element.getAttribute('data-action'))).toEqual(marked.map(() => key))
+    })
+
+    it('selects an action with Enter on its button', async () => {
+      const { design } = await openActions()
+
+      button(design, '/widgets/0', 'rowActions/1').focus()
+      await userEvent.keyboard('{Enter}')
+
+      expect(
+        within(within(design).getByTestId('studio-field-/widgets/0/rowActions')).getByTestId('studio-action-1'),
+      ).toHaveAttribute('aria-current', 'true')
+    })
+
+    it('selects the widget again when its frame is clicked after an action', async () => {
+      const { design } = await openActions()
+      await userEvent.click(button(design, '/widgets/0', 'rowActions/1'))
+
+      await userEvent.click(within(design).getByTestId('kpi-tile'))
+
+      expect(design.querySelector('[data-action][aria-current="true"]')).toBeNull()
+      expect(within(design).getByTestId('studio-widget-/widgets/3')).toHaveAttribute('aria-current', 'true')
+    })
+
+    it('draws an action that the site would hide, a row action whose visibleWhen fails and a form action with no record', async () => {
+      const { design } = await openActions()
+
+      const rows = design.querySelectorAll('[data-action="rowActions/1"]')
+      expect(rows).toHaveLength(3)
+      expect(rows[0]).toHaveTextContent('request.delete')
+      expect(button(design, '/widgets/1', 'actions/0')).toHaveTextContent('request.submit')
+      expect(button(design, '/widgets/1', 'actions/1')).toHaveTextContent('Show tickets')
+    })
+
+    it('marks the card of an added action and selects it, and selects the widget when the action is removed', async () => {
+      const { design } = await openActions()
+      const list = within(design).getByTestId('studio-field-/widgets/0/rowActions')
+
+      await userEvent.click(within(list).getByRole('button', { name: 'Add navigate action' }))
+
+      expect(within(list).getByTestId('studio-action-2')).toHaveAttribute('aria-current', 'true')
+      expect(within(list).getByTestId('studio-action-1')).not.toHaveAttribute('aria-current')
+
+      await userEvent.click(
+        within(within(list).getByTestId('studio-action-2')).getByRole('button', { name: 'Remove action' }),
+      )
+
+      expect(within(list).queryByTestId('studio-action-2')).not.toBeInTheDocument()
+      expect(within(list).getByTestId('studio-action-1')).not.toHaveAttribute('aria-current')
+      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
+    })
+
+    it('runs nothing when an action button is clicked: no request, no navigation and no confirmation', async () => {
+      const { fetchMock, design } = await openActions()
+      const before = screen.getByTestId('location').textContent
+      const clicked = [
+        button(design, '/widgets/0', 'rowActions/0'),
+        button(design, '/widgets/0', 'rowActions/1'),
+        button(design, '/widgets/0', 'toolbarActions/0'),
+        button(design, '/widgets/1', 'actions/0'),
+        button(design, '/widgets/1', 'actions/1'),
+        button(design, '/widgets/2', 'actions/0'),
+        button(design, '/widgets/3', 'navigate'),
+      ]
+
+      for (const element of clicked) {
+        await userEvent.click(element)
+      }
+
+      expect(screen.getByTestId('location')).toHaveTextContent(before!)
+      expect(document.querySelector('.ant-modal')).toBeNull()
+      expect(screen.queryByTestId('table-action-error')).not.toBeInTheDocument()
+      expect(appRequests(fetchMock)).toEqual([])
+    })
+
+    it('inserts from the palette after the widget of a selected row action, not into its action list', async () => {
+      const { design, posts } = await openActions()
+      await userEvent.click(button(design, '/widgets/0', 'rowActions/1'))
+
+      await userEvent.click(within(within(design).getByTestId('studio-palette')).getByTestId('studio-palette-kpi'))
+
+      await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(5), slow)
+      const saved = posts.at(-1)!.widgets
+      expect(saved[0].rowActions).toHaveLength(2)
+      expect(saved[1]).toEqual(newWidget('kpi'))
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+    })
+
+    it('inserts from the palette after a KPI whose navigate action is selected', async () => {
+      const { design, posts } = await openActions()
+      await userEvent.click(button(design, '/widgets/3', 'navigate'))
+
+      await userEvent.click(within(within(design).getByTestId('studio-palette')).getByTestId('studio-palette-kpi'))
+
+      await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(5), slow)
+      expect(posts.at(-1)!.widgets[4]).toEqual(newWidget('kpi'))
+      expect(within(design).getByTestId('studio-widget-/widgets/4')).toHaveAttribute('aria-current', 'true')
     })
   })
 
