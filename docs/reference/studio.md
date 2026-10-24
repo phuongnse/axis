@@ -453,7 +453,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
   | `application` | Generic form                          | Nothing                                                               |
   | `entity`      | Entity designer                       | Nothing                                                               |
-  | `page`        | Typed editor                          | A widget or layout that M12 adds, until M12 gives each container a panel |
+  | `page`        | Typed editor                          | A `delete` row action, which the editor does not edit yet (planned for M13) |
   | `form`        | Generic form, typed steps panel       | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
   | `process`     | Typed editor with the process graph   | Nothing                                                               |
@@ -480,7 +480,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     with a text box for each locale, and a list of its widgets, each with its
     type and a summary such as `table · PurchaseRequestList`. A panel per
     widget type, `table`, `form`, `taskInbox`, `processInspector`, `kpi`,
-    `chart` and `detail`, shows the properties the widget has today. A `table` panel has entity and data source
+    `chart`, `detail`, `columns`, `tabs` and `section`, shows the properties the widget has today. The `columns`, `tabs` and `section` panels edit the width of each column, the label of each tab, and the title and collapsed state of a section. A `table` panel has entity and data source
     pickers, then `rowActions` and `toolbarActions` lists of
     navigate actions. A `form` panel has entity and form pickers and its
     `actions`, each a `startProcess` action with a process picker and a label,
@@ -591,8 +591,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
       stays in the saved file. A container whose parts are malformed, such as
       `columns` that is not a list, points to the JSON view. See [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
     - **Unknown keys.** A key the editor does not show, on the page or on a
-      widget, is saved unchanged. A widget of a type with no panel, such as one
-      M12 adds, shows its type and points to the JSON view.
+      widget, is saved unchanged. A widget of a type with no panel shows its
+      type and points to the JSON view.
   - **Process step editor.** The Form tab opens the process with its name,
     entity and optional start condition, and its start step. The JSON view
     stays as a second view of the same draft.
@@ -741,11 +741,6 @@ Run and the Test results list, the read-only view of a module entity, and the re
     `steps`, and the form goes back to one page. A condition offers the fields
     that the form lists, because a condition reads only those. A `steps` value
     that is not a list is left to the JSON view.
-  - **Page editor and M12.** M12 adds layouts and widgets while this editor is
-    built, see
-    [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
-    and [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
-    The page editor changes again then.
 - **Process graph** *(built)*. A process shows a
   drawn graph of its steps and transitions above its editor, see
   [D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md).

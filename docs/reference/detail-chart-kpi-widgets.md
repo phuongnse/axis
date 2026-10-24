@@ -67,7 +67,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     `measures` and `title`, so a missing one is `AXC0004`. Names match the data
     source ignoring letter case, and the compiled chart keeps the names the data
     source declares. A chart cannot bind page parameters yet *(planned for
-    M12)*. The schema rejects `parameters` on a chart (`AXC0004`), as on a
+    M13)*. The schema rejects `parameters` on a chart (`AXC0004`), as on a
     KPI, and every data source parameter must be optional (`AXC0060`).
   - **Metadata.** The widget has the `dataSource` object of the table
     binding, `"entity": null`, `"form": null`, `"actions": []` and

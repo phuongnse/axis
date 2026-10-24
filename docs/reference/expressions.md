@@ -284,7 +284,7 @@ Paths in validations and computed fields are not built. There a path is
   columns, or the record's fields for a table over an entity. On a form they
   are the record's fields. `id` is the id of the root record, typed as a
   reference to the root entity. In a table's toolbar there are no names. The
-  scope has no rules and no aggregates, and paths *(planned for M12)* are not
+  scope has no rules and no aggregates, and paths *(planned for M13)* are not
   resolved yet. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Child collection.** A child collection field gives a `list<Entity>`,
   which only aggregates accept. Inside an aggregate's item expression, names
