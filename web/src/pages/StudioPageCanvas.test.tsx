@@ -174,6 +174,7 @@ function renderEditor() {
               path={null}
               diagnosticPaths={[]}
               onOpenPath={vi.fn()}
+              onOpen={vi.fn()}
               onSaved={vi.fn()}
               onTextsWritten={vi.fn()}
               onDeleted={vi.fn()}
