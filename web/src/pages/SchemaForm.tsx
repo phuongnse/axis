@@ -1,7 +1,8 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
-import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
-import { resolveSchema, type JsonSchema } from '../platform/studioSchemas'
+import type { StudioNames } from '../platform/studio'
+import { parameterType, referenceOptions, StudioNamesContext } from '../platform/studioNames'
+import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -24,7 +25,7 @@ const conditionalKeywords = new Set(['if', 'then', 'else'])
 /**
  * A form built from the JSON Schema of a resource kind, for the draft `value`. It shows text, number,
  * boolean and enum values, nested objects and arrays. A string that names a resource gets a picker of the
- * application's names. Anything else points to the JSON view.
+ * application's names, as does each key of a map whose keys are marked. Anything else points to the JSON view.
  */
 export function SchemaForm({
   schema,
@@ -75,7 +76,7 @@ function Properties({
           node={child}
           root={root}
           rootValue={rootValue}
-          pointer={`${pointer}/${name.replaceAll('~', '~0').replaceAll('/', '~1')}`}
+          pointer={`${pointer}/${escapeSegment(name)}`}
           name={name}
           value={(value as Record<string, unknown> | undefined)?.[name]}
           required={required.has(name)}
@@ -110,7 +111,10 @@ function SchemaNode({
   const isArray = schema.type === 'array' && schema.items !== undefined
   // A label is an object whose only property is `textKey`. It needs the names and the resource to show its texts.
   const isLabel = isObject && label !== null && names !== undefined && isLabelSchema(schema)
-  const unsupported = !isSupported(schema)
+  const keyMark = schema.propertyNames?.['x-axis-reference']
+  const isMarkedMap =
+    schema.type === 'object' && schema.properties === undefined && keyMark !== undefined && names !== undefined
+  const unsupported = !isMarkedMap && !isSupported(schema)
 
   let input
   if (unsupported) {
@@ -193,6 +197,20 @@ function SchemaNode({
         onChange={(event) => onChange(pointer, event.target.checked)}
       />
     )
+  } else if (isMarkedMap) {
+    input = (
+      <MarkedMap
+        schema={schema}
+        keyMark={keyMark}
+        names={names}
+        root={root}
+        rootValue={rootValue}
+        pointer={pointer}
+        name={name}
+        value={value}
+        onChange={onChange}
+      />
+    )
   } else if (isLabel) {
     input = (
       <fieldset style={{ margin: 0 }}>
@@ -258,6 +276,125 @@ function SchemaNode({
       {input}
     </div>
   )
+}
+
+/**
+ * A map whose keys name a part, such as the parameters of a data source. Each row has a picker for the key, a box
+ * for the value and Remove. Add appends the first name that no row uses.
+ */
+function MarkedMap({
+  schema,
+  keyMark,
+  names,
+  root,
+  rootValue,
+  pointer,
+  name,
+  value,
+  onChange,
+}: {
+  schema: JsonSchema
+  keyMark: ReferenceMark
+  names: StudioNames
+  root: JsonSchema
+  rootValue: unknown
+  pointer: string
+  name: string
+  value: unknown
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const { colour, radius, spacing } = useDesignTokens()
+  const map = isRecord(value) ? value : {}
+  const entries = Object.entries(map)
+  const options = (key: string) => referenceOptions(names, keyMark, rootValue, `${pointer}/${escapeSegment(key)}`)
+  // A parameter's value follows its type unless the schema gives the values a schema.
+  const valueSchema = (key: string): JsonSchema => {
+    if (typeof schema.additionalProperties === 'object') {
+      return schema.additionalProperties
+    }
+    const type = parameterType(names, keyMark, rootValue, `${pointer}/${escapeSegment(key)}`, key)
+    return {
+      type: type === 'integer' ? 'integer' : type === 'decimal' ? 'number' : type === 'boolean' ? 'boolean' : 'string',
+    }
+  }
+  const unused = (key: string) => {
+    const used = new Set(entries.map(([other]) => other.toLowerCase()))
+    return options(key).filter((option) => !used.has(option.toLowerCase()))
+  }
+  const next = unused('')[0]
+
+  const rename = (from: string, to: string | undefined) => {
+    if (to === undefined || to === '' || to === from) {
+      return
+    }
+    const fresh = defaultFor(valueSchema(to), root)
+    onChange(
+      pointer,
+      Object.fromEntries(
+        entries.map(([key, entry]) =>
+          key === from ? [to, typeof entry === typeof fresh ? entry : fresh] : [key, entry],
+        ),
+      ),
+    )
+  }
+
+  return (
+    <Flex vertical gap="small">
+      {entries.map(([key, entry], index) => (
+        <Flex
+          key={key}
+          gap="small"
+          align="flex-start"
+          style={{ border: `1px solid ${colour.border}`, borderRadius: radius.base, padding: spacing.xs }}
+        >
+          <ReferencePicker
+            name={`${name} ${index + 1}`}
+            value={key}
+            required
+            options={options(key).filter(
+              (option) => option === key || !entries.some(([other]) => other.toLowerCase() === option.toLowerCase()),
+            )}
+            onChange={(to) => rename(key, to)}
+          />
+          <div style={{ flex: 1 }}>
+            <SchemaNode
+              node={valueSchema(key)}
+              root={root}
+              rootValue={rootValue}
+              pointer={`${pointer}/${escapeSegment(key)}`}
+              name={key}
+              value={entry}
+              required
+              item
+              onChange={onChange}
+            />
+          </div>
+          <Button onClick={() => onChange(`${pointer}/${escapeSegment(key)}`, undefined)}>
+            {t('shell.studio.removeItem')}
+          </Button>
+        </Flex>
+      ))}
+      <div>
+        <Button
+          disabled={next === undefined}
+          onClick={() =>
+            next !== undefined && onChange(pointer, { ...map, [next]: defaultFor(valueSchema(next), root) })
+          }
+        >
+          {t('shell.studio.addItem')}
+        </Button>
+      </div>
+    </Flex>
+  )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function escapeSegment(segment: string): string {
+  return segment.replaceAll('~', '~0').replaceAll('/', '~1')
 }
 
 /** Whether the schema is a label: an object whose only property is `textKey`. */

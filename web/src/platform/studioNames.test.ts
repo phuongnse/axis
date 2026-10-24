@@ -1,12 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import type { StudioNames } from './studio'
-import { getAt, referenceOptions, referencePointer } from './studioNames'
+import { getAt, parameterType, referenceOptions, referencePointer } from './studioNames'
 
 const names = {
   locales: ['en'],
-  dataSources: [],
+  dataSources: [
+    {
+      id: '4',
+      name: 'Orders',
+      module: null,
+      parameters: [
+        { name: 'status', type: 'text' },
+        { name: 'limit', type: 'integer' },
+      ],
+      columns: [
+        { name: 'openCount', type: 'integer' },
+        { name: 'region', type: 'text' },
+      ],
+      groupBy: null,
+    },
+  ],
   rules: [],
-  connectors: [],
+  connectors: [{ id: '5', name: 'Crm', operations: [{ name: 'getAccount' }, { name: 'listAccounts' }] }],
   events: [],
   sequences: [],
   forms: [],
@@ -69,6 +84,55 @@ describe('referenceOptions', () => {
   it('lists the steps of the process the draft names', () => {
     const draft = { name: 'Approval', steps: [{ name: 'Review', next: 'Done' }] }
     expect(referenceOptions(names, { part: 'step', of: '/name' }, draft, '/steps/0/next')).toEqual(['Review', 'Done'])
+  })
+
+  it('lists the parameters and the columns of the data source the draft names', () => {
+    const draft = {
+      dataSource: 'orders',
+      widgets: [{ dataSource: 'Orders', measure: 'openCount', parameters: { status: 'x' } }],
+    }
+    expect(referenceOptions(names, { part: 'parameter', of: '/dataSource' }, draft, '/parameters/status')).toEqual([
+      'status',
+      'limit',
+    ])
+    expect(referenceOptions(names, { part: 'column', of: '1/dataSource' }, draft, '/widgets/0/measure')).toEqual([
+      'openCount',
+      'region',
+    ])
+    expect(
+      referenceOptions(names, { part: 'parameter', of: '2/dataSource' }, draft, '/widgets/0/parameters/status'),
+    ).toEqual(['status', 'limit'])
+  })
+
+  it('lists the operations of the connector the draft names', () => {
+    const draft = { steps: [{ connector: { name: 'crm', operation: 'getAccount' } }] }
+    expect(referenceOptions(names, { part: 'operation', of: '1/name' }, draft, '/steps/0/connector/operation')).toEqual(
+      ['getAccount', 'listAccounts'],
+    )
+  })
+
+  it('lists the outcomes of the task steps with the name the draft gives, without repeats', () => {
+    const other = {
+      ...names,
+      processes: [
+        ...names.processes,
+        { id: '6', name: 'Escalation', steps: [{ name: 'review', type: 'task', outcomes: ['Approve', 'Reject'] }] },
+      ],
+    } as StudioNames
+    const draft = { steps: [{ type: 'completeTask', step: 'Review', outcome: 'Approve' }] }
+    expect(referenceOptions(other, { part: 'outcome', of: '1/step' }, draft, '/steps/0/outcome')).toEqual([
+      'Approve',
+      'Reject',
+    ])
+    expect(referenceOptions(names, { part: 'outcome', of: '1/step' }, { steps: [{}] }, '/steps/0/outcome')).toEqual([])
+  })
+
+  it('finds the type of a data source parameter', () => {
+    const draft = { dataSource: 'Orders' }
+    const mark = { part: 'parameter', of: '/dataSource' } as const
+    expect(parameterType(names, mark, draft, '/parameters/Limit', 'Limit')).toBe('integer')
+    expect(parameterType(names, mark, draft, '/parameters/gone', 'gone')).toBeUndefined()
+    expect(parameterType(names, mark, {}, '/parameters/limit', 'limit')).toBeUndefined()
   })
 
   it('lists nothing when the owner is not named', () => {

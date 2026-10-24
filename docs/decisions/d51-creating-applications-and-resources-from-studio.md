@@ -7,7 +7,7 @@ template, and starts a resource of every kind. D46 plans this for M11. The
 `Studio:ApplicationsPath` setting, `POST /api/studio/apps`, `studioCreate` and
 the Studio New application dialog are built. Application templates and `GET /api/studio/templates`,
 New resource with its starters, and the `request-approval` sample template are built too.
-Development and Compose setting the folder is _(planned for M13)_. See the
+Development and Compose setting the folder is built too. See the
 [authoring API](../reference/authoring.md#creating-an-application), the
 [application templates](../reference/modules-and-templates.md#application-templates) and
 the [Studio section of the frontend](../reference/studio.md). The owner
@@ -26,7 +26,7 @@ confirmed these points on issue #778 on 2026-10-20.
   - Under several server replicas, the folder is on the shared Studio folder
     ([D49](d49-several-server-replicas-behind-a-tls-proxy.md)).
   - E2E's journey server sets it to a temporary folder, and Development and Compose set it to
-    `artifacts/studio-apps`, which git ignores _(planned for M13)_.
+    `artifacts/studio-apps`, which git ignores.
 - **Creating an application:**
   - `POST /api/studio/apps` takes `{ name, template? }`. It needs the author
     role and the CSRF header.
@@ -87,7 +87,7 @@ confirmed these points on issue #778 on 2026-10-20.
     first site, so every label still resolves. The author then translates.
 - **Effect on [D38](d38-studio-edits-application-folders-through-an-authoring-api.md):**
   - `Studio:Folders` stays for folders kept in git. New applications live in
-    `Studio:ApplicationsPath`, which nothing commits to git yet.
+    `Studio:ApplicationsPath`, a folder that is kept out of git.
 
 _Why:_ an author who cannot start an application or a resource without
 hand-written JSON cannot use Studio alone. A second folder setting keeps the

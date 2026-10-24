@@ -1,6 +1,8 @@
+import type { ChartKind } from '../platform/chartOption'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
 import type { InstancePage } from '../platform/inspection'
 import type {
+  DataSourceMetadata,
   EntityMetadata,
   EntityWidgetMetadata,
   FieldMetadata,
@@ -23,6 +25,8 @@ const categoriesPath = `${apiPath}/entities/Category/records`
 const formStatePath = `${apiPath}/forms/RequestForm/state`
 const tasksPath = `${apiPath}/tasks`
 const instancesPath = `${apiPath}/processes/Approve/instances`
+const requestsByStatusPath = `${apiPath}/data-sources/RequestsByStatus/rows`
+const requestTotalsPath = `${apiPath}/data-sources/RequestTotals/rows`
 
 export const requestId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
 const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
@@ -175,6 +179,9 @@ export function fieldWidget(type: FieldType): EntityWidgetMetadata {
   return { ...formWidget, entity: entityWithField(type), form: null, actions: [] }
 }
 
+/** A detail widget of a request: the form's sections, read-only, with the start button. */
+export const detailWidget: EntityWidgetMetadata = { ...formWidget, type: 'detail', detail: { record: 'request' } }
+
 export const taskInboxWidget: WidgetMetadata = { ...widgetBase, type: 'taskInbox', tasksPath }
 
 export const processInspectorWidget: WidgetMetadata = {
@@ -182,6 +189,67 @@ export const processInspectorWidget: WidgetMetadata = {
   type: 'processInspector',
   process: 'Approve',
   instancesPath,
+}
+
+const requestsByStatus: DataSourceMetadata = {
+  name: 'RequestsByStatus',
+  rowsPath: requestsByStatusPath,
+  entity: 'Request',
+  parameters: [],
+  pageSize: 100,
+  columns: [
+    {
+      name: 'status',
+      type: 'enum',
+      labelKey: 'request.status',
+      values: ['draft', 'submitted', 'approved'],
+      target: null,
+    },
+    { name: 'requests', type: 'integer', labelKey: null, values: null, target: null },
+    { name: 'amountSum', type: 'decimal', labelKey: null, values: null, target: null },
+  ],
+}
+
+/** A chart of the requests by status: bars and lines show two series, and a pie shows one. */
+export function chartWidget(kind: ChartKind): WidgetMetadata {
+  const requests = { name: 'requests', labelKey: 'chart.requests' }
+  const amount = { name: 'amountSum', labelKey: 'chart.amount' }
+  return {
+    ...widgetBase,
+    type: 'chart',
+    dataSource: requestsByStatus,
+    chart: {
+      kind,
+      titleKey: 'chart.requestsByStatus',
+      category: 'status',
+      measures: kind === 'pie' ? [requests] : [requests, amount],
+    },
+  }
+}
+
+const requestTotals: DataSourceMetadata = {
+  name: 'RequestTotals',
+  rowsPath: requestTotalsPath,
+  entity: 'Request',
+  parameters: [],
+  pageSize: 1,
+  columns: [
+    { name: 'requests', type: 'integer', labelKey: null, values: null, target: null },
+    { name: 'amountSum', type: 'decimal', labelKey: null, values: null, target: null },
+  ],
+}
+
+/** A kpi tile of the total amount, with the request count as its comparison and no navigate action. */
+export const kpiWidget: WidgetMetadata = {
+  ...widgetBase,
+  type: 'kpi',
+  dataSource: requestTotals,
+  kpi: {
+    measure: 'amountSum',
+    labelKey: 'kpi.amount',
+    comparison: { measure: 'requests', labelKey: 'kpi.requests' },
+    navigate: null,
+  },
 }
 
 /** A columns widget: the request table at width 8 and a section with the task inbox at width 4. */
@@ -309,6 +377,38 @@ const categoryPage: RecordPage = {
   totalCount: 1,
 }
 
+const statusGroup = (id: string, status: string, requests: string, amountSum: string): RecordItem => ({
+  id,
+  version: 1,
+  values: { status, requests, amountSum },
+  labels: {},
+})
+
+const requestsByStatusPage: RecordPage = {
+  items: [
+    statusGroup('1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d', 'draft', '4', '1830.00'),
+    statusGroup('2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e', 'submitted', '7', '5240.50'),
+    statusGroup('3c4d5e6f-7a8b-4c9d-8e1f-2a3b4c5d6e7f', 'approved', '12', '9875.25'),
+  ],
+  page: 1,
+  pageSize: 100,
+  totalCount: 3,
+}
+
+const requestTotalsPage: RecordPage = {
+  items: [
+    {
+      id: '4d5e6f70-8b9c-4d0e-8f2a-3b4c5d6e7f80',
+      version: 1,
+      values: { requests: '23', amountSum: '16945.75' },
+      labels: {},
+    },
+  ],
+  page: 1,
+  pageSize: 1,
+  totalCount: 1,
+}
+
 /** The site texts, in English. */
 export const siteTexts: Record<string, string> = {
   'request.label': 'Request',
@@ -330,6 +430,11 @@ export const siteTexts: Record<string, string> = {
   'request.delete': 'Delete',
   'request.submit': 'Submit for approval',
   'request.task.review': 'Review the request',
+  'chart.requestsByStatus': 'Requests by status',
+  'chart.requests': 'Requests',
+  'chart.amount': 'Amount',
+  'kpi.amount': 'Total amount',
+  'kpi.requests': 'Requests',
   'preview.requests': 'Requests',
   'preview.tasks': 'Tasks',
 }
@@ -346,5 +451,7 @@ export const routes: Record<string, () => unknown> = {
   [categoriesPath]: () => categoryPage,
   [tasksPath]: () => taskPage,
   [instancesPath]: () => instancePage,
+  [requestsByStatusPath]: () => requestsByStatusPage,
+  [requestTotalsPath]: () => requestTotalsPage,
   [`/api/sites/${sitePath}/texts/${locale}`]: () => ({ texts: siteTexts }),
 }
