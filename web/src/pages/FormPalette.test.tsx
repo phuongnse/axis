@@ -110,4 +110,30 @@ describe('FormPalette', () => {
     await userEvent.click(screen.getByTestId('studio-form-palette-lines'))
     expect(screen.getByText('Every field of the entity is on the form.')).toBeInTheDocument()
   })
+
+  it('adds a section, selects it and says so', async () => {
+    render(<Harness start="/sections/0" />)
+    await userEvent.click(screen.getByTestId('studio-form-add-section'))
+
+    const sections = latest.sections as { name: string; fields: unknown[] }[]
+    expect(sections).toHaveLength(3)
+    expect(sections[2]).toMatchObject({ name: 'section1', fields: [] })
+    expect(latest.steps).toBeUndefined()
+    expect(screen.getByTestId('studio-form-palette-announcement')).toHaveTextContent('Added section1')
+
+    await userEvent.click(screen.getByTestId('studio-form-palette-notes'))
+    expect((latest.sections as { fields: unknown[] }[])[2].fields).toEqual([{ field: 'notes' }])
+  })
+
+  it('adds the first step with every section, then an empty one', async () => {
+    render(<Harness />)
+    await userEvent.click(screen.getByTestId('studio-form-add-step'))
+    expect((latest.steps as { sections: string[] }[]).map((step) => step.sections)).toEqual([['problem', 'details']])
+
+    await userEvent.click(screen.getByTestId('studio-form-add-step'))
+    expect((latest.steps as { sections: string[] }[]).map((step) => step.sections)).toEqual([
+      ['problem', 'details'],
+      [],
+    ])
+  })
 })

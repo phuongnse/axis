@@ -23,7 +23,8 @@ interface DragListeners {
  * inside its section's row, so the innermost row under the pointer wins. A field row is also sortable: the pointer, or
  * Space, the arrow keys and Space, move it within its section or into another one. While a field moves, the targets
  * are the field rows and the empty sections, and a section that has fields is not one, so a move always lands on a
- * field. A section is named by its `name`, or `Section N`, because the translated titles load only inside the canvas.
+ * field. A section is named by its `name`, or `Section N`, because the translated titles load only inside the canvas. A
+ * section with no fields shows a dashed drop area inside its row, so a drop on it lands in that section.
  */
 export function FormOutline({
   draft,
@@ -101,6 +102,7 @@ function SectionRow({
 }) {
   const t = useText()
   const { active } = useDndContext()
+  const { colour, radius } = useDesignTokens()
   const path = `/sections/${index}`
   const moving = (active?.data.current as { move?: unknown } | undefined)?.move !== undefined
   const names = fields.map((field) => fieldName(field))
@@ -121,6 +123,14 @@ function SectionRow({
         strategy={verticalListSortingStrategy}
       >
         <ul style={{ listStyle: 'none', margin: 0, paddingLeft: 16 }}>
+          {fields.length === 0 && (
+            <li
+              data-testid="studio-outline-empty-section"
+              style={{ border: `1px dashed ${colour.border}`, borderRadius: radius.base, padding: '4px 8px' }}
+            >
+              <Typography.Text type="secondary">{t('shell.studio.design.dropFieldHere')}</Typography.Text>
+            </li>
+          )}
           {fields.map((_, position) => {
             const fieldPath = `${path}/fields/${position}`
             return (

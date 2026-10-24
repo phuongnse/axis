@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
@@ -15,6 +15,7 @@ const ticketEditId = "1db765b0-483d-456b-9939-17e2a36de3b6";
 const allTicketsId = "4ff52d55-8194-45c4-901b-bdc18e269096";
 const ticketDetailId = "e6a7b810-39ed-4751-a0cc-b761ffc812e5";
 const ticketTriageId = "e5650c79-b0cb-449b-a5c2-1bd8d9acd452";
+const ticketResolutionId = "e9311296-cc52-47fd-ac30-01d9051fab1d";
 
 /**
  * Drags `source`, a palette type or a data panel name, with the mouse to the point of `target` that is `fraction` of its height
@@ -600,5 +601,50 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       parameters: { ticket: "id" },
     });
     expect(applicationRequests).toEqual([]);
+  });
+
+  test("an author adds a section to a one-section form, fills both from the palette, saves, and finds both in the file", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    const file = path.join(copy, "forms", "ticket-resolution.json");
+    const original = await readFile(file, "utf8");
+    try {
+      const form = JSON.parse(original);
+      form.sections = [{ ...form.sections[0], fields: [{ field: "number" }] }];
+      await writeFile(file, JSON.stringify(form, null, 2));
+
+      await page.goto(
+        `${server.url}/studio?app=ServiceDesk&resource=${ticketResolutionId}`,
+      );
+      await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+      await page.getByTestId("studio-form-palette-title").click();
+      await page.getByTestId("studio-form-add-section").click();
+      await expect(
+        page.getByTestId("studio-outline-empty-section"),
+      ).toBeVisible();
+      await page.getByTestId("studio-form-palette-category").click();
+      await page.getByTestId("studio-form-palette-priority").click();
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await expect(page.getByTestId("studio-saved")).toBeVisible();
+
+      await expect
+        .poll(async () => JSON.parse(await readFile(file, "utf8")).sections)
+        .toEqual([
+          {
+            ...form.sections[0],
+            fields: [{ field: "number" }, { field: "title" }],
+          },
+          {
+            name: "section1",
+            title: { textKey: "forms.ticketResolution.sections.1.title" },
+            fields: [{ field: "category" }, { field: "priority" }],
+          },
+        ]);
+    } finally {
+      await writeFile(file, original);
+    }
   });
 });
