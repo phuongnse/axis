@@ -1,10 +1,11 @@
+import { useDroppable } from '@dnd-kit/core'
 import { Card, Segmented, Typography } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
 import { setApiGuard } from '../platform/api'
 import { CanvasActionsContext } from '../platform/canvasActions'
 import { getAt } from '../platform/jsonPatch'
-import { actionKeyOf, widgetPointerOf, widgetSummary } from '../platform/pageWidgets'
+import { actionKeyOf, childLists, widgetPointerOf, widgetSummary } from '../platform/pageWidgets'
 import { PageLayout } from '../platform/PageLayout'
 import { PageLeaf } from '../platform/PageLeaf'
 import { placeholderApi, placeholderPageValues } from '../platform/placeholderApi'
@@ -44,7 +45,9 @@ const actionSelector = '[data-action]'
  * nothing. A widget that does not compile draws as a placeholder with its diagnostics. A widget that a diagnostic
  * names is marked. The width switch draws the page at phone width, 375 px, with the phone layout. A click selects the
  * innermost widget under the pointer. Each widget is a Tab stop, which Enter or Space selects, and its name is its
- * type and summary from the draft. The widget at `selected` is outlined and has `aria-current`.
+ * type and summary from the draft. The widget at `selected` is outlined and has `aria-current`. Inside a drag context
+ * every widget with a path and every widget list is a drop target, and a placeholder that is a container has a drop
+ * area for each list its draft has.
  *
  * Every action of a widget draws as a button, also one the site would hide. A click on an action's button, or Enter
  * or Space on it, selects the action, whose pointer ends the widget's pointer, such as `/widgets/0/rowActions/1`. The
@@ -115,6 +118,12 @@ export function StudioPageCanvas({
   const pageValues = useMemo(() => placeholderPageValues(page?.parameters ?? []), [page])
   const pages = useMemo(() => names?.pages.map((entry) => entry.name) ?? [], [names])
 
+  const frameList = (pointer: string, content: ReactNode) => (
+    <CanvasListFrame pointer={pointer} empty={isEmptyList(draft, pointer)}>
+      {content}
+    </CanvasListFrame>
+  )
+
   const frameWidget = (widget: PageWidgetMetadata | PlaceholderWidgetMetadata, content: ReactNode) => {
     const path = widget.path
     const draftWidget = path === undefined ? undefined : getAt(draft, path)
@@ -175,9 +184,14 @@ export function StudioPageCanvas({
                     />
                   )}
                   renderPlaceholder={(widget) => (
-                    <PlaceholderBox widget={widget} diagnostics={diagnosticsAt(diagnostics, widget.path)} />
+                    <PlaceholderBox
+                      widget={widget}
+                      draft={draft}
+                      diagnostics={diagnosticsAt(diagnostics, widget.path)}
+                    />
                   )}
                   frameWidget={frameWidget}
+                  frameList={frameList}
                 />
               </CanvasPage>
             </div>
@@ -201,6 +215,12 @@ function WidthSwitch({ value, onChange }: { value: CanvasWidth; onChange: (width
       ]}
     />
   )
+}
+
+/** Whether the draft has a widget list at `pointer` with no widget in it. */
+function isEmptyList(draft: Record<string, unknown>, pointer: string): boolean {
+  const list = getAt(draft, pointer)
+  return Array.isArray(list) && list.length === 0
 }
 
 /** The outline of the selected action's button. Only the buttons of the selected action have `aria-current`. */
@@ -244,9 +264,15 @@ function CanvasWidgetFrame({
   const t = useText()
   const { colour, radius } = useDesignTokens()
   const label = summary || (type ?? t('shell.studio.design.placeholder'))
+  const { setNodeRef } = useDroppable({
+    id: `widget:${path}`,
+    data: { kind: 'widget', pointer: path },
+    disabled: path === undefined,
+  })
   const actions = useMemo(() => ({ selected: action }), [action])
   return (
     <div
+      ref={setNodeRef}
       role="group"
       data-testid="studio-canvas-widget"
       data-path={path}
@@ -272,21 +298,53 @@ function CanvasWidgetFrame({
   )
 }
 
+/**
+ * A widget list of the canvas, and a drop target for a palette type: a drop on it, outside any widget of the list,
+ * appends to the list. It has a dashed border while a drag is over it or while the list is empty, and a minimum height
+ * so that an empty list can be hit.
+ */
+function CanvasListFrame({ pointer, empty, children }: { pointer: string; empty: boolean; children?: ReactNode }) {
+  const { colour, radius } = useDesignTokens()
+  const { setNodeRef, isOver } = useDroppable({ id: `list:${pointer}`, data: { kind: 'list', pointer } })
+  return (
+    <div
+      ref={setNodeRef}
+      data-testid="studio-canvas-list"
+      data-list={pointer}
+      style={{
+        minHeight: 32,
+        border: `1px dashed ${isOver ? colour.primary : empty ? colour.border : 'transparent'}`,
+        borderRadius: radius.base,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 // The title is a key of the application's texts, so it resolves inside the canvas's TextProvider.
 function CanvasPage({ title, children }: { title: string; children: ReactNode }) {
   const t = useText()
   return <PageLayout title={t(title)}>{children}</PageLayout>
 }
 
-/** A widget that does not compile: a box with its type and a line for each of its diagnostics. */
+/**
+ * A widget that does not compile: a box with its type and a line for each of its diagnostics, and a drop area for
+ * each widget list its draft has.
+ */
 function PlaceholderBox({
   widget,
+  draft,
   diagnostics,
 }: {
   widget: PlaceholderWidgetMetadata
+  draft: Record<string, unknown>
   diagnostics: StudioDiagnostic[]
 }) {
   const t = useText()
+  const draftWidget = getAt(draft, widget.path)
+  // The widgets inside are not drawn, but the author can still drop into the lists the draft has.
+  const lists = isContent(draftWidget) ? childLists(draftWidget, widget.path) : []
   return (
     <Card size="small" data-testid="studio-canvas-placeholder" data-path={widget.path}>
       <Typography.Text type="secondary">
@@ -300,6 +358,9 @@ function PlaceholderBox({
           </li>
         ))}
       </ul>
+      {lists.map((list) => (
+        <CanvasListFrame key={list.pointer} pointer={list.pointer} empty={isEmptyList(draft, list.pointer)} />
+      ))}
     </Card>
   )
 }

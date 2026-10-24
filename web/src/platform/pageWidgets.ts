@@ -248,6 +248,51 @@ export function paletteLimit(
   return undefined
 }
 
+/** What a palette type is dropped on: a widget, on its upper or lower half, or a widget list. */
+export type DropTarget =
+  { kind: 'widget'; pointer: string; half: 'upper' | 'lower' } | { kind: 'list'; pointer: string }
+
+/**
+ * Where a new widget of `type` lands when it is dropped on `target`, or the page limit that forbids it. A widget
+ * target gives its own list, at its index on the upper half and after it on the lower half. A list target gives that
+ * list, at its end. It is `undefined` when the draft has no such widget or list. The widgets are never changed.
+ */
+export function dropPlace(
+  widgets: unknown[],
+  type: string,
+  target: DropTarget,
+): { list: string; index: number } | { limit: 'table' | 'recordWidget' | 'depth' } | undefined {
+  let place: { list: string; index: number }
+  if (target.kind === 'widget') {
+    const cut = target.pointer.lastIndexOf('/')
+    const list = target.pointer.slice(0, cut)
+    const index = Number(target.pointer.slice(cut + 1))
+    if (!Array.isArray(getAt({ widgets }, list)) || getAt({ widgets }, target.pointer) === undefined) {
+      return undefined
+    }
+    place = { list, index: target.half === 'upper' ? index : index + 1 }
+  } else {
+    const items = getAt({ widgets }, target.pointer)
+    if (!Array.isArray(items)) {
+      return undefined
+    }
+    place = { list: target.pointer, index: items.length }
+  }
+  const limit = paletteLimit(widgets, place.list, type)
+  return limit === undefined ? place : { limit }
+}
+
+/** The pointer with the most segments, which is the innermost one, or `undefined` for none. The first of equals wins. */
+export function innermostPointer(pointers: string[]): string | undefined {
+  let best: string | undefined
+  for (const pointer of pointers) {
+    if (best === undefined || pointer.split('/').length > best.split('/').length) {
+      best = pointer
+    }
+  }
+  return best
+}
+
 /**
  * The page's widgets with the widget at `from` moved to the end of the list at `toList`, and the pointer the widget
  * has after the move. The widget keeps every key. Nothing changes when `from` does not hold a widget, or when

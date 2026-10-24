@@ -4,6 +4,8 @@ import {
   addableTypes,
   childLists,
   containerTypes,
+  dropPlace,
+  innermostPointer,
   insertionPlace,
   knownWidgetKeys,
   listLevel,
@@ -425,5 +427,77 @@ describe('paletteLimit', () => {
       expect(paletteLimit(page, '/widgets/0/widgets/0/widgets', type)).toBeUndefined()
     }
     expect(paletteLimit(page, deep, 'kpi')).toBeUndefined()
+  })
+})
+
+describe('dropPlace', () => {
+  const section = (widgets: unknown[]) => ({ type: 'section', title: { textKey: '' }, widgets })
+  const page = [{ type: 'kpi' }, section([{ type: 'chart' }, { type: 'detail' }])]
+
+  it('puts the type before a widget on its upper half and after it on its lower half', () => {
+    expect(dropPlace(page, 'kpi', { kind: 'widget', pointer: '/widgets/0', half: 'upper' })).toEqual({
+      list: '/widgets',
+      index: 0,
+    })
+    expect(dropPlace(page, 'kpi', { kind: 'widget', pointer: '/widgets/0', half: 'lower' })).toEqual({
+      list: '/widgets',
+      index: 1,
+    })
+    expect(dropPlace(page, 'kpi', { kind: 'widget', pointer: '/widgets/1/widgets/1', half: 'lower' })).toEqual({
+      list: '/widgets/1/widgets',
+      index: 2,
+    })
+  })
+
+  it('appends to a list, empty or not', () => {
+    expect(dropPlace(page, 'kpi', { kind: 'list', pointer: '/widgets' })).toEqual({ list: '/widgets', index: 2 })
+    expect(dropPlace(page, 'kpi', { kind: 'list', pointer: '/widgets/1/widgets' })).toEqual({
+      list: '/widgets/1/widgets',
+      index: 2,
+    })
+    expect(dropPlace([section([])], 'kpi', { kind: 'list', pointer: '/widgets/0/widgets' })).toEqual({
+      list: '/widgets/0/widgets',
+      index: 0,
+    })
+  })
+
+  it('does nothing when the draft has no such widget or list', () => {
+    expect(dropPlace(page, 'kpi', { kind: 'widget', pointer: '/widgets/5', half: 'upper' })).toBeUndefined()
+    expect(dropPlace(page, 'kpi', { kind: 'widget', pointer: '/widgets/0/widgets/0', half: 'upper' })).toBeUndefined()
+    expect(dropPlace(page, 'kpi', { kind: 'list', pointer: '/widgets/0/widgets' })).toBeUndefined()
+    expect(dropPlace(page, 'kpi', { kind: 'list', pointer: '/widgets/9/widgets' })).toBeUndefined()
+  })
+
+  it('gives the page limit that forbids the drop and leaves the widgets unchanged', () => {
+    const deep = [section([section([section([{ type: 'kpi' }])])])]
+    const before = structuredClone(deep)
+    expect(dropPlace(deep, 'section', { kind: 'list', pointer: '/widgets/0/widgets/0/widgets/0/widgets' })).toEqual({
+      limit: 'depth',
+    })
+    expect(
+      dropPlace(deep, 'columns', {
+        kind: 'widget',
+        pointer: '/widgets/0/widgets/0/widgets/0/widgets/0',
+        half: 'lower',
+      }),
+    ).toEqual({ limit: 'depth' })
+    expect(dropPlace([{ type: 'table' }], 'table', { kind: 'list', pointer: '/widgets' })).toEqual({ limit: 'table' })
+    expect(dropPlace([{ type: 'form' }], 'taskInbox', { kind: 'list', pointer: '/widgets' })).toEqual({
+      limit: 'recordWidget',
+    })
+    expect(deep).toEqual(before)
+  })
+})
+
+describe('innermostPointer', () => {
+  it('picks the pointer with the most segments', () => {
+    expect(innermostPointer(['/widgets', '/widgets/0', '/widgets/0/widgets', '/widgets/0/widgets/1'])).toBe(
+      '/widgets/0/widgets/1',
+    )
+    expect(innermostPointer(['/widgets/0/widgets/1', '/widgets'])).toBe('/widgets/0/widgets/1')
+  })
+
+  it('picks nothing from no pointers', () => {
+    expect(innermostPointer([])).toBeUndefined()
   })
 })

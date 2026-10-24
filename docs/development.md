@@ -27,10 +27,11 @@ critical alert. It is not a NexKit check and does not run on NexKit's branches. 
 The bundle budget, `web/bundle-budget.json`, keeps the SPA's first load small. The main bundle is the
 entry script of `index.html` and the scripts it preloads, gzipped. Its baseline is 537,019 bytes,
 built from commit `ad13bd4`, the last commit before any M12 code. It may grow by 50 KB over that.
-The chart library loads in its own lazy chunk, the file `assets/ChartDrawing-*.js`. `scripts/build.sh`
-runs [`scripts/check-bundle.mjs`](../scripts/check-bundle.mjs) after the SPA build. It prints both
-sizes and fails when the main bundle is over budget, when there is no chart chunk or when the chart
-chunk is among the main bundle files. Do not raise the budget to make the check pass: find what grew.
+The chart library loads in its own lazy chunk, the file `assets/ChartDrawing-*.js`. The page
+designer's canvas, palette and drag library load in another, `assets/StudioPageDesign-*.js`, when
+the Design tab opens. `scripts/build.sh` runs [`scripts/check-bundle.mjs`](../scripts/check-bundle.mjs)
+after the SPA build. It prints the three sizes and fails when the main bundle is over budget, when
+there is no chart chunk or page design chunk or when either chunk is among the main bundle files. Do not raise the budget to make the check pass: find what grew.
 
 ## Test runs and reports
 

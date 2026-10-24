@@ -4,11 +4,12 @@
 //
 // SPA_DIR defaults to src/Axis.Server/wwwroot and FILE to web/bundle-budget.json. The main bundle is
 // the entry script of index.html plus every script it preloads. The chart chunk is the file in
-// assets/ whose name starts with the budget's chartChunk prefix, the lazy module that draws charts.
-// Sizes are gzipped. Prints both sizes, and exits 1 when
+// assets/ whose name starts with the budget's chartChunk prefix, the lazy module that draws charts. The page
+// design chunk is the same for the designChunk prefix, the lazy module of the page designer's canvas and palette.
+// Sizes are gzipped. Prints the three sizes, and exits 1 when
 // - the main bundle is larger than mainBaselineBytes + allowedGrowthBytes,
-// - there is no separate chart chunk, or
-// - the chart code is among the main bundle files, so every page would load it.
+// - there is no separate chart chunk or page design chunk, or
+// - the chart code or the page designer is among the main bundle files, so every page would load it.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -32,8 +33,8 @@ function mainBundleFiles(spaDirectory) {
   return [...new Set(references.map((reference) => reference.replace(/^\/+/, '')))]
 }
 
-/** The chart chunk files in assets/, relative to the SPA folder. */
-function chartChunkFiles(spaDirectory, prefix) {
+/** The files in assets/ whose name starts with `prefix`, relative to the SPA folder. */
+function chunkFiles(spaDirectory, prefix) {
   const assets = path.join(spaDirectory, 'assets')
   if (!existsSync(assets)) return []
   return readdirSync(assets)
@@ -43,13 +44,15 @@ function chartChunkFiles(spaDirectory, prefix) {
 
 /**
  * Measures the SPA in spaDirectory and checks it against the budget. Returns the gzipped size of the
- * main bundle and of the chart chunk in bytes, and the problems found.
+ * main bundle, of the chart chunk and of the page design chunk in bytes, and the problems found.
  */
 export function checkBundle(spaDirectory, budget) {
   const mainFiles = mainBundleFiles(spaDirectory)
-  const chartFiles = chartChunkFiles(spaDirectory, budget.chartChunk)
+  const chartFiles = chunkFiles(spaDirectory, budget.chartChunk)
+  const designFiles = chunkFiles(spaDirectory, budget.designChunk)
   const mainBytes = mainFiles.reduce((sum, file) => sum + gzippedSize(path.join(spaDirectory, file)), 0)
   const chartBytes = chartFiles.reduce((sum, file) => sum + gzippedSize(path.join(spaDirectory, file)), 0)
+  const designBytes = designFiles.reduce((sum, file) => sum + gzippedSize(path.join(spaDirectory, file)), 0)
   const limit = budget.mainBaselineBytes + budget.allowedGrowthBytes
 
   const problems = []
@@ -65,7 +68,13 @@ export function checkBundle(spaDirectory, budget) {
   for (const file of mainFiles.filter((candidate) => chartFiles.includes(candidate))) {
     problems.push(`The chart chunk ${file} is part of the main bundle, so every page loads the chart code.`)
   }
-  return { mainBytes, chartBytes, problems }
+  if (designFiles.length === 0) {
+    problems.push(`There is no page design chunk: no file in assets/ starts with '${budget.designChunk}'.`)
+  }
+  for (const file of mainFiles.filter((candidate) => designFiles.includes(candidate))) {
+    problems.push(`The page design chunk ${file} is part of the main bundle, so every page loads the page designer.`)
+  }
+  return { mainBytes, chartBytes, designBytes, problems }
 }
 
 function main(args) {
@@ -76,11 +85,12 @@ function main(args) {
   const spaDirectory = path.resolve(rest[0] ?? path.join(scriptRoot, 'src', 'Axis.Server', 'wwwroot'))
   const budget = JSON.parse(readFileSync(budgetFile, 'utf8'))
 
-  const { mainBytes, chartBytes, problems } = checkBundle(spaDirectory, budget)
+  const { mainBytes, chartBytes, designBytes, problems } = checkBundle(spaDirectory, budget)
   console.log(
     `Main bundle: ${kilobytes(mainBytes)} gzipped, budget ${kilobytes(budget.mainBaselineBytes + budget.allowedGrowthBytes)}.`,
   )
   console.log(`Chart chunk: ${kilobytes(chartBytes)} gzipped.`)
+  console.log(`Page design chunk: ${kilobytes(designBytes)} gzipped.`)
   for (const problem of problems) process.stderr.write(`${problem}\n`)
   return problems.length > 0 ? 1 : 0
 }

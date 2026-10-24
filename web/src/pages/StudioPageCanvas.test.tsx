@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import type { DndContextProps } from '@dnd-kit/core'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -14,6 +15,20 @@ import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import { chooseOption } from '../test/antd'
 import { StudioEditor } from './StudioEditor'
+
+// The drag library draws as it is, and the test calls the drop handler that the page designer gives it, because jsdom
+// has no layout to hit-test.
+const dnd = vi.hoisted(() => ({ props: undefined as DndContextProps | undefined }))
+vi.mock('@dnd-kit/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@dnd-kit/core')>()
+  return {
+    ...actual,
+    DndContext: (props: DndContextProps) => {
+      dnd.props = props
+      return <actual.DndContext {...props} />
+    },
+  }
+})
 
 // The chart library is not under test here.
 vi.mock('../platform/Chart', () => ({
@@ -696,6 +711,104 @@ describe('the Design tab of a page', () => {
         expect(button).toHaveAccessibleDescription('A container here would hold a list past level 4.')
       }
       expect(palette.getByTestId('studio-palette-kpi')).toBeEnabled()
+    })
+  })
+
+  describe('dropping', () => {
+    const section = (widgets: Record<string, unknown>[]) => ({ type: 'section', title: { textKey: '' }, widgets })
+
+    async function openDesign(widgets: Record<string, unknown>[]) {
+      const stubbed = stub(content(widgets))
+      renderEditor()
+      await screen.findByTestId('studio-page-editor', {}, slow)
+      await openTab('Design')
+      const design = await screen.findByTestId('studio-design-panel', {}, slow)
+      await screen.findByTestId('studio-page-canvas', {}, slow)
+      return { ...stubbed, design, palette: within(within(design).getByTestId('studio-palette')) }
+    }
+
+    /** Drops a palette type on a target, as the library reports the end of a drag: the pointer at `clientY` in a box 100 high. */
+    function dropOn(type: string, data: { kind: 'widget' | 'list'; pointer: string }, clientY = 10) {
+      act(() =>
+        dnd.props!.onDragEnd!({
+          active: { id: `palette:${type}`, data: { current: { type } } },
+          over: { id: `${data.kind}:${data.pointer}`, data: { current: data }, rect: { top: 0, height: 100 } },
+          delta: { x: 0, y: 0 },
+          activatorEvent: new MouseEvent('pointerdown', { clientY }),
+        } as never),
+      )
+    }
+
+    it('inserts nothing when the depth limit forbids the drop, and says why', async () => {
+      const nest = [section([section([section([{ type: 'kpi' }])])])]
+      const { design, palette } = await openDesign(nest)
+
+      dropOn('section', { kind: 'list', pointer: '/widgets/0/widgets/0/widgets/0/widgets' })
+
+      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent(
+        'A container here would hold a list past level 4.',
+      )
+      expect(
+        within(design).queryByTestId('studio-widget-/widgets/0/widgets/0/widgets/0/widgets/1'),
+      ).not.toBeInTheDocument()
+      await openTab('JSON')
+      const json = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'JSON' })
+      expect(JSON.parse(json.value)).toEqual(content(nest))
+    })
+
+    it('inserts after a widget dropped on its lower half, selects the new widget and names the place', async () => {
+      const { design, palette, posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+
+      dropOn('detail', { kind: 'widget', pointer: '/widgets/0' }, 90)
+
+      await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
+      expect(posts.at(-1)!.widgets[1]).toEqual(newWidget('detail'))
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      const announcement = palette.getByTestId('studio-palette-announcement')
+      expect(announcement).toHaveTextContent('Inserted detail')
+      expect(announcement).toHaveTextContent('Page')
+      expect(announcement).toHaveTextContent('position 2')
+    })
+
+    it('inserts before a widget dropped on its upper half', async () => {
+      const { posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+
+      dropOn('detail', { kind: 'widget', pointer: '/widgets/1' }, 10)
+
+      await waitFor(
+        () => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['kpi', 'detail', 'chart']),
+        slow,
+      )
+    })
+
+    it('appends to the list of a section it is dropped on', async () => {
+      const { design, palette, posts } = await openDesign([{ type: 'kpi' }, section([{ type: 'chart' }])])
+      // The stub draws the section as a placeholder, which still has a drop area for its list.
+      await screen.findByTestId('studio-canvas-placeholder', {}, slow)
+      const lists = screen.getAllByTestId('studio-canvas-list').map((list) => list.getAttribute('data-list'))
+      expect(lists).toEqual(['/widgets', '/widgets/1/widgets'])
+
+      dropOn('kpi', { kind: 'list', pointer: '/widgets/1/widgets' })
+
+      await waitFor(
+        () => expect(posts.at(-1)!.widgets[1]).toMatchObject({ widgets: [{ type: 'chart' }, newWidget('kpi')] }),
+        slow,
+      )
+      expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('Page › section 2 · position 2')
+    })
+
+    it('does nothing when the draft has no such target', async () => {
+      const { palette, posts } = await openDesign([{ type: 'kpi' }])
+      await screen.findByTestId('kpi-tile', {}, slow)
+      const before = posts.length
+
+      dropOn('kpi', { kind: 'widget', pointer: '/widgets/4' })
+      dropOn('kpi', { kind: 'list', pointer: '/widgets/0/widgets' })
+
+      expect(palette.getByTestId('studio-palette-announcement')).toBeEmptyDOMElement()
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      expect(posts).toHaveLength(before)
     })
   })
 })

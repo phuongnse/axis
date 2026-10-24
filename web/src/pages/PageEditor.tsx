@@ -1,5 +1,5 @@
 import { Button, Card, Flex, Input, InputNumber, Select, Switch, Typography } from 'antd'
-import { lazy, Suspense, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { lazy, Suspense, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { getAt } from '../platform/jsonPatch'
 import {
   actionKeyOf,
@@ -8,15 +8,12 @@ import {
   containerTypes,
   dataSourceColumns,
   dataSourceParameters,
-  insertionPlace,
   isNumberType,
   type ListPart,
   moveTo,
   newColumn,
   newTab,
   newWidget,
-  paletteLimit,
-  type PathStep,
   typeChanges,
   widgetLists,
   widgetPointerOf,
@@ -32,6 +29,7 @@ import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTextsContext } from './labelTextsContext'
 import { MappingRows } from './MappingRows'
+import { stepLabels, usePartLabel } from './pagePaletteSupport'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -182,103 +180,6 @@ export function PageWidgets({
             )}
           </>
         )}
-      </Flex>
-    </div>
-  )
-}
-
-/** Hides the announcement from the eye and keeps it in the accessibility tree. It has no colour of its own. */
-const visuallyHidden: CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  margin: -1,
-  padding: 0,
-  border: 0,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-}
-
-const paletteReasons = {
-  table: 'shell.studio.palette.oneTable',
-  recordWidget: 'shell.studio.palette.oneRecordWidget',
-  depth: 'shell.studio.palette.tooDeep',
-} as const
-
-/**
- * The palette of the ten widget types. A click, Enter or Space on a type inserts a new widget at the selection and
- * selects it: after a leaf, at the end of a container's first list, or at the end of the page's list when the page has
- * no widgets. A hidden live region names the list and position where it landed. A type the page cannot take under the
- * limits of D61 is disabled, with its reason beside it. A pointer that names no widget selects the first widget, as
- * the tree does. A pointer to an action of a widget counts as that widget.
- */
-export function PagePalette({
-  value,
-  selected: pointer,
-  onSelect,
-  onChange,
-}: {
-  value: Content
-  selected: string
-  onSelect: (pointer: string) => void
-  onChange: ChangeHandler
-}) {
-  const t = useText()
-  const partLabel = usePartLabel()
-  const [announcement, setAnnouncement] = useState('')
-  const widgets = Array.isArray(value.widgets) ? value.widgets : undefined
-  if (widgets === undefined) {
-    return null
-  }
-  const widgetPointer = widgetPointerOf(pointer)
-  const selected = getAt(value, widgetPointer) === undefined ? '/widgets/0' : widgetPointer
-  const place = insertionPlace(widgets, selected)
-
-  function insert(type: string) {
-    if (widgets === undefined) {
-      return
-    }
-    const items = getAt({ widgets }, place.list) as unknown[]
-    onChange(place.list, [...items.slice(0, place.index), newWidget(type), ...items.slice(place.index)])
-    onSelect(`${place.list}/${place.index}`)
-    const path = widgetLists(widgets).find((list) => list.pointer === place.list)?.path ?? []
-    const label = [t('shell.studio.page.pageList'), ...path.flatMap((step) => stepLabels(step, partLabel))].join(' › ')
-    setAnnouncement(
-      `${t('shell.studio.palette.inserted')} ${type} · ${label} · ${t('shell.studio.palette.position')} ${place.index + 1}`,
-    )
-  }
-
-  return (
-    <div data-testid="studio-palette" role="group" aria-label={t('shell.studio.palette')}>
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.palette')}</Typography.Text>
-        <Flex gap="small" wrap>
-          {addableTypes.map((type) => {
-            const limit = paletteLimit(widgets, place.list, type)
-            const reasonId = `studio-palette-reason-${type}`
-            return (
-              <Flex vertical key={type}>
-                <Button
-                  disabled={limit !== undefined}
-                  aria-describedby={limit === undefined ? undefined : reasonId}
-                  data-testid={`studio-palette-${type}`}
-                  onClick={() => insert(type)}
-                >
-                  {type}
-                </Button>
-                {limit !== undefined && (
-                  <Typography.Text type="secondary" id={reasonId}>
-                    {t(paletteReasons[limit])}
-                  </Typography.Text>
-                )}
-              </Flex>
-            )
-          })}
-        </Flex>
-        <div role="status" aria-live="polite" data-testid="studio-palette-announcement" style={visuallyHidden}>
-          {announcement}
-        </div>
       </Flex>
     </div>
   )
@@ -436,17 +337,6 @@ function WidgetList({ pointer, widgets, tree }: { pointer: string; widgets: unkn
   )
 }
 
-/** The words that name a part of a container, such as `Column 2` or `Tab 1`. A section has none. */
-function usePartLabel() {
-  const t = useText()
-  return (part: ListPart): string | undefined => {
-    if (part.kind === 'section') {
-      return undefined
-    }
-    return `${t(part.kind === 'column' ? 'shell.studio.page.column' : 'shell.studio.page.tab')} ${part.index + 1}`
-  }
-}
-
 /** One widget: the button that selects it, its move and remove buttons, and the lists inside a container. */
 function WidgetRow({
   listPointer,
@@ -568,12 +458,6 @@ function partCount(widget: Content): number {
   }
   const parts = widget.type === 'columns' ? widget.columns : widget.tabs
   return Array.isArray(parts) ? parts.length : -1
-}
-
-/** The names a step adds to a list's path, such as `columns 1` and `Column 2`. */
-function stepLabels(step: PathStep, partLabel: (part: ListPart) => string | undefined): string[] {
-  const part = partLabel(step.part)
-  return part === undefined ? [`${step.type} ${step.position}`] : [`${step.type} ${step.position}`, part]
 }
 
 /** The picker of a name, or a plain box while the application's names have not loaded. */
