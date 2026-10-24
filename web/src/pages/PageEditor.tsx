@@ -211,7 +211,7 @@ const paletteReasons = {
  * selects it: after a leaf, at the end of a container's first list, or at the end of the page's list when the page has
  * no widgets. A hidden live region names the list and position where it landed. A type the page cannot take under the
  * limits of D61 is disabled, with its reason beside it. A pointer that names no widget selects the first widget, as
- * the tree does.
+ * the tree does. A pointer to an action of a widget counts as that widget.
  */
 export function PagePalette({
   value,
@@ -231,7 +231,8 @@ export function PagePalette({
   if (widgets === undefined) {
     return null
   }
-  const selected = getAt(value, pointer) === undefined ? '/widgets/0' : pointer
+  const widgetPointer = widgetPointerOf(pointer)
+  const selected = getAt(value, widgetPointer) === undefined ? '/widgets/0' : widgetPointer
   const place = insertionPlace(widgets, selected)
 
   function insert(type: string) {

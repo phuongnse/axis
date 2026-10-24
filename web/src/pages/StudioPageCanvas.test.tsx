@@ -609,6 +609,30 @@ describe('the Design tab of a page', () => {
       expect(screen.queryByTestId('table-action-error')).not.toBeInTheDocument()
       expect(appRequests(fetchMock)).toEqual([])
     })
+
+    it('inserts from the palette after the widget of a selected row action, not into its action list', async () => {
+      const { design, posts } = await openActions()
+      await userEvent.click(button(design, '/widgets/0', 'rowActions/1'))
+
+      await userEvent.click(within(within(design).getByTestId('studio-palette')).getByTestId('studio-palette-kpi'))
+
+      await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(5), slow)
+      const saved = posts.at(-1)!.widgets
+      expect(saved[0].rowActions).toHaveLength(2)
+      expect(saved[1]).toEqual(newWidget('kpi'))
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+    })
+
+    it('inserts from the palette after a KPI whose navigate action is selected', async () => {
+      const { design, posts } = await openActions()
+      await userEvent.click(button(design, '/widgets/3', 'navigate'))
+
+      await userEvent.click(within(within(design).getByTestId('studio-palette')).getByTestId('studio-palette-kpi'))
+
+      await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(5), slow)
+      expect(posts.at(-1)!.widgets[4]).toEqual(newWidget('kpi'))
+      expect(within(design).getByTestId('studio-widget-/widgets/4')).toHaveAttribute('aria-current', 'true')
+    })
   })
 
   describe('palette', () => {
