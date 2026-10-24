@@ -1,5 +1,6 @@
 import { Steps } from 'antd'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { FormCanvasContext } from './formCanvas'
 import type { FormMetadata } from './site'
 import { useText } from './texts'
 import type { Section, useRecordForm } from './useRecordForm'
@@ -13,6 +14,8 @@ const focusable = 'input:not([type=hidden]), textarea, [role=combobox], button'
  * because the values live in `recordForm`. A step whose fields the form state answer all hides is
  * skipped and left out of the progress bar. After a move, focus goes to the first input of the new
  * step. A form without steps is one page: `fields` holds every section and `last` is always true.
+ *
+ * Inside the Studio form canvas, the canvas picks the step. Hidden steps are not skipped and focus does not move.
  */
 export function useFormSteps(
   form: FormMetadata | null,
@@ -20,6 +23,7 @@ export function useFormSteps(
   recordForm: ReturnType<typeof useRecordForm>,
 ) {
   const t = useText()
+  const canvas = useContext(FormCanvasContext)
   const steps = form?.steps ?? []
   const active = steps.length > 0
   const [current, setCurrent] = useState(0)
@@ -36,20 +40,24 @@ export function useFormSteps(
     const names = fieldNamesOf(index)
     return names.length > 0 && names.every((name) => recordForm.hidden(name))
   }
-  const visible = steps.map((_, index) => index).filter((index) => !hiddenStep(index))
+  const visible = steps.map((_, index) => index).filter((index) => canvas !== null || !hiddenStep(index))
   // A current step that became hidden moves to the next visible one, or to the last visible one.
-  const index = visible.includes(current) ? current : (visible.find((i) => i > current) ?? visible.at(-1) ?? current)
+  const index = canvas
+    ? Math.max(0, Math.min(canvas.step, steps.length - 1))
+    : visible.includes(current)
+      ? current
+      : (visible.find((i) => i > current) ?? visible.at(-1) ?? current)
   const position = visible.indexOf(index)
   const last = !active || position === visible.length - 1 || position < 0
 
   useEffect(() => {
-    if (previous.current === index) {
+    if (canvas !== null || previous.current === index) {
       return
     }
     previous.current = index
     const inputs = [...(container.current?.querySelectorAll<HTMLElement>(focusable) ?? [])]
     inputs.find((element) => !element.matches(':disabled, [readonly]'))?.focus()
-  }, [index])
+  }, [index, canvas])
 
   const next = async () => {
     if (last || checking) {

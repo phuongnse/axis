@@ -1,4 +1,4 @@
-import { Alert, Card, Segmented, Typography } from 'antd'
+import { Card, Segmented, Typography } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
 import { setApiGuard } from '../platform/api'
@@ -13,20 +13,18 @@ import {
   fetchStudioPageMetadata,
   ServerUnreachableError,
   type StudioDiagnostic,
-  type StudioNames,
   type StudioPageMetadataAnswer,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { StudioNamesContext } from '../platform/studioNames'
-import { useText, useTextCatalogs, type TextCatalog } from '../platform/texts'
+import { useText, useTextCatalogs } from '../platform/texts'
 import { TextProvider } from '../platform/TextProvider'
 import { useDesignTokens } from '../platform/themeMode'
 import { PhoneWidthOverride } from '../platform/usePhoneWidth'
 import { WidgetTree } from '../platform/WidgetTree'
 import { PlatformContext } from './context'
-
-/** How long after the last edit the canvas asks for the draft's metadata. */
-const debounceMs = 300
+import { CanvasAlert } from './CanvasAlert'
+import { canvasTexts, cancel, debounceMs, diagnosticsAt } from './studioCanvas'
 
 /** The route's latest answer, or `'failed'`. `undefined` before the first. */
 type Answer = StudioPageMetadataAnswer | 'failed' | undefined
@@ -36,37 +34,8 @@ type CanvasWidth = 'desktop' | 'phone'
 /** The width of the page at phone width, in pixels. */
 const phoneWidth = 375
 
-/** A click or a submit on the canvas runs nothing: not a link, not a button and not a form. */
-function cancel(event: SyntheticEvent) {
-  event.preventDefault()
-  event.stopPropagation()
-}
-
 const frameSelector = '[data-testid="studio-canvas-widget"]'
 const actionSelector = '[data-action]'
-
-/**
- * The application's own texts, from Studio's names: the platform locale when the application has it, otherwise its
- * first locale, which is also the fallback. The platform texts come after, through the outer catalogs.
- */
-function canvasTexts(names: StudioNames | undefined, platformLocale: string | undefined) {
-  const fallbackLocale = names?.locales[0]
-  if (!names || fallbackLocale === undefined) {
-    return null
-  }
-  const locale =
-    platformLocale !== undefined && names.locales.includes(platformLocale) ? platformLocale : fallbackLocale
-  const catalog: TextCatalog = { texts: {}, fallbackTexts: {} }
-  for (const item of names.texts) {
-    if (Object.hasOwn(item.texts, locale)) {
-      catalog.texts[item.key] = item.texts[locale]
-    }
-    if (Object.hasOwn(item.texts, fallbackLocale)) {
-      catalog.fallbackTexts[item.key] = item.texts[fallbackLocale]
-    }
-  }
-  return { catalog, locale, fallbackLocale }
-}
 
 /**
  * Draws the unsaved draft of a page with the site's own widgets. It posts the draft to the draft page metadata
@@ -219,14 +188,6 @@ export function StudioPageCanvas({
   )
 }
 
-/** The diagnostics that name the widget at `path`, or a path inside it. None when the widget has no path. */
-function diagnosticsAt(diagnostics: StudioDiagnostic[], path: string | undefined): StudioDiagnostic[] {
-  if (path === undefined) {
-    return []
-  }
-  return diagnostics.filter((diagnostic) => diagnostic.path === path || diagnostic.path.startsWith(`${path}/`))
-}
-
 function WidthSwitch({ value, onChange }: { value: CanvasWidth; onChange: (width: CanvasWidth) => void }) {
   const t = useText()
   return (
@@ -315,11 +276,6 @@ function CanvasWidgetFrame({
 function CanvasPage({ title, children }: { title: string; children: ReactNode }) {
   const t = useText()
   return <PageLayout title={t(title)}>{children}</PageLayout>
-}
-
-function CanvasAlert({ testId, textKey }: { testId: string; textKey: string }) {
-  const t = useText()
-  return <Alert data-testid={testId} type="warning" title={t(textKey)} />
 }
 
 /** A widget that does not compile: a box with its type and a line for each of its diagnostics. */

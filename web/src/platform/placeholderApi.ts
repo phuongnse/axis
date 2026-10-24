@@ -20,7 +20,7 @@ const defaultPage = 1
 const defaultPageSize = 20
 
 /** The constant id of placeholder record number `n`. */
-function placeholderId(n: number): string {
+export function placeholderId(n: number): string {
   return `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 }
 
@@ -128,7 +128,7 @@ function rowCount(dataSource: DataSourceMetadata, kind: 'kpi' | 'chart' | 'other
  * metadata. Values depend on the field type and are fixed, so the same request always gets the same
  * answer. A write, and a path the page does not use, gets a local 404.
  */
-export function placeholderApi(metadata: PageMetadata): ApiGuard {
+export function placeholderApi(metadata: Pick<PageMetadata, 'widgets'>): ApiGuard {
   const recordSources = new Map<string, RecordBuilder>()
   const exact = new Map<string, (query: URLSearchParams) => unknown>()
   const widgets = leafWidgets(metadata.widgets)

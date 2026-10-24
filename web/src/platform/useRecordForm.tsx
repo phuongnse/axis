@@ -1,7 +1,8 @@
 import { Button, Form, Input, Space, Typography } from 'antd'
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
+import { FormCanvasContext } from './formCanvas'
 import { fetchFormState, type FormStateAnswer } from './formState'
 import { formatValue } from './formatValue'
 import { buildFormStateBody } from './recordBody'
@@ -132,6 +133,7 @@ export function useRecordForm(
   conditions?: FormConditions,
 ) {
   const t = useText()
+  const canvas = useContext(FormCanvasContext)
   const shown = useMemo(() => sections.flatMap((section) => section.fields), [sections])
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
   const [values, setValues] = useState<Record<string, FieldValue>>(snapshot.initial)
@@ -381,12 +383,16 @@ export function useRecordForm(
     fieldErrors[name] ??
     (touched.has(name) ? answer?.errors[`${fieldPointer}${name}`]?.map((message) => t(message)) : undefined)
 
-  // The inputs of the sections a wizard step lists, or of every section with `null`.
+  // The inputs of the sections a wizard step lists, or of every section with `null`. In the Studio canvas each
+  // section and each field is wrapped, so the canvas can mark it.
   const fieldsFor = (names: readonly string[] | null): ReactNode => (
     <>
-      {sections.map((section, index) =>
-        names !== null && !(section.name !== null && names.includes(section.name)) ? null : (
-          <Fragment key={index}>
+      {sections.map((section, index) => {
+        if (names !== null && !(section.name !== null && names.includes(section.name))) {
+          return null
+        }
+        const content = (
+          <>
             {section.titleKey !== null &&
               !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
                 <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
@@ -397,7 +403,7 @@ export function useRecordForm(
                 const { field } = entry
                 const errors = errorsOf(field.name)
                 const control = input(field, lockedOf(entry))
-                return (
+                const item = (
                   <Form.Item
                     key={field.name}
                     label={labelOf(field)}
@@ -416,10 +422,12 @@ export function useRecordForm(
                     {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
                   </Form.Item>
                 )
+                return canvas ? <Fragment key={field.name}>{canvas.field(field.name, item)}</Fragment> : item
               })}
-          </Fragment>
-        ),
-      )}
+          </>
+        )
+        return <Fragment key={index}>{canvas ? canvas.section(index, content) : content}</Fragment>
+      })}
       {shown
         .filter(
           (entry) =>

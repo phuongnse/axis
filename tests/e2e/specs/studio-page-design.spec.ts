@@ -11,11 +11,12 @@ import { useSession } from "../sessions";
 test.setTimeout(180_000);
 
 const dashboardId = "8ae8ab97-77c5-48e9-a798-a912b5bb3cf3";
+const ticketEditId = "1db765b0-483d-456b-9939-17e2a36de3b6";
 const allTicketsId = "4ff52d55-8194-45c4-901b-bdc18e269096";
 
 // The main server's Studio edits the purchase request copy only. This server's Studio folder is a copy of the service
 // desk sample, whose Dashboard page has KPIs, a chart and a table.
-test.describe("Studio draws a page on the Design tab", () => {
+test.describe("Studio draws a page and a form on the Design tab", () => {
   let copy: string;
   let server: Awaited<ReturnType<typeof startServer>>;
 
@@ -92,6 +93,42 @@ test.describe("Studio draws a page on the Design tab", () => {
       '[data-testid="studio-canvas-widget"][data-path="/widgets/0/columns/0/widgets/0"]',
     );
     await expect(kpi).not.toHaveAttribute("data-marked");
+  });
+
+  test("an author sees both steps of the ticket form, and the condition of the Resolution field after picking the second", async ({
+    page,
+  }) => {
+    await useSession(page, "hoa");
+    const applicationRequests: string[] = [];
+    page.on("request", (request) => {
+      const { pathname } = new URL(request.url());
+      if (pathname.startsWith("/api/apps/")) {
+        applicationRequests.push(`${request.method()} ${pathname}`);
+      }
+    });
+
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketEditId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    const steps = page.getByTestId("studio-form-steps");
+    await expect(steps).toContainText("Describe the problem");
+    await expect(steps).toContainText("Add details");
+    const canvas = page.getByTestId("studio-form-canvas");
+    await expect(
+      canvas.getByRole("textbox", { name: "* Title", exact: true }),
+    ).toBeVisible();
+
+    await steps.getByText("Add details", { exact: true }).click();
+    await expect(
+      canvas
+        .getByTestId("studio-form-field")
+        .filter({ has: page.getByTestId("studio-condition-mark") })
+        .getByTestId("studio-condition-mark")
+        .first(),
+    ).toContainText("status == 'resolved'");
+    expect(applicationRequests).toEqual([]);
   });
 
   test("an author selects a row action on the canvas and adds a navigate action that maps the record, and no request goes to the application's API", async ({

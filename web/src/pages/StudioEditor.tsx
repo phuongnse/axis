@@ -43,6 +43,7 @@ import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
+import { StudioFormCanvas } from './StudioFormCanvas'
 import { StudioPageCanvas } from './StudioPageCanvas'
 import { TextTable, type TextColumn } from './TextTable'
 
@@ -635,7 +636,20 @@ export function StudioEditor({
                         ) : null,
                     },
                   ]
-                : []),
+                : item.kind === 'form' && schema
+                  ? [
+                      {
+                        key: 'design',
+                        label: t('shell.studio.design'),
+                        children:
+                          tab === 'design' ? (
+                            <div data-testid="studio-form-design">
+                              <StudioFormCanvas application={application} resourceId={item.id} draft={draft} />
+                            </div>
+                          ) : null,
+                      },
+                    ]
+                  : []),
               {
                 key: 'form',
                 label: t('shell.studio.form'),
