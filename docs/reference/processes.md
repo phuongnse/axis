@@ -530,7 +530,8 @@ for texts. **Both** means different parts use different releases.
   different active release under the lock runs again on the new release. The
   process start endpoint, the [inbound endpoint](inbound-endpoints.md#responses),
   task completion and record creates and updates answer `503` after three
-  release changes. Operator [retry](process-inspection.md#retry) takes it too, as the first
+  release changes. A record delete takes the lock shared too, and the subject's row lock decides between a
+  start and a delete of the same record. Operator [retry](process-inspection.md#retry) takes it too, as the first
   statement of its transaction, and answers `503` after three release changes.
   [Resolve](process-inspection.md#resolve) takes it the same way. Event delivery reads the active release again in each
   trigger's transaction, and skips a trigger that the new release no longer
