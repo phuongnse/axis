@@ -492,7 +492,7 @@ data sources.
     a date-time. A `pie` has exactly one measure, otherwise it is `AXC0241` at
     `/widgets/{i}/measures`.
   - `parameters` will bind page parameters with the table's name map, under
-    the same type and required rules as above *(planned for M12)*. The page
+    the same type and required rules as above *(planned for M13)*. The page
     schema rejects `parameters` on a chart (`AXC0004`), as on a KPI.
   - Every data source parameter must be optional (`AXC0060`, as for a KPI),
     because a chart has no filter bar and binds no page parameter yet.
@@ -507,7 +507,7 @@ data sources.
   - Every parameter of the data source must be optional (`AXC0060` at
     `/widgets/{i}/dataSource`, naming the parameter), because a KPI has no
     filter bar. A KPI cannot bind page parameters with `parameters` yet
-    *(planned for M12)*, and the page schema does not allow it on a `kpi`
+    *(planned for M13)*, and the page schema does not allow it on a `kpi`
     (`AXC0004`).
   - The `label` and the `comparison` label join `AXC0028`. A `navigate`
     follows the checks of

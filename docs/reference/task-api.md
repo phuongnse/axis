@@ -257,7 +257,7 @@ is a `403` before any of these checks.
     evaluated on the record as it will be stored, whether or not the body
     sends `values`: without `values` it reads the stored record. Nothing is
     written and the task stays open. A hidden field is not required.
-  - *(Planned for M12.)* A value for a field whose `readOnlyWhen` is true, or
+  - *(Planned for M13.)* A value for a field whose `readOnlyWhen` is true, or
     that is hidden, is keyed `/values/<field>` with "Cannot be set.". It is
     evaluated on the record as it will be stored.
   - Any other property, a repeated property and a body that is not a JSON

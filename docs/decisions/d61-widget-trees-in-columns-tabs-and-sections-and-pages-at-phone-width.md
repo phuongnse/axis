@@ -9,7 +9,7 @@ container widgets, and they change the page format in place, see
 [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
 The [frontend reference](../reference/frontend.md) and the
 [resource files reference](../reference/resource-files.md) show the shapes. All
-of it is planned for M12.
+of it is built.
 
 - **Widget tree:** the `widgets` of a page holds one or more widgets. The
   format changes in place, `formatVersion` stays 1 and today's pages stay
@@ -36,7 +36,7 @@ of it is planned for M12.
   There is no per-widget setting until a sample needs one.
 - **Studio:** the page editor shows the tree, with add, remove, reorder and
   move into a container, and one panel per container type, as
-  [D53](d53-typed-editors-and-the-process-graph-in-studio.md) planned for M12.
+  [D53](d53-typed-editors-and-the-process-graph-in-studio.md) set out.
 
 Diagnostic codes for the new checks change with the issues that build them.
 

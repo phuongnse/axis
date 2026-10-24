@@ -47,8 +47,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   each field type, from fixture metadata, in light and dark mode. They are at
   `/design-system.html` on the development server only, and
   `scripts/design-system.sh` saves each as static HTML, see
-  [Development](../development.md#widget-previews). Previews of the tokens and
-  of the other M12 widgets are still *(planned for M12)*. The local agent session
+  [Development](../development.md#widget-previews). Previews of the detail, chart and
+  KPI widgets are still *(planned for M13)*. The local agent session
   publishes the saved files as the Design System artifact. See
   [D57](../decisions/d57-a-design-system-published-from-the-repository.md)
   and [Design changes](../delivery.md#design-changes).
@@ -58,6 +58,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   table binds an entity or a data source. The container widgets `columns`,
   `tabs` and `section` hold other widgets, see
   [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
+  Navigate actions with page parameters, and the detail, chart and KPI widgets,
+  are built, see [D63](../decisions/d63-navigate-actions-and-page-parameters.md)
+  and [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
   Data sources are agreed in
   [D18](../decisions/d18-data-sources.md) and described in
   [data-sources.md](data-sources.md). Shared `form` resources, the task inbox
@@ -601,8 +604,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `visibleWhen`, which works out a larger part of the language, see below.
       A toolbar has no row, so only its literals resolve. A parameter whose
       value is `null` is left out of the query, and a button whose `record` is
-      `null` is hidden. The target page does not read its parameters from the
-      URL or bind them yet _(planned for M12)_.
+      `null` is hidden. The target page reads its parameters from the URL
+      and binds them.
     - **`visibleWhen`.** A row action may have a boolean expression over the
       row. The compiler checks it against the row's names, as it checks a
       `navigate` parameter. The SPA works out only part of the language:
@@ -643,7 +646,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       the same `Idempotency-Key` and `409` text. On `201` it loads the
       current page of rows again, with no success message. A failure shows
       above the table.
-    - **Later.** Actions on selected rows come after M12.
+    - **Later.** Actions on selected rows come later.
   - **States.** Loading, empty and error states use the shared table and
     alert with platform texts. While the next page loads, the current rows
     stay under the loading overlay.
