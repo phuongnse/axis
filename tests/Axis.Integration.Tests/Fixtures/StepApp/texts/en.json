@@ -15,6 +15,7 @@
     "requestReview.main": "Request",
     "requestReview.step": "Review",
     "requestSettlement.main": "Settlement",
+    "requestSettlement.extra": "Extra",
     "role.auditor": "Auditor",
     "role.clerk": "Clerk",
     "role.finance": "Finance",

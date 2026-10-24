@@ -14,6 +14,8 @@
 # and seeds as axis_runtime. Docker Compose creates both roles. The publisher also gets the role
 # axis_scenario, which has CREATEDB, to run test scenarios. The server turns on Studio's test controls
 # through appsettings.Development.json.
+# The server creates Studio's new applications in artifacts/studio-apps, which git ignores. An exported
+# Studio__ApplicationsPath replaces that folder.
 # The publisher runs from the built Axis.Admin.dll, not under dotnet watch, so a change to its code
 # needs a restart of this script. The admin host reads no appsettings file, so this script sets the
 # publisher's tenant settings as environment variables of its process only. It serves the tenant
@@ -39,6 +41,7 @@ keycloak_port="${AXIS_KEYCLOAK_PORT:-8080}"
 purchasing_port="${AXIS_PURCHASING_PORT:-5207}"
 server_port="${AXIS_SERVER_PORT:-5206}"
 web_port="${AXIS_WEB_PORT:-5173}"
+studio_apps="${Studio__ApplicationsPath:-$PWD/artifacts/studio-apps}"
 
 log() { printf '[dev] %s\n' "$*"; }
 
@@ -232,7 +235,7 @@ generation=0
 start_server() {
   generation=$((generation + 1))
   # With the default port the server reads the schema connection string from appsettings.Development.json.
-  (cd src/Axis.Server && export ASPNETCORE_ENVIRONMENT=Development DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
+  (cd src/Axis.Server && export ASPNETCORE_ENVIRONMENT=Development DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true Studio__ApplicationsPath="$studio_apps"
     if [ -n "$schema_connection" ]; then
       export Tenants__default__SchemaConnectionString="$schema_connection" ConnectionStrings__PlatformSchema="$schema_connection"
     fi

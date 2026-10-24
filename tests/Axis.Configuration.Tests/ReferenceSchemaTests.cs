@@ -87,6 +87,16 @@ public sealed class ReferenceSchemaTests
         ("process", "$defs/branch/properties/next", "step", "/name"),
         ("process", "$defs/outcome/properties/next", "step", "/name"),
         ("scenario", "properties/steps/items/properties/step", "step", "1/process"),
+        ("page", "$defs/widget/properties/measure", "column", "1/dataSource"),
+        ("page", "$defs/widget/properties/comparison/properties/measure", "column", "2/dataSource"),
+        ("page", "$defs/widget/properties/category", "column", "1/dataSource"),
+        ("page", "$defs/widget/properties/measures/items/properties/name", "column", "3/dataSource"),
+        ("page", "$defs/widget/properties/parameters/propertyNames", "parameter", "2/dataSource"),
+        ("trigger", "properties/parameters/propertyNames", "parameter", "/dataSource"),
+        ("process", "$defs/step/properties/connector/properties/operation", "operation", "1/name"),
+        ("scenario", "$defs/stub/properties/connector/properties/operation", "operation", "1/name"),
+        ("connector", "$defs/operation/properties/lookup", "operation", "/name"),
+        ("scenario", "$defs/step/properties/outcome", "outcome", "1/step"),
     ];
 
     [Fact]
@@ -184,7 +194,7 @@ public sealed class ReferenceSchemaTests
     private static bool IsValidMark(JsonElement mark) => mark.ValueKind switch
     {
         JsonValueKind.String => _kinds.Contains(mark.GetString()),
-        JsonValueKind.Object => mark.GetProperty("part").GetString() is "field" or "step" && mark.GetProperty("of").ValueKind == JsonValueKind.String,
+        JsonValueKind.Object => mark.GetProperty("part").GetString() is "field" or "step" or "parameter" or "column" or "outcome" or "operation" && mark.GetProperty("of").ValueKind == JsonValueKind.String,
         _ => false,
     };
 
@@ -243,6 +253,7 @@ public sealed class ReferenceSchemaTests
                 "properties" => node.GetProperty("properties").GetProperty(segments[++i]),
                 "items" => node.GetProperty("items"),
                 "additionalProperties" => node.GetProperty("additionalProperties"),
+                "propertyNames" => node.GetProperty("propertyNames"),
                 "$defs" => root.GetProperty("$defs").GetProperty(segments[++i]),
                 _ => throw new ArgumentException($"Unknown path segment in {path}.", nameof(path)),
             };

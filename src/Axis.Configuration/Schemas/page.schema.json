@@ -88,7 +88,7 @@
         },
         "parameters": {
           "type": "object",
-          "propertyNames": { "$ref": "#/$defs/name" },
+          "propertyNames": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "parameter", "of": "2/dataSource" } },
           "additionalProperties": { "$ref": "#/$defs/name" }
         },
         "columns": {
@@ -104,20 +104,20 @@
         "title": { "$ref": "#/$defs/textReference" },
         "collapsed": { "type": "boolean" },
         "widgets": { "$ref": "#/$defs/widgets" },
-        "measure": { "$ref": "#/$defs/name" },
+        "measure": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "column", "of": "1/dataSource" } },
         "label": { "$ref": "#/$defs/textReference" },
         "comparison": {
           "type": "object",
           "additionalProperties": false,
           "required": ["measure", "label"],
           "properties": {
-            "measure": { "$ref": "#/$defs/name" },
+            "measure": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "column", "of": "2/dataSource" } },
             "label": { "$ref": "#/$defs/textReference" }
           }
         },
         "navigate": { "$ref": "#/$defs/navigateAction" },
         "kind": { "enum": ["bar", "line", "pie"] },
-        "category": { "$ref": "#/$defs/name" },
+        "category": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "column", "of": "1/dataSource" } },
         "measures": {
           "type": "array",
           "minItems": 1,
@@ -126,7 +126,7 @@
             "additionalProperties": false,
             "required": ["name", "label"],
             "properties": {
-              "name": { "$ref": "#/$defs/name" },
+              "name": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "column", "of": "3/dataSource" } },
               "label": { "$ref": "#/$defs/textReference" }
             }
           }

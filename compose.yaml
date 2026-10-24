@@ -18,6 +18,9 @@
 # activates both samples on it. It has no deployment bindings. The publisher serves both tenants, so it
 # runs preview requests. PostgreSQL runs the file only on an empty volume, so a volume from before the roles or
 # before the preview database needs `docker compose down -v` once. That deletes its data.
+# The server creates Studio's new applications in ./artifacts/studio-apps, mounted at /studio-apps.
+# AXIS_STUDIO_APPS_DIR moves that folder. On Linux the server runs as UID 1654, so the folder must be writable by
+# that UID. Docker creates a missing folder as root, so create it first.
 services:
   postgres:
     image: postgres:18-alpine
@@ -83,6 +86,10 @@ services:
       Templates__Path: /templates
       # The purchasing system stub on the Compose network. The token is in appsettings.Development.json.
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
+      # The folder where Studio creates new applications. The volume below mounts it from the checkout.
+      Studio__ApplicationsPath: /studio-apps
+    volumes:
+      - ${AXIS_STUDIO_APPS_DIR:-./artifacts/studio-apps}:/studio-apps
     ports:
       - "127.0.0.1:${AXIS_SERVER_PORT:-5206}:8080"
     # Healthy only once activation has finished and the server answers.

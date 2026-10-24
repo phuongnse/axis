@@ -2,7 +2,8 @@
  * What a string property names: a resource kind, or a part of the resource named by `of`, a JSON Pointer or a
  * Relative JSON Pointer from the property.
  */
-export type ReferenceMark = string | { part: 'field' | 'step'; of: string }
+export type ReferenceMark =
+  string | { part: 'field' | 'step' | 'parameter' | 'column' | 'outcome' | 'operation'; of: string }
 
 /** The part of JSON Schema that Studio's form reads. Other keywords are ignored. */
 export interface JsonSchema {
@@ -19,6 +20,8 @@ export interface JsonSchema {
   anyOf?: JsonSchema[]
   allOf?: JsonSchema[]
   additionalProperties?: boolean | JsonSchema
+  /** The schema of a map's keys. A mark on it makes the keys names of a part. */
+  propertyNames?: JsonSchema
   minimum?: number
   maximum?: number
   /** Marks a string that holds an expression, which Studio shows in the expression editor. */
