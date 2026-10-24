@@ -441,6 +441,9 @@ export const siteTexts: Record<string, string> = {
   'preview.tasks': 'Tasks',
 }
 
+/** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
+export const fixtureScopes = [`${apiPath}/`, `/api/sites/${sitePath}/`] as const
+
 /**
  * The answers of the fixture application's APIs, by path or by path and query. The page's own
  * queries (paging, sorting) are answered by the path alone.

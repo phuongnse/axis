@@ -16,7 +16,7 @@ Run from the repository root. Each script is also a NexKit check and a CI step.
 | `scripts/lint.sh`        | `dotnet format` check, oxlint, TypeScript and Prettier checks, the check that no test selects an `ant-` class, the check that every Playwright locator matches a string name or text exactly, the check that no test outside a `*PerformanceTests` class measures elapsed time, the Markdown link and anchor check, the docs structure check, and the Helm chart lint and schema check                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |         |
 | `scripts/test.sh`        | .NET unit tests, Vitest and the tests of the scripts themselves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |         |
 | `scripts/integration.sh` | .NET tests against real PostgreSQL and Keycloak through Testcontainers, which also run the test scenarios of every application under `samples/apps/` and of every sample template under `samples/templates/` on that PostgreSQL. Both are skipped when `NEXKIT_BASE_SHA` is set and every changed file is on the safe list in `scripts/lib/affected.mjs`. The performance tests, whose class names end in `PerformanceTests`, run one class at a time, after the other integration tests. They do not run when `NEXKIT_BASE_SHA` is set, and CI on `main` runs them. The smoke test of `scripts/dev.sh` is skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list. With arguments, which go to `dotnet test`, such as `--filter-class 'Axis.Integration.Tests.Studio*'`, it runs only the matching tests, without the scenario suites and the smoke test                                                                                        | Docker  |
-| `scripts/e2e.sh`         | Starts PostgreSQL, Keycloak, the built purchasing system stub, server, worker and publisher, creates the `journey` tenant for Studio journeys with its own database `axis_journey`, roles `axis_journey_schema` and `axis_journey_runtime`, and server on `127.0.0.2`, which the worker and the publisher serve too, builds the design-system preview page into `artifacts/design-system-app` for its spec, runs Playwright in Chromium, then runs the Compose smoke test, the production images smoke test and the on-premises smoke test, which installs `deploy/compose/` from the production images for two tenants, each skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list. Playwright and the services it starts are skipped when `NEXKIT_BASE_SHA` is set and every changed file is under `docs/` or is a Markdown file. With arguments, which go to Playwright, such as `tests/e2e/specs/studio.spec.ts` or `--grep 'publishes'`, it runs only the matching specs, after the sign-in setup, without the three smoke tests | Docker  |
+| `scripts/e2e.sh`         | Starts PostgreSQL, Keycloak, the built purchasing system stub, server, worker and publisher, creates the `journey` tenant for Studio journeys with its own database `axis_journey`, roles `axis_journey_schema` and `axis_journey_runtime`, and server on `127.0.0.2`, which the worker and the publisher serve too, builds and checks the design-system bundle in `artifacts/design-system` for its spec, runs Playwright in Chromium, then runs the Compose smoke test, the production images smoke test and the on-premises smoke test, which installs `deploy/compose/` from the production images for two tenants, each skipped when `NEXKIT_BASE_SHA` is set and no changed file is on its path list. Playwright and the services it starts are skipped when `NEXKIT_BASE_SHA` is set and every changed file is under `docs/` or is a Markdown file. With arguments, which go to Playwright, such as `tests/e2e/specs/studio.spec.ts` or `--grep 'publishes'`, it runs only the matching specs, after the sign-in setup, without the three smoke tests | Docker  |
 | `scripts/scan.sh`        | NuGet and npm vulnerability scan that fails on high or critical findings. CI is to run it on its triggers and once a week _(planned for M16)_                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Network |
 
 The CodeQL workflow, `.github/workflows/codeql.yml`, scans C# and TypeScript on pull requests to
@@ -254,23 +254,28 @@ Relative paths are resolved from `src/Axis.Server`.
 
 ## Widget previews
 
-The design system has a picture of every widget, drawn by the real widget components in light and dark
-mode, see the "Design tokens and previews" bullet of the [frontend reference](reference/frontend.md). The previews are one
-page, `web/design-system.html`, which feeds fixture page metadata to the widgets and answers their API
-calls from fixtures in `web/src/designSystem/`. It needs no server, database or sign-in.
+The design system has a live preview of every widget, drawn by the real widget components in light and dark
+mode, see the "Design tokens and previews" bullet of the [frontend reference](reference/frontend.md) and
+[D67](decisions/d67-live-widget-previews-in-the-design-system.md). The previews are one bundle, built from
+`web/src/designSystem/`. It feeds fixture page metadata to the widgets and answers their API calls from
+fixtures, only for the API paths of the fixture application. It needs no server, database or sign-in.
 
-- On the Vite dev server (`scripts/dev.sh` or `npm run dev --prefix web`), open `/design-system.html`
-  for the index. `/design-system.html?preview=<name>&mode=light|dark` draws one preview. The names are
-  `table`, `form`, `taskInbox`, `processInspector`, `detail`, `chart-<kind>` for `bar`, `line` and `pie`,
-  `kpi`, `columns`, `tabs`, `section` and `field-<type>` for each field type.
-- `npm run build:design-system --prefix web` builds the page into `artifacts/design-system-app`. The
-  server's web root never gets it, because `vite build` builds only `index.html`.
-- `scripts/design-system.sh` builds the page, draws every preview in Chromium and writes
-  `artifacts/design-system/<name>-<mode>.html` and an `index.html`. Each file holds the drawn page with its
-  styles and no scripts. It needs the Playwright browser from `scripts/setup.sh`. It is not a NexKit check.
-  The local agent session publishes the files as the Design System artifact.
+- `scripts/design-system.sh` builds the bundle into `artifacts/design-system/axis-design-system.js` and
+  checks it with `scripts/check-design-system.mjs`: one classic script, no `import`, no literal `</script`
+  or `<!--`, at most 6 MB, and no HTML file in the folder. It needs no Playwright browser. It is not a
+  NexKit check. The local agent session publishes the bundle as the Design System artifact.
+- The bundle sets `window.Axis`. `window.Axis.<name>(element)` mounts one preview into an element and
+  returns a function that unmounts it. The names are `table`, `form`, `taskInbox`, `processInspector`,
+  `detail`, `chart-<kind>` for `bar`, `line` and `pie`, `kpi`, `columns`, `tabs`, `section` and
+  `field-<type>` for each field type. A mounted widget follows `data-theme` on the root element of the page.
+  `dark` is dark mode, and any other value or none is light mode.
+- `web/design-system.html` is the harness. After `scripts/design-system.sh`, open it from disk. With no
+  query it mounts every preview. `?preview=<name>&mode=light|dark` mounts one preview in that mode. The
+  Vite dev server does not serve the previews.
 
-`tests/e2e/specs/design-system.spec.ts` opens each preview in both modes and fails on a console error.
+`tests/e2e/specs/design-system.spec.ts` mounts each preview from the bundle in the harness, in both modes,
+and fails on a console error or on a request other than the harness and the bundle. It also checks that
+changing `data-theme` redraws a table, and that no fixture reaches the server's web root.
 
 ## Formatting
 

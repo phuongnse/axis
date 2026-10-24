@@ -2,12 +2,17 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
-// The design-system preview page is a separate build, which scripts/e2e.sh makes with `npm run build:design-system`.
-// It answers every API call from fixtures, so the spec serves it from disk and needs no server.
-const repositoryRoot = path.resolve(import.meta.dirname, '..', '..', '..')
-const previewBuild = path.join(repositoryRoot, 'artifacts', 'design-system-app')
-const productionBuild = path.join(repositoryRoot, 'src', 'Axis.Server', 'wwwroot')
+// The design-system bundle is a separate build, which scripts/e2e.sh makes with scripts/design-system.sh. The page
+// web/design-system.html is its harness. The bundle answers every API call of the fixture application from fixtures,
+// so the spec serves both from disk and needs no server.
 const origin = 'http://design-system.test'
+const repositoryRoot = path.resolve(import.meta.dirname, '..', '..', '..')
+const harnessFile = path.join(repositoryRoot, 'web', 'design-system.html')
+const bundleFolder = path.join(repositoryRoot, 'artifacts', 'design-system')
+const bundleFile = path.join(bundleFolder, 'axis-design-system.js')
+const harnessUrl = `${origin}/design-system.html`
+const bundleUrl = `${origin}/artifacts/design-system/axis-design-system.js`
+const productionBuild = path.join(repositoryRoot, 'src', 'Axis.Server', 'wwwroot')
 // The name of the fixture application in web/src/designSystem/fixtures.ts.
 const fixtureMarker = 'DesignSystemSample'
 
@@ -49,71 +54,82 @@ function filesUnder(folder: string): string[] {
   }
 }
 
-/** Opens the preview build from disk and records every console error and page error. */
-async function openPreview(page: Page, query: string): Promise<string[]> {
-  const errors: string[] = []
+/** What a page records while it loads the harness: console errors, page errors and every request. */
+interface Recording {
+  errors: string[]
+  requests: string[]
+}
+
+/** Opens the harness from disk with the bundle next to it, and records errors and requests. */
+async function openHarness(page: Page, query: string): Promise<Recording> {
+  const recording: Recording = { errors: [], requests: [] }
   page.on('console', (message) => {
     if (message.type() === 'error') {
-      errors.push(message.text())
+      recording.errors.push(message.text())
     }
   })
-  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('pageerror', (error) => recording.errors.push(error.message))
+  page.on('request', (request) => recording.requests.push(request.url()))
   await page.route(`${origin}/**`, async (route) => {
     const { pathname } = new URL(route.request().url())
-    const file = path.join(previewBuild, pathname === '/' ? 'design-system.html' : pathname)
-    if (path.relative(previewBuild, file).startsWith('..')) {
+    if (pathname === '/design-system.html') {
+      await route.fulfill({ path: harnessFile })
+    } else if (pathname.startsWith('/artifacts/design-system/')) {
+      const file = path.join(bundleFolder, path.basename(pathname))
+      await route.fulfill({ path: file }).catch(() => route.fulfill({ status: 404 }))
+    } else {
       await route.fulfill({ status: 404 })
-      return
     }
-    await route.fulfill({ path: file }).catch(() => route.fulfill({ status: 404 }))
   })
-  await page.goto(`${origin}/design-system.html${query}`)
-  return errors
+  await page.goto(`${harnessUrl}${query}`)
+  return recording
 }
 
 for (const [name, widget] of Object.entries(previews)) {
   for (const mode of modes) {
-    test(`the ${name} preview draws its widget in ${mode} mode with no error`, async ({ page }) => {
-      const errors = await openPreview(page, `?preview=${name}&mode=${mode}`)
+    test(`the ${name} preview mounts its widget from the bundle in ${mode} mode with no error`, async ({ page }) => {
+      const recording = await openHarness(page, `?preview=${name}&mode=${mode}`)
 
       await expect(widget(page)).toBeVisible()
       await page.waitForLoadState('networkidle')
 
-      expect(errors).toEqual([])
+      expect(recording.errors).toEqual([])
+      // The fixtures answer every API call, so nothing but the harness and the bundle is requested.
+      expect(recording.requests.filter((url) => !url.startsWith('data:'))).toEqual([
+        `${harnessUrl}?preview=${name}&mode=${mode}`,
+        bundleUrl,
+      ])
     })
   }
 }
 
-test('the index lists each preview in light and dark mode', async ({ page }) => {
-  const errors = await openPreview(page, '')
+test('a mounted table redraws in the other mode when the page changes data-theme', async ({ page }) => {
+  const recording = await openHarness(page, '?preview=table&mode=light')
+  const header = page.getByRole('columnheader', { name: 'Title', exact: true })
+  await expect(header).toBeVisible()
+  const background = () => header.evaluate((cell) => getComputedStyle(cell).backgroundColor)
+  const light = await background()
 
-  await expect(page.getByRole('heading', { name: 'Axis design system', exact: true })).toBeVisible()
-  const hrefs = await page.getByRole('link').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
-  expect(hrefs).toEqual(
-    Object.keys(previews).flatMap((name) => modes.map((mode) => `?preview=${name}&mode=${mode}`)),
-  )
-  expect(errors).toEqual([])
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = 'dark'
+  })
+
+  await expect.poll(background).not.toBe(light)
+  expect(recording.errors).toEqual([])
 })
 
-test('light and dark mode draw different background colours', async ({ page }) => {
-  const errors = await openPreview(page, '?preview=table&mode=light')
-  await expect(page.getByRole('main')).toBeVisible()
-  const light = await page.getByRole('main').evaluate((main) => getComputedStyle(main).backgroundColor)
+test('the bundle sets window.Axis with one mount for each preview', async ({ page }) => {
+  const recording = await openHarness(page, '')
 
-  await page.goto(`${origin}/design-system.html?preview=table&mode=dark`)
-  await expect(page.getByRole('main')).toBeVisible()
-  const dark = await page.getByRole('main').evaluate((main) => getComputedStyle(main).backgroundColor)
-
-  expect(dark).not.toBe(light)
-  expect(errors).toEqual([])
+  const mounts = await page.evaluate(() => Object.keys((window as unknown as { Axis: object }).Axis))
+  expect(mounts.sort()).toEqual(Object.keys(previews).sort())
+  await expect(page.locator('[data-preview]')).toHaveCount(Object.keys(previews).length)
+  await page.waitForLoadState('networkidle')
+  expect(recording.errors).toEqual([])
 })
 
-test('only the preview build holds the previews, and the production SPA does not', () => {
-  const previewFiles = filesUnder(previewBuild)
-  expect(previewFiles).toContain('design-system.html')
-  expect(previewFiles.some((file) => readFileSync(path.join(previewBuild, file), 'utf8').includes(fixtureMarker))).toBe(
-    true,
-  )
+test('only the bundle holds the fixtures, and the production SPA does not', () => {
+  expect(readFileSync(bundleFile, 'utf8')).toContain(fixtureMarker)
 
   const productionFiles = filesUnder(productionBuild)
   // An empty web root would pass the checks below for no reason.

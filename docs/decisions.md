@@ -77,3 +77,4 @@ files agree, title and status included.
 | [D64](decisions/d64-detail-chart-and-kpi-widgets.md) | Detail, chart and KPI widgets | **Agreed** |
 | [D65](decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md) | A visual page designer on a canvas drawn by the site's widgets | **Agreed** |
 | [D66](decisions/d66-a-visual-form-designer-for-form-resources.md) | A visual form designer for form resources | **Agreed** |
+| [D67](decisions/d67-live-widget-previews-in-the-design-system.md) | Live widget previews in the design system | **Agreed** |

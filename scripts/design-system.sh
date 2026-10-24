@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Saves each widget preview of the design system as a standalone HTML file in light and dark mode:
-# artifacts/design-system/<preview>-<mode>.html and an index.html. It builds the preview page into
-# artifacts/design-system-app first and draws it in Chromium. The files hold the drawn page and its styles
-# and no scripts. The local agent session publishes them as the Design System artifact.
+# Builds the design-system bundle into artifacts/design-system/axis-design-system.js, one classic script
+# that sets window.Axis with a mount function for each widget preview, and checks it with
+# scripts/check-design-system.mjs: one script, no import, no literal </script or <!--, at most 6 MB. It
+# needs no Chromium and saves no HTML files. The local agent session publishes the bundle as the Design
+# System artifact. web/design-system.html is its harness.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 npm run build:design-system --prefix web
-node scripts/design-system.mjs
+node scripts/check-design-system.mjs artifacts/design-system

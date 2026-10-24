@@ -45,11 +45,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   `table`, `form`, `taskInbox`, `processInspector`, `detail` and `kpi` widgets,
   the bar, line and pie `chart` widgets, the `columns`, `tabs` and `section`
   containers and the input of each field type, from fixture metadata, in light
-  and dark mode. They are at
-  `/design-system.html` on the development server only, and
-  `scripts/design-system.sh` saves each as static HTML, see
-  [Development](../development.md#widget-previews). The local agent session
-  publishes the saved files as the Design System artifact. See
+  and dark mode. `scripts/design-system.sh` builds them into one classic
+  script that sets `window.Axis` with a mount per preview. A mounted widget
+  follows `data-theme` on the page's root element. See
+  [Development](../development.md#widget-previews),
+  [D67](../decisions/d67-live-widget-previews-in-the-design-system.md) and
   [D57](../decisions/d57-a-design-system-published-from-the-repository.md)
   and [Design changes](../delivery.md#design-changes).
 - **How pages and widgets grow.** A page draws its whole tree of widgets.
