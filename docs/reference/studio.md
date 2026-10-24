@@ -809,49 +809,47 @@ Run and the Test results list, the read-only view of a module entity, and the re
     draws the page, with labels from the application's texts and no request to
     `/api/apps/`. It cancels every click and form submit, so a navigate action
     or a link leaves Studio where it is. A page parameter gets a placeholder
-    value made from its type. A page the route cannot draw shows a short notice
-    instead of widgets.
+    value made from its type. A page the route cannot draw shows a short notice.
   - **Placeholders and diagnostic marks.** A widget that does not compile draws
     as a placeholder with its type and a line for each of its diagnostics, with
     the code and the message. A widget is marked when a diagnostic of the page
     names its `path` or a path inside it, of any severity. So a container is
-    marked too when a widget inside it has a diagnostic, even in a closed section
-    or an inactive tab. A marked widget has an error-coloured border, "has
-    diagnostics" in its text label, and `data-marked`, as a node of the process
-    graph has. The marks come from the route's latest answer, so they follow the
+    marked too when a widget inside it has a diagnostic, even in a closed
+    section or an inactive tab. A marked widget has an error-coloured border,
+    "has diagnostics" in its text label, and `data-marked`, as a node of the
+    process graph has. The marks follow the route's latest answer, so the
     unsaved draft.
   - **Selection.** A click on the canvas or a pick in the widget tree selects a
     widget in both. The selected widget has `aria-current`. _Partly built:_ a
     click selects the innermost widget under the pointer, and a click on the
     empty area of a container selects the container. A pick in the tree outlines
-    the widget on the canvas in the primary colour, and the selected frame has
-    `aria-current`. Every frame is a Tab stop, and Enter or Space selects it. A
-    frame's name is its type and summary, such as `table · PurchaseRequestList`,
-    with "has diagnostics" when it is marked. The selection is kept across the
-    Design and Form tabs while the resource stays open. It is not in the URL's
-    `path`, because `path` makes the editor open the Form tab.
+    the widget on the canvas in the primary colour. Every frame is a Tab stop,
+    and Enter or Space selects it. A frame's name is its type and summary, such
+    as `table · PurchaseRequestList`, with "has diagnostics" when it is marked.
+    The selection is kept across the Design and Form tabs while the resource
+    stays open. It is not in the URL's `path`, which opens the Form tab.
   - **Property panel.** It sits beside the canvas and shows the widget's
-    existing panel. An edit redraws the canvas. Each action draws as a button
-    on the canvas, and selecting it opens its action in the panel, including a
-    `delete` action. _Partly built:_ the side pane of the Design tab holds the
-    whole widget tree and the panel of the selected widget, the same as the Form
-    tab. An edit redraws the canvas through the 300 ms draft post. On the
-    canvas, every action of a table (row and toolbar), a form, a detail and a
-    KPI draws as a button, also one the site would hide, such as an action whose
-    `visibleWhen` fails on placeholder data or a form action on an unsaved
-    record. A click on the button, or Enter or Space on it, selects the action
-    and not its widget. The selection is the JSON Pointer of the action, such as
-    `/widgets/0/rowActions/1`, or `/widgets/0/navigate` for a KPI. The button has
-    `aria-current` and an outline in the primary colour, and the widget tree
-    keeps its widget selected. The panel then shows the whole widget panel with
-    the action's card marked by `aria-current` and scrolled into view. Adding a
-    navigate, `startProcess` or `delete` action in the panel selects the new
-    action, and removing an action selects its widget. The button runs nothing,
-    so it does not navigate, start a process, open a delete confirmation or call
-    `/api/apps/`. On the canvas a KPI's navigate action is a link-style button
-    on the label line, and the tile is not a link. At phone width, a table's row
-    actions fold into a menu that the canvas cannot open, because it cancels the
-    click. There the author selects a row action from the tree and the panel.
+    existing panel. Each action draws as a button on the canvas, and selecting
+    it opens its action in the panel, including a `delete` action. _Partly
+    built:_ the side pane of the Design tab holds the whole widget tree and the
+    panel of the selected widget, the same as the Form tab. An edit redraws the
+    canvas through the 300 ms draft post. On the canvas, every action of a table
+    (row and toolbar), a form, a detail and a KPI draws as a button, also one
+    the site would hide, such as an action whose `visibleWhen` fails on
+    placeholder data or a form action on an unsaved record. A click, Enter or
+    Space on the button selects the action and not its widget. The selection is
+    the JSON Pointer of the action, such as `/widgets/0/rowActions/1`, or
+    `/widgets/0/navigate` for a KPI. The button has `aria-current` and an
+    outline in the primary colour, and the widget tree keeps its widget
+    selected. The panel then shows the whole widget panel with the action's card
+    marked by `aria-current` and scrolled into view. Adding a navigate,
+    `startProcess` or `delete` action in the panel selects the new action, and
+    removing an action selects its widget. The button runs nothing: it does not
+    navigate, start a process, open a delete confirmation or call `/api/apps/`.
+    A KPI's navigate action is a link-style button on the label line, and the
+    tile is not a link. At phone width, a table's row actions fold into a menu
+    that the canvas cannot open, because it cancels the click. There the author
+    selects a row action from the tree and the panel.
   - **Palette.** It lists the ten widget types. The author drags one onto the
     canvas, or picks one and inserts it after the selected widget or into the
     selected container. A type is disabled, with the reason, when the page
@@ -863,39 +861,46 @@ Run and the Test results list, the read-only view of a module entity, and the re
     new widget after the selected widget, at the end of the selected container's
     first list, or at the end of the page's list on an empty page. The new
     widget is selected, and a live region names the list and the position where
-    it landed. A type the page cannot take is disabled and shows its reason.
-    The author can also drag a type with the pointer onto the canvas. A drop on
-    the upper half of a widget inserts before it, and a drop on its lower half
-    inserts after it. A drop on a widget list, which is the page's own list or
-    the list of a column, a tab or a section, empty or not, appends to that
-    list, and a drop between two widgets lands in the list, so it appends. The
-    innermost target wins. A container that does not compile yet, such as a new
-    empty section, is drawn as a placeholder with a drop area for each list its
-    draft has. A drop that a page limit forbids inserts nothing, and the live
-    region gives the same reason that is shown beside the disabled type. An
-    allowed drop selects the new widget, and the live region names the list and
-    the position where it landed. A type that is disabled cannot be dragged. The
-    library's own spoken messages are off, so the live region is the only voice,
-    and a keyboard user inserts with Enter or Space as above.
+    it landed. A type the page cannot take is disabled, cannot be dragged, and
+    shows its reason. The author can also drag a type with the pointer onto the
+    canvas. A drop on the upper half of a widget inserts before it, and a drop
+    on its lower half inserts after it. A drop on a widget list (the page's own,
+    or that of a column, a tab or a section), or between two widgets, appends to
+    that list. The innermost target wins. A container that does not compile yet,
+    such as a new empty section, is drawn as a placeholder with a drop area for
+    each list its draft has. A drop that a page limit forbids inserts nothing,
+    and the live region gives the reason shown beside the disabled type. An
+    allowed drop selects the new widget and the live region names where it
+    landed. The library's spoken messages are off, so the live region is the
+    only voice.
   - **Moves.** The author drags a widget to reorder it or to move it into or out
-    of a container. The keyboard sensor does the same, and a screen reader
-    hears where the widget lands. The Move to picker stays. _Partly built:_ the
-    author can drag any widget of the canvas with the pointer. The innermost
-    widget under the pointer drags, so a press on a KPI in a column moves the
-    KPI. It drops on the same targets as a palette type: before or after a
-    widget by its half, or at the end of a widget list, nested lists and empty
-    ones included. A move the format refuses is flagged while it is dragged. The
-    drag overlay and the live region give the reason, and a drop there changes
-    nothing. The refusals are a widget inside itself, and a container whose
-    deepest list would land past level 4. A move is one edit of the draft, so
-    one undo reverses it, and the widget keeps all its keys. After a move the
-    widget stays selected at its new place, and the live region says "Moved"
-    with the type, the list and the position. A drop on the widget itself or
-    where it already is changes nothing. The keyboard sensor and its spoken
-    messages are not built yet.
+    of a container. The keyboard sensor does the same, and a screen reader hears
+    where the widget lands. The Move to picker stays. _Partly built:_ the author
+    can drag any widget of the canvas with the pointer. The innermost widget
+    under the pointer drags, so a press on a KPI in a column moves the KPI. It
+    drops on the same targets as a palette type. A move the format refuses is
+    flagged while it is dragged: the drag overlay and the live region give the
+    reason, and a drop there changes nothing. The refusals are a widget inside
+    itself, and a container whose deepest list would land past level 4. A move
+    is one edit of the draft, so one undo reverses it, and the widget keeps all
+    its keys. It stays selected and the live region says "Moved" with the type,
+    the list and the position. A drop on the widget itself or where it is
+    changes nothing.
   - **Data panel.** It lists the entities and the data sources. Dropping an
     entity offers a table, a form or a detail. Dropping a data source offers a
-    table, and a chart with one group field or a KPI with a total row.
+    table, and a chart with one group field or a KPI with a total row. _Partly
+    built:_ the side pane of the Design tab lists every entity and every data
+    source, module ones too, between the palette and the widget tree. A drop
+    lands where a palette drop lands, and opens a dialog with one button for
+    each widget that can show the name, disabled with the palette's reason when
+    a page limit forbids it. Enter, Space or a click on a name opens the same
+    dialog, and the widget goes after the selected widget. The bound widget is
+    selected, and the live region names where it landed. A detail takes as its
+    record the first required `reference` parameter that targets the entity, or
+    none, because the designer adds no page parameter. A chart takes the group
+    field as its category, the `bar` kind and the first numeric measure. A KPI
+    takes the first measure. A measure has no label, so a chart and a KPI start
+    with empty text keys and draw as placeholders until the author writes them.
   - **Width switch.** It draws the canvas at desktop width, which fills the
     canvas area, or at phone width, which is 375 px. At phone width the columns
     stack to full width and tables use their phone layout, even in a wide
@@ -904,26 +909,24 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Undo.** Undo and redo buttons, Ctrl+Z and Ctrl+Shift+Z, or Cmd on macOS,
     cover every edit of the draft in the three tabs. The history is kept in
     memory, up to 100 steps, with one step for each box. It is cleared by a
-    reload, a conflict reload or opening another resource. A save keeps it.
-    Studio's undo replaces the browser's own inside the editor's boxes.
-    _Built:_ it covers pages. The buttons sit beside Save and are off when
-    there is nothing to undo or redo, and while a save runs. A step ends when
-    the author edits another property or leaves the box, and a pick in a
-    dropdown or a button action is always a step of its own. The keys also work
-    when nothing has focus, but not when the focus is outside the editor. A
-    reload after a reconnect clears the history too. Other kinds of resource
-    have no undo yet.
+    reload (a reload after a reconnect too), a conflict reload or opening
+    another resource. A save keeps it. Studio's undo replaces the browser's own
+    inside the editor's boxes. _Built:_ it covers pages. The buttons sit beside
+    Save and are off when there is nothing to undo or redo, and while a save
+    runs. A step ends when the author edits another property or leaves the box,
+    and a pick in a dropdown or a button action is always a step of its own.
+    The keys also work when nothing has focus, but not when the focus is outside
+    the editor. Other kinds of resource have no undo yet.
   - **Library.** Drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
-    `@dnd-kit/utilities`. The core package, which brings `@dnd-kit/accessibility`
-    and `@dnd-kit/utilities` with it, measures 12.7 KB gzipped in the lazy chunk
-    `StudioPageDesign`. The chunk holds the canvas, the palette and the library,
-    and loads when the Design tab opens. The build fails when the chunk is
-    missing or is part of the main bundle. The pointer moves of existing
-    widgets use the core package and the same drop targets as the palette.
-    `@dnd-kit/sortable` is not added yet.
+    `@dnd-kit/utilities`. The core package, which brings
+    `@dnd-kit/accessibility` and `@dnd-kit/utilities` with it, measures 12.7 KB
+    gzipped in the lazy chunk `StudioPageDesign`. The chunk holds the canvas,
+    the palette, the data panel and the library, and loads when the Design tab
+    opens. The build fails when the chunk is missing or is part of the main
+    bundle. Pointer moves of existing widgets use the core package and the
+    palette's drop targets. `@dnd-kit/sortable` is not added yet.
   - **Format.** The designer writes only the order of the widget tree and the
-    properties the format has. It writes no pixels, and widths stay in
-    twelfths.
+    properties the format has. It writes no pixels, and widths stay in twelfths.
 - **Form designer** _(partly built, planned for M13)_. The form editor gets a Design tab that
   lays out a form by drag and drop, per
   [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md). It sits
@@ -932,8 +935,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   a reload) and `@dnd-kit` drag and drop of the page designer.
   - **Canvas.** It draws the unsaved draft with the site's form widget, in its
     sections and steps. Fields get placeholder values made from the field
-    types, and a child collection gets placeholder rows. The Save button does
-    nothing. The canvas asks
+    types, and a child collection gets placeholder rows. The canvas asks
     [the draft page metadata route](authoring.md#draft-page-metadata) 300 ms
     after the last edit. For a form it answers the metadata of a form widget,
     with a `path` on each section, field and step.
@@ -944,8 +946,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     click and form submit. A click only selects. A form the route cannot draw
     shows a short notice. The tab shows the Used on list above the step switch
     and the canvas, with a property panel beside the canvas, and no palette or
-    width switch.
-    The canvas is mounted only while the Design tab is active.
+    width switch. The canvas is mounted only while the Design tab is active.
   - **Step switch.** It lists the steps in order and shows the sections of one
     step. A form without `steps` has no switch.
     _Partly built:_ the switch is a segmented control above the canvas, with
