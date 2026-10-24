@@ -50,7 +50,9 @@ public sealed record TaskCompletionResult(
 /// actor may act on it (denied) and that it is open (already completed), then that the request is
 /// JSON and its body is valid. A completion is refused as invalid when a field of the task's form
 /// is visible, has a <c>requiredWhen</c> that holds and is <c>null</c> in the record as it will be
-/// stored, whether or not the body sends values. The body gives the <c>outcome</c> and optional <c>values</c> and
+/// stored, whether or not the body sends values. It is also refused as invalid, with "Cannot be set.",
+/// when the body sends a value for a field that the form hides or makes read-only through a condition
+/// in the record as it will be stored. The body gives the <c>outcome</c> and optional <c>values</c> and
 /// <c>version</c>, and a value is written only for a field the task's form makes editable and the
 /// actor may read. One transaction then writes the values as a record update on the task's release,
 /// closes the task, resumes the instance on the outcome's next step and appends the audit record
@@ -156,8 +158,9 @@ public static class TaskCompletionCommand
             }
 
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+            var sent = RecordCommand.SetFields(entity, input).ToList();
             var failures = RecordFormRequirements.Merge(
-                RecordFormRequirements.Check(release, entity, form, stored, computed.Values, computed.Rows, now),
+                RecordFormRequirements.Check(release, entity, form, stored, computed.Values, computed.Rows, now, sent),
                 RecordValidator.ValidateUpdate(release, entity, stored, computed.Values, computed.Rows, now));
             if (failures is not null)
             {
@@ -178,7 +181,7 @@ public static class TaskCompletionCommand
             updated = written;
             readVersion = stored.Version;
             writtenVersion = written.Version;
-            fields = [.. RecordCommand.SetFields(entity, input)];
+            fields = sent;
         }
         else if (form.HasRequiredWhen)
         {

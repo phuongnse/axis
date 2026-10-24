@@ -91,7 +91,7 @@
         "path": { "type": "string", "pattern": "^/", "maxLength": 2000 },
         "input": { "type": "array", "items": { "$ref": "#/$defs/field" } },
         "output": { "type": "array", "items": { "$ref": "#/$defs/field" } },
-        "lookup": { "$ref": "#/$defs/name" }
+        "lookup": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "operation", "of": "/name" } }
       },
       "if": { "required": ["method"], "properties": { "method": { "const": "GET" } } },
       "then": { "properties": { "input": { "maxItems": 0 } } }

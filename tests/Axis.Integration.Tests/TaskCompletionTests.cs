@@ -118,7 +118,9 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     }
 
     // The RequestSettlement form of the Settle process requires a comment and a divisor when the
-    // amount is above 100, and shows the divisor only when the amount is above 1000.
+    // amount is above 100, and shows the divisor only when the amount is above 1000. It makes the
+    // divisor read-only when the comment is 'final', and shows the status only when the amount is
+    // above 5000.
     [Fact]
     public async Task A_completion_that_leaves_a_required_field_empty_is_400_and_the_task_stays_open()
     {
@@ -166,6 +168,94 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var record = await ReadRecordAsync(maria, subject, TenantA);
         Assert.Equal("Settled", record.RootElement.GetProperty("values").GetProperty("comment").GetString());
+        Assert.Equal(ProcessTasks.Completed, (await fixture.SnapshotAsync(TenantA, instance)).TaskState);
+    }
+
+    [Fact]
+    public async Task A_completion_that_sends_a_value_for_a_field_hidden_by_its_own_condition_is_400_and_the_task_stays_open()
+    {
+        var (task, _, instance) = await CreateTaskAsync(TenantA, "Settle", amount: 500m);
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        // The divisor shows only above 1000.
+        using var response = await CompleteAsync(
+            maria, task, TenantA, $$"""{ "outcome": "settle", "values": { "comment": "Fine", "divisor": 2 }, "version": {{waiting.SubjectVersion}} }""");
+
+        await AssertCannotBeSetAsync(response, "/values/divisor");
+        Assert.Equal(waiting, await fixture.SnapshotAsync(TenantA, instance));
+        Assert.Empty(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
+    }
+
+    [Fact]
+    public async Task A_completion_that_sends_a_value_for_a_field_in_a_hidden_section_is_400_and_the_task_stays_open()
+    {
+        var (task, _, instance) = await CreateTaskAsync(TenantA, "Settle", amount: 2000m);
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        // The section with the status shows only above 5000.
+        using var response = await CompleteAsync(
+            maria,
+            task,
+            TenantA,
+            $$"""{ "outcome": "settle", "values": { "comment": "Fine", "divisor": 2, "status": "submitted" }, "version": {{waiting.SubjectVersion}} }""");
+
+        await AssertCannotBeSetAsync(response, "/values/status");
+        Assert.Equal(waiting, await fixture.SnapshotAsync(TenantA, instance));
+        Assert.Empty(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
+    }
+
+    [Fact]
+    public async Task A_value_sent_in_the_same_body_decides_whether_a_field_is_read_only()
+    {
+        var (task, _, instance) = await CreateTaskAsync(TenantA, "Settle", amount: 2000m);
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        // The divisor is read-only when the comment is 'final', and this body sets the comment.
+        using var response = await CompleteAsync(
+            maria, task, TenantA, $$"""{ "outcome": "settle", "values": { "comment": "final", "divisor": 2 }, "version": {{waiting.SubjectVersion}} }""");
+
+        await AssertCannotBeSetAsync(response, "/values/divisor");
+        Assert.Equal(waiting, await fixture.SnapshotAsync(TenantA, instance));
+        Assert.Empty(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
+    }
+
+    [Fact]
+    public async Task A_value_for_a_visible_editable_field_is_stored()
+    {
+        var (task, subject, instance) = await CreateTaskAsync(TenantA, "Settle", amount: 2000m);
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var response = await CompleteAsync(
+            maria, task, TenantA, $$"""{ "outcome": "settle", "values": { "comment": "Fine", "divisor": 2 }, "version": {{waiting.SubjectVersion}} }""");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var record = await ReadRecordAsync(maria, subject, TenantA);
+        var values = record.RootElement.GetProperty("values");
+        Assert.Equal("Fine", values.GetProperty("comment").GetString());
+        Assert.Equal(2, values.GetProperty("divisor").GetInt64());
+        Assert.Equal(ProcessTasks.Completed, (await fixture.SnapshotAsync(TenantA, instance)).TaskState);
+    }
+
+    [Fact]
+    public async Task A_value_for_a_field_in_a_section_that_is_shown_is_stored()
+    {
+        var (task, subject, instance) = await CreateTaskAsync(TenantA, "Settle", amount: 6000m);
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var response = await CompleteAsync(
+            maria,
+            task,
+            TenantA,
+            $$"""{ "outcome": "settle", "values": { "comment": "Fine", "divisor": 2, "status": "submitted" }, "version": {{waiting.SubjectVersion}} }""");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var record = await ReadRecordAsync(maria, subject, TenantA);
+        Assert.Equal("submitted", record.RootElement.GetProperty("values").GetProperty("status").GetString());
         Assert.Equal(ProcessTasks.Completed, (await fixture.SnapshotAsync(TenantA, instance)).TaskState);
     }
 
@@ -451,4 +541,12 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
 
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+
+    private static async Task AssertCannotBeSetAsync(HttpResponseMessage response, string pointer)
+    {
+        using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        var errors = problem.RootElement.GetProperty("errors");
+        Assert.Equal([pointer], errors.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["Cannot be set."], errors.GetProperty(pointer).EnumerateArray().Select(message => message.GetString()));
+    }
 }

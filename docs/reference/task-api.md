@@ -257,9 +257,12 @@ is a `403` before any of these checks.
     evaluated on the record as it will be stored, whether or not the body
     sends `values`: without `values` it reads the stored record. Nothing is
     written and the task stays open. A hidden field is not required.
-  - *(Planned for M13.)* A value for a field whose `readOnlyWhen` is true, or
-    that is hidden, is keyed `/values/<field>` with "Cannot be set.". It is
-    evaluated on the record as it will be stored.
+  - A value for a field whose `readOnlyWhen` is true, or that is hidden, is
+    keyed `/values/<field>` with "Cannot be set.". A field is hidden when its
+    own `visibleWhen` or its section's is false. It is evaluated on the record
+    as it will be stored, so a value in the same body can lock or hide another
+    field. Nothing is written and the task stays open. The same value is
+    accepted when the condition is false.
   - Any other property, a repeated property and a body that is not a JSON
     object get the record API's keys and messages, such as "Unknown
     property.".

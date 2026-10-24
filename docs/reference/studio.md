@@ -76,7 +76,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     arrays with add and remove. `id`, `kind` and fixed values such as
     `formatVersion` are read-only. Labels are the property names as written in
     the schema, without translation. A part the form cannot show, such as
-    `oneOf`, `anyOf` or a map, points to the JSON view. A text resource's
+    `oneOf`, `anyOf` or a map, points to the JSON view. A map whose keys carry a
+    reference mark is the exception, see **Reference pickers** below. A text resource's
     `texts` map shows in the Text editor, see **Editors by kind** below. An
     `allOf` whose items hold only `if`, `then` and `else` shows its
     properties, and the form does not show the conditions.
@@ -242,7 +243,19 @@ Run and the Test results list, the read-only view of a module entity, and the re
   box.
   - The select is searchable, and it matches a typed name without regard to
     letter case. A field or step part lists the fields of the entity, or the
-    steps of the process, that the draft names.
+    steps of the process, that the draft names. A parameter or column part
+    lists the parameters or columns of the data source that the draft names,
+    and an operation part lists the operations of the connector it names. An
+    outcome part lists the outcomes of the task steps that have the step name
+    the draft gives, in every process, without repeats.
+  - A map whose keys carry a mark, such as a trigger's `parameters`, shows one
+    row for each entry, in the order of the file. A row has a key select, a
+    value box and **Remove**. The key select offers the names that no other
+    row uses. **Add** appends the first name that is not used and is off when
+    none is left. A parameter's value box follows its type: a number box for
+    `integer` and `decimal`, a checkbox for `boolean` and a text box for the
+    rest. Picking another key for a row keeps its value when the value fits
+    the new type. A `null` value is edited in the JSON view.
   - A value that is not one of the names stays in the select as the first
     option, tagged **unknown**, so nothing is lost. The select takes only the
     listed names. To set a name that is not listed, the author edits the value
@@ -465,7 +478,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | `connector`   | Typed editor                          | Nothing                                                               |
   | `endpoint`    | Generic form, typed rows for `values` | Nothing                                                               |
   | `event`       | Generic form                          | Nothing                                                               |
-  | `trigger`     | Generic form                          | The `parameters` map of a data source trigger                         |
+  | `trigger`     | Generic form                          | Nothing                                                               |
   | `migration`   | Generic form                          | The `changes` list, because each change's fields depend on its `type` |
   | `seed`        | Typed editor                          | Nothing                                                               |
   | `scenario`    | Typed editor                          | Nothing                                                               |
@@ -473,7 +486,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
 
   The generic form sends a part to the JSON view when it holds `oneOf` or
   `anyOf`, when it holds `allOf` with an item that has more than `if`, `then`
-  and `else`, is an object with no `properties`, such as a map, or has no type. The last column follows that rule. A new kind or property that the
+  and `else`, is an object with no `properties`, such as a map, or has no type. A map whose keys carry a reference
+  mark is the exception. The last column follows that rule. A new kind or property that the
   form cannot show goes to the JSON view until an editor covers it.
 
   - **Page editor** *(built)*. The Form tab shows the page's name, its title

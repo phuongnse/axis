@@ -81,7 +81,7 @@
           "required": ["name", "operation"],
           "properties": {
             "name": { "$ref": "#/$defs/name", "x-axis-reference": "connector" },
-            "operation": { "$ref": "#/$defs/name" }
+            "operation": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "operation", "of": "1/name" } }
           }
         },
         "input": {

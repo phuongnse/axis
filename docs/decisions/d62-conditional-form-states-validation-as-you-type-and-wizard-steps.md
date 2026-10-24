@@ -9,7 +9,7 @@ server-side validation as you type are built. Enforcing `requiredWhen` on write 
 and the task API. The form widget in the SPA follows the record form state endpoint: it hides,
 requires and locks fields as the answer says, and shows the messages under touched fields. The task page
 does the same through the task form state endpoint. Both show a form with `steps` as a wizard.
-Refusing a value for a hidden or `readOnlyWhen` field in the task API is _(planned for M13)_. The
+Refusing a value for a hidden or `readOnlyWhen` field in the task API is built. The
 server evaluates every condition.
 NexKit autopilot confirmed these points for the owner on
 issue #934 on 2026-10-21. The reference text is in
