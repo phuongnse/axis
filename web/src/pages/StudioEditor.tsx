@@ -38,7 +38,7 @@ import { EntityDesigner } from './EntityDesigner'
 import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
-import { PageEditor, PageWidgets } from './PageEditor'
+import { PageEditor, PagePalette, PageWidgets } from './PageEditor'
 import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
@@ -112,8 +112,8 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * binding as a name only. A page opens in the page editor, which shows its widgets as a tree with add, move and remove
  * and a panel for the selected widget, and keeps a key it does not show. A process opens in the process editor, which shows its
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
- * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data, beside the same
- * widget tree and panel as the Form tab. The two tabs share the selected widget, which is not written to the URL.
+ * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data, beside a palette
+ * of the ten widget types and the same widget tree and panel as the Form tab. The two tabs share the selected widget, which is not written to the URL.
  * Form stays the tab that opens first. A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
  * calls `onOpenPath`. A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
  * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
@@ -618,6 +618,12 @@ export function StudioEditor({
                               />
                             </div>
                             <div data-testid="studio-design-panel" style={{ width: 400, flexShrink: 0 }}>
+                              <PagePalette
+                                value={draft}
+                                selected={widgetPath}
+                                onSelect={setWidgetPath}
+                                onChange={change}
+                              />
                               <PageWidgets
                                 value={draft}
                                 selected={widgetPath}

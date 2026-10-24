@@ -8,6 +8,7 @@ import type { ChartProps } from '../platform/Chart'
 import type { NavigateAction, PageMetadata, PageWidgetMetadata } from '../platform/site'
 import type { StudioDiagnostic, StudioNames, StudioResourceItem } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
+import { newWidget } from '../platform/pageWidgets'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
@@ -441,6 +442,69 @@ describe('the Design tab of a page', () => {
       const again = await screen.findByTestId('studio-page-design', {}, slow)
       await within(again).findByTestId('chart-widget', {}, slow)
       expect(frame(again, '/widgets/1')).toHaveAttribute('aria-current', 'true')
+    })
+  })
+
+  describe('palette', () => {
+    async function openDesign(widgets: Record<string, unknown>[]) {
+      const stubbed = stub(content(widgets))
+      renderEditor()
+      await screen.findByTestId('studio-page-editor', {}, slow)
+      await openTab('Design')
+      const design = await screen.findByTestId('studio-design-panel', {}, slow)
+      await screen.findByTestId('studio-page-canvas', {}, slow)
+      return { ...stubbed, design, palette: within(within(design).getByTestId('studio-palette')) }
+    }
+
+    const section = (widgets: Record<string, unknown>[]) => ({ type: 'section', title: { textKey: '' }, widgets })
+
+    it('inserts the type after the selected leaf on Enter, selects it and names the place', async () => {
+      const { design, palette, posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+
+      palette.getByTestId('studio-palette-kpi').focus()
+      await userEvent.keyboard('{Enter}')
+
+      await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
+      expect(posts.at(-1)!.widgets[1]).toEqual(newWidget('kpi'))
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      const announcement = palette.getByTestId('studio-palette-announcement')
+      expect(announcement).toHaveTextContent('Page')
+      expect(announcement).toHaveTextContent('position 2')
+    })
+
+    it('inserts the type at the end of the selected section and selects it', async () => {
+      const { design, palette, posts } = await openDesign([{ type: 'kpi' }, section([{ type: 'chart' }])])
+      await userEvent.click(within(design).getByTestId('studio-widget-/widgets/1'))
+
+      await userEvent.click(palette.getByTestId('studio-palette-kpi'))
+
+      await waitFor(
+        () => expect(posts.at(-1)!.widgets[1]).toMatchObject({ widgets: [{ type: 'chart' }, newWidget('kpi')] }),
+        slow,
+      )
+      expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('Page › section 2 · position 2')
+    })
+
+    it('disables table with its reason when the page holds a table inside a container', async () => {
+      const { palette } = await openDesign([section([{ type: 'table' }])])
+
+      const button = palette.getByTestId('studio-palette-table')
+      expect(button).toBeDisabled()
+      expect(button).toHaveAccessibleDescription('The page already holds a table. A page holds at most one.')
+      expect(palette.getByTestId('studio-palette-kpi')).toBeEnabled()
+    })
+
+    it('disables the containers with the depth reason in a list on level 4 and keeps other types', async () => {
+      const { design, palette } = await openDesign([section([section([section([{ type: 'kpi' }])])])])
+      await userEvent.click(within(design).getByTestId('studio-widget-/widgets/0/widgets/0/widgets/0/widgets/0'))
+
+      for (const type of ['section', 'columns', 'tabs']) {
+        const button = palette.getByTestId(`studio-palette-${type}`)
+        expect(button).toBeDisabled()
+        expect(button).toHaveAccessibleDescription('A container here would hold a list past level 4.')
+      }
+      expect(palette.getByTestId('studio-palette-kpi')).toBeEnabled()
     })
   })
 })

@@ -843,7 +843,13 @@ Run and the Test results list, the read-only view of a module entity, and the re
     cannot take it under a limit of
     [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md):
     a second table, a second form, task inbox or process inspector, or a
-    container past 4 levels.
+    container past 4 levels. _Partly built:_ the side pane of the Design tab
+    lists the ten types above the widget tree. Enter, Space or a click inserts a
+    new widget after the selected widget, at the end of the selected container's
+    first list, or at the end of the page's list on an empty page. The new
+    widget is selected, and a live region names the list and the position where
+    it landed. A type the page cannot take is disabled and shows its reason.
+    Dragging a type onto the canvas is not built yet.
   - **Moves.** The author drags a widget to reorder it or to move it into or out
     of a container. The keyboard sensor does the same, and a screen reader
     hears where the widget lands. The Move to picker stays.

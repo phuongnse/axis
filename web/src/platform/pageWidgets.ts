@@ -183,6 +183,51 @@ export function widgetLists(widgets: unknown[]): WidgetList[] {
   return lists
 }
 
+/** The level of a widget list, the page's own list being 1: the number of `widgets` segments in its pointer. */
+export function listLevel(list: string): number {
+  return list.split('/').filter((segment) => segment === 'widgets').length
+}
+
+/**
+ * Where the palette puts a new widget for the selected pointer: after a leaf, at the end of a container's first list
+ * (after the container when it has none), or at the end of the page's list when `selected` names no widget.
+ */
+export function insertionPlace(widgets: unknown[], selected: string): { list: string; index: number } {
+  const widget = getAt({ widgets }, selected)
+  if (!isContent(widget) || typeof widget.type !== 'string') {
+    return { list: '/widgets', index: widgets.length }
+  }
+  const first = childLists(widget, selected)[0]
+  if (containerTypes.includes(widget.type) && first !== undefined) {
+    const items = getAt({ widgets }, first.pointer) as unknown[]
+    return { list: first.pointer, index: items.length }
+  }
+  const cut = selected.lastIndexOf('/')
+  return { list: selected.slice(0, cut), index: Number(selected.slice(cut + 1)) + 1 }
+}
+
+/** Why the page cannot take one more widget of `type` in `list`, or undefined. */
+export function paletteLimit(
+  widgets: unknown[],
+  list: string,
+  type: string,
+): 'table' | 'recordWidget' | 'depth' | undefined {
+  const types = widgetLists(widgets).flatMap((item) =>
+    (getAt({ widgets }, item.pointer) as unknown[]).map((widget) => (isContent(widget) ? widget.type : undefined)),
+  )
+  if (type === 'table' && types.includes('table')) {
+    return 'table'
+  }
+  const recordWidgets = ['form', 'taskInbox', 'processInspector']
+  if (recordWidgets.includes(type) && types.some((existing) => recordWidgets.includes(existing as string))) {
+    return 'recordWidget'
+  }
+  if (containerTypes.includes(type) && listLevel(list) >= 4) {
+    return 'depth'
+  }
+  return undefined
+}
+
 /**
  * The page's widgets with the widget at `from` moved to the end of the list at `toList`, and the pointer the widget
  * has after the move. The widget keeps every key. Nothing changes when `from` does not hold a widget, or when
