@@ -462,27 +462,27 @@ Run and the Test results list, the read-only view of a module entity, and the re
   editor, the process editor's step list, with its decision, end, task and operation panels, and the entity designer are
   built. The last column lists what still needs the JSON view, because the form cannot show it.
 
-  | Kind          | Editor                                     | Still needs the JSON view                                             |
-  | ------------- | ------------------------------------------ | --------------------------------------------------------------------- |
-  | `application` | Generic form                               | Nothing                                                               |
-  | `entity`      | Entity designer                            | Nothing                                                               |
-  | `page`        | Typed editor, Design tab (planned for M13) | Nothing                                                               |
-  | `form`        | Generic form, typed steps panel            | Nothing                                                               |
-  | `site`        | Generic form                               | Nothing                                                               |
-  | `process`     | Typed editor with the process graph        | Nothing                                                               |
-  | `rule`        | Generic form                               | Nothing                                                               |
-  | `sequence`    | Generic form                               | Nothing                                                               |
-  | `role`        | Generic form                               | Nothing                                                               |
-  | `policy`      | Generic form                               | Nothing                                                               |
-  | `dataSource`  | Generic form                               | Nothing                                                               |
-  | `connector`   | Typed editor                               | Nothing                                                               |
-  | `endpoint`    | Generic form, typed rows for `values`      | Nothing                                                               |
-  | `event`       | Generic form                               | Nothing                                                               |
-  | `trigger`     | Generic form                               | Nothing                                                               |
-  | `migration`   | Generic form                               | The `changes` list, because each change's fields depend on its `type` |
-  | `seed`        | Typed editor                               | Nothing                                                               |
-  | `scenario`    | Typed editor                               | Nothing                                                               |
-  | `text`        | Typed editor                               | Nothing                                                               |
+  | Kind          | Editor                                                        | Still needs the JSON view                                             |
+  | ------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
+  | `application` | Generic form                                                  | Nothing                                                               |
+  | `entity`      | Entity designer                                               | Nothing                                                               |
+  | `page`        | Typed editor, Design tab (planned for M13)                    | Nothing                                                               |
+  | `form`        | Generic form, typed steps panel, Design tab (planned for M13) | Nothing                                                               |
+  | `site`        | Generic form                                                  | Nothing                                                               |
+  | `process`     | Typed editor with the process graph                           | Nothing                                                               |
+  | `rule`        | Generic form                                                  | Nothing                                                               |
+  | `sequence`    | Generic form                                                  | Nothing                                                               |
+  | `role`        | Generic form                                                  | Nothing                                                               |
+  | `policy`      | Generic form                                                  | Nothing                                                               |
+  | `dataSource`  | Generic form                                                  | Nothing                                                               |
+  | `connector`   | Typed editor                                                  | Nothing                                                               |
+  | `endpoint`    | Generic form, typed rows for `values`                         | Nothing                                                               |
+  | `event`       | Generic form                                                  | Nothing                                                               |
+  | `trigger`     | Generic form                                                  | Nothing                                                               |
+  | `migration`   | Generic form                                                  | The `changes` list, because each change's fields depend on its `type` |
+  | `seed`        | Typed editor                                                  | Nothing                                                               |
+  | `scenario`    | Typed editor                                                  | Nothing                                                               |
+  | `text`        | Typed editor                                                  | Nothing                                                               |
 
   The generic form sends a part to the JSON view when it holds `oneOf` or
   `anyOf`, when it holds `allOf` with an item that has more than `if`, `then`
@@ -790,7 +790,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
 - **Page designer** _(planned for M13)_. The page editor gets a Design tab
   that builds a page by drag and drop, per
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md).
-  Form and process designers are planned for M13 and M14, see
+  The form designer is planned for M13, see
+  [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md), and the
+  process designer for M14, see
   [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
   The process graph is read-only, and not a designer.
   - **Design tab.** It sits next to the Form and JSON tabs and is the default
@@ -839,5 +841,49 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Format.** The designer writes only the order of the widget tree and the
     properties the format has. It writes no pixels, and widths stay in
     twelfths.
+- **Form designer** _(planned for M13)_. The form editor gets a Design tab that
+  lays out a form by drag and drop, per
+  [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md). It sits
+  next to the Form and JSON tabs, is the default tab, and the three tabs edit
+  one draft. It reuses the canvas, property panel, undo (100 steps, cleared by
+  a reload) and `@dnd-kit` drag and drop of the page designer.
+  - **Canvas.** It draws the unsaved draft with the site's form widget, in its
+    sections and steps. Fields get placeholder values made from the field
+    types, and a child collection gets placeholder rows. The Save button does
+    nothing. The canvas asks
+    [the draft page metadata route](authoring.md#draft-page-metadata) 300 ms
+    after the last edit. For a form it answers the metadata of a form widget,
+    with a `path` on each section, field and step.
+  - **Step switch.** It lists the steps in order and shows the sections of one
+    step. A form without `steps` has no switch.
+  - **Condition marks.** No condition is evaluated, because the canvas has no
+    record. Every field and section shows. An element with `visibleWhen`,
+    `requiredWhen` or `readOnlyWhen` carries a mark that names each condition
+    and shows its text from the draft. A diagnostic of the form marks an
+    element as in the page designer: an error-coloured border, "has
+    diagnostics" in the text label, and `data-marked`.
+  - **Field palette.** It lists the entity's fields that no section lists,
+    child collections included. The author drags one into a section, or picks
+    one and inserts it into the selected section by keyboard. Removing a field
+    puts it back in the palette. The palette never offers a field already on
+    the form, and a drop never copies one.
+  - **Moves.** The author drags fields within and between sections, and
+    sections within and between steps. To move a section to another step, drop
+    it on that step in the switch, or use the Move to step picker. Every move
+    has a keyboard way, and a screen reader hears where the element lands.
+  - **Sections and steps.** The palette adds a section, with a unique `name`
+    and a new title key that the label editor opens, and a step. A new section
+    joins the selected step. Adding the first step names every unnamed section
+    and puts all sections into it, so the form stays valid (`AXC0230`).
+    Removing the last step removes `steps`.
+  - **Property panel.** A field shows `readOnly` and its three conditions in
+    the expression editor, which offers only the fields the form lists. A field
+    that the entity marks `required` has no `visibleWhen` box. A computed,
+    sequence or creator field shows `readOnly` on and locked. A section shows
+    its title and `visibleWhen`. A step shows its title.
+  - **Used on.** A list of the pages and process steps that use the form. It is
+    the Used by list filtered to the `widget form` and `task form` relations,
+    loads with the resource, and can be stale like the `usedBy` counts. An
+    entry opens the resource at its path. One edit changes every one of them.
 - **Texts.** Its texts, including those of the lists above, are the platform
   texts under `shell.studio.*`, in `en` and `vi`, like the other shell texts.
