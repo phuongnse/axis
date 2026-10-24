@@ -20,6 +20,10 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
 
     private const string PageId = "e0ee63b0-ff11-4f06-95ee-e73922f2c1a9";
 
+    private const string FormFile = "forms/purchase-request-review.json";
+
+    private const string FormId = "77c7c183-7283-46a7-b56f-5cf5cec518aa";
+
     private const string EntityId = "d9ccbf89-5004-4d52-8885-2ee377b7caa5";
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"axis-studio-page-{Guid.NewGuid():N}");
@@ -90,6 +94,136 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
 
         Assert.Equal("""{"type":"columns","columns":[{"width":12,"widgets":[]}]}""", JsonSerializer.Serialize<PageWidgetMetadata>(widget, JsonSerializerOptions.Web));
         Assert.Equal("""{"type":"columns","path":"/widgets/0","columns":[{"width":12,"widgets":[]}]}""", JsonSerializer.Serialize<PageWidgetMetadata>(widget with { Path = "/widgets/0" }, JsonSerializerOptions.Web));
+    }
+
+    [Fact]
+    public void Form_metadata_writes_no_path_until_the_draft_route_sets_one()
+    {
+        // The site's page route and the task routes share these types, and their answers must stay as they were.
+        var form = new FormMetadata(
+            "Review",
+            [new FormSectionMetadata("request", "review.request", false, [new FormFieldMetadata("title", false, false)])],
+            [new FormStepMetadata("review.step", ["request"])]);
+
+        Assert.Equal(
+            """{"name":"Review","sections":[{"name":"request","titleKey":"review.request","visibleWhen":false,"fields":[{"name":"title","readOnly":false,"visibleWhen":false}]}],"steps":[{"titleKey":"review.step","sections":["request"]}]}""",
+            JsonSerializer.Serialize(form, JsonSerializerOptions.Web));
+
+        var withPaths = form with
+        {
+            Sections = [form.Sections[0] with { Path = "/sections/0", Fields = [form.Sections[0].Fields[0] with { Path = "/sections/0/fields/0" }] }],
+            Steps = [form.Steps[0] with { Path = "/steps/0" }],
+        };
+        var json = JsonSerializer.Serialize(withPaths, JsonSerializerOptions.Web);
+        Assert.Contains("""{"path":"/sections/0","name":"request",""", json, StringComparison.Ordinal);
+        Assert.Contains("""{"path":"/sections/0/fields/0","name":"title",""", json, StringComparison.Ordinal);
+        Assert.Contains("""{"path":"/steps/0","titleKey":"review.step",""", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Valid_draft_form_answers_a_form_widget_with_the_paths_of_its_sections_fields_and_steps()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var form = SteppedForm();
+
+        var response = await Post(client, form.ToJsonString(), id: FormId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Empty(body.RootElement.GetProperty("diagnostics").EnumerateArray());
+        var widget = body.RootElement.GetProperty("widget");
+        Assert.Equal("form", widget.GetProperty("type").GetString());
+        Assert.False(widget.TryGetProperty("path", out _));
+        Assert.Empty(widget.GetProperty("actions").EnumerateArray());
+        var entity = widget.GetProperty("entity");
+        Assert.Equal("PurchaseRequest", entity.GetProperty("name").GetString());
+        var fieldNames = entity.GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()).ToArray();
+        Assert.Equal(13, fieldNames.Length);
+        Assert.Contains("purchaseOrderNumber", fieldNames);
+        var access = widget.GetProperty("access");
+        Assert.Equal(
+            ["read", "create", "update", "delete"],
+            access.GetProperty("actions").EnumerateArray().Select(action => action.GetString()).ToArray());
+        Assert.Equal(fieldNames, access.GetProperty("createFields").EnumerateArray().Select(field => field.GetString()).ToArray());
+        Assert.Equal(fieldNames, access.GetProperty("updateFields").EnumerateArray().Select(field => field.GetString()).ToArray());
+
+        var drawn = widget.GetProperty("form");
+        Assert.Equal("PurchaseRequestReview", drawn.GetProperty("name").GetString());
+        var sections = drawn.GetProperty("sections");
+        Assert.Equal("/sections/0", sections[0].GetProperty("path").GetString());
+        Assert.Equal("request", sections[0].GetProperty("name").GetString());
+        Assert.Equal("/sections/1", sections[1].GetProperty("path").GetString());
+        Assert.Equal("decision", sections[1].GetProperty("name").GetString());
+        Assert.Equal("/sections/0/fields/0", sections[0].GetProperty("fields")[0].GetProperty("path").GetString());
+        Assert.Equal("/sections/0/fields/2", sections[0].GetProperty("fields")[2].GetProperty("path").GetString());
+        Assert.Equal("requester", sections[0].GetProperty("fields")[2].GetProperty("name").GetString());
+        Assert.Equal("/sections/1/fields/0", sections[1].GetProperty("fields")[0].GetProperty("path").GetString());
+        var steps = drawn.GetProperty("steps");
+        Assert.Equal(2, steps.GetArrayLength());
+        Assert.Equal("/steps/0", steps[0].GetProperty("path").GetString());
+        Assert.Equal("/steps/1", steps[1].GetProperty("path").GetString());
+        Assert.Equal("decision", steps[1].GetProperty("sections")[0].GetString());
+    }
+
+    [Fact]
+    public async Task Draft_form_with_an_unknown_field_answers_no_widget_and_the_diagnostics_of_the_form()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+        var form = SteppedForm();
+        form["sections"]![1]!["fields"] = new JsonArray(new JsonObject { ["field"] = "noSuchField" });
+
+        var response = await Post(client, form.ToJsonString(), id: FormId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("widget").ValueKind);
+        var diagnostics = body.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.NotEmpty(diagnostics);
+        Assert.All(diagnostics, item => Assert.Equal(FormId, item.GetProperty("resourceId").GetString()));
+        Assert.Contains(diagnostics, item => item.GetProperty("path").GetString() == "/sections/1/fields/0/field");
+    }
+
+    [Fact]
+    public async Task Form_widget_is_null_when_another_file_has_an_error_and_its_diagnostics_are_not_listed()
+    {
+        File.WriteAllText(Path.Combine(Folder, "pages", "suppliers.json"), """{ "id": "not-an-id" }""");
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("hoa");
+
+        var response = await Post(client, SavedForm().ToJsonString(), id: FormId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("widget").ValueKind);
+        Assert.Empty(body.RootElement.GetProperty("diagnostics").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Draft_form_route_refuses_callers_and_bodies_like_the_page_route()
+    {
+        await using var factory = CreateFactory();
+        using var anonymous = factory.CreateClient();
+        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        var json = SavedForm().ToJsonString();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Post(anonymous, json, id: FormId)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(anna, json, id: FormId)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(hoa, json, id: FormId, csrf: false)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Post(hoa, json, id: EntityId)).StatusCode);
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, (await Post(hoa, json, id: FormId, contentType: "text/plain")).StatusCode);
+
+        var otherId = SavedForm();
+        otherId["id"] = Guid.NewGuid().ToString("D");
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, otherId.ToJsonString(), id: FormId)).StatusCode);
+
+        var otherKind = SavedForm();
+        otherKind["kind"] = "page";
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, otherKind.ToJsonString(), id: FormId)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, "[]", id: FormId)).StatusCode);
     }
 
     [Fact]
@@ -275,6 +409,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, (await Post(client, SavedPage().ToJsonString())).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Post(client, TwoColumns(ValidChart()).ToJsonString())).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Post(client, TwoColumns(BrokenChart()).ToJsonString())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Post(client, SavedForm().ToJsonString(), id: FormId)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await Post(client, "[]")).StatusCode);
 
         Assert.Equal(before, Snapshot());
@@ -302,6 +437,20 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     }
 
     private JsonObject SavedPage() => (JsonObject)JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, PageFile)))!;
+
+    private JsonObject SavedForm() => (JsonObject)JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, FormFile)))!;
+
+    // The saved form with its two sections named and one wizard step for each.
+    private JsonObject SteppedForm()
+    {
+        var form = SavedForm();
+        form["sections"]![0]!["name"] = "request";
+        form["sections"]![1]!["name"] = "decision";
+        form["steps"] = new JsonArray(
+            new JsonObject { ["title"] = new JsonObject { ["textKey"] = "purchaseRequest.sections.request" }, ["sections"] = new JsonArray("request") },
+            new JsonObject { ["title"] = new JsonObject { ["textKey"] = "purchaseRequest.sections.decision" }, ["sections"] = new JsonArray("decision") });
+        return form;
+    }
 
     // The saved table in a column of 8, and the given widget in a column of 4.
     private JsonObject TwoColumns(JsonObject second)
