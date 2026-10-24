@@ -1,0 +1,20 @@
+{
+  "id": "1637b38e-ad5b-4526-8f14-338e75725bb7",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.analyst": "Analyst",
+    "site.title": "Performance",
+    "nav.dashboard": "Dashboard",
+    "dashboard.title": "Dashboard",
+    "dashboard.overview": "Overview",
+    "dashboard.requests": "Requests",
+    "dashboard.open": "Open requests",
+    "dashboard.amount": "Total amount",
+    "dashboard.largest": "Largest amount",
+    "dashboard.byStatus": "Requests by status",
+    "dashboard.requestCount": "Requests"
+  }
+}

@@ -90,8 +90,10 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     text**. The SPA turns them into numbers only to draw. The tooltip and the
     data table keep the source text.
   - **Look.** Series colours come from the theme tokens, in light and dark
-    mode. The SPA loads the library lazily in its own chunk, as it loads React
-    Flow, so a page without a chart never loads it. The shared chart component
+    mode. The SPA loads the library lazily in its own chunk of about 185 KB
+    gzipped, as it loads React Flow, so a page without a chart never loads it.
+    `scripts/build.sh` prints the chunk's size and fails when the chunk is
+    missing or part of the main bundle. The shared chart component
     in `web/src/platform/Chart.tsx` is built and draws bar, line and pie charts
     from categories and labelled series. The widget that reads a data source
     draws a card with the chart's title above the chart.

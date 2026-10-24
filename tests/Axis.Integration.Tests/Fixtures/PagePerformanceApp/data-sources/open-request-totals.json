@@ -1,0 +1,23 @@
+{
+  "id": "bd5baccd-a7aa-48d0-9871-ecfdae4b4ec8",
+  "kind": "dataSource",
+  "name": "OpenRequestTotals",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    {
+      "name": "status",
+      "path": "status"
+    }
+  ],
+  "filter": "status == 'open'",
+  "aggregate": {
+    "groupBy": [],
+    "measures": [
+      {
+        "name": "openCount",
+        "function": "count"
+      }
+    ]
+  }
+}

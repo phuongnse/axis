@@ -1,0 +1,15 @@
+{
+  "id": "87034057-36dc-4aec-9258-dd25ce7280f8",
+  "kind": "entity",
+  "name": "Department",
+  "formatVersion": 1,
+  "displayField": "name",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true,
+      "maxLength": 100
+    }
+  ]
+}

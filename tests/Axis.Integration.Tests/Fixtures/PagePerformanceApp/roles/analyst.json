@@ -1,0 +1,9 @@
+{
+  "id": "3346ff2f-5ff1-42f5-a06a-516b6d31e2e0",
+  "kind": "role",
+  "name": "analyst",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.analyst"
+  }
+}

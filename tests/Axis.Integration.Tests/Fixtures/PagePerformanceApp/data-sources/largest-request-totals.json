@@ -1,0 +1,23 @@
+{
+  "id": "db4c7459-479a-40dd-a6fb-d08e75697759",
+  "kind": "dataSource",
+  "name": "LargestRequestTotals",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    {
+      "name": "amount",
+      "path": "amount"
+    }
+  ],
+  "aggregate": {
+    "groupBy": [],
+    "measures": [
+      {
+        "name": "amountMax",
+        "function": "max",
+        "field": "amount"
+      }
+    ]
+  }
+}

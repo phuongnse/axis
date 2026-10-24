@@ -1,0 +1,53 @@
+{
+  "id": "4bb0cb62-a325-4687-abf7-e42f797187bf",
+  "kind": "policy",
+  "name": "AnalystAccess",
+  "formatVersion": 1,
+  "roles": [
+    "analyst"
+  ],
+  "grants": [
+    {
+      "entity": "Request",
+      "actions": [
+        "read"
+      ]
+    },
+    {
+      "entity": "Department",
+      "actions": [
+        "read"
+      ]
+    },
+    {
+      "dataSource": "RequestList",
+      "actions": [
+        "read"
+      ]
+    },
+    {
+      "dataSource": "RequestsByStatus",
+      "actions": [
+        "read"
+      ]
+    },
+    {
+      "dataSource": "OpenRequestTotals",
+      "actions": [
+        "read"
+      ]
+    },
+    {
+      "dataSource": "AmountTotals",
+      "actions": [
+        "read"
+      ]
+    },
+    {
+      "dataSource": "LargestRequestTotals",
+      "actions": [
+        "read"
+      ]
+    }
+  ]
+}

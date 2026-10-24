@@ -1,0 +1,25 @@
+{
+  "id": "747fd218-23b2-4f08-b2d2-f23c6652fcf1",
+  "kind": "site",
+  "name": "Performance",
+  "formatVersion": 1,
+  "path": "performance",
+  "title": {
+    "textKey": "site.title"
+  },
+  "locales": {
+    "default": "en",
+    "fallback": "en",
+    "available": [
+      "en"
+    ]
+  },
+  "navigation": [
+    {
+      "page": "Dashboard",
+      "label": {
+        "textKey": "nav.dashboard"
+      }
+    }
+  ]
+}

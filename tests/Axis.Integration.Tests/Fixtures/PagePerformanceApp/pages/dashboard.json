@@ -1,0 +1,91 @@
+{
+  "id": "6b2301b3-b24a-41a2-b6df-f086b01972fe",
+  "kind": "page",
+  "name": "Dashboard",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "dashboard.title"
+  },
+  "widgets": [
+    {
+      "type": "tabs",
+      "tabs": [
+        {
+          "label": {
+            "textKey": "dashboard.overview"
+          },
+          "widgets": [
+            {
+              "type": "section",
+              "title": {
+                "textKey": "dashboard.requests"
+              },
+              "widgets": [
+                {
+                  "type": "columns",
+                  "columns": [
+                    {
+                      "width": 4,
+                      "widgets": [
+                        {
+                          "type": "kpi",
+                          "dataSource": "OpenRequestTotals",
+                          "measure": "openCount",
+                          "label": {
+                            "textKey": "dashboard.open"
+                          }
+                        },
+                        {
+                          "type": "kpi",
+                          "dataSource": "AmountTotals",
+                          "measure": "amountSum",
+                          "label": {
+                            "textKey": "dashboard.amount"
+                          }
+                        },
+                        {
+                          "type": "kpi",
+                          "dataSource": "LargestRequestTotals",
+                          "measure": "amountMax",
+                          "label": {
+                            "textKey": "dashboard.largest"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "width": 8,
+                      "widgets": [
+                        {
+                          "type": "chart",
+                          "kind": "bar",
+                          "dataSource": "RequestsByStatus",
+                          "category": "status",
+                          "title": {
+                            "textKey": "dashboard.byStatus"
+                          },
+                          "measures": [
+                            {
+                              "name": "requests",
+                              "label": {
+                                "textKey": "dashboard.requestCount"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "table",
+                  "dataSource": "RequestList"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

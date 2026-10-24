@@ -1,0 +1,23 @@
+{
+  "id": "723c45cd-bede-4752-9ddc-f964def1458c",
+  "kind": "dataSource",
+  "name": "AmountTotals",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    {
+      "name": "amount",
+      "path": "amount"
+    }
+  ],
+  "aggregate": {
+    "groupBy": [],
+    "measures": [
+      {
+        "name": "amountSum",
+        "function": "sum",
+        "field": "amount"
+      }
+    ]
+  }
+}

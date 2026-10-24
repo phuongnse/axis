@@ -1,0 +1,188 @@
+{
+  "id": "027a1f3c-777d-4eb4-b761-152483f9cebf",
+  "kind": "entity",
+  "name": "Claim",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "maxLength": 100,
+      "required": true
+    },
+    {
+      "name": "kind",
+      "type": "enum",
+      "values": [
+        "standard",
+        "express",
+        "special"
+      ]
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "values": [
+        "draft",
+        "submitted",
+        "approved",
+        "rejected"
+      ]
+    },
+    {
+      "name": "priority",
+      "type": "enum",
+      "values": [
+        "low",
+        "normal",
+        "high"
+      ]
+    },
+    {
+      "name": "urgent",
+      "type": "boolean"
+    },
+    {
+      "name": "amount",
+      "type": "integer"
+    },
+    {
+      "name": "discount",
+      "type": "integer"
+    },
+    {
+      "name": "total",
+      "type": "integer",
+      "expression": "amount - discount"
+    },
+    {
+      "name": "lineTotal",
+      "type": "decimal",
+      "precision": 20,
+      "scale": 2,
+      "expression": "sum(lines, amount)"
+    },
+    {
+      "name": "lineCount",
+      "type": "integer",
+      "expression": "count(lines)"
+    },
+    {
+      "name": "costCenter",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "project",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "reference",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "approver",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "approvalNote",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "rejectionReason",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "contactName",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "contactEmail",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "contactPhone",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "addressLine",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "city",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "country",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "postalCode",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "dueOn",
+      "type": "date"
+    },
+    {
+      "name": "notes",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "lines",
+      "type": "child-collection",
+      "target": "ClaimLine"
+    }
+  ],
+  "validations": [
+    {
+      "expression": "discount is null or amount is null or discount <= amount",
+      "message": {
+        "textKey": "claim.discountTooHigh"
+      },
+      "field": "discount"
+    },
+    {
+      "expression": "amount is null or amount >= 0",
+      "message": {
+        "textKey": "claim.amountNotNegative"
+      },
+      "field": "amount"
+    },
+    {
+      "expression": "contactEmail is null or contains(contactEmail, '@')",
+      "message": {
+        "textKey": "claim.emailNeedsAt"
+      },
+      "field": "contactEmail"
+    },
+    {
+      "expression": "postalCode is null or length(postalCode) <= 10",
+      "message": {
+        "textKey": "claim.postalCodeShort"
+      },
+      "field": "postalCode"
+    },
+    {
+      "expression": "count(lines) >= 1",
+      "message": {
+        "textKey": "claim.needsLine"
+      },
+      "field": "lines"
+    }
+  ]
+}

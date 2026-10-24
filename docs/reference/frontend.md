@@ -100,6 +100,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts. Optional `?release={releaseId}` serves any stored release of the site's application. An unknown id, a non-UUID or another application's release answers `404`. |
   | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below |
 
+  At typical size, a page with a three-level widget tree loads in under 2 s: its
+  metadata, then the rows of its table, chart and KPIs read in parallel over 100,000
+  records. `PageLoadPerformanceTests` fails when the best of three loads takes 2 s or more.
+
   A page response looks like this:
 
   ```json
