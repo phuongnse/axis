@@ -835,8 +835,23 @@ Run and the Test results list, the read-only view of a module entity, and the re
     on the canvas, and selecting it opens its action in the panel, including a
     `delete` action. _Partly built:_ the side pane of the Design tab holds the
     whole widget tree and the panel of the selected widget, the same as the Form
-    tab. An edit redraws the canvas through the 300 ms draft post. An action's
-    button does not select its action yet.
+    tab. An edit redraws the canvas through the 300 ms draft post. On the
+    canvas, every action of a table (row and toolbar), a form, a detail and a
+    KPI draws as a button, also one the site would hide, such as an action whose
+    `visibleWhen` fails on placeholder data or a form action on an unsaved
+    record. A click on the button, or Enter or Space on it, selects the action
+    and not its widget. The selection is the JSON Pointer of the action, such as
+    `/widgets/0/rowActions/1`, or `/widgets/0/navigate` for a KPI. The button has
+    `aria-current` and an outline in the primary colour, and the widget tree
+    keeps its widget selected. The panel then shows the whole widget panel with
+    the action's card marked by `aria-current` and scrolled into view. Adding a
+    navigate, `startProcess` or `delete` action in the panel selects the new
+    action, and removing an action selects its widget. The button runs nothing,
+    so it does not navigate, start a process, open a delete confirmation or call
+    `/api/apps/`. On the canvas a KPI's navigate action is a link-style button
+    on the label line, and the tile is not a link. At phone width, a table's row
+    actions fold into a menu that the canvas cannot open, because it cancels the
+    click. There the author selects a row action from the tree and the panel.
   - **Palette.** It lists the ten widget types. The author drags one onto the
     canvas, or picks one and inserts it after the selected widget or into the
     selected container. A type is disabled, with the reason, when the page

@@ -1,7 +1,8 @@
-import { Alert, Card, Flex } from 'antd'
+import { Alert, Button, Card, Flex } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { boundParameterQuery } from './boundParameters'
+import { useCanvasActions } from './canvasActions'
 import { formatValue } from './formatValue'
 import { navigatePath } from './navigateAction'
 import { fetchRecords, type RecordItem, type RecordValue } from './records'
@@ -35,10 +36,12 @@ interface LoadState {
  * source parameter's name, and asks again when one changes. The compiler makes every parameter that the
  * widget leaves unbound optional. With a navigate action the whole tile is a link to the
  * target page, ending in the action's label, and the action reads only the page's parameter values.
- * Without one, or when the SPA cannot build the address, the tile is plain.
+ * Without one, or when the SPA cannot build the address, the tile is plain. On the page designer's canvas the tile is
+ * never a link: the navigate action is a link-style button on the label line, also when the SPA cannot build the address.
  */
 export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetProps) {
   const t = useText()
+  const canvas = useCanvasActions()
   const { dataSource, kpi } = widget
   // The server sets both on a kpi widget.
   const { name, rowsPath, columns } = dataSource!
@@ -92,7 +95,14 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
             {t(comparison.labelKey)}: <strong>{display(comparison.measure)}</strong>
           </div>
         )}
-        {navigate && path && <div>{t(navigate.labelKey)}</div>}
+        {navigate && canvas.active && (
+          <div>
+            <Button type="link" size="small" {...canvas.props('navigate')}>
+              {t(navigate.labelKey)}
+            </Button>
+          </div>
+        )}
+        {navigate && !canvas.active && path && <div>{t(navigate.labelKey)}</div>}
       </Flex>
     )
   }
@@ -102,5 +112,5 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
       {content}
     </Card>
   )
-  return path ? <Link to={path}>{tile}</Link> : tile
+  return path && !canvas.active ? <Link to={path}>{tile}</Link> : tile
 }
