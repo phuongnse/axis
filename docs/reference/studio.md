@@ -903,8 +903,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
     until the designer is complete. The canvas opens the placeholder record, so
     each field shows a placeholder value, and no request goes to `/api/apps/`.
     Save, Next, Back and Cancel do nothing, because the canvas cancels every
-    click and form submit. A form the route cannot draw shows a short notice.
-    The tab has the canvas only, with no side pane, selection or width switch.
+    click and form submit. A click only selects. A form the route cannot draw
+    shows a short notice. The tab has the canvas and a property panel beside it,
+    and no palette or width switch.
     The canvas is mounted only while the Design tab is active.
   - **Step switch.** It lists the steps in order and shows the sections of one
     step. A form without `steps` has no switch.
@@ -940,6 +941,15 @@ Run and the Test results list, the read-only view of a module entity, and the re
     that the entity marks `required` has no `visibleWhen` box. A computed,
     sequence or creator field shows `readOnly` on and locked. A section shows
     its title and `visibleWhen`. A step shows its title.
+    _Partly built:_ a click, Enter or Space selects a field or a section. A
+    click on a step selects it and shows its sections. The selected element has
+    `aria-current` and an outline in the primary colour. The panel asks the
+    author to select something when nothing is selected. The selection is kept
+    across the Design, Form and JSON tabs while the resource stays open. The
+    panel reads the entity flags from the canvas's latest answer, so it shows
+    nothing about a field until the form is drawn. A required field that
+    already has a `visibleWhen` shows no box for it. Remove it in the Form or
+    JSON tab.
   - **Used on.** A list of the pages and process steps that use the form. It is
     the Used by list filtered to the `widget form` and `task form` relations,
     loads with the resource, and can be stale like the `usedBy` counts. An

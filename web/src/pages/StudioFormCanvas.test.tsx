@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { EditorView } from '@codemirror/view'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -140,6 +141,34 @@ const draft = {
   ],
 }
 
+/** The widget with a required title and a computed number in the first section, and the draft that lists them. */
+const requiredWidget: EntityWidgetMetadata = {
+  ...widget,
+  entity: {
+    ...widget.entity,
+    fields: [
+      { ...field('title', 'text'), required: true },
+      ...widget.entity.fields.slice(1),
+      { ...field('number', 'integer'), computed: true },
+    ],
+  },
+  form: {
+    ...widget.form!,
+    sections: [
+      {
+        ...widget.form!.sections[0],
+        fields: [widget.form!.sections[0].fields[0], { name: 'number', readOnly: true, path: '/sections/0/fields/1' }],
+      },
+      widget.form!.sections[1],
+    ],
+  },
+}
+
+const requiredDraft = {
+  ...draft,
+  sections: [{ ...draft.sections[0], fields: [{ field: 'title' }, { field: 'number' }] }, draft.sections[1]],
+}
+
 function diagnosticAt(path: string): StudioDiagnostic {
   return {
     code: 'AXC0076',
@@ -159,13 +188,13 @@ function respond(answer: EntityWidgetMetadata | null, diagnostics: StudioDiagnos
 }
 
 /** Serves the resource and answers each page-metadata post. */
-function stub(answer: () => Response = () => respond(widget)) {
+function stub(answer: () => Response = () => respond(widget), content: object = draft) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     if (input === `${folder}/resources/${formId}/page-metadata` && init?.method === 'POST') {
       return answer()
     }
     if (input === `${folder}/resources/${formId}`) {
-      return new Response(JSON.stringify({ ...item, content: draft }), {
+      return new Response(JSON.stringify({ ...item, content }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -206,6 +235,23 @@ async function openDesign() {
   await screen.findByTestId('studio-editor', {}, slow)
   await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
   return screen.findByTestId('studio-form-canvas', {}, slow)
+}
+
+/** The CodeMirror view of the expression editor with the given name inside `panel`. */
+async function expressionView(panel: HTMLElement, name: string): Promise<EditorView> {
+  let view: EditorView | null = null
+  // The editor chunk loads after the panel shows a read-only box.
+  await waitFor(() => {
+    view = EditorView.findFromDOM(within(panel).getByRole('textbox', { name }))
+    expect(view).not.toBeNull()
+  }, slow)
+  return view as unknown as EditorView
+}
+
+function metadataPosts(fetchMock: ReturnType<typeof vi.fn>): Record<string, any>[] {
+  return fetchMock.mock.calls
+    .filter(([input, init]) => input === `${folder}/resources/${formId}/page-metadata` && init?.method === 'POST')
+    .map(([, init]) => JSON.parse(init.body as string))
 }
 
 function appRequests(fetchMock: ReturnType<typeof vi.fn>) {
@@ -306,5 +352,123 @@ describe('the Design tab of a form', () => {
       'The form cannot be drawn until its errors are fixed.',
     )
     expect(screen.queryByTestId('studio-form-steps')).not.toBeInTheDocument()
+  })
+
+  it('asks the author to select something while nothing is selected', async () => {
+    stub()
+    renderEditor()
+
+    await openDesign()
+
+    expect(await screen.findByTestId('studio-design-hint', {}, slow)).toHaveTextContent(
+      'Select a field, section or step on the canvas.',
+    )
+  })
+
+  it('edits the visibleWhen of the selected field and posts the new draft', async () => {
+    const fetchMock = stub()
+    renderEditor()
+
+    const canvas = await openDesign()
+    await userEvent.click(within(await screen.findByTestId('studio-form-steps', {}, slow)).getByText('Add details'))
+    const field = await within(canvas).findByRole('group', { name: 'resolution' }, slow)
+    await userEvent.click(field)
+
+    expect(field).toHaveAttribute('aria-current', 'true')
+    const panel = screen.getByTestId('studio-design-panel')
+    const view = await expressionView(panel, 'Visible when')
+    act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "status != 'open'" } }))
+
+    await waitFor(
+      () =>
+        expect(
+          metadataPosts(fetchMock).some((body) => body.sections[1].fields[1].visibleWhen === "status != 'open'"),
+        ).toBe(true),
+      slow,
+    )
+  })
+
+  it('selects a field with Enter', async () => {
+    stub()
+    renderEditor()
+
+    const canvas = await openDesign()
+    const field = await within(canvas).findByRole('group', { name: 'title' }, slow)
+    field.focus()
+    await userEvent.keyboard('{Enter}')
+
+    expect(field).toHaveAttribute('aria-current', 'true')
+    expect(within(screen.getByTestId('studio-design-panel')).getByRole('checkbox', { name: 'Read-only' })).toBeEnabled()
+  })
+
+  it('has no visibleWhen box for a field that the entity requires', async () => {
+    stub(() => respond(requiredWidget), requiredDraft)
+    renderEditor()
+
+    const canvas = await openDesign()
+    await userEvent.click(await within(canvas).findByRole('group', { name: 'title' }, slow))
+
+    const panel = screen.getByTestId('studio-design-panel')
+    expect(await within(panel).findByRole('textbox', { name: 'Required when' }, slow)).toBeInTheDocument()
+    expect(within(panel).getByRole('textbox', { name: 'Read-only when' })).toBeInTheDocument()
+    expect(within(panel).queryByRole('textbox', { name: 'Visible when' })).not.toBeInTheDocument()
+  })
+
+  it('shows readOnly on and locked for a computed field', async () => {
+    stub(() => respond(requiredWidget), requiredDraft)
+    renderEditor()
+
+    const canvas = await openDesign()
+    await userEvent.click(await within(canvas).findByRole('group', { name: 'number' }, slow))
+
+    const checkbox = within(screen.getByTestId('studio-design-panel')).getByRole('checkbox', { name: 'Read-only' })
+    expect(checkbox).toBeChecked()
+    expect(checkbox).toBeDisabled()
+    expect(screen.getByTestId('studio-design-panel')).toHaveTextContent('The server sets this field')
+  })
+
+  it('selects a step in the switch, shows its title and shows its sections', async () => {
+    stub()
+    renderEditor()
+
+    const canvas = await openDesign()
+    const steps = await screen.findByTestId('studio-form-steps', {}, slow)
+    await userEvent.click(within(steps).getByText('Add details'))
+
+    const panel = screen.getByTestId('studio-design-panel')
+    const title = within(panel).getByTestId('studio-field-/steps/1/title')
+    expect(within(title).getByRole('textbox', { name: 'Text key' })).toHaveValue('ticket.steps.details')
+    expect(within(steps).getByText('Add details')).toHaveAttribute('aria-current', 'true')
+    expect(await within(canvas).findByRole('textbox', { name: 'Resolution' }, slow)).toBeInTheDocument()
+  })
+
+  it('selects a section and shows its title and visibleWhen', async () => {
+    stub()
+    renderEditor()
+
+    const canvas = await openDesign()
+    await userEvent.click(within(await screen.findByTestId('studio-form-steps', {}, slow)).getByText('Add details'))
+    const section = await within(canvas).findByRole('group', { name: 'The details' }, slow)
+    await userEvent.click(section)
+
+    expect(section).toHaveAttribute('aria-current', 'true')
+    const panel = screen.getByTestId('studio-design-panel')
+    expect(
+      within(within(panel).getByTestId('studio-field-/sections/1/title')).getByRole('textbox', { name: 'Text key' }),
+    ).toHaveValue('ticket.sections.details')
+    expect(await within(panel).findByRole('textbox', { name: 'Visible when' }, slow)).toBeInTheDocument()
+  })
+
+  it('keeps the selection across the tabs', async () => {
+    stub()
+    renderEditor()
+
+    const canvas = await openDesign()
+    await userEvent.click(await within(canvas).findByRole('group', { name: 'title' }, slow))
+    await userEvent.click(screen.getByRole('tab', { name: 'Form' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
+
+    const again = await screen.findByTestId('studio-form-canvas', {}, slow)
+    expect(await within(again).findByRole('group', { name: 'title' }, slow)).toHaveAttribute('aria-current', 'true')
   })
 })

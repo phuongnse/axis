@@ -165,6 +165,7 @@ export function StudioEditor({
   const [deleteFailed, setDeleteFailed] = useState(false)
   const [tab, setTab] = useState<'design' | 'form' | 'json'>('form')
   const [widgetPath, setWidgetPath] = useState('/widgets/0')
+  const [formPath, setFormPath] = useState<string | null>(null)
   const [seedEntity, setSeedEntity] = useState<SeedEntity>()
   // The other locales of a text resource, read from their files, for the text table to show beside the open one.
   const [otherTexts, setOtherTexts] = useState<TextColumn[]>()
@@ -644,7 +645,14 @@ export function StudioEditor({
                         children:
                           tab === 'design' ? (
                             <div data-testid="studio-form-design">
-                              <StudioFormCanvas application={application} resourceId={item.id} draft={draft} />
+                              <StudioFormCanvas
+                                application={application}
+                                resourceId={item.id}
+                                draft={draft}
+                                selected={formPath}
+                                onSelect={setFormPath}
+                                onChange={change}
+                              />
                             </div>
                           ) : null,
                       },

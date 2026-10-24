@@ -1,0 +1,217 @@
+import { Checkbox, Flex, Input, Typography } from 'antd'
+import { lazy, Suspense, useContext } from 'react'
+import { getAt } from '../platform/jsonPatch'
+import type { FieldMetadata } from '../platform/site'
+import { StudioNamesContext } from '../platform/studioNames'
+import { useText } from '../platform/texts'
+import { ExpressionCheckContext } from './expressionCheckContext'
+import { expressionScope } from './expressionScope'
+import { LabelTexts } from './LabelTexts'
+import { LabelTextsContext } from './labelTextsContext'
+import type { ChangeHandler } from './SchemaForm'
+
+const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
+
+type Content = Record<string, unknown>
+
+type Condition = 'visibleWhen' | 'requiredWhen' | 'readOnlyWhen'
+
+const fieldPointer = /^\/sections\/\d+\/fields\/\d+$/
+const sectionPointer = /^\/sections\/\d+$/
+const stepPointer = /^\/steps\/\d+$/
+
+function isContent(value: unknown): value is Content {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * The properties of the element that is selected on the form canvas, found by its JSON Pointer in the draft. A field
+ * has `readOnly` and its three conditions, a section its title and `visibleWhen`, and a step its title. A field the
+ * entity marks required has no `visibleWhen` (AXC0226). A computed, sequence or creator field is always read-only. A
+ * selection that finds no object in the draft shows a hint, so no edit goes to a stale pointer.
+ */
+export function FormProperties({
+  draft,
+  selected,
+  entityFields,
+  onChange,
+}: {
+  draft: Content
+  selected: string | null
+  entityFields: FieldMetadata[]
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const element = selected === null ? undefined : getAt(draft, selected)
+  const content = isContent(element) ? element : undefined
+  let panel
+  if (selected !== null && content !== undefined) {
+    if (fieldPointer.test(selected)) {
+      panel = (
+        <FieldProperties
+          draft={draft}
+          pointer={selected}
+          field={content}
+          entityFields={entityFields}
+          onChange={onChange}
+        />
+      )
+    } else if (sectionPointer.test(selected)) {
+      panel = <SectionProperties draft={draft} pointer={selected} section={content} onChange={onChange} />
+    } else if (stepPointer.test(selected)) {
+      panel = <StepProperties pointer={selected} step={content} onChange={onChange} />
+    }
+  }
+  return (
+    <Flex vertical gap="small" aria-label={t('shell.studio.design.properties')} role="region">
+      {panel ?? (
+        <Typography.Text type="secondary" data-testid="studio-design-hint">
+          {t('shell.studio.design.selectFormElement')}
+        </Typography.Text>
+      )}
+    </Flex>
+  )
+}
+
+function FieldProperties({
+  draft,
+  pointer,
+  field,
+  entityFields,
+  onChange,
+}: {
+  draft: Content
+  pointer: string
+  field: Content
+  entityFields: FieldMetadata[]
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const name = typeof field.field === 'string' ? field.field : ''
+  const entityField = entityFields.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase())
+  const locked = entityField !== undefined && (entityField.computed || entityField.sequence || entityField.creator)
+  const conditions: Condition[] = entityField?.required
+    ? ['requiredWhen', 'readOnlyWhen']
+    : ['visibleWhen', 'requiredWhen', 'readOnlyWhen']
+  return (
+    <Flex vertical gap="small" data-testid="studio-design-field">
+      <Typography.Text strong>{name}</Typography.Text>
+      <div>
+        <Checkbox
+          aria-label={t('shell.studio.design.readOnly')}
+          checked={locked || field.readOnly === true}
+          disabled={locked}
+          onChange={(event) => onChange(`${pointer}/readOnly`, event.target.checked)}
+        >
+          {t('shell.studio.design.readOnly')}
+        </Checkbox>
+        {locked && (
+          <div>
+            <Typography.Text type="secondary">{t('shell.studio.design.readOnlyLocked')}</Typography.Text>
+          </div>
+        )}
+      </div>
+      {conditions.map((condition) => (
+        <ConditionBox
+          key={condition}
+          draft={draft}
+          pointer={pointer}
+          element={field}
+          condition={condition}
+          onChange={onChange}
+        />
+      ))}
+    </Flex>
+  )
+}
+
+function SectionProperties({
+  draft,
+  pointer,
+  section,
+  onChange,
+}: {
+  draft: Content
+  pointer: string
+  section: Content
+  onChange: ChangeHandler
+}) {
+  return (
+    <Flex vertical gap="small" data-testid="studio-design-section">
+      <TitleEditor pointer={pointer} element={section} onChange={onChange} />
+      <ConditionBox draft={draft} pointer={pointer} element={section} condition="visibleWhen" onChange={onChange} />
+    </Flex>
+  )
+}
+
+function StepProperties({ pointer, step, onChange }: { pointer: string; step: Content; onChange: ChangeHandler }) {
+  return (
+    <Flex vertical gap="small" data-testid="studio-design-step">
+      <TitleEditor pointer={pointer} element={step} onChange={onChange} />
+    </Flex>
+  )
+}
+
+/** The title of a section or a step. The label editor keeps its key in state, so the pointer is its key. */
+function TitleEditor({ pointer, element, onChange }: { pointer: string; element: Content; onChange: ChangeHandler }) {
+  const t = useText()
+  const names = useContext(StudioNamesContext)
+  const label = useContext(LabelTextsContext)
+  const title = `${pointer}/title`
+  const textKey = isContent(element.title) && typeof element.title.textKey === 'string' ? element.title.textKey : ''
+  return (
+    <div data-testid={`studio-field-${title}`}>
+      <div>{t('shell.studio.design.title')}</div>
+      {names !== undefined && label !== null ? (
+        <LabelTexts key={title} pointer={title} value={element.title} onChange={onChange} />
+      ) : (
+        <Input
+          aria-label={t('shell.studio.design.title')}
+          value={textKey}
+          onChange={(event) => onChange(title, { textKey: event.target.value })}
+        />
+      )}
+    </div>
+  )
+}
+
+/** An expression box for a condition of a field or a section. It offers only the fields the form lists. */
+function ConditionBox({
+  draft,
+  pointer,
+  element,
+  condition,
+  onChange,
+}: {
+  draft: Content
+  pointer: string
+  element: Content
+  condition: Condition
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const check = useContext(ExpressionCheckContext)
+  const path = `${pointer}/${condition}`
+  const name = t(`shell.studio.design.${condition}`)
+  const value = typeof element[condition] === 'string' ? element[condition] : ''
+  return (
+    <div data-testid={`studio-field-${path}`}>
+      <div>{name}</div>
+      {check && (
+        <Suspense fallback={<Input aria-label={name} value={value} readOnly />}>
+          <LazyExpressionEditor
+            key={path}
+            application={check.application}
+            resourceId={check.resourceId}
+            path={path}
+            name={name}
+            value={value}
+            required={false}
+            options={expressionScope('form', draft, path, check.names)}
+            onChange={onChange}
+          />
+        </Suspense>
+      )}
+    </div>
+  )
+}
