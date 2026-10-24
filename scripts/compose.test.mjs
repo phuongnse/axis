@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve as resolvePath } from 'node:path'
 import { after, before, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -18,6 +18,7 @@ let env
 let baseUrl
 let keycloakUrl
 let purchasingUrl
+let studioApps
 
 const freePort = () =>
   new Promise((resolve, reject) => {
@@ -42,12 +43,16 @@ before(async () => {
   const postgresPort = await freePort()
   const keycloakPort = await freePort()
   const purchasingPort = await freePort()
+  studioApps = mkdtempSync(join(tmpdir(), 'axis-studio-apps-'))
+  // The server's user, UID 1654 on Linux, writes the folder.
+  chmodSync(studioApps, 0o777)
   env = {
     ...process.env,
     AXIS_SERVER_PORT: String(serverPort),
     AXIS_POSTGRES_PORT: String(postgresPort),
     AXIS_KEYCLOAK_PORT: String(keycloakPort),
     AXIS_PURCHASING_PORT: String(purchasingPort),
+    AXIS_STUDIO_APPS_DIR: studioApps,
   }
   // The sample's tenant host is localhost.
   baseUrl = `http://localhost:${serverPort}`
@@ -57,6 +62,7 @@ before(async () => {
 
 after(() => {
   compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore' })
+  rmSync(studioApps, { recursive: true, force: true })
 })
 
 test('the stack runs from source', { timeout }, async () => {
@@ -133,6 +139,10 @@ test('the stack runs from source', { timeout }, async () => {
   }
   assert.doesNotMatch(compose(['logs', 'server']).stdout, /The module version is not loaded/)
 
+  // The server's applications folder is the bind mount of the temporary folder.
+  const applicationsFolder = compose(['exec', '-T', 'server', 'test', '-d', '/studio-apps'])
+  assert.equal(applicationsFolder.status, 0, applicationsFolder.stderr)
+
   const services = compose(['ps', '--status', 'running', '--services'])
   assert.match(services.stdout, /^worker$/m, `${services.stdout}${services.stderr}`)
   assert.match(services.stdout, /^publisher$/m, `${services.stdout}${services.stderr}`)
@@ -202,6 +212,23 @@ test('the default ports are 5206, 5432, 8080 and 5207 on 127.0.0.1', () => {
   assert.deepEqual(published('postgres'), ['127.0.0.1:5432->5432'])
   assert.deepEqual(published('keycloak'), ['127.0.0.1:8080->8080'])
   assert.deepEqual(published('purchasing'), ['127.0.0.1:5207->8080'])
+})
+
+test('the server creates its applications in artifacts/studio-apps, which git ignores', () => {
+  const { AXIS_STUDIO_APPS_DIR, ...rest } = env
+  const config = compose(['--env-file', '/dev/null', 'config', '--format', 'json'], { env: rest })
+  assert.equal(config.status, 0, config.stderr)
+  const { services } = JSON.parse(config.stdout)
+  assert.equal(services.server.environment.Studio__ApplicationsPath, '/studio-apps')
+  const folder = resolvePath(root, 'artifacts/studio-apps')
+  assert.ok(
+    services.server.volumes.some(
+      (volume) => volume.type === 'bind' && volume.target === '/studio-apps' && resolvePath(volume.source) === folder,
+    ),
+    JSON.stringify(services.server.volumes),
+  )
+  const ignored = spawnSync('git', ['check-ignore', '-q', 'artifacts/studio-apps/new-app/application.json'], { cwd: root })
+  assert.equal(ignored.status, 0, 'artifacts/studio-apps is not ignored by git')
 })
 
 test('the server and the publisher run on both database roles and the worker only on the runtime role', () => {

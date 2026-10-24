@@ -91,7 +91,10 @@ healthy once its `/health/ready` passes, and `docker compose up --wait` waits fo
 health address `http://127.0.0.1:5208` stays inside its container. The Keycloak admin console login is
 `admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT` and
 `AXIS_PURCHASING_PORT` to change the host ports (5206, 5432, 8080 and 5207). All four ports
-are published on `127.0.0.1` only.
+are published on `127.0.0.1` only. The server creates Studio's new applications in
+`artifacts/studio-apps`, which the checkout mounts at `/studio-apps`. Set `AXIS_STUDIO_APPS_DIR`
+to move that folder. On Linux the server runs as UID 1654, so create the folder first and make it
+writable by that UID. Docker creates a missing folder as root.
 
 ## Database roles
 
@@ -157,9 +160,9 @@ works on a fresh clone:
   `request-approval` sample template. The server reads the template catalog only when it starts, so a template
   edit needs a restart of the script. The production images and `deploy/` set no
   `Templates:Path`, so they list no template.
-- E2E's journey server sets `Studio:ApplicationsPath` to a temporary folder. Development and
-  Compose set it to `artifacts/studio-apps` _(planned for M13)_, which `artifacts/` already keeps
-  out of git. See
+- E2E's journey server sets `Studio:ApplicationsPath` to a temporary folder. `scripts/dev.sh` and
+  the Compose server set it to `artifacts/studio-apps`, which `artifacts/` keeps out of git. An
+  exported `Studio__ApplicationsPath` replaces that folder in `scripts/dev.sh`. See
   [D51](decisions/d51-creating-applications-and-resources-from-studio.md).
 - It runs the server and the worker under `dotnet watch` and the SPA on Vite in
   one terminal. It starts the worker once the server has migrated the tenant

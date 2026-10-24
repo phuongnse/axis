@@ -247,6 +247,10 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.ok(fs.statSync(path.join(copy, 'artifacts/templates')).isDirectory())
     assert.doesNotMatch(run.stdout, /The template version is not loaded/)
 
+    // The server creates the applications folder from Studio:ApplicationsPath at start. The copy excludes artifacts,
+    // so only the server can have made it.
+    assert.ok(fs.statSync(path.join(copy, 'artifacts/studio-apps')).isDirectory())
+
     // Keycloak serves the development realm, and starts before the server.
     const discovery = await fetch(`http://localhost:${ports.keycloak}/realms/axis/.well-known/openid-configuration`)
     assert.equal(discovery.status, 200)
