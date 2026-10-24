@@ -2,7 +2,10 @@ import { Layout, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { ChartWidget } from '../platform/ChartWidget'
+import { DetailWidget } from '../platform/DetailWidget'
 import { FormWidget } from '../platform/FormWidget'
+import { KpiWidget } from '../platform/KpiWidget'
 import { PageLayout } from '../platform/PageLayout'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
 import type { FieldType, WidgetMetadata } from '../platform/site'
@@ -13,9 +16,12 @@ import { ThemeModeProvider } from '../platform/theme'
 import { useDesignTokens, type ThemeMode } from '../platform/themeMode'
 import { WidgetTree } from '../platform/WidgetTree'
 import {
+  chartWidget,
   columnsWidget,
+  detailWidget,
   fieldWidget,
   formWidget,
+  kpiWidget,
   locale,
   processInspectorWidget,
   requestId,
@@ -75,6 +81,14 @@ const previews: Record<string, () => ReactNode> = {
   processInspector: () => (
     <ProcessInspectorWidget sitePath={sitePath} pageName="Instances" widget={processInspectorWidget} locale={locale} />
   ),
+  detail: () => <DetailWidget widget={detailWidget} sitePath={sitePath} recordId={requestId} locale={locale} />,
+  ...Object.fromEntries(
+    (['bar', 'line', 'pie'] as const).map((kind) => [
+      `chart-${kind}`,
+      () => <ChartWidget widget={chartWidget(kind)} locale={locale} />,
+    ]),
+  ),
+  kpi: () => <KpiWidget sitePath={sitePath} widget={kpiWidget} locale={locale} pageValues={{}} />,
   columns: () => <WidgetTree widgets={[columnsWidget]} renderLeaf={renderLeaf} />,
   tabs: () => <WidgetTree widgets={[tabsWidget]} renderLeaf={renderLeaf} />,
   section: () => <WidgetTree widgets={[sectionWidget]} renderLeaf={renderLeaf} />,

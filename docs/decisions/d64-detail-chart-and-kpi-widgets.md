@@ -6,7 +6,7 @@ M12 adds three widgets: a read-only detail of one record, a chart over a
 grouped data source and a KPI tile that shows one measure. This builds on
 [D15](d15-presentation-model.md), [D18](d18-data-sources.md) and
 [D63](d63-navigate-actions-and-page-parameters.md). The three widgets are
-built. Chart and KPI page parameters and their design-system previews are
+built and previewed in the design system. Chart and KPI page parameters are
 _(planned for M13)_. The owner confirmed these points on issue #933 on
 2026-10-21.
 

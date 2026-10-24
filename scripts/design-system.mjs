@@ -50,6 +50,17 @@ try {
     await page.goto(`${origin}/design-system.html${link}`)
     await page.waitForLoadState('networkidle')
     await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null)
+    // A chart animates for about a second, so the preview waits until its SVG stops changing.
+    await page.waitForFunction(
+      () => {
+        const drawing = Array.from(document.querySelectorAll('svg'), (svg) => svg.outerHTML).join('')
+        const stable = drawing === window.__previousDrawing
+        window.__previousDrawing = drawing
+        return stable
+      },
+      undefined,
+      { polling: 250 },
+    )
     await page.evaluate(() => {
       for (const sheet of document.querySelectorAll('link[rel=stylesheet]')) {
         const style = document.createElement('style')
