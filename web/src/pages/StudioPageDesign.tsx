@@ -1,46 +1,15 @@
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  pointerWithin,
-  useSensor,
-  useSensors,
-  type CollisionDetection,
-  type DragEndEvent,
-} from '@dnd-kit/core'
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { Button, Flex } from 'antd'
 import { useState } from 'react'
 import { getAt } from '../platform/jsonPatch'
-import { addableTypes, dropPlace, innermostPointer, newWidget, type DropTarget } from '../platform/pageWidgets'
+import { addableTypes, dropPlace, newWidget, type DropTarget } from '../platform/pageWidgets'
 import { useText } from '../platform/texts'
+import { innermostCollision, silent } from './designDrag'
 import { PageWidgets } from './PageEditor'
 import { PagePalette } from './PagePalette'
 import { landedText, paletteReasons, usePartLabel } from './pagePaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 import { StudioPageCanvas } from './StudioPageCanvas'
-
-/** The pointer of the draft that a droppable stands for. */
-function pointerOf(data: unknown): string | undefined {
-  const pointer = (data as { pointer?: unknown } | undefined)?.pointer
-  return typeof pointer === 'string' ? pointer : undefined
-}
-
-/** Of the droppables under the pointer, only the innermost one: the one whose pointer has the most segments. */
-const innermostCollision: CollisionDetection = (args) => {
-  const collisions = pointerWithin(args)
-  const wanted = innermostPointer(
-    collisions.flatMap((collision) => pointerOf(collision.data?.droppableContainer.data.current) ?? []),
-  )
-  return collisions.filter((collision) => pointerOf(collision.data?.droppableContainer.data.current) === wanted)
-}
-
-/** What a drag of the library says aloud by itself is off: the palette's live region is the only voice. */
-const silent = {
-  onDragStart: () => undefined,
-  onDragOver: () => undefined,
-  onDragEnd: () => undefined,
-  onDragCancel: () => undefined,
-}
 
 /**
  * The Design tab of a page: the canvas, and beside it the palette and the widget tree. A palette type that is dragged

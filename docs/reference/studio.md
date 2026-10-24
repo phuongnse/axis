@@ -894,18 +894,19 @@ Run and the Test results list, the read-only view of a module entity, and the re
     memory, up to 100 steps, with one step for each box. It is cleared by a
     reload, a conflict reload or opening another resource. A save keeps it.
     Studio's undo replaces the browser's own inside the editor's boxes.
-    _Built:_ it covers pages. The buttons sit beside Save and are off when
+    _Built:_ it covers pages and forms. The buttons sit beside Save and are off when
     there is nothing to undo or redo, and while a save runs. A step ends when
     the author edits another property or leaves the box, and a pick in a
     dropdown or a button action is always a step of its own. The keys also work
     when nothing has focus, but not when the focus is outside the editor. A
-    reload after a reconnect clears the history too. Other kinds of resource
-    have no undo yet.
+    reload after a reconnect clears the history too. The other kinds of
+    resource have no undo yet.
   - **Library.** Drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
     `@dnd-kit/utilities`. The core package, which brings `@dnd-kit/accessibility`
-    and `@dnd-kit/utilities` with it, measures 12.7 KB gzipped in the lazy chunk
-    `StudioPageDesign`. The chunk holds the canvas, the palette and the library,
-    and loads when the Design tab opens. The build fails when the chunk is
+    and `@dnd-kit/utilities` with it, measures 12.7 KB gzipped, in the lazy chunk
+    `studioCanvas` that both designers share. Each designer's canvas and palette
+    are a lazy chunk of their own, `StudioPageDesign` and `StudioFormDesign`,
+    and load when the Design tab opens. The build fails when the page chunk is
     missing or is part of the main bundle. `@dnd-kit/sortable` comes with the
     moves of existing widgets.
   - **Format.** The designer writes only the order of the widget tree and the
@@ -916,7 +917,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md). It sits
   next to the Form and JSON tabs, is the default tab, and the three tabs edit
   one draft. It reuses the canvas, property panel, undo (100 steps, cleared by
-  a reload) and `@dnd-kit` drag and drop of the page designer.
+  a reload; built for forms) and `@dnd-kit` drag and drop of the page designer.
   - **Canvas.** It draws the unsaved draft with the site's form widget, in its
     sections and steps. Fields get placeholder values made from the field
     types, and a child collection gets placeholder rows. The Save button does
@@ -930,9 +931,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
     Save, Next, Back and Cancel do nothing, because the canvas cancels every
     click and form submit. A click only selects. A form the route cannot draw
     shows a short notice. The tab shows the Used on list above the step switch
-    and the canvas, with a property panel beside the canvas, and no palette or
-    width switch.
-    The canvas is mounted only while the Design tab is active.
+    and the canvas, with the field palette, the layout outline and a property
+    panel beside the canvas, and no width switch.
+    The canvas is mounted only while the Design tab is active. The tab's code is
+    the lazy chunk `StudioFormDesign`, which loads when the tab first opens.
   - **Step switch.** It lists the steps in order and shows the sections of one
     step. A form without `steps` has no switch.
     _Partly built:_ the switch is a segmented control above the canvas, with
@@ -953,6 +955,18 @@ Run and the Test results list, the read-only view of a module entity, and the re
     one and inserts it into the selected section by keyboard. Removing a field
     puts it back in the palette. The palette never offers a field already on
     the form, and a drop never copies one.
+    _Partly built:_ the panel column lists the fields above the layout outline
+    and the property panel. The names come from Studio's names list, so an
+    unsaved edit of the entity shows only after a save. Enter, Space or a click
+    inserts a field at the end of the selected section, after the selected
+    field, or at the end of the selected step's first section. With no usable
+    selection it goes to the end of the first section. The new field is
+    selected, and a live region names it, its section and its position. A
+    section is named by its `name`, or `Section N`, because its title loads
+    only inside the canvas. The outline lists the steps, sections and fields of
+    the draft. A click selects a row. A pointer drag from the palette onto a
+    section row appends to it, and onto a field row inserts after it. The
+    innermost row wins. Removing a field is not built yet.
   - **Moves.** The author drags fields within and between sections, and
     sections within and between steps. To move a section to another step, drop
     it on that step in the switch, or use the Move to step picker. Every move

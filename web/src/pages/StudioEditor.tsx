@@ -45,8 +45,7 @@ import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
-import { StudioFormCanvas } from './StudioFormCanvas'
-import { type FormUse, StudioFormUsedOn } from './StudioFormUsedOn'
+import type { FormUse } from './StudioFormUsedOn'
 import type { OpenResource } from './StudioReferences'
 import { TextTable, type TextColumn } from './TextTable'
 
@@ -68,6 +67,7 @@ const noProblems = new Map<string, string>()
 
 const LazyStudioProcessGraph = lazy(() => import('./StudioProcessGraph'))
 const LazyStudioPageDesign = lazy(() => import('./StudioPageDesign'))
+const LazyStudioFormDesign = lazy(() => import('./StudioFormDesign'))
 
 function seedFieldsOf(content: Content): SeedField[] | null {
   if (!Array.isArray(content.fields)) {
@@ -143,9 +143,11 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
  * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data, beside a palette
  * of the ten widget types and the same widget tree and panel as the Form tab. The two tabs share the selected widget, which is not written to the URL.
- * A page also has Undo and Redo, as buttons beside Save and as Ctrl+Z and Ctrl+Shift+Z (Cmd on macOS), for up to 100 steps of
- * its draft on all three tabs. Typing in one box is one step, and a load of the file clears the history.
+ * A page or a form also has Undo and Redo, as buttons beside Save and as Ctrl+Z and Ctrl+Shift+Z (Cmd on macOS), for up to
+ * 100 steps of its draft on all its tabs. Typing in one box is one step, and a load of the file clears the history.
  * A form's Design tab shows a Used on list above its canvas, with the pages and process steps that use the form, and an entry calls `onOpen`.
+ * Beside the canvas it has a palette of the entity's fields that no section lists and an outline of the draft's steps, sections and fields.
+ * Its code loads when the tab first opens.
  * Form stays the tab that opens first. A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
  * calls `onOpenPath`. A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
  * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
@@ -209,7 +211,7 @@ export function StudioEditor({
   // The pages and process steps that use a form, or `failed` when their references did not load.
   const [usedOn, setUsedOn] = useState<FormUse[] | 'failed'>()
   const [history, setHistory] = useState(emptyHistory)
-  const undoable = item.kind === 'page'
+  const undoable = item.kind === 'page' || item.kind === 'form'
   const handledPath = useRef<string | null>(null)
   // A field to scroll to once the form tab is shown, because a hidden field cannot be scrolled to.
   const pendingField = useRef<HTMLElement | null>(null)
@@ -775,19 +777,18 @@ export function StudioEditor({
                         label: t('shell.studio.design'),
                         children:
                           tab === 'design' ? (
-                            <div data-testid="studio-form-design">
-                              <Flex vertical gap="middle">
-                                <StudioFormUsedOn entries={usedOn} onOpen={onOpen} />
-                                <StudioFormCanvas
-                                  application={application}
-                                  resourceId={item.id}
-                                  draft={draft}
-                                  selected={formPath}
-                                  onSelect={setFormPath}
-                                  onChange={change}
-                                />
-                              </Flex>
-                            </div>
+                            <Suspense fallback={null}>
+                              <LazyStudioFormDesign
+                                application={application}
+                                resourceId={item.id}
+                                draft={draft}
+                                selected={formPath}
+                                onSelect={setFormPath}
+                                onChange={change}
+                                usedOn={usedOn}
+                                onOpen={onOpen}
+                              />
+                            </Suspense>
                           ) : null,
                       },
                     ]
