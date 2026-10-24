@@ -222,19 +222,11 @@ changelog of every release after the pinned ref, not only the latest.
 
 ## When something fails
 
-NexKit handles these by itself, so do nothing until it mentions the owner: a
-conflict with `main`, the Claude usage limit, failing checks and requested
-changes within the automatic fix limit, a CI failure on `main`, which it runs
-again and then turns into a `bug` issue that it plans first, a run on `main`
-that passed only when run again, which it records on a `bug` issue for each
-failure, named by the failing test, a missed dependency cache, a first stop on
-a transient error, which it runs once more, shown as `(retry)`, a merge
-refused because `main` moved, which it tries again, a merge refused because
-the pull request branch moved, which it reviews again on the new head
-(`head_moved`), a fix round that changed nothing and named a cause outside the
-code, such as a failed package registry, which runs the checks and the review
-once more, and a conflict round that waits until the `/nexkit go` run that
-opened the pull request ends. Its troubleshooting doc at the pinned ref has the mechanics.
+NexKit handles by itself what the
+[decisions](../../../docs/delivery.md#decisions) and the
+[life of an issue](../../../docs/delivery.md#the-life-of-an-issue) say it
+does, so do nothing until it mentions the owner. Its troubleshooting doc at
+the pinned ref has the mechanics.
 
 | Failure | What you do |
 | --- | --- |
