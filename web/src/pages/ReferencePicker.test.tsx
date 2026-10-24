@@ -30,7 +30,22 @@ const names: StudioNames = {
       fields: [{ name: 'Email', type: 'text', target: null, values: null }],
     },
   ],
-  dataSources: [],
+  dataSources: [
+    {
+      id: '4',
+      name: 'Orders',
+      module: null,
+      parameters: [
+        { name: 'status', type: 'text' },
+        { name: 'limit', type: 'integer' },
+      ],
+      columns: [
+        { name: 'openCount', type: 'integer' },
+        { name: 'region', type: 'text' },
+      ],
+      groupBy: null,
+    },
+  ],
   processes: [],
   rules: [],
   connectors: [],
@@ -63,19 +78,32 @@ const schema: JsonSchema = {
   },
 }
 
+// A widget names its data source at `dataSource`. Its measure and the keys of its parameters name parts of it.
+const widgetSchema: JsonSchema = {
+  type: 'object',
+  properties: {
+    dataSource: { type: 'string', 'x-axis-reference': 'dataSource' },
+    measure: { type: 'string', 'x-axis-reference': { part: 'column', of: '1/dataSource' } },
+    parameters: {
+      type: 'object',
+      propertyNames: { type: 'string', 'x-axis-reference': { part: 'parameter', of: '2/dataSource' } },
+    },
+  },
+}
+
 /** The theme root of the shell: an element that carries the mode the provider chose. */
 function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
-function renderForm(value: Record<string, unknown>, namesLoaded = true) {
+function renderForm(value: Record<string, unknown>, namesLoaded = true, formSchema: JsonSchema = schema) {
   const onChange = vi.fn()
   render(
     <ThemeModeProvider>
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioNamesContext.Provider value={namesLoaded ? names : undefined}>
-            <SchemaForm schema={schema} value={value} onChange={onChange} />
+            <SchemaForm schema={formSchema} value={value} onChange={onChange} />
           </StudioNamesContext.Provider>
         </TextProvider>
       </ThemeRoot>
@@ -147,5 +175,64 @@ describe.each(['light', 'dark'])('ReferencePicker in %s mode', (mode) => {
 
     expect(screen.getByRole('textbox', { name: 'entity' })).toHaveValue('Order')
     expect(screen.queryByRole('combobox', { name: 'entity' })).not.toBeInTheDocument()
+  })
+
+  it('lists the columns of the data source that the widget names', async () => {
+    const onChange = renderForm({ dataSource: 'Orders', measure: 'openCount' }, true, widgetSchema)
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'measure' }))
+    expect(screen.getByRole('option', { name: 'region' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'status' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('option', { name: 'region' }))
+    expect(onChange).toHaveBeenLastCalledWith('/measure', 'region')
+  })
+
+  it('shows a map with marked keys as rows with a key picker', async () => {
+    const onChange = renderForm({ dataSource: 'Orders', parameters: { status: 'open' } }, true, widgetSchema)
+
+    expect(screen.getByRole('combobox', { name: 'parameters 1' })).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'status' })).toHaveValue('open')
+    expect(screen.queryByTestId('studio-json-only')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'parameters 1' }))
+    // The key that another row uses is not offered twice, and this row's own key stays.
+    expect(screen.getAllByRole('option', { name: 'status' }).length).toBeGreaterThan(0)
+    await userEvent.click(screen.getByRole('option', { name: 'limit' }))
+    expect(onChange).toHaveBeenLastCalledWith('/parameters', { limit: 0 })
+  })
+
+  it('adds a row with the first unused name and removes a row', async () => {
+    const onChange = renderForm({ dataSource: 'Orders', parameters: { status: 'open' } }, true, widgetSchema)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(onChange).toHaveBeenLastCalledWith('/parameters', { status: 'open', limit: 0 })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(onChange).toHaveBeenLastCalledWith('/parameters/status', undefined)
+  })
+
+  it('shows a number box for an integer parameter and reports the typed number', async () => {
+    const onChange = renderForm({ dataSource: 'Orders', parameters: { limit: 3 } }, true, widgetSchema)
+
+    const box = screen.getByRole('spinbutton', { name: 'limit' })
+    expect(box).toHaveValue('3')
+    await userEvent.clear(box)
+    await userEvent.type(box, '7')
+
+    expect(onChange).toHaveBeenLastCalledWith('/parameters/limit', 7)
+  })
+
+  it('keeps a map with marked keys in the JSON view until the names load', () => {
+    renderForm({ dataSource: 'Orders', parameters: { status: 'open' } }, false, widgetSchema)
+
+    expect(screen.getByTestId('studio-json-only')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'parameters 1' })).not.toBeInTheDocument()
+  })
+
+  it('disables Add when every name is used', () => {
+    renderForm({ dataSource: 'Orders', parameters: { status: 'a', limit: 'b' } }, true, widgetSchema)
+
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
   })
 })
