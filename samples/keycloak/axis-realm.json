@@ -41,6 +41,10 @@
           "clientRole": true
         },
         {
+          "name": "approver",
+          "clientRole": true
+        },
+        {
           "name": "purchasing-system",
           "clientRole": true
         }
@@ -330,6 +334,28 @@
       "clientRoles": {
         "axis": [
           "service-desk-lead"
+        ]
+      }
+    },
+    {
+      "id": "minh",
+      "username": "minh",
+      "enabled": true,
+      "email": "minh@axis.local",
+      "emailVerified": true,
+      "firstName": "Minh",
+      "lastName": "Approver",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "approver"
         ]
       }
     },

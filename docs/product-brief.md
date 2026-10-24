@@ -253,5 +253,6 @@ Studio, publishes it and takes one ticket through the process on the site.
   them.
 - Another Playwright journey uses the sample at phone
   width.
-- _(planned for M13)_ A second, smaller journey starts from the
-  `request-approval` template.
+- A second, smaller journey creates an application from the
+  `request-approval` template in Studio, runs its test scenario, publishes it,
+  and takes one request through the approval on the site.

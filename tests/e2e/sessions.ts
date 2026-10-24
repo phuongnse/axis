@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import { journeyURL } from "./server-settings";
 
-export type SampleUser = "anna" | "lan" | "binh" | "chau" | "dung" | "giang" | "hoa" | "khoa" | "linh";
+export type SampleUser = "anna" | "lan" | "binh" | "chau" | "dung" | "giang" | "hoa" | "khoa" | "linh" | "minh";
 
 /** The sample users and the roles the development realm gives them. */
 export const sampleUsers: Record<SampleUser, string[]> = {
@@ -16,11 +16,12 @@ export const sampleUsers: Record<SampleUser, string[]> = {
   hoa: ["author", "publisher"],
   khoa: ["agent"],
   linh: ["service-desk-lead"],
+  minh: ["approver"],
 };
 
-const journeyRoles = ["author", "requester", "service-desk-lead", "agent"];
+const journeyRoles = ["author", "requester", "service-desk-lead", "agent", "approver"];
 
-/** The users who sign in on the journey host: those who hold the author, requester, service desk lead or agent role. */
+/** The users who sign in on the journey host: those who hold the author, requester, service desk lead, agent or approver role. */
 export const journeyUsers = (Object.keys(sampleUsers) as SampleUser[]).filter((user) =>
   sampleUsers[user].some((role) => journeyRoles.includes(role)),
 );
