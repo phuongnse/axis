@@ -63,6 +63,15 @@ Dn refers to [decisions.md](../decisions.md).
     sections within and between steps. To move a section to another step, drop
     it on that step in the switch, or use the Move to step picker. Every move
     has a keyboard way, and a screen reader hears where the element lands.
+    _Partly built:_ a field row of the layout outline moves within its section
+    or into another one, by a pointer drag, or by the keyboard: Space picks the
+    focused row up, the arrow keys move it, Space drops it and Escape cancels.
+    The moved field takes the place of the field it is dropped on, so in
+    another section it lands just before that field. An empty section takes it
+    too, and a section that has fields is not a target. The field keeps all its
+    keys and stays selected, and the live region names the field, its section
+    and its position. A move is one change of the draft, so one undo reverses
+    it. Moving sections and the Move to step picker are not built yet.
   - **Sections and steps.** The palette adds a section, with a unique `name`
     and a new title key that the label editor opens, and a step. A new section
     joins the selected step. Adding the first step names every unnamed section

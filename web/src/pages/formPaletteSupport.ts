@@ -1,4 +1,4 @@
-import type { FieldPlace } from '../platform/formLayout'
+import { moveField, type FieldPlace } from '../platform/formLayout'
 import type { ChangeHandler } from './SchemaForm'
 
 /** The name of the section at `index` for the outline and the live region: its `name`, or `Section N` without one. */
@@ -32,5 +32,32 @@ export function insertField(
   onSelect(`/sections/${place.section}/fields/${index}`)
   onAnnounce(
     `${t('shell.studio.palette.inserted')} ${name} · ${sectionLabel(t, draft, place.section)} · ${t('shell.studio.palette.position')} ${index + 1}`,
+  )
+}
+
+/**
+ * Moves the field at `from` to `to`, selects it where it landed and says where that is. The move is one change of the
+ * draft, so one undo reverses it. Nothing happens when `moveField` finds nothing to move.
+ */
+export function moveFieldTo(
+  t: (key: string) => string,
+  draft: Record<string, unknown>,
+  from: FieldPlace,
+  to: FieldPlace,
+  onChange: ChangeHandler,
+  onSelect: (pointer: string) => void,
+  onAnnounce: (text: string) => void,
+) {
+  const result = moveField(draft, from, to)
+  if (result === undefined) {
+    return
+  }
+  const { section, index } = result.place
+  const field = (result.sections[section] as { fields: { field?: unknown }[] }).fields[index]
+  const name = typeof field.field === 'string' ? field.field : `/sections/${section}/fields/${index}`
+  onChange('/sections', result.sections)
+  onSelect(`/sections/${section}/fields/${index}`)
+  onAnnounce(
+    `${t('shell.studio.palette.moved')} ${name} · ${sectionLabel(t, draft, section)} · ${t('shell.studio.palette.position')} ${index + 1}`,
   )
 }
