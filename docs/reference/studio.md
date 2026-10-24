@@ -878,9 +878,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
     library's own spoken messages are off, so the live region is the only voice,
     and a keyboard user inserts with Enter or Space as above.
   - **Moves.** The author drags a widget to reorder it or to move it into or out
-    of a container. The keyboard sensor does the same, and a screen reader
-    hears where the widget lands. The Move to picker stays. _Partly built:_ the
-    author can drag any widget of the canvas with the pointer. The innermost
+    of a container. Alt+ArrowDown and Alt+ArrowUp move the selected widget to
+    the next or previous allowed place in reading order, and a screen reader
+    hears where it lands. The Move to picker stays. _Partly built:_ the author
+    can drag any widget of the canvas with the pointer. The innermost
     widget under the pointer drags, so a press on a KPI in a column moves the
     KPI. It drops on the same targets as a palette type: before or after a
     widget by its half, or at the end of a widget list, nested lists and empty
@@ -891,8 +892,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     one undo reverses it, and the widget keeps all its keys. After a move the
     widget stays selected at its new place, and the live region says "Moved"
     with the type, the list and the position. A drop on the widget itself or
-    where it already is changes nothing. The keyboard sensor and its spoken
-    messages are not built yet.
+    where it already is changes nothing. Alt+Arrow swaps, enters or leaves, skips
+    refused places and moves focus along. At the end the live region says so.
   - **Data panel.** It lists the entities and the data sources. Dropping an
     entity offers a table, a form or a detail. Dropping a data source offers a
     table, and a chart with one group field or a KPI with a total row.

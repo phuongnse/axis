@@ -392,7 +392,7 @@ describe('the Design tab of a page', () => {
 
     it('selects the widget that is clicked on the canvas in the tree and opens its panel', async () => {
       const { design } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
-      await within(design).findByTestId('chart-widget', {}, slow)
+      await screen.findByTestId('chart-widget', {}, slow)
       expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
       expect(within(design).queryByTestId('studio-field-/widgets/1')).not.toBeInTheDocument()
 
@@ -407,7 +407,7 @@ describe('the Design tab of a page', () => {
 
     it('outlines the canvas widget that is picked in the tree, and no other', async () => {
       const { design } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
-      await within(design).findByTestId('chart-widget', {}, slow)
+      await screen.findByTestId('chart-widget', {}, slow)
 
       await userEvent.click(within(design).getByTestId('studio-widget-/widgets/1'))
 
@@ -424,13 +424,13 @@ describe('the Design tab of a page', () => {
         within(design).getByRole('combobox', { name: 'Widget type' }).closest<HTMLElement>('.ant-select')!,
       )
 
-      expect(await within(design).findByTestId('chart-widget', {}, slow)).toBeInTheDocument()
+      expect(await screen.findByTestId('chart-widget', {}, slow)).toBeInTheDocument()
       expect(posts.at(-1)!.widgets[0].type).toBe('chart')
     })
 
     it('moves between the widgets with Tab and selects one with Enter', async () => {
       const { design } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
-      await within(design).findByTestId('chart-widget', {}, slow)
+      await screen.findByTestId('chart-widget', {}, slow)
 
       frame(design, '/widgets/0').focus()
       await userEvent.tab()
@@ -453,7 +453,7 @@ describe('the Design tab of a page', () => {
 
     it('keeps the selection when the author goes to the Form tab and back', async () => {
       const { design } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
-      await within(design).findByTestId('chart-widget', {}, slow)
+      await screen.findByTestId('chart-widget', {}, slow)
       await userEvent.click(within(design).getByTestId('chart-widget'))
 
       await openTab('Form')
@@ -904,6 +904,54 @@ describe('the Design tab of a page', () => {
       drag('/widgets/1', { kind: 'widget', pointer: '/widgets/0' }, { clientY: 10 })
 
       await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['chart', 'kpi']), slow)
+    })
+
+    it('moves the selected widget with Alt+ArrowDown and Alt+ArrowUp, keeps it selected and focused, and says where it landed', async () => {
+      const { design, palette, posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+      await screen.findByTestId('chart-widget', {}, slow)
+      const announcement = palette.getByTestId('studio-palette-announcement')
+
+      act(() => frame('/widgets/0').focus())
+      await userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}')
+
+      await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['chart', 'kpi']), slow)
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(announcement).toHaveTextContent('Moved kpi · Page · position 2')
+      await waitFor(() => expect(frame('/widgets/1')).toHaveFocus(), slow)
+
+      await userEvent.keyboard('{Alt>}{ArrowUp}{/Alt}')
+
+      await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['kpi', 'chart']), slow)
+      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
+      expect(announcement).toHaveTextContent('Moved kpi · Page · position 1')
+      await waitFor(() => expect(frame('/widgets/0')).toHaveFocus(), slow)
+    })
+
+    it('says the widget cannot move further at the end of the page and posts no new draft', async () => {
+      const { design, palette, posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+      await screen.findByTestId('chart-widget', {}, slow)
+      await userEvent.click(within(design).getByTestId('studio-widget-/widgets/1'))
+      const before = posts.length
+
+      act(() => frame('/widgets/1').focus())
+      await userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}')
+
+      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('The widget cannot move further.')
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      expect(posts).toHaveLength(before)
+    })
+
+    it('does not move a widget with Alt+Arrow when another widget is selected', async () => {
+      const { design, posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+      await screen.findByTestId('chart-widget', {}, slow)
+      const before = posts.length
+
+      act(() => frame('/widgets/1').focus())
+      await userEvent.keyboard('{Alt>}{ArrowUp}{/Alt}')
+
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      expect(posts).toHaveLength(before)
+      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
     })
 
     it('flags a section dragged over its own list while dragging, and the drop changes nothing', async () => {

@@ -197,6 +197,7 @@
   "shell.studio.palette.tooDeep": "Một vùng chứa ở đây sẽ có danh sách vượt quá cấp 4.",
   "shell.studio.palette.insideItself": "Một widget không thể nằm bên trong chính nó.",
   "shell.studio.palette.moved": "Đã chuyển",
+  "shell.studio.palette.cannotMoveFurther": "Widget không thể di chuyển thêm.",
   "shell.studio.save": "Lưu",
   "shell.studio.undo": "Hoàn tác",
   "shell.studio.redo": "Làm lại",

@@ -7,6 +7,7 @@ import {
   dropPlace,
   innermostPointer,
   insertionPlace,
+  keyboardMove,
   knownWidgetKeys,
   listLevel,
   movePlace,
@@ -411,6 +412,73 @@ describe('movePlace', () => {
     expect(movePlace(tree, '/widgets/9', { kind: 'list', pointer: '/widgets' })).toBeUndefined()
     expect(movePlace(tree, '/widgets/0', { kind: 'list', pointer: '/widgets/9/widgets' })).toBeUndefined()
     expect(movePlace(tree, '/widgets/0', { kind: 'widget', pointer: '/widgets/9', half: 'upper' })).toBeUndefined()
+  })
+})
+
+describe('keyboardMove', () => {
+  const types = (widgets: unknown[]) => widgets.map((widget) => (widget as { type: string }).type)
+
+  it('swaps with a sibling in both directions', () => {
+    const down = keyboardMove([{ type: 'kpi' }, { type: 'chart' }], '/widgets/0', 'down')!
+    expect(types(down.widgets)).toEqual(['chart', 'kpi'])
+    expect(down.pointer).toBe('/widgets/1')
+    const up = keyboardMove(down.widgets, down.pointer, 'up')!
+    expect(types(up.widgets)).toEqual(['kpi', 'chart'])
+    expect(up.pointer).toBe('/widgets/0')
+  })
+
+  it('enters a container at its start, crosses its widgets and leaves after it', () => {
+    const tree = [{ type: 'kpi' }, { type: 'section', widgets: [{ type: 'chart' }] }]
+    const entered = keyboardMove(tree, '/widgets/0', 'down')!
+    expect(entered.pointer).toBe('/widgets/0/widgets/0')
+    expect(types(entered.widgets)).toEqual(['section'])
+    const crossed = keyboardMove(entered.widgets, entered.pointer, 'down')!
+    expect(crossed.pointer).toBe('/widgets/0/widgets/1')
+    const left = keyboardMove(crossed.widgets, crossed.pointer, 'down')!
+    expect(left.pointer).toBe('/widgets/1')
+    expect(types(left.widgets)).toEqual(['section', 'kpi'])
+  })
+
+  it('enters a container at its end, crosses its widgets and leaves before it going up', () => {
+    const tree = [{ type: 'section', widgets: [{ type: 'chart' }] }, { type: 'kpi' }]
+    const entered = keyboardMove(tree, '/widgets/1', 'up')!
+    expect(entered.pointer).toBe('/widgets/0/widgets/1')
+    const crossed = keyboardMove(entered.widgets, entered.pointer, 'up')!
+    expect(crossed.pointer).toBe('/widgets/0/widgets/0')
+    const left = keyboardMove(crossed.widgets, crossed.pointer, 'up')!
+    expect(left.pointer).toBe('/widgets/0')
+    expect(types(left.widgets)).toEqual(['kpi', 'section'])
+  })
+
+  it('visits the columns of a container one by one', () => {
+    const tree = [{ type: 'kpi' }, { type: 'columns', columns: [{ widgets: [] }, { widgets: [{ type: 'chart' }] }] }]
+    const first = keyboardMove(tree, '/widgets/0', 'down')!
+    expect(first.pointer).toBe('/widgets/0/columns/0/widgets/0')
+    const second = keyboardMove(first.widgets, first.pointer, 'down')!
+    expect(second.pointer).toBe('/widgets/0/columns/1/widgets/0')
+  })
+
+  it('skips a place that would put the deepest list past level 4, in both directions', () => {
+    const deep = { type: 'section', widgets: [{ type: 'section', widgets: [] }] }
+    const tree = [{ type: 'section', widgets: [deep, { type: 'section', widgets: [] }] }]
+    const down = keyboardMove(tree, '/widgets/0/widgets/0', 'down')!
+    expect(down.pointer).toBe('/widgets/0/widgets/1')
+    const section = down.widgets[0] as { widgets: { widgets: unknown[] }[] }
+    expect(section.widgets[0].widgets).toEqual([])
+    const up = keyboardMove(down.widgets, down.pointer, 'up')!
+    expect(up.pointer).toBe('/widgets/0/widgets/0')
+    expect((up.widgets[0] as { widgets: unknown[] }).widgets[0]).toEqual(deep)
+  })
+
+  it('is undefined at the first and the last place of the page', () => {
+    const tree = [{ type: 'kpi' }, { type: 'section', widgets: [{ type: 'chart' }] }]
+    expect(keyboardMove(tree, '/widgets/0', 'up')).toBeUndefined()
+    expect(keyboardMove([{ type: 'kpi' }, { type: 'chart' }], '/widgets/1', 'down')).toBeUndefined()
+    expect(keyboardMove([{ type: 'kpi' }], '/widgets/0', 'down')).toBeUndefined()
+  })
+
+  it('is undefined when the pointer holds no widget', () => {
+    expect(keyboardMove([{ type: 'kpi' }], '/widgets/3', 'down')).toBeUndefined()
   })
 })
 

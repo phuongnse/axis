@@ -1,6 +1,15 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { Card, Segmented, Typography } from 'antd'
-import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type SyntheticEvent,
+} from 'react'
 import { useLocation } from 'react-router'
 import { setApiGuard } from '../platform/api'
 import { CanvasActionsContext } from '../platform/canvasActions'
@@ -53,6 +62,10 @@ const actionSelector = '[data-action]'
  * or Space on it, selects the action, whose pointer ends the widget's pointer, such as `/widgets/0/rowActions/1`. The
  * selected action's button is outlined and has `aria-current`, and its widget stays the selected widget. A button
  * runs nothing.
+ *
+ * On the frame of the selected widget, Alt+ArrowDown or Alt+ArrowUp asks `onMove` to move the widget to the next or
+ * previous place. When `onMove` answers that it moved the widget, focus goes to the frame of the widget at its new
+ * pointer once the canvas redraws from the answer to the moved draft. When that frame is not drawn, focus stays.
  */
 export function StudioPageCanvas({
   application,
@@ -60,6 +73,7 @@ export function StudioPageCanvas({
   draft,
   selected,
   onSelect,
+  onMove,
 }: {
   application: string
   resourceId: string
@@ -67,6 +81,8 @@ export function StudioPageCanvas({
   /** The pointer of the selected widget, or of the selected action of a widget. */
   selected: string
   onSelect: (path: string) => void
+  /** Moves the widget at the pointer one place in reading order. It answers whether the widget moved. */
+  onMove?: (from: string, direction: 'up' | 'down') => boolean
 }) {
   const outer = useTextCatalogs()
   const names = useContext(StudioNamesContext)
@@ -79,6 +95,21 @@ export function StudioPageCanvas({
   const drawn = answer === undefined || answer === 'failed' ? undefined : answer
   const page = drawn?.page ?? null
   const diagnostics = drawn?.diagnostics ?? []
+  const canvas = useRef<HTMLDivElement>(null)
+  // The page drawn when a key moved the widget. Focus follows the widget once a different page is drawn.
+  const focusAfter = useRef<{ page: typeof page } | undefined>(undefined)
+
+  useEffect(() => {
+    if (focusAfter.current === undefined || focusAfter.current.page === page) {
+      return
+    }
+    focusAfter.current = undefined
+    const pointer = widgetPointerOf(selected)
+    const frames = canvas.current?.querySelectorAll<HTMLElement>(frameSelector) ?? []
+    Array.from(frames)
+      .find((frame) => frame.dataset.path === pointer)
+      ?.focus()
+  }, [page, selected])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -136,6 +167,15 @@ export function StudioPageCanvas({
         selected={path !== undefined && path === selected}
         action={path !== undefined && widgetPointerOf(selected) === path ? actionKeyOf(selected) : undefined}
         onSelect={path === undefined ? undefined : () => onSelect(path)}
+        onMove={
+          path === undefined || onMove === undefined || widgetPointerOf(selected) !== path
+            ? undefined
+            : (direction) => {
+                if (onMove(path, direction)) {
+                  focusAfter.current = { page }
+                }
+              }
+        }
       >
         {content}
       </CanvasWidgetFrame>
@@ -158,7 +198,7 @@ export function StudioPageCanvas({
   return (
     <TextProvider catalogs={catalogs} development={outer.development}>
       <WidthSwitch value={width} onChange={setWidth} />
-      <div data-testid="studio-page-canvas" onClickCapture={click} onSubmitCapture={cancel}>
+      <div ref={canvas} data-testid="studio-page-canvas" onClickCapture={click} onSubmitCapture={cancel}>
         <SelectedActionStyle />
         {drawn?.page === null && (
           <CanvasAlert testId="studio-canvas-cannot-draw" textKey="shell.studio.design.cannotDraw" />
@@ -241,7 +281,7 @@ function isContent(value: unknown): value is Record<string, unknown> {
  * and `aria-current`. Its name is its summary, or its type, and "has diagnostics" when marked. It tells the widgets
  * inside that they are on the canvas, and which of their actions is selected. A widget with a path can be dragged with
  * the pointer to move it. The drag starts on the innermost frame under the pointer, and the widget is dimmed while it
- * is dragged.
+ * is dragged. With `onMove`, Alt+ArrowDown or Alt+ArrowUp on the frame itself moves its widget.
  */
 function CanvasWidgetFrame({
   type,
@@ -251,6 +291,7 @@ function CanvasWidgetFrame({
   selected,
   action,
   onSelect,
+  onMove,
   children,
 }: {
   type: string | null
@@ -261,6 +302,8 @@ function CanvasWidgetFrame({
   /** The key of the selected action of this widget, such as `rowActions/1`. */
   action: string | undefined
   onSelect?: () => void
+  /** Set only on the frame of the selected widget. */
+  onMove?: (direction: 'up' | 'down') => void
   children: ReactNode
 }) {
   const t = useText()
@@ -298,6 +341,16 @@ function CanvasWidgetFrame({
       aria-current={selected ? 'true' : undefined}
       tabIndex={path === undefined ? undefined : 0}
       onKeyDown={(event) => {
+        if (
+          onMove &&
+          event.target === event.currentTarget &&
+          event.altKey &&
+          (event.key === 'ArrowDown' || event.key === 'ArrowUp')
+        ) {
+          event.preventDefault()
+          onMove(event.key === 'ArrowDown' ? 'down' : 'up')
+          return
+        }
         if (onSelect && event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
           event.preventDefault()
           onSelect()
