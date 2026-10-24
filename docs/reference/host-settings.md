@@ -130,8 +130,8 @@ and a JSON view, and shows the diagnostics.
   the server stops if it cannot create it. Under several replicas it sits on
   the shared Studio volume, such as `/studio/apps`, see
   [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
-  E2E's journey server uses a temporary folder, and Development and Compose use
-  `artifacts/studio-apps` _(planned for M13)_. Studio is on when
+  E2E's journey server uses a temporary folder. `scripts/dev.sh` and Compose use
+  `artifacts/studio-apps`, which git ignores, see [development](../development.md#docker-compose). Studio is on when
   `Studio:Folders` is not empty or this setting is set. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
