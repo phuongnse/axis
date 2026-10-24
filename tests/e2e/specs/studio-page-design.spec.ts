@@ -14,6 +14,7 @@ const dashboardId = "8ae8ab97-77c5-48e9-a798-a912b5bb3cf3";
 const ticketEditId = "1db765b0-483d-456b-9939-17e2a36de3b6";
 const allTicketsId = "4ff52d55-8194-45c4-901b-bdc18e269096";
 const ticketDetailId = "e6a7b810-39ed-4751-a0cc-b761ffc812e5";
+const ticketTriageId = "e5650c79-b0cb-449b-a5c2-1bd8d9acd452";
 
 /**
  * Drags `source`, a palette type or a data panel name, with the mouse to the point of `target` that is `fraction` of its height
@@ -38,6 +39,29 @@ async function dragFrom(
   await page.mouse.down();
   await page.mouse.move(startX + 10, startY + 10);
   await page.mouse.move(to.x + to.width / 2, to.y + to.height * fraction, {
+    steps: 15,
+  });
+  await page.mouse.up();
+}
+
+/**
+ * Drags a form palette field with the mouse to the middle of `target`, as `dragType` does for a page: a small move
+ * starts the drag, then steps reach the point, both measured after the designer is scrolled to the top.
+ */
+async function dragField(page: Page, name: string, target: Locator) {
+  await page
+    .getByTestId("studio-form-design")
+    .evaluate((element) => element.scrollIntoView({ block: "start" }));
+  const from = (await page
+    .getByTestId(`studio-form-palette-${name}`)
+    .boundingBox())!;
+  const to = (await target.boundingBox())!;
+  const startX = from.x + from.width / 2;
+  const startY = from.y + from.height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 10, startY + 10);
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, {
     steps: 15,
   });
   await page.mouse.up();
@@ -372,6 +396,41 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
         .first(),
     ).toContainText("status == 'resolved'");
     expect(applicationRequests).toEqual([]);
+  });
+
+  test("an author drags the Resolution field from the palette onto a section of the triage form's outline, and the JSON tab shows it there", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketTriageId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    // The ticket entity has a Resolution field that the triage form leaves out.
+    await expect(
+      page.getByTestId("studio-form-palette-resolution"),
+    ).toBeVisible();
+    // The outline's section rows hold their field rows, so the section's own middle is a row of a field. The first
+    // line of the row is the section itself.
+    const section = page.locator(
+      '[data-testid="studio-outline-section"][data-path="/sections/1"]',
+    );
+    await expect(section).toBeVisible();
+    await dragField(page, "resolution", section.locator("> span").first());
+
+    await expect(
+      page.getByTestId("studio-form-palette-announcement"),
+    ).toContainText("Inserted resolution");
+    await expect(
+      page.getByTestId("studio-form-palette-resolution"),
+    ).toHaveCount(0);
+
+    await page.getByRole("tab", { name: "JSON", exact: true }).click();
+    const json = page.getByRole("textbox", { name: "JSON", exact: true });
+    const draft = JSON.parse(await json.inputValue());
+    expect(draft.sections[1].fields.at(-1)).toEqual({ field: "resolution" });
   });
 
   test("an author selects a row action on the canvas and adds a navigate action that maps the record, and no request goes to the application's API", async ({

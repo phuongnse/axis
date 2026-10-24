@@ -1,6 +1,7 @@
 import { EditorView } from '@codemirror/view'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
@@ -91,6 +92,8 @@ beforeAll(() =>
     loadKindSchema('text'),
     loadKindSchema('page'),
     loadKindSchema('entity'),
+    loadKindSchema('form'),
+    import('./StudioFormDesign'),
   ]),
 )
 
@@ -1286,6 +1289,93 @@ describe('StudioEditor for a page', () => {
       expect(name).toHaveValue('MyTasksabc')
       outside.remove()
     })
+  })
+})
+
+describe('StudioEditor for a form', () => {
+  const formId = '1db765b0-483d-456b-9939-17e2a36de3b6'
+  const formItem: StudioResourceItem = {
+    id: formId,
+    kind: 'form',
+    name: 'TicketEdit',
+    file: 'forms/ticket-edit.json',
+    version: 'f1',
+    usedBy: 0,
+  }
+  const formContent = {
+    id: formId,
+    kind: 'form',
+    name: 'TicketEdit',
+    formatVersion: 1,
+    entity: 'Ticket',
+    sections: [{ name: 'problem', title: { textKey: 'ticket.sections.problem' }, fields: [{ field: 'title' }] }],
+  }
+  const formNames = {
+    ...namesWithEntity,
+    entities: [
+      {
+        id: 'e1',
+        name: 'Ticket',
+        module: null,
+        fields: [
+          { name: 'title', type: 'text', target: null, values: null },
+          { name: 'resolution', type: 'text', target: null, values: null },
+        ],
+      },
+    ],
+  } as unknown as StudioNames
+
+  function stubForm() {
+    const { fetchMock } = stubResource(formItem, formContent)
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+      input === `${folder}/resources/${formId}/references` ? json({ usedBy: [] }) : base(input, init),
+    )
+  }
+
+  function renderForm() {
+    render(
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioNamesContext.Provider value={formNames}>
+              <StudioEditor
+                application="Shop"
+                item={formItem}
+                resources={[formItem]}
+                path={null}
+                diagnosticPaths={[]}
+                onOpenPath={vi.fn()}
+                onOpen={vi.fn()}
+                onSaved={vi.fn()}
+                onTextsWritten={vi.fn()}
+                onDeleted={vi.fn()}
+              />
+            </StudioNamesContext.Provider>
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
+    )
+  }
+
+  it('undoes and redoes the insert of a palette field', async () => {
+    stubForm()
+    renderForm()
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Design' }, slow))
+    await userEvent.click(await screen.findByTestId('studio-form-palette-resolution', {}, slow))
+    expect(screen.queryByTestId('studio-form-palette-resolution')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByTestId('studio-form-palette-resolution')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Redo' }))
+    expect(screen.queryByTestId('studio-form-palette-resolution')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    const view = screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement
+    expect(JSON.parse(view.value).sections[0].fields).toEqual([{ field: 'title' }, { field: 'resolution' }])
   })
 })
 

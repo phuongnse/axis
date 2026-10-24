@@ -29,7 +29,7 @@ entry script of `index.html` and the scripts it preloads, gzipped. Its baseline 
 built from commit `ad13bd4`, the last commit before any M12 code. It may grow by 50 KB over that.
 The chart library loads in its own lazy chunk, the file `assets/ChartDrawing-*.js`. The page
 designer's canvas, palette and drag library load in another, `assets/StudioPageDesign-*.js`, when
-the Design tab opens. `scripts/build.sh` runs [`scripts/check-bundle.mjs`](../scripts/check-bundle.mjs)
+the Design tab opens. The form designer's Design tab loads as `assets/StudioFormDesign-*.js`, when it first opens. `scripts/build.sh` runs [`scripts/check-bundle.mjs`](../scripts/check-bundle.mjs)
 after the SPA build. It prints the three sizes and fails when the main bundle is over budget, when
 there is no chart chunk or page design chunk or when either chunk is among the main bundle files. Do not raise the budget to make the check pass: find what grew.
 

@@ -2,10 +2,8 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
-  pointerWithin,
   useSensor,
   useSensors,
-  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -17,7 +15,6 @@ import {
   addableTypes,
   boundWidget,
   dropPlace,
-  innermostPointer,
   insertionPlace,
   keyboardMove,
   movePlace,
@@ -30,6 +27,7 @@ import {
 } from '../platform/pageWidgets'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { innermostCollision, silent } from './designDrag'
 import { BindingChoice, PageDataPanel } from './PageDataPanel'
 import { PageWidgets } from './PageEditor'
 import { PagePalette } from './PagePalette'
@@ -37,32 +35,9 @@ import { landedText, paletteReasons, usePartLabel } from './pagePaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 import { StudioPageCanvas } from './StudioPageCanvas'
 
-/** The pointer of the draft that a droppable stands for. */
-function pointerOf(data: unknown): string | undefined {
-  const pointer = (data as { pointer?: unknown } | undefined)?.pointer
-  return typeof pointer === 'string' ? pointer : undefined
-}
-
-/** Of the droppables under the pointer, only the innermost one: the one whose pointer has the most segments. */
-const innermostCollision: CollisionDetection = (args) => {
-  const collisions = pointerWithin(args)
-  const wanted = innermostPointer(
-    collisions.flatMap((collision) => pointerOf(collision.data?.droppableContainer.data.current) ?? []),
-  )
-  return collisions.filter((collision) => pointerOf(collision.data?.droppableContainer.data.current) === wanted)
-}
-
 /** The pointer of the widget list or widget before the last segment: `/widgets/1/widgets/0` gives `/widgets/1/widgets`. */
 function parentList(pointer: string): string {
   return pointer.slice(0, pointer.lastIndexOf('/'))
-}
-
-/** What a drag of the library says aloud by itself is off: the palette's live region is the only voice. */
-const silent = {
-  onDragStart: () => undefined,
-  onDragOver: () => undefined,
-  onDragEnd: () => undefined,
-  onDragCancel: () => undefined,
 }
 
 /** The binding that a draggable of the data panel carries, or `undefined` for any other draggable. */
