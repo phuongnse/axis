@@ -351,4 +351,96 @@ describe('the Design tab of a page', () => {
       expect(cell).toHaveClass('ant-col-md-24')
     }
   })
+
+  describe('selection', () => {
+    async function openDesign(widgets: Record<string, unknown>[]) {
+      const stubbed = stub(content(widgets))
+      renderEditor()
+      await screen.findByTestId('studio-page-editor', {}, slow)
+      await openTab('Design')
+      const design = await screen.findByTestId('studio-page-design', {}, slow)
+      await within(design).findByTestId('kpi-tile', {}, slow)
+      return { ...stubbed, design }
+    }
+
+    function frame(design: HTMLElement, path: string) {
+      return within(design)
+        .getAllByTestId('studio-canvas-widget')
+        .find((element) => element.getAttribute('data-path') === path)!
+    }
+
+    it('selects the widget that is clicked on the canvas in the tree and opens its panel', async () => {
+      const { design } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+      await within(design).findByTestId('chart-widget', {}, slow)
+      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).queryByTestId('studio-field-/widgets/1')).not.toBeInTheDocument()
+
+      await userEvent.click(within(design).getByTestId('chart-widget'))
+
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'false')
+      expect(within(design).getByTestId('studio-field-/widgets/1')).toBeInTheDocument()
+      expect(frame(design, '/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=Shop&resource=dashboard')
+    })
+
+    it('outlines the canvas widget that is picked in the tree, and no other', async () => {
+      const { design } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+      await within(design).findByTestId('chart-widget', {}, slow)
+
+      await userEvent.click(within(design).getByTestId('studio-widget-/widgets/1'))
+
+      expect(frame(design, '/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(frame(design, '/widgets/0')).not.toHaveAttribute('aria-current')
+    })
+
+    it('draws the canvas again after the widget type changes in the panel of the Design tab', async () => {
+      const { design, posts } = await openDesign([{ type: 'kpi' }])
+      expect(within(design).queryByTestId('chart-widget')).not.toBeInTheDocument()
+
+      await chooseOption(
+        'chart',
+        within(design).getByRole('combobox', { name: 'Widget type' }).closest<HTMLElement>('.ant-select')!,
+      )
+
+      expect(await within(design).findByTestId('chart-widget', {}, slow)).toBeInTheDocument()
+      expect(posts.at(-1)!.widgets[0].type).toBe('chart')
+    })
+
+    it('moves between the widgets with Tab and selects one with Enter', async () => {
+      const { design } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+      await within(design).findByTestId('chart-widget', {}, slow)
+
+      frame(design, '/widgets/0').focus()
+      await userEvent.tab()
+      expect(frame(design, '/widgets/1')).toHaveFocus()
+      await userEvent.keyboard('{Enter}')
+
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(frame(design, '/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(frame(design, '/widgets/0')).not.toHaveAttribute('aria-current')
+    })
+
+    it('names a widget by its type and summary', async () => {
+      const { design } = await openDesign([{ type: 'kpi', dataSource: 'RequestTotals' }])
+
+      expect(within(design).getByRole('group', { name: 'kpi · RequestTotals' })).toHaveAttribute(
+        'data-path',
+        '/widgets/0',
+      )
+    })
+
+    it('keeps the selection when the author goes to the Form tab and back', async () => {
+      const { design } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+      await within(design).findByTestId('chart-widget', {}, slow)
+      await userEvent.click(within(design).getByTestId('chart-widget'))
+
+      await openTab('Form')
+      await openTab('Design')
+
+      const again = await screen.findByTestId('studio-page-design', {}, slow)
+      await within(again).findByTestId('chart-widget', {}, slow)
+      expect(frame(again, '/widgets/1')).toHaveAttribute('aria-current', 'true')
+    })
+  })
 })

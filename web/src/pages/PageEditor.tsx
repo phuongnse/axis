@@ -78,15 +78,24 @@ function JsonOnly() {
  * application's names, and a table's data source and entity, like a form's or a detail's entity and form, exclude
  * each other, so a pick clears the other. The editor edits the draft through `onChange`, so a key it does not show,
  * on the page or on a widget, stays as it is. A widget of a type it has no panel for shows its type and points to the
- * JSON view.
+ * JSON view. The caller can keep the selected widget and pass it as `selected` and `onSelect`.
  */
-export function PageEditor({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
+export function PageEditor({
+  value,
+  onChange,
+  selected,
+  onSelect,
+}: {
+  value: Content
+  onChange: ChangeHandler
+  /** The pointer of the selected widget, when the caller keeps the selection. Otherwise the editor keeps it. */
+  selected?: string
+  onSelect?: (pointer: string) => void
+}) {
   const t = useText()
   const names = useContext(StudioNamesContext)
   const label = useContext(LabelTextsContext)
   const [picked, setPicked] = useState('/widgets/0')
-  const widgets = Array.isArray(value.widgets) ? value.widgets : undefined
-  const selected = getAt(value, picked) === undefined ? '/widgets/0' : picked
 
   return (
     <Flex vertical gap="small" data-testid="studio-page-editor">
@@ -113,32 +122,52 @@ export function PageEditor({ value, onChange }: { value: Content; onChange: Chan
         )}
       </div>
       <PageParameters value={value.parameters} onChange={onChange} />
-      <div data-testid="studio-field-/widgets">
-        <Flex vertical gap="small">
-          <Typography.Text strong>{t('shell.studio.page.widgets')}</Typography.Text>
-          {widgets === undefined ? (
-            <JsonOnly />
-          ) : (
-            <>
-              <WidgetList
-                pointer="/widgets"
-                widgets={widgets}
-                tree={{ widgets, selected, onSelect: setPicked, onChange }}
-              />
-              {widgets.length > 0 && (
-                <WidgetPanel
-                  key={selected}
-                  base={selected}
-                  widget={getAt(value, selected)}
-                  parameters={value.parameters}
-                  onChange={onChange}
-                />
-              )}
-            </>
-          )}
-        </Flex>
-      </div>
+      <PageWidgets value={value} selected={selected ?? picked} onSelect={onSelect ?? setPicked} onChange={onChange} />
     </Flex>
+  )
+}
+
+/**
+ * The widgets of a page as a tree, and the panel of the selected widget below it. The selection is a pointer that the
+ * caller keeps, so that other views of the page can share it. A pointer that names nothing selects the first widget.
+ */
+export function PageWidgets({
+  value,
+  selected: pointer,
+  onSelect,
+  onChange,
+}: {
+  value: Content
+  selected: string
+  onSelect: (pointer: string) => void
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const widgets = Array.isArray(value.widgets) ? value.widgets : undefined
+  const selected = getAt(value, pointer) === undefined ? '/widgets/0' : pointer
+
+  return (
+    <div data-testid="studio-field-/widgets">
+      <Flex vertical gap="small">
+        <Typography.Text strong>{t('shell.studio.page.widgets')}</Typography.Text>
+        {widgets === undefined ? (
+          <JsonOnly />
+        ) : (
+          <>
+            <WidgetList pointer="/widgets" widgets={widgets} tree={{ widgets, selected, onSelect, onChange }} />
+            {widgets.length > 0 && (
+              <WidgetPanel
+                key={selected}
+                base={selected}
+                widget={getAt(value, selected)}
+                parameters={value.parameters}
+                onChange={onChange}
+              />
+            )}
+          </>
+        )}
+      </Flex>
+    </div>
   )
 }
 
