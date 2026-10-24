@@ -22,6 +22,11 @@ public sealed record FormModel
 
     /// <summary>Whether any field of the form declares a <c>requiredWhen</c> condition.</summary>
     public bool HasRequiredWhen => Sections.Any(section => section.Fields.Any(formField => formField.RequiredWhen is not null));
+
+    /// <summary>Whether any section declares a <c>visibleWhen</c> or any field declares a <c>visibleWhen</c> or <c>readOnlyWhen</c> condition.</summary>
+    public bool HasVisibleOrReadOnlyWhen => Sections.Any(section =>
+        section.VisibleWhen is not null
+        || section.Fields.Any(formField => formField.VisibleWhen is not null || formField.ReadOnlyWhen is not null));
 }
 
 /// <summary>

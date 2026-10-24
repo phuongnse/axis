@@ -157,6 +157,90 @@ public sealed class RecordFormRequirementsTests
     }
 
     [Fact]
+    public void Sent_field_hidden_by_its_own_condition_cannot_be_set()
+    {
+        var form = Form(Section(Field("price", visibleWhen: "quantity > 0")));
+
+        var failures = Check(form, Values(("price", "1.5"), ("quantity", 0L)), "price", "quantity");
+
+        Assert.NotNull(failures);
+        var failure = Assert.Single(failures);
+        Assert.Equal("/values/price", failure.Key);
+        Assert.Equal(["Cannot be set."], failure.Value);
+        Assert.Null(Check(form, Values(("price", "1.5"), ("quantity", 1L)), "price", "quantity"));
+    }
+
+    [Fact]
+    public void Sent_field_in_a_hidden_section_cannot_be_set()
+    {
+        var form = Form(Section(visibleWhen: "quantity > 0", Field("price")));
+
+        var failures = Check(form, Values(("price", "1.5"), ("quantity", 0L)), "price");
+
+        Assert.NotNull(failures);
+        Assert.Equal("/values/price", Assert.Single(failures).Key);
+        Assert.Null(Check(form, Values(("price", "1.5"), ("quantity", 1L)), "price"));
+    }
+
+    [Fact]
+    public void Sent_field_whose_read_only_condition_holds_cannot_be_set()
+    {
+        var form = Form(Section(Field("price", readOnlyWhen: "status == 'closed'")));
+
+        var failures = Check(form, Values(("price", "1.5"), ("status", "closed")), "price", "status");
+
+        Assert.NotNull(failures);
+        var failure = Assert.Single(failures);
+        Assert.Equal("/values/price", failure.Key);
+        Assert.Equal(["Cannot be set."], failure.Value);
+        Assert.Null(Check(form, Values(("price", "1.5"), ("status", "open")), "price", "status"));
+    }
+
+    [Fact]
+    public void Sent_child_collection_that_is_hidden_cannot_be_set()
+    {
+        var form = Form(Section(Field("lines", visibleWhen: "quantity > 0")));
+
+        var failures = Check(form, Values(("quantity", 0L)), "lines");
+
+        Assert.NotNull(failures);
+        Assert.Equal("/values/lines", Assert.Single(failures).Key);
+    }
+
+    [Fact]
+    public void Field_that_is_not_sent_is_not_refused_while_hidden_or_read_only()
+    {
+        var form = Form(Section(Field("price", visibleWhen: "quantity > 0"), Field("neededBy", readOnlyWhen: "true")));
+
+        Assert.Null(Check(form, Values(("quantity", 0L)), "quantity"));
+        Assert.Null(Check(form, Values(("quantity", 0L))));
+    }
+
+    [Fact]
+    public void Sent_null_for_a_read_only_required_field_gets_only_cannot_be_set()
+    {
+        var form = Form(Section(Field("price", requiredWhen: "true", readOnlyWhen: "true")));
+
+        var failures = Check(form, Values(("price", null)), "price");
+
+        Assert.NotNull(failures);
+        var failure = Assert.Single(failures);
+        Assert.Equal("/values/price", failure.Key);
+        Assert.Equal(["Cannot be set."], failure.Value);
+    }
+
+    [Fact]
+    public void Caller_that_sends_no_fields_gets_no_cannot_be_set_error()
+    {
+        var form = Form(Section(Field("price", visibleWhen: "false", readOnlyWhen: "true")));
+
+        Assert.True(form.HasVisibleOrReadOnlyWhen);
+        Assert.Null(Check(form, Values(("price", "1.5"))));
+        Assert.Null(Check(form, Values(("price", "1.5")), sent: []));
+        Assert.False(Form(Section(Field("price"))).HasVisibleOrReadOnlyWhen);
+    }
+
+    [Fact]
     public void Merge_keeps_required_over_a_validation_message_on_the_same_key()
     {
         var form = new SortedDictionary<string, string[]> { ["/values/a"] = ["Required."] };
@@ -175,6 +259,9 @@ public sealed class RecordFormRequirementsTests
     private static SortedDictionary<string, string[]>? Check(FormModel form, List<RecordValue> values) =>
         RecordFormRequirements.Check(_application, _order, form, null, values, [], null);
 
+    private static SortedDictionary<string, string[]>? Check(FormModel form, List<RecordValue> values, params string[] sent) =>
+        RecordFormRequirements.Check(_application, _order, form, null, values, [], null, sent);
+
     private static FormModel Form(params FormSectionModel[] sections) =>
         new()
         {
@@ -190,8 +277,8 @@ public sealed class RecordFormRequirementsTests
     private static FormSectionModel Section(string? visibleWhen, params FormFieldModel[] fields) =>
         new(new TextReference("section"), fields, visibleWhen is null ? null : "section", Condition(visibleWhen));
 
-    private static FormFieldModel Field(string name, string? visibleWhen = null, string? requiredWhen = null) =>
-        new(name, false, Condition(visibleWhen), Condition(requiredWhen));
+    private static FormFieldModel Field(string name, string? visibleWhen = null, string? requiredWhen = null, string? readOnlyWhen = null) =>
+        new(name, false, Condition(visibleWhen), Condition(requiredWhen), Condition(readOnlyWhen));
 
     private static ExpressionModel? Condition(string? expression) =>
         expression is null
