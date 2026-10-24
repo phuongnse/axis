@@ -27,7 +27,7 @@ internal static class StudioDiagnostics
         IReadOnlyList<ResourceContent> files, PackageCatalog packages, ModuleCatalog modules) =>
         [.. ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules).Diagnostics.Select(Map)];
 
-    private static StudioDiagnostic Map(Diagnostic diagnostic) => new(
+    internal static StudioDiagnostic Map(Diagnostic diagnostic) => new(
         diagnostic.Code,
         diagnostic.Severity == DiagnosticSeverity.Error ? "error" : "warning",
         diagnostic.Message,

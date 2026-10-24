@@ -86,6 +86,7 @@ internal static class StudioEndpoints
         endpoints.MapPut("/api/studio/apps/{application}/texts/{key}", TextWriteAsync);
         endpoints.MapStudioPublishEndpoints();
         endpoints.MapStudioExpressionEndpoints();
+        endpoints.MapStudioPageMetadataEndpoints();
         endpoints.MapStudioTemplateEndpoints();
         endpoints.MapStudioApplicationEndpoints();
     }
