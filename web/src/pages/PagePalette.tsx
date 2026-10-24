@@ -1,7 +1,7 @@
 import { useDraggable } from '@dnd-kit/core'
 import { Button, Flex, Typography } from 'antd'
 import { getAt } from '../platform/jsonPatch'
-import { addableTypes, insertionPlace, newWidget, paletteLimit } from '../platform/pageWidgets'
+import { addableTypes, insertionPlace, newWidget, paletteLimit, widgetPointerOf } from '../platform/pageWidgets'
 import { useText } from '../platform/texts'
 import { landedText, paletteReasons, usePartLabel, visuallyHidden } from './pagePaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
@@ -14,7 +14,7 @@ type Content = Record<string, unknown>
  * no widgets. A pointer drag from a type to the canvas is handled by the page designer around it. A hidden live region
  * shows `announcement`, which names the list and position where a widget landed. A type the page cannot take under
  * the limits of D61 is disabled, with its reason beside it, and cannot be dragged. A pointer that names no widget
- * selects the first widget, as the tree does.
+ * selects the first widget, as the tree does. A pointer to an action of a widget counts as that widget.
  */
 export function PagePalette({
   value,
@@ -37,7 +37,8 @@ export function PagePalette({
   if (widgets === undefined) {
     return null
   }
-  const selected = getAt(value, pointer) === undefined ? '/widgets/0' : pointer
+  const widgetPointer = widgetPointerOf(pointer)
+  const selected = getAt(value, widgetPointer) === undefined ? '/widgets/0' : widgetPointer
   const place = insertionPlace(widgets, selected)
 
   function insert(type: string) {

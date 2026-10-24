@@ -3,8 +3,9 @@ import { Alert, Card, Segmented, Typography } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
 import { setApiGuard } from '../platform/api'
+import { CanvasActionsContext } from '../platform/canvasActions'
 import { getAt } from '../platform/jsonPatch'
-import { childLists, widgetSummary } from '../platform/pageWidgets'
+import { actionKeyOf, childLists, widgetPointerOf, widgetSummary } from '../platform/pageWidgets'
 import { PageLayout } from '../platform/PageLayout'
 import { PageLeaf } from '../platform/PageLeaf'
 import { placeholderApi, placeholderPageValues } from '../platform/placeholderApi'
@@ -43,6 +44,7 @@ function cancel(event: SyntheticEvent) {
 }
 
 const frameSelector = '[data-testid="studio-canvas-widget"]'
+const actionSelector = '[data-action]'
 
 /**
  * The application's own texts, from Studio's names: the platform locale when the application has it, otherwise its
@@ -77,6 +79,11 @@ function canvasTexts(names: StudioNames | undefined, platformLocale: string | un
  * type and summary from the draft. The widget at `selected` is outlined and has `aria-current`. Inside a drag context
  * every widget with a path and every widget list is a drop target, and a placeholder that is a container has a drop
  * area for each list its draft has.
+ *
+ * Every action of a widget draws as a button, also one the site would hide. A click on an action's button, or Enter
+ * or Space on it, selects the action, whose pointer ends the widget's pointer, such as `/widgets/0/rowActions/1`. The
+ * selected action's button is outlined and has `aria-current`, and its widget stays the selected widget. A button
+ * runs nothing.
  */
 export function StudioPageCanvas({
   application,
@@ -88,7 +95,7 @@ export function StudioPageCanvas({
   application: string
   resourceId: string
   draft: Record<string, unknown>
-  /** The pointer of the selected widget. */
+  /** The pointer of the selected widget, or of the selected action of a widget. */
   selected: string
   onSelect: (path: string) => void
 }) {
@@ -158,6 +165,7 @@ export function StudioPageCanvas({
         summary={isContent(draftWidget) ? widgetSummary(draftWidget) : ''}
         marked={diagnosticsAt(diagnostics, path).length > 0}
         selected={path !== undefined && path === selected}
+        action={path !== undefined && widgetPointerOf(selected) === path ? actionKeyOf(selected) : undefined}
         onSelect={path === undefined ? undefined : () => onSelect(path)}
       >
         {content}
@@ -167,16 +175,22 @@ export function StudioPageCanvas({
 
   function click(event: SyntheticEvent) {
     cancel(event)
-    const path = (event.target as HTMLElement).closest<HTMLElement>(frameSelector)?.dataset.path
-    if (path !== undefined) {
-      onSelect(path)
+    const target = event.target as HTMLElement
+    const frame = target.closest<HTMLElement>(frameSelector)
+    const path = frame?.dataset.path
+    if (path === undefined) {
+      return
     }
+    // A button of the frame's own widget, not one of a widget inside it, selects its action.
+    const action = target.closest<HTMLElement>(actionSelector)
+    onSelect(action !== null && frame!.contains(action) ? `${path}/${action.dataset.action}` : path)
   }
 
   return (
     <TextProvider catalogs={catalogs} development={outer.development}>
       <WidthSwitch value={width} onChange={setWidth} />
       <div data-testid="studio-page-canvas" onClickCapture={click} onSubmitCapture={cancel}>
+        <SelectedActionStyle />
         {drawn?.page === null && (
           <CanvasAlert testId="studio-canvas-cannot-draw" textKey="shell.studio.design.cannotDraw" />
         )}
@@ -248,6 +262,14 @@ function isEmptyList(draft: Record<string, unknown>, pointer: string): boolean {
   return Array.isArray(list) && list.length === 0
 }
 
+/** The outline of the selected action's button. Only the buttons of the selected action have `aria-current`. */
+function SelectedActionStyle() {
+  const { colour, radius } = useDesignTokens()
+  return (
+    <style>{`[data-testid="studio-page-canvas"] [data-action][aria-current="true"] { outline: 2px solid ${colour.primary}; outline-offset: 2px; border-radius: ${radius.base}px; }`}</style>
+  )
+}
+
 function isContent(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -255,7 +277,8 @@ function isContent(value: unknown): value is Record<string, unknown> {
 /**
  * A widget of the canvas. It has a border in the error colour when a diagnostic names it, and `data-marked` then. A
  * widget with a path is a Tab stop that Enter or Space selects. The selected one has an outline in the primary colour
- * and `aria-current`. Its name is its summary, or its type, and "has diagnostics" when marked.
+ * and `aria-current`. Its name is its summary, or its type, and "has diagnostics" when marked. It tells the widgets
+ * inside that they are on the canvas, and which of their actions is selected.
  */
 function CanvasWidgetFrame({
   type,
@@ -263,6 +286,7 @@ function CanvasWidgetFrame({
   summary,
   marked,
   selected,
+  action,
   onSelect,
   children,
 }: {
@@ -271,6 +295,8 @@ function CanvasWidgetFrame({
   summary: string
   marked: boolean
   selected: boolean
+  /** The key of the selected action of this widget, such as `rowActions/1`. */
+  action: string | undefined
   onSelect?: () => void
   children: ReactNode
 }) {
@@ -282,6 +308,7 @@ function CanvasWidgetFrame({
     data: { kind: 'widget', pointer: path },
     disabled: path === undefined,
   })
+  const actions = useMemo(() => ({ selected: action }), [action])
   return (
     <div
       ref={setNodeRef}
@@ -305,7 +332,7 @@ function CanvasWidgetFrame({
         outlineOffset: 2,
       }}
     >
-      {children}
+      <CanvasActionsContext.Provider value={actions}>{children}</CanvasActionsContext.Provider>
     </div>
   )
 }

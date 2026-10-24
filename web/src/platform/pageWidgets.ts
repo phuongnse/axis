@@ -24,6 +24,26 @@ export const widgetKeys: Record<string, string[]> = {
 /** Every property the editor knows on a widget. A key outside this set is never touched. */
 export const knownWidgetKeys = [...new Set(Object.values(widgetKeys).flat())]
 
+/** The end of a pointer to an action: a list entry of a table, form or detail, or the navigate action of a KPI. */
+const actionEnd = /\/(?:(?:rowActions|toolbarActions|actions)\/\d+|navigate)$/
+
+/**
+ * The pointer of the widget that a selection pointer names. The selection of an action ends in the action, such as
+ * `/widgets/0/rowActions/1`, and its widget is `/widgets/0`. The pointer of a widget is returned as it is.
+ */
+export function widgetPointerOf(pointer: string): string {
+  return pointer.replace(actionEnd, '')
+}
+
+/**
+ * The key of the action a selection pointer names, relative to its widget, such as `rowActions/1` or `navigate`.
+ * It is `undefined` when the pointer names a widget.
+ */
+export function actionKeyOf(pointer: string): string | undefined {
+  const end = actionEnd.exec(pointer)
+  return end === null ? undefined : end[0].slice(1)
+}
+
 /** The properties of a widget that name what it shows, in the order the summary prefers them. */
 const summaryKeys = ['entity', 'dataSource', 'form', 'process']
 

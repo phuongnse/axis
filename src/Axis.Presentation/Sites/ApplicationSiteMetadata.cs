@@ -269,7 +269,16 @@ public sealed record FormMetadata(string Name, IReadOnlyList<FormSectionMetadata
 /// Whether the section has a <c>visibleWhen</c> condition. The condition itself never leaves the
 /// server: a client gets the answer from the form state endpoint.
 /// </param>
-public sealed record FormSectionMetadata(string? Name, string TitleKey, bool VisibleWhen, IReadOnlyList<FormFieldMetadata> Fields);
+public sealed record FormSectionMetadata(string? Name, string TitleKey, bool VisibleWhen, IReadOnlyList<FormFieldMetadata> Fields)
+{
+    /// <summary>
+    /// The JSON Pointer of the section in the draft form, such as <c>/sections/0</c>. Only the draft page metadata route of
+    /// the authoring API sets it. The site's form metadata never writes it.
+    /// </summary>
+    [JsonPropertyOrder(-1)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Path { get; init; }
+}
 
 /// <summary>One field of a form section, by its declared name.</summary>
 /// <param name="ReadOnly">
@@ -277,10 +286,28 @@ public sealed record FormSectionMetadata(string? Name, string TitleKey, bool Vis
 /// numbered or creator field is always read-only.
 /// </param>
 /// <param name="VisibleWhen">Whether the field has a <c>visibleWhen</c> condition, which stays on the server.</param>
-public sealed record FormFieldMetadata(string Name, bool ReadOnly, bool VisibleWhen);
+public sealed record FormFieldMetadata(string Name, bool ReadOnly, bool VisibleWhen)
+{
+    /// <summary>
+    /// The JSON Pointer of the field in the draft form, such as <c>/sections/0/fields/1</c>. Only the draft page metadata route of
+    /// the authoring API sets it. The site's form metadata never writes it.
+    /// </summary>
+    [JsonPropertyOrder(-1)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Path { get; init; }
+}
 
 /// <summary>One wizard step of a form: the text key of its title and the names of its sections.</summary>
-public sealed record FormStepMetadata(string TitleKey, IReadOnlyList<string> Sections);
+public sealed record FormStepMetadata(string TitleKey, IReadOnlyList<string> Sections)
+{
+    /// <summary>
+    /// The JSON Pointer of the step in the draft form, such as <c>/steps/0</c>. Only the draft page metadata route of
+    /// the authoring API sets it. The site's form metadata never writes it.
+    /// </summary>
+    [JsonPropertyOrder(-1)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Path { get; init; }
+}
 
 /// <summary>The entity a widget shows, with its fields and the path of its record API.</summary>
 public sealed record EntityMetadata(string Name, string? LabelKey, string? DisplayField, string RecordsPath, IReadOnlyList<FieldMetadata> Fields);

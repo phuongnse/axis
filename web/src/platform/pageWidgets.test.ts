@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  actionKeyOf,
   addableTypes,
   childLists,
   containerTypes,
@@ -16,6 +17,7 @@ import {
   typeChanges,
   widgetKeys,
   widgetLists,
+  widgetPointerOf,
   widgetSummary,
   widgetTypes,
 } from './pageWidgets'
@@ -323,6 +325,27 @@ describe('moveTo', () => {
     expect(moveTo(tree, '/widgets/9', '/widgets')).toBeUndefined()
     expect(moveTo(tree, '/widgets/0', '/widgets/0/columns/0/widgets')).toBeUndefined()
   })
+})
+
+describe('action pointers', () => {
+  it.each([
+    ['/widgets/0/rowActions/1', '/widgets/0', 'rowActions/1'],
+    ['/widgets/0/toolbarActions/0', '/widgets/0', 'toolbarActions/0'],
+    ['/widgets/2/actions/12', '/widgets/2', 'actions/12'],
+    ['/widgets/1/navigate', '/widgets/1', 'navigate'],
+    ['/widgets/1/columns/0/widgets/3/rowActions/0', '/widgets/1/columns/0/widgets/3', 'rowActions/0'],
+  ])('splits %s into its widget and its action', (pointer, widget, key) => {
+    expect(widgetPointerOf(pointer)).toBe(widget)
+    expect(actionKeyOf(pointer)).toBe(key)
+  })
+
+  it.each(['/widgets/0', '/widgets/1/columns/0/widgets/3', '/widgets/0/rowActions', '/widgets/0/rowActions/x'])(
+    'leaves the pointer of a widget, %s, as it is',
+    (pointer) => {
+      expect(widgetPointerOf(pointer)).toBe(pointer)
+      expect(actionKeyOf(pointer)).toBeUndefined()
+    },
+  )
 })
 
 describe('listLevel', () => {

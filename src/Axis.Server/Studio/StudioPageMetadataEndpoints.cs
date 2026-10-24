@@ -23,7 +23,10 @@ namespace Axis.Server.Studio;
 /// compiles. The checks run in the order of the rest of the authoring API: session (401), author role (403), application
 /// (404), then 404 for an unknown resource or one that is not a page, 415 for a content type other than
 /// <c>application/json</c>, and 400 for a body that is not an object or whose <c>id</c> or <c>kind</c> differs from the
-/// saved file.
+/// saved file. The route also answers an unsaved form as <c>{ widget, diagnostics }</c>, where <c>widget</c> is the metadata of
+/// a <c>form</c> widget that names the form and each section, field and step carries <c>path</c>. The widget is null when the
+/// compile has any error. Its diagnostics are those whose resource is the form. A resource that is neither a page nor a form
+/// is 404.
 /// </summary>
 internal static partial class StudioPageMetadataEndpoints
 {
@@ -54,9 +57,9 @@ internal static partial class StudioPageMetadataEndpoints
             return StudioEndpoints.NotFound(StudioEndpoints.NoResource);
         }
 
-        if (found.Kind != "page")
+        if (found.Kind is not ("page" or "form"))
         {
-            return StudioEndpoints.NotFound("The resource is not a page.");
+            return StudioEndpoints.NotFound("The resource is not a page or a form.");
         }
 
         var request = httpContext.Request;
@@ -78,7 +81,19 @@ internal static partial class StudioPageMetadataEndpoints
 
         if (draft is null || !SameIdentity(draft, found))
         {
-            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid draft page.");
+            return StudioEndpoints.Problem(
+                StatusCodes.Status400BadRequest,
+                found.Kind == "form" ? "The body is not a valid draft form." : "The body is not a valid draft page.");
+        }
+
+        if (found.Kind == "form")
+        {
+            var compiled = Compile(folderFiles, found.File, draft, packages, modules);
+            var formDiagnostics = compiled.Diagnostics
+                .Where(diagnostic => diagnostic.ResourceId == pageId)
+                .Select(StudioDiagnostics.Map)
+                .ToList();
+            return Results.Ok(new StudioFormMetadataResponse(DrawForm(compiled, pageId), formDiagnostics));
         }
 
         var first = Compile(folderFiles, found.File, draft, packages, modules);
@@ -119,6 +134,50 @@ internal static partial class StudioPageMetadataEndpoints
 
     private static bool HasErrors(CompilationResult result) =>
         result.Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+    // The metadata of a form widget that names the draft form, or null when the compile has any error. Without errors the
+    // model keeps the order of the draft, so the position of each section, field and step is its JSON Pointer.
+    private static WidgetMetadata? DrawForm(CompilationResult result, Guid formId)
+    {
+        if (HasErrors(result) || result.Model is not { } model
+            || model.Forms.FirstOrDefault(candidate => candidate.Id == formId) is not { } form)
+        {
+            return null;
+        }
+
+        var entity = ApplicationSites.DescribeEntity(model, form.Entity.Name);
+        IReadOnlyList<string> fields = [.. entity.Fields.Select(field => field.Name)];
+        return new WidgetMetadata(
+            "form",
+            entity,
+            null,
+            WithPaths(ApplicationSites.DescribeForm(model, form.Name)),
+            null,
+            null,
+            null,
+            [],
+            [],
+            [],
+            new Dictionary<string, string>(),
+            new WidgetAccess(["read", "create", "update", "delete"], fields, fields),
+            null,
+            null,
+            null);
+    }
+
+    private static FormMetadata WithPaths(FormMetadata form) =>
+        form with
+        {
+            Sections =
+            [
+                .. form.Sections.Select((section, index) => section with
+                {
+                    Path = $"/sections/{index}",
+                    Fields = [.. section.Fields.Select((field, position) => field with { Path = $"/sections/{index}/fields/{position}" })],
+                }),
+            ],
+            Steps = [.. form.Steps.Select((step, index) => step with { Path = $"/steps/{index}" })],
+        };
 
     // The page metadata of the draft, or null when the page cannot be drawn. A widget with an error is taken out of a copy of
     // the draft, the copy is compiled again, and the widget comes back as a placeholder at its path in the draft.
@@ -380,3 +439,6 @@ internal static partial class StudioPageMetadataEndpoints
 
 /// <summary>The answer to a draft page metadata call: the page, or null when it cannot be drawn, and the draft's diagnostics.</summary>
 internal sealed record StudioPageMetadataResponse(PageMetadata? Page, IReadOnlyList<StudioDiagnostic> Diagnostics);
+
+/// <summary>The answer to a draft form metadata call: a form widget, or null when the compile has an error, and the form's diagnostics.</summary>
+internal sealed record StudioFormMetadataResponse(WidgetMetadata? Widget, IReadOnlyList<StudioDiagnostic> Diagnostics);

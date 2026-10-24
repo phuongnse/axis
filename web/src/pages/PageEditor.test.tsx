@@ -1427,3 +1427,111 @@ describe('PageEditor container panels', () => {
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns', [{ width: 6, widgets: [inbox] }])
   })
 })
+
+describe('PageEditor action selection', () => {
+  const first = { type: 'navigate', page: 'ReviewForm', label: { textKey: 'pages.review.title' } }
+  const second = { type: 'delete', label: { textKey: 'pages.review.title' } }
+  const withActions = page({ ...table, rowActions: [first, second], toolbarActions: [first] })
+
+  /** The editor with the selection kept by the caller, as the Design tab keeps it. */
+  function renderSelecting(value: Record<string, unknown>, selected: string) {
+    const onSelect = vi.fn()
+    const onChange = vi.fn()
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioNamesContext.Provider value={names}>
+            <LabelTextsContext.Provider value={labelContext}>
+              <PageEditor value={value} onChange={onChange} selected={selected} onSelect={onSelect} />
+            </LabelTextsContext.Provider>
+          </StudioNamesContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+    return { onSelect, onChange }
+  }
+
+  it('marks the card of the selected action and keeps its widget selected in the tree', () => {
+    renderSelecting(withActions, '/widgets/0/rowActions/1')
+
+    const rows = within(screen.getByTestId('studio-field-/widgets/0/rowActions'))
+    expect(rows.getByTestId('studio-action-1')).toHaveAttribute('aria-current', 'true')
+    expect(rows.getByTestId('studio-action-0')).not.toHaveAttribute('aria-current')
+    const toolbar = within(screen.getByTestId('studio-field-/widgets/0/toolbarActions'))
+    expect(toolbar.getByTestId('studio-action-0')).not.toHaveAttribute('aria-current')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('studio-field-/widgets/0')).toBeInTheDocument()
+  })
+
+  it('marks no card when the pointer names an action that is not there, and still shows the widget', () => {
+    renderSelecting(withActions, '/widgets/0/rowActions/5')
+
+    expect(screen.getByTestId('studio-field-/widgets/0')).toBeInTheDocument()
+    expect(document.querySelector('[data-testid^="studio-action-"][aria-current]')).toBeNull()
+  })
+
+  it('marks the navigate action of a KPI', () => {
+    renderSelecting(
+      page({ type: 'kpi', dataSource: '', measure: '', label: { textKey: '' }, navigate: first }),
+      '/widgets/0/navigate',
+    )
+
+    expect(screen.getByTestId('studio-field-/widgets/0/navigate')).toHaveAttribute('aria-current', 'true')
+  })
+
+  it.each([
+    ['Add navigate action', 'studio-field-/widgets/0/rowActions', '/widgets/0/rowActions/2'],
+    ['Add delete action', 'studio-field-/widgets/0/rowActions', '/widgets/0/rowActions/2'],
+    ['Add navigate action', 'studio-field-/widgets/0/toolbarActions', '/widgets/0/toolbarActions/1'],
+  ])('selects the new action when %s is pressed in %s', async (name, list, pointer) => {
+    const { onSelect, onChange } = renderSelecting(withActions, '/widgets/0')
+
+    await userEvent.click(within(screen.getByTestId(list)).getByRole('button', { name }))
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onSelect).toHaveBeenLastCalledWith(pointer)
+  })
+
+  it('selects the new start action of a form and the new navigate action of a KPI', async () => {
+    const forms = renderSelecting(page({ ...form, actions: [] }), '/widgets/0')
+    await userEvent.click(screen.getByRole('button', { name: 'Add action' }))
+    expect(forms.onSelect).toHaveBeenLastCalledWith('/widgets/0/actions/0')
+    cleanup()
+
+    const kpi = renderSelecting(
+      page({ type: 'kpi', dataSource: '', measure: '', label: { textKey: '' } }),
+      '/widgets/0',
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Add navigate action' }))
+    expect(kpi.onSelect).toHaveBeenLastCalledWith('/widgets/0/navigate')
+  })
+
+  it('selects the widget when an action is removed', async () => {
+    const { onSelect, onChange } = renderSelecting(withActions, '/widgets/0/rowActions/1')
+
+    await userEvent.click(
+      within(within(screen.getByTestId('studio-field-/widgets/0/rowActions')).getByTestId('studio-action-1')).getByRole(
+        'button',
+        { name: 'Remove action' },
+      ),
+    )
+
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions/1', undefined)
+    expect(onSelect).toHaveBeenLastCalledWith('/widgets/0')
+  })
+
+  it('scrolls the card of the selected action into view', () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      renderSelecting(withActions, '/widgets/0/rowActions/1')
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView
+    }
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts[0]).toBe(
+      within(screen.getByTestId('studio-field-/widgets/0/rowActions')).getByTestId('studio-action-1'),
+    )
+  })
+})

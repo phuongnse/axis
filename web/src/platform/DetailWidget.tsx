@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { ChildCollectionTable } from './ChildCollectionTable'
+import { useCanvasActions } from './canvasActions'
 import { formatValue } from './formatValue'
 import { navigateTarget, type NavigateOpen } from './navigateAction'
 import { newIdempotencyKey, startProcess } from './processes'
@@ -34,12 +35,14 @@ const noRows: RecordRow[] = []
  *
  * A button for each `startProcess` action starts its process for the record straight away, with
  * nothing to save first, and then loads the record again. A button for each `navigate` action opens
- * its target page with the record's values, and is hidden when the SPA cannot work out an expression.
+ * its target page with the record's values, and is hidden when the SPA cannot work out an expression. On the
+ * page designer's canvas the SPA draws a button for every action, also one it cannot work out.
  */
 export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidgetProps) {
   const t = useText()
   const navigate = useNavigate()
   const location = useLocation()
+  const canvas = useCanvasActions()
   const { entity } = widget
   const sections = useMemo(() => sectionsOf(entity, widget.form), [entity, widget.form])
   const [load, setLoad] = useState<LoadState>('loading')
@@ -143,15 +146,29 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
   const navigateActions = widget.actions.filter((action): action is NavigateAction => action.type === 'navigate')
   const buttons = [
     ...startActions.map((action) => (
-      <Button key={action.instancesPath} disabled={starting} onClick={() => void runAction(action)}>
+      <Button
+        key={action.instancesPath}
+        disabled={starting}
+        onClick={() => void runAction(action)}
+        {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
+      >
         {t(action.labelKey)}
       </Button>
     )),
     ...navigateActions.flatMap((action, index) => {
       const open = navigateTarget(sitePath, action, { id: recordId, values: record.values })
-      return open
+      return open || canvas.active
         ? [
-            <Button key={`navigate-${index}`} disabled={starting} onClick={() => void runNavigate(open)}>
+            <Button
+              key={`navigate-${index}`}
+              disabled={starting}
+              onClick={() => {
+                if (open) {
+                  void runNavigate(open)
+                }
+              }}
+              {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
+            >
               {t(action.labelKey)}
             </Button>,
           ]
