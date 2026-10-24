@@ -10,6 +10,7 @@ using Axis.Data.Naming;
 using Axis.Data.Schema;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
+using Axis.Processes.Storage;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -99,6 +100,12 @@ public sealed class RecordApiFixture : IAsyncLifetime
             await using var data = DataDatabaseFixture.CreateContext(connection);
             await configuration.Database.MigrateAsync();
             await data.Database.MigrateAsync();
+            await using (var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connectionString).Options))
+            {
+                // A delete looks for the process instances of the record.
+                await processes.Database.MigrateAsync();
+            }
+
             await PostgreSqlServer.GrantRuntimeRoleAsync(connectionString);
 
             // Releases live in the tenant database, so the fixture is compiled once per tenant.

@@ -19,7 +19,7 @@ namespace Axis.Integration.Tests;
 /// One tenant database, <c>a</c>, with the configuration, data and processes migrations applied
 /// and the ProcessApp fixture activated, served by the real server on host <c>a.example.test</c>.
 /// The test authentication scheme signs in <c>anna</c>, who holds <c>requester</c>, and
-/// <c>olga</c>, who holds <c>reader</c>. <see cref="Client"/> is signed in as <c>anna</c>.
+/// <c>olga</c>, who holds <c>reader</c> and may also delete requests. <see cref="Client"/> is signed in as <c>anna</c>.
 /// </summary>
 public sealed class ProcessStartFixture : IAsyncLifetime
 {
@@ -47,6 +47,9 @@ public sealed class ProcessStartFixture : IAsyncLifetime
     /// <summary>A new client of the server with its own cookies. The caller disposes it.</summary>
     public HttpClient CreateClient() =>
         (_factory ?? throw new InvalidOperationException("The test host is not started.")).CreateClient();
+
+    /// <summary>A new connection to the tenant database. The caller disposes it.</summary>
+    public ValueTask<NpgsqlConnection> OpenConnectionAsync() => DataSource.OpenConnectionAsync();
 
     public async ValueTask InitializeAsync()
     {

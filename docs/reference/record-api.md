@@ -187,6 +187,7 @@ HTTP also call. The record API maps its outcome to the responses below.
 - **Delete.** `DELETE` removes the record by id only. It needs no body and no
   version. The response is `204` with no body. A record that another record
   references through a `reference` field is kept, and the response is `409`.
+  So is a record that is the subject of a running or waiting process instance.
 - **Content type.** Both need `Content-Type: application/json`. The media
   type matches ignoring letter case. The only allowed parameter is `charset`
   with the value `utf-8`, in any letter case. A cross-site page can send a
@@ -268,8 +269,8 @@ the path (`404`), the content type (`415`), the body (`400`), then storage
 (`400`, `404` or `409`). A request with the wrong content type is answered
 before its body is read. Validations are a step between the body and
 storage: see
-[Child rows, computed fields and validations](#child-rows-computed-fields-and-validations). A delete has no body, so it is checked for the path
-and then in storage (`404` or `409`).
+[Child rows, computed fields and validations](#child-rows-computed-fields-and-validations). A delete has no body, so it is checked for the path,
+then for a running process (`409`), then in storage (`404` or `409`).
 
 A write without the [CSRF header](#create-update-and-delete) is a `403`
 before any of these checks. The session comes next: a request without a
@@ -295,6 +296,8 @@ Policies add more checks. The full order is:
 6. On update and delete, the stored record outside every `update` or
    `delete` filter, `403`. An `update` or `delete` filter that reads a pending
    field of the stored record is a `409` first, before the `403`.
+   On delete, a stored record that is the subject of a running or waiting
+   process instance is a `409`, after the `403` and before storage.
 7. The content type, `415`.
 8. The query of a list, or the body, `400`. Then, on a list, a `sort` or
    `search` on a pending field, `409`.
@@ -392,10 +395,14 @@ otherwise the answer is the stale-version `409`. See
   references. Any foreign-key violation on delete maps to it. The title is
   fixed, and the response never names the referencing entity, table or
   constraint.
-- **`409` for a record in a running process** *(planned for M13)*. A delete
-  of a record that is the subject of a running or waiting process instance.
-  The title is fixed, and the response never names the process. See the
-  [start lock](processes.md#releases-and-running-work).
+- **`409` for a record in a running process.** A delete of a record that is
+  the subject of a running or waiting process instance. The title is fixed,
+  and the response never names the process. The check runs after the record
+  filters, so a user who cannot reach the record never learns about its
+  processes. It runs under the [start lock](processes.md#releases-and-running-work)
+  and the record's row lock, so a start and a delete of the same record
+  cannot both succeed. A delete never answers `503`, because it pins no
+  release.
 - **`409` for a schema conflict.** The table has a constraint the active model
   does not declare, such as a `NOT NULL` column left by an activation that
   failed after provisioning committed. The title is fixed, and the response

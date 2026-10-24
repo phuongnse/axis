@@ -54,7 +54,8 @@ namespace Axis.Server.Records;
 /// A create or update that finds a different active release under the start lock runs again from
 /// the path check on the new release, and answers 503 after three attempts. Nothing is written by
 /// an attempt that finds a change.
-/// A delete is 204, or 404 or 409 from storage. A record's history is checked as a single read
+/// A delete is 204, or 404 or 409 from storage. It is also a 409 when a running or waiting process works on
+/// the record. A record's history is checked as a single read
 /// (404), then paging (400), and an unknown or deleted record is a 404.
 /// A <c>read</c> filter of the user's grants that reads a computed field that is being recomputed
 /// makes a list, a single read and a history a 409 that names no field or policy. It comes before
@@ -600,6 +601,8 @@ internal static class RecordEndpoints
                 RecordConflict.Referenced => Conflict("Another record references this record."),
                 // Names no column or constraint: the storage names are not part of the API.
                 RecordConflict.Schema => Conflict("The stored schema does not match the active model."),
+                // Names no process, instance or step: the process is not part of the response.
+                RecordConflict.RunningProcess => Conflict("A running process works on this record."),
                 var conflict => throw new InvalidOperationException($"Unexpected conflict {conflict}."),
             },
             var outcome => throw new InvalidOperationException($"Unexpected record command outcome {outcome}."),
