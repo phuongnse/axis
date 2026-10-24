@@ -72,8 +72,9 @@ models, are not copied here. Look them up where they live.
   unverifiable criterion, one that the diff, its tests and the check results
   show neither way, never merges by itself: the owner confirms the criteria
   that the review comment lists, then merges. A merge that GitHub refuses
-  because `main` moved meanwhile is tried again, and one that waits for
-  required checks happens on a later sweep once they pass. The owner
+  because `main` moved meanwhile is tried again, one refused because the pull
+  request branch moved gets a new review on that branch, and one that waits
+  for required checks happens on a later sweep once they pass. The owner
   turns the setting off to decide each merge again, and then only the owner
   merges. The switch is in `.nexkit/`, so changing it is a hand-made pull
   request.
@@ -82,7 +83,8 @@ models, are not copied here. Look them up where they live.
   ends in a state that needs a person: a plan with a question that has no
   recommended option, a blocked round with such a question, a question asked
   again after autopilot answered it, a failed run, a second time-out, no
-  automatic fix rounds left, a refused automatic merge, an approved pull
+  automatic fix rounds left, checks that fail again after a fix round blamed a
+  cause outside the code, a refused automatic merge, an approved pull
   request with an unverifiable criterion, a CI failure on `main`, or the last
   issue of the milestone closed. It mentions the owner once for each issue
   that waits. Every other
@@ -113,8 +115,9 @@ models, are not copied here. Look them up where they live.
   its failed jobs run again, and an older failed run that a newer run overtook,
   are recorded too, planned right after those, so a failure that passed on a
   second attempt is not lost. Each failure gets a `bug` issue of its own, named
-  by the failing test from the job's error annotation, or by the job and its
-  first failed step; the same failure later adds a comment to its open issue.
+  in plain words by the failing test from the job's error annotation and its
+  file, or by the job and its first failed step; the same failure later adds a
+  comment to its open issue.
 - **Every merge to `main` gets a CI result.** A run on `main` always finishes.
   A newer merge replaces only a run that is still waiting to start, so the next
   run tests both merges. On any other branch a newer push stops the older run.
@@ -250,14 +253,21 @@ them.
    at. A change that lives only in a comment is missing from both.
 5. **Implement.** Autopilot starts `/nexkit go` on the latest plan once it has
    no open question, is not too large and no comment came after it. NexKit
-   implements that plan and opens a pull request. When an implement or fix
+   implements that plan and opens a pull request. When the round finds that no
+   change is needed, for example because a commit on `main` already fixed the
+   failure, it opens no pull request and the issue closes as completed with
+   the finding: at once when the issue or its plan says to stop in that case,
+   otherwise through autopilot's recommended answer. When an implement or fix
    round runs out of time, autopilot plans once more with a note to split the
    issue, and the plan says why the round did not finish. A cause that was not
    found makes the first part a diagnosis. A part inherits its parent's
    time-outs, so a second time-out anywhere below waits for a person, and parts
    go at most three levels deep.
 6. **Pull request.** Every round runs NexKit's checks and the AI review on the
-   new commit. Merging needs both to pass.
+   new commit. Merging needs both to pass. A pull request runs one round at a
+   time: while the `/nexkit go` run that opened it still checks, reviews and
+   merges it, a conflict round waits for it, and a person's command or
+   *Request changes* review gets a reply to post it again once that run ends.
 7. **Fix.** NexKit starts fix rounds by itself for a conflict with `main`,
    which it merges and never rebases, and for failing checks or a review that
    requests changes, up to the automatic fix limit in its configuration. A
@@ -266,7 +276,10 @@ them.
    what earlier fix rounds tried. When a check fails the same way before and
    after a fix round, the next automatic round is a diagnosis: it names the
    cause with evidence before it changes code, or stops as `blocked` with what
-   it found. Beyond that, a person comments `/nexkit fix <instructions>`.
+   it found. A fix round that changes nothing because the cause lies outside
+   the code, such as a package registry that failed, runs the checks and the
+   review once more on the same commit; when they fail again, it waits for a
+   person. Beyond that, a person comments `/nexkit fix <instructions>`.
 8. **Merge.** NexKit squash-merges, starts CI on `main` and closes the issue.
    With `merge.auto` off, or when the review left a criterion unverifiable,
    the owner squash-merges instead, and GitHub closes the issue.
