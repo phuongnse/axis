@@ -466,7 +466,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
   | `application` | Generic form                          | Nothing                                                               |
   | `entity`      | Entity designer                       | Nothing                                                               |
-  | `page`        | Typed editor                          | A `delete` row action, which the editor does not edit yet (planned for M13) |
+  | `page`        | Typed editor, Design tab (planned for M13) | A `delete` row action, which the editor does not edit yet (planned for M13) |
   | `form`        | Generic form, typed steps panel       | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
   | `process`     | Typed editor with the process graph   | Nothing                                                               |
@@ -781,9 +781,57 @@ Run and the Test results list, the read-only view of a module entity, and the re
     error-coloured border, "has diagnostics" in its text label, and
     `data-marked`. The marks come from the panel's last loaded list, so they
     change on a load, a save or a request, not on every edit.
-- **Designers.** Visual page, form and process designers are not built yet.
-  They are planned for M13 and M14, see
+- **Page designer** *(planned for M13)*. The page editor gets a Design tab
+  that builds a page by drag and drop, per
+  [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md).
+  Form and process designers are planned for M13 and M14, see
   [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
   The process graph is read-only, and not a designer.
+  - **Design tab.** It sits next to the Form and JSON tabs and is the default
+    tab. The three tabs edit one draft.
+  - **Canvas.** It draws the unsaved draft with the site's own widget
+    components. Tables, charts and other data widgets show placeholder rows and
+    values made from the field types, as the widget previews do with fixtures.
+    Actions run nothing. The canvas asks
+    [the draft page metadata route](authoring.md#draft-page-metadata) 300 ms
+    after the last edit and redraws from its answer.
+  - **Placeholders and diagnostic marks.** A widget that does not compile draws
+    as a placeholder with its diagnostics. A widget is marked when a diagnostic
+    of the page names its `path` or a path inside it. A marked widget has an
+    error-coloured border, "has diagnostics" in its text label, and
+    `data-marked`, as a node of the process graph has. The marks come from the
+    route's latest answer, so they follow the unsaved draft.
+  - **Selection.** A click on the canvas or a pick in the widget tree selects a
+    widget in both. The selected widget is the open path and has
+    `aria-current`.
+  - **Property panel.** It sits beside the canvas and shows the widget's
+    existing panel. An edit redraws the canvas. Each action draws as a button
+    on the canvas, and selecting it opens its action in the panel, including a
+    `delete` action.
+  - **Palette.** It lists the ten widget types. The author drags one onto the
+    canvas, or picks one and inserts it after the selected widget or into the
+    selected container. A type is disabled, with the reason, when the page
+    cannot take it under a limit of
+    [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md):
+    a second table, a second form, task inbox or process inspector, or a
+    container past 4 levels.
+  - **Moves.** The author drags a widget to reorder it or to move it into or out
+    of a container. The keyboard sensor does the same, and a screen reader
+    hears where the widget lands. The Move to picker stays.
+  - **Data panel.** It lists the entities and the data sources. Dropping an
+    entity offers a table, a form or a detail. Dropping a data source offers a
+    table, and a chart with one group field or a KPI with a total row.
+  - **Width switch.** It draws the canvas at desktop width, which fills the
+    canvas area, or at phone width, which is 375 px.
+  - **Undo.** Undo and redo buttons, Ctrl+Z and Ctrl+Shift+Z, or Cmd on macOS,
+    cover every edit of the draft in the three tabs. The history is kept in
+    memory, up to 100 steps, with one step for each box. It is cleared by a
+    reload, a conflict reload or opening another resource. A save keeps it.
+    Studio's undo replaces the browser's own inside the editor's boxes.
+  - **Library.** Drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
+    `@dnd-kit/utilities`, about 15 KB min+gzip, in Studio's lazy chunk.
+  - **Format.** The designer writes only the order of the widget tree and the
+    properties the format has. It writes no pixels, and widths stay in
+    twelfths.
 - **Texts.** Its texts, including those of the lists above, are the platform
   texts under `shell.studio.*`, in `en` and `vi`, like the other shell texts.
