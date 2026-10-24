@@ -190,6 +190,8 @@
   "shell.studio.palette.oneTable": "Trang đã có một bảng. Mỗi trang chỉ có tối đa một bảng.",
   "shell.studio.palette.oneRecordWidget": "Trang đã có một biểu mẫu, hộp thư tác vụ hoặc bộ kiểm tra quy trình. Mỗi trang chỉ có tối đa một trong ba loại này.",
   "shell.studio.palette.tooDeep": "Một vùng chứa ở đây sẽ có danh sách vượt quá cấp 4.",
+  "shell.studio.palette.insideItself": "Một widget không thể nằm bên trong chính nó.",
+  "shell.studio.palette.moved": "Đã chuyển",
   "shell.studio.save": "Lưu",
   "shell.studio.saved": "Đã lưu.",
   "shell.studio.saveFailed": "Không thể lưu tài nguyên.",

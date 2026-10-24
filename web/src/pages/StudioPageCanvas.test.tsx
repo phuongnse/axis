@@ -1,4 +1,5 @@
 import type { DndContextProps } from '@dnd-kit/core'
+import type { ReactNode } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
@@ -27,6 +28,8 @@ vi.mock('@dnd-kit/core', async (importOriginal) => {
       dnd.props = props
       return <actual.DndContext {...props} />
     },
+    // The real overlay draws only while the library holds a drag, which the test does not start.
+    DragOverlay: ({ children }: { children?: ReactNode }) => <div data-testid="studio-drag-overlay">{children}</div>,
   }
 })
 
@@ -805,6 +808,144 @@ describe('the Design tab of a page', () => {
 
       dropOn('kpi', { kind: 'widget', pointer: '/widgets/4' })
       dropOn('kpi', { kind: 'list', pointer: '/widgets/0/widgets' })
+
+      expect(palette.getByTestId('studio-palette-announcement')).toBeEmptyDOMElement()
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      expect(posts).toHaveLength(before)
+    })
+  })
+
+  describe('moving', () => {
+    const section = (widgets: Record<string, unknown>[]) => ({ type: 'section', title: { textKey: '' }, widgets })
+
+    async function openDesign(widgets: Record<string, unknown>[]) {
+      const stubbed = stub(content(widgets))
+      renderEditor()
+      await screen.findByTestId('studio-page-editor', {}, slow)
+      await openTab('Design')
+      const design = await screen.findByTestId('studio-design-panel', {}, slow)
+      await screen.findByTestId('studio-page-canvas', {}, slow)
+      return { ...stubbed, design, palette: within(within(design).getByTestId('studio-palette')) }
+    }
+
+    function frame(path: string) {
+      return screen
+        .getAllByTestId('studio-canvas-widget')
+        .find((element) => element.getAttribute('data-path') === path)!
+    }
+
+    /** Drags the widget at `from` over a target, as the library reports a drag: the pointer at `clientY` in a box 100 high. */
+    function drag(
+      from: string,
+      data: { kind: 'widget' | 'list'; pointer: string },
+      { clientY = 10, drop = true }: { clientY?: number; drop?: boolean } = {},
+    ) {
+      const event = {
+        active: { id: `move:${from}`, data: { current: { kind: 'move', pointer: from, label: 'x' } } },
+        over: { id: `${data.kind}:${data.pointer}`, data: { current: data }, rect: { top: 0, height: 100 } },
+        delta: { x: 0, y: 0 },
+        activatorEvent: new MouseEvent('pointerdown', { clientY }),
+      } as never
+      act(() => dnd.props!.onDragStart!(event))
+      act(() => dnd.props!.onDragOver!(event))
+      if (drop) {
+        act(() => dnd.props!.onDragEnd!(event))
+      }
+    }
+
+    async function expectDraftUnchanged(widgets: Record<string, unknown>[]) {
+      await openTab('JSON')
+      const json = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'JSON' })
+      expect(JSON.parse(json.value)).toEqual(content(widgets))
+    }
+
+    it('moves a widget after another on its lower half and into an empty section, and selects it each time', async () => {
+      const { design, palette, posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }, section([])])
+      await screen.findByTestId('studio-canvas-placeholder', {}, slow)
+
+      drag('/widgets/0', { kind: 'widget', pointer: '/widgets/1' }, { clientY: 90 })
+
+      await waitFor(
+        () => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['chart', 'kpi', 'section']),
+        slow,
+      )
+      await waitFor(() => expect(frame('/widgets/1')).toHaveAttribute('aria-current', 'true'), slow)
+      expect(within(frame('/widgets/1')).getByTestId('kpi-tile')).toBeInTheDocument()
+      const announcement = palette.getByTestId('studio-palette-announcement')
+      expect(announcement).toHaveTextContent('Moved kpi')
+      expect(announcement).toHaveTextContent('position 2')
+
+      drag('/widgets/1', { kind: 'list', pointer: '/widgets/2/widgets' })
+
+      await waitFor(() => expect(posts.at(-1)!.widgets).toEqual([{ type: 'chart' }, section([{ type: 'kpi' }])]), slow)
+      expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/0')).toHaveAttribute('aria-current', 'true')
+      expect(announcement).toHaveTextContent('Moved kpi · Page › section 2 · position 1')
+    })
+
+    it('moves a widget before another on its upper half', async () => {
+      const { posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+
+      drag('/widgets/1', { kind: 'widget', pointer: '/widgets/0' }, { clientY: 10 })
+
+      await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['chart', 'kpi']), slow)
+    })
+
+    it('flags a section dragged over its own list while dragging, and the drop changes nothing', async () => {
+      const nest = [section([{ type: 'kpi' }])]
+      const { palette } = await openDesign(nest)
+
+      drag('/widgets/0', { kind: 'list', pointer: '/widgets/0/widgets' }, { drop: false })
+
+      expect(screen.getByTestId('studio-drag-refusal')).toHaveTextContent('A widget cannot go inside itself.')
+      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('A widget cannot go inside itself.')
+
+      act(() =>
+        dnd.props!.onDragEnd!({
+          active: { id: 'move:/widgets/0', data: { current: { kind: 'move', pointer: '/widgets/0', label: 'x' } } },
+          over: {
+            id: 'list:/widgets/0/widgets',
+            data: { current: { kind: 'list', pointer: '/widgets/0/widgets' } },
+            rect: { top: 0, height: 100 },
+          },
+          delta: { x: 0, y: 0 },
+          activatorEvent: new MouseEvent('pointerdown', { clientY: 10 }),
+        } as never),
+      )
+
+      expect(screen.queryByTestId('studio-drag-refusal')).not.toBeInTheDocument()
+      await expectDraftUnchanged(nest)
+    })
+
+    it('flags a container that would go past level 4 while dragging, and the drop changes nothing', async () => {
+      const nest = [section([section([{ type: 'kpi' }])]), section([section([{ type: 'chart' }])])]
+      const { palette } = await openDesign(nest)
+
+      drag('/widgets/1', { kind: 'list', pointer: '/widgets/0/widgets/0/widgets' })
+
+      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent(
+        'A container here would hold a list past level 4.',
+      )
+      await expectDraftUnchanged(nest)
+    })
+
+    it('shows the depth reason in the overlay during the drag', async () => {
+      const nest = [section([section([{ type: 'kpi' }])]), section([section([{ type: 'chart' }])])]
+      await openDesign(nest)
+
+      drag('/widgets/1', { kind: 'list', pointer: '/widgets/0/widgets/0/widgets' }, { drop: false })
+
+      expect(screen.getByTestId('studio-drag-refusal')).toHaveTextContent(
+        'A container here would hold a list past level 4.',
+      )
+    })
+
+    it('changes nothing and says nothing when a widget is dropped on itself', async () => {
+      const { palette, posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+      await screen.findByTestId('chart-widget', {}, slow)
+      const before = posts.length
+
+      drag('/widgets/0', { kind: 'widget', pointer: '/widgets/0' }, { clientY: 90 })
+      drag('/widgets/0', { kind: 'widget', pointer: '/widgets/1' }, { clientY: 10 })
 
       expect(palette.getByTestId('studio-palette-announcement')).toBeEmptyDOMElement()
       await new Promise((resolve) => setTimeout(resolve, 500))

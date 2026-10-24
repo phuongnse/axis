@@ -294,14 +294,16 @@ export function innermostPointer(pointers: string[]): string | undefined {
 }
 
 /**
- * The page's widgets with the widget at `from` moved to the end of the list at `toList`, and the pointer the widget
- * has after the move. The widget keeps every key. Nothing changes when `from` does not hold a widget, or when
- * `toList` is not a list or lies inside the widget.
+ * The page's widgets with the widget at `from` moved into the list at `toList`, and the pointer the widget has after
+ * the move. `index` is the place in the list as it was before the move, and defaults to the end. The widget keeps
+ * every key. Nothing changes when `from` does not hold a widget, or when `toList` is not a list or lies inside the
+ * widget.
  */
 export function moveTo(
   widgets: unknown[],
   from: string,
   toList: string,
+  index?: number,
 ): { widgets: unknown[]; pointer: string } | undefined {
   const cut = from.lastIndexOf('/')
   const sourcePointer = from.slice(0, cut)
@@ -315,8 +317,11 @@ export function moveTo(
   if (toList.startsWith(`${from}/`)) {
     return undefined
   }
-  target.push(source[sourceIndex])
-  source.splice(sourceIndex, 1)
+  const [moved] = source.splice(sourceIndex, 1)
+  // The index counts the list as it was before the widget left it.
+  const shifted = index !== undefined && target === source && index > sourceIndex ? index - 1 : index
+  const at = Math.min(Math.max(shifted ?? target.length, 0), target.length)
+  target.splice(at, 0, moved)
   let targetPointer = toList
   if (toList.startsWith(`${sourcePointer}/`)) {
     // The target lies inside a widget of the source list, so a widget removed before it shifts its index.
@@ -326,7 +331,49 @@ export function moveTo(
     }
     targetPointer = `${sourcePointer}/${rest.join('/')}`
   }
-  return { widgets: root.widgets, pointer: `${targetPointer}/${target.length - 1}` }
+  return { widgets: root.widgets, pointer: `${targetPointer}/${at}` }
+}
+
+/**
+ * Where the widget at `from` lands when it is dropped on `target`, or the limit that forbids it. A widget target gives
+ * its own list, at its index on the upper half and after it on the lower half. A list target gives that list, at its
+ * end. The limit is `inside` for a drop inside the widget itself, and `depth` when the deepest list in the widget
+ * would land past level 4. It is `undefined` when `from` holds no widget, the draft has no such target, or the
+ * target is the widget itself. The widgets are never changed.
+ */
+export function movePlace(
+  widgets: unknown[],
+  from: string,
+  target: DropTarget,
+): { list: string; index: number } | { limit: 'inside' | 'depth' } | undefined {
+  const widget = getAt({ widgets }, from)
+  if (!isContent(widget) || target.pointer === from) {
+    return undefined
+  }
+  if (target.pointer.startsWith(`${from}/`)) {
+    return { limit: 'inside' }
+  }
+  let place: { list: string; index: number }
+  if (target.kind === 'widget') {
+    const cut = target.pointer.lastIndexOf('/')
+    const list = target.pointer.slice(0, cut)
+    const index = Number(target.pointer.slice(cut + 1))
+    if (!Array.isArray(getAt({ widgets }, list)) || getAt({ widgets }, target.pointer) === undefined) {
+      return undefined
+    }
+    place = { list, index: target.half === 'upper' ? index : index + 1 }
+  } else {
+    const items = getAt({ widgets }, target.pointer)
+    if (!Array.isArray(items)) {
+      return undefined
+    }
+    place = { list: target.pointer, index: items.length }
+  }
+  const inner = widgetLists(widgets)
+    .filter((item) => item.pointer.startsWith(`${from}/`))
+    .map((item) => listLevel(item.pointer))
+  const extra = inner.length === 0 ? 0 : Math.max(...inner) - listLevel(from.slice(0, from.lastIndexOf('/')))
+  return listLevel(place.list) + extra > 4 ? { limit: 'depth' } : place
 }
 
 /** A column a data source projects, with its type as Studio's names give it. */
