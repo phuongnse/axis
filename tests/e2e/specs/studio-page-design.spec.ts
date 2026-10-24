@@ -59,4 +59,36 @@ test.describe("Studio draws a page on the Design tab", () => {
     );
     expect(applicationRequests).toEqual([]);
   });
+
+  test("a widget that does not compile draws as a marked placeholder with its diagnostic on the Design tab", async ({
+    page,
+  }) => {
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${dashboardId}`,
+    );
+    await page.getByRole("tab", { name: "JSON", exact: true }).click();
+    const json = page.getByRole("textbox", { name: "JSON", exact: true });
+    const draft = JSON.parse(await json.inputValue());
+    draft.widgets[0].columns[1].widgets[0].dataSource = "MissingSource";
+    await json.fill(JSON.stringify(draft));
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    const canvas = page.getByTestId("studio-page-canvas");
+    const chart = canvas.locator(
+      '[data-testid="studio-canvas-widget"][data-path="/widgets/0/columns/1/widgets/0"]',
+    );
+    await expect(chart).toHaveAttribute("data-marked", "true");
+    await expect(chart.getByTestId("studio-canvas-placeholder")).toContainText(
+      "This widget does not compile: chart",
+    );
+    await expect(
+      chart.getByTestId("studio-canvas-placeholder-diagnostic"),
+    ).toContainText("The data source 'MissingSource' was not found.");
+
+    const kpi = canvas.locator(
+      '[data-testid="studio-canvas-widget"][data-path="/widgets/0/columns/0/widgets/0"]',
+    );
+    await expect(kpi).not.toHaveAttribute("data-marked");
+  });
 });

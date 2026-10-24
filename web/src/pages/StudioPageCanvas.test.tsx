@@ -6,7 +6,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { chartWidget, kpiWidget } from '../designSystem/fixtures'
 import type { ChartProps } from '../platform/Chart'
 import type { NavigateAction, PageMetadata, PageWidgetMetadata } from '../platform/site'
-import type { StudioNames, StudioResourceItem } from '../platform/studio'
+import type { StudioDiagnostic, StudioNames, StudioResourceItem } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
@@ -78,13 +78,16 @@ function content(widgets: Record<string, unknown>[]) {
 /** What the route answers for a draft: each widget by its type, and a placeholder for any other type. */
 function metadataOf(draft: Draft): PageMetadata {
   const widgets = draft.widgets.map((widget, index): PageWidgetMetadata => {
+    const path = `/widgets/${index}`
     switch (widget.type) {
       case 'kpi':
-        return widget.navigate ? { ...kpiWidget, kpi: { ...kpiWidget.kpi!, navigate: showTickets } } : kpiWidget
+        return widget.navigate
+          ? { ...kpiWidget, path, kpi: { ...kpiWidget.kpi!, navigate: showTickets } }
+          : { ...kpiWidget, path }
       case 'chart':
-        return chartWidget('bar')
+        return { ...chartWidget('bar'), path }
       default:
-        return { type: widget.type, path: `/widgets/${index}`, placeholder: true } as unknown as PageWidgetMetadata
+        return { type: widget.type, path, placeholder: true } as unknown as PageWidgetMetadata
     }
   })
   return { name: 'Dashboard', titleKey: 'dashboard.title', parameters: [], widgets }
@@ -116,6 +119,25 @@ function stub(
   })
   vi.stubGlobal('fetch', fetchMock)
   return { fetchMock, posts }
+}
+
+/** The answer to a draft's post with the given page and diagnostics. */
+function respond(page: PageMetadata | null, diagnostics: StudioDiagnostic[]) {
+  return new Response(JSON.stringify({ page, diagnostics }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+function diagnosticAt(path: string): StudioDiagnostic {
+  return {
+    code: 'UnknownWidgetDataSource',
+    severity: 'error',
+    message: "The data source 'MissingSource' was not found. No loaded data source has that name.",
+    file: 'pages/dashboard.json',
+    path,
+    resourceId: pageId,
+  }
 }
 
 function LocationProbe() {
@@ -224,7 +246,7 @@ describe('the Design tab of a page', () => {
     expect(appRequests(fetchMock)).toEqual([])
   })
 
-  it('draws a widget that does not compile as a plain box, even one whose type is columns, and draws the rest', async () => {
+  it('draws a widget that does not compile as a placeholder, even one whose type is columns, and draws the rest', async () => {
     stub(content([{ type: 'kpi' }, { type: 'columns' }]))
     renderEditor()
 
@@ -261,5 +283,72 @@ describe('the Design tab of a page', () => {
     expect(await screen.findByTestId('studio-canvas-failed', {}, slow)).toHaveTextContent(
       'The page could not be drawn.',
     )
+  })
+
+  it('marks the widget that a diagnostic names, and no other', async () => {
+    stub(content([{ type: 'kpi' }, { type: 'chart' }]), (draft) =>
+      respond(metadataOf(draft), [diagnosticAt('/widgets/1/dataSource')]),
+    )
+    renderEditor()
+
+    await screen.findByTestId('studio-page-editor', {}, slow)
+    await openTab('Design')
+    const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
+    await within(canvas).findByTestId('chart-widget', {}, slow)
+    const marked = within(canvas).getByRole('group', { name: /has diagnostics$/ })
+    expect(marked).toHaveAttribute('data-path', '/widgets/1')
+    expect(marked).toHaveAttribute('data-marked', 'true')
+    const unmarked = within(canvas)
+      .getAllByTestId('studio-canvas-widget')
+      .find((frame) => frame.getAttribute('data-path') === '/widgets/0')!
+    expect(unmarked).not.toHaveAttribute('data-marked')
+    expect(unmarked).not.toHaveAccessibleName(/has diagnostics/)
+  })
+
+  it('lists the diagnostics of a placeholder and marks it, and still draws the rest of the page', async () => {
+    const placeholder = { type: 'chart', path: '/widgets/1', placeholder: true } as unknown as PageWidgetMetadata
+    stub(content([{ type: 'kpi' }, { type: 'chart' }]), (draft) => {
+      const page = metadataOf(draft)
+      return respond({ ...page, widgets: [page.widgets[0], placeholder] }, [diagnosticAt('/widgets/1/dataSource')])
+    })
+    renderEditor()
+
+    await screen.findByTestId('studio-page-editor', {}, slow)
+    await openTab('Design')
+    const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
+    const box = await within(canvas).findByTestId('studio-canvas-placeholder', {}, slow)
+    expect(box).toHaveTextContent('This widget does not compile: chart')
+    expect(within(box).getByTestId('studio-canvas-placeholder-diagnostic')).toHaveTextContent(
+      "UnknownWidgetDataSource: The data source 'MissingSource' was not found. No loaded data source has that name.",
+    )
+    expect(within(canvas).getByRole('group', { name: /has diagnostics$/ })).toContainElement(box)
+    expect(within(canvas).getByTestId('kpi-tile')).toBeInTheDocument()
+  })
+
+  it('draws the page 375 px wide at phone width, with every column full width', async () => {
+    const columns: PageWidgetMetadata = {
+      type: 'columns',
+      path: '/widgets/0',
+      columns: [
+        { width: 4, widgets: [{ ...kpiWidget, path: '/widgets/0/columns/0/widgets/0' }] },
+        { width: 8, widgets: [{ ...chartWidget('bar'), path: '/widgets/0/columns/1/widgets/0' }] },
+      ],
+    }
+    stub(content([{ type: 'columns' }]), (draft) => respond({ ...metadataOf(draft), widgets: [columns] }, []))
+    renderEditor()
+
+    await screen.findByTestId('studio-page-editor', {}, slow)
+    await openTab('Design')
+    const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
+    const cells = await within(canvas).findAllByTestId('column', {}, slow)
+    expect(cells[0]).toHaveClass('ant-col-md-8')
+    expect(cells[1]).toHaveClass('ant-col-md-16')
+
+    await userEvent.click(screen.getByText('Phone'))
+
+    expect(within(canvas).getByTestId('studio-canvas-frame')).toHaveStyle({ width: '375px' })
+    for (const cell of cells) {
+      expect(cell).toHaveClass('ant-col-md-24')
+    }
   })
 })

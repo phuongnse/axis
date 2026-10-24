@@ -1,24 +1,37 @@
-import { Alert, Card, Typography } from 'antd'
+import { Alert, Card, Segmented, Typography } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
 import { setApiGuard } from '../platform/api'
 import { PageLayout } from '../platform/PageLayout'
 import { PageLeaf } from '../platform/PageLeaf'
 import { placeholderApi, placeholderPageValues } from '../platform/placeholderApi'
-import type { PageMetadata, PlaceholderWidgetMetadata } from '../platform/site'
-import { fetchStudioPageMetadata, ServerUnreachableError, type StudioNames } from '../platform/studio'
+import type { PageWidgetMetadata, PlaceholderWidgetMetadata } from '../platform/site'
+import {
+  fetchStudioPageMetadata,
+  ServerUnreachableError,
+  type StudioDiagnostic,
+  type StudioNames,
+  type StudioPageMetadataAnswer,
+} from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText, useTextCatalogs, type TextCatalog } from '../platform/texts'
 import { TextProvider } from '../platform/TextProvider'
+import { useDesignTokens } from '../platform/themeMode'
+import { PhoneWidthOverride } from '../platform/usePhoneWidth'
 import { WidgetTree } from '../platform/WidgetTree'
 import { PlatformContext } from './context'
 
 /** How long after the last edit the canvas asks for the draft's metadata. */
 const debounceMs = 300
 
-/** The route's latest answer: the page, `null` when it cannot be drawn, or `'failed'`. `undefined` before the first. */
-type Answer = PageMetadata | null | 'failed' | undefined
+/** The route's latest answer, or `'failed'`. `undefined` before the first. */
+type Answer = StudioPageMetadataAnswer | 'failed' | undefined
+
+type CanvasWidth = 'desktop' | 'phone'
+
+/** The width of the page at phone width, in pixels. */
+const phoneWidth = 375
 
 /** A click or a submit on the canvas runs nothing: not a link, not a button and not a form. */
 function cancel(event: SyntheticEvent) {
@@ -53,7 +66,8 @@ function canvasTexts(names: StudioNames | undefined, platformLocale: string | un
  * Draws the unsaved draft of a page with the site's own widgets. It posts the draft to the draft page metadata
  * route 300 ms after the last edit and redraws from the answer. While it is mounted, the widgets' `/api/apps/`
  * calls get placeholder data in the browser and none goes to the server. A click or a submit on the canvas does
- * nothing. A widget that does not compile draws as a plain box with its type.
+ * nothing. A widget that does not compile draws as a placeholder with its diagnostics. A widget that a diagnostic
+ * names is marked. The width switch draws the page at phone width, 375 px, with the phone layout.
  */
 export function StudioPageCanvas({
   application,
@@ -70,13 +84,17 @@ export function StudioPageCanvas({
   const { pathname } = useLocation()
   const { generation, lost } = useStudioConnection()
   const [answer, setAnswer] = useState<Answer>()
-  const page = typeof answer === 'object' && answer !== null ? answer : null
+  const [width, setWidth] = useState<CanvasWidth>('desktop')
+  const phone = width === 'phone'
+  const drawn = answer === undefined || answer === 'failed' ? undefined : answer
+  const page = drawn?.page ?? null
+  const diagnostics = drawn?.diagnostics ?? []
 
   useEffect(() => {
     const controller = new AbortController()
     const timer = setTimeout(() => {
       fetchStudioPageMetadata(application, resourceId, draft, controller.signal).then(
-        (result) => setAnswer(result.page),
+        (result) => setAnswer(result),
         (error: unknown) => {
           if (controller.signal.aborted) {
             return
@@ -110,34 +128,106 @@ export function StudioPageCanvas({
   const pageValues = useMemo(() => placeholderPageValues(page?.parameters ?? []), [page])
   const pages = useMemo(() => names?.pages.map((entry) => entry.name) ?? [], [names])
 
+  const frameWidget = (widget: PageWidgetMetadata | PlaceholderWidgetMetadata, content: ReactNode) => (
+    <CanvasWidgetFrame
+      type={widget.type}
+      path={widget.path}
+      marked={diagnosticsAt(diagnostics, widget.path).length > 0}
+    >
+      {content}
+    </CanvasWidgetFrame>
+  )
+
   return (
     <TextProvider catalogs={catalogs} development={outer.development}>
+      <WidthSwitch value={width} onChange={setWidth} />
       <div data-testid="studio-page-canvas" onClickCapture={cancel} onSubmitCapture={cancel}>
-        {answer === null && <CanvasAlert testId="studio-canvas-cannot-draw" textKey="shell.studio.design.cannotDraw" />}
+        {drawn?.page === null && (
+          <CanvasAlert testId="studio-canvas-cannot-draw" textKey="shell.studio.design.cannotDraw" />
+        )}
         {answer === 'failed' && <CanvasAlert testId="studio-canvas-failed" textKey="shell.studio.design.loadFailed" />}
         {page && (
-          <CanvasPage title={page.titleKey}>
-            <WidgetTree
-              widgets={page.widgets}
-              renderLeaf={(widget) => (
-                <PageLeaf
-                  widget={widget}
-                  sitePath={application}
-                  pageName={page.name}
-                  pages={pages}
-                  locale={texts?.locale ?? platformLocale ?? 'en'}
-                  fallbackLocale={texts?.fallbackLocale ?? 'en'}
-                  pageValues={pageValues}
-                  recordId={null}
-                  returnTo={pathname}
+          <PhoneWidthOverride.Provider value={phone ? true : undefined}>
+            <div data-testid="studio-canvas-frame" style={{ width: phone ? phoneWidth : '100%' }}>
+              <CanvasPage title={page.titleKey}>
+                <WidgetTree
+                  widgets={page.widgets}
+                  renderLeaf={(widget) => (
+                    <PageLeaf
+                      widget={widget}
+                      sitePath={application}
+                      pageName={page.name}
+                      pages={pages}
+                      locale={texts?.locale ?? platformLocale ?? 'en'}
+                      fallbackLocale={texts?.fallbackLocale ?? 'en'}
+                      pageValues={pageValues}
+                      recordId={null}
+                      returnTo={pathname}
+                    />
+                  )}
+                  renderPlaceholder={(widget) => (
+                    <PlaceholderBox widget={widget} diagnostics={diagnosticsAt(diagnostics, widget.path)} />
+                  )}
+                  frameWidget={frameWidget}
                 />
-              )}
-              renderPlaceholder={(widget) => <PlaceholderBox widget={widget} />}
-            />
-          </CanvasPage>
+              </CanvasPage>
+            </div>
+          </PhoneWidthOverride.Provider>
         )}
       </div>
     </TextProvider>
+  )
+}
+
+/** The diagnostics that name the widget at `path`, or a path inside it. None when the widget has no path. */
+function diagnosticsAt(diagnostics: StudioDiagnostic[], path: string | undefined): StudioDiagnostic[] {
+  if (path === undefined) {
+    return []
+  }
+  return diagnostics.filter((diagnostic) => diagnostic.path === path || diagnostic.path.startsWith(`${path}/`))
+}
+
+function WidthSwitch({ value, onChange }: { value: CanvasWidth; onChange: (width: CanvasWidth) => void }) {
+  const t = useText()
+  return (
+    <Segmented
+      aria-label={t('shell.studio.design.width')}
+      value={value}
+      onChange={onChange}
+      options={[
+        { value: 'desktop', label: t('shell.studio.design.desktop') },
+        { value: 'phone', label: t('shell.studio.design.phone') },
+      ]}
+    />
+  )
+}
+
+/** A widget of the canvas. It has a border in the error colour when a diagnostic names it, and `data-marked` then. */
+function CanvasWidgetFrame({
+  type,
+  path,
+  marked,
+  children,
+}: {
+  type: string | null
+  path: string | undefined
+  marked: boolean
+  children: ReactNode
+}) {
+  const t = useText()
+  const { colour, radius } = useDesignTokens()
+  const label = type ?? t('shell.studio.design.placeholder')
+  return (
+    <div
+      role="group"
+      data-testid="studio-canvas-widget"
+      data-path={path}
+      data-marked={marked ? 'true' : undefined}
+      aria-label={marked ? `${label} · ${t('shell.studio.design.hasDiagnostics')}` : label}
+      style={{ border: `1px solid ${marked ? colour.danger : 'transparent'}`, borderRadius: radius.base }}
+    >
+      {children}
+    </div>
   )
 }
 
@@ -152,8 +242,14 @@ function CanvasAlert({ testId, textKey }: { testId: string; textKey: string }) {
   return <Alert data-testid={testId} type="warning" title={t(textKey)} />
 }
 
-/** A widget that does not compile, drawn as a plain box with its type. */
-function PlaceholderBox({ widget }: { widget: PlaceholderWidgetMetadata }) {
+/** A widget that does not compile: a box with its type and a line for each of its diagnostics. */
+function PlaceholderBox({
+  widget,
+  diagnostics,
+}: {
+  widget: PlaceholderWidgetMetadata
+  diagnostics: StudioDiagnostic[]
+}) {
   const t = useText()
   return (
     <Card size="small" data-testid="studio-canvas-placeholder" data-path={widget.path}>
@@ -161,6 +257,13 @@ function PlaceholderBox({ widget }: { widget: PlaceholderWidgetMetadata }) {
         {t('shell.studio.design.placeholder')}
         {widget.type === null ? '' : `: ${widget.type}`}
       </Typography.Text>
+      <ul>
+        {diagnostics.map((diagnostic, index) => (
+          <li key={index} data-testid="studio-canvas-placeholder-diagnostic">
+            {`${diagnostic.code}: ${diagnostic.message}`}
+          </li>
+        ))}
+      </ul>
     </Card>
   )
 }

@@ -812,13 +812,14 @@ Run and the Test results list, the read-only view of a module entity, and the re
     value made from its type. A page the route cannot draw shows a short notice
     instead of widgets.
   - **Placeholders and diagnostic marks.** A widget that does not compile draws
-    as a placeholder with its diagnostics. A widget is marked when a diagnostic
-    of the page names its `path` or a path inside it. A marked widget has an
-    error-coloured border, "has diagnostics" in its text label, and
-    `data-marked`, as a node of the process graph has. The marks come from the
-    route's latest answer, so they follow the unsaved draft. _Partly built:_
-    until diagnostics and marks ship, a widget that does not compile draws as a
-    plain box with its type, and carries no diagnostics and no mark.
+    as a placeholder with its type and a line for each of its diagnostics, with
+    the code and the message. A widget is marked when a diagnostic of the page
+    names its `path` or a path inside it, of any severity. So a container is
+    marked too when a widget inside it has a diagnostic, even in a closed section
+    or an inactive tab. A marked widget has an error-coloured border, "has
+    diagnostics" in its text label, and `data-marked`, as a node of the process
+    graph has. The marks come from the route's latest answer, so they follow the
+    unsaved draft.
   - **Selection.** A click on the canvas or a pick in the widget tree selects a
     widget in both. The selected widget is the open path and has
     `aria-current`.
@@ -840,7 +841,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
     entity offers a table, a form or a detail. Dropping a data source offers a
     table, and a chart with one group field or a KPI with a total row.
   - **Width switch.** It draws the canvas at desktop width, which fills the
-    canvas area, or at phone width, which is 375 px.
+    canvas area, or at phone width, which is 375 px. At phone width the columns
+    stack to full width and tables use their phone layout, even in a wide
+    browser window. The choice goes back to desktop when the author returns to
+    the Design tab. The live site keeps its own rule, which is the window width.
   - **Undo.** Undo and redo buttons, Ctrl+Z and Ctrl+Shift+Z, or Cmd on macOS,
     cover every edit of the draft in the three tabs. The history is kept in
     memory, up to 100 steps, with one step for each box. It is cleared by a
