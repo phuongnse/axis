@@ -12,10 +12,12 @@ import {
 } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { usePhoneWidth } from './usePhoneWidth'
 import { tabParameters } from './widgetTree'
 
 type RenderLeaf = (widget: WidgetMetadata) => ReactNode
 type RenderPlaceholder = (widget: PlaceholderWidgetMetadata) => ReactNode
+type FrameWidget = (widget: PageWidgetMetadata | PlaceholderWidgetMetadata, drawn: ReactNode) => ReactNode
 
 // The query parameter of each tabs widget of the page, worked out once at the root.
 const TabParameters = createContext<Map<TabsWidgetMetadata, string>>(new Map())
@@ -23,25 +25,32 @@ const TabParameters = createContext<Map<TabsWidgetMetadata, string>>(new Map())
 // How the page designer's canvas draws a widget that does not compile. The site has none, so it draws nothing.
 const PlaceholderRenderer = createContext<RenderPlaceholder | undefined>(undefined)
 
+// Wraps what each widget draws, such as the page designer's marks. The site has none, so it wraps nothing.
+const WidgetFrame = createContext<FrameWidget | undefined>(undefined)
+
 /**
  * Draws a page's widget tree. A widget that shows something is drawn by `renderLeaf`, and a container draws its
  * widgets in file order. Each leaf keeps its own loading, empty and error states. A placeholder, which only a draft
- * page has, is drawn by `renderPlaceholder`, or not at all without it.
+ * page has, is drawn by `renderPlaceholder`, or not at all without it. `frameWidget` wraps what each widget draws.
  */
 export function WidgetTree({
   widgets,
   renderLeaf,
   renderPlaceholder,
+  frameWidget,
 }: {
   widgets: PageWidgetMetadata[]
   renderLeaf: RenderLeaf
   renderPlaceholder?: RenderPlaceholder
+  frameWidget?: FrameWidget
 }) {
   const parameters = useMemo(() => tabParameters(widgets), [widgets])
   return (
     <TabParameters.Provider value={parameters}>
       <PlaceholderRenderer.Provider value={renderPlaceholder}>
-        <WidgetList widgets={widgets} renderLeaf={renderLeaf} />
+        <WidgetFrame.Provider value={frameWidget}>
+          <WidgetList widgets={widgets} renderLeaf={renderLeaf} />
+        </WidgetFrame.Provider>
       </PlaceholderRenderer.Provider>
     </TabParameters.Provider>
   )
@@ -59,6 +68,16 @@ function WidgetList({ widgets, renderLeaf }: { widgets: readonly PageWidgetMetad
 
 function Node({ widget, renderLeaf }: { widget: PageWidgetMetadata; renderLeaf: RenderLeaf }) {
   const renderPlaceholder = useContext(PlaceholderRenderer)
+  const frameWidget = useContext(WidgetFrame)
+  const drawn = drawWidget(widget, renderLeaf, renderPlaceholder)
+  return frameWidget ? frameWidget(widget, drawn) : drawn
+}
+
+function drawWidget(
+  widget: PageWidgetMetadata,
+  renderLeaf: RenderLeaf,
+  renderPlaceholder: RenderPlaceholder | undefined,
+) {
   if (isPlaceholder(widget)) {
     return renderPlaceholder?.(widget) ?? null
   }
@@ -75,14 +94,16 @@ function Node({ widget, renderLeaf }: { widget: PageWidgetMetadata; renderLeaf: 
 }
 
 // Ant Design's grid has 24 parts and an Axis column width is in twelfths. Below `md`, 768 px, the columns stack.
+// The grid reads the window width, so a page designer's phone width is passed through `usePhoneWidth` instead.
 // A widget wider than its column, such as a table with many fields, scrolls inside the column instead of
 // running under the next one.
 function Columns({ widget, renderLeaf }: { widget: ColumnsWidgetMetadata; renderLeaf: RenderLeaf }) {
   const { spacing } = useDesignTokens()
+  const phone = usePhoneWidth()
   return (
     <Row gutter={[spacing.md, spacing.md]}>
       {widget.columns.map((column, index) => (
-        <Col key={index} xs={24} md={column.width * 2} style={{ overflowX: 'auto' }} data-testid="column">
+        <Col key={index} xs={24} md={phone ? 24 : column.width * 2} style={{ overflowX: 'auto' }} data-testid="column">
           <WidgetList widgets={column.widgets} renderLeaf={renderLeaf} />
         </Col>
       ))}

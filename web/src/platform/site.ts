@@ -222,6 +222,8 @@ export interface WidgetAccess {
  */
 export interface WidgetMetadata {
   type: 'table' | 'form' | 'taskInbox' | 'processInspector' | 'kpi' | 'chart' | 'detail'
+  /** The widget's JSON Pointer in the draft. Only the draft page metadata route sets it. */
+  path?: string
   entity: EntityMetadata | null
   dataSource: DataSourceMetadata | null
   form: FormMetadata | null
@@ -294,18 +296,24 @@ export interface KpiMetadata {
 /** A `columns` widget: columns side by side, each `width` twelfths of the row wide. */
 export interface ColumnsWidgetMetadata {
   type: 'columns'
+  /** The widget's JSON Pointer in the draft. Only the draft page metadata route sets it. */
+  path?: string
   columns: { width: number; widgets: PageWidgetMetadata[] }[]
 }
 
 /** A `tabs` widget: one tab per entry, each with the text key of its label. */
 export interface TabsWidgetMetadata {
   type: 'tabs'
+  /** The widget's JSON Pointer in the draft. Only the draft page metadata route sets it. */
+  path?: string
   tabs: { labelKey: string; widgets: PageWidgetMetadata[] }[]
 }
 
 /** A `section` widget: a titled group of widgets that may start closed. */
 export interface SectionWidgetMetadata {
   type: 'section'
+  /** The widget's JSON Pointer in the draft. Only the draft page metadata route sets it. */
+  path?: string
   titleKey: string
   collapsed: boolean
   widgets: PageWidgetMetadata[]
