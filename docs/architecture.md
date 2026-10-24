@@ -816,7 +816,7 @@ The Studio specs use these folders:
   `studio-page-parameters`: a temporary `Studio:ApplicationsPath`.
 - `studio-entity-migrations` and `purchase-request-release`: folders under the
   test's output path.
-- `service-desk-journey` and `journey-tenant`: each its own application under
+- `service-desk-journey`, `request-approval-journey` and `journey-tenant`: each its own application under
   the journey server's applications folder, `AXIS_E2E_JOURNEY_APPLICATIONS`.
 
 A spec can also activate another folder during the run, to test releases. The
@@ -850,8 +850,8 @@ platform database. The journey server runs in the `Testing` environment, because
 It sets `Studio:ApplicationsPath` to a temporary folder and has no preview tenant or bindings. Only startup
 activation migrates a tenant database, so it activates one application at start,
 `tests/e2e/fixtures/journey-base`, which holds only a manifest. It clashes with no sample. A journey therefore builds a whole application in Studio and publishes it, with no clash with
-the committed samples on the main tenant. The setup step signs the author, the requester, the service desk lead
-and the agent in on the journey host and saves those sessions apart from the sessions of the main host. The
+the committed samples on the main tenant. The setup step signs the author, the requester, the service desk lead,
+the agent and the approver in on the journey host and saves those sessions apart from the sessions of the main host. The
 worker and the publisher serve the journey tenant too, and the run fails when the worker log lacks
 `Tenant journey is ready for work` or the publisher log lacks `journey ready`. The server output goes to
 `artifacts/logs/e2e-journey-server.log`.
@@ -878,6 +878,8 @@ application already has: the `vi` locale and four navigation entries, the last o
 none. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
 the requester from editing `resolution`, and the read grants of the lead on the three aggregate data sources. That list adds `category` and `priority`, so the requester fills step 2 too. It then writes the eight test scenarios in the scenario editor, each with its users, time and steps. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
 The journey then runs the eight scenarios with Run tests, and every one must pass. It publishes release 1, and the release history must show that one row, active. On the `service-desk` site of the journey tenant, anna creates and submits a ticket, pressing Next to reach step 2, linh assigns it to khoa, khoa resolves it and anna confirms it, until the ticket's status is `closed`.
+
+`tests/e2e/specs/request-approval-journey.spec.ts` creates `EquipmentRequests` on the journey tenant from the `request-approval` template in the New application dialog, with no file edit. It runs the template's one test scenario from Studio, and the scenario must pass. It publishes release 1, and the release history must show that one row, active. On the `equipment-requests` site, anna creates and submits a request and minh approves its Approval task, until the request's status is `approved`. While the task waits for minh, it is not in anna's My tasks.
 
 The E2E run also starts the purchasing system stub from the build output, and
 fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its

@@ -208,17 +208,18 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 These are test fixtures. Docs and GitHub text name roles instead. A new
 sample reuses a user that holds the role it needs before it adds a user.
 
-| User    | Roles                   | Used by                                                                  |
-| ------- | ----------------------- | ------------------------------------------------------------------------ |
-| `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys   |
-| `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                 |
-| `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                 |
-| `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                 |
-| `dung`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                              |
-| `giang` | `operator`              | Purchase request sample's Approvals inspector; E2E journeys              |
-| `hoa`   | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys |
-| `khoa`  | `agent`                 | Service desk sample; E2E journeys                                        |
-| `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                        |
+| User    | Roles                   | Used by                                                                                          |
+| ------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey |
+| `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                                         |
+| `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                         |
+| `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                         |
+| `dung`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                      |
+| `giang` | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                      |
+| `hoa`   | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                         |
+| `khoa`  | `agent`                 | Service desk sample; E2E journeys                                                                |
+| `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                                                |
+| `minh`  | `approver`              | Request approval template journey; E2E journeys                                                  |
 
 ## Machine callers
 
