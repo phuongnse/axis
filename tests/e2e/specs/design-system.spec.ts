@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { waitForDialog } from '../dialogs'
 
 // The design-system bundle is a separate build, which scripts/e2e.sh makes with scripts/design-system.sh. The page
 // web/design-system.html is its harness. The bundle answers every API call of the fixture application from fixtures,
@@ -93,6 +94,14 @@ for (const [name, widget] of Object.entries(previews)) {
       await expect(widget(page)).toBeVisible()
       await page.waitForLoadState('networkidle')
 
+      if (name.startsWith('field-')) {
+        await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
+        await expect(page.getByRole('button', { name: 'Submit for approval', exact: true })).toHaveCount(0)
+        // The history card's title is not an ARIA heading, so the test id and the text are checked.
+        await expect(page.getByTestId('record-history')).toHaveCount(0)
+        await expect(page.getByText('History', { exact: true })).toHaveCount(0)
+      }
+
       expect(recording.errors).toEqual([])
       // The fixtures answer every API call, so nothing but the harness and the bundle is requested.
       expect(recording.requests.filter((url) => !url.startsWith('data:'))).toEqual([
@@ -102,6 +111,32 @@ for (const [name, widget] of Object.entries(previews)) {
     })
   }
 }
+
+test('the field-date-time preview opens its date picker', async ({ page }) => {
+  const recording = await openHarness(page, '?preview=field-date-time&mode=light')
+  await page.getByLabel('Submitted at', { exact: true }).click()
+
+  await expect(page.getByRole('button', { name: 'Next month', exact: true })).toBeVisible()
+  expect(recording.errors).toEqual([])
+})
+
+test('the field-reference preview lists the fixture categories in its lookup', async ({ page }) => {
+  const recording = await openHarness(page, '?preview=field-reference&mode=light')
+  await page.getByTestId('reference-category').getByRole('button', { name: 'Choose', exact: true }).click()
+
+  const dialog = await waitForDialog(page, 'Category')
+  await expect(dialog).toContainText('Office furniture')
+  expect(recording.errors).toEqual([])
+})
+
+test('the field-child-collection preview adds a row', async ({ page }) => {
+  const recording = await openHarness(page, '?preview=field-child-collection&mode=light')
+  await expect(page.getByLabel('Description 2', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Add row', exact: true }).click()
+
+  await expect(page.getByLabel('Description 3', { exact: true })).toBeVisible()
+  expect(recording.errors).toEqual([])
+})
 
 test('a mounted table redraws in the other mode when the page changes data-theme', async ({ page }) => {
   const recording = await openHarness(page, '?preview=table&mode=light')

@@ -176,11 +176,6 @@ export const formWidget: EntityWidgetMetadata = {
   ],
 }
 
-/** A form over a one-field entity, for the preview of that field type's input. */
-export function fieldWidget(type: FieldType): EntityWidgetMetadata {
-  return { ...formWidget, entity: entityWithField(type), form: null, actions: [] }
-}
-
 /** A detail widget of a request: the form's sections, read-only, with the start button. */
 export const detailWidget: EntityWidgetMetadata = { ...formWidget, type: 'detail', detail: { record: 'request' } }
 

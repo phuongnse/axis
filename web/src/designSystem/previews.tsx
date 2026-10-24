@@ -9,11 +9,11 @@ import type { FieldType, WidgetMetadata } from '../platform/site'
 import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
+import { FieldPreview } from './FieldPreview'
 import {
   chartWidget,
   columnsWidget,
   detailWidget,
-  fieldWidget,
   formWidget,
   kpiWidget,
   locale,
@@ -84,21 +84,7 @@ export const previews: Record<string, () => ReactNode> = {
   columns: () => <WidgetTree widgets={[columnsWidget]} renderLeaf={renderLeaf} />,
   tabs: () => <WidgetTree widgets={[tabsWidget]} renderLeaf={renderLeaf} />,
   section: () => <WidgetTree widgets={[sectionWidget]} renderLeaf={renderLeaf} />,
-  ...Object.fromEntries(
-    fieldTypes.map((type) => [
-      `field-${type}`,
-      () => (
-        <FormWidget
-          widget={fieldWidget(type)}
-          sitePath={sitePath}
-          pages={[]}
-          recordId={requestId}
-          returnTo="/ds"
-          locale={locale}
-        />
-      ),
-    ]),
-  ),
+  ...Object.fromEntries(fieldTypes.map((type) => [`field-${type}`, () => <FieldPreview type={type} />])),
 }
 
 export const catalogs = [
