@@ -466,7 +466,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
   | `application` | Generic form                          | Nothing                                                               |
   | `entity`      | Entity designer                       | Nothing                                                               |
-  | `page`        | Typed editor                          | A `delete` row action, which the editor does not edit yet (planned for M13) |
+  | `page`        | Typed editor                          | Nothing                                                               |
   | `form`        | Generic form, typed steps panel       | Nothing                                                               |
   | `site`        | Generic form                          | Nothing                                                               |
   | `process`     | Typed editor with the process graph   | Nothing                                                               |
@@ -495,12 +495,11 @@ Run and the Test results list, the read-only view of a module entity, and the re
     type and a summary such as `table · PurchaseRequestList`. A panel per
     widget type, `table`, `form`, `taskInbox`, `processInspector`, `kpi`,
     `chart`, `detail`, `columns`, `tabs` and `section`, shows the properties the widget has today. The `columns`, `tabs` and `section` panels edit the width of each column, the label of each tab, and the title and collapsed state of a section. A `table` panel has entity and data source
-    pickers, then `rowActions` and `toolbarActions` lists of
-    navigate actions. A `form` panel has entity and form pickers and its
-    `actions`, each a `startProcess` action with a process picker and a label,
-    or a navigate action. The editor does not edit a `delete` row action yet.
-    It shows the action as JSON only, which the JSON view edits, and Remove
-    action removes it. A
+    pickers, then a `rowActions` list of navigate or delete actions and a
+    `toolbarActions` list of navigate actions. A delete action has a label and
+    an optional `visibleWhen` expression. A `form` panel has entity and form
+    pickers and its `actions`, each a `startProcess` action with a process
+    picker and a label, or a navigate action. A
     `taskInbox` panel has no properties. A `processInspector` panel has a
     process picker. A `detail` panel has the entity and form pickers and the
     actions of a form, and a record picker between them. The widget is described
