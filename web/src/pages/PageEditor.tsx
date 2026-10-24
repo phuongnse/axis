@@ -1,7 +1,8 @@
 import { Button, Card, Flex, Input, InputNumber, Select, Switch, Typography } from 'antd'
-import { lazy, Suspense, useContext, useState, type CSSProperties } from 'react'
+import { lazy, Suspense, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { getAt } from '../platform/jsonPatch'
 import {
+  actionKeyOf,
   addableTypes,
   childLists,
   containerTypes,
@@ -18,12 +19,14 @@ import {
   type PathStep,
   typeChanges,
   widgetLists,
+  widgetPointerOf,
   widgetSummary,
   widgetTypes,
 } from '../platform/pageWidgets'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import type { StudioNamePage, StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { LabelTexts } from './LabelTexts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
@@ -80,7 +83,10 @@ function JsonOnly() {
  * application's names, and a table's data source and entity, like a form's or a detail's entity and form, exclude
  * each other, so a pick clears the other. The editor edits the draft through `onChange`, so a key it does not show,
  * on the page or on a widget, stays as it is. A widget of a type it has no panel for shows its type and points to the
- * JSON view. The caller can keep the selected widget and pass it as `selected` and `onSelect`.
+ * JSON view. The caller can keep the selected widget and pass it as `selected` and `onSelect`. The selection can also
+ * name an action of a widget, such as `/widgets/0/rowActions/1`, or `/widgets/0/navigate` for a KPI. The tree and the
+ * panel are then those of the widget, and the panel marks the action's card with `aria-current`, scrolls it into view
+ * and, when the action is new, selects it. Removing an action selects its widget.
  */
 export function PageEditor({
   value,
@@ -90,7 +96,7 @@ export function PageEditor({
 }: {
   value: Content
   onChange: ChangeHandler
-  /** The pointer of the selected widget, when the caller keeps the selection. Otherwise the editor keeps it. */
+  /** The pointer of the selected widget or action, when the caller keeps the selection. Otherwise the editor keeps it. */
   selected?: string
   onSelect?: (pointer: string) => void
 }) {
@@ -132,6 +138,7 @@ export function PageEditor({
 /**
  * The widgets of a page as a tree, and the panel of the selected widget below it. The selection is a pointer that the
  * caller keeps, so that other views of the page can share it. A pointer that names nothing selects the first widget.
+ * A pointer to an action of a widget selects the widget, and its panel marks the action.
  */
 export function PageWidgets({
   value,
@@ -146,7 +153,12 @@ export function PageWidgets({
 }) {
   const t = useText()
   const widgets = Array.isArray(value.widgets) ? value.widgets : undefined
-  const selected = getAt(value, pointer) === undefined ? '/widgets/0' : pointer
+  const widgetPointer = widgetPointerOf(pointer)
+  const selected = getAt(value, widgetPointer) === undefined ? '/widgets/0' : widgetPointer
+  const selectedAction =
+    selected === widgetPointer && actionKeyOf(pointer) !== undefined && getAt(value, pointer) !== undefined
+      ? pointer
+      : undefined
 
   return (
     <div data-testid="studio-field-/widgets">
@@ -163,6 +175,8 @@ export function PageWidgets({
                 base={selected}
                 widget={getAt(value, selected)}
                 parameters={value.parameters}
+                selectedAction={selectedAction}
+                onSelect={onSelect}
                 onChange={onChange}
               />
             )}
@@ -197,7 +211,7 @@ const paletteReasons = {
  * selects it: after a leaf, at the end of a container's first list, or at the end of the page's list when the page has
  * no widgets. A hidden live region names the list and position where it landed. A type the page cannot take under the
  * limits of D61 is disabled, with its reason beside it. A pointer that names no widget selects the first widget, as
- * the tree does.
+ * the tree does. A pointer to an action of a widget counts as that widget.
  */
 export function PagePalette({
   value,
@@ -217,7 +231,8 @@ export function PagePalette({
   if (widgets === undefined) {
     return null
   }
-  const selected = getAt(value, pointer) === undefined ? '/widgets/0' : pointer
+  const widgetPointer = widgetPointerOf(pointer)
+  const selected = getAt(value, widgetPointer) === undefined ? '/widgets/0' : widgetPointer
   const place = insertionPlace(widgets, selected)
 
   function insert(type: string) {
@@ -612,6 +627,8 @@ function WidgetPanel({
   base,
   widget,
   parameters,
+  selectedAction,
+  onSelect,
   onChange,
 }: {
   /** The pointer of the selected widget. */
@@ -619,6 +636,9 @@ function WidgetPanel({
   widget: unknown
   /** The page's parameters, which a detail's record names and a KPI or chart binds. */
   parameters: unknown
+  /** The pointer of the selected action of the widget, which its card marks. */
+  selectedAction: string | undefined
+  onSelect: (pointer: string) => void
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -697,6 +717,9 @@ function WidgetPanel({
             actions={widget.rowActions}
             startProcess={false}
             deleteAction
+            widget={base}
+            selected={selectedAction}
+            onSelect={onSelect}
             onChange={onChange}
           />
           <Actions
@@ -705,6 +728,9 @@ function WidgetPanel({
             actions={widget.toolbarActions}
             startProcess={false}
             deleteAction={false}
+            widget={base}
+            selected={selectedAction}
+            onSelect={onSelect}
             onChange={onChange}
           />
         </>
@@ -742,6 +768,9 @@ function WidgetPanel({
             actions={widget.actions}
             startProcess
             deleteAction={false}
+            widget={base}
+            selected={selectedAction}
+            onSelect={onSelect}
             onChange={onChange}
           />
         </>
@@ -756,7 +785,16 @@ function WidgetPanel({
           onPick={(next) => pick('process', next)}
         />
       )}
-      {type === 'kpi' && <KpiPanel base={base} widget={widget} parameters={parameters} onChange={onChange} />}
+      {type === 'kpi' && (
+        <KpiPanel
+          base={base}
+          widget={widget}
+          parameters={parameters}
+          selectedAction={selectedAction}
+          onSelect={onSelect}
+          onChange={onChange}
+        />
+      )}
       {type === 'chart' && <ChartPanel base={base} widget={widget} parameters={parameters} onChange={onChange} />}
     </Flex>
   )
@@ -878,17 +916,22 @@ function ParameterBindings({
 /**
  * The panel of a KPI: a data source with a total row, a measure of it and a label. It can add a comparison with its
  * own measure and label, and a navigate action. Picking another data source keeps the names already set, which the
- * pickers tag unknown when the new data source does not project them.
+ * pickers tag unknown when the new data source does not project them. The navigate action is marked and scrolled into
+ * view when it is the selected action. Adding it selects it and removing it selects the widget.
  */
 function KpiPanel({
   base,
   widget,
   parameters,
+  selectedAction,
+  onSelect,
   onChange,
 }: {
   base: string
   widget: Content
   parameters: unknown
+  selectedAction: string | undefined
+  onSelect: (pointer: string) => void
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -898,6 +941,9 @@ function KpiPanel({
       ? undefined
       : (dataSourceColumns(names, widget.dataSource)?.measures.map((measure) => measure.name) ?? [])
   const { comparison, navigate } = widget
+  const navigateSelected = selectedAction === `${base}/navigate`
+  const navigateRef = useScrolledTo<HTMLDivElement>(navigateSelected)
+  const { colour, radius } = useDesignTokens()
 
   return (
     <>
@@ -961,12 +1007,24 @@ function KpiPanel({
           )}
         </Flex>
       </div>
-      <div data-testid={`studio-field-${base}/navigate`}>
+      <div
+        ref={navigateRef}
+        data-testid={`studio-field-${base}/navigate`}
+        aria-current={navigateSelected ? 'true' : undefined}
+        style={
+          navigateSelected
+            ? { border: `1px solid ${colour.primary}`, borderRadius: radius.base, padding: 8 }
+            : undefined
+        }
+      >
         <Flex vertical gap="small">
           {navigate === undefined ? (
             <div>
               <Button
-                onClick={() => onChange(`${base}/navigate`, { type: 'navigate', page: '', label: { textKey: '' } })}
+                onClick={() => {
+                  onChange(`${base}/navigate`, { type: 'navigate', page: '', label: { textKey: '' } })
+                  onSelect(`${base}/navigate`)
+                }}
               >
                 {t('shell.studio.page.addNavigateAction')}
               </Button>
@@ -976,7 +1034,13 @@ function KpiPanel({
               <Typography.Text strong>{t('shell.studio.page.navigate')}</Typography.Text>
               <NavigateFields pointer={`${base}/navigate`} action={navigate} onChange={onChange} />
               <div>
-                <Button danger onClick={() => onChange(`${base}/navigate`, undefined)}>
+                <Button
+                  danger
+                  onClick={() => {
+                    onChange(`${base}/navigate`, undefined)
+                    onSelect(base)
+                  }}
+                >
                   {t('shell.studio.page.removeNavigate')}
                 </Button>
               </div>
@@ -1517,6 +1581,8 @@ function ParameterExpressions({
  * parameters. A `startProcess` action has a process and a label. A `delete` action has a label and a `visibleWhen`.
  * Any other action is JSON only, and can be removed. The list always offers Add navigate action, offers Add action
  * for `startProcess` only when `startProcess` is set and offers Add delete action only when `deleteAction` is set.
+ * The card of the action at `selected` has `aria-current` and a border in the primary colour, and scrolls into view.
+ * An Add button selects the new action, and Remove selects the `widget`.
  */
 function Actions({
   pointer,
@@ -1524,6 +1590,9 @@ function Actions({
   actions,
   startProcess,
   deleteAction,
+  widget,
+  selected,
+  onSelect,
   onChange,
 }: {
   pointer: string
@@ -1531,10 +1600,20 @@ function Actions({
   actions: unknown
   startProcess: boolean
   deleteAction: boolean
+  /** The pointer of the widget that holds the list. */
+  widget: string
+  /** The pointer of the selected action. */
+  selected: string | undefined
+  onSelect: (pointer: string) => void
   onChange: ChangeHandler
 }) {
   const t = useText()
   const list = Array.isArray(actions) ? actions : []
+
+  function add(action: Content) {
+    onChange(pointer, [...list, action])
+    onSelect(`${pointer}/${list.length}`)
+  }
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
@@ -1548,15 +1627,15 @@ function Actions({
               const actionPointer = `${pointer}/${position}`
               if (!isContent(action)) {
                 return (
-                  <Card size="small" key={position} data-testid={`studio-action-${position}`}>
+                  <ActionCard key={position} position={position} selected={actionPointer === selected}>
                     <div data-testid={`studio-field-${actionPointer}`}>
                       <JsonOnly />
                     </div>
-                  </Card>
+                  </ActionCard>
                 )
               }
               return (
-                <Card size="small" key={position} data-testid={`studio-action-${position}`}>
+                <ActionCard key={position} position={position} selected={actionPointer === selected}>
                   <Flex vertical gap="small">
                     <Typography.Text>{text(action.type)}</Typography.Text>
                     {action.type === 'navigate' ? (
@@ -1596,31 +1675,31 @@ function Actions({
                       </div>
                     )}
                     <div>
-                      <Button danger onClick={() => onChange(actionPointer, undefined)}>
+                      <Button
+                        danger
+                        onClick={() => {
+                          onChange(actionPointer, undefined)
+                          onSelect(widget)
+                        }}
+                      >
                         {t('shell.studio.page.removeAction')}
                       </Button>
                     </div>
                   </Flex>
-                </Card>
+                </ActionCard>
               )
             })}
             <Flex gap="small" wrap>
               {startProcess && (
-                <Button
-                  onClick={() =>
-                    onChange(pointer, [...list, { type: 'startProcess', process: '', label: { textKey: '' } }])
-                  }
-                >
+                <Button onClick={() => add({ type: 'startProcess', process: '', label: { textKey: '' } })}>
                   {t('shell.studio.page.addAction')}
                 </Button>
               )}
-              <Button
-                onClick={() => onChange(pointer, [...list, { type: 'navigate', page: '', label: { textKey: '' } }])}
-              >
+              <Button onClick={() => add({ type: 'navigate', page: '', label: { textKey: '' } })}>
                 {t('shell.studio.page.addNavigateAction')}
               </Button>
               {deleteAction && (
-                <Button onClick={() => onChange(pointer, [...list, { type: 'delete', label: { textKey: '' } }])}>
+                <Button onClick={() => add({ type: 'delete', label: { textKey: '' } })}>
                   {t('shell.studio.page.addDeleteAction')}
                 </Button>
               )}
@@ -1629,5 +1708,33 @@ function Actions({
         )}
       </Flex>
     </div>
+  )
+}
+
+/** A ref that scrolls its element into view when `selected` becomes true. */
+function useScrolledTo<T extends HTMLElement>(selected: boolean) {
+  const ref = useRef<T>(null)
+  useEffect(() => {
+    if (selected) {
+      ref.current?.scrollIntoView?.({ block: 'nearest' })
+    }
+  }, [selected])
+  return ref
+}
+
+/** The card of an action. The selected one has `aria-current` and a border in the primary colour. */
+function ActionCard({ position, selected, children }: { position: number; selected: boolean; children: ReactNode }) {
+  const { colour } = useDesignTokens()
+  const ref = useScrolledTo<HTMLDivElement>(selected)
+  return (
+    <Card
+      ref={ref}
+      size="small"
+      data-testid={`studio-action-${position}`}
+      aria-current={selected ? 'true' : undefined}
+      style={selected ? { borderColor: colour.primary } : undefined}
+    >
+      {children}
+    </Card>
   )
 }

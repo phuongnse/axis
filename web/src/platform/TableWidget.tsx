@@ -1,6 +1,7 @@
 import { Alert, Button, Dropdown, Flex, Modal, Table, type TableColumnsType, type TableProps } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
+import { useCanvasActions } from './canvasActions'
 import { FilterBar } from './FilterBar'
 import { formatValue } from './formatValue'
 import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
@@ -127,6 +128,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { rowActions, toolbarActions } = widget
+  const canvas = useCanvasActions()
   // The form returns to this address, with its paging and sorting, after save or cancel.
   const location = useLocation()
   const from = `${location.pathname}${location.search}`
@@ -344,6 +346,10 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           // A start action runs for the row. A delete action asks for confirmation first. A navigate action opens its page, or is dropped when its path is unknown.
           // An action whose visibleWhen is not plainly true is dropped.
           const list = rowActions.flatMap((action, index): { action: RowAction; index: number; run: () => void }[] => {
+            // The canvas draws every action, also one that the site would hide.
+            if (canvas.active) {
+              return [{ action, index, run: () => {} }]
+            }
             if (!isVisible(action.visibleWhen, scope)) {
               return []
             }
@@ -386,6 +392,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
                   size="small"
                   disabled={action.type !== 'navigate' && (starting || deleting)}
                   onClick={run}
+                  {...canvas.props(`rowActions/${index}`)}
                 >
                   {t(action.labelKey)}
                 </Button>
@@ -396,7 +403,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       })
     }
     return result
-  }, [fields, locale, phone, query.sort, rowActions, runNavigate, runStart, sitePath, starting, deleting, t])
+  }, [fields, locale, phone, query.sort, rowActions, runNavigate, runStart, sitePath, starting, deleting, t, canvas])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
@@ -430,7 +437,11 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
 
   // A toolbar has no row, so only the literals of its expressions resolve. An action to a form page
   // without a record creates one, so it needs the `create` grant.
+  // The canvas draws every toolbar action, also one that the site would hide.
   const toolbarButtons = toolbarActions.flatMap((action, index) => {
+    if (canvas.active) {
+      return [{ action, path: '', index }]
+    }
     const path = navigatePath(sitePath, action, null)
     const creates = action.opensForm && action.record === null
     return path && (!creates || widget.access?.actions.includes('create')) ? [{ action, path, index }] : []
@@ -441,7 +452,11 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       {toolbarButtons.length > 0 && (
         <Flex justify="flex-end" gap="small">
           {toolbarButtons.map(({ action, path, index }) => (
-            <Button key={index} onClick={() => navigate(path, { state: { from } })}>
+            <Button
+              key={index}
+              onClick={() => navigate(path, { state: { from } })}
+              {...canvas.props(`toolbarActions/${index}`)}
+            >
               {t(action.labelKey)}
             </Button>
           ))}
