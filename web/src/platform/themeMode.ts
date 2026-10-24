@@ -1,11 +1,13 @@
 import { createContext, useContext, useMemo } from 'react'
-import { designTokensFor } from './designTokens'
+import { designTokensFor, type DesignTokens } from './designTokens'
 
 export type ThemeMode = 'light' | 'dark'
 
 export interface ThemeModeContextValue {
   mode: ThemeMode
   toggleMode: () => void
+  /** Tokens that already include a page's values. Only the design-system bundle sets them. */
+  tokens?: DesignTokens
 }
 
 export const ThemeModeContext = createContext<ThemeModeContextValue | null>(null)
@@ -20,6 +22,8 @@ export function useThemeMode(): ThemeModeContextValue {
 
 /** The Axis tokens of the current mode. Outside the provider it gives the light tokens. */
 export function useDesignTokens() {
-  const mode = useContext(ThemeModeContext)?.mode ?? 'light'
-  return useMemo(() => designTokensFor(mode), [mode])
+  const context = useContext(ThemeModeContext)
+  const mode = context?.mode ?? 'light'
+  const tokens = context?.tokens
+  return useMemo(() => tokens ?? designTokensFor(mode), [tokens, mode])
 }

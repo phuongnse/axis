@@ -118,6 +118,28 @@ test('a mounted table redraws in the other mode when the page changes data-theme
   expect(recording.errors).toEqual([])
 })
 
+test("a mounted form uses the page's --primary and redraws when it changes", async ({ page }) => {
+  const recording = await openHarness(page, '?preview=table&mode=light')
+  await expect(previews.table(page)).toBeVisible()
+
+  // The harness mounts its previews at load, so the test sets the property and then mounts the form itself.
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--primary', '#13c2c2')
+    const element = document.createElement('div')
+    document.getElementById('previews')!.appendChild(element)
+    ;(window as unknown as { Axis: { form: (element: HTMLElement) => void } }).Axis.form(element)
+  })
+
+  const save = page.getByRole('button', { name: 'Save', exact: true })
+  const background = () => save.evaluate((button) => getComputedStyle(button).backgroundColor)
+  await expect.poll(background).toBe('rgb(19, 194, 194)')
+
+  await page.evaluate(() => document.documentElement.style.setProperty('--primary', '#eb2f96'))
+
+  await expect.poll(background).toBe('rgb(235, 47, 150)')
+  expect(recording.errors).toEqual([])
+})
+
 test('the bundle sets window.Axis with one mount for each preview', async ({ page }) => {
   const recording = await openHarness(page, '')
 
