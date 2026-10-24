@@ -874,18 +874,18 @@ Run and the Test results list, the read-only view of a module entity, and the re
     landed. The library's spoken messages are off, so the live region is the
     only voice.
   - **Moves.** The author drags a widget to reorder it or to move it into or out
-    of a container. The keyboard sensor does the same, and a screen reader hears
-    where the widget lands. The Move to picker stays. _Partly built:_ the author
-    can drag any widget of the canvas with the pointer. The innermost widget
-    under the pointer drags, so a press on a KPI in a column moves the KPI. It
-    drops on the same targets as a palette type. A move the format refuses is
-    flagged while it is dragged: the drag overlay and the live region give the
-    reason, and a drop there changes nothing. The refusals are a widget inside
-    itself, and a container whose deepest list would land past level 4. A move
-    is one edit of the draft, so one undo reverses it, and the widget keeps all
-    its keys. It stays selected and the live region says "Moved" with the type,
-    the list and the position. A drop on the widget itself or where it is
-    changes nothing.
+    of a container. Alt+ArrowDown and Alt+ArrowUp move the selected widget to
+    the next or previous allowed place, skipping refused ones, and focus follows
+    it. The Move to picker stays. _Partly built:_ the author can drag any widget
+    of the canvas. The innermost widget under the pointer drags, so a press on a
+    KPI in a column moves the KPI. It drops on the same targets as a palette
+    type. A move the format refuses is flagged while it is dragged: the drag
+    overlay and the live region give the reason, and a drop there changes
+    nothing. The refusals are a widget inside itself, and a container whose
+    deepest list would land past level 4. A move is one edit of the draft, so
+    one undo reverses it, and the widget keeps all its keys. It stays selected
+    and the live region says "Moved" with the type, the list and the position,
+    or that it cannot move further. A drop on the widget itself changes nothing.
   - **Data panel.** It lists the entities and the data sources. Dropping an
     entity offers a table, a form or a detail. Dropping a data source offers a
     table, and a chart with one group field or a KPI with a total row. _Partly

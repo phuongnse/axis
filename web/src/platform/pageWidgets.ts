@@ -375,11 +375,72 @@ export function movePlace(
     }
     place = { list: target.pointer, index: items.length }
   }
+  const refusal = moveRefusal(widgets, from, place.list)
+  return refusal === undefined ? place : { limit: refusal }
+}
+
+/**
+ * Why the widget at `from` cannot move into `list`: `inside` for a list inside the widget itself, and `depth` when the
+ * deepest list in the widget would land past level 4. It is `undefined` when the move is allowed.
+ */
+function moveRefusal(widgets: unknown[], from: string, list: string): 'inside' | 'depth' | undefined {
+  if (list.startsWith(`${from}/`)) {
+    return 'inside'
+  }
   const inner = widgetLists(widgets)
     .filter((item) => item.pointer.startsWith(`${from}/`))
     .map((item) => listLevel(item.pointer))
   const extra = inner.length === 0 ? 0 : Math.max(...inner) - listLevel(from.slice(0, from.lastIndexOf('/')))
-  return listLevel(place.list) + extra > 4 ? { limit: 'depth' } : place
+  return listLevel(list) + extra > 4 ? 'depth' : undefined
+}
+
+/**
+ * The page's widgets with the widget at `from` moved one allowed place later (`down`) or earlier (`up`) in reading
+ * order, and the pointer the widget has after the move. A place is a gap between widgets in any widget list, taken in
+ * document order, so a step swaps with a sibling, enters the start or end of a container next to the widget, or leaves
+ * its container. Places inside the widget and places past level 4 are skipped. It is `undefined` when `from` holds no
+ * widget or no allowed place is left in that direction. The widgets are never changed.
+ */
+export function keyboardMove(
+  widgets: unknown[],
+  from: string,
+  direction: 'up' | 'down',
+): { widgets: unknown[]; pointer: string } | undefined {
+  const widget = getAt({ widgets }, from)
+  if (!isContent(widget)) {
+    return undefined
+  }
+  const slots: { list: string; index: number }[] = []
+  function walk(items: unknown[], list: string) {
+    items.forEach((item, index) => {
+      slots.push({ list, index })
+      if (isContent(item)) {
+        for (const child of childLists(item, `${list}/${index}`)) {
+          walk(getAt({ widgets }, child.pointer) as unknown[], child.pointer)
+        }
+      }
+    })
+    slots.push({ list, index: items.length })
+  }
+  walk(widgets, '/widgets')
+  const cut = from.lastIndexOf('/')
+  const list = from.slice(0, cut)
+  const index = Number(from.slice(cut + 1))
+  // The widget sits between the slots at its index and the one after it.
+  const start = slots.findIndex(
+    (slot) => slot.list === list && slot.index === (direction === 'down' ? index + 1 : index),
+  )
+  if (start < 0) {
+    return undefined
+  }
+  const step = direction === 'down' ? 1 : -1
+  for (let at = start + step; at >= 0 && at < slots.length; at += step) {
+    const slot = slots[at]
+    if (moveRefusal(widgets, from, slot.list) === undefined) {
+      return moveTo(widgets, from, slot.list, slot.index)
+    }
+  }
+  return undefined
 }
 
 /** A column a data source projects, with its type as Studio's names give it. */

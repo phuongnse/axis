@@ -19,6 +19,7 @@ import {
   dropPlace,
   innermostPointer,
   insertionPlace,
+  keyboardMove,
   movePlace,
   moveTo,
   newWidget,
@@ -86,8 +87,11 @@ function bindingOf(data: unknown): DataBinding | undefined {
  * A widget of the canvas that is dragged moves to the same targets, as one edit of the draft, and stays selected. A
  * move the format refuses is flagged while it is dragged: the drag overlay and the live region give the reason, and a
  * drop there changes nothing. These are a widget inside itself, and a container whose lists would go past level 4. A
- * drop on the widget itself or where it already is changes nothing and says nothing. The canvas, the palette, the data
- * panel and the drag library are one lazy chunk, which loads when the tab opens.
+ * drop on the widget itself or where it already is changes nothing and says nothing.
+ *
+ * The keyboard moves the selected canvas widget with Alt+ArrowDown and Alt+ArrowUp, one allowed place at a time, as one
+ * edit of the draft. The live region names where it landed, or says that it cannot move further. The canvas, the
+ * palette, the data panel and the drag library are one lazy chunk, which loads when the tab opens.
  */
 export default function StudioPageDesign({
   application,
@@ -176,6 +180,11 @@ export default function StudioPageDesign({
     if (moved === undefined || moved.pointer === from) {
       return
     }
+    applyMove(moved, widgets, from)
+  }
+
+  /** Puts a moved widget into the draft, keeps it selected and says where it landed. */
+  function applyMove(moved: { widgets: unknown[]; pointer: string }, widgets: unknown[], from: string) {
     const type = (getAt({ widgets }, from) as { type?: unknown }).type
     onChange('/widgets', moved.widgets)
     onSelect(moved.pointer)
@@ -190,6 +199,21 @@ export default function StudioPageDesign({
         'shell.studio.palette.moved',
       ),
     )
+  }
+
+  /** Moves the widget one allowed place by key, and answers whether it moved. */
+  function keyMove(from: string, direction: 'up' | 'down'): boolean {
+    const widgets = draft.widgets
+    if (!Array.isArray(widgets)) {
+      return false
+    }
+    const moved = keyboardMove(widgets, from, direction)
+    if (moved === undefined) {
+      setAnnouncement(t('shell.studio.palette.cannotMoveFurther'))
+      return false
+    }
+    applyMove(moved, widgets, from)
+    return true
   }
 
   function drop(event: DragEndEvent) {
@@ -286,6 +310,7 @@ export default function StudioPageDesign({
             draft={draft}
             selected={selected}
             onSelect={onSelect}
+            onMove={keyMove}
           />
         </div>
         <div data-testid="studio-design-panel" style={{ width: 400, flexShrink: 0 }}>
