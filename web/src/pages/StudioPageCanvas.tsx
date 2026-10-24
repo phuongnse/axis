@@ -1,4 +1,4 @@
-import { useDroppable } from '@dnd-kit/core'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { Card, Segmented, Typography } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
@@ -46,8 +46,8 @@ const actionSelector = '[data-action]'
  * names is marked. The width switch draws the page at phone width, 375 px, with the phone layout. A click selects the
  * innermost widget under the pointer. Each widget is a Tab stop, which Enter or Space selects, and its name is its
  * type and summary from the draft. The widget at `selected` is outlined and has `aria-current`. Inside a drag context
- * every widget with a path and every widget list is a drop target, and a placeholder that is a container has a drop
- * area for each list its draft has.
+ * every widget with a path is a drag source and a drop target, every widget list is a drop target, and a placeholder
+ * that is a container has a drop area for each list its draft has.
  *
  * Every action of a widget draws as a button, also one the site would hide. A click on an action's button, or Enter
  * or Space on it, selects the action, whose pointer ends the widget's pointer, such as `/widgets/0/rowActions/1`. The
@@ -239,7 +239,9 @@ function isContent(value: unknown): value is Record<string, unknown> {
  * A widget of the canvas. It has a border in the error colour when a diagnostic names it, and `data-marked` then. A
  * widget with a path is a Tab stop that Enter or Space selects. The selected one has an outline in the primary colour
  * and `aria-current`. Its name is its summary, or its type, and "has diagnostics" when marked. It tells the widgets
- * inside that they are on the canvas, and which of their actions is selected.
+ * inside that they are on the canvas, and which of their actions is selected. A widget with a path can be dragged with
+ * the pointer to move it. The drag starts on the innermost frame under the pointer, and the widget is dimmed while it
+ * is dragged.
  */
 function CanvasWidgetFrame({
   type,
@@ -264,15 +266,30 @@ function CanvasWidgetFrame({
   const t = useText()
   const { colour, radius } = useDesignTokens()
   const label = summary || (type ?? t('shell.studio.design.placeholder'))
-  const { setNodeRef } = useDroppable({
+  const droppable = useDroppable({
     id: `widget:${path}`,
     data: { kind: 'widget', pointer: path },
     disabled: path === undefined,
   })
+  // Only the listeners, as the palette does: the frame keeps its own role and key handling.
+  const {
+    setNodeRef: setDragRef,
+    listeners,
+    isDragging,
+  } = useDraggable({
+    id: `move:${path}`,
+    data: { kind: 'move', pointer: path, label },
+    disabled: path === undefined,
+  })
+  const setNodeRef = (node: HTMLElement | null) => {
+    droppable.setNodeRef(node)
+    setDragRef(node)
+  }
   const actions = useMemo(() => ({ selected: action }), [action])
   return (
     <div
       ref={setNodeRef}
+      {...listeners}
       role="group"
       data-testid="studio-canvas-widget"
       data-path={path}
@@ -291,6 +308,7 @@ function CanvasWidgetFrame({
         borderRadius: radius.base,
         outline: selected ? `2px solid ${colour.primary}` : undefined,
         outlineOffset: 2,
+        opacity: isDragging ? 0.5 : undefined,
       }}
     >
       <CanvasActionsContext.Provider value={actions}>{children}</CanvasActionsContext.Provider>
@@ -299,9 +317,9 @@ function CanvasWidgetFrame({
 }
 
 /**
- * A widget list of the canvas, and a drop target for a palette type: a drop on it, outside any widget of the list,
- * appends to the list. It has a dashed border while a drag is over it or while the list is empty, and a minimum height
- * so that an empty list can be hit.
+ * A widget list of the canvas, and a drop target for a palette type or a moved widget: a drop on it, outside any
+ * widget of the list, appends to the list. It has a dashed border while a drag is over it or while the list is empty,
+ * and a minimum height so that an empty list can be hit.
  */
 function CanvasListFrame({ pointer, empty, children }: { pointer: string; empty: boolean; children?: ReactNode }) {
   const { colour, radius } = useDesignTokens()

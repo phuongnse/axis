@@ -9,6 +9,7 @@ import {
   insertionPlace,
   knownWidgetKeys,
   listLevel,
+  movePlace,
   moveTo,
   newColumn,
   newTab,
@@ -324,6 +325,92 @@ describe('moveTo', () => {
     expect(moveTo(tree, '/widgets/1', '/widgets/1/columns/0/widgets')).toBeUndefined()
     expect(moveTo(tree, '/widgets/9', '/widgets')).toBeUndefined()
     expect(moveTo(tree, '/widgets/0', '/widgets/0/columns/0/widgets')).toBeUndefined()
+  })
+})
+
+describe('moveTo with an index', () => {
+  const flat = [{ type: 'kpi' }, { type: 'chart' }, { type: 'table' }, { type: 'detail' }]
+  const order = (widgets: unknown[]) => widgets.map((widget) => (widget as { type: string }).type)
+
+  it.each([
+    [0, 2, ['chart', 'kpi', 'table', 'detail'], '/widgets/1'],
+    [0, 4, ['chart', 'table', 'detail', 'kpi'], '/widgets/3'],
+    [3, 1, ['kpi', 'detail', 'chart', 'table'], '/widgets/1'],
+    [1, 1, ['kpi', 'chart', 'table', 'detail'], '/widgets/1'],
+    [1, 2, ['kpi', 'chart', 'table', 'detail'], '/widgets/1'],
+  ])('moves %i before the place %i of its own list', (from, index, expected, pointer) => {
+    const moved = moveTo(flat, `/widgets/${from}`, '/widgets', index)!
+    expect(order(moved.widgets)).toEqual(expected)
+    expect(moved.pointer).toBe(pointer)
+  })
+
+  it('inserts at the index of another list and keeps the other widgets', () => {
+    const moved = moveTo(tree, '/widgets/0', '/widgets/2/widgets', 0)!
+    expect(moved.pointer).toBe('/widgets/1/widgets/0')
+    expect((moved.widgets[1] as { widgets: unknown[] }).widgets).toEqual([tree[0], { type: 'taskInbox' }])
+  })
+
+  it('moves a widget out of a container to a place on the page', () => {
+    const moved = moveTo(tree, '/widgets/2/widgets/0', '/widgets', 1)!
+    expect(moved.pointer).toBe('/widgets/1')
+    expect(moved.widgets[1]).toEqual({ type: 'taskInbox' })
+  })
+})
+
+describe('movePlace', () => {
+  it('gives the list and index of a widget target by its half', () => {
+    const target = { kind: 'widget', pointer: '/widgets/1/columns/0/widgets/0' } as const
+    expect(movePlace(tree, '/widgets/0', { ...target, half: 'upper' })).toEqual({
+      list: '/widgets/1/columns/0/widgets',
+      index: 0,
+    })
+    expect(movePlace(tree, '/widgets/0', { ...target, half: 'lower' })).toEqual({
+      list: '/widgets/1/columns/0/widgets',
+      index: 1,
+    })
+  })
+
+  it('gives the end of a list target', () => {
+    expect(movePlace(tree, '/widgets/0', { kind: 'list', pointer: '/widgets/2/widgets' })).toEqual({
+      list: '/widgets/2/widgets',
+      index: 1,
+    })
+  })
+
+  it('refuses a drop inside the widget itself', () => {
+    expect(movePlace(tree, '/widgets/2', { kind: 'list', pointer: '/widgets/2/widgets' })).toEqual({ limit: 'inside' })
+    expect(
+      movePlace(tree, '/widgets/1', { kind: 'widget', pointer: '/widgets/1/columns/0/widgets/0', half: 'upper' }),
+    ).toEqual({ limit: 'inside' })
+  })
+
+  it('refuses a container whose deepest list would land past level 4', () => {
+    const deep = [
+      { type: 'section', title: { textKey: '' }, widgets: [{ type: 'section', title: { textKey: '' }, widgets: [] }] },
+      { type: 'section', title: { textKey: '' }, widgets: [{ type: 'section', title: { textKey: '' }, widgets: [] }] },
+      { type: 'kpi' },
+    ]
+    // The target list is at level 3, and the moved section holds a list at level 3 from level 1: two levels more.
+    expect(movePlace(deep, '/widgets/1', { kind: 'list', pointer: '/widgets/0/widgets/0/widgets' })).toEqual({
+      limit: 'depth',
+    })
+    // A level-2 list leaves the deepest list at level 4.
+    expect(movePlace(deep, '/widgets/1', { kind: 'list', pointer: '/widgets/0/widgets' })).toEqual({
+      list: '/widgets/0/widgets',
+      index: 1,
+    })
+    // A leaf goes as deep as level 4.
+    expect(movePlace(deep, '/widgets/2', { kind: 'list', pointer: '/widgets/0/widgets/0/widgets' })).toEqual({
+      list: '/widgets/0/widgets/0/widgets',
+      index: 0,
+    })
+  })
+
+  it('is undefined for the widget itself, a missing widget or a missing target', () => {
+    expect(movePlace(tree, '/widgets/0', { kind: 'widget', pointer: '/widgets/0', half: 'lower' })).toBeUndefined()
+    expect(movePlace(tree, '/widgets/9', { kind: 'list', pointer: '/widgets' })).toBeUndefined()
+    expect(movePlace(tree, '/widgets/0', { kind: 'list', pointer: '/widgets/9/widgets' })).toBeUndefined()
+    expect(movePlace(tree, '/widgets/0', { kind: 'widget', pointer: '/widgets/9', half: 'upper' })).toBeUndefined()
   })
 })
 

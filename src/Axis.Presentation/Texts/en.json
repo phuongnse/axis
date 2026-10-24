@@ -195,6 +195,8 @@
   "shell.studio.palette.oneTable": "The page already holds a table. A page holds at most one.",
   "shell.studio.palette.oneRecordWidget": "The page already holds a form, task inbox or process inspector. A page holds at most one of them.",
   "shell.studio.palette.tooDeep": "A container here would hold a list past level 4.",
+  "shell.studio.palette.insideItself": "A widget cannot go inside itself.",
+  "shell.studio.palette.moved": "Moved",
   "shell.studio.save": "Save",
   "shell.studio.undo": "Undo",
   "shell.studio.redo": "Redo",

@@ -876,11 +876,23 @@ Run and the Test results list, the read-only view of a module entity, and the re
     allowed drop selects the new widget, and the live region names the list and
     the position where it landed. A type that is disabled cannot be dragged. The
     library's own spoken messages are off, so the live region is the only voice,
-    and a keyboard user inserts with Enter or Space as above. Dragging an
-    existing widget is not built yet.
+    and a keyboard user inserts with Enter or Space as above.
   - **Moves.** The author drags a widget to reorder it or to move it into or out
     of a container. The keyboard sensor does the same, and a screen reader
-    hears where the widget lands. The Move to picker stays.
+    hears where the widget lands. The Move to picker stays. _Partly built:_ the
+    author can drag any widget of the canvas with the pointer. The innermost
+    widget under the pointer drags, so a press on a KPI in a column moves the
+    KPI. It drops on the same targets as a palette type: before or after a
+    widget by its half, or at the end of a widget list, nested lists and empty
+    ones included. A move the format refuses is flagged while it is dragged. The
+    drag overlay and the live region give the reason, and a drop there changes
+    nothing. The refusals are a widget inside itself, and a container whose
+    deepest list would land past level 4. A move is one edit of the draft, so
+    one undo reverses it, and the widget keeps all its keys. After a move the
+    widget stays selected at its new place, and the live region says "Moved"
+    with the type, the list and the position. A drop on the widget itself or
+    where it already is changes nothing. The keyboard sensor and its spoken
+    messages are not built yet.
   - **Data panel.** It lists the entities and the data sources. Dropping an
     entity offers a table, a form or a detail. Dropping a data source offers a
     table, and a chart with one group field or a KPI with a total row.
@@ -906,8 +918,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
     and `@dnd-kit/utilities` with it, measures 12.7 KB gzipped in the lazy chunk
     `StudioPageDesign`. The chunk holds the canvas, the palette and the library,
     and loads when the Design tab opens. The build fails when the chunk is
-    missing or is part of the main bundle. `@dnd-kit/sortable` comes with the
-    moves of existing widgets.
+    missing or is part of the main bundle. The pointer moves of existing
+    widgets use the core package and the same drop targets as the palette.
+    `@dnd-kit/sortable` is not added yet.
   - **Format.** The designer writes only the order of the widget tree and the
     properties the format has. It writes no pixels, and widths stay in
     twelfths.
