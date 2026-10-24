@@ -164,12 +164,12 @@ function LocationProbe() {
   return <span data-testid="location">{`${location.pathname}${location.search}`}</span>
 }
 
-function renderEditor() {
+function renderEditor(provided: StudioNames = names) {
   render(
     <MemoryRouter initialEntries={['/studio?app=Shop&resource=dashboard']}>
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioNamesContext.Provider value={names}>
+          <StudioNamesContext.Provider value={provided}>
             <StudioEditor
               application="Shop"
               item={item}
@@ -828,6 +828,135 @@ describe('the Design tab of a page', () => {
       expect(palette.getByTestId('studio-palette-announcement')).toBeEmptyDOMElement()
       await new Promise((resolve) => setTimeout(resolve, 500))
       expect(posts).toHaveLength(before)
+    })
+  })
+
+  describe('data panel', () => {
+    const bound = {
+      ...names,
+      entities: [{ id: 'e1', name: 'Ticket', module: null, fields: [] }],
+      dataSources: [
+        {
+          id: 'd1',
+          name: 'ByStatus',
+          module: null,
+          parameters: [],
+          columns: [
+            { name: 'status', type: 'text' },
+            { name: 'count', type: 'integer' },
+          ],
+          groupBy: ['status'],
+        },
+        {
+          id: 'd2',
+          name: 'Totals',
+          module: null,
+          parameters: [],
+          columns: [{ name: 'open', type: 'integer' }],
+          groupBy: [],
+        },
+      ],
+    } as unknown as StudioNames
+
+    async function openDesign(widgets: Record<string, unknown>[]) {
+      const stubbed = stub(content(widgets))
+      renderEditor(bound)
+      await screen.findByTestId('studio-page-editor', {}, slow)
+      await openTab('Design')
+      const design = await screen.findByTestId('studio-design-panel', {}, slow)
+      await screen.findByTestId('studio-page-canvas', {}, slow)
+      return { ...stubbed, design, data: within(within(design).getByTestId('studio-data-panel')) }
+    }
+
+    function dropBinding(binding: { kind: string; name: string }, pointer: string, clientY: number) {
+      act(() =>
+        dnd.props!.onDragEnd!({
+          active: { id: `data:${binding.kind}:${binding.name}`, data: { current: { binding } } },
+          over: {
+            id: `widget:${pointer}`,
+            data: { current: { kind: 'widget', pointer } },
+            rect: { top: 0, height: 100 },
+          },
+          delta: { x: 0, y: 0 },
+          activatorEvent: new MouseEvent('pointerdown', { clientY }),
+        } as never),
+      )
+    }
+
+    it('lists the entities and data sources of the names, each as a button', async () => {
+      const { data } = await openDesign([{ type: 'kpi' }])
+
+      for (const [kind, name] of [
+        ['entity', 'Ticket'],
+        ['dataSource', 'ByStatus'],
+        ['dataSource', 'Totals'],
+      ]) {
+        expect(data.getByTestId(`studio-data-${kind}-${name}`)).toHaveRole('button')
+      }
+      expect(data.getByText('Entities')).toBeInTheDocument()
+      expect(data.getByText('Data sources')).toBeInTheDocument()
+    })
+
+    it('opens the choice on a drop, and inserts the bound chart after the widget, selected', async () => {
+      const { design, posts } = await openDesign([{ type: 'kpi' }, { type: 'detail' }])
+
+      dropBinding({ kind: 'dataSource', name: 'ByStatus' }, '/widgets/0', 90)
+      const choice = await screen.findByTestId('studio-binding-choice')
+      expect(within(choice).getByTestId('studio-binding-table')).toBeEnabled()
+      expect(within(choice).queryByTestId('studio-binding-kpi')).not.toBeInTheDocument()
+      await userEvent.click(within(choice).getByTestId('studio-binding-chart'))
+
+      await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
+      expect(posts.at(-1)!.widgets[1]).toEqual({
+        type: 'chart',
+        dataSource: 'ByStatus',
+        kind: 'bar',
+        category: 'status',
+        measures: [{ name: 'count', label: { textKey: '' } }],
+        title: { textKey: '' },
+      })
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(screen.getByTestId('studio-palette-announcement')).toHaveTextContent('Inserted chart')
+    })
+
+    it('inserts nothing when the choice is cancelled', async () => {
+      const { posts } = await openDesign([{ type: 'kpi' }])
+      await screen.findByTestId('kpi-tile', {}, slow)
+      const before = posts.length
+
+      dropBinding({ kind: 'dataSource', name: 'Totals' }, '/widgets/0', 10)
+      await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      expect(posts).toHaveLength(before)
+      expect(screen.getByTestId('studio-palette-announcement')).toBeEmptyDOMElement()
+    })
+
+    it('opens the choice on Enter and inserts the bound widget after the selection', async () => {
+      const { design, data, posts } = await openDesign([{ type: 'kpi' }, { type: 'detail' }])
+
+      data.getByTestId('studio-data-entity-Ticket').focus()
+      await userEvent.keyboard('{Enter}')
+      await userEvent.click(await screen.findByTestId('studio-binding-table'))
+
+      await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
+      expect(posts.at(-1)!.widgets[1]).toEqual({ type: 'table', entity: 'Ticket' })
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      const announcement = screen.getByTestId('studio-palette-announcement')
+      expect(announcement).toHaveTextContent('Inserted table')
+      expect(announcement).toHaveTextContent('position 2')
+    })
+
+    it('disables table with the one-table reason when the page already holds a table', async () => {
+      const { data } = await openDesign([{ type: 'table' }])
+
+      await userEvent.click(data.getByTestId('studio-data-entity-Ticket'))
+
+      const choice = await screen.findByTestId('studio-binding-choice')
+      const table = within(choice).getByTestId('studio-binding-table')
+      expect(table).toBeDisabled()
+      expect(table).toHaveAccessibleDescription('The page already holds a table. A page holds at most one.')
+      expect(within(choice).getByTestId('studio-binding-form')).toBeEnabled()
     })
   })
 

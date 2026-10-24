@@ -253,16 +253,11 @@ export type DropTarget =
   { kind: 'widget'; pointer: string; half: 'upper' | 'lower' } | { kind: 'list'; pointer: string }
 
 /**
- * Where a new widget of `type` lands when it is dropped on `target`, or the page limit that forbids it. A widget
- * target gives its own list, at its index on the upper half and after it on the lower half. A list target gives that
- * list, at its end. It is `undefined` when the draft has no such widget or list. The widgets are never changed.
+ * The place a drop on `target` gives: the list and the index in it. A widget target gives its own list, at its index on
+ * the upper half and after it on the lower half. A list target gives that list, at its end. It is `undefined` when the
+ * draft has no such widget or list. The widgets are never changed.
  */
-export function dropPlace(
-  widgets: unknown[],
-  type: string,
-  target: DropTarget,
-): { list: string; index: number } | { limit: 'table' | 'recordWidget' | 'depth' } | undefined {
-  let place: { list: string; index: number }
+export function targetPlace(widgets: unknown[], target: DropTarget): { list: string; index: number } | undefined {
   if (target.kind === 'widget') {
     const cut = target.pointer.lastIndexOf('/')
     const list = target.pointer.slice(0, cut)
@@ -270,13 +265,24 @@ export function dropPlace(
     if (!Array.isArray(getAt({ widgets }, list)) || getAt({ widgets }, target.pointer) === undefined) {
       return undefined
     }
-    place = { list, index: target.half === 'upper' ? index : index + 1 }
-  } else {
-    const items = getAt({ widgets }, target.pointer)
-    if (!Array.isArray(items)) {
-      return undefined
-    }
-    place = { list: target.pointer, index: items.length }
+    return { list, index: target.half === 'upper' ? index : index + 1 }
+  }
+  const items = getAt({ widgets }, target.pointer)
+  return Array.isArray(items) ? { list: target.pointer, index: items.length } : undefined
+}
+
+/**
+ * Where a new widget of `type` lands when it is dropped on `target`, or the page limit that forbids it. See
+ * {@link targetPlace} for the place. It is `undefined` when the draft has no such widget or list.
+ */
+export function dropPlace(
+  widgets: unknown[],
+  type: string,
+  target: DropTarget,
+): { list: string; index: number } | { limit: 'table' | 'recordWidget' | 'depth' } | undefined {
+  const place = targetPlace(widgets, target)
+  if (place === undefined) {
+    return undefined
   }
   const limit = paletteLimit(widgets, place.list, type)
   return limit === undefined ? place : { limit }
@@ -483,4 +489,77 @@ export function dataSourceParameters(
 /** Whether a column type is a number, which a chart measure must be. */
 export function isNumberType(type: string | null): boolean {
   return type === 'integer' || type === 'decimal'
+}
+
+/** An entity or a data source that the data panel offers to bind a widget to. */
+export interface DataBinding {
+  kind: 'entity' | 'dataSource'
+  name: string
+}
+
+/**
+ * The widget types that can show a binding. An entity gives a table, a form or a detail. A data source gives a table,
+ * a chart when it has exactly one group field, and a KPI when it has a total row, which is an empty `groupBy`.
+ * Names are found ignoring letter case. A data source the names do not list gives a table only.
+ */
+export function bindingTypes(names: StudioNames, binding: DataBinding): string[] {
+  if (binding.kind === 'entity') {
+    return ['table', 'form', 'detail']
+  }
+  const wanted = binding.name.toLowerCase()
+  const groupBy = names.dataSources.find((item) => item.name.toLowerCase() === wanted)?.groupBy
+  const types = ['table']
+  if (groupBy?.length === 1) {
+    types.push('chart')
+  }
+  if (Array.isArray(groupBy) && groupBy.length === 0) {
+    types.push('kpi')
+  }
+  return types
+}
+
+/**
+ * A new widget of `type` bound to `binding`. A table or a form takes the entity or data source. A detail takes the
+ * entity and, as its record, the first required `reference` parameter of the page that targets the entity, or an empty
+ * record when there is none. A chart takes the data source, its only group field as the category and its first numeric
+ * measure, or its first measure when none is numeric. A KPI takes the data source's first measure. Texts stay empty,
+ * as `newWidget` leaves them, because a data source measure has no label.
+ */
+export function boundWidget(
+  names: StudioNames,
+  page: Record<string, unknown>,
+  binding: DataBinding,
+  type: string,
+): Record<string, unknown> {
+  if (binding.kind === 'entity') {
+    if (type !== 'detail') {
+      return { type, entity: binding.name }
+    }
+    const wanted = binding.name.toLowerCase()
+    const parameters = Array.isArray(page.parameters) ? page.parameters : []
+    const record = parameters.find(
+      (parameter) =>
+        isContent(parameter) &&
+        parameter.type === 'reference' &&
+        parameter.required === true &&
+        typeof parameter.target === 'string' &&
+        parameter.target.toLowerCase() === wanted,
+    ) as Record<string, unknown> | undefined
+    return { type, entity: binding.name, record: typeof record?.name === 'string' ? record.name : '' }
+  }
+  const columns = dataSourceColumns(names, binding.name)
+  const first = columns?.measures[0]?.name
+  if (type === 'chart') {
+    const measure = columns?.measures.find((item) => isNumberType(item.type))?.name ?? first ?? ''
+    return {
+      ...newWidget('chart'),
+      dataSource: binding.name,
+      category: columns?.groupFields[0] ?? '',
+      measures: [{ name: measure, label: { textKey: '' } }],
+    }
+  }
+  if (type === 'kpi') {
+    return { ...newWidget('kpi'), dataSource: binding.name, measure: first ?? '' }
+  }
+  return { type, dataSource: binding.name }
 }
