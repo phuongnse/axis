@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
+import { confirmDialog, waitForDialog } from '../dialogs'
 import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
@@ -235,7 +236,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio`)
 
     await page.getByRole('button', { name: 'New application', exact: true }).click()
-    const dialog = page.getByRole('dialog')
+    const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('ServiceDesk')
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     await expect(page).toHaveURL(/app=ServiceDesk$/)
@@ -250,7 +251,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expectForm(page)
 
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
+    await confirmDialog(page, 'Delete')
     await expect(starter.getByRole('button')).toHaveCount(0)
 
     await createResource(page, 'text', 'en', 'TextsEn')
@@ -437,7 +438,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await migrations.getByRole('button').click()
     await expectForm(page)
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
+    await confirmDialog(page, 'Delete')
     await expect(migrations).toHaveCount(0)
   })
 
@@ -853,7 +854,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await home.click()
     await expectForm(page)
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
+    await confirmDialog(page, 'Delete')
     await expect(page.getByTestId("studio-group-page").getByRole("button", { name: /Home/i })).toHaveCount(0)
   })
 
@@ -961,7 +962,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await page.getByRole('button', { name: 'Publish', exact: true }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Publish', exact: true }).click()
+    await confirmDialog(page, 'Publish')
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 120_000,
     })

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { findLooseLocators } from './check-locators.mjs'
+import { findDialogLookups, findLooseLocators } from './check-locators.mjs'
 
 const script = fileURLToPath(new URL('./check-locators.mjs', import.meta.url))
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
@@ -24,6 +24,9 @@ before(() => {
     path.join(root, 'tests/e2e/node_modules/x/b.ts'),
     "page.getByRole('button', { name: 'Installed' })\n",
   )
+  writeFileSync(path.join(root, 'tests/e2e/specs/c.spec.ts'), "await page.getByRole('dialog', { name: 'X', exact: true })\n")
+  writeFileSync(path.join(root, 'tests/e2e/specs/d.spec.ts'), 'const dialog = await waitForDialog(page)\n')
+  writeFileSync(path.join(root, 'tests/e2e/helper.ts'), "await page.getByRole('dialog', { name: 'X', exact: true })\n")
 })
 
 after(() => rmSync(root, { recursive: true, force: true }))
@@ -116,14 +119,43 @@ describe('findLooseLocators', () => {
   })
 })
 
+describe('findDialogLookups', () => {
+  test('finds a dialog looked up with single, double or backtick quotes', () => {
+    assert.deepEqual(findDialogLookups("page.getByRole('dialog')"), [1])
+    assert.deepEqual(findDialogLookups('page.getByRole("dialog")'), [1])
+    assert.deepEqual(findDialogLookups('page.getByRole(`dialog`)'), [1])
+  })
+
+  test('finds a dialog looked up through a chain or a name, on the line of the call', () => {
+    const chained = ["await page", "  .getByTestId('x')", "  .getByRole('dialog', { name: 'X', exact: true })"].join('\n')
+    assert.deepEqual(findDialogLookups(chained), [3])
+    assert.deepEqual(findDialogLookups("await page\n  .getByRole(\n    'dialog')"), [2])
+  })
+
+  test('ignores other roles, and a dialog named in a string or a comment', () => {
+    assert.deepEqual(findDialogLookups("page.getByRole('button', { name: 'dialog', exact: true })"), [])
+    assert.deepEqual(findDialogLookups("// page.getByRole('dialog')\nconst s = \"getByRole('dialog')\""), [])
+  })
+})
+
 describe('CLI', () => {
-  test('reports a loose call with its file and line and skips installed packages', () => {
+  test('reports a loose call and a dialog lookup in a spec, with its file and line, and skips installed packages', () => {
     const result = runCli(['--root', root])
 
     assert.equal(result.status, 1)
     assert.match(result.stderr, /^tests\/e2e\/specs\/a\.spec\.ts:2: getByRole name without exact: true$/m)
-    assert.equal(result.stderr.trim().split('\n').length, 1)
+    assert.match(
+      result.stderr,
+      /^tests\/e2e\/specs\/c\.spec\.ts:1: getByRole dialog without waitForDialog or confirmDialog$/m,
+    )
+    assert.equal(result.stderr.trim().split('\n').length, 2)
     assert.doesNotMatch(result.stderr, /node_modules|Installed/)
+  })
+
+  test('does not report a dialog lookup outside the specs folder or a spec that uses waitForDialog', () => {
+    const result = runCli(['--root', root])
+
+    assert.doesNotMatch(result.stderr, /helper\.ts|d\.spec\.ts/)
   })
 
   test('passes on the repository', () => {

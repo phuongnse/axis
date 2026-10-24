@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { startServer } from '../activate'
+import { waitForDialog } from '../dialogs'
 import { e2eApp } from '../server-settings'
 import { useSession } from '../sessions'
 
@@ -33,7 +34,7 @@ test.describe('Studio creates an application', () => {
 
   async function createApplication(page: Page, name: string, template?: string) {
     await page.getByRole('button', { name: 'New application', exact: true }).click()
-    const dialog = page.getByRole('dialog')
+    const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
     if (template !== undefined) {
       await dialog.getByRole('radio', { name: new RegExp(`^${template}`) }).click()
@@ -71,7 +72,7 @@ test.describe('Studio creates an application', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
     await page.getByRole('button', { name: 'New application', exact: true }).click()
-    const dialog = page.getByRole('dialog')
+    const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('PurchaseRequests')
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
 

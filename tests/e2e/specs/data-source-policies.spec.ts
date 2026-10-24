@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { waitForDialog } from '../dialogs'
 import { sessionFile, useSession } from '../sessions'
 
 // anna creates the records through the record API, then dung looks at them. dung's finance-reviewer
@@ -34,7 +35,7 @@ test('a data source table and a reference lookup show only the records the user 
   await page.goto('/e2e/notes')
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await page.getByRole('button', { name: 'Choose', exact: true }).click()
-  const dialog = page.getByRole('dialog')
+  const dialog = await waitForDialog(page)
   await expect(dialog.getByRole('row', { name: new RegExp(`0 Shared ${run}`) })).toBeVisible()
   await expect(dialog.getByRole('row', { name: new RegExp(`0 Private ${run}`) })).toHaveCount(0)
 })

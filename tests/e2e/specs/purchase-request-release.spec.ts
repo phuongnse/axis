@@ -3,7 +3,7 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test, type Browser, type Page, type TestInfo } from '@playwright/test'
 import { activateFolder, startServer } from '../activate'
-import { confirmDialog } from '../dialogs'
+import { confirmDialog, waitForDialog } from '../dialogs'
 import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
@@ -97,7 +97,7 @@ async function signInToPreview(browser: Browser, baseURL: string, user: string) 
 /** Clicks Publish, fills the dialog's label and confirms. */
 async function publishWithLabel(page: Page, label: string) {
   await page.getByRole('button', { name: 'Publish', exact: true }).click()
-  const dialog = page.getByRole('dialog')
+  const dialog = await waitForDialog(page)
   await dialog.getByRole('textbox', { name: 'Label (optional)', exact: true }).fill(label)
   await confirmDialog(page, 'Publish')
 }
@@ -306,7 +306,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       const first = page.getByTestId('studio-release-row').filter({ hasText: `First ${stamp}` })
       const number = await first.getAttribute('data-number')
       await first.getByRole('button', { name: 'Roll back', exact: true }).click()
-      const dialog = page.getByRole('dialog')
+      const dialog = await waitForDialog(page)
       await expect(dialog).toContainText(`Release ${number} First ${stamp}`)
       await confirmDialog(page, 'Roll back')
 

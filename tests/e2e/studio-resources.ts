@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { waitForDialog } from './dialogs'
 import { pickOption } from './select'
 
 /**
@@ -8,7 +9,7 @@ import { pickOption } from './select'
  */
 export async function createResource(page: Page, kind: string, value: string, shownAs = value) {
   await page.getByRole('button', { name: 'New resource', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'New resource', exact: true })
+  const dialog = await waitForDialog(page, 'New resource')
   await pickOption(dialog.getByRole('combobox', { name: 'Kind', exact: true }), kind)
   await dialog.getByRole('textbox', { name: kind === 'text' ? 'Locale' : 'Name', exact: true }).fill(value)
   const create = dialog.getByRole('button', { name: 'Create', exact: true })
