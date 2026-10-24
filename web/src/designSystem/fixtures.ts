@@ -208,14 +208,14 @@ const requestsByStatus: DataSourceMetadata = {
       target: null,
     },
     { name: 'requests', type: 'integer', labelKey: null, values: null, target: null },
-    { name: 'amountSum', type: 'decimal', labelKey: null, values: null, target: null },
+    { name: 'urgentRequests', type: 'integer', labelKey: null, values: null, target: null },
   ],
 }
 
-/** A chart of the requests by status: bars and lines show two series, and a pie shows one. */
+/** A chart of the requests by status: bars and lines show two counts, and a pie shows one. */
 export function chartWidget(kind: ChartKind): WidgetMetadata {
   const requests = { name: 'requests', labelKey: 'chart.requests' }
-  const amount = { name: 'amountSum', labelKey: 'chart.amount' }
+  const urgent = { name: 'urgentRequests', labelKey: 'chart.urgentRequests' }
   return {
     ...widgetBase,
     type: 'chart',
@@ -224,7 +224,7 @@ export function chartWidget(kind: ChartKind): WidgetMetadata {
       kind,
       titleKey: 'chart.requestsByStatus',
       category: 'status',
-      measures: kind === 'pie' ? [requests] : [requests, amount],
+      measures: kind === 'pie' ? [requests] : [requests, urgent],
     },
   }
 }
@@ -379,18 +379,18 @@ const categoryPage: RecordPage = {
   totalCount: 1,
 }
 
-const statusGroup = (id: string, status: string, requests: string, amountSum: string): RecordItem => ({
+const statusGroup = (id: string, status: string, requests: string, urgentRequests: string): RecordItem => ({
   id,
   version: 1,
-  values: { status, requests, amountSum },
+  values: { status, requests, urgentRequests },
   labels: {},
 })
 
 const requestsByStatusPage: RecordPage = {
   items: [
-    statusGroup('1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d', 'draft', '4', '1830.00'),
-    statusGroup('2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e', 'submitted', '7', '5240.50'),
-    statusGroup('3c4d5e6f-7a8b-4c9d-8e1f-2a3b4c5d6e7f', 'approved', '12', '9875.25'),
+    statusGroup('1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d', 'draft', '4', '1'),
+    statusGroup('2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e', 'submitted', '7', '3'),
+    statusGroup('3c4d5e6f-7a8b-4c9d-8e1f-2a3b4c5d6e7f', 'approved', '12', '5'),
   ],
   page: 1,
   pageSize: 100,
@@ -434,7 +434,7 @@ export const siteTexts: Record<string, string> = {
   'request.task.review': 'Review the request',
   'chart.requestsByStatus': 'Requests by status',
   'chart.requests': 'Requests',
-  'chart.amount': 'Amount',
+  'chart.urgentRequests': 'Urgent requests',
   'kpi.amount': 'Total amount',
   'kpi.requests': 'Requests',
   'preview.requests': 'Requests',
