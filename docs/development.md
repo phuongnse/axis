@@ -122,7 +122,8 @@ user and the roles they hold. The `operator` role opens the purchase request sam
 inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
 `department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,
 adds the `agent` and `service-desk-lead` users and gives an employee the `requester` role, in a site
-at `/service-desk`. The `author` role lets the authoring API list and read the purchase request
+at `/service-desk`. The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
+adds the `approver` user, `minh`. The `author` role lets the authoring API list and read the purchase request
 sample's resources under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.
 The `publisher` role lets the authoring API publish, shows **Publish** on the Studio page and allows
 rollback from the release history. Under `scripts/dev.sh`,

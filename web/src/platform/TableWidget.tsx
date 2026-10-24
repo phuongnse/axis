@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { FilterBar } from './FilterBar'
 import { formatValue } from './formatValue'
-import { navigatePath } from './navigateAction'
+import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
 import { markCurrentPage } from './pagination'
 import { newIdempotencyKey, startProcess } from './processes'
 import {
@@ -303,6 +303,21 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     }
   }, [confirming, deleting, t])
 
+  // Opens the page of a navigate action. A refused read on its path opens nothing and shows a message.
+  const runNavigate = useCallback(
+    async (open: NavigateOpen) => {
+      setActionError(null)
+      setActionDone(null)
+      const address = await open()
+      if (address === null) {
+        setActionError(t('shell.navigate.failed'))
+      } else {
+        navigate(address, { state: { from } })
+      }
+    },
+    [from, navigate, t],
+  )
+
   const columns = useMemo<TableColumnsType<TableRow>>(() => {
     const sortOrder = (field: string) =>
       query.sort?.field === field ? (query.sort.descending ? 'descend' : 'ascend') : null
@@ -338,8 +353,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
             if (action.type === 'delete') {
               return [{ action, index, run: () => setConfirming({ action, rowId: record.id! }) }]
             }
-            const path = navigatePath(sitePath, action, scope)
-            return path ? [{ action, index, run: () => navigate(path, { state: { from } }) }] : []
+            const open = navigateTarget(sitePath, action, scope)
+            return open ? [{ action, index, run: () => void runNavigate(open) }] : []
           })
           if (list.length === 0) {
             return null
@@ -381,7 +396,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       })
     }
     return result
-  }, [fields, from, locale, navigate, phone, query.sort, rowActions, runStart, sitePath, starting, deleting, t])
+  }, [fields, locale, phone, query.sort, rowActions, runNavigate, runStart, sitePath, starting, deleting, t])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {

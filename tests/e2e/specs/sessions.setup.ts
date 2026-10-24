@@ -23,7 +23,7 @@ for (const user of Object.keys(sampleUsers) as SampleUser[]) {
 }
 
 // The journey host is another server, so its sessions are separate. The author, the requester, the service desk
-// lead and the agent sign in there.
+// lead, the agent and the approver sign in there.
 for (const user of journeyUsers) {
   setup(`${user} signs in on the journey host and the session is saved`, async ({ page }) => {
     await page.goto(`${journeyURL}/api/auth/sign-in?returnUrl=/`)

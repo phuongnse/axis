@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { formatValue } from './formatValue'
-import { navigatePath } from './navigateAction'
+import { navigateTarget, type NavigateOpen } from './navigateAction'
 import { newIdempotencyKey, startProcess } from './processes'
 import { fetchRecord, type RecordItem, type RecordRow, type RecordValue } from './records'
 import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
@@ -128,6 +128,17 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     return <NotFoundPage />
   }
 
+  // A refused read on the path of an expression opens nothing and shows a message.
+  const runNavigate = async (open: NavigateOpen) => {
+    setErrors([])
+    const address = await open()
+    if (address === null) {
+      setErrors([t('shell.navigate.failed')])
+    } else {
+      navigate(address, { state: { from: `${location.pathname}${location.search}` } })
+    }
+  }
+
   const startActions = widget.actions.filter((action): action is StartProcessAction => action.type === 'startProcess')
   const navigateActions = widget.actions.filter((action): action is NavigateAction => action.type === 'navigate')
   const buttons = [
@@ -137,14 +148,10 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
       </Button>
     )),
     ...navigateActions.flatMap((action, index) => {
-      const path = navigatePath(sitePath, action, { id: recordId, values: record.values })
-      return path
+      const open = navigateTarget(sitePath, action, { id: recordId, values: record.values })
+      return open
         ? [
-            <Button
-              key={`navigate-${index}`}
-              disabled={starting}
-              onClick={() => navigate(path, { state: { from: `${location.pathname}${location.search}` } })}
-            >
+            <Button key={`navigate-${index}`} disabled={starting} onClick={() => void runNavigate(open)}>
               {t(action.labelKey)}
             </Button>,
           ]

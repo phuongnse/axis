@@ -1,6 +1,7 @@
 {
   "shell.title": "Axis",
   "shell.nav.home": "Trang chủ",
+  "shell.navigate.failed": "Không thể mở trang.",
   "shell.home.title": "Chào mừng đến với Axis",
   "shell.serverStatus.title": "Trạng thái máy chủ",
   "shell.serverStatus.checking": "Đang kiểm tra",
@@ -368,6 +369,7 @@
   "shell.studio.page.parameterRequired": "Bắt buộc",
   "shell.studio.page.parameterTarget": "Thực thể đích",
   "shell.studio.page.parameterValues": "Giá trị",
+  "shell.studio.page.parameterBindings": "Tham số trang",
   "shell.studio.page.addParameter": "Thêm tham số",
   "shell.studio.page.removeParameter": "Xóa tham số",
   "shell.studio.page.undeclaredParameter": "Không phải tham số của trang này",

@@ -165,7 +165,10 @@ export interface StartProcessAction {
  * A `navigate` action: opens the page `page`, by its declared name. `parameters` holds the expression
  * of each target page parameter the action gives, and `record` the expression of the record id a
  * form page opens, or `null`. `opensForm` says whether the target page holds a form widget, so the
- * SPA knows to open `/new` when no `record` is given. `visibleWhen` is as on a `startProcess` action.
+ * SPA knows to open `/new` when no `record` is given. `paths` maps each reference along a path
+ * expression, by its dotted declared names (`customer`, `customer.parent`), to the record API path
+ * of that reference's target entity, so the SPA reads the records on click. `visibleWhen` is as on a
+ * `startProcess` action.
  */
 export interface NavigateAction {
   type: 'navigate'
@@ -174,6 +177,7 @@ export interface NavigateAction {
   parameters: Record<string, string>
   record: string | null
   opensForm: boolean
+  paths: Record<string, string>
   visibleWhen: string | null
 }
 
