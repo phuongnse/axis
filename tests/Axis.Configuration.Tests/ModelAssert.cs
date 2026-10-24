@@ -111,9 +111,10 @@ internal static class ModelAssert
                 if (expectedAction is NavigateActionModel expectedNavigate && actualAction is NavigateActionModel actualNavigate)
                 {
                     Assert.Equal(expectedNavigate.Parameters, actualNavigate.Parameters);
+                    Assert.Equal(expectedNavigate.Paths, actualNavigate.Paths);
                     Assert.Equal(
-                        expectedNavigate with { Parameters = NavigateActionModel.NoParameters },
-                        actualNavigate with { Parameters = NavigateActionModel.NoParameters });
+                        expectedNavigate with { Parameters = NavigateActionModel.NoParameters, Paths = NavigateActionModel.NoPaths },
+                        actualNavigate with { Parameters = NavigateActionModel.NoParameters, Paths = NavigateActionModel.NoPaths });
                 }
                 else
                 {

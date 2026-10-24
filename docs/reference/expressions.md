@@ -261,8 +261,8 @@ and in [functions](#functions).
 
 ## Names and references
 
-Bare field names, data source parameters, paths in data source filters and
-process conditions, child collections in aggregates and rule calls from
+Bare field names, data source parameters, paths in data source filters,
+process conditions and navigate actions, child collections in aggregates and rule calls from
 validations, data source filters and process conditions are built: the type
 checker resolves names against the fields, parameters and collections it is
 given, paths against the reference fields' targets when it is given a way to
@@ -281,11 +281,18 @@ Paths in validations and computed fields are not built. There a path is
   is a field, never a data source parameter, because a reference parameter
   holds an id and not a record.
 - **Scope in a navigate action.** On a table row, bare names are the row's
-  columns, or the record's fields for a table over an entity. On a form they
-  are the record's fields. `id` is the id of the root record, typed as a
-  reference to the root entity. In a table's toolbar there are no names. The
-  scope has no rules and no aggregates, and paths *(planned for M13)* are not
-  resolved yet. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
+  columns, or the record's fields for a table over an entity. On a form and a
+  detail they are the record's fields. `id` is the id of the root record,
+  typed as a reference parameter to the root entity, so a path cannot start
+  at it: `id.name` is `AXC0047`. In a table's toolbar there are no names. The
+  scope has no rules and no aggregates. A path such as `department.name` is
+  resolved in the parameters and `record` of an action on a table over an
+  entity, a form and a detail, takes at most 3 hops, and has the type of the
+  field it ends at. An unknown field on the path is `AXC0046` and a path of 4
+  hops is `AXC0058`. A path stays `AXC0046` in a row action's `visibleWhen`
+  and in an action on a table over a data source, whose columns hold no
+  reference to follow. See
+  [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Child collection.** A child collection field gives a `list<Entity>`,
   which only aggregates accept. Inside an aggregate's item expression, names
   are the child row's fields, computed ones included, and nothing else: no

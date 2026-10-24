@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 
 public sealed class KpiPageTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
 {
-    private const string ShowDepartments = """{"type":"navigate","page":"Departments","labelKey":"itemKpi.showDepartments","parameters":{},"record":null,"opensForm":false,"visibleWhen":null}""";
+    private const string ShowDepartments = """{"type":"navigate","page":"Departments","labelKey":"itemKpi.showDepartments","parameters":{},"record":null,"opensForm":false,"paths":{},"visibleWhen":null}""";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 

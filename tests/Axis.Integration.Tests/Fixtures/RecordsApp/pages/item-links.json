@@ -1,0 +1,22 @@
+{
+  "id": "72ca24ba-9e94-4822-8e46-3855602ee398",
+  "kind": "page",
+  "name": "ItemLinks",
+  "formatVersion": 1,
+  "title": { "textKey": "itemLinks.title" },
+  "widgets": [
+    {
+      "type": "table",
+      "entity": "Item",
+      "rowActions": [
+        {
+          "type": "navigate",
+          "page": "ItemsInDepartment",
+          "label": { "textKey": "itemLinks.sameDepartment" },
+          "parameters": { "departmentName": "department.name" }
+        },
+        { "type": "navigate", "page": "ItemForm", "label": { "textKey": "itemLinks.open" }, "record": "id" }
+      ]
+    }
+  ]
+}
