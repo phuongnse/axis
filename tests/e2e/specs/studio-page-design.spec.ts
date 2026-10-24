@@ -16,20 +16,21 @@ const allTicketsId = "4ff52d55-8194-45c4-901b-bdc18e269096";
 const ticketDetailId = "e6a7b810-39ed-4751-a0cc-b761ffc812e5";
 
 /**
- * Drags a palette type or a data panel name, by its test id, with the mouse to the point of `target` that is `fraction` of its height down: a small move
- * starts the drag, then steps reach the point. The designer is scrolled to the top of the window first, and both
- * points are measured after that, because the page scrolls while it loads and a mouse outside the window hits nothing.
+ * Drags `source`, a palette type or a data panel name, with the mouse to the point of `target` that is `fraction` of its height
+ * down: a small move starts the drag, then steps reach the point. The designer is scrolled to the top of the window first,
+ * and both points are measured after that, because the page scrolls while it loads and a mouse outside the window hits
+ * nothing.
  */
-async function dragType(
+async function dragFrom(
   page: Page,
-  source: string,
+  source: Locator,
   target: Locator,
   fraction = 0.5,
 ) {
   await page
     .getByTestId("studio-page-design")
     .evaluate((element) => element.scrollIntoView({ block: "start" }));
-  const from = (await page.getByTestId(source).boundingBox())!;
+  const from = (await source.boundingBox())!;
   const to = (await target.boundingBox())!;
   const startX = from.x + from.width / 2;
   const startY = from.y + from.height / 2;
@@ -40,6 +41,11 @@ async function dragType(
     steps: 15,
   });
   await page.mouse.up();
+}
+
+/** Drags a palette type or a data panel name, by its test id, to the point of `target` that is `fraction` of its height down. */
+function dragType(page: Page, testId: string, target: Locator, fraction = 0.5) {
+  return dragFrom(page, page.getByTestId(testId), target, fraction);
 }
 
 // The main server's Studio edits the purchase request copy only. This server's Studio folder is a copy of the service
@@ -246,6 +252,45 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       // The saved chart has empty text keys and does not compile. The page metadata route answers no page while any
       // file has an error, so the next journeys, which share this folder, would find no canvas.
       await cp(path.join(serviceDesk, "pages", "ticket-detail.json"), file);
+    }
+  });
+
+  test("an author drags the Dashboard's table onto the chart in the second column, saves, and finds it there", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${dashboardId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    const canvas = page.getByTestId("studio-page-canvas");
+    const frame = (pointer: string) =>
+      canvas.locator(
+        `[data-testid="studio-canvas-widget"][data-path="${pointer}"]`,
+      );
+    const table = frame("/widgets/1");
+    const chart = frame("/widgets/0/columns/1/widgets/0");
+    await expect(table).toBeVisible();
+    await expect(chart).toBeVisible();
+    await dragFrom(page, table, chart, 0.75);
+
+    await expect(page.getByTestId("studio-palette-announcement")).toContainText(
+      "Moved table",
+    );
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+
+    const file = path.join(copy, "pages", "dashboard.json");
+    try {
+      await expect
+        .poll(async () => {
+          const { widgets } = JSON.parse(await readFile(file, "utf8"));
+          return [widgets.length, widgets[0].columns[1].widgets[1]];
+        })
+        .toEqual([1, { type: "table", dataSource: "AllTicketList" }]);
+    } finally {
+      await cp(path.join(serviceDesk, "pages", "dashboard.json"), file);
     }
   });
 

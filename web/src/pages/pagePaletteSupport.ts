@@ -20,6 +20,7 @@ export const paletteReasons = {
   table: 'shell.studio.palette.oneTable',
   recordWidget: 'shell.studio.palette.oneRecordWidget',
   depth: 'shell.studio.palette.tooDeep',
+  inside: 'shell.studio.palette.insideItself',
 } as const
 
 /** The words that name a part of a container, such as `Column 2` or `Tab 1`. A section has none. */
@@ -40,8 +41,9 @@ export function stepLabels(step: PathStep, partLabel: (part: ListPart) => string
 }
 
 /**
- * What the live region says after a widget of `type` is inserted at `index` of `list`: the list by its path from the
- * page, and the position counted from 1. `widgets` are the page's widgets before the insert.
+ * What the live region says after a widget of `type` is inserted or moved to `index` of `list`: the list by its path
+ * from the page, and the position counted from 1. `widgets` are the page's widgets before the insert, or after the
+ * move. `verbKey` is the text key of the verb.
  */
 export function landedText(
   t: (key: string) => string,
@@ -50,8 +52,9 @@ export function landedText(
   list: string,
   index: number,
   type: string,
+  verbKey = 'shell.studio.palette.inserted',
 ): string {
   const path = widgetLists(widgets).find((item) => item.pointer === list)?.path ?? []
   const label = [t('shell.studio.page.pageList'), ...path.flatMap((step) => stepLabels(step, partLabel))].join(' › ')
-  return `${t('shell.studio.palette.inserted')} ${type} · ${label} · ${t('shell.studio.palette.position')} ${index + 1}`
+  return `${t(verbKey)} ${type} · ${label} · ${t('shell.studio.palette.position')} ${index + 1}`
 }

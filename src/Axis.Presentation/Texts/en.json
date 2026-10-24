@@ -200,6 +200,8 @@
   "shell.studio.data.dataSources": "Data sources",
   "shell.studio.data.bind": "Bind",
   "shell.studio.data.cancel": "Cancel",
+  "shell.studio.palette.insideItself": "A widget cannot go inside itself.",
+  "shell.studio.palette.moved": "Moved",
   "shell.studio.save": "Save",
   "shell.studio.undo": "Undo",
   "shell.studio.redo": "Redo",
