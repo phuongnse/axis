@@ -286,6 +286,51 @@ export function moveSection(
 }
 
 /**
+ * The result of a rename: the new `sections` and `steps` (`undefined` when the draft has no steps), or the reason the
+ * name is refused. `undefined` when there is nothing to do.
+ */
+export type SectionRename =
+  { sections: unknown[]; steps: unknown[] | undefined } | { refused: 'empty' | 'taken' } | undefined
+
+/**
+ * Renames the section at `index` to `name`, trimmed. Every step entry that lists the old name, without regard to
+ * letter case, lists the new name in the same position. The section keeps all its other keys. The name is refused
+ * when it is empty, and when another section has it, without regard to letter case. A change of letter case alone is
+ * allowed. Only the section and the steps that change are rebuilt. `undefined` when `index` names no section and when
+ * the name does not change.
+ */
+export function renameSection(draft: Content, index: number, name: string): SectionRename {
+  const sections = Array.isArray(draft.sections) ? draft.sections : []
+  const section = sections[index]
+  if (!isContent(section)) {
+    return undefined
+  }
+  const next = name.trim()
+  const old = typeof section.name === 'string' ? section.name : ''
+  if (next === old) {
+    return undefined
+  }
+  if (next === '') {
+    return { refused: 'empty' }
+  }
+  const wanted = next.toLowerCase()
+  if (sections.some((other, position) => position !== index && isContent(other) && sameName(other.name, wanted))) {
+    return { refused: 'taken' }
+  }
+  const before = old.toLowerCase()
+  return {
+    sections: sections.map((item, position) => (position === index ? { ...section, name: next } : item)),
+    steps: Array.isArray(draft.steps)
+      ? draft.steps.map((step) =>
+          isContent(step) && listedBy(step).some((item) => sameName(item, before))
+            ? { ...step, sections: listedBy(step).map((item) => (sameName(item, before) ? next : item)) }
+            : step,
+        )
+      : undefined,
+  }
+}
+
+/**
  * The layout of a draft: each step with the indexes of the sections it lists, in the order the step lists them, then
  * the sections that no step lists. A draft without steps has all its sections in one group with no step.
  */

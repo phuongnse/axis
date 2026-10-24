@@ -68,7 +68,7 @@ _(planned for M13)_. The owner confirmed these points on issue #1141 on
   - A field that the entity marks `required` has no `visibleWhen` box
     (`AXC0226`). A computed, sequence or creator field shows `readOnly` on and
     locked.
-  - A section shows its title and `visibleWhen`. A step shows its title.
+  - A section shows its name, title and `visibleWhen`. A step shows its title.
   - The panel keeps the rules of D62.
 - **Where it is used:** a form can serve several pages and tasks, so one edit
   changes all of them. The Design tab lists them in a Used on list. It is the

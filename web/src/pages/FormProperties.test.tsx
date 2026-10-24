@@ -75,4 +75,51 @@ describe('FormProperties section', () => {
     expect(screen.getByTestId('studio-design-section')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-design-move-to-step')).toBeNull()
   })
+
+  it('renames the section and the step entry that lists it in one edit', async () => {
+    renderHarness(stepped, '/sections/0')
+
+    const box = screen.getByRole('textbox', { name: 'Name' })
+    await userEvent.clear(box)
+    await userEvent.type(box, 'first{Enter}')
+
+    const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
+    expect(draft.sections[0].name).toBe('first')
+    expect(draft.steps[0].sections).toEqual(['first', 'b'])
+  })
+
+  it('renames a section of a form without steps and adds no steps', async () => {
+    renderHarness({ sections: [{ name: 'a', fields: [] }] }, '/sections/0')
+
+    const box = screen.getByRole('textbox', { name: 'Name' })
+    await userEvent.clear(box)
+    await userEvent.type(box, 'first{Enter}')
+
+    const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
+    expect(draft.sections[0].name).toBe('first')
+    expect(draft).not.toHaveProperty('steps')
+  })
+
+  it("refuses another section's name in different letter case and says why", async () => {
+    renderHarness(stepped, '/sections/0')
+    const before = screen.getByTestId('draft').textContent
+
+    const box = screen.getByRole('textbox', { name: 'Name' })
+    await userEvent.clear(box)
+    await userEvent.type(box, 'B{Enter}')
+
+    expect(screen.getByTestId('draft').textContent).toBe(before)
+    expect(screen.getByText('Another section already has this name.')).toBeInTheDocument()
+  })
+
+  it('refuses an empty name and says why', async () => {
+    renderHarness(stepped, '/sections/0')
+    const before = screen.getByTestId('draft').textContent
+
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Name' }))
+    await userEvent.tab()
+
+    expect(screen.getByTestId('draft').textContent).toBe(before)
+    expect(screen.getByText('A section needs a name.')).toBeInTheDocument()
+  })
 })

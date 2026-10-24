@@ -9,6 +9,7 @@ import {
   moveSection,
   outline,
   paletteFields,
+  renameSection,
   sectionMovePlace,
 } from './formLayout'
 import type { StudioNames } from './studio'
@@ -328,5 +329,52 @@ describe('addStep', () => {
     expect(add.sections).toEqual([{ name: 'a', fields: [] }])
     expect(add.steps?.[1]).toEqual({ title: { textKey: 'forms.ticket.steps.1.title' }, sections: [] })
     expect(add.select).toBe('/steps/1')
+  })
+})
+
+describe('renameSection', () => {
+  const plain = { sections: [{ name: 'a', fields: [{ field: 'x' }] }, { name: 'b' }] }
+  const stepped = {
+    sections: [{ name: 'a', title: { textKey: 't' } }, { name: 'b' }],
+    steps: [
+      { title: { textKey: 'one' }, sections: ['B', 'A'] },
+      { title: { textKey: 'two' }, sections: [] },
+    ],
+  }
+
+  it('renames the section and the step entries that list it, ignoring case', () => {
+    const result = renameSection(stepped, 0, ' first ')
+    expect(result).toEqual({
+      sections: [{ name: 'first', title: { textKey: 't' } }, { name: 'b' }],
+      steps: [{ title: { textKey: 'one' }, sections: ['B', 'first'] }, stepped.steps[1]],
+    })
+    expect(result && 'steps' in result ? result.steps?.[1] : undefined).toBe(stepped.steps[1])
+  })
+
+  it('renames a section of a form without steps and returns no steps', () => {
+    expect(renameSection(plain, 0, 'c')).toEqual({
+      sections: [{ name: 'c', fields: [{ field: 'x' }] }, { name: 'b' }],
+      steps: undefined,
+    })
+  })
+
+  it('allows a change of letter case alone', () => {
+    expect(renameSection(stepped, 0, 'A')).toEqual({
+      sections: [{ name: 'A', title: { textKey: 't' } }, { name: 'b' }],
+      steps: [{ title: { textKey: 'one' }, sections: ['B', 'A'] }, stepped.steps[1]],
+    })
+  })
+
+  it('refuses a name that another section has, ignoring case', () => {
+    expect(renameSection(stepped, 0, 'B')).toEqual({ refused: 'taken' })
+  })
+
+  it('refuses an empty name', () => {
+    expect(renameSection(stepped, 0, '  ')).toEqual({ refused: 'empty' })
+  })
+
+  it('does nothing for the same name or a missing section', () => {
+    expect(renameSection(stepped, 0, 'a')).toBeUndefined()
+    expect(renameSection(stepped, 5, 'z')).toBeUndefined()
   })
 })
