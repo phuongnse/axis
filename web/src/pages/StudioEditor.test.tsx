@@ -1102,6 +1102,191 @@ describe('StudioEditor for a page', () => {
     ])
     expect(operations.some((operation) => operation.path.includes('x-note'))).toBe(false)
   })
+
+  describe('undo and redo', () => {
+    const undoButton = () => screen.getByRole('button', { name: 'Undo' })
+    const redoButton = () => screen.getByRole('button', { name: 'Redo' })
+    const tableAndInbox = {
+      ...pageContent,
+      widgets: [{ type: 'taskInbox' }, { type: 'table', dataSource: 'PurchaseRequestList' }],
+    }
+
+    it('starts with Undo and Redo off', async () => {
+      stubResource(pageItem, pageContent)
+      renderResource(pageItem, pageNames)
+
+      await screen.findByTestId('studio-page-editor', {}, slow)
+      expect(undoButton()).toBeDisabled()
+      expect(redoButton()).toBeDisabled()
+    })
+
+    it('undoes and redoes the typing in one box as one step', async () => {
+      stubResource(pageItem, pageContent)
+      renderResource(pageItem, pageNames)
+
+      const name = await screen.findByRole('textbox', { name: 'Name' }, slow)
+      await userEvent.type(name, 'abc')
+      expect(name).toHaveValue('MyTasksabc')
+
+      await userEvent.click(undoButton())
+      expect(name).toHaveValue('MyTasks')
+      expect(undoButton()).toBeDisabled()
+      expect(redoButton()).toBeEnabled()
+
+      await userEvent.click(redoButton())
+      expect(name).toHaveValue('MyTasksabc')
+      expect(redoButton()).toBeDisabled()
+    })
+
+    it('makes the typing in a box after leaving it a new step', async () => {
+      stubResource(pageItem, pageContent)
+      renderResource(pageItem, pageNames)
+
+      const name = await screen.findByRole('textbox', { name: 'Name' }, slow)
+      await userEvent.type(name, 'a')
+      await userEvent.click(document.body)
+      await userEvent.type(name, 'b')
+      await userEvent.click(undoButton())
+
+      expect(name).toHaveValue('MyTasksa')
+    })
+
+    it('undoes and redoes a data source pick with the buttons and with the keys', async () => {
+      stubResource(pageItem, tableAndInbox)
+      renderResource(pageItem, pageNames)
+
+      await userEvent.click(await screen.findByTestId('studio-widget-/widgets/1', {}, slow))
+      await userEvent.click(within(screen.getByTestId('studio-field-/widgets/1/dataSource')).getByRole('combobox'))
+      await userEvent.click(await screen.findByTitle('SupplierList'))
+      expect(screen.getByTestId('studio-field-/widgets/1/dataSource')).toHaveTextContent('SupplierList')
+
+      await userEvent.click(undoButton())
+      expect(screen.getByTestId('studio-field-/widgets/1/dataSource')).toHaveTextContent('PurchaseRequestList')
+      await userEvent.click(redoButton())
+      expect(screen.getByTestId('studio-field-/widgets/1/dataSource')).toHaveTextContent('SupplierList')
+
+      await userEvent.keyboard('{Control>}z{/Control}')
+      expect(screen.getByTestId('studio-field-/widgets/1/dataSource')).toHaveTextContent('PurchaseRequestList')
+      await userEvent.keyboard('{Control>}{Shift>}z{/Shift}{/Control}')
+      expect(screen.getByTestId('studio-field-/widgets/1/dataSource')).toHaveTextContent('SupplierList')
+    })
+
+    it('undoes and redoes a move of a widget', async () => {
+      stubResource(pageItem, tableAndInbox)
+      renderResource(pageItem, pageNames)
+
+      await screen.findByTestId('studio-widget-/widgets/1', {}, slow)
+      await userEvent.click(
+        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Move up' }),
+      )
+      expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('table')
+
+      await userEvent.click(undoButton())
+      expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('taskInbox')
+      await userEvent.click(redoButton())
+      expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('table')
+
+      await userEvent.keyboard('{Meta>}z{/Meta}')
+      expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('taskInbox')
+      await userEvent.keyboard('{Meta>}{Shift>}z{/Shift}{/Meta}')
+      expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('table')
+    })
+
+    it('undoes and redoes an edit in the JSON view with the keys', async () => {
+      stubResource(pageItem, pageContent)
+      renderResource(pageItem, pageNames)
+
+      await screen.findByTestId('studio-page-editor', {}, slow)
+      await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+      const view = screen.getByRole('textbox', { name: 'JSON' })
+      const original = (view as HTMLTextAreaElement).value
+      await userEvent.click(view)
+      fireEvent.change(view, { target: { value: original.replace('MyTasks', 'Renamed') } })
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+
+      await userEvent.keyboard('{Control>}z{/Control}')
+      expect(view).toHaveValue(original)
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+
+      await userEvent.keyboard('{Control>}{Shift>}z{/Shift}{/Control}')
+      expect(view).toHaveValue(original.replace('MyTasks', 'Renamed'))
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    })
+
+    it('turns Save off again after undoing an invalid edit in the JSON view', async () => {
+      stubResource(pageItem, pageContent)
+      renderResource(pageItem, pageNames)
+
+      await screen.findByTestId('studio-page-editor', {}, slow)
+      await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+      const view = screen.getByRole('textbox', { name: 'JSON' })
+      await userEvent.click(view)
+      fireEvent.change(view, { target: { value: '{' } })
+      expect(screen.getByTestId('studio-json-error')).toBeInTheDocument()
+
+      await userEvent.click(undoButton())
+      expect(screen.queryByTestId('studio-json-error')).not.toBeInTheDocument()
+    })
+
+    it('keeps the history after a save, and the next save sends the patch that reverts the edit', async () => {
+      const { fetchMock } = stubResource(pageItem, pageContent)
+      renderResource(pageItem, pageNames)
+
+      const name = await screen.findByRole('textbox', { name: 'Name' }, slow)
+      await userEvent.type(name, 'abc')
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await screen.findByTestId('studio-saved')
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+      expect(undoButton()).toBeEnabled()
+
+      await userEvent.click(undoButton())
+      expect(name).toHaveValue('MyTasks')
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await waitFor(() => expect(requests(fetchMock, 'PATCH')).toBe(2))
+      const [, init] = fetchMock.mock.calls.filter(([, call]) => call?.method === 'PATCH')[1]
+      expect(JSON.parse(init!.body as string)).toEqual([{ op: 'replace', path: '/name', value: 'MyTasks' }])
+    })
+
+    it('clears the history when the author reloads after a conflict', async () => {
+      const { fetchMock } = stubResource(pageItem, pageContent)
+      const base = fetchMock.getMockImplementation()!
+      fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+        init?.method === 'PATCH' ? json({ title: 'Conflict.' }, 409) : base(input, init),
+      )
+      renderResource(pageItem, pageNames)
+
+      const name = await screen.findByRole('textbox', { name: 'Name' }, slow)
+      await userEvent.type(name, 'abc')
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await screen.findByTestId('studio-conflict')
+      expect(undoButton()).toBeEnabled()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Reload' }))
+
+      await waitFor(() => expect(screen.queryByTestId('studio-conflict')).not.toBeInTheDocument())
+      expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('MyTasks')
+      expect(undoButton()).toBeDisabled()
+      expect(redoButton()).toBeDisabled()
+    })
+
+    it('leaves the keys to the browser when the focus is outside the editor', async () => {
+      stubResource(pageItem, pageContent)
+      renderResource(pageItem, pageNames)
+
+      const name = await screen.findByRole('textbox', { name: 'Name' }, slow)
+      await userEvent.type(name, 'abc')
+      const outside = document.createElement('input')
+      document.body.append(outside)
+      outside.focus()
+
+      await userEvent.keyboard('{Control>}z{/Control}')
+
+      expect(name).toHaveValue('MyTasksabc')
+      outside.remove()
+    })
+  })
 })
 
 describe('StudioEditor for an entity', () => {

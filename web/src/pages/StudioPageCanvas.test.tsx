@@ -681,6 +681,22 @@ describe('the Design tab of a page', () => {
       expect(announcement).toHaveTextContent('position 2')
     })
 
+    it('undoes a palette insert with Ctrl+Z and brings it back with Ctrl+Shift+Z', async () => {
+      const { design, palette } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+      palette.getByTestId('studio-palette-kpi').focus()
+      await userEvent.keyboard('{Enter}')
+      await waitFor(() => expect(within(design).getByTestId('studio-widget-/widgets/2')).toBeInTheDocument(), slow)
+
+      await userEvent.keyboard('{Control>}z{/Control}')
+
+      await waitFor(
+        () => expect(within(design).queryByTestId('studio-widget-/widgets/2')).not.toBeInTheDocument(),
+        slow,
+      )
+      await userEvent.keyboard('{Control>}{Shift>}z{/Shift}{/Control}')
+      await waitFor(() => expect(within(design).getByTestId('studio-widget-/widgets/2')).toBeInTheDocument(), slow)
+    })
+
     it('inserts the type at the end of the selected section and selects it', async () => {
       const { design, palette, posts } = await openDesign([{ type: 'kpi' }, section([{ type: 'chart' }])])
       await userEvent.click(within(design).getByTestId('studio-widget-/widgets/1'))
