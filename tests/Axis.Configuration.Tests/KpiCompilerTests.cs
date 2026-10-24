@@ -166,6 +166,88 @@ public sealed class KpiCompilerTests
         Assert.Null(result.Model);
     }
 
+    private const string NumberParameter = """{ "name": "number", "type": "text", "required": true }""";
+
+    private static string BoundKpi(string dataSource, string parameters) =>
+        $$"""{ "type": "kpi", "dataSource": "{{dataSource}}", "measure": "orders", "label": { "textKey": "kpi.orders" }, "parameters": {{parameters}} }""";
+
+    [Fact]
+    public void Kpi_binding_a_required_parameter_to_a_required_page_parameter_compiles_with_the_declared_names()
+    {
+        using var folder = Folder(
+            BoundKpi("FilteredTotals", """{ "NUMBERFILTER": "NUMBER" }"""),
+            pageParameters: NumberParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var widget = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets);
+        Assert.Equal(new Dictionary<string, string> { ["numberFilter"] = "number" }, widget.Parameters);
+    }
+
+    [Theory]
+    [InlineData("""{ "missing": "number" }""", """{ "name": "number", "type": "text" }""")]
+    [InlineData("""{ "numberFilter": "missing" }""", """{ "name": "number", "type": "text" }""")]
+    [InlineData("""{ "numberFilter": "number" }""", """{ "name": "number", "type": "integer" }""")]
+    [InlineData("""{ "numberFilter": "number", "NUMBERFILTER": "number" }""", """{ "name": "number", "type": "text" }""")]
+    public void Kpi_binding_an_unknown_name_or_a_mismatched_type_is_reported_at_the_binding(string parameters, string pageParameter)
+    {
+        using var folder = Folder(BoundKpi("OptionalTotals", parameters), pageParameters: pageParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.InvalidWidgetBinding, diagnostic.Code);
+        Assert.Equal(OrdersFile, diagnostic.File);
+        Assert.StartsWith("/widgets/0/parameters/", diagnostic.Path, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Kpi_binding_a_required_parameter_to_an_optional_page_parameter_is_reported_at_the_binding()
+    {
+        using var folder = Folder(
+            BoundKpi("FilteredTotals", """{ "numberFilter": "number" }"""),
+            pageParameters: """{ "name": "number", "type": "text" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, OrdersFile, "/widgets/0/parameters/numberFilter"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Kpi_leaving_a_required_parameter_unbound_is_reported_at_its_data_source_naming_the_parameter()
+    {
+        using var folder = Folder(
+            BoundKpi("FilteredTotals", "{}"),
+            pageParameters: NumberParameter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidWidgetBinding, OrdersFile, "/widgets/0/dataSource"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'numberFilter'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Page_parameter_named_like_an_unbound_parameter_of_its_kpi_compiles()
+    {
+        using var folder = Folder(
+            BoundKpi("OptionalTotals", """{ "numberFilter": "number" }"""),
+            pageParameters: """{ "name": "number", "type": "text" }, { "name": "other", "type": "text" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
     [Fact]
     public void Kpi_naming_no_loaded_data_source_is_reported_at_its_data_source()
     {
@@ -262,7 +344,6 @@ public sealed class KpiCompilerTests
     [InlineData("""{ "type": "kpi", "measure": "orders", "label": { "textKey": "kpi.orders" } }""")]
     [InlineData("""{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders" }""")]
     [InlineData("""{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "comparison": { "measure": "orders" } }""")]
-    [InlineData("""{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "parameters": {} }""")]
     [InlineData("""{ "type": "table", "entity": "Order", "measure": "orders" }""")]
     [InlineData("""{ "type": "table", "entity": "Order", "label": { "textKey": "kpi.orders" } }""")]
     [InlineData("""{ "type": "table", "entity": "Order", "comparison": { "measure": "orders", "label": { "textKey": "kpi.orders" } } }""")]
@@ -299,6 +380,12 @@ public sealed class KpiCompilerTests
                 { "id": "77777777-7777-4777-8777-777777777773", "kind": "dataSource", "name": "OrderTotals", "formatVersion": 1, "entity": "Order",
                   "fields": [ { "name": "quantity", "path": "quantity" } ],
                   "aggregate": { "groupBy": [], "measures": [ { "name": "orders", "function": "count" }, { "name": "quantitySum", "function": "sum", "field": "quantity" } ] } }
+                """)
+            .With("data-sources/optional-totals.json", """
+                { "id": "77777777-7777-4777-8777-777777777775", "kind": "dataSource", "name": "OptionalTotals", "formatVersion": 1, "entity": "Order",
+                  "fields": [ { "name": "quantity", "path": "quantity" } ],
+                  "parameters": [ { "name": "numberFilter", "type": "text" }, { "name": "other", "type": "text" } ],
+                  "aggregate": { "groupBy": [], "measures": [ { "name": "orders", "function": "count" } ] } }
                 """)
             .With("data-sources/filtered-totals.json", """
                 { "id": "77777777-7777-4777-8777-777777777774", "kind": "dataSource", "name": "FilteredTotals", "formatVersion": 1, "entity": "Order",

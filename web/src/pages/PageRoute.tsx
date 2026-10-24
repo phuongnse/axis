@@ -195,7 +195,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       case 'kpi':
         return <KpiWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
       case 'chart':
-        return <ChartWidget widget={widget} locale={locale} />
+        return <ChartWidget widget={widget} locale={locale} pageValues={pageValues} />
     }
   }
 

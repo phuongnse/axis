@@ -25,6 +25,8 @@
     "itemKpi.priceSum": "Tổng giá",
     "itemKpi.showDepartments": "Xem phòng ban",
     "itemKpiOverview.title": "Mặt hàng và tổng",
+    "itemDepartmentKpi.title": "Tổng mặt hàng trong phòng ban",
+    "itemDepartmentKpi.items": "Mặt hàng trong phòng ban",
     "itemChart.title": "Mặt hàng theo phòng ban",
     "itemChart.items": "Mặt hàng",
     "itemChart.quantitySum": "Số lượng",

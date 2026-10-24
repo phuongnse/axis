@@ -1,5 +1,6 @@
 import { Alert, Card } from 'antd'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { boundParameterQuery } from './boundParameters'
 import { Chart } from './Chart'
 import { formatValue, type FormatOptions } from './formatValue'
 import { fetchRecords, type RecordItem, type RecordValue } from './records'
@@ -11,6 +12,8 @@ interface ChartWidgetProps {
   widget: WidgetMetadata
   /** The UI locale, for formatting values. */
   locale: string
+  /** The values of the page's parameters from its URL, by page parameter name. The widget's `parameters` read these. */
+  pageValues?: Record<string, string>
 }
 
 /** The most groups a chart draws. The data source rows endpoint allows no larger page. */
@@ -18,7 +21,7 @@ const maxGroups = 100
 
 /** The outcome of the last finished request. */
 interface LoadState {
-  /** The request path, so a result for an older widget shows as loading. */
+  /** The request URL, so a result for an older widget or older parameter values shows as loading. */
   path: string
   /** The groups, in the order the data source sorts them. */
   rows: RecordItem[]
@@ -56,34 +59,39 @@ function cellText(
 
 /**
  * Draws the groups of a chart widget's grouped data source as a bar, line or pie chart. The category is the
- * group field and each measure is one series, labelled from its text key. The chart asks for the groups once,
- * with no query parameters beyond the page size, as the compiler makes every parameter of a chart's data
- * source optional. It draws at most 100 groups and says so when the data source has more. A null category
+ * group field and each measure is one series, labelled from its text key. The chart asks for the groups with
+ * the page size and the value of each page parameter the widget binds, under the data source parameter's name,
+ * and asks again when one changes. The compiler makes every parameter that the widget leaves unbound
+ * optional. It draws at most 100 groups and says so when the data source has more. A null category
  * shows the platform text for an empty value. The chart's data is also in a table that only screen readers
  * reach, with the category and each measure as columns, and its values look as they do in a table cell.
  */
-export function ChartWidget({ widget, locale }: ChartWidgetProps) {
+export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
   const t = useText()
   // The server sets both on a chart widget.
   const { name, rowsPath, columns } = widget.dataSource!
   const { kind, titleKey, category, measures } = widget.chart!
+  const bound = boundParameterQuery(widget, pageValues)
+  bound.set('pageSize', String(maxGroups))
+  const query = bound.toString()
+  const requestUrl = `${rowsPath}?${query}`
   const [state, setState] = useState<LoadState>()
-  const loading = state?.path !== rowsPath
+  const loading = state?.path !== requestUrl
   const failed = !loading && state.failed
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchRecords(rowsPath, `pageSize=${maxGroups}`, controller.signal)
-      .then((page) => setState({ path: rowsPath, rows: page.items, totalCount: page.totalCount, failed: false }))
+    fetchRecords(rowsPath, query, controller.signal)
+      .then((page) => setState({ path: requestUrl, rows: page.items, totalCount: page.totalCount, failed: false }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
           return
         }
         console.warn(`Loading the groups of '${name}' failed`, error)
-        setState({ path: rowsPath, rows: [], totalCount: 0, failed: true })
+        setState({ path: requestUrl, rows: [], totalCount: 0, failed: true })
       })
     return () => controller.abort()
-  }, [rowsPath, name])
+  }, [rowsPath, query, requestUrl, name])
 
   const title = t(titleKey)
   const rows = useMemo(() => (loading ? [] : state.rows), [loading, state])
