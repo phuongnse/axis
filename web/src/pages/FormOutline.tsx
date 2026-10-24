@@ -23,7 +23,10 @@ interface DragListeners {
  * inside its section's row, so the innermost row under the pointer wins. A field row is also sortable: the pointer, or
  * Space, the arrow keys and Space, move it within its section or into another one. While a field moves, the targets
  * are the field rows and the empty sections, and a section that has fields is not one, so a move always lands on a
- * field. A section is named by its `name`, or `Section N`, because the translated titles load only inside the canvas. A
+ * field. A section row is sortable too, by a press on its own area, such as its title line, and not on a field row. It
+ * moves within its group, or into another step when a section row or a step's heading of that step is the target.
+ * While a section moves, the targets are the section rows and the step headings, and no field row is one. On a form
+ * with steps, a section that no step lists is not a target. A section is named by its `name`, or `Section N`, because the translated titles load only inside the canvas. A
  * section with no fields shows a dashed drop area inside its row, so a drop on it lands in that section.
  */
 export function FormOutline({
@@ -36,7 +39,10 @@ export function FormOutline({
   onSelect: (pointer: string) => void
 }) {
   const t = useText()
+  const { active } = useDndContext()
+  const sectionMoving = typeof (active?.data.current as { section?: unknown } | undefined)?.section === 'number'
   const sections = Array.isArray(draft.sections) ? (draft.sections as unknown[]) : []
+  const hasSteps = Array.isArray(draft.steps) && draft.steps.length > 0
   return (
     <Flex
       vertical
@@ -53,7 +59,7 @@ export function FormOutline({
               <DroppableRow
                 testId="studio-outline-step"
                 as="div"
-                droppable={false}
+                droppable={sectionMoving}
                 path={group.step.pointer}
                 selected={selected === group.step.pointer}
                 onSelect={onSelect}
@@ -63,18 +69,24 @@ export function FormOutline({
                 </Typography.Text>
               </DroppableRow>
             )}
-            <ul style={{ listStyle: 'none', margin: 0, paddingLeft: group.step === null ? 0 : 16 }}>
-              {group.sections.map((index) => (
-                <SectionRow
-                  key={index}
-                  draft={draft}
-                  index={index}
-                  fields={sectionFields(sections[index])}
-                  selected={selected}
-                  onSelect={onSelect}
-                />
-              ))}
-            </ul>
+            <SortableContext
+              items={group.sections.map((index) => `outline:/sections/${index}`)}
+              strategy={verticalListSortingStrategy}
+            >
+              <ul style={{ listStyle: 'none', margin: 0, paddingLeft: group.step === null ? 0 : 16 }}>
+                {group.sections.map((index) => (
+                  <SectionRow
+                    key={index}
+                    draft={draft}
+                    index={index}
+                    fields={sectionFields(sections[index])}
+                    unlisted={group.step === null && hasSteps}
+                    selected={selected}
+                    onSelect={onSelect}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
           </li>
         ))}
       </ul>
@@ -91,12 +103,15 @@ function SectionRow({
   draft,
   index,
   fields,
+  unlisted,
   selected,
   onSelect,
 }: {
   draft: Content
   index: number
   fields: unknown[]
+  /** The draft has steps and none lists this section, so a section move cannot land here. */
+  unlisted: boolean
   selected: string | null
   onSelect: (pointer: string) => void
 }) {
@@ -104,20 +119,31 @@ function SectionRow({
   const { active } = useDndContext()
   const { colour, radius } = useDesignTokens()
   const path = `/sections/${index}`
-  const moving = (active?.data.current as { move?: unknown } | undefined)?.move !== undefined
+  const data = active?.data.current as { move?: unknown; section?: unknown } | undefined
+  const moving = data?.move !== undefined
+  const sectionMoving = typeof data?.section === 'number'
+  const label = sectionLabel(t, draft, index)
+  const { setNodeRef, listeners, transform, transition, isOver } = useSortable({
+    id: `outline:${path}`,
+    data: { pointer: path, section: index, label },
+    disabled: { draggable: false, droppable: (moving && fields.length > 0) || (sectionMoving && unlisted) },
+  })
   const names = fields.map((field) => fieldName(field))
   const keys = names.map((name, position) =>
     name === undefined || names.indexOf(name) !== position ? `#${position}` : name,
   )
   return (
-    <DroppableRow
+    <Row
       testId="studio-outline-section"
       path={path}
       selected={selected === path}
       onSelect={onSelect}
-      droppable={!(moving && fields.length > 0)}
+      nodeRef={setNodeRef}
+      isOver={isOver}
+      listeners={listeners as DragListeners | undefined}
+      motion={{ transform: CSS.Translate.toString(transform), transition }}
     >
-      <Typography.Text>{sectionLabel(t, draft, index)}</Typography.Text>
+      <Typography.Text>{label}</Typography.Text>
       <SortableContext
         items={fields.map((_, position) => `outline:${path}/fields/${position}`)}
         strategy={verticalListSortingStrategy}
@@ -146,7 +172,7 @@ function SectionRow({
           })}
         </ul>
       </SortableContext>
-    </DroppableRow>
+    </Row>
   )
 }
 
@@ -157,7 +183,8 @@ function fieldName(field: unknown): string | undefined {
 
 /**
  * A field row. It is a drop target for a palette field and a sortable item: its data carries the pointer it stands for,
- * the place `move` it moves from and its `label`. There is no `field` key, which marks a palette drag.
+ * the place `move` it moves from and its `label`. There is no `field` key, which marks a palette drag. It is not a drop
+ * target while a section moves.
  */
 function FieldRow({
   path,
@@ -172,9 +199,12 @@ function FieldRow({
   selected: boolean
   onSelect: (pointer: string) => void
 }) {
+  const { active } = useDndContext()
+  const sectionMoving = typeof (active?.data.current as { section?: unknown } | undefined)?.section === 'number'
   const { setNodeRef, listeners, transform, transition, isOver } = useSortable({
     id: `outline:${path}`,
     data: { pointer: path, move, label: name },
+    disabled: { draggable: false, droppable: sectionMoving },
   })
   return (
     <Row

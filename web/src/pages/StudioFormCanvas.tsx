@@ -40,7 +40,7 @@ const fieldConditions: ConditionKey[] = ['visibleWhen', 'requiredWhen', 'readOnl
  * `visibleWhen`, `requiredWhen` or `readOnlyWhen` has a mark for each condition with its text from the draft. A
  * section, field or step that a diagnostic names is marked. A click, Enter or Space on a field or a section selects it,
  * and a click on a step selects it too. The selected element has an outline and `aria-current`, and a panel beside the
- * canvas shows its properties. An edit there changes the draft. An `aside` goes in the panel above the properties.
+ * canvas shows its properties. An edit there changes the draft, and so does the Move to step picker of a section. An `aside` goes in the panel above the properties.
  */
 export function StudioFormCanvas({
   application,
@@ -49,6 +49,7 @@ export function StudioFormCanvas({
   selected,
   onSelect,
   onChange,
+  onAnnounce,
   aside,
 }: {
   application: string
@@ -58,6 +59,8 @@ export function StudioFormCanvas({
   selected: string | null
   onSelect: (path: string) => void
   onChange: ChangeHandler
+  /** Says a move aloud in the live region. */
+  onAnnounce: (text: string) => void
   /** Shown in the panel column above the properties. */
   aside?: ReactNode
 }) {
@@ -217,6 +220,8 @@ export function StudioFormCanvas({
           draft={draft}
           selected={selected}
           entityFields={widget?.entity.fields ?? []}
+          onSelect={onSelect}
+          onAnnounce={onAnnounce}
           onChange={onChange}
         />
       </div>

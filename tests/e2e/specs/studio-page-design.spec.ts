@@ -494,6 +494,50 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     expect(await fieldsOf()).toEqual(original);
   });
 
+  test("an author drags the ticket edit form's problem section onto the second step, and one undo restores the draft", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketEditId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    const section = page.locator(
+      '[data-testid="studio-outline-section"][data-path="/sections/0"]',
+    );
+    const step = page.locator(
+      '[data-testid="studio-outline-step"][data-path="/steps/1"]',
+    );
+    await expect(step).toBeVisible();
+    await dragPointer(page, section.locator("> span").first(), step);
+
+    await expect(
+      page.getByTestId("studio-form-palette-announcement"),
+    ).toContainText("Moved problem");
+
+    const layout = async () => {
+      await page.getByRole("tab", { name: "JSON", exact: true }).click();
+      const json = page.getByRole("textbox", { name: "JSON", exact: true });
+      const draft = JSON.parse(await json.inputValue());
+      return {
+        sections: draft.sections.map((item: { name: string }) => item.name),
+        steps: draft.steps.map((item: { sections: string[] }) => item.sections),
+      };
+    };
+    expect(await layout()).toEqual({
+      sections: ["details", "problem"],
+      steps: [[], ["details", "problem"]],
+    });
+
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    expect(await layout()).toEqual({
+      sections: ["problem", "details"],
+      steps: [["problem"], ["details"]],
+    });
+  });
+
   test("an author moves the triage form's status field to the second section with the keyboard, and the live region says where it landed", async ({
     page,
   }) => {

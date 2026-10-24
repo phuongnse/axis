@@ -1,4 +1,4 @@
-import { moveField, type FieldPlace } from '../platform/formLayout'
+import { moveField, moveSection, type FieldPlace, type SectionPlace } from '../platform/formLayout'
 import type { ChangeHandler } from './SchemaForm'
 
 /** The name of the section at `index` for the outline and the live region: its `name`, or `Section N` without one. */
@@ -59,5 +59,40 @@ export function moveFieldTo(
   onSelect(`/sections/${section}/fields/${index}`)
   onAnnounce(
     `${t('shell.studio.palette.moved')} ${name} · ${sectionLabel(t, draft, section)} · ${t('shell.studio.palette.position')} ${index + 1}`,
+  )
+}
+
+/**
+ * Moves the section at `from` to `to`, selects it where it landed and says where that is: its name, its step when the
+ * draft has steps, and its position in the step or in `sections`. `sections` and `steps` change in the same event, so
+ * one undo reverses the move. Nothing happens when `moveSection` finds nothing to move.
+ */
+export function moveSectionTo(
+  t: (key: string) => string,
+  draft: Record<string, unknown>,
+  from: number,
+  to: SectionPlace,
+  onChange: ChangeHandler,
+  onSelect: (pointer: string) => void,
+  onAnnounce: (text: string) => void,
+) {
+  const result = moveSection(draft, from, to)
+  if (result === undefined) {
+    return
+  }
+  const label = sectionLabel(t, { ...draft, sections: result.sections }, result.index)
+  const step = to.step === null ? undefined : (result.steps?.[to.step] as Record<string, unknown> | undefined)
+  const textKey = (step?.title as { textKey?: unknown } | undefined)?.textKey
+  const named = step === undefined || !Array.isArray(step.sections) ? [] : (step.sections as unknown[])
+  const position = step === undefined ? result.index : named.findIndex((name) => name === label)
+  const where =
+    to.step === null ? '' : ` · ${typeof textKey === 'string' && textKey !== '' ? t(textKey) : `/steps/${to.step}`}`
+  onChange('/sections', result.sections)
+  if (result.steps !== undefined) {
+    onChange('/steps', result.steps)
+  }
+  onSelect(`/sections/${result.index}`)
+  onAnnounce(
+    `${t('shell.studio.palette.moved')} ${label}${where} · ${t('shell.studio.palette.position')} ${position + 1}`,
   )
 }
