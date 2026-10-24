@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { confirmDialog, waitForDialog } from '../dialogs'
 import { sessionFile, useSession } from '../sessions'
 
 // anna holds the delete grant on notes. dung, a finance reviewer, reads notes whose title contains
@@ -25,9 +26,9 @@ test('a user with the delete grant deletes a note after confirming', async ({ pa
   await page.goto(deletesPage)
   const row = page.getByRole('row', { name: new RegExp(title) })
   await row.getByRole('button', { name: 'Delete', exact: true }).click()
-  const dialog = page.getByRole('dialog')
+  const dialog = await waitForDialog(page)
   await expect(dialog).toContainText('Delete this record? This cannot be undone.')
-  await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
+  await confirmDialog(page, 'Delete')
 
   await expect(page.getByTestId('table-action-done')).toHaveText('The record was deleted.')
   await expect(row).toHaveCount(0)

@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { startServer } from '../activate'
+import { waitForDialog } from '../dialogs'
 import { pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
@@ -166,7 +167,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await useSession(page, 'hoa')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     await page.getByRole('button', { name: 'New resource', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'New resource', exact: true })
+    const dialog = await waitForDialog(page, 'New resource')
     const create = dialog.getByRole('button', { name: 'Create', exact: true })
 
     const started = Date.now()

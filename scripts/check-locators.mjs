@@ -6,6 +6,8 @@
 // text, because a partial match can pick the wrong element. A regular expression literal or
 // new RegExp(...) states on purpose how much it matches and is allowed. The check reads the
 // source as text, so a name it cannot see, such as one inside an options variable, is reported.
+// A spec under tests/e2e/specs/ must not look up a dialog with getByRole('dialog') itself, because a click
+// during the dialog's opening is lost. It reaches the dialog through waitForDialog or confirmDialog in dialogs.ts.
 // Prints one line per problem on stderr as file:line and exits 1 when any call is loose.
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -217,7 +219,11 @@ function lineOf(source, index) {
   return source.slice(0, index).split('\n').length
 }
 
-/** Returns every locator call in the source with its line and the reason it is loose, if it is. */
+function isDialogLookup(method, source, args) {
+  return method === 'getByRole' && args.length > 0 && /^(['"`])dialog\1$/.test(source.slice(...args[0]))
+}
+
+/** Returns every locator call with its line, its loose reason if any, and whether it looks up a dialog. */
 function locatorCalls(source) {
   const masked = maskSource(source)
   const calls = []
@@ -227,11 +233,16 @@ function locatorCalls(source) {
     const open = match.index + match[0].length - 1
     const close = matchingClose(masked, open)
     if (close < 0) {
-      calls.push({ line, method, reason: 'call is not closed' })
+      calls.push({ line, method, reason: 'call is not closed', dialog: false })
       continue
     }
     const args = splitTopLevel(masked, open + 1, close)
-    calls.push({ line, method, reason: looseReason(method, source, masked, args) })
+    calls.push({
+      line,
+      method,
+      reason: looseReason(method, source, masked, args),
+      dialog: isDialogLookup(method, source, args),
+    })
   }
   return calls
 }
@@ -241,6 +252,13 @@ export function findLooseLocators(source) {
   return locatorCalls(source)
     .filter((call) => call.reason)
     .map(({ line, method, reason }) => ({ line, method, reason }))
+}
+
+/** Returns the lines of the getByRole('dialog') calls in the source. */
+export function findDialogLookups(source) {
+  return locatorCalls(source)
+    .filter((call) => call.dialog)
+    .map(({ line }) => line)
 }
 
 function findTypeScriptFiles(directory, files = []) {
@@ -264,8 +282,12 @@ export function checkLocators(root) {
     const relativeFile = path.relative(root, file).split(path.sep).join('/')
     const calls = locatorCalls(readFileSync(file, 'utf8'))
     callCount += calls.length
-    for (const { line, method, reason } of calls) {
+    const isSpec = relativeFile.startsWith('tests/e2e/specs/')
+    for (const { line, method, reason, dialog } of calls) {
       if (reason) problems.push({ file: relativeFile, line, method, reason })
+      if (dialog && isSpec) {
+        problems.push({ file: relativeFile, line, method, reason: 'dialog without waitForDialog or confirmDialog' })
+      }
     }
   }
   return { problems, callCount, fileCount: files.length }

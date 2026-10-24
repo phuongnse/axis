@@ -741,6 +741,8 @@ Playwright specs match accessible names and texts exactly. A string name or text
 `getByRole`, `getByLabel`, `getByText` or `getByTitle` comes with `exact: true`. Only a regular
 expression matches part of a name. `scripts/lint.sh` fails on a call that breaks this.
 
+Specs reach a dialog only through `waitForDialog` and `confirmDialog` in `tests/e2e/dialogs.ts`. A dialog zooms in when it opens, and a click during the zoom is lost. So `waitForDialog` returns the dialog once it is fully opaque and its opening animation has ended. `confirmDialog` waits the same way before it clicks its button, and it retries until the dialog closes. `scripts/lint.sh` fails when a file under `tests/e2e/specs/` calls `getByRole('dialog')` itself.
+
 Only `*PerformanceTests` classes may assert on elapsed time, because they run alone.
 Other tests prove a bound with a count, such as the steps used or the nodes inlined, and
 show that nothing waited through an outcome. `scripts/lint.sh` fails when a test file

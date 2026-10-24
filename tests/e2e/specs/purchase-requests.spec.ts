@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { waitForDialog } from '../dialogs'
 import { expectChosen, pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 
@@ -27,7 +28,7 @@ async function departmentId(request: APIRequestContext, name: string) {
 /** Opens the lookup of the reference field `field`, labelled `label`, and picks the row named `name`. */
 async function choose(page: Page, field: string, label: string, name: string) {
   await page.getByTestId(`reference-${field}`).getByRole('button', { name: 'Choose', exact: true }).click()
-  const dialog = page.getByRole('dialog')
+  const dialog = await waitForDialog(page)
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
   await expect(dialog).toBeHidden()
   await expect(page.getByLabel(label, { exact: true })).toHaveValue(name)
@@ -374,7 +375,7 @@ test('searching in the supplier lookup filters the suppliers by name, and pickin
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
 
   await page.getByTestId('reference-supplier').getByRole('button', { name: 'Choose', exact: true }).click()
-  const dialog = page.getByRole('dialog')
+  const dialog = await waitForDialog(page)
   await expect(dialog.getByRole('row', { name: /Acme Supplies/ })).toBeVisible()
   await dialog.getByLabel('Search', { exact: true }).fill('glob')
 

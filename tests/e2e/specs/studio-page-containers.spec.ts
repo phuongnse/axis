@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { startServer } from '../activate'
-import { confirmDialog } from '../dialogs'
+import { confirmDialog, waitForDialog } from '../dialogs'
 import { pickAction, pickOption } from '../select'
 import { e2eApp } from '../server-settings'
 import { useSession } from '../sessions'
@@ -66,7 +66,7 @@ test.describe('Studio builds a page with two columns', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
     await page.getByRole('button', { name: 'New application', exact: true }).click()
-    const dialog = page.getByRole('dialog')
+    const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
     await dialog.getByRole('radio', { name: /^Request approval/ }).click()
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
@@ -74,12 +74,13 @@ test.describe('Studio builds a page with two columns', () => {
     await expect(dialog).toBeHidden()
 
     await page.getByRole('button', { name: 'New resource', exact: true }).click()
-    await pickOption(dialog.getByRole('combobox', { name: 'Kind', exact: true }), 'page')
-    await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Overview')
-    await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+    const resource = await waitForDialog(page)
+    await pickOption(resource.getByRole('combobox', { name: 'Kind', exact: true }), 'page')
+    await resource.getByRole('textbox', { name: 'Name', exact: true }).fill('Overview')
+    await resource.getByRole('button', { name: 'Create', exact: true }).click()
     // The dialog gives the focus back to the New resource button when its close animation ends, and the pick helpers
     // press Enter, so they start only when it is gone.
-    await expect(dialog).toBeHidden()
+    await expect(resource).toBeHidden()
     const editor = page.getByTestId('studio-page-editor')
     await expect(editor.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Overview')
 

@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { startServer } from "../activate";
+import { confirmDialog } from "../dialogs";
 import { useSession } from "../sessions";
 
 // Each journey starts a second server and publishes once, which takes a while.
@@ -46,10 +47,7 @@ async function publishedOrder(page: Page, testInfo: TestInfo, prefix: string) {
     await useSession(page, "hoa");
     await page.goto(`${server.url}/studio?app=${name}`);
     await page.getByRole("button", { name: "Publish", exact: true }).click();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Publish", exact: true })
-      .click();
+    await confirmDialog(page, "Publish");
     await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
       "data-status",
       "succeeded",

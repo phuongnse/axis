@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { waitForDialog } from '../dialogs'
 import {
   appPath,
   createRequest,
@@ -124,7 +125,7 @@ test('a finance reviewer cancels a waiting request in the inspector and its task
   await expect(page.getByTestId('inspector-instance')).toBeVisible()
   await expect(page.getByTestId('inspector-command-retry')).toHaveCount(0)
   await page.getByTestId('inspector-command-cancel').click()
-  const dialog = page.getByRole('dialog')
+  const dialog = await waitForDialog(page)
   await dialog.getByLabel('Reason', { exact: true }).fill('The request was raised by mistake')
   await dialog.getByRole('button', { name: 'Send', exact: true }).click()
 
@@ -195,7 +196,7 @@ test('a finance reviewer resolves an unknown purchase order call in the inspecto
 
   await page.goto(`/purchasing/approvals/${instanceId}`)
   await page.getByTestId(`inspector-resolve-${callId}`).click()
-  const dialog = page.getByRole('dialog')
+  const dialog = await waitForDialog(page)
   await dialog.getByLabel('Reason', { exact: true }).fill('The order exists in the purchasing system')
   await dialog.getByLabel('Succeeded', { exact: true }).check()
   await dialog.getByLabel('orderNumber (text)', { exact: true }).fill(orderNumber)
