@@ -821,12 +821,22 @@ Run and the Test results list, the read-only view of a module entity, and the re
     graph has. The marks come from the route's latest answer, so they follow the
     unsaved draft.
   - **Selection.** A click on the canvas or a pick in the widget tree selects a
-    widget in both. The selected widget is the open path and has
-    `aria-current`.
+    widget in both. The selected widget has `aria-current`. _Partly built:_ a
+    click selects the innermost widget under the pointer, and a click on the
+    empty area of a container selects the container. A pick in the tree outlines
+    the widget on the canvas in the primary colour, and the selected frame has
+    `aria-current`. Every frame is a Tab stop, and Enter or Space selects it. A
+    frame's name is its type and summary, such as `table · PurchaseRequestList`,
+    with "has diagnostics" when it is marked. The selection is kept across the
+    Design and Form tabs while the resource stays open. It is not in the URL's
+    `path`, because `path` makes the editor open the Form tab.
   - **Property panel.** It sits beside the canvas and shows the widget's
     existing panel. An edit redraws the canvas. Each action draws as a button
     on the canvas, and selecting it opens its action in the panel, including a
-    `delete` action.
+    `delete` action. _Partly built:_ the side pane of the Design tab holds the
+    whole widget tree and the panel of the selected widget, the same as the Form
+    tab. An edit redraws the canvas through the 300 ms draft post. An action's
+    button does not select its action yet.
   - **Palette.** It lists the ten widget types. The author drags one onto the
     canvas, or picks one and inserts it after the selected widget or into the
     selected container. A type is disabled, with the reason, when the page

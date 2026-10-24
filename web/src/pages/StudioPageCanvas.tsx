@@ -2,6 +2,8 @@ import { Alert, Card, Segmented, Typography } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
 import { setApiGuard } from '../platform/api'
+import { getAt } from '../platform/jsonPatch'
+import { widgetSummary } from '../platform/pageWidgets'
 import { PageLayout } from '../platform/PageLayout'
 import { PageLeaf } from '../platform/PageLeaf'
 import { placeholderApi, placeholderPageValues } from '../platform/placeholderApi'
@@ -39,6 +41,8 @@ function cancel(event: SyntheticEvent) {
   event.stopPropagation()
 }
 
+const frameSelector = '[data-testid="studio-canvas-widget"]'
+
 /**
  * The application's own texts, from Studio's names: the platform locale when the application has it, otherwise its
  * first locale, which is also the fallback. The platform texts come after, through the outer catalogs.
@@ -67,16 +71,23 @@ function canvasTexts(names: StudioNames | undefined, platformLocale: string | un
  * route 300 ms after the last edit and redraws from the answer. While it is mounted, the widgets' `/api/apps/`
  * calls get placeholder data in the browser and none goes to the server. A click or a submit on the canvas does
  * nothing. A widget that does not compile draws as a placeholder with its diagnostics. A widget that a diagnostic
- * names is marked. The width switch draws the page at phone width, 375 px, with the phone layout.
+ * names is marked. The width switch draws the page at phone width, 375 px, with the phone layout. A click selects the
+ * innermost widget under the pointer. Each widget is a Tab stop, which Enter or Space selects, and its name is its
+ * type and summary from the draft. The widget at `selected` is outlined and has `aria-current`.
  */
 export function StudioPageCanvas({
   application,
   resourceId,
   draft,
+  selected,
+  onSelect,
 }: {
   application: string
   resourceId: string
   draft: Record<string, unknown>
+  /** The pointer of the selected widget. */
+  selected: string
+  onSelect: (path: string) => void
 }) {
   const outer = useTextCatalogs()
   const names = useContext(StudioNamesContext)
@@ -128,20 +139,35 @@ export function StudioPageCanvas({
   const pageValues = useMemo(() => placeholderPageValues(page?.parameters ?? []), [page])
   const pages = useMemo(() => names?.pages.map((entry) => entry.name) ?? [], [names])
 
-  const frameWidget = (widget: PageWidgetMetadata | PlaceholderWidgetMetadata, content: ReactNode) => (
-    <CanvasWidgetFrame
-      type={widget.type}
-      path={widget.path}
-      marked={diagnosticsAt(diagnostics, widget.path).length > 0}
-    >
-      {content}
-    </CanvasWidgetFrame>
-  )
+  const frameWidget = (widget: PageWidgetMetadata | PlaceholderWidgetMetadata, content: ReactNode) => {
+    const path = widget.path
+    const draftWidget = path === undefined ? undefined : getAt(draft, path)
+    return (
+      <CanvasWidgetFrame
+        type={widget.type}
+        path={path}
+        summary={isContent(draftWidget) ? widgetSummary(draftWidget) : ''}
+        marked={diagnosticsAt(diagnostics, path).length > 0}
+        selected={path !== undefined && path === selected}
+        onSelect={path === undefined ? undefined : () => onSelect(path)}
+      >
+        {content}
+      </CanvasWidgetFrame>
+    )
+  }
+
+  function click(event: SyntheticEvent) {
+    cancel(event)
+    const path = (event.target as HTMLElement).closest<HTMLElement>(frameSelector)?.dataset.path
+    if (path !== undefined) {
+      onSelect(path)
+    }
+  }
 
   return (
     <TextProvider catalogs={catalogs} development={outer.development}>
       <WidthSwitch value={width} onChange={setWidth} />
-      <div data-testid="studio-page-canvas" onClickCapture={cancel} onSubmitCapture={cancel}>
+      <div data-testid="studio-page-canvas" onClickCapture={click} onSubmitCapture={cancel}>
         {drawn?.page === null && (
           <CanvasAlert testId="studio-canvas-cannot-draw" textKey="shell.studio.design.cannotDraw" />
         )}
@@ -202,21 +228,35 @@ function WidthSwitch({ value, onChange }: { value: CanvasWidth; onChange: (width
   )
 }
 
-/** A widget of the canvas. It has a border in the error colour when a diagnostic names it, and `data-marked` then. */
+function isContent(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * A widget of the canvas. It has a border in the error colour when a diagnostic names it, and `data-marked` then. A
+ * widget with a path is a Tab stop that Enter or Space selects. The selected one has an outline in the primary colour
+ * and `aria-current`. Its name is its summary, or its type, and "has diagnostics" when marked.
+ */
 function CanvasWidgetFrame({
   type,
   path,
+  summary,
   marked,
+  selected,
+  onSelect,
   children,
 }: {
   type: string | null
   path: string | undefined
+  summary: string
   marked: boolean
+  selected: boolean
+  onSelect?: () => void
   children: ReactNode
 }) {
   const t = useText()
   const { colour, radius } = useDesignTokens()
-  const label = type ?? t('shell.studio.design.placeholder')
+  const label = summary || (type ?? t('shell.studio.design.placeholder'))
   return (
     <div
       role="group"
@@ -224,7 +264,20 @@ function CanvasWidgetFrame({
       data-path={path}
       data-marked={marked ? 'true' : undefined}
       aria-label={marked ? `${label} · ${t('shell.studio.design.hasDiagnostics')}` : label}
-      style={{ border: `1px solid ${marked ? colour.danger : 'transparent'}`, borderRadius: radius.base }}
+      aria-current={selected ? 'true' : undefined}
+      tabIndex={path === undefined ? undefined : 0}
+      onKeyDown={(event) => {
+        if (onSelect && event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault()
+          onSelect()
+        }
+      }}
+      style={{
+        border: `1px solid ${marked ? colour.danger : 'transparent'}`,
+        borderRadius: radius.base,
+        outline: selected ? `2px solid ${colour.primary}` : undefined,
+        outlineOffset: 2,
+      }}
     >
       {children}
     </div>

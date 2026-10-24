@@ -38,7 +38,7 @@ import { EntityDesigner } from './EntityDesigner'
 import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
-import { PageEditor } from './PageEditor'
+import { PageEditor, PageWidgets } from './PageEditor'
 import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
@@ -112,8 +112,9 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * binding as a name only. A page opens in the page editor, which shows its widgets as a tree with add, move and remove
  * and a panel for the selected widget, and keeps a key it does not show. A process opens in the process editor, which shows its
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
- * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data. Form stays the
- * tab that opens first. A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
+ * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data, beside the same
+ * widget tree and panel as the Form tab. The two tabs share the selected widget, which is not written to the URL.
+ * Form stays the tab that opens first. A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
  * calls `onOpenPath`. A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
  * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
  * of a field of its entity and an expression. When the server does not answer, the draft stays, and the resource loads
@@ -162,6 +163,7 @@ export function StudioEditor({
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
   const [tab, setTab] = useState<'design' | 'form' | 'json'>('form')
+  const [widgetPath, setWidgetPath] = useState('/widgets/0')
   const [seedEntity, setSeedEntity] = useState<SeedEntity>()
   // The other locales of a text resource, read from their files, for the text table to show beside the open one.
   const [otherTexts, setOtherTexts] = useState<TextColumn[]>()
@@ -605,7 +607,25 @@ export function StudioEditor({
                       label: t('shell.studio.design'),
                       children:
                         tab === 'design' ? (
-                          <StudioPageCanvas application={application} resourceId={item.id} draft={draft} />
+                          <Flex gap="middle" align="flex-start" data-testid="studio-page-design">
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <StudioPageCanvas
+                                application={application}
+                                resourceId={item.id}
+                                draft={draft}
+                                selected={widgetPath}
+                                onSelect={setWidgetPath}
+                              />
+                            </div>
+                            <div data-testid="studio-design-panel" style={{ width: 400, flexShrink: 0 }}>
+                              <PageWidgets
+                                value={draft}
+                                selected={widgetPath}
+                                onSelect={setWidgetPath}
+                                onChange={change}
+                              />
+                            </div>
+                          </Flex>
                         ) : null,
                     },
                   ]
@@ -656,7 +676,7 @@ export function StudioEditor({
                 ) : processSchema ? (
                   <ProcessEditor schema={processSchema} value={draft} onChange={change} />
                 ) : item.kind === 'page' && schema ? (
-                  <PageEditor value={draft} onChange={change} />
+                  <PageEditor value={draft} onChange={change} selected={widgetPath} onSelect={setWidgetPath} />
                 ) : endpointSchema ? (
                   <Flex vertical gap="middle">
                     <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
