@@ -62,7 +62,7 @@
           "required": ["name", "operation"],
           "properties": {
             "name": { "$ref": "#/$defs/name", "x-axis-reference": "connector" },
-            "operation": { "$ref": "#/$defs/name" }
+            "operation": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "operation", "of": "1/name" } }
           }
         },
         "operation": {
@@ -121,7 +121,7 @@
         "as": { "$ref": "#/$defs/reference" },
         "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" },
         "step": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "1/process" } },
-        "outcome": { "$ref": "#/$defs/name" },
+        "outcome": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "outcome", "of": "1/step" } },
         "state": { "enum": ["running", "waiting", "completed", "failed", "open"] },
         "assignee": { "$ref": "#/$defs/assignee" },
         "values": { "type": "object" },

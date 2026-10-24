@@ -28,8 +28,10 @@ export function getAt(root: unknown, pointer: string): unknown {
 }
 
 /**
- * The names a property may hold. A kind lists the application's names of that kind. A part lists the fields of
- * the entity or the steps of the process that the draft names at `of`, which is found from `pointer`.
+ * The names a property may hold. A kind lists the application's names of that kind. A part lists names that belong
+ * to the resource the draft names at `of`, which is found from `pointer`: the fields of an entity, the steps of a
+ * process, the parameters or columns of a data source, the operations of a connector or the outcomes of the task
+ * steps with that name. Names match without regard to case.
  */
 export function referenceOptions(names: StudioNames, mark: ReferenceMark, draft: unknown, pointer: string): string[] {
   if (typeof mark === 'string') {
@@ -40,12 +42,43 @@ export function referenceOptions(names: StudioNames, mark: ReferenceMark, draft:
     return []
   }
   const wanted = owner.toLowerCase()
-  if (mark.part === 'field') {
-    const entity = names.entities.find((item) => item.name.toLowerCase() === wanted)
-    return entity?.fields.map((field) => field.name) ?? []
+  const named = (item: { name: string }) => item.name.toLowerCase() === wanted
+  switch (mark.part) {
+    case 'field':
+      return names.entities.find(named)?.fields.map((field) => field.name) ?? []
+    case 'step':
+      return names.processes.find(named)?.steps.map((step) => step.name) ?? []
+    case 'parameter':
+      return names.dataSources.find(named)?.parameters.map((parameter) => parameter.name) ?? []
+    case 'column':
+      return names.dataSources.find(named)?.columns.map((column) => column.name) ?? []
+    case 'operation':
+      return names.connectors.find(named)?.operations.map((operation) => operation.name) ?? []
+    case 'outcome':
+      return [
+        ...new Set(names.processes.flatMap((process) => process.steps.filter(named).flatMap((step) => step.outcomes))),
+      ]
   }
-  const process = names.processes.find((item) => item.name.toLowerCase() === wanted)
-  return process?.steps.map((step) => step.name) ?? []
+}
+
+/** The type of the data source parameter that a `parameter` mark names with `key`, or `undefined` when it is not found. */
+export function parameterType(
+  names: StudioNames,
+  mark: ReferenceMark,
+  draft: unknown,
+  pointer: string,
+  key: string,
+): string | undefined {
+  if (typeof mark === 'string' || mark.part !== 'parameter') {
+    return undefined
+  }
+  const owner = getAt(draft, referencePointer(pointer, mark.of))
+  if (typeof owner !== 'string') {
+    return undefined
+  }
+  return names.dataSources
+    .find((item) => item.name.toLowerCase() === owner.toLowerCase())
+    ?.parameters.find((parameter) => parameter.name.toLowerCase() === key.toLowerCase())?.type
 }
 
 function kindNames(names: StudioNames, kind: string): string[] {

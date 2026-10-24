@@ -384,17 +384,28 @@ agrees. The schemas stay the single source of what the form shows.
   The kind `text` marks a `textKey`.
 - **Part form.** `"x-axis-reference": { "part": "<part>", "of": "<pointer>" }`
   marks a property that holds a part of another resource.
-  - `part` is `field` or `step`. The schemas mark no other part yet. _(Planned
-    for M13.)_ `parameter`, `column`, `outcome` and `operation`.
+  - `part` is `field`, `step`, `parameter`, `column`, `outcome` or `operation`.
+    A `parameter` or `column` part belongs to a data source, an `operation`
+    part to a connector, and a `step` part to a process.
+  - A mark on a map's `propertyNames` marks the map's keys. The data source
+    `parameters` of a schedule trigger and of a table widget are such maps,
+    because a parameter is named only as a key.
   - `of` is a JSON Pointer from the resource root, or a Relative JSON Pointer
     `N/<pointer>`, to the property that names the resource the part belongs
-    to. A relative pointer goes up `N` segments from the marked property.
+    to. A relative pointer goes up `N` segments from the marked property. For
+    `outcome`, `of` names the task step. The picker gathers that step's outcomes
+    from every process, because a `completeTask` step names a step and never a
+    process.
 - **Examples.** A form field's `field` is `{ "part": "field", "of": "/entity" }`,
   because the form's `entity` names the entity whose fields it lists. A grant's
   `fields` item is `{ "part": "field", "of": "2/entity" }`, because the entity
   sits two levels above the item. A process step's `next` is
   `{ "part": "step", "of": "/name" }`, because the process's `name` names the
-  process whose steps it lists.
+  process whose steps it lists. A KPI's `measure` is
+  `{ "part": "column", "of": "1/dataSource" }`, because the widget's
+  `dataSource` sits one level above it and the picker lists that data source's
+  columns. The keys of a schedule trigger's `parameters` map are
+  `{ "part": "parameter", "of": "/dataSource" }` on `propertyNames`.
 - *(Planned.)* **Set keys.** The keys of a process `updateRecord` step's `set`
   map are fields of the process's `/entity` in the same way.
 - **Exempt relations.** Text entries, packages, modules, rule calls and field
