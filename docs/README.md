@@ -49,6 +49,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Security](reference/security.md)                                      | Sign-in and the session, machine callers, authorization, development users            |
 | [Frontend](reference/frontend.md)                                      | The SPA, sites, pages and widgets                                                     |
 | [Studio](reference/studio.md)                                          | The Studio page: editors, designers, publishing, tests                                |
+| [Form designer](reference/form-designer.md)                            | The Design tab of the form editor: canvas, field palette, layout outline, moves       |
 | [Authoring API](reference/authoring.md)                                | The API that Studio uses to read, write and publish application folders               |
 | [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, admin and telemetry settings      |
 | [Administration](reference/administration.md)                          | The `Axis.Admin` commands: tenants, backup, restore, migrate, activate, publisher     |
