@@ -6,8 +6,10 @@ import {
   insertionPlace,
   moveField,
   movePlace,
+  moveSection,
   outline,
   paletteFields,
+  sectionMovePlace,
 } from './formLayout'
 import type { StudioNames } from './studio'
 
@@ -127,6 +129,84 @@ describe('moveField', () => {
     expect(moveField(draft, { section: 0, index: 0 }, { section: 9, index: 0 })).toBeUndefined()
     expect(moveField(draft, { section: 0, index: 0 }, { section: 0, index: 0 })).toBeUndefined()
     expect(moveField(draft, { section: 0, index: 1 }, { section: 0, index: 9 })).toBeUndefined()
+  })
+})
+
+describe('sectionMovePlace', () => {
+  it('takes the place of a section by its place in its step, or in sections without steps', () => {
+    expect(sectionMovePlace(draft, '/sections/0')).toEqual({ step: 1, index: 0 })
+    expect(sectionMovePlace({ sections: [{ name: 'a' }, { name: 'b' }] }, '/sections/1')).toEqual({
+      step: null,
+      index: 1,
+    })
+  })
+
+  it('takes the end of a step list for a step pointer', () => {
+    expect(sectionMovePlace(draft, '/steps/1')).toEqual({ step: 1, index: 2 })
+    expect(sectionMovePlace(draft, '/steps/5')).toBeUndefined()
+    expect(sectionMovePlace({ sections: [] }, '/steps/0')).toBeUndefined()
+  })
+
+  it('finds no place for a section no step lists, a missing section or another pointer', () => {
+    expect(sectionMovePlace(draft, '/sections/2')).toBeUndefined()
+    expect(sectionMovePlace(draft, '/sections/9')).toBeUndefined()
+    expect(sectionMovePlace(draft, '/sections/0/fields/0')).toBeUndefined()
+  })
+})
+
+describe('moveSection', () => {
+  const plain = { sections: [{ name: 'a' }, { name: 'b' }, { name: 'c' }] }
+  const stepped = {
+    sections: [{ name: 'a' }, { name: 'b' }, { name: 'c' }, { name: 'd' }],
+    steps: [
+      { title: { textKey: 'one' }, sections: ['a', 'b'] },
+      { title: { textKey: 'two' }, sections: ['C'] },
+    ],
+  }
+  const names = (sections: unknown[] | undefined) => sections?.map((section) => (section as { name: string }).name)
+
+  it('reorders sections of a form without steps', () => {
+    const result = moveSection(plain, 0, { step: null, index: 2 })
+    expect(names(result?.sections)).toEqual(['b', 'c', 'a'])
+    expect(result?.steps).toBeUndefined()
+    expect(result?.index).toBe(2)
+    expect(names(moveSection(plain, 2, { step: null, index: 0 })?.sections)).toEqual(['c', 'a', 'b'])
+  })
+
+  it('reorders within a step and makes sections follow the step order', () => {
+    const result = moveSection(stepped, 1, { step: 0, index: 0 })
+    expect(result?.steps).toEqual([{ title: { textKey: 'one' }, sections: ['b', 'a'] }, stepped.steps[1]])
+    expect(result?.steps?.[1]).toBe(stepped.steps[1])
+    expect(names(result?.sections)).toEqual(['b', 'a', 'c', 'd'])
+    expect(result?.index).toBe(0)
+  })
+
+  it('moves a section to another step and leaves the first step without it', () => {
+    const result = moveSection(stepped, 0, { step: 1, index: Number.MAX_SAFE_INTEGER })
+    expect(result?.steps).toEqual([
+      { title: { textKey: 'one' }, sections: ['b'] },
+      { title: { textKey: 'two' }, sections: ['C', 'a'] },
+    ])
+    expect(names(result?.sections)).toEqual(['b', 'c', 'a', 'd'])
+    expect(result?.index).toBe(2)
+  })
+
+  it('puts a section that no step lists in a step, and keeps unlisted ones at the end', () => {
+    const result = moveSection(stepped, 3, { step: 0, index: 1 })
+    expect(result?.steps?.[0]).toEqual({ title: { textKey: 'one' }, sections: ['a', 'd', 'b'] })
+    expect(names(result?.sections)).toEqual(['a', 'd', 'b', 'c'])
+  })
+
+  it('moves nothing when the section lands where it was or cannot move', () => {
+    expect(moveSection(plain, 1, { step: null, index: 1 })).toBeUndefined()
+    expect(moveSection(plain, 0, { step: null, index: 0 })).toBeUndefined()
+    expect(moveSection(plain, 9, { step: null, index: 0 })).toBeUndefined()
+    expect(moveSection(plain, 0, { step: 0, index: 0 })).toBeUndefined()
+    expect(moveSection(stepped, 0, { step: 0, index: 0 })).toBeUndefined()
+    expect(moveSection(stepped, 1, { step: 0, index: 9 })).toBeUndefined()
+    expect(moveSection(stepped, 0, { step: 5, index: 0 })).toBeUndefined()
+    expect(moveSection(stepped, 0, { step: null, index: 0 })).toBeUndefined()
+    expect(moveSection({ ...stepped, sections: [{}, ...stepped.sections] }, 0, { step: 1, index: 0 })).toBeUndefined()
   })
 })
 

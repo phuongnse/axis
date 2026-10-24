@@ -925,7 +925,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     `StudioPageDesign` and `StudioFormDesign`, and load when the Design tab
     opens. The build fails when the page chunk is missing or is part of the main
     bundle. The pointer moves of existing widgets use the core package and the
-    palette's drop targets. The form outline's field moves use
+    palette's drop targets. The form outline's field and section moves use
     `@dnd-kit/sortable`.
   - **Format.** The designer writes only the order of the widget tree and the
     properties the format has. It writes no pixels, and widths stay in twelfths.

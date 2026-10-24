@@ -71,8 +71,19 @@ Dn refers to [decisions.md](../decisions.md).
     another section it lands just before that field. An empty section takes it
     too, and a section that has fields is not a target. The field keeps all its
     keys and stays selected, and the live region names the field, its section
-    and its position. A move is one change of the draft, so one undo reverses
-    it. Moving sections and the Move to step picker are not built yet.
+    and its position. A section row moves the same way: by a pointer drag from
+    its title line, or by the keyboard. It takes the place of the section row it
+    is dropped on, and a drop on another step's heading in the outline appends
+    it to that step. While a section moves, field rows are not targets, and
+    while a field moves, step headings are not. The section property panel of a
+    form with steps has a Move to step picker, which appends the section to the
+    chosen step. On a form with steps, `sections` follows the step order after a
+    move: the first step's sections, then the second step's and so on, then the
+    sections that no step lists. A section that no step lists is not a target,
+    and a section without a `name` cannot move between steps. The live region
+    names the section, its step and its position, and the section stays
+    selected. A move is one change of the draft, so one undo reverses it. A drop
+    on a step in the step switch is not built yet.
   - **Sections and steps.** The palette adds a section, with a unique `name`
     and a new title key that the label editor opens, and a step. A new section
     joins the selected step. Adding the first step names every unnamed section

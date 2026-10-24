@@ -164,6 +164,127 @@ export function moveField(
   return { sections: next, place: { section: to.section, index } }
 }
 
+/** Where a section goes: the index of its step, or null without steps, and the position in that step's list or in `sections`. */
+export interface SectionPlace {
+  step: number | null
+  index: number
+}
+
+/** The steps of a draft, or `undefined` when it has none. */
+function stepsOf(draft: Content): unknown[] | undefined {
+  return Array.isArray(draft.steps) && draft.steps.length > 0 ? draft.steps : undefined
+}
+
+/** The section names that a step lists, or none. */
+function listedBy(step: unknown): unknown[] {
+  return isContent(step) && Array.isArray(step.sections) ? step.sections : []
+}
+
+function sameName(name: unknown, wanted: string): boolean {
+  return typeof name === 'string' && name.toLowerCase() === wanted
+}
+
+/**
+ * Where a drop on the pointer of an outline section or step moves a section. Without steps, a section takes the place
+ * of the section it is dropped on. With steps, it takes the place in the list of the step that lists the dropped-on
+ * section, and a step takes it at the end of its list. `undefined` for any other pointer, and for a section that no
+ * step lists.
+ */
+export function sectionMovePlace(draft: Content, pointer: string): SectionPlace | undefined {
+  const sections = Array.isArray(draft.sections) ? draft.sections : []
+  const steps = stepsOf(draft)
+  const section = /^\/sections\/(\d+)$/.exec(pointer)
+  if (section !== null && Number(section[1]) < sections.length) {
+    if (steps === undefined) {
+      return { step: null, index: Number(section[1]) }
+    }
+    const named = sections[Number(section[1])]
+    const wanted = isContent(named) && typeof named.name === 'string' ? named.name.toLowerCase() : undefined
+    if (wanted === undefined) {
+      return undefined
+    }
+    const step = steps.findIndex((item) => listedBy(item).some((name) => sameName(name, wanted)))
+    return step < 0 ? undefined : { step, index: listedBy(steps[step]).findIndex((name) => sameName(name, wanted)) }
+  }
+  const step = /^\/steps\/(\d+)$/.exec(pointer)
+  if (step !== null && steps !== undefined && isContent(steps[Number(step[1])])) {
+    return { step: Number(step[1]), index: listedBy(steps[Number(step[1])]).length }
+  }
+  return undefined
+}
+
+/**
+ * Moves the section at `from` to `to`. Without steps, the section is taken out and put at `to.index` of `sections`.
+ * With steps, its name leaves every step's list and joins the list of step `to.step` at `to.index`, which is clamped
+ * to that list after the removal. Then `sections` is rebuilt to follow the steps: the first step's sections, then the
+ * second step's and so on, then the sections that no step lists in their current order. A section moves between steps
+ * only when it has a name. Returns the new `sections`, the new `steps` (`undefined` without steps) and the index where
+ * the section landed. Only the steps that change are rebuilt. `undefined` when `from` names no section, when the
+ * target is missing, and when the section lands where it was.
+ */
+export function moveSection(
+  draft: Content,
+  from: number,
+  to: SectionPlace,
+): { sections: unknown[]; steps: unknown[] | undefined; index: number } | undefined {
+  const sections = Array.isArray(draft.sections) ? draft.sections : []
+  const moved = sections[from]
+  if (moved === undefined) {
+    return undefined
+  }
+  const steps = stepsOf(draft)
+  if (steps === undefined) {
+    if (to.step !== null) {
+      return undefined
+    }
+    const remaining = sections.filter((_, position) => position !== from)
+    const index = Math.max(0, Math.min(to.index, remaining.length))
+    if (index === from) {
+      return undefined
+    }
+    return { sections: [...remaining.slice(0, index), moved, ...remaining.slice(index)], steps: undefined, index }
+  }
+  if (to.step === null || !isContent(moved) || typeof moved.name !== 'string' || moved.name === '') {
+    return undefined
+  }
+  const target = steps[to.step]
+  if (!isContent(target)) {
+    return undefined
+  }
+  const wanted = moved.name.toLowerCase()
+  const without = (step: unknown) => listedBy(step).filter((name) => !sameName(name, wanted))
+  const remaining = without(target)
+  const index = Math.max(0, Math.min(to.index, remaining.length))
+  const current = sectionMovePlace(draft, `/sections/${from}`)
+  if (current?.step === to.step && current.index === index) {
+    return undefined
+  }
+  const nextSteps = steps.map((step, position) => {
+    if (!isContent(step)) {
+      return step
+    }
+    if (position === to.step) {
+      return { ...step, sections: [...remaining.slice(0, index), moved.name, ...remaining.slice(index)] }
+    }
+    const kept = without(step)
+    return kept.length === listedBy(step).length ? step : { ...step, sections: kept }
+  })
+  const order: number[] = []
+  const used = new Set<number>()
+  for (const step of nextSteps) {
+    for (const name of listedBy(step)) {
+      const position = typeof name === 'string' ? sectionNamed(draft, name) : -1
+      if (position >= 0 && !used.has(position)) {
+        used.add(position)
+        order.push(position)
+      }
+    }
+  }
+  const rest = sections.flatMap((_, position) => (used.has(position) ? [] : [position]))
+  const next = [...order, ...rest].map((position) => sections[position])
+  return { sections: next, steps: nextSteps, index: next.indexOf(moved) }
+}
+
 /**
  * The layout of a draft: each step with the indexes of the sections it lists, in the order the step lists them, then
  * the sections that no step lists. A draft without steps has all its sections in one group with no step.

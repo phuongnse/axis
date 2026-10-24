@@ -34,4 +34,26 @@ describe('FormOutline', () => {
     expect(within(rows[1]).queryByTestId('studio-outline-empty-section')).toBeNull()
     expect(screen.getAllByTestId('studio-outline-empty-section')).toHaveLength(1)
   })
+
+  it('shows sortable section rows under step headings that keep their path', () => {
+    renderOutline({
+      sections: [
+        { name: 'a', fields: [{ field: 'title' }] },
+        { name: 'b', fields: [] },
+      ],
+      steps: [
+        { title: { textKey: 'steps.one' }, sections: ['a'] },
+        { title: { textKey: 'steps.two' }, sections: ['b'] },
+      ],
+    })
+
+    expect(screen.getAllByTestId('studio-outline-step').map((step) => step.getAttribute('data-path'))).toEqual([
+      '/steps/0',
+      '/steps/1',
+    ])
+    expect(screen.getAllByTestId('studio-outline-section').map((row) => row.getAttribute('data-path'))).toEqual([
+      '/sections/0',
+      '/sections/1',
+    ])
+  })
 })

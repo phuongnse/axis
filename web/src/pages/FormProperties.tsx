@@ -1,4 +1,4 @@
-import { Checkbox, Flex, Input, Typography } from 'antd'
+import { Checkbox, Flex, Input, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
 import { getAt } from '../platform/jsonPatch'
 import type { FieldMetadata } from '../platform/site'
@@ -7,6 +7,7 @@ import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
+import { moveSectionTo } from './formPaletteSupport'
 import { LabelTextsContext } from './labelTextsContext'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -26,7 +27,8 @@ function isContent(value: unknown): value is Content {
 
 /**
  * The properties of the element that is selected on the form canvas, found by its JSON Pointer in the draft. A field
- * has `readOnly` and its three conditions, a section its title and `visibleWhen`, and a step its title. A field the
+ * has `readOnly` and its three conditions, a section its title, `visibleWhen` and, on a form with steps, a Move to step
+ * picker, and a step its title. A field the
  * entity marks required has no `visibleWhen` (AXC0226). A computed, sequence or creator field is always read-only. A
  * selection that finds no object in the draft shows a hint, so no edit goes to a stale pointer.
  */
@@ -34,11 +36,17 @@ export function FormProperties({
   draft,
   selected,
   entityFields,
+  onSelect,
+  onAnnounce,
   onChange,
 }: {
   draft: Content
   selected: string | null
   entityFields: FieldMetadata[]
+  /** Selects the section where a move lands. */
+  onSelect: (pointer: string) => void
+  /** Says a move aloud. */
+  onAnnounce: (text: string) => void
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -57,7 +65,16 @@ export function FormProperties({
         />
       )
     } else if (sectionPointer.test(selected)) {
-      panel = <SectionProperties draft={draft} pointer={selected} section={content} onChange={onChange} />
+      panel = (
+        <SectionProperties
+          draft={draft}
+          pointer={selected}
+          section={content}
+          onSelect={onSelect}
+          onAnnounce={onAnnounce}
+          onChange={onChange}
+        />
+      )
     } else if (stepPointer.test(selected)) {
       panel = <StepProperties pointer={selected} step={content} onChange={onChange} />
     }
@@ -129,16 +146,55 @@ function SectionProperties({
   draft,
   pointer,
   section,
+  onSelect,
+  onAnnounce,
   onChange,
 }: {
   draft: Content
   pointer: string
   section: Content
+  onSelect: (pointer: string) => void
+  onAnnounce: (text: string) => void
   onChange: ChangeHandler
 }) {
+  const t = useText()
+  const steps = Array.isArray(draft.steps) ? (draft.steps as unknown[]) : []
+  const name = typeof section.name === 'string' ? section.name.toLowerCase() : ''
+  const current = steps.findIndex(
+    (step) =>
+      isContent(step) &&
+      Array.isArray(step.sections) &&
+      step.sections.some((item) => typeof item === 'string' && item.toLowerCase() === name),
+  )
   return (
     <Flex vertical gap="small" data-testid="studio-design-section">
       <TitleEditor pointer={pointer} element={section} onChange={onChange} />
+      {steps.length > 0 && name !== '' && (
+        <div>
+          <div>{t('shell.studio.design.moveToStep')}</div>
+          <Select
+            aria-label={t('shell.studio.design.moveToStep')}
+            data-testid="studio-design-move-to-step"
+            style={{ width: '100%' }}
+            value={current >= 0 ? current : undefined}
+            options={steps.map((step, index) => {
+              const title = isContent(step) && isContent(step.title) ? step.title.textKey : undefined
+              return { value: index, label: typeof title === 'string' && title !== '' ? t(title) : `/steps/${index}` }
+            })}
+            onChange={(index: number) =>
+              moveSectionTo(
+                t,
+                draft,
+                Number(pointer.slice('/sections/'.length)),
+                { step: index, index: Number.MAX_SAFE_INTEGER },
+                onChange,
+                onSelect,
+                onAnnounce,
+              )
+            }
+          />
+        </div>
+      )}
       <ConditionBox draft={draft} pointer={pointer} element={section} condition="visibleWhen" onChange={onChange} />
     </Flex>
   )
