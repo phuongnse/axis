@@ -14,13 +14,14 @@ run_suite PaymentReferences.Tests samples/packages/PaymentReferences.Tests dotne
 run_suite web web npm test --prefix web -- \
   --reporter=default --reporter=junit --outputFile.junit="$results_dir/web.xml"
 
-# The report, smoke test selection, link check, docs structure check, locator check, dependency scan,
-# E2E folder comparison and hang guard helpers and Helm chart scripts' own tests.
+# The report, smoke test selection, link check, docs structure check, locator check, bundle budget check,
+# dependency scan, E2E folder comparison and hang guard helpers and Helm chart scripts' own tests.
 node --test scripts/test-report.test.mjs || status=1
 node --test scripts/affected.test.mjs || status=1
 node --test scripts/check-links.test.mjs || status=1
 node --test scripts/check-docs.test.mjs || status=1
 node --test scripts/check-locators.test.mjs || status=1
+node --test scripts/check-bundle.test.mjs || status=1
 node --test scripts/scan.test.mjs || status=1
 node --test tests/e2e/folder-comparison.test.ts || status=1
 node --test tests/e2e/hang-guard.test.ts || status=1

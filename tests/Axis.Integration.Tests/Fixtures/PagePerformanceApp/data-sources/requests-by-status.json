@@ -1,0 +1,34 @@
+{
+  "id": "f80b3f69-640e-4e53-b970-d91029d9585a",
+  "kind": "dataSource",
+  "name": "RequestsByStatus",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    {
+      "name": "status",
+      "path": "status"
+    },
+    {
+      "name": "amount",
+      "path": "amount"
+    }
+  ],
+  "aggregate": {
+    "groupBy": [
+      "status"
+    ],
+    "measures": [
+      {
+        "name": "requests",
+        "function": "count"
+      },
+      {
+        "name": "amountSum",
+        "function": "sum",
+        "field": "amount"
+      }
+    ]
+  },
+  "sort": "status"
+}

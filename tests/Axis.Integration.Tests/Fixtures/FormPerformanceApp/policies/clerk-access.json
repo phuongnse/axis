@@ -1,0 +1,19 @@
+{
+  "id": "8a9633ef-ebe9-4a5b-a9ec-82947edc639d",
+  "kind": "policy",
+  "name": "ClerkAccess",
+  "formatVersion": 1,
+  "roles": [
+    "clerk"
+  ],
+  "grants": [
+    {
+      "entity": "Claim",
+      "actions": [
+        "read",
+        "create",
+        "update"
+      ]
+    }
+  ]
+}

@@ -262,6 +262,14 @@ test('a category is picked in the lookup and shows on the saved note', async ({ 
   await page.getByRole('textbox', { name: '* Title', exact: true }).fill(`Lookup ${run}`)
   await page.getByRole('button', { name: 'Choose', exact: true }).click()
   const dialog = page.getByRole('dialog')
+  // The dialog zooms in. A click that lands while it still grows can leave it open, so wait until it has settled.
+  await expect
+    .poll(async () => {
+      const before = await dialog.boundingBox()
+      await page.waitForTimeout(100)
+      return JSON.stringify(before) === JSON.stringify(await dialog.boundingBox())
+    })
+    .toBe(true)
   await dialog.getByRole('row', { name: new RegExp(category) }).click()
 
   await expect(dialog).toBeHidden()

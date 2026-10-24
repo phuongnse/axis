@@ -661,6 +661,9 @@ Computed fields are calculated on it.
   a body of the wrong shape: it is not an object, `recordId` is not `null` or a
   UUID, `values` is not an object, `touched` is not an array of text, a property
   is repeated, unknown or missing (`recordId` may be left out).
+- At typical size, a form of 25 fields with a condition each and 50 line items,
+  it answers within 300 ms. `TypicalFormStatePerformanceTests` fails when a call
+  stays over that at best of three attempts.
 - It writes nothing, adds no audit record and uses no sequence number. It
   does not run unique or reference-existence checks, because they query
   storage on every keystroke and could reveal which records exist. A save runs

@@ -1,0 +1,31 @@
+{
+  "id": "53fb90f6-742f-47eb-be1a-5b58631c682d",
+  "kind": "dataSource",
+  "name": "RequestList",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    {
+      "name": "title",
+      "path": "title"
+    },
+    {
+      "name": "amount",
+      "path": "amount"
+    },
+    {
+      "name": "status",
+      "path": "status"
+    },
+    {
+      "name": "createdOn",
+      "path": "createdOn"
+    },
+    {
+      "name": "departmentName",
+      "path": "department.name"
+    }
+  ],
+  "sort": "createdOn",
+  "pageSize": 50
+}

@@ -1,0 +1,165 @@
+{
+  "id": "9714cc5d-e032-40a3-93b5-43a365fb1627",
+  "kind": "form",
+  "name": "ClaimEdit",
+  "formatVersion": 1,
+  "entity": "Claim",
+  "sections": [
+    {
+      "name": "general",
+      "title": {
+        "textKey": "claimEdit.general"
+      },
+      "fields": [
+        {
+          "field": "title",
+          "readOnlyWhen": "status == 'approved'"
+        },
+        {
+          "field": "kind",
+          "requiredWhen": "status == 'submitted'"
+        },
+        {
+          "field": "status",
+          "readOnlyWhen": "status == 'rejected'"
+        },
+        {
+          "field": "priority",
+          "readOnlyWhen": "status == 'approved'"
+        },
+        {
+          "field": "urgent",
+          "visibleWhen": "priority == 'high'"
+        }
+      ]
+    },
+    {
+      "name": "money",
+      "title": {
+        "textKey": "claimEdit.money"
+      },
+      "fields": [
+        {
+          "field": "amount",
+          "requiredWhen": "status == 'submitted'"
+        },
+        {
+          "field": "discount",
+          "visibleWhen": "amount > 100",
+          "readOnlyWhen": "status == 'approved'"
+        },
+        {
+          "field": "total",
+          "visibleWhen": "amount > 0"
+        },
+        {
+          "field": "lineTotal",
+          "visibleWhen": "count(lines) > 0"
+        },
+        {
+          "field": "lineCount",
+          "visibleWhen": "count(lines) > 0"
+        },
+        {
+          "field": "costCenter",
+          "requiredWhen": "amount > 1000"
+        },
+        {
+          "field": "project",
+          "visibleWhen": "kind == 'special'"
+        },
+        {
+          "field": "reference",
+          "readOnlyWhen": "status != 'draft'"
+        }
+      ]
+    },
+    {
+      "name": "approval",
+      "title": {
+        "textKey": "claimEdit.approval"
+      },
+      "visibleWhen": "status != 'draft'",
+      "fields": [
+        {
+          "field": "approver",
+          "requiredWhen": "status == 'approved'"
+        },
+        {
+          "field": "approvalNote",
+          "visibleWhen": "status == 'approved'"
+        },
+        {
+          "field": "rejectionReason",
+          "visibleWhen": "status == 'rejected'",
+          "requiredWhen": "status == 'rejected'"
+        }
+      ]
+    },
+    {
+      "name": "contact",
+      "title": {
+        "textKey": "claimEdit.contact"
+      },
+      "fields": [
+        {
+          "field": "contactName",
+          "requiredWhen": "kind == 'express'"
+        },
+        {
+          "field": "contactEmail",
+          "requiredWhen": "kind == 'express'"
+        },
+        {
+          "field": "contactPhone",
+          "visibleWhen": "kind != 'standard'"
+        }
+      ]
+    },
+    {
+      "name": "address",
+      "title": {
+        "textKey": "claimEdit.address"
+      },
+      "visibleWhen": "kind == 'special' or amount > 500",
+      "fields": [
+        {
+          "field": "addressLine",
+          "requiredWhen": "kind == 'special'"
+        },
+        {
+          "field": "city",
+          "requiredWhen": "kind == 'special'"
+        },
+        {
+          "field": "country",
+          "readOnlyWhen": "kind == 'standard'"
+        },
+        {
+          "field": "postalCode",
+          "visibleWhen": "country is not null"
+        }
+      ]
+    },
+    {
+      "name": "notes",
+      "title": {
+        "textKey": "claimEdit.notes"
+      },
+      "fields": [
+        {
+          "field": "dueOn",
+          "requiredWhen": "urgent == true"
+        },
+        {
+          "field": "notes",
+          "visibleWhen": "priority != 'low'"
+        },
+        {
+          "field": "lines",
+          "readOnlyWhen": "status == 'approved'"
+        }
+      ]
+    }
+  ]
+}

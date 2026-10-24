@@ -1,0 +1,22 @@
+{
+  "id": "b6a40cb8-6450-4033-b5ea-c959e5081adb",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.clerk": "Clerk",
+    "claim.discountTooHigh": "The discount is higher than the amount.",
+    "claim.amountNotNegative": "The amount cannot be negative.",
+    "claim.emailNeedsAt": "The email address needs an @.",
+    "claim.postalCodeShort": "The postal code has at most 10 characters.",
+    "claim.needsLine": "A claim needs a line.",
+    "claimLine.quantityPositive": "The quantity must be positive.",
+    "claimEdit.general": "General",
+    "claimEdit.money": "Money",
+    "claimEdit.approval": "Approval",
+    "claimEdit.contact": "Contact",
+    "claimEdit.address": "Address",
+    "claimEdit.notes": "Notes"
+  }
+}

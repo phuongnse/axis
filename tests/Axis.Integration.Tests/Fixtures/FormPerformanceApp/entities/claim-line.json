@@ -1,0 +1,39 @@
+{
+  "id": "81fe6a19-8311-42e5-a988-07472f90c838",
+  "kind": "entity",
+  "name": "ClaimLine",
+  "formatVersion": 1,
+  "fields": [
+    {
+      "name": "description",
+      "type": "text",
+      "maxLength": 100
+    },
+    {
+      "name": "quantity",
+      "type": "integer"
+    },
+    {
+      "name": "unitPrice",
+      "type": "decimal",
+      "precision": 20,
+      "scale": 2
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "precision": 20,
+      "scale": 2,
+      "expression": "quantity * unitPrice"
+    }
+  ],
+  "validations": [
+    {
+      "expression": "quantity is null or quantity > 0",
+      "message": {
+        "textKey": "claimLine.quantityPositive"
+      },
+      "field": "quantity"
+    }
+  ]
+}
