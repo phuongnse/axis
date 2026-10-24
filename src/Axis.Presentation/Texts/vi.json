@@ -368,6 +368,7 @@
   "shell.studio.page.parameterRequired": "Bắt buộc",
   "shell.studio.page.parameterTarget": "Thực thể đích",
   "shell.studio.page.parameterValues": "Giá trị",
+  "shell.studio.page.parameterBindings": "Tham số trang",
   "shell.studio.page.addParameter": "Thêm tham số",
   "shell.studio.page.removeParameter": "Xóa tham số",
   "shell.studio.page.undeclaredParameter": "Không phải tham số của trang này",

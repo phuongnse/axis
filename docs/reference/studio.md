@@ -537,8 +537,14 @@ Run and the Test results list, the read-only view of a module entity, and the re
       type of its field. Picking another data source keeps the names already
       set, and a name the new data source does not project shows as unknown.
       The compiler reports it after the save. While the names have not loaded,
-      the column pickers are plain boxes. The editor does not check that a
-      `pie` has exactly one measure. See [widget
+      the column pickers are plain boxes. Both panels also have a Parameters
+      list, with one picker for each parameter of the data source. Each picker
+      lists the page parameters of the same type. Clearing a picker removes its
+      key, and a key the list does not show stays as it is. Clearing the last
+      one leaves an empty `parameters` object. A binding to a missing or
+      wrong-type page parameter shows as unknown. The compiler checks the
+      target, the enum values and the required flag after the save. The editor
+      does not check that a `pie` has exactly one measure. See [widget
       binding](data-sources.md#widget-binding) and
       [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
     - **Exclusive bindings.** The compiler accepts exactly one of a table's

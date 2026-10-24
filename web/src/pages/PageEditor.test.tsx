@@ -9,7 +9,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, clearButton, optionTexts, selectRoot, shownDropdown } from '../test/antd'
+import { chooseOption, clearButton, clearSelect, optionTexts, selectRoot, shownDropdown } from '../test/antd'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
 
@@ -26,7 +26,10 @@ const names = {
       id: 'd3',
       name: 'OpenTotals',
       module: null,
-      parameters: [],
+      parameters: [
+        { name: 'inRegion', type: 'text' },
+        { name: 'since', type: 'date' },
+      ],
       columns: [
         { name: 'openCount', type: 'integer' },
         { name: 'urgentCount', type: 'integer' },
@@ -37,7 +40,7 @@ const names = {
       id: 'd4',
       name: 'RequestsByCategory',
       module: null,
-      parameters: [],
+      parameters: [{ name: 'inCategory', type: 'text' }],
       columns: [
         { name: 'category', type: 'text' },
         { name: 'openCount', type: 'integer' },
@@ -1136,6 +1139,53 @@ describe('PageEditor kpi and chart panels', () => {
     expect(
       within(screen.getByTestId('studio-field-/widgets/0/measure')).getByTestId('studio-reference-unknown'),
     ).toHaveTextContent('gone')
+  })
+
+  const pageParameters = [
+    { name: 'region', type: 'text' },
+    { name: 'from', type: 'date' },
+    { name: 'count', type: 'integer' },
+  ]
+
+  it('binds a KPI and a chart parameter to a page parameter of the same type', async () => {
+    const savedKpi = renderStateful(page({ ...kpi, dataSource: 'OpenTotals' }, { parameters: pageParameters }))
+    expect(await listed('studio-field-/widgets/0/parameters/inRegion')).toEqual(['region'])
+    await userEvent.keyboard('{Escape}')
+    await chooseOption('region', screen.getByTestId('studio-field-/widgets/0/parameters/inRegion'))
+    expect(savedKpi().widgets).toEqual([{ ...kpi, dataSource: 'OpenTotals', parameters: { inRegion: 'region' } }])
+
+    cleanup()
+    const savedChart = renderStateful(
+      page({ ...chart, dataSource: 'RequestsByCategory' }, { parameters: pageParameters }),
+    )
+    expect(await listed('studio-field-/widgets/0/parameters/inCategory')).toEqual(['region'])
+    await userEvent.keyboard('{Escape}')
+    await chooseOption('region', screen.getByTestId('studio-field-/widgets/0/parameters/inCategory'))
+    expect(savedChart().widgets).toEqual([
+      { ...chart, dataSource: 'RequestsByCategory', parameters: { inCategory: 'region' } },
+    ])
+  })
+
+  it('clears one binding and keeps a key the panel does not show', async () => {
+    const saved = renderStateful(
+      page(
+        { ...kpi, dataSource: 'OpenTotals', parameters: { inRegion: 'region', Extra: 'x' } },
+        { parameters: pageParameters },
+      ),
+    )
+
+    await clearSelect(screen.getByTestId('studio-field-/widgets/0/parameters/inRegion'))
+    expect(saved().widgets).toEqual([{ ...kpi, dataSource: 'OpenTotals', parameters: { Extra: 'x' } }])
+  })
+
+  it('tags a page parameter of the wrong type as unknown and lists only the fitting ones', async () => {
+    renderEditor(
+      page({ ...kpi, dataSource: 'OpenTotals', parameters: { since: 'region' } }, { parameters: pageParameters }),
+    )
+    const row = screen.getByTestId('studio-field-/widgets/0/parameters/since')
+
+    expect(within(row).getByTestId('studio-reference-unknown')).toHaveTextContent('region')
+    expect(await listed('studio-field-/widgets/0/parameters/since')).toEqual(['region unknown', 'from'])
   })
 
   it('gives a new KPI and a new chart the keys the schema requires on a type switch', async () => {

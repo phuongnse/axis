@@ -6,6 +6,7 @@ import {
   childLists,
   containerTypes,
   dataSourceColumns,
+  dataSourceParameters,
   isNumberType,
   type ListPart,
   moveTo,
@@ -72,10 +73,12 @@ function JsonOnly() {
  * page does not declare. A `kpi` panel has a data source with a total row, a measure, a label, and an optional comparison
  * and navigate action. A `chart` panel has a data source with one group field, a kind, a category, a title and a list of
  * measures. Their column pickers list only what the chosen data source projects, and a chart's measures only the
- * numbers. A property is a name picked from the application's names, and a table's data source and
- * entity, like a form's or a detail's entity and form, exclude each other, so a pick clears the other. The editor edits
- * the draft through `onChange`, so a key it does not show, on the page or on a widget, stays as it is. A widget of a
- * type it has no panel for shows its type and points to the JSON view.
+ * numbers. A `kpi` and a `chart` panel also list the parameters of their data source, each with a picker over the
+ * page's parameters of the same type, which sets the widget's `parameters`. A property is a name picked from the
+ * application's names, and a table's data source and entity, like a form's or a detail's entity and form, exclude
+ * each other, so a pick clears the other. The editor edits the draft through `onChange`, so a key it does not show,
+ * on the page or on a widget, stays as it is. A widget of a type it has no panel for shows its type and points to the
+ * JSON view.
  */
 export function PageEditor({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
   const t = useText()
@@ -487,7 +490,7 @@ function WidgetPanel({
   /** The pointer of the selected widget. */
   base: string
   widget: unknown
-  /** The page's parameters, which a detail's record names. */
+  /** The page's parameters, which a detail's record names and a KPI or chart binds. */
   parameters: unknown
   onChange: ChangeHandler
 }) {
@@ -626,8 +629,8 @@ function WidgetPanel({
           onPick={(next) => pick('process', next)}
         />
       )}
-      {type === 'kpi' && <KpiPanel base={base} widget={widget} onChange={onChange} />}
-      {type === 'chart' && <ChartPanel base={base} widget={widget} onChange={onChange} />}
+      {type === 'kpi' && <KpiPanel base={base} widget={widget} parameters={parameters} onChange={onChange} />}
+      {type === 'chart' && <ChartPanel base={base} widget={widget} parameters={parameters} onChange={onChange} />}
     </Flex>
   )
 }
@@ -676,11 +679,91 @@ function dataSourcesGroupedBy(names: StudioNames | undefined, count: number): st
 }
 
 /**
+ * The parameter bindings of a KPI or chart: a picker for each parameter of its data source, over the page's parameters
+ * of the same type. A binding to a page parameter that is missing or of another type stays visible and is tagged
+ * unknown. A key that matches no data source parameter is not shown and stays in the widget.
+ */
+function ParameterBindings({
+  base,
+  dataSource,
+  value,
+  pageParameters,
+  onChange,
+}: {
+  base: string
+  dataSource: unknown
+  value: unknown
+  pageParameters: unknown
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const names = useContext(StudioNamesContext)
+  const parameters = names === undefined ? undefined : dataSourceParameters(names, dataSource)
+  if (parameters === undefined || parameters.length === 0) {
+    return null
+  }
+
+  const pointer = `${base}/parameters`
+  if (value !== undefined && !isContent(value)) {
+    return (
+      <div data-testid={`studio-field-${pointer}`}>
+        <div>{t('shell.studio.page.parameterBindings')}</div>
+        <JsonOnly />
+      </div>
+    )
+  }
+
+  const bound: Content = isContent(value) ? value : {}
+  const candidates = Array.isArray(pageParameters) ? pageParameters : []
+
+  return (
+    <div data-testid={`studio-field-${pointer}`}>
+      <Flex vertical gap="small">
+        <Typography.Text strong>{t('shell.studio.page.parameterBindings')}</Typography.Text>
+        {parameters.map((parameter) => {
+          const key =
+            Object.keys(bound).find((name) => name.toLowerCase() === parameter.name.toLowerCase()) ?? parameter.name
+          const rowPointer = `${pointer}/${escapeSegment(key)}`
+          const current = bound[key]
+          const options = candidates.flatMap((candidate) =>
+            isContent(candidate) && typeof candidate.name === 'string' && candidate.type === parameter.type
+              ? [candidate.name]
+              : [],
+          )
+          return (
+            <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
+              <Typography.Text type="secondary">{`${parameter.name} · ${parameter.type}`}</Typography.Text>
+              <ReferencePicker
+                name={parameter.name}
+                value={typeof current === 'string' ? current : undefined}
+                required={false}
+                options={options}
+                onChange={(next) => onChange(rowPointer, next)}
+              />
+            </div>
+          )
+        })}
+      </Flex>
+    </div>
+  )
+}
+
+/**
  * The panel of a KPI: a data source with a total row, a measure of it and a label. It can add a comparison with its
  * own measure and label, and a navigate action. Picking another data source keeps the names already set, which the
  * pickers tag unknown when the new data source does not project them.
  */
-function KpiPanel({ base, widget, onChange }: { base: string; widget: Content; onChange: ChangeHandler }) {
+function KpiPanel({
+  base,
+  widget,
+  parameters,
+  onChange,
+}: {
+  base: string
+  widget: Content
+  parameters: unknown
+  onChange: ChangeHandler
+}) {
   const t = useText()
   const names = useContext(StudioNamesContext)
   const measures =
@@ -699,6 +782,13 @@ function KpiPanel({ base, widget, onChange }: { base: string; widget: Content; o
         current={widget.dataSource}
         required
         onPick={(next) => onChange(`${base}/dataSource`, next)}
+      />
+      <ParameterBindings
+        base={base}
+        dataSource={widget.dataSource}
+        value={widget.parameters}
+        pageParameters={parameters}
+        onChange={onChange}
       />
       <ColumnField
         pointer={`${base}/measure`}
@@ -780,7 +870,17 @@ const chartKinds = ['bar', 'line', 'pie']
  * The panel of a chart: a data source with one group field, a kind, the category from that field, a title and a list
  * of measures of the data source that are numbers, each with a label. The list keeps at least one measure.
  */
-function ChartPanel({ base, widget, onChange }: { base: string; widget: Content; onChange: ChangeHandler }) {
+function ChartPanel({
+  base,
+  widget,
+  parameters,
+  onChange,
+}: {
+  base: string
+  widget: Content
+  parameters: unknown
+  onChange: ChangeHandler
+}) {
   const t = useText()
   const names = useContext(StudioNamesContext)
   const columns = names === undefined ? undefined : dataSourceColumns(names, widget.dataSource)
@@ -801,6 +901,13 @@ function ChartPanel({ base, widget, onChange }: { base: string; widget: Content;
         current={widget.dataSource}
         required
         onPick={(next) => onChange(`${base}/dataSource`, next)}
+      />
+      <ParameterBindings
+        base={base}
+        dataSource={widget.dataSource}
+        value={widget.parameters}
+        pageParameters={parameters}
+        onChange={onChange}
       />
       <div data-testid={`studio-field-${base}/kind`}>
         <div>{t('shell.studio.page.chartKind')}</div>
