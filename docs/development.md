@@ -267,7 +267,10 @@ fixtures, only for the API paths of the fixture application. It needs no server,
 - The bundle sets `window.Axis`. `window.Axis.<name>(element)` mounts one preview into an element and
   returns a function that unmounts it. The names are `table`, `form`, `taskInbox`, `processInspector`,
   `detail`, `chart-<kind>` for `bar`, `line` and `pie`, `kpi`, `columns`, `tabs`, `section` and
-  `field-<type>` for each field type. A mounted widget follows `data-theme` on the root element of the page.
+  `field-<type>` for each field type. A `field-<type>` preview draws the input the form widget uses for that field type,
+  with its label and the fixture value, laid out as on a form. It has no Save, Cancel or action buttons and no history,
+  which only the `form` preview shows. Its input works as on a form, and nothing is saved. A mounted widget follows
+  `data-theme` on the root element of the page.
   `dark` is dark mode, and any other value or none is light mode. A mounted widget also follows the token custom
   properties of the root element, such as `--primary`, see [frontend](reference/frontend.md).
 - `web/design-system.html` is the harness. After `scripts/design-system.sh`, open it from disk. With no
@@ -277,7 +280,8 @@ fixtures, only for the API paths of the fixture application. It needs no server,
 `tests/e2e/specs/design-system.spec.ts` mounts each preview from the bundle in the harness, in both modes,
 and fails on a console error or on a request other than the harness and the bundle. It also checks that
 changing `data-theme` redraws a table, that a mounted form follows `--primary` on the root element and redraws when
-it changes, and that no fixture reaches the server's web root.
+it changes, and that no fixture reaches the server's web root. It checks that a field preview has no Save button and
+no history, and it opens the date-time picker and the reference lookup and adds a child collection row.
 
 ## Formatting
 
