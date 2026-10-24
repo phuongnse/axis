@@ -7,8 +7,7 @@ detail page, deleting draft tickets and a two-step ticket form. This extends
 [D56](d56-a-service-desk-as-the-third-sample-application.md) and does not
 replace it. The page list of D56 stays true for M11. See the
 [Third application section](../product-brief.md#third-application-service-desk)
-of the product brief. The ticket detail page is built. The rest is still
-_(planned for M12)_. The owner confirmed
+of the product brief. All four parts are built. The owner confirmed
 these points on issue #935 on 2026-10-21.
 
 - **Dashboard:** a page for `service-desk-lead`. It shows KPIs (key figures)

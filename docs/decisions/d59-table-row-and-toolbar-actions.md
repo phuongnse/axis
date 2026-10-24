@@ -3,8 +3,7 @@
 Status: **Agreed**
 
 A `table` widget offers actions on its rows and in its toolbar, delete
-included. All of it is _(planned for M12)_. The owner confirmed these points on
-issue #932 on 2026-10-21.
+included. The owner confirmed these points on issue #932 on 2026-10-21.
 
 - **Lists:** a `table` widget has `rowActions` and `toolbarActions`. `navigate`
   may sit in either list. `startProcess` and `delete` sit in `rowActions` only,
@@ -23,7 +22,7 @@ issue #932 on 2026-10-21.
 - **Layout:** toolbar actions sit next to the create button. Row actions show
   as buttons and fold into a menu at phone width.
 - **Running process:** a delete of a record that a running process holds is
-  refused with `409`.
+  refused with `409`. _(planned for M13)_
 - **Bulk actions:** actions on selected rows come after M12. M12 acts on one
   row at a time.
 
