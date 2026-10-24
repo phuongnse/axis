@@ -43,6 +43,7 @@ import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
+import { StudioPageCanvas } from './StudioPageCanvas'
 import { TextTable, type TextColumn } from './TextTable'
 
 type Content = Record<string, unknown>
@@ -111,7 +112,8 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * binding as a name only. A page opens in the page editor, which shows its widgets as a tree with add, move and remove
  * and a panel for the selected widget, and keeps a key it does not show. A process opens in the process editor, which shows its
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
- * A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
+ * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data. Form stays the
+ * tab that opens first. A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
  * calls `onOpenPath`. A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
  * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
  * of a field of its entity and an expression. When the server does not answer, the draft stays, and the resource loads
@@ -159,7 +161,7 @@ export function StudioEditor({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
-  const [tab, setTab] = useState<'form' | 'json'>('form')
+  const [tab, setTab] = useState<'design' | 'form' | 'json'>('form')
   const [seedEntity, setSeedEntity] = useState<SeedEntity>()
   // The other locales of a text resource, read from their files, for the text table to show beside the open one.
   const [otherTexts, setOtherTexts] = useState<TextColumn[]>()
@@ -592,8 +594,22 @@ export function StudioEditor({
           )}
           <Tabs
             activeKey={tab}
-            onChange={(key) => setTab(key as 'form' | 'json')}
+            onChange={(key) => setTab(key as 'design' | 'form' | 'json')}
             items={[
+              // The canvas is mounted only while its tab is active, so it posts again and sets the placeholder
+              // guard on return, and clears the guard when the author leaves.
+              ...(item.kind === 'page' && schema
+                ? [
+                    {
+                      key: 'design',
+                      label: t('shell.studio.design'),
+                      children:
+                        tab === 'design' ? (
+                          <StudioPageCanvas application={application} resourceId={item.id} draft={draft} />
+                        ) : null,
+                    },
+                  ]
+                : []),
               {
                 key: 'form',
                 label: t('shell.studio.form'),

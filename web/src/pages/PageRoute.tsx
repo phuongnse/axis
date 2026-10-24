@@ -1,16 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
-import { ChartWidget } from '../platform/ChartWidget'
-import { DetailWidget } from '../platform/DetailWidget'
-import { FormWidget } from '../platform/FormWidget'
-import { KpiWidget } from '../platform/KpiWidget'
 import { PageLayout } from '../platform/PageLayout'
-import { readPageParameters } from '../platform/pageParameters'
-import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
+import { PageLeaf, type PageLeafProps } from '../platform/PageLeaf'
+import { detailRecordId, readPageParameters } from '../platform/pageParameters'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
-import { fetchPage, type EntityWidgetMetadata, type PageMetadata, type WidgetMetadata } from '../platform/site'
-import { TableWidget } from '../platform/TableWidget'
-import { TaskInboxWidget } from '../platform/TaskInboxWidget'
+import { fetchPage, type PageMetadata } from '../platform/site'
 import { TaskPage } from '../platform/TaskPage'
 import { useText } from '../platform/texts'
 import { WidgetTree } from '../platform/WidgetTree'
@@ -24,11 +18,6 @@ type FormMode = 'new' | 'edit'
 
 // A record id in the hyphenated 8-4-4-4-12 hex form, as the record API accepts it.
 const recordIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-// The compiler binds a form or detail widget to an entity, never to a data source.
-function hasEntity(widget: WidgetMetadata): widget is EntityWidgetMetadata {
-  return widget.entity !== null
-}
 
 /** Shows the page named by the `:page` segment inside the site shell. */
 export function PageRoute({ form }: { form?: FormMode }) {
@@ -145,8 +134,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
     )
   }
   // A detail shows the record its page parameter names. A value that is no record id names no record, so none is requested.
-  const detailIdOf = (widget: WidgetMetadata) => (widget.detail ? pageValues[widget.detail.record] : undefined)
-  if (details.some((widget) => !recordIdPattern.test(detailIdOf(widget) ?? ''))) {
+  if (details.some((widget) => !recordIdPattern.test(detailRecordId(widget, pageValues) ?? ''))) {
     return <NotFoundPage />
   }
   // A table page has no record segment, and a form page always has one.
@@ -155,53 +143,20 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
     return <NotFoundPage />
   }
 
-  const renderLeaf = (widget: WidgetMetadata) => {
-    const detailId = detailIdOf(widget)
-    switch (widget.type) {
-      case 'table':
-        return <TableWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
-      case 'form':
-        return (
-          hasEntity(widget) && (
-            <FormWidget
-              widget={widget}
-              sitePath={sitePath}
-              pages={pages}
-              recordId={recordId}
-              returnTo={returnTo}
-              locale={locale}
-            />
-          )
-        )
-      case 'detail':
-        return (
-          hasEntity(widget) &&
-          detailId !== undefined && (
-            <DetailWidget key={detailId} widget={widget} sitePath={sitePath} recordId={detailId} locale={locale} />
-          )
-        )
-      case 'taskInbox':
-        return (
-          <TaskInboxWidget
-            sitePath={sitePath}
-            pageName={page.name}
-            widget={widget}
-            locale={locale}
-            fallbackLocale={fallbackLocale}
-          />
-        )
-      case 'processInspector':
-        return <ProcessInspectorWidget sitePath={sitePath} pageName={page.name} widget={widget} locale={locale} />
-      case 'kpi':
-        return <KpiWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
-      case 'chart':
-        return <ChartWidget widget={widget} locale={locale} pageValues={pageValues} />
-    }
+  const leafProps: PageLeafProps = {
+    sitePath,
+    pageName: page.name,
+    pages,
+    locale,
+    fallbackLocale,
+    pageValues,
+    recordId,
+    returnTo,
   }
 
   return (
     <PageLayout title={t(page.titleKey)}>
-      <WidgetTree widgets={page.widgets} renderLeaf={renderLeaf} />
+      <WidgetTree widgets={page.widgets} renderLeaf={(widget) => <PageLeaf widget={widget} {...leafProps} />} />
     </PageLayout>
   )
 }
