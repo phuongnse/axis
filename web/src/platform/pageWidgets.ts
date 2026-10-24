@@ -247,6 +247,21 @@ export function dataSourceColumns(
   return { groupFields, measures: found.columns.filter((column) => !grouped.includes(column.name.toLowerCase())) }
 }
 
+/**
+ * The parameters of the data source a widget names, found in Studio's names ignoring letter case. It is `undefined`
+ * when the names do not list the data source.
+ */
+export function dataSourceParameters(
+  names: StudioNames,
+  dataSource: unknown,
+): { name: string; type: string }[] | undefined {
+  if (typeof dataSource !== 'string') {
+    return undefined
+  }
+  const wanted = dataSource.toLowerCase()
+  return names.dataSources.find((item) => item.name.toLowerCase() === wanted)?.parameters
+}
+
 /** Whether a column type is a number, which a chart measure must be. */
 export function isNumberType(type: string | null): boolean {
   return type === 'integer' || type === 'decimal'

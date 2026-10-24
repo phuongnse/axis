@@ -369,6 +369,7 @@
   "shell.studio.page.parameterRequired": "Required",
   "shell.studio.page.parameterTarget": "Target entity",
   "shell.studio.page.parameterValues": "Values",
+  "shell.studio.page.parameterBindings": "Page parameters",
   "shell.studio.page.addParameter": "Add parameter",
   "shell.studio.page.removeParameter": "Remove parameter",
   "shell.studio.page.undeclaredParameter": "Not a parameter of this page",
