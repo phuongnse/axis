@@ -40,14 +40,34 @@ models, are not copied here. Look them up where they live.
   every issue of the milestone is closed, it waits until the owner closes the
   milestone. Issues outside that milestone, or opened by someone without write
   access, are never touched.
-- **Issues run in parallel unless one blocks another.** An issue is ready when
+- **Issues run in parallel unless one needs another.** An issue is ready when
   no issue that blocks it, by GitHub's *blocked by* relationship, is open.
   Autopilot reads no text such as "Depends on #12", and the order of
-  sub-issues does not count. So the creator of an issue that must wait for
-  another marks it *blocked by* that issue, for example each step of a journey
-  by the step before it, and the milestone's docs sweep by every other issue
-  of the milestone. There is no limit on how many issues run at once:
-  autopilot's `max_parallel` is left unset.
+  sub-issues does not count. So the creator of an issue marks it *blocked by*
+  another open issue when, and only when, one of these holds:
+  - Its acceptance criteria check behaviour that the other issue delivers, for
+    example each step of a journey and the step before it.
+  - It needs something new that the other issue adds: code, an API, a schema,
+    a test helper, or a lint rule that its checks will meet. When two open
+    issues need the same new thing, one builds it and the other waits for it,
+    so it is built once.
+  - It is the milestone's docs sweep, which waits for every other issue of the
+    milestone.
+
+  Touching the same files, or a tidier order, is no reason to wait: NexKit
+  resolves conflicts with `main` by itself. Nor is adding a new case of
+  something that another issue covers in every case, such as a new kind of
+  edit while the other makes every edit undoable: that issue's test finds
+  every case, so whichever of the two merges last fails its checks until it
+  covers the new one. The reason: a mark that is not needed only slows the
+  milestone, while a missing one makes two issues build the same thing
+  without any conflict to show it. Each mark has its own line in the issue
+  text, `Depends on #N: <what this issue uses from #N>`. A reader can check
+  every mark against its line, and the local agent adds a mark that its line
+  names but GitHub lacks. A mark that no such line explains is not made. The
+  docs sweep's marks, and those autopilot makes when it splits a plan, need
+  no line. There is no limit on how many issues run at once: autopilot's
+  `max_parallel` is left unset.
 - **Autopilot answers a question that has a recommended option.** Plans, and
   rounds that stop as `blocked`, give each question its options and the one
   NexKit recommends. With `answer` set to `recommended`, autopilot answers when
@@ -226,8 +246,15 @@ them.
    on GitHub fits its content. There is no fixed list, because the owner adds
    and removes labels. The owner or the local agent opens it, because
    autopilot takes only issues opened by someone with write access, and marks
-   it *blocked by* every issue it must wait for. It may link a Design artifact
-   as a picture, while the docs stay the source of behaviour.
+   it *blocked by* every issue it must wait for, by the rules under
+   [Decisions](#decisions), with a `Depends on` line for each. Before that, it
+   checks the issue against every other open issue of the milestone by those
+   rules. An issue that covers something in every case, such as every edit
+   or every widget, has a criterion with a test that finds every case from
+   the code itself, not from a fixed list, and fails on one that is not
+   covered. So a case added later, in any milestone, cannot be left out
+   unnoticed. It may link a Design artifact as a picture, while the docs stay
+   the source of behaviour.
 2. **Plan.** Autopilot starts `/nexkit plan` once the issue is ready. NexKit's
    plan agent posts a plan as a comment. A person may comment `/nexkit plan`
    to start it sooner or with a note.
