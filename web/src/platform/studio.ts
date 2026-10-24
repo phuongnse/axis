@@ -1,6 +1,7 @@
 import { apiFetch } from './api'
 import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
+import type { PageMetadata } from './site'
 
 /** The server did not answer a Studio request, or answered it with 502, 503 or 504. */
 export class ServerUnreachableError extends Error {}
@@ -139,6 +140,35 @@ export interface StudioResource extends StudioResourceItem {
 
 /** What a patch answers: the new version, and the diagnostics of the folder after the write. */
 export type PatchResult = { status: 'saved'; version: string; diagnostics: StudioDiagnostic[] } | { status: 'conflict' }
+
+/** What the draft page metadata route answers: the page as the site would serve it, or `null` when it cannot be drawn. */
+export interface StudioPageMetadataAnswer {
+  page: PageMetadata | null
+  diagnostics: StudioDiagnostic[]
+}
+
+/**
+ * Asks for the metadata an unsaved page would have, without saving it. Any status other than 200 throws, as does a
+ * server that does not answer.
+ */
+export async function fetchStudioPageMetadata(
+  application: string,
+  id: string,
+  draft: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<StudioPageMetadataAnswer> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/resources/${encodeURIComponent(id)}/page-metadata`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(draft),
+    signal,
+  })
+  if (response.status !== 200) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioPageMetadataAnswer
+}
 
 /** A compile diagnostic of a Studio folder. `resourceId` is `null` when it belongs to no resource. */
 export interface StudioDiagnostic {

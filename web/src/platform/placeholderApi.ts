@@ -2,7 +2,7 @@ import type { ApiGuard } from './api'
 import { formStatePath, type FieldState, type FormStateAnswer } from './formState'
 import type { InstancePage } from './inspection'
 import type { FieldValue, RecordItem, RecordRow } from './records'
-import type { DataSourceMetadata, FieldMetadata, PageMetadata, ReferenceTarget } from './site'
+import type { DataSourceMetadata, FieldMetadata, PageMetadata, PageParameter, ReferenceTarget } from './site'
 import type { TaskPage } from './tasks'
 import { leafWidgets } from './widgetTree'
 
@@ -62,6 +62,14 @@ function labels(fields: readonly Typed[]): Record<string, string> {
 
 function recordBuilder(fields: readonly Typed[]): RecordBuilder {
   return (n, id) => ({ id, version: 1, values: values(fields, n), labels: labels(fields) })
+}
+
+/**
+ * The value of each page parameter, as the address would carry it, made from the parameter's type. A reference gets
+ * the id of a placeholder record, so a detail or a bound widget has something to draw.
+ */
+export function placeholderPageValues(parameters: readonly PageParameter[]): Record<string, string> {
+  return Object.fromEntries(parameters.map((parameter) => [parameter.name, String(value(parameter, 1))]))
 }
 
 /** The builder for a reference target's records, which hold only the display field. */

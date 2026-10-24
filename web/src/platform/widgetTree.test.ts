@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PageWidgetMetadata, TabsWidgetMetadata, WidgetMetadata } from './site'
+import type { PageWidgetMetadata, PlaceholderWidgetMetadata, TabsWidgetMetadata, WidgetMetadata } from './site'
 import { isContainer, leafWidgets, tabParameters } from './widgetTree'
 
 function leaf(type: WidgetMetadata['type'], process: string | null = null): WidgetMetadata {
@@ -32,6 +32,21 @@ describe('isContainer', () => {
     expect(isContainer(tabs())).toBe(true)
     expect(isContainer({ type: 'section', titleKey: 't', collapsed: false, widgets: [] })).toBe(true)
     expect(isContainer(leaf('table'))).toBe(false)
+  })
+
+  it('is false for a placeholder, even when its type names a container', () => {
+    const placeholder = { type: 'columns', path: '/widgets/0', placeholder: true } as PlaceholderWidgetMetadata
+    expect(isContainer(placeholder as unknown as PageWidgetMetadata)).toBe(false)
+  })
+})
+
+describe('a placeholder in a tree', () => {
+  const placeholder = { type: 'columns', path: '/widgets/1', placeholder: true } as unknown as PageWidgetMetadata
+
+  it('is a leaf, and leafWidgets and tabParameters do not read its missing columns', () => {
+    const first = leaf('table')
+    expect(leafWidgets([first, placeholder])).toEqual([first, placeholder])
+    expect(tabParameters([placeholder, tabs([placeholder])]).size).toBe(1)
   })
 })
 

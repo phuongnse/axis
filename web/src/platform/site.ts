@@ -317,6 +317,22 @@ export type ContainerWidgetMetadata = ColumnsWidgetMetadata | TabsWidgetMetadata
 /** One entry of a page's widget tree: a widget that shows something, or a container around other widgets. */
 export type PageWidgetMetadata = WidgetMetadata | ContainerWidgetMetadata
 
+/**
+ * A widget of a draft page that does not compile, as the draft page metadata route answers it. `type` is the draft's
+ * `type`, or `null` when that is not a string, and `path` is the widget's JSON Pointer in the draft. Only the page
+ * designer's canvas gets one. The site never does.
+ */
+export interface PlaceholderWidgetMetadata {
+  type: string | null
+  path: string
+  placeholder: true
+}
+
+/** Whether a widget of a draft page is a {@link PlaceholderWidgetMetadata}. */
+export function isPlaceholder(widget: unknown): widget is PlaceholderWidgetMetadata {
+  return typeof widget === 'object' && widget !== null && (widget as { placeholder?: unknown }).placeholder === true
+}
+
 /** A widget over an entity. A form widget is always one: it is never bound to a data source. */
 export type EntityWidgetMetadata = WidgetMetadata & { entity: EntityMetadata }
 

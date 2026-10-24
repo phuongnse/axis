@@ -1,8 +1,17 @@
-import type { ContainerWidgetMetadata, PageWidgetMetadata, TabsWidgetMetadata, WidgetMetadata } from './site'
+import {
+  isPlaceholder,
+  type ContainerWidgetMetadata,
+  type PageWidgetMetadata,
+  type TabsWidgetMetadata,
+  type WidgetMetadata,
+} from './site'
 
-/** Whether a page widget is a container that holds other widgets. */
+/**
+ * Whether a page widget is a container that holds other widgets. A placeholder is none, even when its type names a
+ * container, because it holds nothing.
+ */
 export function isContainer(widget: PageWidgetMetadata): widget is ContainerWidgetMetadata {
-  return widget.type === 'columns' || widget.type === 'tabs' || widget.type === 'section'
+  return !isPlaceholder(widget) && (widget.type === 'columns' || widget.type === 'tabs' || widget.type === 'section')
 }
 
 /** The widgets directly inside a container, in file order. A tabs widget lists every tab's widgets. */

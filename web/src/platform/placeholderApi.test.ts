@@ -11,9 +11,9 @@ import {
 import { apiFetch, setApiGuard } from './api'
 import { fetchFormState } from './formState'
 import { fetchInstances } from './inspection'
-import { placeholderApi } from './placeholderApi'
+import { placeholderApi, placeholderPageValues } from './placeholderApi'
 import { fetchHistory, fetchRecord, fetchRecords } from './records'
-import type { PageMetadata } from './site'
+import type { PageMetadata, PageParameter } from './site'
 import { fetchTasks } from './tasks'
 
 const page: PageMetadata = {
@@ -160,5 +160,37 @@ describe('placeholderApi', () => {
     await apiFetch('/api/apps/DesignSystemSample/unknown', { method: 'POST' })
 
     expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('placeholderPageValues', () => {
+  const parameter = (name: string, type: PageParameter['type'], values: string[] | null = null): PageParameter => ({
+    name,
+    type,
+    required: true,
+    values,
+    target: null,
+  })
+
+  it('makes a string for each parameter from its type, and a placeholder record id for a reference', () => {
+    expect(
+      placeholderPageValues([
+        parameter('title', 'text'),
+        parameter('count', 'integer'),
+        parameter('since', 'date'),
+        parameter('state', 'enum', ['open', 'closed']),
+        parameter('ticket', 'reference'),
+      ]),
+    ).toEqual({
+      title: 'Sample title 1',
+      count: '10',
+      since: '2026-03-01',
+      state: 'open',
+      ticket: '00000000-0000-4000-8000-000000000101',
+    })
+  })
+
+  it('is empty for a page with no parameters', () => {
+    expect(placeholderPageValues([])).toEqual({})
   })
 })

@@ -1,4 +1,4 @@
-import type { PageParameter } from './site'
+import type { PageParameter, WidgetMetadata } from './site'
 
 const int64Min = -(2n ** 63n)
 const int64Max = 2n ** 63n - 1n
@@ -100,4 +100,9 @@ export function readPageParameters(
     }
   }
   return values
+}
+
+/** The record id a detail widget shows: the value of the page parameter it names, or `undefined` for any other widget. */
+export function detailRecordId(widget: WidgetMetadata, pageValues: Record<string, string>): string | undefined {
+  return widget.detail ? pageValues[widget.detail.record] : undefined
 }

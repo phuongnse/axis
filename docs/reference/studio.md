@@ -466,7 +466,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | ------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
   | `application` | Generic form                                                  | Nothing                                                               |
   | `entity`      | Entity designer                                               | Nothing                                                               |
-  | `page`        | Typed editor, Design tab (planned for M13)                    | Nothing                                                               |
+  | `page`        | Typed editor, Design tab (partly built, see Page designer)    | Nothing                                                               |
   | `form`        | Generic form, typed steps panel, Design tab (planned for M13) | Nothing                                                               |
   | `site`        | Generic form                                                  | Nothing                                                               |
   | `process`     | Typed editor with the process graph                           | Nothing                                                               |
@@ -787,7 +787,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     error-coloured border, "has diagnostics" in its text label, and
     `data-marked`. The marks come from the panel's last loaded list, so they
     change on a load, a save or a request, not on every edit.
-- **Page designer** _(planned for M13)_. The page editor gets a Design tab
+- **Page designer** _(partly built, planned for M13)_. The page editor gets a Design tab
   that builds a page by drag and drop, per
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md).
   The form designer is planned for M13, see
@@ -796,19 +796,29 @@ Run and the Test results list, the read-only view of a module entity, and the re
   [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
   The process graph is read-only, and not a designer.
   - **Design tab.** It sits next to the Form and JSON tabs and is the default
-    tab. The three tabs edit one draft.
+    tab. The three tabs edit one draft. _Partly built:_ the tab is there, but
+    Form stays the default tab until the designer is complete. The canvas is
+    mounted only while the Design tab is active, so it asks again when the
+    author returns.
   - **Canvas.** It draws the unsaved draft with the site's own widget
     components. Tables, charts and other data widgets show placeholder rows and
     values made from the field types, as the widget previews do with fixtures.
     Actions run nothing. The canvas asks
     [the draft page metadata route](authoring.md#draft-page-metadata) 300 ms
-    after the last edit and redraws from its answer.
+    after the last edit and redraws from its answer. _Partly built:_ the canvas
+    draws the page, with labels from the application's texts and no request to
+    `/api/apps/`. It cancels every click and form submit, so a navigate action
+    or a link leaves Studio where it is. A page parameter gets a placeholder
+    value made from its type. A page the route cannot draw shows a short notice
+    instead of widgets.
   - **Placeholders and diagnostic marks.** A widget that does not compile draws
     as a placeholder with its diagnostics. A widget is marked when a diagnostic
     of the page names its `path` or a path inside it. A marked widget has an
     error-coloured border, "has diagnostics" in its text label, and
     `data-marked`, as a node of the process graph has. The marks come from the
-    route's latest answer, so they follow the unsaved draft.
+    route's latest answer, so they follow the unsaved draft. _Partly built:_
+    until diagnostics and marks ship, a widget that does not compile draws as a
+    plain box with its type, and carries no diagnostics and no mark.
   - **Selection.** A click on the canvas or a pick in the widget tree selects a
     widget in both. The selected widget is the open path and has
     `aria-current`.

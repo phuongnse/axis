@@ -1,31 +1,48 @@
 import { Col, Collapse, Flex, Row, Tabs } from 'antd'
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
-import type {
-  ColumnsWidgetMetadata,
-  PageWidgetMetadata,
-  SectionWidgetMetadata,
-  TabsWidgetMetadata,
-  WidgetMetadata,
+import {
+  isPlaceholder,
+  type ColumnsWidgetMetadata,
+  type PageWidgetMetadata,
+  type PlaceholderWidgetMetadata,
+  type SectionWidgetMetadata,
+  type TabsWidgetMetadata,
+  type WidgetMetadata,
 } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { tabParameters } from './widgetTree'
 
 type RenderLeaf = (widget: WidgetMetadata) => ReactNode
+type RenderPlaceholder = (widget: PlaceholderWidgetMetadata) => ReactNode
 
 // The query parameter of each tabs widget of the page, worked out once at the root.
 const TabParameters = createContext<Map<TabsWidgetMetadata, string>>(new Map())
 
+// How the page designer's canvas draws a widget that does not compile. The site has none, so it draws nothing.
+const PlaceholderRenderer = createContext<RenderPlaceholder | undefined>(undefined)
+
 /**
  * Draws a page's widget tree. A widget that shows something is drawn by `renderLeaf`, and a container draws its
- * widgets in file order. Each leaf keeps its own loading, empty and error states.
+ * widgets in file order. Each leaf keeps its own loading, empty and error states. A placeholder, which only a draft
+ * page has, is drawn by `renderPlaceholder`, or not at all without it.
  */
-export function WidgetTree({ widgets, renderLeaf }: { widgets: PageWidgetMetadata[]; renderLeaf: RenderLeaf }) {
+export function WidgetTree({
+  widgets,
+  renderLeaf,
+  renderPlaceholder,
+}: {
+  widgets: PageWidgetMetadata[]
+  renderLeaf: RenderLeaf
+  renderPlaceholder?: RenderPlaceholder
+}) {
   const parameters = useMemo(() => tabParameters(widgets), [widgets])
   return (
     <TabParameters.Provider value={parameters}>
-      <WidgetList widgets={widgets} renderLeaf={renderLeaf} />
+      <PlaceholderRenderer.Provider value={renderPlaceholder}>
+        <WidgetList widgets={widgets} renderLeaf={renderLeaf} />
+      </PlaceholderRenderer.Provider>
     </TabParameters.Provider>
   )
 }
@@ -41,6 +58,10 @@ function WidgetList({ widgets, renderLeaf }: { widgets: readonly PageWidgetMetad
 }
 
 function Node({ widget, renderLeaf }: { widget: PageWidgetMetadata; renderLeaf: RenderLeaf }) {
+  const renderPlaceholder = useContext(PlaceholderRenderer)
+  if (isPlaceholder(widget)) {
+    return renderPlaceholder?.(widget) ?? null
+  }
   switch (widget.type) {
     case 'columns':
       return <Columns widget={widget} renderLeaf={renderLeaf} />
