@@ -45,6 +45,14 @@ public abstract record PageWidgetMetadata
 {
     /// <summary>The widget type name as written in page files, such as <c>table</c> or <c>columns</c>.</summary>
     public abstract string Type { get; init; }
+
+    /// <summary>
+    /// The JSON Pointer of the widget in the draft page, such as <c>/widgets/0/columns/1/widgets/0</c>. Only the draft page
+    /// metadata route of the authoring API sets it. The site's page metadata never writes it.
+    /// </summary>
+    [JsonPropertyOrder(-1)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Path { get; init; }
 }
 
 /// <summary>Writes a page widget by its runtime type, so each kind has only its own properties.</summary>
@@ -55,6 +63,24 @@ public sealed class PageWidgetMetadataConverter : JsonConverter<PageWidgetMetada
 
     public override void Write(Utf8JsonWriter writer, PageWidgetMetadata value, JsonSerializerOptions options) =>
         JsonSerializer.Serialize(writer, value, value.GetType(), options);
+}
+
+/// <summary>
+/// A widget of a draft page that does not compile, which the page designer draws as a placeholder. It writes
+/// <c>{ type, path, placeholder: true }</c>.
+/// </summary>
+public sealed record PlaceholderWidgetMetadata : PageWidgetMetadata
+{
+    /// <summary>The kind of every placeholder, which is not the widget type the draft wrote. <see cref="DraftType"/> is that.</summary>
+    [JsonIgnore]
+    public override string Type { get; init; } = "placeholder";
+
+    /// <summary>The <c>type</c> the draft wrote, or null when the draft has none or it is not a string.</summary>
+    [JsonPropertyName("type")]
+    [JsonPropertyOrder(-1)]
+    public string? DraftType { get; init; }
+
+    public bool Placeholder { get; } = true;
 }
 
 /// <summary>A <c>columns</c> widget: its columns in page file order.</summary>
