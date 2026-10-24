@@ -18,6 +18,7 @@ import { tabParameters } from './widgetTree'
 type RenderLeaf = (widget: WidgetMetadata) => ReactNode
 type RenderPlaceholder = (widget: PlaceholderWidgetMetadata) => ReactNode
 type FrameWidget = (widget: PageWidgetMetadata | PlaceholderWidgetMetadata, drawn: ReactNode) => ReactNode
+type FrameList = (pointer: string, drawn: ReactNode) => ReactNode
 
 // The query parameter of each tabs widget of the page, worked out once at the root.
 const TabParameters = createContext<Map<TabsWidgetMetadata, string>>(new Map())
@@ -28,42 +29,67 @@ const PlaceholderRenderer = createContext<RenderPlaceholder | undefined>(undefin
 // Wraps what each widget draws, such as the page designer's marks. The site has none, so it wraps nothing.
 const WidgetFrame = createContext<FrameWidget | undefined>(undefined)
 
+// Wraps what each widget list draws, by the list's JSON Pointer in the draft. The site has none, so it wraps nothing.
+const ListFrame = createContext<FrameList | undefined>(undefined)
+
 /**
  * Draws a page's widget tree. A widget that shows something is drawn by `renderLeaf`, and a container draws its
  * widgets in file order. Each leaf keeps its own loading, empty and error states. A placeholder, which only a draft
- * page has, is drawn by `renderPlaceholder`, or not at all without it. `frameWidget` wraps what each widget draws.
+ * page has, is drawn by `renderPlaceholder`, or not at all without it. `frameWidget` wraps what each widget draws, and
+ * `frameList` what each widget list draws, by its pointer in the draft: `/widgets` for the page, then `…/widgets` for a
+ * section, `…/columns/1/widgets` for a column and `…/tabs/1/widgets` for a tab.
  */
 export function WidgetTree({
   widgets,
   renderLeaf,
   renderPlaceholder,
   frameWidget,
+  frameList,
 }: {
   widgets: PageWidgetMetadata[]
   renderLeaf: RenderLeaf
   renderPlaceholder?: RenderPlaceholder
   frameWidget?: FrameWidget
+  frameList?: FrameList
 }) {
   const parameters = useMemo(() => tabParameters(widgets), [widgets])
   return (
     <TabParameters.Provider value={parameters}>
       <PlaceholderRenderer.Provider value={renderPlaceholder}>
         <WidgetFrame.Provider value={frameWidget}>
-          <WidgetList widgets={widgets} renderLeaf={renderLeaf} />
+          <ListFrame.Provider value={frameList}>
+            <WidgetList widgets={widgets} renderLeaf={renderLeaf} pointer="/widgets" />
+          </ListFrame.Provider>
         </WidgetFrame.Provider>
       </PlaceholderRenderer.Provider>
     </TabParameters.Provider>
   )
 }
 
-function WidgetList({ widgets, renderLeaf }: { widgets: readonly PageWidgetMetadata[]; renderLeaf: RenderLeaf }) {
-  return (
+function WidgetList({
+  widgets,
+  renderLeaf,
+  pointer,
+}: {
+  widgets: readonly PageWidgetMetadata[]
+  renderLeaf: RenderLeaf
+  /** The list's JSON Pointer in the draft, when it is known. */
+  pointer?: string
+}) {
+  const frameList = useContext(ListFrame)
+  const drawn = (
     <Flex vertical gap="middle">
       {widgets.map((widget, index) => (
         <Node key={index} widget={widget} renderLeaf={renderLeaf} />
       ))}
     </Flex>
   )
+  return frameList && pointer !== undefined ? frameList(pointer, drawn) : drawn
+}
+
+/** The pointer of a list inside a widget: the widget's own path and the list's place in it, or none without a path. */
+function listPointer(widget: { path?: string }, place: string): string | undefined {
+  return widget.path === undefined ? undefined : `${widget.path}/${place}`
 }
 
 function Node({ widget, renderLeaf }: { widget: PageWidgetMetadata; renderLeaf: RenderLeaf }) {
@@ -104,7 +130,11 @@ function Columns({ widget, renderLeaf }: { widget: ColumnsWidgetMetadata; render
     <Row gutter={[spacing.md, spacing.md]}>
       {widget.columns.map((column, index) => (
         <Col key={index} xs={24} md={phone ? 24 : column.width * 2} style={{ overflowX: 'auto' }} data-testid="column">
-          <WidgetList widgets={column.widgets} renderLeaf={renderLeaf} />
+          <WidgetList
+            widgets={column.widgets}
+            renderLeaf={renderLeaf}
+            pointer={listPointer(widget, `columns/${index}/widgets`)}
+          />
         </Col>
       ))}
     </Row>
@@ -138,7 +168,13 @@ function TabsNode({ widget, renderLeaf }: { widget: TabsWidgetMetadata; renderLe
       items={widget.tabs.map((tab, index) => ({
         key: String(index + 1),
         label: t(tab.labelKey),
-        children: <WidgetList widgets={tab.widgets} renderLeaf={renderLeaf} />,
+        children: (
+          <WidgetList
+            widgets={tab.widgets}
+            renderLeaf={renderLeaf}
+            pointer={listPointer(widget, `tabs/${index}/widgets`)}
+          />
+        ),
       }))}
     />
   )
@@ -155,7 +191,9 @@ function Section({ widget, renderLeaf }: { widget: SectionWidgetMetadata; render
           {
             key: 'section',
             label: title,
-            children: <WidgetList widgets={widget.widgets} renderLeaf={renderLeaf} />,
+            children: (
+              <WidgetList widgets={widget.widgets} renderLeaf={renderLeaf} pointer={listPointer(widget, 'widgets')} />
+            ),
           },
         ]}
       />

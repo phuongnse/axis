@@ -38,12 +38,11 @@ import { EntityDesigner } from './EntityDesigner'
 import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
-import { PageEditor, PagePalette, PageWidgets } from './PageEditor'
+import { PageEditor } from './PageEditor'
 import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
-import { StudioPageCanvas } from './StudioPageCanvas'
 import { TextTable, type TextColumn } from './TextTable'
 
 type Content = Record<string, unknown>
@@ -63,6 +62,7 @@ interface SeedEntity {
 const noProblems = new Map<string, string>()
 
 const LazyStudioProcessGraph = lazy(() => import('./StudioProcessGraph'))
+const LazyStudioPageDesign = lazy(() => import('./StudioPageDesign'))
 
 function seedFieldsOf(content: Content): SeedField[] | null {
   if (!Array.isArray(content.fields)) {
@@ -599,7 +599,7 @@ export function StudioEditor({
             onChange={(key) => setTab(key as 'design' | 'form' | 'json')}
             items={[
               // The canvas is mounted only while its tab is active, so it posts again and sets the placeholder
-              // guard on return, and clears the guard when the author leaves.
+              // guard on return, and clears the guard when the author leaves. Its code loads on first use.
               ...(item.kind === 'page' && schema
                 ? [
                     {
@@ -607,31 +607,16 @@ export function StudioEditor({
                       label: t('shell.studio.design'),
                       children:
                         tab === 'design' ? (
-                          <Flex gap="middle" align="flex-start" data-testid="studio-page-design">
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <StudioPageCanvas
-                                application={application}
-                                resourceId={item.id}
-                                draft={draft}
-                                selected={widgetPath}
-                                onSelect={setWidgetPath}
-                              />
-                            </div>
-                            <div data-testid="studio-design-panel" style={{ width: 400, flexShrink: 0 }}>
-                              <PagePalette
-                                value={draft}
-                                selected={widgetPath}
-                                onSelect={setWidgetPath}
-                                onChange={change}
-                              />
-                              <PageWidgets
-                                value={draft}
-                                selected={widgetPath}
-                                onSelect={setWidgetPath}
-                                onChange={change}
-                              />
-                            </div>
-                          </Flex>
+                          <Suspense fallback={null}>
+                            <LazyStudioPageDesign
+                              application={application}
+                              resourceId={item.id}
+                              draft={draft}
+                              selected={widgetPath}
+                              onSelect={setWidgetPath}
+                              onChange={change}
+                            />
+                          </Suspense>
                         ) : null,
                     },
                   ]

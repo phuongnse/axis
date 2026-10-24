@@ -849,7 +849,20 @@ Run and the Test results list, the read-only view of a module entity, and the re
     first list, or at the end of the page's list on an empty page. The new
     widget is selected, and a live region names the list and the position where
     it landed. A type the page cannot take is disabled and shows its reason.
-    Dragging a type onto the canvas is not built yet.
+    The author can also drag a type with the pointer onto the canvas. A drop on
+    the upper half of a widget inserts before it, and a drop on its lower half
+    inserts after it. A drop on a widget list, which is the page's own list or
+    the list of a column, a tab or a section, empty or not, appends to that
+    list, and a drop between two widgets lands in the list, so it appends. The
+    innermost target wins. A container that does not compile yet, such as a new
+    empty section, is drawn as a placeholder with a drop area for each list its
+    draft has. A drop that a page limit forbids inserts nothing, and the live
+    region gives the same reason that is shown beside the disabled type. An
+    allowed drop selects the new widget, and the live region names the list and
+    the position where it landed. A type that is disabled cannot be dragged. The
+    library's own spoken messages are off, so the live region is the only voice,
+    and a keyboard user inserts with Enter or Space as above. Dragging an
+    existing widget is not built yet.
   - **Moves.** The author drags a widget to reorder it or to move it into or out
     of a container. The keyboard sensor does the same, and a screen reader
     hears where the widget lands. The Move to picker stays.
@@ -867,7 +880,12 @@ Run and the Test results list, the read-only view of a module entity, and the re
     reload, a conflict reload or opening another resource. A save keeps it.
     Studio's undo replaces the browser's own inside the editor's boxes.
   - **Library.** Drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
-    `@dnd-kit/utilities`, about 15 KB min+gzip, in Studio's lazy chunk.
+    `@dnd-kit/utilities`. The core package, which brings `@dnd-kit/accessibility`
+    and `@dnd-kit/utilities` with it, measures 12.7 KB gzipped in the lazy chunk
+    `StudioPageDesign`. The chunk holds the canvas, the palette and the library,
+    and loads when the Design tab opens. The build fails when the chunk is
+    missing or is part of the main bundle. `@dnd-kit/sortable` comes with the
+    moves of existing widgets.
   - **Format.** The designer writes only the order of the widget tree and the
     properties the format has. It writes no pixels, and widths stay in
     twelfths.
