@@ -7,8 +7,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
 - **One SPA for all applications.** The SPA renders from metadata served by
   the server: site navigation, pages and their widgets, data source schemas
-  and text resources. Publishing an application never
-  rebuilds the frontend.
+  and text resources. Publishing an application never rebuilds the frontend.
 - **Shared look and feel.** A page is a route in a site, and its widgets are
   its content. Each widget type, such as `table` and `form`, has one shared
   component, and layout comes from container widgets rather than per-page
@@ -16,8 +15,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   dark modes live in `web/src/platform/`. Feature code assembles them and
   adds no styling of its own.
 - **The UI library is a detail of the SPA.** The SPA builds on Ant Design for
-  its base components
-  ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
+  its base components ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
   Configuration, page metadata, configurable theme tokens and the custom widget
   API never name an Ant Design component, prop or token. A custom widget builds
   on Axis widgets and Axis tokens and never imports the UI library directly.
@@ -29,29 +27,31 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   library. Where the library leaves a state out, such as loading (`aria-busy`)
   or the current page (`aria-current`, as on the active navigation entry), the
   widget adds it.
-- **Design tokens and previews.** The token file `web/src/platform/designTokens.ts`
-  holds every colour, type, spacing and radius value of the theme, in Axis
-  names. The colours are primary, success, warning, danger, info, canvas,
-  surface, text, textMuted, border, borderSubtle and divider, each with a light
-  and a dark value. Type has the body and code fonts and the font size, spacing
-  runs from xs to xl, and radius has the base corner radius.
-  `web/src/platform/antTheme.ts` is the only file that maps them to Ant Design
-  tokens. A component that needs a theme value reads Axis tokens through
+- **Design tokens and previews.** The token file
+  `web/src/platform/designTokens.ts` holds every colour, type, spacing and
+  radius value of the theme, in Axis names. The colours are primary, success,
+  warning, danger, info, canvas, surface, text, textMuted, border, borderSubtle
+  and divider, each with a light and a dark value. Type has the body and code
+  fonts and the font size, spacing runs from xs to xl, and radius has the base
+  radius. `web/src/platform/antTheme.ts` is the only file that maps them to Ant
+  Design tokens. A component that needs a theme value reads Axis tokens through
   `useDesignTokens`, never through Ant Design's `theme.useToken`. A Vitest test
-  scans `web/src` and fails on a hard-coded colour, font family or radius
-  outside those two files. The shared chart component in
-  `web/src/platform/Chart.tsx` maps the Axis tokens to chart colours, font and
-  grid, and loads the library in its own chunk. Widget previews draw the
-  `table`, `form`, `taskInbox`, `processInspector`, `detail` and `kpi` widgets,
-  the bar, line and pie `chart` widgets, the `columns`, `tabs` and `section`
-  containers and the input of each field type, from fixture metadata, in light
-  and dark mode. `scripts/design-system.sh` builds them into one classic
-  script that sets `window.Axis` with a mount per preview. A mounted widget
-  follows `data-theme` on the page's root element. See
-  [Development](../development.md#widget-previews),
-  [D67](../decisions/d67-live-widget-previews-in-the-design-system.md) and
-  [D57](../decisions/d57-a-design-system-published-from-the-repository.md)
-  and [Design changes](../delivery.md#design-changes).
+  fails on a hard-coded colour, font family or radius in `web/src` outside those
+  two files. The shared chart component in `web/src/platform/Chart.tsx` maps the
+  Axis tokens to chart colours, font and grid, and loads the library in its own
+  chunk. Widget previews draw every widget, container and field input from
+  fixture metadata, in light and dark mode. `scripts/design-system.sh` builds
+  them into one classic script that sets `window.Axis` with a mount per preview.
+  A mounted widget follows `data-theme` on the page's root element. For the
+  current mode it also reads the custom properties `--primary` to `--divider`
+  for the colours (named as above), `--spacing-xs` to `--spacing-xl`,
+  `--radius-base`, `--font-sans` and `--font-code` from that element, and
+  redraws when one changes. A property the page leaves out, or sets to a value
+  the theme cannot use, keeps its token file value. Only the design-system
+  bundle reads them. See [Development](../development.md#widget-previews),
+  [D67](../decisions/d67-live-widget-previews-in-the-design-system.md),
+  [D57](../decisions/d57-a-design-system-published-from-the-repository.md) and
+  [Design changes](../delivery.md#design-changes).
 - **How pages and widgets grow.** A page draws its whole tree of widgets.
   Containers show their widgets in file order and can nest. A form binds an entity
   or a `form` resource, which lays the entity's fields out in sections, and a

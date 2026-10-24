@@ -42,15 +42,84 @@ export type ColourName = keyof typeof colourTokens
 export interface DesignTokens {
   colour: Record<ColourName, string>
   type: typeof typeTokens
-  spacing: typeof spacingTokens
-  radius: typeof radiusTokens
+  spacing: Record<keyof typeof spacingTokens, number>
+  radius: Record<keyof typeof radiusTokens, number>
 }
 
-/** The tokens of one mode, with each colour resolved to its light or dark value. */
-export function designTokensFor(mode: ThemeMode): DesignTokens {
-  const colour = Object.fromEntries(Object.entries(colourTokens).map(([name, value]) => [name, value[mode]])) as Record<
+type SpacingName = keyof typeof spacingTokens
+
+/**
+ * The CSS custom property that carries each Axis token on a page. Only the design-system bundle reads them, from
+ * the page's root element. Colours use their Axis name as written.
+ */
+export const pageTokenProperties = {
+  colour: Object.fromEntries(Object.keys(colourTokens).map((name) => [name, `--${name}`])) as Record<
     ColourName,
     string
-  >
-  return { colour, type: typeTokens, spacing: spacingTokens, radius: radiusTokens }
+  >,
+  spacing: Object.fromEntries(Object.keys(spacingTokens).map((name) => [name, `--spacing-${name}`])) as Record<
+    SpacingName,
+    string
+  >,
+  radius: { base: '--radius-base' },
+  type: { fontFamily: '--font-sans', codeFontFamily: '--font-code' },
+}
+
+/** Raw property values of a page, keyed by property name. A property the page leaves out is missing or empty. */
+export type PageTokenValues = Partial<Record<string, string>>
+
+/** Every property name of pageTokenProperties. */
+export const pageTokenPropertyNames: string[] = [
+  ...Object.values(pageTokenProperties.colour),
+  ...Object.values(pageTokenProperties.spacing),
+  ...Object.values(pageTokenProperties.radius),
+  ...Object.values(pageTokenProperties.type),
+]
+
+// The forms that Ant Design's colour parser and number tokens accept.
+const colourPattern = /^(#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|(rgba?|hsla?)\([^()]*\))$/i
+const lengthPattern = /^\d+(\.\d+)?(px)?$/
+
+function usableColour(value: string | undefined): string | undefined {
+  const text = value?.trim()
+  return text !== undefined && colourPattern.test(text) ? text : undefined
+}
+
+function usableLength(value: string | undefined): number | undefined {
+  const text = value?.trim()
+  return text !== undefined && lengthPattern.test(text) ? Number.parseFloat(text) : undefined
+}
+
+function usableFont(value: string | undefined): string | undefined {
+  const text = value?.trim()
+  return text ? text : undefined
+}
+
+/**
+ * The tokens of one mode, with each colour resolved to its light or dark value. A value the page declares and the
+ * theme can use replaces the token file's value. Anything else keeps the token file's value.
+ */
+export function designTokensFor(mode: ThemeMode, page: PageTokenValues = {}): DesignTokens {
+  const colour = Object.fromEntries(
+    (Object.keys(colourTokens) as ColourName[]).map((name) => [
+      name,
+      usableColour(page[pageTokenProperties.colour[name]]) ?? colourTokens[name][mode],
+    ]),
+  ) as Record<ColourName, string>
+  const spacing = Object.fromEntries(
+    (Object.keys(spacingTokens) as SpacingName[]).map((name) => [
+      name,
+      usableLength(page[pageTokenProperties.spacing[name]]) ?? spacingTokens[name],
+    ]),
+  ) as Record<SpacingName, number>
+  return {
+    colour,
+    type: {
+      fontFamily: usableFont(page[pageTokenProperties.type.fontFamily]) ?? typeTokens.fontFamily,
+      codeFontFamily: usableFont(page[pageTokenProperties.type.codeFontFamily]) ?? typeTokens.codeFontFamily,
+      fontSize: typeTokens.fontSize,
+    },
+    spacing,
+    radius: { base: usableLength(page[pageTokenProperties.radius.base]) ?? radiusTokens.base },
+  }
 }
