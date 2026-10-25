@@ -330,6 +330,13 @@ Run and the Test results list, the read-only view of a module entity, and the re
     `sequence`, `creator` and `sensitive`. The settings follow the
     [field types](resource-files.md#entity-field-types-and-constraints), so a
     setting a type does not take cannot be edited.
+  - _(Planned for M15.)_ The type picker adds `money`, `file` and
+    `references`, and a child entity's fields may be `reference`. The
+    settings column adds `currency` or `currencyField`, `maxSize`, `accept`,
+    `default` in the expression editor, `min`, `max`, `minLength`,
+    `searchable` and a label picker for each enum value. An Indexes list
+    under the fields adds, orders and removes the entity's `indexes`. See
+    [types and properties added in M15](resource-files.md#types-and-properties-added-in-m15).
   - Changing a field's type drops the settings the new type does not take and
     keeps the rest. It does not add an empty `values` or `target`, and Validate
     reports the missing setting.
@@ -421,7 +428,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - Only the actions a target takes can be chosen. An entity takes `read`,
     `create`, `update` and `delete`. A data source takes `read`. A process
     takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
-    takes `invoke`. Filter and fields are only on entity grants.
+    takes `invoke`. Filter and fields are only on entity grants. An entity
+    also takes `export` and `import`, and a data source `export`
+    _(planned for M15)_.
   - The view reads the [policy matrix route](authoring.md#policy-matrix).
   - A Resources / Policy matrix switch sits under the application picker. The
     matrix view is kept in the address as `&view=policies`, so a reload or a
@@ -764,7 +773,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
 - **Process graph** _(built)_. A process shows a
   drawn graph of its steps and transitions above its editor, see
   [D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md).
-  It is read-only. The author edits steps in the list.
+  It is read-only. The author edits steps in the list. _(Planned for M14)_ The
+  graph becomes the process designer, on a Design tab, see
+  [process designer](process-designer.md).
   - Dagre, `@dagrejs/dagre`, lays out the graph, and React Flow,
     `@xyflow/react`, draws it. Their sizes are about 30 KB and 50 KB min+gzip.
     The SPA loads them in their own chunk when a process opens. M14's process
@@ -793,7 +804,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
   The form designer is built, see
   [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md), and the
   process designer for M14, see
-  [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
+  [D74](../decisions/d74-a-visual-process-designer.md) and
+  [process designer](process-designer.md).
   The process graph is read-only, and not a designer.
   - **Design tab.** It sits next to the Form and JSON tabs. The three tabs edit
     one draft. _Built:_ the tab is there, and Form is the default tab. Opening a

@@ -1,8 +1,8 @@
 # Host settings
 
 Detailed reference for the settings of the server and of `Axis.Admin`: startup activation,
-Studio, tenancy and preview tenants, forwarded headers, the admin settings, rate limits and telemetry
-export.
+Studio, tenancy and preview tenants, data settings, forwarded headers, the admin settings, rate limits
+and telemetry export.
 The worker's own settings are in [worker settings](process-execution.md#worker-settings).
 The conventions of [architecture.md](../architecture.md) apply: sections marked
 _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
@@ -299,6 +299,29 @@ the operator sets it with
   connection string. The development Keycloak realm accepts the preview hosts as
   redirect and sign-out addresses. An existing Compose volume has no
   `axis_preview` database and needs `docker compose down -v` once.
+
+## Data settings
+
+These are _(planned for M15)_. The server reads them. See
+[D79](../decisions/d79-import-and-export-under-policies.md) and
+[D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Data:QueryTimeout` | `00:00:10` | The `statement_timeout` of every interactive read: record lists and reads, data source rows, lookups and page reads. A read past it is a `503`. |
+| `Data:ExportQueryTimeout` | `00:01:00` | The `statement_timeout` of an export's query. |
+| `Data:ExportMaxRows` | `100000` | The most rows one export writes. |
+| `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. |
+| `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. |
+| `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. A field's `maxSize` cannot exceed it. |
+
+- **Per transaction.** Each timeout is set with `SET LOCAL`, so it never
+  outlives its query's transaction and never reaches a pooled connection's
+  next user.
+- **Writes.** Record writes, activation and the worker's own statements keep
+  their current limits. M16 sets the final values against its SLOs.
+- **Environment.** As environment variables they are `Data__QueryTimeout`
+  and so on.
 
 ## Forwarded headers
 

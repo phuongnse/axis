@@ -19,6 +19,8 @@ retries and reconciliation.
   declares bindings. A connector names one as `{ "binding": "<name>" }`, and
   where the name is used decides its kind: `baseUrl` needs a `url` binding,
   and `auth` needs a `secret` binding.
+  - [D76](d76-file-money-and-enum-label-field-types.md) adds a third kind,
+    `storage`, for the files of file fields.
 - **Where values live:** per tenant, in `Tenants:{id}:Bindings:{name}` of
   the server and worker configuration under `Tenancy:Source=configuration`.
   Both hosts must hold them. Under `Tenancy:Source=directory`,

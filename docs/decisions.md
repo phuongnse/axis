@@ -79,6 +79,19 @@ files agree, title and status included.
 | [D66](decisions/d66-a-visual-form-designer-for-form-resources.md) | A visual form designer for form resources | **Agreed** |
 | [D67](decisions/d67-live-widget-previews-in-the-design-system.md) | Live widget previews in the design system | **Agreed** |
 | [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) | Issues of several milestones run at once | **Agreed** |
+| [D69](decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md) | Timer, wait for event and sub-process steps, loops and create record | **Agreed** |
+| [D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md) | Processes without a subject, scheduled jobs and delete triggers | **Agreed** |
+| [D71](decisions/d71-task-deadlines-escalation-claim-and-reassign.md) | Task deadlines, escalation, claim and reassign | **Agreed** |
+| [D72](decisions/d72-a-delivery-limit-and-dead-letters.md) | A delivery limit and dead letters | **Agreed** |
+| [D73](decisions/d73-in-app-and-email-notifications.md) | In-app and email notifications | **Agreed** |
+| [D74](decisions/d74-a-visual-process-designer.md) | A visual process designer | **Agreed** |
+| [D75](decisions/d75-the-application-time-zone.md) | The application time zone | **Agreed** |
+| [D76](decisions/d76-file-money-and-enum-label-field-types.md) | File, money and enum label field types | **Agreed** |
+| [D77](decisions/d77-indexes-defaults-and-ranges.md) | Indexes, defaults and ranges | **Agreed** |
+| [D78](decisions/d78-references-from-child-rows-and-many-to-many.md) | References from child rows and many-to-many | **Agreed** |
+| [D79](decisions/d79-import-and-export-under-policies.md) | Import and export under policies | **Agreed** |
+| [D80](decisions/d80-search-more-aggregates-and-query-timeouts.md) | Search, more aggregates and query timeouts | **Agreed** |
+| [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md) | Asset management as the fourth sample application | **Agreed** |
 | [D82](decisions/d82-performance-slos-and-load-tests.md) | Performance SLOs and load tests | **Agreed** |
 | [D83](decisions/d83-the-fapi-20-profile-per-tenant.md) | The FAPI 2.0 profile per tenant | **Agreed** |
 | [D84](decisions/d84-asvs-level-2-and-a-server-side-session.md) | ASVS Level 2 and a server-side session | **Agreed** |

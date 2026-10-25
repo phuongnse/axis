@@ -16,7 +16,7 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 | **Application template** | An installed, versioned application folder with a `template.json`. Studio creates a new application by copying it, with new resource ids, the new name and a site path that follows the name. See [application templates](../reference/modules-and-templates.md#application-templates). | M11 |
 | **Release** | The immutable compiled form of an application at one point in time. It pins every resource version it uses. New work starts on the active release. Running work, with its tasks, forms, texts and package versions, stays on its release until it ends, while roles and policies come from the active release. | M1 (basic), M6 (full) |
 | **Diagnostic** | A validation or compile error or warning. It points at the resource, field and path that caused it. | M1 |
-| **Studio** | The visual editor of an application's resources. It edits the JSON files of the application folders that `Studio:Folders` lists, through an authoring API. It also creates applications in `Studio:ApplicationsPath`. Its edit routes never activate a release. It asks for an activation through a publish request, see **Publish request**. It shows where each resource is used. A visual page designer, the Design tab of the page editor, is built, see [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md). A visual form designer, the Design tab of the form editor, is built, see [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md). Opening a page or a form on the Design tab by default is *(planned for M14)*. A process designer comes later, see [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md). See [authoring API](../reference/authoring.md). | M8, M13 (page and form designers) |
+| **Studio** | The visual editor of an application's resources. It edits the JSON files of the application folders that `Studio:Folders` lists, through an authoring API. It also creates applications in `Studio:ApplicationsPath`. Its edit routes never activate a release. It asks for an activation through a publish request, see **Publish request**. It shows where each resource is used. A visual page designer, the Design tab of the page editor, is built, see [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md). A visual form designer, the Design tab of the form editor, is built, see [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md). Opening a page or a form on the Design tab by default is *(planned for M14)*. A visual process designer, the Design tab of the process editor, is *(planned for M14)*, see [D74](../decisions/d74-a-visual-process-designer.md). See [authoring API](../reference/authoring.md). | M8, M13 (page and form designers), M14 (process designer) |
 | **Publish request** | A request that Studio stores in the tenant database to validate or publish an application, or to roll back to an earlier release. It holds a snapshot of the folder, or a release id, and has a status: `queued`, `running`, `succeeded` or `failed`. A separate publisher runs it, so the server never activates a release itself. A request can also target the tenant's preview tenant, see **Preview tenant**. See [publishing](../reference/authoring.md#publishing) and [D47](../decisions/d47-publishing-from-studio.md). Validate, publish, rollback, preview and test requests are built. A fourth kind, `test`, runs the application's test scenarios from Studio, see [D55](../decisions/d55-running-test-scenarios-from-studio.md). | M10 |
 | **Release history** | The per-tenant list of activations of each application. Each row holds the release, its content hash, the actor, the label, the note and the request. A release gets a number, 1, 2, 3…, the first time it is activated in the tenant. A rollback names a release from it. See [release history](../reference/storage.md#release-history). The history, its route and rollback are built. | M10 |
 | **Reference index** | The uses and used-by edges between resources, text keys, extension packages and modules. A compile builds it in memory, and it is not stored in the release. Studio shows it as a **Uses** list and a **Used by** list. See [reference index](../reference/configuration.md#reference-index). | M8 |
@@ -31,6 +31,8 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 | **Data source** | A named, parameterized query over entities. It declares projections, filters, sorting, paging, related entities and aggregates. Pages, widgets, rules and processes read data only through data sources or entity APIs. See [data sources](../reference/data-sources.md). | M2 |
 | **Sequence** | A `sequence` resource that hands out business numbers from a format such as `PR-{yyyy}-{n:5}`, giving `PR-2026-00042`. A `text` field names it and gets its number on create, in the create's transaction, so there are no gaps. When the format has a year, the counter restarts each UTC year. See [configuration](../reference/resource-files.md#sequences). | M3 |
 | **Seed data** | Reference or demo records shipped with an application and applied idempotently. Seed data is not created by process code. A seed can be synced so changed values update the seeded records on start. | M1 (basic), M2 |
+| **File** | A file that a `file` field holds: uploaded first as `pending`, then attached by a record write, downloaded by id under the owner record's read grants, and stored where the application's `storage` binding says. M15 stores the bytes in the tenant database. See [file fields](../reference/file-fields.md) and [D76](../decisions/d76-file-money-and-enum-label-field-types.md). *(planned for M15)* | M15 |
+| **Import and export** | Writing the rows of a data source or an entity to a CSV or spreadsheet file, and creating or updating records from one. Each needs its own grant action, `export` or `import`. An export runs the rows query under the user's read grants. An import runs on the worker, checks every row in a dry run, then writes all rows or none through the record command. See [import and export](../reference/import-export.md) and [D79](../decisions/d79-import-and-export-under-policies.md). *(planned for M15)* | M15 |
 | **Migration** | A `migration` resource that changes one entity's stored data in a way that is not additive: rename or drop a field, drop the entity, fill nulls or convert values. Activation runs it once per tenant, before additive provisioning, in the same transaction. Rename field, drop field, drop entity, fill and convert are built, and so is the refusal of a destructive migration while old-release instances use the column. A retry of a `failed` instance after a destructive migration on a column its pinned release uses is refused. A fill or convert on a child entity or of a field a computed field reads recomputes the changed rows and their owners at activation. See [storage](../reference/migrations.md#migrations). | M6 |
 
 **Field types** start with:
@@ -46,10 +48,16 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 - child collection (owned rows such as line items). The record API reads and
   writes its rows through the owner record.
 
+M15 adds *(planned for M15)*, see
+[entity field types](../reference/resource-files.md#types-and-properties-added-in-m15):
+
+- money, with a fixed currency or a currency field
+- file
+- references (a set of records, many-to-many)
+- labels for enum values
+
 Later types:
 
-- money
-- file
 - JSON object
 
 **Field constraints** in M1:
@@ -59,15 +67,19 @@ Later types:
 - maxLength (text)
 - precision and scale (decimal)
 
-Later constraints:
+M15 adds *(planned for M15)*:
 
-- range
-- index
+- range (`min`, `max` and `minLength`)
+- index, declared on the entity, and added by the platform on every
+  reference and owner column
 - default value
 
-**Field flags** (later):
+**Field flags**:
 
-- searchable
+- searchable *(planned for M15)*
+
+Later field flags:
+
 - audited
 - masked in logs
 - encrypted at rest
@@ -85,11 +97,14 @@ Later constraints:
 
 | Concept | Meaning | From |
 | --- | --- | --- |
-| **Process** | A versioned definition of steps and transitions, executed durably. It explicitly declares the entities it works on. In M3 a process names one entity, its subject, and runs for one record of it. | M3 |
+| **Process** | A versioned definition of steps and transitions, executed durably. It explicitly declares the entities it works on. In M3 a process names one entity, its subject, and runs for one record of it. A process without a subject, with typed parameters, is *(planned for M14)*, see [process flow](../reference/process-flow.md#processes-without-a-subject). | M3 |
 | **Process instance** | One run of a process. It is pinned to its release and records every step occurrence with its input, output, decision and error. | M3 |
-| **Human task** | A step that waits for a person. It has an assignee, a form, a due date and allowed outcomes such as approve, return or reject. Exactly one final decision is recorded. In M3 the assignee is a user or a role, and the due date is only shown. Queues and escalation come later. See [processes](../reference/task-api.md). | M3 |
+| **Human task** | A step that waits for a person. It has an assignee, a form, a due date and allowed outcomes such as approve, return or reject. Exactly one final decision is recorded. In M3 the assignee is a user or a role, and the due date is only shown. Escalations, a deadline that expires the task, claim, release and reassign are *(planned for M14)*, see [task deadlines and claims](../reference/task-deadlines.md). See [processes](../reference/task-api.md). | M3, M14 (deadlines and claims) |
 | **Operator command** | An authorized, audited command on process work that the engine cannot finish alone. **Cancel** ends a `running` or `waiting` instance as `cancelled` and cancels its open tasks. **Retry** runs a `failed` instance again from its failed step, on its pinned release. **Resolve** settles a connector call or a package call. It settles a call whose outcome is `unknown`, as succeeded with output values or as failed. All three are built. Each needs its own `process` grant and a reason, and writes a history row and an audit record. Cancel does not undo steps that already ran. See [operator commands](../reference/process-inspection.md#operator-commands). | M7 |
 | **Retry policy** | A `callConnector` step and a package operation step declare their attempts and their backoff. The platform fixes which errors are retried, and the instance fails when attempts run out. Operator [retry](../reference/process-inspection.md#retry) is built. Alerts and compensation come later. See [call outcomes](../reference/process-execution.md#call-outcomes) and [package call outcomes](../reference/process-execution.md#package-call-outcomes). | M5 |
+| **Dead letter** | A delivery that kept failing after `Worker:DeliveryAttempts` tries: an event to a trigger or a waiting instance, a schedule fan-out or an email. It is kept in `axis.dead_letters` until an operator redelivers or discards it, with a reason. See [dead letters](../reference/process-events.md#dead-letters) and [D72](../decisions/d72-a-delivery-limit-and-dead-letters.md). *(Planned for M14.)* | M14 |
+| **Notification** | A message a `notify` operation or a task escalation sends to users, roles or email addresses, in the site (in-app) or by email. Its texts have named placeholders filled from typed values, never from a `sensitive` field. Email goes through an outbox and is sent at least once. See [notifications](../reference/notifications.md) and [D73](../decisions/d73-in-app-and-email-notifications.md). *(Planned for M14.)* | M14 |
+| **User profile** | What Axis keeps about a user who signed in: the user id, display name, email and locale, from the identity provider's claims. It gives notifications an address and a locale, and a reassign its known users. It is not a user directory. See [user profiles](../reference/notifications.md#user-profiles). *(Planned for M14.)* | M14 |
 | **Process inspector** | A widget that names one process, lists its instances and opens one. It shows the graph with the path drawn on it, the tasks, and the connector and package calls with their attempts. A call's input is shown only when the user may read every field its mapping reads or writes, and a field marked `sensitive` is never shown. It needs an `inspect` grant on the process. The purchase request sample has one, the Approvals page, for its `operator` role. The record history links to an instance. See [process inspection](../reference/process-inspection.md#process-inspection). | M7 |
 
 **Step kinds:**
@@ -98,17 +113,19 @@ Later constraints:
 - decision (M3)
 - human task (M3)
 - end (M3)
-- wait for event (later)
-- timer (later)
-- sub-process (later)
+- wait for event (M14)
+- timer (M14)
+- sub-process (M14)
 
-See [processes](../reference/processes.md#steps).
+See [processes](../reference/processes.md#steps) and, for the M14 steps,
+loops through a waiting step and the `createRecord` and `notify` operations,
+[process flow](../reference/process-flow.md) *(planned for M14)*.
 
 ## Triggers and integration
 
 | Concept | Meaning | From |
 | --- | --- | --- |
-| **Trigger** | A `trigger` resource starts a process for one record when something happens. M5 has three kinds, listed below. The event, data change and schedule trigger resources and their compile checks are built. The worker runs schedule triggers over the records of their data source. Data change triggers start their processes on record API creates and updates, on an inbound endpoint's create, on task form saves, on `updateRecord` steps and on connector and package operation outputs, the worker delivers raised events to `async` event triggers, and a `raiseEvent` step starts the processes of `sync` event triggers in its own transaction. See [triggers](../reference/integration-resources.md#events-and-triggers). | M5 |
+| **Trigger** | A `trigger` resource starts a process for one record when something happens. M5 has three kinds, listed below. A schedule without a data source and a delete start a process without a subject *(planned for M14)*. The event, data change and schedule trigger resources and their compile checks are built. The worker runs schedule triggers over the records of their data source. Data change triggers start their processes on record API creates and updates, on an inbound endpoint's create, on task form saves, on `updateRecord` steps and on connector and package operation outputs, the worker delivers raised events to `async` event triggers, and a `raiseEvent` step starts the processes of `sync` event triggers in its own transaction. See [triggers](../reference/integration-resources.md#events-and-triggers). | M5 |
 | **Event** | An `event` resource: a named event about one entity, with typed payload fields. A `raiseEvent` step raises it for its subject record. Event triggers start processes from it, in the same transaction (sync) or through durable delivery (async). Events raised by the platform come later. | M5 |
 | **Connector** | A `connector` resource for calling an external system. It has a base URL from a `url` binding, auth from a `secret` binding, a timeout and named operations. It can name the idempotency header the system accepts, and each operation can name a lookup that finds an earlier call by its key. See [connectors](../reference/integration-resources.md#connectors-and-deployment-bindings). | M5 |
 | **Endpoint** | An `endpoint` resource that lets another system, signed in with a bearer token, create a record and start a process on it in one call. It has typed input fields, the entity it creates, a mapping from input to fields and the process it starts. It can return output fields when the process completes within a short wait. The resource, its compile checks, the call with its output and wait, its idempotency key, and the status location are built. See [endpoints](../reference/integration-resources.md#endpoint-resource). | M5 |
@@ -116,9 +133,12 @@ See [processes](../reference/processes.md#steps).
 **Trigger kinds:**
 
 - **Data change:** a record was created or updated, optionally only when
-  named fields changed. Delete comes later.
+  named fields changed. Delete, which starts a process without a subject, is
+  *(planned for M14)*.
 - **Event:** a named event was raised.
-- **Schedule:** a cron schedule in an IANA time zone. It fans out over the
+- **Schedule:** a cron schedule in an IANA time zone. Without a data source
+  it starts a process without a subject once, a scheduled job *(planned for
+  M14)*. With one, it fans out over the
   records of a data source.
 
 Inbound endpoints are their own resource, not a trigger kind. See
@@ -131,7 +151,7 @@ Inbound endpoints are their own resource, not a trigger kind. See
 | **Site** | An entry point of one application, with its own path, title, locales (default, fallback and available) and navigation. Theme, identity provider binding and domain come later. | M1 |
 | **Page** | A route in a site. It has a title, and its content is its widgets: a tree of widgets, drawn in order (M12). A page has no entity or template of its own. It can declare typed parameters, filled by navigate actions (M12). | M1, M12 (widget tree, parameters) |
 | **Widget** | A UI block on a page. M1 has `table` and `form` widgets over one entity, a `table` may bind a data source instead of an entity (M2), and a table opens and creates records through navigate actions (M12). M3 adds the `taskInbox` widget, which lists the user's open tasks. The process inspector widget, which lists the instances of one process and shows one, is built in M7. M12 adds the container widgets `columns`, `tabs` and `section`, which hold other widgets and are drawn by the SPA. M12 adds `detail`, `chart` and `kpi`, see [D64](../decisions/d64-detail-chart-and-kpi-widgets.md). A chart and a KPI bind page parameters into their data source with the name map of a table (M13). A list widget and custom widgets come later. | M1, M12 (containers, detail, chart and KPI widgets), M13 (chart and KPI page parameters) |
-| **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. M1 has a basic form over all of an entity's fields. M3 builds the `form` resource: sections of fields, any of them read-only, used by both pages and tasks. Conditional visible, required and read-only states, validation as the user types and wizard steps are built in M12. The form schema, compile checks, metadata, the record and task form state endpoints, the SPA's form widget conditions and the task page's conditions are built, and so are the wizard steps on form pages and task pages ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)). Refusing a value for a hidden or read-only field in the task API is built in M13. File upload comes later. See [frontend](../reference/frontend.md). | M1 (basic), M3 (form resource), M12 (states, steps), M13 (task API refusal), later |
+| **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. M1 has a basic form over all of an entity's fields. M3 builds the `form` resource: sections of fields, any of them read-only, used by both pages and tasks. Conditional visible, required and read-only states, validation as the user types and wizard steps are built in M12. The form schema, compile checks, metadata, the record and task form state endpoints, the SPA's form widget conditions and the task page's conditions are built, and so are the wizard steps on form pages and task pages ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)). Refusing a value for a hidden or read-only field in the task API is built in M13. File upload is *(planned for M15)*, see [file fields](../reference/file-fields.md#in-the-spa). See [frontend](../reference/frontend.md). | M1 (basic), M3 (form resource), M12 (states, steps), M13 (task API refusal), M15 (file upload) |
 | **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. M3 builds the `startProcess` action on a form widget and the outcomes of a task. Run operation comes later. Navigate actions with page parameters are built in M12, see [D63](../decisions/d63-navigate-actions-and-page-parameters.md). Table row and toolbar actions, delete included, are built in M12, see [D59](../decisions/d59-table-row-and-toolbar-actions.md). A delete of a record that a running or waiting process instance works on is refused with `409`. Page metadata lists them, and the SPA shows their buttons on table rows, the table toolbar and saved forms. | M3, M12 (navigate, row and toolbar actions), M13 (delete refusal) |
 | **Theme** | Design tokens for light and dark mode, shared by every site. M1 has the shared tokens. A site will be able to adjust tokens later, but never add per-page styling. | M1 (shared tokens), later (site adjustments) |
 | **Text resource** | A localized text with a stable key. Every UI string comes from text resources. An application has one `text` resource per locale, and every locale has the same keys. A key used by a label must exist in every locale. Texts are never shared across applications. Each release carries its own texts, so removing a key in a newer release does not affect work still running on an older one. | M1 (basic), M6 (full) |
@@ -147,7 +167,7 @@ Inbound endpoints are their own resource, not a trigger kind. See
 | **Tenant** | An isolated customer scope with its own database, users, applications and settings. | M1 (context), M9 (management) |
 | **Tenant directory** | The list of tenants in the platform database: each tenant's status, hosts, database, sign-in settings and deployment bindings, with secrets stored encrypted. The server and the worker read it and pick up changes without a restart. Host configuration stays the default source. See [D42](../decisions/d42-tenant-directory-in-the-platform-database.md). | M9 |
 | **Preview tenant** | A tenant that belongs to one main tenant, where an author tries an application before publishing it. It has its own database, hosts and deployment bindings, and its data never mixes with the main tenant's. Its bindings are empty by default, so it never calls a real system by accident. It signs people in with its main tenant's sign-in settings. See [preview tenants](../architecture.md#preview-tenants) and [D48](../decisions/d48-preview-tenants.md). Built under the `configuration` and `directory` tenant sources, with `PreviewOf`, sign-in and bindings. The publisher runs preview requests on it, and the Studio **Preview** button and its route send them. Each tenant keeps its own status. | M10 |
-| **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. M5 has two kinds, `url` and `secret`. Their values are set per tenant in host configuration or in the tenant directory under `Tenancy:Source=directory`. See [deployment bindings](../reference/integration-resources.md#deployment-bindings). | M5 |
+| **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. M5 has two kinds, `url` and `secret`. M15 adds `storage`, for the files of file fields *(planned for M15)*. Their values are set per tenant in host configuration or in the tenant directory under `Tenancy:Source=directory`. See [deployment bindings](../reference/integration-resources.md#deployment-bindings). | M5, M15 (storage) |
 | **Audit record** | An append-only record of a consequential action, committed in the same transaction as the action. It holds the time, the actor, the action, the application, the entity, the record, the process instance and a details object. It also holds the actor's display name at the time of the action. The database rejects every update and delete. See [storage](../reference/storage.md#audit-records-and-sequence-counters). | M3 |
 | **Platform audit record** | An append-only record of an `Axis.Admin` command that changes the tenant directory, a tenant database, a key or a password, or backs up a tenant. It holds the time, the command, the tenant, the operating system user and machine, and the names of what changed, never a secret value. It lives in the platform database. See [platform audit records](../reference/tenant-setting-commands.md#platform-audit-records) and [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md). *(Planned for M16.)* | M16 |
 | **Service account** | A client of the tenant's identity provider that calls the record API, data source rows and the process API with a bearer token from the client credentials grant. It has roles from the roles claim, and policies apply to it as to a user. It never completes a task. See [service accounts](../reference/security.md#service-accounts) and [D86](../decisions/d86-service-accounts-for-the-record-and-process-apis.md). *(Planned for M16.)* | M16 |

@@ -103,9 +103,12 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | Primary key             | `pk_` + table                                                             | 37         |
   | Unique constraint       | `uq_` + table + `_` + hash of the column name                             | 54         |
   | Foreign key             | `fk_` + table + `_` + hash of the column name                             | 54         |
+  | Index _(planned for M15)_ | `ix_` + table + `_` + hash of the column list                           | 54         |
+  | Junction table _(planned for M15)_ | `m_` + entity `id` + `_` + hash of the field name              | 51         |
 
   The hash is the first 16 lowercase hex characters of SHA-256 over the UTF-8
-  column name. Because names are ASCII and at most 60 characters, every
+  column name. For an index it is over the column names joined by commas, in
+  order, and for a junction table over the field name in lowercase. Because names are ASCII and at most 60 characters, every
   identifier fits PostgreSQL's 63-byte limit by construction and is never
   truncated. Identifiers are always double-quoted in SQL.
 
@@ -134,6 +137,9 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | `enum`             | `text`; the values are recorded, not enforced by a `CHECK`                                                |
   | `reference`        | `uuid` with a foreign key to the target table's `id`                                                      |
   | `child-collection` | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns) |
+  | `money` _(planned for M15)_ | `numeric(p,s)`, as `decimal` with its defaults. The currency is the field's or the `currencyField` column's |
+  | `file` _(planned for M15)_ | `uuid` with a foreign key to `axis.files`. See [file fields](file-fields.md#storage-and-clean-up) |
+  | `references` _(planned for M15)_ | No column on the owner table. A junction table holds `owner_id` and `target_id`, see [Schema planning](#schema-planning) |
 
 - **SQL safety.** Every SQL statement for entity data is built by the data
   module from compiled metadata. Identifiers are resolved and quoted by the
@@ -548,6 +554,29 @@ access. It returns diagnostics, SQL statements and the new records to write.
   [Recomputing computed fields](migrations.md#recomputing-computed-fields).
 - **Errors.** When any diagnostic exists, the plan has no statements and no
   new records; nothing is applied.
+- **Indexes** _(planned for M15)_. See
+  [D77](../decisions/d77-indexes-defaults-and-ranges.md).
+  - Every `reference` column and every child table's `owner_id` gets an
+    `ix_` index without being declared. So do a junction table's `target_id`
+    and every `searchable` field, whose index is a `pg_trgm` GIN index on
+    `lower()` of the column.
+  - The catalog snapshot also reads the `ix_` indexes of each table. The
+    planner adds an index the release declares and the table lacks, and drops
+    an `ix_` index the release no longer declares. A drop needs no migration.
+  - A unique index added to a table with rows is `AXC0016`, as for `unique`.
+    It is built inside the activation transaction.
+  - Another new index on a table with at most
+    `Activation:InlineRecomputeLimit` rows is built inside the activation
+    transaction. On a larger table, activation commits without it and the
+    worker builds it with `CREATE INDEX CONCURRENTLY`. An index the build
+    leaves `INVALID` is dropped and built again. Until it is valid, queries
+    work without it.
+- **Junction tables** _(planned for M15)_. A `references` field gets a
+  junction table with `owner_id`, a foreign key to the owner deleted with it,
+  and `target_id`, a foreign key to the target that refuses a delete while
+  linked. Its primary key is both columns. Removing the field drops nothing
+  and is `AXC0015`, as for a column. See
+  [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md).
 
 ## Child tables and computed columns
 

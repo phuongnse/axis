@@ -66,6 +66,10 @@ removed. Everything in this decision is in place. See
 - **Audit actor:** the actor is the user id from the session. The display
   name is stored with the audit record, because Axis has no user directory
   to look it up later.
+  - [D73](d73-in-app-and-email-notifications.md) changes this reason: from
+    M14 each sign-in writes a user profile, with the email and locale that
+    notifications need. It is still not a directory, and audit records keep
+    the display name.
 
 _Why:_ see [knowledge](../domain/knowledge.md#authorization). Policies and
 processes need to know who acts, so test users must give way to real
