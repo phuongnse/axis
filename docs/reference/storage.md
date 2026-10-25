@@ -184,9 +184,9 @@ and creates no tables. See
   transaction after the migrations, and revokes any wider right the role had
   there. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
   It does not yet check whether the role is a superuser, owns the schema or
-  inherits rights through membership. The planned `platform.audit_records`
-  table is the one exception: the role gets no `SELECT` on it
-  _(planned for M16)_.
+  inherits rights through membership. The `platform.audit_records` table is
+  the one exception: the role gets no right on it at all. The same step revokes
+  the right that the default privileges would give it on that table.
 - **One write grant.** The same role also gets `INSERT` on
   `platform.data_protection_keys`, and on no other table. Key rotation happens
   while the server runs, so the server must add keys. It never updates or
@@ -211,7 +211,7 @@ The tables:
 | `platform.tenant_hosts`                             | The tenant id and the host. The host is unique on `lower(host)` across all tenants                                                                                                                                                                                                                                          |
 | `platform.tenant_bindings`                          | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                         |
 | `platform.data_protection_keys`                     | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. Rows are only inserted, never updated or deleted. Every server replica reads them                                                                                                                                                                   |
-| `platform.audit_records`                            | _(Planned for M16.)_ The time, the `Axis.Admin` command, the tenant id, the operating system user and machine, and the names of what changed. Append-only. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records)                                                    |
+| `platform.audit_records`                            The `id`, `occurred_at`, `command`, the `tenant_id`, which can be empty and has no foreign key, `os_user`, `machine` and `changed` (`text[]`), the names of what changed. Triggers reject every update, delete and truncate with SQLSTATE `23001`. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records) |
 
 The tenant `version` grows on every change to the tenant, its hosts or its
 bindings.

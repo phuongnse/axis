@@ -49,6 +49,46 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("data_protection_keys", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.PlatformAuditRecordRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.PrimitiveCollection<string[]>("Changed")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("changed");
+
+                    b.Property<string>("Command")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("command");
+
+                    b.Property<string>("Machine")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("machine");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("OsUser")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("os_user");
+
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_audit_records");
+
+                    b.ToTable("audit_records", "platform");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantBindingRow", b =>
                 {
                     b.Property<string>("TenantId")
