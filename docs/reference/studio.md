@@ -920,13 +920,13 @@ Run and the Test results list, the read-only view of a module entity, and the re
     own. The keys also work when nothing has focus, but not when the focus is
     outside the editor. The other kinds of resource have no undo yet.
   - **Library.** Drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
-    `@dnd-kit/utilities`. The core package, which brings `@dnd-kit/accessibility`
-    and `@dnd-kit/utilities` with it, measures 12.7 KB gzipped, in the lazy chunk
-    `studioCanvas` that both designers share. Each designer's canvas, palette
-    and, for a page, data panel are a lazy chunk of their own,
-    `StudioPageDesign` and `StudioFormDesign`, and load when the Design tab
-    opens. The build fails when the page chunk is missing or is part of the main
-    bundle. The pointer moves of existing widgets use the core package and the
+    `@dnd-kit/utilities`. The four `@dnd-kit` packages,
+    `@dnd-kit/accessibility` among them, measure 15.4 KB gzipped together, in the lazy
+    chunk `assets/DragAndDrop-*.js` that both designers share. Each designer's
+    canvas, palette and, for a page, data panel are a lazy chunk of their own,
+    `StudioPageDesign` and `StudioFormDesign`. All of them load when the Design
+    tab opens. The build fails when the drag and drop chunk or the page chunk is
+    missing, or is part of the main bundle. The pointer moves of existing widgets use the core package and the
     palette's drop targets. The form outline's field and section moves use
     `@dnd-kit/sortable`.
   - **Format.** The designer writes only the order of the widget tree and the
