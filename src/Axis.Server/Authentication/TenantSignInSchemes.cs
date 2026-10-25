@@ -6,8 +6,8 @@ using Microsoft.Extensions.Options;
 namespace Axis.Server.Authentication;
 
 /// <summary>
-/// Brings the OIDC client and the endpoint caller scheme of each tenant in line with the tenants served now. A tenant
-/// that is served gains both schemes, a tenant that is no longer served loses them, and a tenant whose settings changed
+/// Brings the OIDC client and the endpoint caller and service account schemes of each tenant in line with the tenants served now. A tenant
+/// that is served gains all three schemes, a tenant that is no longer served loses them, and a tenant whose settings changed
 /// builds its options again on their next use, which also fetches the identity provider's metadata again.
 /// </summary>
 internal sealed class TenantSignInSchemes(
@@ -26,6 +26,7 @@ internal sealed class TenantSignInSchemes(
         {
             schemes.RemoveScheme(TenantSignIn.SchemeName(id));
             schemes.RemoveScheme(EndpointCaller.SchemeName(id));
+            schemes.RemoveScheme(ServiceAccount.SchemeName(id));
         }
 
         settings.Replace(next);
@@ -35,12 +36,14 @@ internal sealed class TenantSignInSchemes(
         {
             oidcOptions.TryRemove(TenantSignIn.SchemeName(id));
             bearerOptions.TryRemove(EndpointCaller.SchemeName(id));
+            bearerOptions.TryRemove(ServiceAccount.SchemeName(id));
         }
 
         foreach (var id in next.Keys.Where(id => !previous.ContainsKey(id)))
         {
             schemes.TryAddScheme(new AuthenticationScheme(TenantSignIn.SchemeName(id), displayName: null, typeof(OpenIdConnectHandler)));
             schemes.TryAddScheme(new AuthenticationScheme(EndpointCaller.SchemeName(id), displayName: null, typeof(JwtBearerHandler)));
+            schemes.TryAddScheme(new AuthenticationScheme(ServiceAccount.SchemeName(id), displayName: null, typeof(JwtBearerHandler)));
         }
     }
 }

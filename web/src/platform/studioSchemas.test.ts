@@ -16,6 +16,7 @@ function nodeAt(root: JsonSchema, pointer: string): JsonSchema {
 const expressionNodes: [kind: string, pointer: string][] = [
   ['entity', '/$defs/validation/properties/expression'],
   ['entity', '/$defs/field/properties/expression'],
+  ['entity', '/$defs/field/properties/default'],
   ['dataSource', '/properties/filter'],
   ['rule', '/properties/expression'],
   ['trigger', '/properties/when'],

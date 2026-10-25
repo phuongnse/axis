@@ -75,6 +75,8 @@ export interface FieldMetadata {
   /** The fewest characters a text value may have. */
   minLength: number | null
   values: string[] | null
+  /** The text key of each enum value's label, by value, or missing or `null` when the enum has no labels. */
+  valueLabelKeys?: Record<string, string> | null
   target: ReferenceTarget | null
   fields: FieldMetadata[] | null
 }
@@ -95,6 +97,8 @@ export interface DataSourceParameter {
   required: boolean
   labelKey: string | null
   values: string[] | null
+  /** The text key of each enum value's label, by value, or missing or `null` when the enum has no labels. */
+  valueLabelKeys?: Record<string, string> | null
   target: ReferenceTarget | null
 }
 
@@ -107,6 +111,8 @@ export interface DataSourceColumn {
   type: FieldType
   labelKey: string | null
   values: string[] | null
+  /** The text key of each enum value's label, by value, or missing or `null` when the enum has no labels. */
+  valueLabelKeys?: Record<string, string> | null
   target: ReferenceTarget | null
 }
 

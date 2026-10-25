@@ -47,6 +47,10 @@
         {
           "name": "purchasing-system",
           "clientRole": true
+        },
+        {
+          "name": "reporting-system",
+          "clientRole": true
         }
       ]
     }
@@ -129,6 +133,47 @@
           "consentRequired": false,
           "config": {
             "included.custom.audience": "axis-endpoints",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "reporting-system",
+      "name": "Reporting system",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "reporting-system-development-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "axis",
+            "claim.name": "roles",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "axis-services audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "axis-services",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
@@ -367,6 +412,17 @@
       "clientRoles": {
         "axis": [
           "purchasing-system"
+        ]
+      }
+    },
+    {
+      "id": "reporting-system",
+      "username": "service-account-reporting-system",
+      "enabled": true,
+      "serviceAccountClientId": "reporting-system",
+      "clientRoles": {
+        "axis": [
+          "reporting-system"
         ]
       }
     }

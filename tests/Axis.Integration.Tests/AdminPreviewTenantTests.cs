@@ -82,7 +82,7 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
     }
 
     [Fact]
-    public async Task The_catalog_gives_a_preview_tenant_the_main_tenants_sign_in_settings_without_its_endpoint_audience()
+    public async Task The_catalog_gives_a_preview_tenant_the_main_tenants_sign_in_settings_without_its_endpoint_and_service_audiences()
     {
         await using var scenario = await NewScenarioAsync();
         var main = scenario.NewTenantId();
@@ -90,6 +90,7 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
         Assert.Equal(0, (await scenario.CreateAsync(main, "main.example.test")).Exit);
         Assert.Equal(0, (await scenario.RunAsync(AdminScenario.PreviewArgs(preview, main, "preview.example.test"), withClientSecret: false)).Exit);
         await scenario.SetEndpointAudienceAsync(main, "axis-endpoints");
+        await scenario.SetServiceAudienceAsync(main, "axis-services");
 
         var catalog = await DirectoryTenantCatalog.LoadAsync(scenario.Platform, AdminScenario.Cipher, CancellationToken);
 
@@ -97,10 +98,12 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
         var previewEntry = catalog.Find(preview)!;
         Assert.Null(mainEntry.PreviewOf);
         Assert.Equal("axis-endpoints", mainEntry.Oidc!.EndpointAudience);
+        Assert.Equal("axis-services", mainEntry.Oidc.ServiceAudience);
         Assert.Equal(main, previewEntry.PreviewOf);
         Assert.Equal(AdminScenario.Authority, previewEntry.Oidc!.Authority);
         Assert.Equal("axis", previewEntry.Oidc.ClientId);
         Assert.Null(previewEntry.Oidc.EndpointAudience);
+        Assert.Null(previewEntry.Oidc.ServiceAudience);
         Assert.Equal(scenario.ClientSecret, previewEntry.Oidc.ClientSecret!.Reveal());
     }
 
