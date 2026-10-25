@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
@@ -7,6 +9,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Expressions;
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Evaluation;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Sql;
 using Axis.Expressions.Typing;
@@ -992,6 +995,47 @@ public static class ApplicationCompiler
         }
     }
 
+    /// <summary>
+    /// Says why <paramref name="limit"/> is not a literal of the limited field type
+    /// <paramref name="type"/>, in the record API's forms, or returns null when it is one. Integer
+    /// and decimal limits are JSON numbers, and a decimal limit must fit a .NET decimal.
+    /// </summary>
+    private static string? LimitProblem(FieldType type, JsonElement limit) => type switch
+    {
+        FieldType.Integer when limit.ValueKind != JsonValueKind.Number || !limit.TryGetInt64(out _) =>
+            "must be an integral number within the signed 64-bit range.",
+        FieldType.Decimal when limit.ValueKind != JsonValueKind.Number || !TryReadDecimalLimit(limit, out _) =>
+            "must be a number that fits a decimal of at most 28 digits.",
+        FieldType.Date when limit.ValueKind != JsonValueKind.String || !DateLiterals.TryParseDate(limit.GetString()!, out _) =>
+            "must be a date in the form yyyy-MM-dd.",
+        FieldType.DateTime when limit.ValueKind != JsonValueKind.String || !DateLiterals.TryParseDateTime(limit.GetString()!, out _) =>
+            "must be an RFC 3339 date-time with an offset and at most 6 fraction digits.",
+        _ => null,
+    };
+
+    /// <summary>The limit as the model keeps it: the text of a date or date-time, and the number text as written.</summary>
+    private static string LimitText(JsonElement limit) =>
+        limit.ValueKind == JsonValueKind.String ? limit.GetString()! : limit.GetRawText();
+
+    private static bool TryReadDecimalLimit(JsonElement limit, out decimal value) =>
+        decimal.TryParse(limit.GetRawText(), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+
+    /// <summary>Compares two limits that <see cref="LimitProblem"/> accepted for <paramref name="type"/>.</summary>
+    private static int CompareLimits(FieldType type, JsonElement left, JsonElement right) => type switch
+    {
+        FieldType.Integer => left.GetInt64().CompareTo(right.GetInt64()),
+        FieldType.Decimal => ReadDecimalLimit(left).CompareTo(ReadDecimalLimit(right)),
+        FieldType.Date => DateOnly.ParseExact(left.GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture)
+            .CompareTo(DateOnly.ParseExact(right.GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture)),
+        _ => ReadDateTimeLimit(left).CompareTo(ReadDateTimeLimit(right)),
+    };
+
+    private static decimal ReadDecimalLimit(JsonElement limit) =>
+        TryReadDecimalLimit(limit, out var value) ? value : throw new InvalidOperationException("The limit is not a decimal.");
+
+    private static DateTimeOffset ReadDateTimeLimit(JsonElement limit) =>
+        DateLiterals.TryParseDateTime(limit.GetString()!, out var value) ? value : throw new InvalidOperationException("The limit is not a date-time.");
+
     private static void CheckField(
         FieldDefinition field,
         string path,
@@ -1077,6 +1121,69 @@ public static class ApplicationCompiler
                     $"'scale' must be between 0 and the precision ({field.Precision}), but is {scale}.",
                     $"{path}/scale");
             }
+        }
+
+        // A limit on a field the server sets would do nothing, because a request never carries its value.
+        bool FitsLimit(string property, string fittingTypeNames, params FieldType[] fittingTypes)
+        {
+            if (!Fits(property, fittingTypeNames, fittingTypes))
+            {
+                return false;
+            }
+
+            if (field.Expression is null && field.Sequence is null && field.Creator != true)
+            {
+                return true;
+            }
+
+            report(
+                DiagnosticCodes.InvalidConstraint,
+                $"'{property}' cannot be set on a field the server sets.",
+                $"{path}/{property}");
+            return false;
+        }
+
+        const string LimitedTypeNames = "integer, decimal, date and date-time";
+        FieldType[] limitedTypes = [FieldType.Integer, FieldType.Decimal, FieldType.Date, FieldType.DateTime];
+        var minValid = field.Min is { } min && FitsLimit("min", LimitedTypeNames, limitedTypes) && CheckLimit("min", min);
+        var maxValid = field.Max is { } max && FitsLimit("max", LimitedTypeNames, limitedTypes) && CheckLimit("max", max);
+        if (minValid && maxValid && CompareLimits(type, field.Min!.Value, field.Max!.Value) > 0)
+        {
+            report(
+                DiagnosticCodes.InvalidConstraint,
+                $"'max' must be at least 'min' ({LimitText(field.Min.Value)}), but is {LimitText(field.Max.Value)}.",
+                $"{path}/max");
+        }
+
+        if (field.MinLength is { } minLength && FitsLimit("minLength", "text", FieldType.Text))
+        {
+            if (minLength is < 1 or > MaxTextLength)
+            {
+                report(
+                    DiagnosticCodes.InvalidConstraint,
+                    $"'minLength' must be between 1 and {MaxTextLength}, but is {minLength}.",
+                    $"{path}/minLength");
+            }
+            else if (field.MaxLength is { } declaredMaxLength && minLength > declaredMaxLength)
+            {
+                report(
+                    DiagnosticCodes.InvalidConstraint,
+                    $"'minLength' must be at most the 'maxLength' ({declaredMaxLength}), but is {minLength}.",
+                    $"{path}/minLength");
+            }
+        }
+
+        // Reports a limit that is not a literal of the field's type. Returns whether it is one.
+        bool CheckLimit(string property, JsonElement limit)
+        {
+            var problem = LimitProblem(type, limit);
+            if (problem is null)
+            {
+                return true;
+            }
+
+            report(DiagnosticCodes.InvalidConstraint, $"'{property}' {problem}", $"{path}/{property}");
+            return false;
         }
 
         if (field.Target is { } target)
@@ -1633,6 +1740,9 @@ public static class ApplicationCompiler
             Required = field.Required ?? false,
             Unique = field.Unique ?? false,
             MaxLength = field.MaxLength,
+            MinLength = field.MinLength,
+            Min = field.Min is { } min ? LimitText(min) : null,
+            Max = field.Max is { } max ? LimitText(max) : null,
             Precision = field.Precision,
             Scale = field.Scale,
             Values = field.Values,

@@ -68,9 +68,12 @@ Later types:
 - maxLength (text)
 - precision and scale (decimal)
 
+Ranges follow: `min` and `max` on integer, decimal, date and date-time, and
+`minLength` on text. The server checks them and the database does not, so
+changing one needs no migration.
+
 M15 adds *(planned for M15)*:
 
-- range (`min`, `max` and `minLength`)
 - index, declared on the entity, and added by the platform on every
   reference and owner column
 - default value

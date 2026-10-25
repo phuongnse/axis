@@ -68,6 +68,12 @@ export interface FieldMetadata {
   maxLength: number | null
   precision: number | null
   scale: number | null
+  /** The lowest accepted value as the literal was written, such as `10`, `0.5` or `2026-01-01`. */
+  min: string | null
+  /** The highest accepted value, written like `min`. */
+  max: string | null
+  /** The fewest characters a text value may have. */
+  minLength: number | null
   values: string[] | null
   target: ReferenceTarget | null
   fields: FieldMetadata[] | null

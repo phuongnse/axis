@@ -126,16 +126,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
             {
               "name": "name", "type": "text", "labelKey": null,
               "required": true, "unique": false, "computed": false, "sequence": false,
-              "creator": false, "maxLength": 100,
-              "precision": null, "scale": null, "values": null, "target": null,
-              "fields": null
+              "creator": false, "maxLength": 100, "minLength": null,
+              "precision": null, "scale": null, "min": null, "max": null, "values": null, "target": null, "fields": null
             },
             {
               "name": "department", "type": "reference", "labelKey": "item.department",
               "required": false, "unique": false, "computed": false, "sequence": false,
-              "creator": false, "maxLength": null,
-              "precision": null, "scale": null, "values": null,
-              "target": {
+              "creator": false, "maxLength": null, "minLength": null, "precision": null,
+              "scale": null, "min": null, "max": null, "values": null, "target": {
                 "entity": "Department",
                 "displayField": "name",
                 "recordsPath": "/api/apps/RecordsApp/entities/Department/records"
@@ -258,8 +256,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     no column for it, and forms show its rows.
   - Each field has its name, its `type` as written in entity files (such as
     `date-time`), its label key, `required`, `unique`, `computed`, `sequence` and `creator`,
-    `maxLength` for text, `precision` and `scale` for decimal, `values` for enum, `target`
-    for reference, and `fields` for child collection. A property the field's
+    `maxLength` and `minLength` for text, `min` and `max` for integer, decimal, date and
+    date-time, `precision` and `scale` for decimal, `values` for enum, `target` for
+    reference, and `fields` for child collection. `min` and `max` are strings in the
+    entity file's literal form, such as `"0.5"` or `"2026-01-01"`. A property the field's
     type does not have, or a label the file leaves out, is `null`; it is
     never left out.
   - `computed` is `true` for a [computed field](resource-files.md#entity-logic).
@@ -725,12 +725,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
     | Field type | Input |
     | --- | --- |
-    | `text` | a text input limited to `maxLength` |
-    | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is |
+    | `text` | a text input limited to `maxLength`. With `minLength` it also has the `minlength` attribute and shows the character count against the limits, such as `0 / 3–10`, or `0 / ≥3` with no `maxLength` |
+    | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is. With `min` or `max` its placeholder shows the range, such as `1 – 10`, `≥ 1` or `≤ 10`, and a typed number outside the range is marked invalid. It is never blocked, because the server decides |
     | `boolean` | a checkbox |
-    | `date` | a date picker |
-    | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction |
-    | `enum` | a choice of the declared values, as written in the entity file, or their labels with `valueLabels`. A `file` field gets the [file input](file-fields.md#in-the-spa), and `min`, `max` and `minLength` show as limits _(planned for M15)_ |
+    | `date` | a date picker. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
+    | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
+    | `enum` | a choice of the declared values, as written in the entity file, or their labels with `valueLabels`. A `file` field gets the [file input](file-fields.md#in-the-spa) |
     | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
     | `child-collection` | a table of its rows, described under **Child collections** |
     | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |

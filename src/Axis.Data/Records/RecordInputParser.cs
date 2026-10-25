@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Text.Unicode;
 using Axis.Configuration.Model;
+using Axis.Expressions.Evaluation;
 using Messages = Axis.Data.Records.RecordInputMessages;
 
 namespace Axis.Data.Records;
@@ -383,11 +384,11 @@ public static partial class RecordInputParser
         return field.Type switch
         {
             FieldType.Text => ReadText(element, field, out value),
-            FieldType.Integer => ReadInteger(element, out value),
+            FieldType.Integer => ReadInteger(element, field, out value),
             FieldType.Decimal => ReadDecimal(element, field, out value),
             FieldType.Boolean => ReadBoolean(element, out value),
-            FieldType.Date => ReadDate(element, out value),
-            FieldType.DateTime => ReadDateTime(element, out value),
+            FieldType.Date => ReadDate(element, field, out value),
+            FieldType.DateTime => ReadDateTime(element, field, out value),
             FieldType.Enum => ReadEnum(element, field, out value),
             FieldType.Reference => ReadReference(element, out value),
             _ => throw new ArgumentOutOfRangeException(nameof(field), field.Type, "Unknown field type."),
@@ -413,16 +414,31 @@ public static partial class RecordInputParser
             return Messages.MaxLength(maxLength);
         }
 
+        if (field.MinLength is { } minLength && text.EnumerateRunes().Count() < minLength)
+        {
+            return Messages.MinLength(minLength);
+        }
+
         value = text;
         return null;
     }
 
-    private static string? ReadInteger(JsonElement element, out object? value)
+    private static string? ReadInteger(JsonElement element, FieldModel field, out object? value)
     {
         value = null;
         if (!TryReadLong(element, out var number))
         {
             return Messages.Integer;
+        }
+
+        if (field.Min is { } min && number < long.Parse(min, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture))
+        {
+            return Messages.AtLeast(min);
+        }
+
+        if (field.Max is { } max && number > long.Parse(max, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture))
+        {
+            return Messages.AtMost(max);
         }
 
         value = number;
@@ -442,6 +458,17 @@ public static partial class RecordInputParser
         if (CheckDigits(field, number) is { } message)
         {
             return message;
+        }
+
+        // The limits are compared exactly, as written: a bound is never rounded to a decimal.
+        if (field.Min is { } min && JsonNumberText.Compare(number, JsonNumberText.Parse(min)) < 0)
+        {
+            return Messages.AtLeast(min);
+        }
+
+        if (field.Max is { } max && JsonNumberText.Compare(number, JsonNumberText.Parse(max)) > 0)
+        {
+            return Messages.AtMost(max);
         }
 
         value = JsonNumberText.Render(number);
@@ -486,7 +513,7 @@ public static partial class RecordInputParser
         return null;
     }
 
-    private static string? ReadDate(JsonElement element, out object? value)
+    private static string? ReadDate(JsonElement element, FieldModel field, out object? value)
     {
         value = null;
         if (!TryReadString(element, out var text)
@@ -496,11 +523,21 @@ public static partial class RecordInputParser
             return Messages.Date;
         }
 
+        if (field.Min is { } min && date < ParseDate(min))
+        {
+            return Messages.AtLeast(min);
+        }
+
+        if (field.Max is { } max && date > ParseDate(max))
+        {
+            return Messages.AtMost(max);
+        }
+
         value = date;
         return null;
     }
 
-    private static string? ReadDateTime(JsonElement element, out object? value)
+    private static string? ReadDateTime(JsonElement element, FieldModel field, out object? value)
     {
         value = null;
         if (!TryReadString(element, out var text) || DateTimePattern().Match(text) is not { Success: true } match)
@@ -560,8 +597,29 @@ public static partial class RecordInputParser
             return Messages.DateTime;
         }
 
+        // Instants are compared in UTC, so the offset a bound or a value is written with does not matter.
+        var instant = (DateTimeOffset)value;
+        if (field.Min is { } min && instant < ParseDateTime(min))
+        {
+            value = null;
+            return Messages.AtLeast(min);
+        }
+
+        if (field.Max is { } max && instant > ParseDateTime(max))
+        {
+            value = null;
+            return Messages.AtMost(max);
+        }
+
         return null;
     }
+
+    // A bound is a literal that the compiler has already checked.
+    private static DateOnly ParseDate(string bound) =>
+        DateOnly.ParseExact(bound, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None);
+
+    private static DateTimeOffset ParseDateTime(string bound) =>
+        DateLiterals.TryParseDateTime(bound, out var instant) ? instant : throw new InvalidOperationException("The limit is not a date-time.");
 
     private static string? ReadEnum(JsonElement element, FieldModel field, out object? value)
     {
