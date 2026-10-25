@@ -441,13 +441,14 @@ bindings work. Status rules and publishing are built too.
     can turn on the FAPI 2.0 profile (D83). See
     [service accounts](reference/security.md#service-accounts) and
     [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
-- **Hardening (D82, D84, D85).** _(Planned for M16.)_
-  - The server sets security headers on every response and rate limits the
-    routes a caller can repeat. See
-    [security headers and rate limits](reference/headers-and-rate-limits.md).
-  - Axis is verified against ASVS 5.0 Level 2, tracked in
+- **Hardening (D82, D84, D85).**
+  - The server rate limits the routes a caller can repeat. See
+    [rate limits](reference/headers-and-rate-limits.md#rate-limits).
+  - _(Planned for M16.)_ The server sets security headers on every response.
+    See [security headers](reference/headers-and-rate-limits.md#security-headers).
+  - _(Planned for M16.)_ Axis is verified against ASVS 5.0 Level 2, tracked in
     [ASVS](reference/asvs.md).
-  - Performance objectives and the weekly load test are in
+  - _(Planned for M16.)_ Performance objectives and the weekly load test are in
     [performance](reference/performance.md).
 - **Authorization (D12, D24).**
   - The record API, the data source endpoint and the process start endpoint
@@ -560,7 +561,9 @@ is not part of this design.
   `server.port`, `network.peer.address` and `dns.question.name` never reach an
   exporter. The Axis metrics are in
   [worker metrics](reference/process-execution.md#worker-metrics). The server's tenant
-  database gauge is in [health checks](#health-checks).
+  database gauge is in [health checks](#health-checks), and its counter of
+  refused requests, `axis.rate_limits.refused`, is in
+  [rate limits](reference/headers-and-rate-limits.md#rate-limits).
 
 ### Axis spans
 
