@@ -1,8 +1,10 @@
 import { Checkbox, DatePicker, Input, Select } from 'antd'
 import dayjs from 'dayjs'
 import type { CSSProperties, KeyboardEvent } from 'react'
+import { enumLabel } from './formatValue'
 import type { RecordValue } from './records'
 import type { FieldMetadata } from './site'
+import { useText } from './texts'
 
 interface FieldInputProps {
   /** A field of a type with a plain value: not a reference and not a child collection. */
@@ -31,6 +33,7 @@ function dateTimeValue(value: RecordValue) {
 
 /** The input for one value of a field, the same in the form and in a child collection's cells. */
 export function FieldInput({ field, value, onChange, id, ariaLabel, style }: FieldInputProps) {
+  const t = useText()
   const text = (event: { target: { value: string } }) => onChange(event.target.value || null)
   switch (field.type) {
     case 'text':
@@ -102,7 +105,7 @@ export function FieldInput({ field, value, onChange, id, ariaLabel, style }: Fie
           // Without a virtual list, each shown option is an `option` with `aria-selected`.
           virtual={false}
           value={value === null ? null : String(value)}
-          options={(field.values ?? []).map((option) => ({ value: option, label: option }))}
+          options={(field.values ?? []).map((option) => ({ value: option, label: enumLabel(field, option, t) }))}
           onChange={(option: string | undefined) => onChange(option ?? null)}
         />
       )

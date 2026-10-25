@@ -358,7 +358,15 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// Compiles and activates a copy of StepApp with one more file, <paramref name="relativePath"/>
     /// holding <paramref name="content"/>. Returns the new release's id.
     /// </summary>
-    public async Task<Guid> ActivateCopyWithAsync(string relativePath, string content)
+    public async Task<Guid> ActivateCopyWithAsync(string relativePath, string content) =>
+        (await ActivateCopyWithFilesAsync((relativePath, content))).ReleaseId;
+
+    /// <summary>
+    /// Compiles and activates a copy of StepApp in which each of <paramref name="files"/> is added,
+    /// or replaces the file of that path. Returns the new release's id and model.
+    /// </summary>
+    public async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateCopyWithFilesAsync(
+        params (string RelativePath, string Content)[] files)
     {
         using var folder = new TemporaryFolder();
         foreach (var file in Directory.EnumerateFiles(StepAppFolder, "*", SearchOption.AllDirectories))
@@ -366,10 +374,14 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             folder.With(Path.GetRelativePath(StepAppFolder, file), await File.ReadAllTextAsync(file));
         }
 
-        folder.With(relativePath, content);
-        var (releaseId, _) = await ActivateAsync(folder.Path);
+        foreach (var (relativePath, content) in files)
+        {
+            folder.With(relativePath, content);
+        }
+
+        var (releaseId, model) = await ActivateAsync(folder.Path);
         Assert.NotEqual(FirstReleaseId, releaseId);
-        return releaseId;
+        return (releaseId, model);
     }
 
     /// <summary>Waits until one session of the tenant database waits on a lock, and fails when <paramref name="run"/> ends first.</summary>
