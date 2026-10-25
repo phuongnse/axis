@@ -23,7 +23,8 @@ namespace Axis.Configuration.Compilation;
 /// resolves paths. A rule call qualified with a module id is allowed only where the scope is given
 /// the application's <c>modules</c>. A navigate action's parameter sees <c>id</c>, as a reference
 /// parameter to the root entity, so a path cannot start at it, and the names of the row or record.
-/// It has no rules and no collections.
+/// It has no rules and no collections. A field default sees no fields, no collections and no
+/// paths, and has the rules it is given.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -71,6 +72,13 @@ public static class ExpressionScopes
             referenceFields: null,
             modules);
     }
+
+    /// <summary>
+    /// The scope of a field default: no fields, no collections and no paths, because no record
+    /// exists yet. It has the named <paramref name="rules"/>.
+    /// </summary>
+    internal static ExpressionScope ForDefault(IEnumerable<ExpressionRule> rules, IEnumerable<string>? modules) =>
+        Build([], rules, collections: null, referenceFields: null, modules);
 
     /// <summary>
     /// The scope of a data source filter: the root entity's fields, then the parameters. A path
@@ -127,12 +135,14 @@ public static class ExpressionScopes
     }
 
     /// <summary>
-    /// The scope of a process condition: every field of the subject entity, computed ones
+    /// The scope of a process condition: <c>id</c> as a reference parameter to the subject entity,
+    /// so a path cannot start at it, then every field of the subject entity, computed ones
     /// included, its child collections, which only aggregates accept, and the named
-    /// <paramref name="rules"/>. A path through a reference field resolves to a field of the entity
-    /// <paramref name="findEntity"/> returns for the target's name.
+    /// <paramref name="rules"/>. A field named <c>id</c> is hidden by it. A path through a reference
+    /// field resolves to a field of the entity <paramref name="findEntity"/> returns for the target's name.
     /// </summary>
     internal static ExpressionScope ForProcess(
+        string subjectEntity,
         IEnumerable<FieldDefinition> fields,
         IEnumerable<ExpressionRule> rules,
         Func<string, EntityResource?> findEntity,
@@ -140,7 +150,10 @@ public static class ExpressionScopes
     {
         var all = fields.ToList();
         return Build(
-            all.Select(field => (field.Name, TypeOf(field))),
+            [
+                ("id", (ExpressionType?)ExpressionType.ReferenceParameter(subjectEntity)),
+                .. all.Select(field => (field.Name, TypeOf(field))),
+            ],
             rules,
             CollectionsOf(all, findEntity),
             ReferenceFieldsOf(findEntity),

@@ -179,6 +179,10 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasDefaultValue("")
                         .HasColumnName("schema_version");
 
+                    b.Property<string>("ServiceAudience")
+                        .HasColumnType("text")
+                        .HasColumnName("service_audience");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")

@@ -423,6 +423,41 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
+    public void A_condition_compares_the_id_of_the_subject_with_a_reference_to_it()
+    {
+        using var folder = Folder(Process("Customer", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "id == referredBy", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_path_cannot_start_at_the_id_of_the_subject()
+    {
+        using var folder = Folder(Process("Customer", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "id.name == 'x'", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.TypeMismatch, "processes/order-review.json", "/steps/0/branches/0/when"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void A_condition_follows_paths_through_reference_fields()
     {
         using var folder = Folder(Process("Order", """

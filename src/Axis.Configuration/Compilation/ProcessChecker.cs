@@ -128,7 +128,7 @@ internal static class ProcessChecker
             ExpressionScope? scope = null;
             if (entity is not null)
             {
-                scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules);
+                scope = ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules);
                 CheckConditions(process, scope, references, Report);
             }
 
@@ -291,7 +291,7 @@ internal static class ProcessChecker
         var entity = process.Entity is { } subjectName ? findEntity(subjectName)! : null;
         var scope = entity is null
             ? ExpressionScopes.ForProcessParameters(process.Parameters!, rules, modules)
-            : ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules);
+            : ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules);
 
         ExpressionModel Compile(string expression) => ExpressionModel.Compile(expression, scope, ExpressionType.Boolean);
 

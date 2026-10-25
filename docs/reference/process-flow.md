@@ -204,8 +204,8 @@ answer `404`.
 
 - `parameters` is a list of `{ "name", "type" }`. The types are the scalar
   types of rule parameters. Names are unique, ignoring letter case, and a
-  repeated name is `AXC0243`. A process has `entity` or `parameters`, not both
-  and not neither. Either mistake is `AXC0242`, reported at `/parameters` when
+  repeated name is `AXC0244`. A process has `entity` or `parameters`, not both
+  and not neither. Either mistake is `AXC0243`, reported at `/parameters` when
   there are both and at the root of the file when there is neither.
 - Expressions see the parameters by name, and the named rules. There is no
   record, so there is no `id` and no field path. The start condition, a
@@ -213,13 +213,13 @@ answer `404`.
   checked over this scope.
 - **Steps.** `decision`, `createRecord`, `callConnector`, package operations,
   `timer`, `subProcess`, `notify` and `end` are allowed. `updateRecord`,
-  `raiseEvent`, `task` and `waitEvent` need a subject and are `AXC0244`. So is
+  `raiseEvent`, `task` and `waitEvent` need a subject and are `AXC0245`. So is
   the `output` of a `callConnector` or package operation step, because it
   writes the subject. Only the step types that exist today are checked: `task`,
   `updateRecord`, `raiseEvent` and the outputs. The compiler reports no other
   problem in such a step.
 - **Triggers and other starts by name.** An event, data change or schedule
-  trigger that names a process without a subject is `AXC0245`. An endpoint, a
+  trigger that names a process without a subject is `AXC0246`. An endpoint, a
   page `startProcess` action and a scenario step that name one are reported
   with their usual codes for a process over another entity: `AXC0117`,
   `AXC0088` and `AXC0184`.

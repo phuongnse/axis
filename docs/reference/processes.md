@@ -286,11 +286,11 @@ reported in one pass. See
 - `entity` names a loaded entity (`AXC0067`) that is not a child entity
   (`AXC0068`).
 - A process has `entity` or `parameters`, not both and not neither
-  (`AXC0242`). Parameter names are unique, ignoring letter case (`AXC0243`).
+  (`AXC0243`). Parameter names are unique, ignoring letter case (`AXC0244`).
   A process without a subject has no `task`, `updateRecord` or `raiseEvent`
-  step and no `output` on a connector or package step (`AXC0244`). Its start
+  step and no `output` on a connector or package step (`AXC0245`). Its start
   condition and each `when` see its parameters and the named rules, and no
-  field, path or `id`. A trigger that names such a process is `AXC0245`. The
+  field, path or `id`. A trigger that names such a process is `AXC0246`. The
   start endpoint answers `400` for it until starting these processes is built,
   see [Processes without a
   subject](process-flow.md#processes-without-a-subject).
@@ -307,9 +307,9 @@ reported in one pass. See
   waiting step, see [Loops](process-flow.md#loops).
 - A decision has at least one branch (`AXC0004`).
 - Each `when` and the `startCondition` expression give a boolean. They see
-  the subject entity's fields, computed ones included, its child collections
-  through aggregates, the named rules, and paths through reference fields
-  such as `department.manager.name`. A path takes at most 3 hops
+  the subject entity's fields, computed ones included, `id`, the subject
+  record's id, its child collections through aggregates, the named rules, and
+  paths through reference fields such as `department.manager.name`. A path takes at most 3 hops
   (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
   See [Scope in a process expression](expressions.md#names-and-references).
 - An operation names `updateRecord`, `callConnector`, `raiseEvent` or a

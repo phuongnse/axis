@@ -1,5 +1,6 @@
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
+using Axis.Server.Http;
 using Axis.Server.Users;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -20,7 +21,7 @@ internal static class AuthEndpoints
     public static void MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var auth = endpoints.MapGroup("/api/auth");
-        auth.MapGet("/sign-in", SignIn);
+        auth.MapGet("/sign-in", SignIn).WithRateLimit(Partition.SignIn);
         auth.MapPost("/sign-out", SignOutAsync);
     }
 
