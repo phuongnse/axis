@@ -765,7 +765,7 @@ can be read as its history (D21).
   returns the audit records of one record.
   - It lists every audit record that names the record. That covers the
     record API's writes, and the [process start](processes.md#start-endpoint),
-    each step and each [task decision](task-api.md#completing-a-task) on it,
+    each step and each [task decision](task-api.md#completing-a-task), claim and release on it,
     including those whose actor is `system`.
   - The path follows the 404 rules of a single read. An unknown record, a
     deleted record, or an id from another tenant is a `404`.

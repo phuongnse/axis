@@ -124,6 +124,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             task.Property(t => t.Outcome).HasColumnName("outcome");
             task.Property(t => t.CompletedBy).HasColumnName("completed_by");
             task.Property(t => t.CompletedAt).HasColumnName("completed_at");
+            task.Property(t => t.ClaimedBy).HasColumnName("claimed_by");
+            task.Property(t => t.ClaimedAt).HasColumnName("claimed_at");
             task.Property(t => t.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             task.HasIndex(t => t.ProcessInstanceId).HasDatabaseName("ix_process_tasks_process_instance_id");
 
