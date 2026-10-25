@@ -117,6 +117,70 @@ public sealed class DataSourceFilterTests(RecordApiFixture fixture) : IClassFixt
         Assert.Equal(expected.Count, page.TotalCount);
     }
 
+    // At 18:00 UTC on 31 December it is already 1 January in Asia/Ho_Chi_Minh. The first three filters read no column,
+    // so they keep every row or none. The last reads a column, which SQL converts per row.
+    public static TheoryData<string, string, int> TimeZoneFilters => new()
+    {
+        { "Asia/Ho_Chi_Minh", "today() == date('2027-01-01')", 7 },
+        { "Asia/Ho_Chi_Minh", "today() == date('2026-12-31')", 0 },
+        { "Asia/Ho_Chi_Minh", "toDate(dateTime('2026-12-31T18:00:00Z')) == date('2027-01-01')", 7 },
+        { "Asia/Ho_Chi_Minh", "toDate(orderedAt) == date('2026-10-08')", 2 },
+        { "UTC", "today() == date('2027-01-01')", 0 },
+        { "UTC", "today() == date('2026-12-31')", 7 },
+        { "UTC", "toDate(dateTime('2026-12-31T18:00:00Z')) == date('2027-01-01')", 0 },
+        { "UTC", "toDate(orderedAt) == date('2026-10-08')", 2 },
+    };
+
+    [Theory]
+    [MemberData(nameof(TimeZoneFilters))]
+    public async Task Today_and_to_date_give_the_same_rows_in_the_interpreter_and_in_sql(string zoneId, string filter, int expectedCount)
+    {
+        var rows = await SeedAsync();
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+        var now = Utc(2026, 12, 31, 18);
+        Assert.True(fixture.Model.TryGetEntity("Item", out var item));
+        Assert.True(item.TryGetField("name", out var nameField));
+        var compiled = ExpressionModel.Compile(filter, ExpressionScopes.ForEntity(item.Fields), ExpressionType.Boolean);
+        var dataSource = new DataSourceModel
+        {
+            Id = Guid.NewGuid(),
+            Name = "Filtered",
+            File = "data-sources/filtered.json",
+            Entity = new EntityReference(item.Id, item.Name),
+            Fields = [new DataSourceFieldModel("name", nameField)],
+            Filter = compiled,
+        };
+
+        var expected = new List<Guid>();
+        foreach (var (id, values) in rows)
+        {
+            var evaluated = ExpressionInterpreter.Evaluate(
+                compiled.Syntax, compiled.Check, new ExpressionValues(values), now: now, timeZone: zone);
+            Assert.True(evaluated.Succeeded, evaluated.Error?.Message);
+            if (evaluated.Value is true)
+            {
+                expected.Add(id);
+            }
+        }
+
+        // The session setting fixes the transaction time of the query, so the connection is not pooled.
+        var connectionString = new NpgsqlConnectionStringBuilder(fixture.ConnectionString(TenantA)) { Pooling = false }.ConnectionString;
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using (var setting = new NpgsqlCommand("SELECT set_config('axis.now', '2026-12-31T18:00:00Z', false)", connection))
+        {
+            await setting.ExecuteScalarAsync(CancellationToken);
+        }
+
+        var page = await DataSourceQueries.ListAsync(
+            connection, fixture.Model with { TimeZone = zone }, dataSource, 1, 100, null, [], cancellationToken: CancellationToken);
+
+        Assert.NotNull(page);
+        Assert.Equal(expectedCount, expected.Count);
+        Assert.Equal(Sorted(expected), Sorted(page.Items.Select(row => row.Id!.Value)));
+        Assert.Equal(expectedCount, page.TotalCount);
+    }
+
     [Theory]
     [MemberData(nameof(RuleFilters))]
     public async Task Filter_that_calls_rules_keeps_exactly_the_rows_the_interpreter_evaluates_to_true(string filter, string interpreterFilter)

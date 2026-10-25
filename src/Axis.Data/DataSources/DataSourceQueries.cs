@@ -222,7 +222,8 @@ public static class DataSourceQueries
 
                 return joins.ColumnOf(ResolvePath(application, dataSource, names));
             },
-            filter.Check);
+            filter.Check,
+            timeZone: application.TimeZone);
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The compiler let through a filter outside the SQL subset: {translated.Diagnostic.Message}");

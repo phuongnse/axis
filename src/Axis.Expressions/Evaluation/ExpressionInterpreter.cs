@@ -31,14 +31,17 @@ public static class ExpressionInterpreter
     /// record. A path evaluated without <paramref name="records"/> is a bug in the caller too.
     /// <paramref name="now"/> is what <c>now()</c> gives: the start time of the caller's transaction.
     /// A <c>now()</c> evaluated without it is a bug in the caller too.
+    /// <paramref name="timeZone"/> is the application's time zone, which <c>today()</c> and <c>toDate</c>
+    /// use to take the calendar date of an instant. Either evaluated without it is a bug in the caller too.
     /// </summary>
     public static ExpressionEvaluationResult Evaluate(
         ExpressionNode expression,
         ExpressionCheckResult checkResult,
         ExpressionValues values,
         ExpressionRecordResolver? records = null,
-        DateTimeOffset? now = null) =>
-        EvaluateCountingSteps(expression, checkResult, values, records, now).Result;
+        DateTimeOffset? now = null,
+        TimeZoneInfo? timeZone = null) =>
+        EvaluateCountingSteps(expression, checkResult, values, records, now, timeZone).Result;
 
     /// <summary>
     /// Evaluates like <see cref="Evaluate"/> and also gives the steps used, so a test can show that
@@ -49,7 +52,8 @@ public static class ExpressionInterpreter
         ExpressionCheckResult checkResult,
         ExpressionValues values,
         ExpressionRecordResolver? records = null,
-        DateTimeOffset? now = null)
+        DateTimeOffset? now = null,
+        TimeZoneInfo? timeZone = null)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(checkResult);
@@ -62,7 +66,7 @@ public static class ExpressionInterpreter
         var budget = new Budget();
         try
         {
-            return (new ExpressionEvaluationResult(new Evaluator(values, checkResult, budget, records, now).Eval(expression), null), budget.Steps);
+            return (new ExpressionEvaluationResult(new Evaluator(values, checkResult, budget, records, now, timeZone).Eval(expression), null), budget.Steps);
         }
         catch (EvaluationFailure failure)
         {
@@ -81,7 +85,8 @@ public static class ExpressionInterpreter
         ExpressionCheckResult checkResult,
         Budget budget,
         ExpressionRecordResolver? records,
-        DateTimeOffset? now)
+        DateTimeOffset? now,
+        TimeZoneInfo? timeZone)
     {
         public object? Eval(ExpressionNode node)
         {
@@ -232,6 +237,10 @@ public static class ExpressionInterpreter
 
                 case "now":
                     return now ?? throw new InvalidOperationException("now() was evaluated without the transaction's time.");
+
+                case "today":
+                    return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(
+                        now ?? throw new InvalidOperationException("today() was evaluated without the transaction's time."), Zone()).DateTime);
             }
 
             // Every argument is evaluated. A null one then gives null before any error is checked.
@@ -272,6 +281,7 @@ public static class ExpressionInterpreter
                 "day" => (long)Date(results[0]).Day,
                 "addDays" => AddDays(call, Date(results[0]), Integer(results[1])),
                 "daysBetween" => (long)(Date(results[1]).DayNumber - Date(results[0]).DayNumber),
+                "toDate" => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(Instant(results[0]), Zone()).DateTime),
                 _ => throw new InvalidOperationException($"The interpreter does not evaluate function '{signature.Name}' yet."),
             };
         }
@@ -295,7 +305,7 @@ public static class ExpressionInterpreter
             var items = new object?[rows.Count];
             for (var i = 0; i < items.Length; i++)
             {
-                items[i] = new Evaluator(rows[i], checkResult, budget, records, now).Eval(item);
+                items[i] = new Evaluator(rows[i], checkResult, budget, records, now, timeZone).Eval(item);
             }
 
             switch (name)
@@ -382,7 +392,7 @@ public static class ExpressionInterpreter
                 arguments[i] = KeyValuePair.Create(parameter.Name, WidenTo(parameter.Type, Eval(call.Arguments[i])));
             }
 
-            var result = new Evaluator(new ExpressionValues(arguments), rule.BodyCheck, budget, records, now).Eval(rule.Body);
+            var result = new Evaluator(new ExpressionValues(arguments), rule.BodyCheck, budget, records, now, timeZone).Eval(rule.Body);
             return WidenTo(rule.ResultType, result);
         }
 
@@ -639,6 +649,11 @@ public static class ExpressionInterpreter
         private static long Integer(object value) => value is long integer ? integer : throw Unexpected(value);
 
         private static DateOnly Date(object value) => value is DateOnly date ? date : throw Unexpected(value);
+
+        private static DateTimeOffset Instant(object value) => value is DateTimeOffset instant ? instant : throw Unexpected(value);
+
+        private TimeZoneInfo Zone() =>
+            timeZone ?? throw new InvalidOperationException("A date function was evaluated without the application's time zone.");
 
         private static decimal Number(object value) => value switch
         {

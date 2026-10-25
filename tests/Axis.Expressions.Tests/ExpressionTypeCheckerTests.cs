@@ -40,6 +40,13 @@ public sealed class ExpressionTypeCheckerTests
     [InlineData("dateTime('2026-10-08T09:30:00+07:00')", "date-time")]
     [InlineData("now()", "date-time")]
     [InlineData("NOW()", "date-time")]
+    [InlineData("today()", "date")]
+    [InlineData("TODAY()", "date")]
+    [InlineData("toDate(ts)", "date")]
+    [InlineData("toDate(now())", "date")]
+    [InlineData("toDate(null)", "date")]
+    [InlineData("toDate(dateTime('2026-10-08T09:30:00Z')) == today()", "boolean")]
+    [InlineData("daysBetween(toDate(ts), today())", "integer")]
     // Arithmetic: integers stay integers, a decimal on either side gives a decimal.
     [InlineData("i + i", "integer")]
     [InlineData("i - 1", "integer")]
@@ -169,6 +176,9 @@ public sealed class ExpressionTypeCheckerTests
     [InlineData("date('a', 'b')", "Function 'date' needs 1 argument, found 2 at character 1.")]
     [InlineData("dateTime()", "Function 'dateTime' needs 1 argument, found 0 at character 1.")]
     [InlineData("now(1)", "Function 'now' needs 0 arguments, found 1 at character 1.")]
+    [InlineData("today(1)", "Function 'today' needs 0 arguments, found 1 at character 1.")]
+    [InlineData("toDate()", "Function 'toDate' needs 1 argument, found 0 at character 1.")]
+    [InlineData("toDate(ts, ts)", "Function 'toDate' needs 1 argument, found 2 at character 1.")]
     public void A_date_literal_with_the_wrong_argument_count_is_reported(string text, string message)
     {
         var diagnostic = CheckFails(text, ExpressionType.Null);
@@ -193,6 +203,51 @@ public sealed class ExpressionTypeCheckerTests
         Assert.Equal(
             $"Function 'now' is not allowed in a computed field, because a stored value cannot depend on the current time at character {offset + 1}.",
             diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("today()", 0, "Function 'today' is not allowed in a computed field, because a stored value cannot depend on the current time")]
+    [InlineData("addDays(today(), 1)", 8, "Function 'today' is not allowed in a computed field, because a stored value cannot depend on the current time")]
+    [InlineData("toDate(ts)", 0, "Function 'toDate' is not allowed in a computed field, because a stored value cannot depend on the application's time zone")]
+    [InlineData("addDays(toDate(ts), 1)", 8, "Function 'toDate' is not allowed in a computed field, because a stored value cannot depend on the application's time zone")]
+    public void Today_and_to_date_in_a_stored_value_are_reported_at_the_call(string text, int offset, string message)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Date, storedValue: true).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal((ExpressionDiagnosticCodes.CurrentTimeInStoredValue, offset), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal($"{message} at character {offset + 1}.", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("toDate(dt)", "date")]
+    [InlineData("toDate(1)", "integer")]
+    [InlineData("toDate('2026-10-08')", "text")]
+    public void To_date_of_something_other_than_a_date_time_is_a_type_mismatch(string text, string found)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Date);
+
+        Assert.Equal(ExpressionDiagnosticCodes.TypeMismatch, diagnostic.Code);
+        Assert.Contains($"found {found}", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Today_and_to_date_in_the_item_of_an_aggregate_of_a_stored_value_are_reported_at_the_call()
+    {
+        foreach (var (text, offset) in new[] { ("max(lineItems, today())", 15), ("max(lineItems, toDate(dateTime('2026-10-08T09:30:00Z')))", 15) })
+        {
+            var parsed = ExpressionParser.Parse(text);
+            Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+            var stored = ExpressionTypeChecker.Check(parsed.Expression, CollectionScope(), ExpressionType.Date, storedValue: true);
+            var notStored = ExpressionTypeChecker.Check(parsed.Expression, CollectionScope(), ExpressionType.Date);
+
+            Assert.Equal((ExpressionDiagnosticCodes.CurrentTimeInStoredValue, offset), (stored.Diagnostic?.Code, stored.Diagnostic?.Offset));
+            Assert.Equal(ExpressionType.Date, notStored.Type);
+        }
     }
 
     [Fact]

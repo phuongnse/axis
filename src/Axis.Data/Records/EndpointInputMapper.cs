@@ -77,7 +77,7 @@ public static class EndpointInputMapper
                 continue;
             }
 
-            var result = ExpressionInterpreter.Evaluate(mapping.Expression!.Syntax, mapping.Expression.Check, expressionValues);
+            var result = ExpressionInterpreter.Evaluate(mapping.Expression!.Syntax, mapping.Expression.Check, expressionValues, timeZone: application.TimeZone);
             RecordValue? value = null;
             var message = result.Succeeded ? RecordComputer.ToRecordValue(field, result.Value, out value) : Messages.NotComputable;
             if (message is not null)

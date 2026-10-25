@@ -656,7 +656,7 @@ flowchart LR
    `/validations/{i}/expression`. The expression of each
    [computed field](resource-files.md#entity-logic) is parsed and type-checked against the
    entity's fields that are not computed and its child collections, and
-   must give the field's type. A call to `now()` in it, including inside an
+   must give the field's type. A call to `now()`, `today()` or `toDate` in it, including inside an
    aggregate's item expression, is `AXC0086`.
    A problem in it is reported the same way at `/fields/{i}/expression`. A `field` that names no field of the
    entity, ignoring letter case, is `AXC0052` at `/validations/{i}/field`,

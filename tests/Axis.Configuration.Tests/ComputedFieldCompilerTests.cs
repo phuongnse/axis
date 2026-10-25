@@ -20,6 +20,8 @@ public sealed class ComputedFieldCompilerTests
         { """{ "name": "state", "type": "enum", "values": ["a", "b"], "expression": "status" }""", ExpressionDiagnosticCodes.ResultTypeMismatch, "/fields/4/expression", "enum" },
         // A stored value cannot depend on the current time.
         { """{ "name": "stamped", "type": "date-time", "expression": "now()" }""", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "/fields/4/expression", "Function 'now' is not allowed in a computed field, because a stored value cannot depend on the current time at character 1." },
+        { """{ "name": "today", "type": "date", "expression": "today()" }""", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "/fields/4/expression", "Function 'today' is not allowed in a computed field, because a stored value cannot depend on the current time at character 1." },
+        { """{ "name": "day", "type": "date", "expression": "toDate(dateTime('2026-10-08T09:30:00Z'))" }""", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "/fields/4/expression", "Function 'toDate' is not allowed in a computed field, because a stored value cannot depend on the application's time zone at character 1." },
     };
 
     [Theory]
@@ -120,6 +122,8 @@ public sealed class ComputedFieldCompilerTests
     [InlineData("if(lines == null, 0, 1)", ExpressionDiagnosticCodes.TypeMismatch, "list<Line>")]
     // The current time is refused inside the item expression too.
     [InlineData("count(lines, now() > dateTime('2026-01-01T00:00:00Z'))", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "at character 14.")]
+    [InlineData("count(lines, today() > date('2026-01-01'))", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "Function 'today' is not allowed in a computed field, because a stored value cannot depend on the current time at character 14.")]
+    [InlineData("count(lines, toDate(dateTime('2026-01-01T00:00:00Z')) > date('2026-01-01'))", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "Function 'toDate' is not allowed in a computed field, because a stored value cannot depend on the application's time zone at character 14.")]
     public void Wrong_aggregate_in_a_computed_field_is_reported_at_its_expression(string expression, string code, string messagePart)
     {
         using var folder = Folder(

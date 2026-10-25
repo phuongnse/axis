@@ -72,7 +72,7 @@ public static class FormStateEvaluator
         var fields = new Dictionary<string, FormFieldState>(StringComparer.Ordinal);
         foreach (var section in form.Sections)
         {
-            var sectionVisible = section.VisibleWhen is null || Holds(section.VisibleWhen, conditions, now);
+            var sectionVisible = section.VisibleWhen is null || Holds(section.VisibleWhen, conditions, now, application.TimeZone);
             var anyReadable = false;
             foreach (var entry in section.Fields)
             {
@@ -81,13 +81,13 @@ public static class FormStateEvaluator
                     continue;
                 }
 
-                var visible = sectionVisible && (entry.VisibleWhen is null || Holds(entry.VisibleWhen, conditions, now));
-                var required = visible && (field.Required || (entry.RequiredWhen is not null && Holds(entry.RequiredWhen, conditions, now)));
+                var visible = sectionVisible && (entry.VisibleWhen is null || Holds(entry.VisibleWhen, conditions, now, application.TimeZone));
+                var required = visible && (field.Required || (entry.RequiredWhen is not null && Holds(entry.RequiredWhen, conditions, now, application.TimeZone)));
                 var readOnly = entry.ReadOnly
                     || field.IsComputed
                     || field.Sequence is not null
                     || field.Creator
-                    || (entry.ReadOnlyWhen is not null && Holds(entry.ReadOnlyWhen, conditions, now));
+                    || (entry.ReadOnlyWhen is not null && Holds(entry.ReadOnlyWhen, conditions, now, application.TimeZone));
                 if (required && field.HasColumn && record[field.Name].Value is null)
                 {
                     errors.TryAdd(ValuesPrefix + field.Name, [Messages.Required]);
@@ -162,9 +162,9 @@ public static class FormStateEvaluator
     }
 
     /// <summary>True only when <paramref name="condition"/> gives <c>true</c>; false when it cannot be evaluated.</summary>
-    private static bool Holds(ExpressionModel condition, ExpressionValues? values, DateTimeOffset now) =>
+    private static bool Holds(ExpressionModel condition, ExpressionValues? values, DateTimeOffset now, TimeZoneInfo timeZone) =>
         values is not null
-        && ExpressionInterpreter.Evaluate(condition.Syntax, condition.Check, values, records: null, now: now) is { Succeeded: true, Value: true };
+        && ExpressionInterpreter.Evaluate(condition.Syntax, condition.Check, values, records: null, now: now, timeZone: timeZone) is { Succeeded: true, Value: true };
 
     /// <summary>The field a key <c>/values/&lt;field&gt;[/…]</c> belongs to, or null for any other key.</summary>
     private static string? FieldOf(string key)

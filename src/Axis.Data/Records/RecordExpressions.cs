@@ -22,6 +22,7 @@ public static class RecordExpressions
     /// cannot hold exactly, on the record or on a record a path reads, stops the evaluation with a
     /// <see cref="ExpressionRuntimeErrorKind.DecimalOverflow"/> error, as no value is rounded.
     /// <c>now()</c> gives <paramref name="now"/>, which is the start time of the caller's transaction.
+    /// <c>today()</c> and <c>toDate</c> take the date in the application's time zone.
     /// </summary>
     public static async Task<ExpressionEvaluationResult> EvaluateAsync(
         NpgsqlConnection connection,
@@ -134,7 +135,8 @@ public static class RecordExpressions
             expression.Check,
             new ExpressionValues(subject.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))),
             Resolve,
-            now);
+            now,
+            application.TimeZone);
     }
 
     /// <summary>The field names of a path's target, from the subject's field to the last reference, such as <c>department, manager</c>.</summary>

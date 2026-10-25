@@ -66,7 +66,7 @@ internal static class EventTriggerStarts
         CancellationToken cancellationToken)
     {
         var connection = transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
-        if (trigger.When is { } when && await EvaluateWhenAsync(connection, @event, occurrence, when, cancellationToken) is { } notTrue)
+        if (trigger.When is { } when && await EvaluateWhenAsync(connection, model.TimeZone, @event, occurrence, when, cancellationToken) is { } notTrue)
         {
             return (null, notTrue);
         }
@@ -121,6 +121,7 @@ internal static class EventTriggerStarts
     /// </summary>
     private static async Task<string?> EvaluateWhenAsync(
         NpgsqlConnection connection,
+        TimeZoneInfo timeZone,
         EventModel @event,
         StoredEvent occurrence,
         ExpressionModel when,
@@ -151,7 +152,7 @@ internal static class EventTriggerStarts
         }
 
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-        var result = ExpressionInterpreter.Evaluate(when.Syntax, when.Check, new ExpressionValues(values), null, now);
+        var result = ExpressionInterpreter.Evaluate(when.Syntax, when.Check, new ExpressionValues(values), null, now, timeZone);
         if (result.Error is { } error)
         {
             return $"the when failed: {error.Kind}";

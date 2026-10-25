@@ -109,8 +109,9 @@ public sealed class DocumentationTests
                 var names = new List<string>();
                 for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
                 {
+                    // A row marked as planned documents an aggregate that is not built yet.
                     var match = Regex.Match(lines[j], @"^\|\s*`([A-Za-z]+)\(");
-                    if (match.Success)
+                    if (match.Success && !lines[j].Contains("_(planned for", StringComparison.Ordinal))
                     {
                         names.Add(match.Groups[1].Value);
                     }
