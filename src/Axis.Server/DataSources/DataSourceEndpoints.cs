@@ -46,7 +46,7 @@ internal static class DataSourceEndpoints
         foreach (var pattern in new[] { "/api/apps/{app}/data-sources/{dataSource}/rows", "/api/apps/{app}/data-sources/{module}/{dataSource}/rows" })
         {
             var rows = endpoints.MapGroup(pattern);
-            rows.MapGet("", ListAsync);
+            rows.MapGet("", ListAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
         }
     }
 
@@ -92,7 +92,7 @@ internal static class DataSourceEndpoints
         var read = PolicyEvaluator.Access(application, user.Roles, root, PolicyAction.Read);
         var connection = await database.GetConnectionAsync(cancellationToken);
         if (read.Filters is { } pendingFilters
-            && await RecordCommand.ReadsPendingAsync(connection, null, application, root, pendingFilters, loggerFactory, cancellationToken))
+            && await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application, root, pendingFilters, loggerFactory, cancellationToken))
         {
             return Grants.PendingFilter();
         }
@@ -124,7 +124,7 @@ internal static class DataSourceEndpoints
         }
 
         // A sort, a group field, a measure or a filter on a field that is being recomputed would decide from a stale stored value.
-        var pending = await DataSourcePendingFields.ReadAsync(connection, null, application, model, order, cancellationToken);
+        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, cancellationToken);
         if (pending.Count > 0)
         {
             return Results.ValidationProblem(pending.ToDictionary(), statusCode: StatusCodes.Status409Conflict, title: "A field is being recomputed.");
@@ -134,7 +134,7 @@ internal static class DataSourceEndpoints
             ? RecordFilters.Condition(application, root, [.. filters.Select(filter => filter.Expression)], user.Id)
             : null;
         var result = await DataSourceQueries.ListAsync(
-            connection, application, model, pageNumber, size, order, parameters, condition, cancellationToken);
+            connection, database.ReadTransaction, application, model, pageNumber, size, order, parameters, condition, cancellationToken);
         if (result is null)
         {
             // PostgreSQL cannot say which part of the WHERE clause failed, so every read filter is named.
@@ -166,5 +166,5 @@ internal static class DataSourceEndpoints
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: title);
 }
 
-/// <summary>One page of data source rows and the number of rows that pass the filter.</summary>
-internal sealed record DataSourceRowsResponse(IReadOnlyList<DataSourceRow> Items, int Page, int PageSize, long TotalCount);
+/// <summary>One page of data source rows and the number of rows that pass the filter, or <see langword="null"/> when the count ran past the query timeout.</summary>
+internal sealed record DataSourceRowsResponse(IReadOnlyList<DataSourceRow> Items, int Page, int PageSize, long? TotalCount);

@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test'
+import { expect, test } from '../test'
+import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
 import { pickOption } from '../select'
@@ -29,6 +30,15 @@ async function tabTo(page: Page, control: Locator, back = false) {
     await page.keyboard.press(back ? 'Shift+Tab' : 'Tab')
   }
   await expect(control).toBeFocused()
+}
+
+const formPage = /\/api\/sites\/e2e\/pages\/noteform$/i
+
+/** Clicks `control` and waits for the form page's metadata. The form renders only after it, which can take longer than an expect waits. */
+async function openForm(page: Page, control: Locator) {
+  const loaded = page.waitForResponse((response) => formPage.test(new URL(response.url()).pathname))
+  await control.click()
+  expect((await loaded).ok()).toBe(true)
 }
 
 /** Types a value into a date or date-time picker and confirms it with Enter, as a user does. */
@@ -91,17 +101,26 @@ test('a note saved by a signed-in user shows its creator read-only', async ({ pa
   const me = (await (await page.request.get('/api/me')).json()) as { id: string }
   await page.goto('/e2e/notes?pageSize=100&sort=-title')
 
-  await page.getByRole('button', { name: 'New', exact: true }).click()
+  // Holds back the first form page response, as a slow server does, so the test shows it waits for the form.
+  await page.route(
+    formPage,
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 6_000))
+      await route.continue()
+    },
+    { times: 1 },
+  )
+  await openForm(page, page.getByRole('button', { name: 'New', exact: true }))
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
   await expect(page.getByLabel('Created by', { exact: true })).toHaveValue('')
   await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(/\/e2e\/notes\?pageSize=100&sort=-title$/)
-  await page
-    .getByRole('row', { name: new RegExp(`${title} `) })
-    .getByRole('button', { name: 'Open', exact: true })
-    .click()
+  await openForm(
+    page,
+    page.getByRole('row', { name: new RegExp(`${title} `) }).getByRole('button', { name: 'Open', exact: true }),
+  )
   await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
   const createdBy = page.getByLabel('Created by', { exact: true })
   await expect(createdBy).toHaveValue(me.id)
@@ -152,7 +171,7 @@ test('line items are added, edited and removed in the form, in light and dark mo
 
   const read = await request.get(`${notesPath}/${id}`)
   const record = await read.json()
-  expect(record.values.lines).toEqual([{ description: 'Pens', quantity: 5 }])
+  expect(record.values.lines).toEqual([{ description: 'Pens', quantity: 5, category: null }])
 })
 
 // Each test has its own browser context, so the saved session is loaded only into this test's context.
@@ -271,6 +290,34 @@ test('a category is picked in the lookup and shows on the saved note', async ({ 
 
   await expect(page).toHaveURL(tablePath)
   await expect(page.getByRole('row', { name: new RegExp(`Lookup ${run} `) })).toContainText(category)
+})
+
+test('a category is picked in the lookup of a line item and shows on the saved line', async ({ page, request }) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  // Other specs create categories too. A leading digit sorts this one onto the first lookup page.
+  const category = `0 Line lookup ${run}`
+  await createRecord(request, 'Category', { name: category })
+  const title = `Line lookup ${run}`
+  await page.goto('/e2e/notes?pageSize=100&sort=-title')
+
+  await page.getByRole('button', { name: 'New', exact: true }).click()
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+  await page.getByRole('button', { name: 'Add row', exact: true }).click()
+  await page.getByLabel('Description 1', { exact: true }).fill('Pens')
+  await page.getByRole('button', { name: 'Choose Category 1', exact: true }).click()
+  const dialog = await waitForDialog(page)
+  await dialog.getByRole('row', { name: new RegExp(category) }).click()
+
+  await expect(dialog).toBeHidden()
+  await expect(page.getByLabel('Category 1', { exact: true })).toHaveValue(category)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/e2e\/notes\?pageSize=100&sort=-title$/)
+  await page
+    .getByRole('row', { name: new RegExp(`${title} `) })
+    .getByRole('button', { name: 'Open', exact: true })
+    .click()
+  await expect(page.getByLabel('Category 1', { exact: true })).toHaveValue(category)
 })
 
 test('a form in two sections shows both titles, and saving keeps its read-only field', async ({ page, request }) => {

@@ -6,6 +6,7 @@
   "roles": ["requester"],
   "grants": [
     { "entity": "Request", "actions": ["read"], "filter": "startsWith(title, 'Request')" },
-    { "process": "Submit", "actions": ["start", "inspect"] }
+    { "process": "Submit", "actions": ["start", "inspect"] },
+    { "process": "NightlyJob", "actions": ["start"] }
   ]
 }

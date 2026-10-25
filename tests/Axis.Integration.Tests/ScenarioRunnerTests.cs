@@ -542,6 +542,44 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
+    public async Task A_task_deadline_moves_the_instance_on_only_after_advance_time_passes_it()
+    {
+        using var folder = DeadlineApplication(Scenario("TaskDeadline", Purchasing, CreateRequest + StartApproval + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "managerApproval" },
+            { "type": "advanceTime", "by": "PT12H" },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "managerApproval" },
+            { "type": "advanceTime", "by": "P1D" },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "financeApproval" }
+            """, now: ScheduleNow));
+
+        var result = await RunAsync(folder, "TaskDeadline");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task A_task_deadline_does_not_run_after_an_action_and_a_completed_task_never_expires()
+    {
+        using var early = DeadlineApplication(Scenario("EarlyDeadline", Purchasing, CreateRequest + StartApproval + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "financeApproval" }
+            """, now: ScheduleNow));
+        using var completed = DeadlineApplication(Scenario("CompletedFirst", Purchasing, CreateRequest + StartApproval + """
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
+            { "type": "advanceTime", "by": "P2D" },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "status": "approved" } }
+            """, now: ScheduleNow));
+
+        var tooEarly = await RunAsync(early, "EarlyDeadline");
+        var afterCompletion = await RunAsync(completed, "CompletedFirst");
+
+        Assert.False(tooEarly.Passed);
+        Assert.Contains("Step 3 (expectInstance)", tooEarly.Failure);
+        Assert.True(afterCompletion.Passed, afterCompletion.Failure);
+    }
+
+    [Fact]
     public async Task No_schedule_instance_exists_before_advance_time()
     {
         using var folder = ScheduleApplication(Scenario("NoInstanceYet", Purchasing, CreateRequest + """
@@ -1034,6 +1072,12 @@ public sealed class ScenarioRunnerTests
     /// </summary>
     private static TemporaryFolder TimerApplication((string Name, string Json) scenario) =>
         Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioTimerApp");
+
+    /// A copy of the ScenarioPurchaseApp fixture with the ScenarioDeadlineApp files over it: the manager's task expires
+    /// after one day and the process moves on to the finance approval.
+    /// </summary>
+    private static TemporaryFolder DeadlineApplication((string Name, string Json) scenario) =>
+        Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioDeadlineApp");
 
     private static TemporaryFolder Application(string fixture, (string Name, string Json)[] scenarios, string? overlay = null)
     {

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../test'
 import { csrfHeaders } from '../csrf'
 import { noSideways, phoneWidth } from '../phone'
 import { pickOption } from '../select'

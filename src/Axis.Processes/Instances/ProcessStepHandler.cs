@@ -184,6 +184,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         DateTimeOffset? timerDueAt = null;
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
         NewTask? task = null;
+        TaskDeadlineModel? taskDeadline = null;
         NewConnectorCall? call = null;
         NewPackageCall? packageCall = null;
         var restagesCall = false;
@@ -241,6 +242,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     assignee,
                     taskStep.Form.Id,
                     taskStep.DueIn is { } dueIn ? instance.Now + dueIn : null);
+                taskDeadline = taskStep.Deadline;
                 state = ProcessStarts.Waiting;
                 nextStep = step.Name;
                 decision = null;
@@ -437,6 +439,19 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         if (task is not null)
         {
             await ProcessTasks.InsertAsync(context.Transaction, task, cancellationToken);
+            if (taskDeadline is not null)
+            {
+                // The deadline counts from the step's time, as the due date does, so a scenario's clock decides it.
+                await WorkItemQueue.EnqueueAsync(
+                    context.Connection,
+                    context.Transaction,
+                    context.Item.TenantId,
+                    ProcessStarts.TaskDeadlineWorkItemKind,
+                    instance.Now + taskDeadline.After,
+                    cancellationToken,
+                    processInstanceId: instance.Id,
+                    taskId: task.Id);
+            }
         }
 
         if (call is not null)

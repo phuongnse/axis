@@ -35,6 +35,9 @@ public sealed class WorkItemRow
     /// <summary>The connector call a <c>connector.call</c> item sends, or <see langword="null"/> for other work.</summary>
     public Guid? ConnectorCallId { get; init; }
 
+    /// <summary>The task a <c>task.deadline</c> item expires, or <see langword="null"/> for other work.</summary>
+    public Guid? TaskId { get; init; }
+
     /// <summary>The package call a <c>package.call</c> item runs, or <see langword="null"/> for other work.</summary>
     public Guid? PackageCallId { get; init; }
 

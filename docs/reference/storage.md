@@ -177,7 +177,10 @@ and creates no tables. See
 - **The `platform` schema.** Its EF Core migrations ship with Axis, with their
   history in `platform.__platform_migrations`. The server applies them at
   start over `ConnectionStrings:PlatformSchema` under both tenant sources, and
-  uses that setting for nothing else.
+  uses that setting for nothing else. `Axis.Admin migrate` applies them too, before it migrates the tenants, so an
+  upgrade that runs `migrate` first has every new platform table before the new
+  server starts. `migrate` does not run the reader role's grants. The server
+  does that at its next start.
 - **Read-only hosts.** The server reads the directory over
   `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
   and `SELECT` on its tables, and nothing else. The server sets this in one
@@ -207,7 +210,7 @@ The tables:
 
 | Table                                               | Columns                                                                                                                                                                                                                                                                                                                     |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the service audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants`. The sign-in profile and the encrypted client keys are _(planned for M16)_ |
+| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the service audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants`, the sign-in profile (`standard` or `fapi2`), and two encrypted client keys, the current and the previous one, each with its key id. A previous key needs a current key |
 | `platform.tenant_hosts`                             | The tenant id and the host. The host is unique on `lower(host)` across all tenants                                                                                                                                                                                                                                          |
 | `platform.tenant_bindings`                          | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                         |
 | `platform.data_protection_keys`                     | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. Rows are only inserted, never updated or deleted. Every server replica reads them                                                                                                                                                                   |
@@ -228,8 +231,8 @@ a tenant only when this value is the one the host was built for, see
   - the OIDC client secret, in `platform.tenants`;
   - the value of a `secret` binding, in `platform.tenant_bindings`;
   - the client keys of a tenant under the `fapi2` sign-in profile, in
-    `platform.tenants`, with the field name `oidc_client_key` and the key id
-    _(planned for M16)_, see [FAPI 2.0 profile](security.md#fapi-20-profile).
+    `platform.tenants`, with the field name `oidc_client_key` and the key id,
+    see [FAPI 2.0 profile](security.md#fapi-20-profile).
 - **Encrypted format.** An encrypted value is a `bytea` that holds a 12-byte
   nonce, the ciphertext and a 16-byte tag. The cipher is AES-256-GCM with the
   installation key `Platform:SecretKey`, see
@@ -237,7 +240,7 @@ a tenant only when this value is the one the host was built for, see
   is the tenant id and the field name, so a value copied to another tenant or
   field does not decrypt. The associated data is the UTF-8 bytes of the tenant
   id, one zero byte, and the UTF-8 bytes of the field name. The field names are
-  `runtime_password`, `schema_password`, `oidc_client_secret`, and `binding:`
+  `runtime_password`, `schema_password`, `oidc_client_secret`, `oidc_client_key`, and `binding:`
   followed by the binding name in lower case. Every writer must use these
   exact bytes and names. A data protection key uses an
   empty tenant id, so the associated data is one zero byte and the field name
@@ -408,6 +411,8 @@ host with one database role:
 | Create the database and the two roles                                                                                   | `Axis.Admin`                    | `Admin:ConnectionString`           |
 | Directory writes                                                                                                        | `Axis.Admin`                    | `ConnectionStrings:PlatformSchema` |
 | Platform migrations, at start, under both tenant sources                                                                | Server                          | `ConnectionStrings:PlatformSchema` |
+| Platform migrations, before the tenants are migrated                                                                    | `Axis.Admin migrate`            | `ConnectionStrings:PlatformSchema` |
+| Platform audit records                                                                                                  | `Axis.Admin`                    | `ConnectionStrings:PlatformSchema` |
 | Grants, EF Core migrations, compile, store and activate                                                                 | `Axis.Admin`                    | The tenant's schema role           |
 | Seeding and schedule trigger state                                                                                      | `Axis.Admin`                    | The tenant's runtime role          |
 | Claim, run and finish a publish request: compile, store, activate, release history and audit record | `axis-admin publisher`          | The tenant's schema role           |

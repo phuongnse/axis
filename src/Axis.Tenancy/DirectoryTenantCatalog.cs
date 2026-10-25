@@ -135,7 +135,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     /// <summary>
     /// The ids of the tenants of this catalog that <paramref name="previous"/> does not hold, or holds on other
     /// sign-in settings, in ordinal order. A tenant whose OIDC authority, client id, encrypted client secret,
-    /// endpoint audience or claim names differ counts, and nothing is decrypted to compare.
+    /// endpoint audience, claim names, sign-in profile or encrypted client keys differ counts, and nothing is decrypted to compare.
     /// </summary>
     public IReadOnlyList<string> OidcChanges(DirectoryTenantCatalog previous)
     {
@@ -229,11 +229,26 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     private static string DatabaseKey(TenantRow row) =>
         $"{row.DatabaseHost}\n{row.DatabasePort}\n{row.DatabaseName}\n{row.RuntimeUser}\n{Convert.ToBase64String(row.RuntimePassword)}";
 
-    // Compares the stored encrypted client secret, so nothing is decrypted to tell whether the sign-in settings changed.
+    // Compares the stored encrypted client secret and client keys, so nothing is decrypted to tell whether the sign-in
+    // settings changed.
     // A preview tenant is keyed by the settings of its main tenant, without the endpoint and service audiences it never
     // takes, so a change to the main tenant's sign-in reaches the preview at the next refresh.
     private static string OidcKey(TenantRow signIn, bool preview) =>
-        string.Join('\n', signIn.OidcAuthority, signIn.OidcClientId, Convert.ToBase64String(signIn.OidcClientSecret), preview ? null : signIn.EndpointAudience, preview ? null : signIn.ServiceAudience, signIn.ClaimUserId, signIn.ClaimDisplayName, signIn.ClaimRoles);
+        string.Join(
+            '\n',
+            signIn.OidcAuthority,
+            signIn.OidcClientId,
+            Convert.ToBase64String(signIn.OidcClientSecret),
+            preview ? null : signIn.EndpointAudience,
+            preview ? null : signIn.ServiceAudience,
+            signIn.ClaimUserId,
+            signIn.ClaimDisplayName,
+            signIn.ClaimRoles,
+            signIn.OidcProfile,
+            signIn.OidcClientKeyId,
+            signIn.OidcClientKey is null ? null : Convert.ToBase64String(signIn.OidcClientKey),
+            signIn.OidcPreviousClientKeyId,
+            signIn.OidcPreviousClientKey is null ? null : Convert.ToBase64String(signIn.OidcPreviousClientKey));
 
     // A preview tenant signs people in with the sign-in settings of its main tenant, whatever the main tenant's status,
     // and decrypts the client secret under the main tenant's id. It never takes the main tenant's EndpointAudience or
@@ -277,9 +292,30 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             main is null ? Blank(signIn.ServiceAudience) : null,
             Blank(signIn.ClaimUserId),
             Blank(signIn.ClaimDisplayName),
-            Blank(signIn.ClaimRoles));
+            Blank(signIn.ClaimRoles),
+            signIn.OidcProfile,
+            ClientKeys(signIn, cipher));
 
         return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf);
+    }
+
+    // The current key comes first, then the previous one. Each is decrypted only at the moment of use.
+    private static List<TenantClientKey> ClientKeys(TenantRow signIn, TenantSecretCipher cipher)
+    {
+        var keys = new List<TenantClientKey>();
+        AddKey(keys, signIn, signIn.OidcClientKeyId, signIn.OidcClientKey, cipher);
+        AddKey(keys, signIn, signIn.OidcPreviousClientKeyId, signIn.OidcPreviousClientKey, cipher);
+        return keys;
+    }
+
+    private static void AddKey(List<TenantClientKey> keys, TenantRow signIn, string? keyId, byte[]? encrypted, TenantSecretCipher cipher)
+    {
+        if (encrypted is { Length: > 0 })
+        {
+            keys.Add(new TenantClientKey(
+                keyId ?? "",
+                SecretValue.Deferred(() => cipher.Decrypt(signIn.Id, TenantSecretFields.OidcClientKey, encrypted).Reveal())));
+        }
     }
 
     // A blank value counts as missing.

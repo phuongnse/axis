@@ -57,9 +57,11 @@ operation step stages its call, and a `package.call` item runs it, see
 operation step stores its event, see [Raise event step](process-events.md#raise-event-step).
 A `timer` step sets the instance `waiting`, and a `process.timer` item resumes
 it, see [Timer step](process-flow.md#timer-step).
+A `task.deadline` item expires the task of a task step that has a `deadline`,
+see [task deadlines](task-deadlines.md#escalations-and-deadline).
 _(Planned for M14)_ The worker also runs `waitEvent` and `subProcess`
 steps and the `createRecord` and `notify` operations, with the work item kinds
-`process.resume`, `task.escalate`, `task.deadline` and
+`process.resume`, `task.escalate` and
 `notification.email`, see [process flow](process-flow.md),
 [task deadlines](task-deadlines.md) and [notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
@@ -122,7 +124,10 @@ one transaction:
    and its work item is deleted, so it never runs again.
 5. A task step then inserts its task into `axis.process_tasks` as `open`. Its
    `due_at` is the transaction time, `now()`, plus `dueIn`, or null without
-   `dueIn`. `dueIn` is added as a fixed length of time.
+   `dueIn`. `dueIn` is added as a fixed length of time. A task step with a
+   `deadline` also queues one `task.deadline` work item for the task, due at
+   the transaction time plus the deadline's `after`. See
+   [task deadlines](task-deadlines.md#escalations-and-deadline).
 
    A `callConnector` step then inserts its call into `axis.connector_calls`
    as `pending`, see [Staging and the call](#staging-and-the-call).
@@ -743,6 +748,7 @@ release cannot be loaded is counted without `axis.application` and
 | `axis.work_items.duration` | histogram | s | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`: `completed`, `failed` or `fenced` |
 | `axis.process.instances.ended` | counter | `{instance}` | `axis.tenant`, `axis.application`, `axis.process`, `axis.outcome`: the end state, `completed` or `failed` |
 | `axis.calls.attempts` | counter | `{attempt}` | `axis.tenant`, `axis.application`, `axis.connector` or `axis.package`, `axis.operation`, `axis.outcome`: the [call outcome](#call-outcomes) class, `succeeded`, `retryable`, `failed` or `unknown` |
+| `axis.queries.timeouts` | counter | `{query}` | `axis.tenant`, `axis.application` when the route has one. An interactive read that ran past `Data:QueryTimeout`, see [Errors](record-api.md#errors) |
 | `axis.dead_letters.created` | counter | `{dead_letter}` | `axis.tenant`, `axis.work_item.kind`. See [Dead letters](process-events.md#dead-letters) |
 | `axis.computed.pending_fields` | gauge | fields | `axis.tenant`, `axis.application`. See [Recomputing computed fields](migrations.md#recomputing-computed-fields) |
 

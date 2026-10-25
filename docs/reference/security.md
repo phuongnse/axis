@@ -47,7 +47,11 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 
 - **Startup checks.** The server's startup fails, naming every problem as
   for the tenant configuration, when a tenant has no `Oidc` block, or when
-  its `Authority`, `ClientId` or `ClientSecret` is missing or blank.
+  its `Authority`, `ClientId` or `ClientSecret` is missing or blank. Under the
+  `fapi2` profile the client key replaces the client secret: the tenant needs a
+  client key with a key id, and no client secret. A `Profile` other than
+  `standard` or `fapi2` fails the start too. The check confirms that the key and
+  its key id are present and does not parse the PEM. No message holds a key.
   A preview tenant has no `Oidc` block, and takes its
   main tenant's, see [preview tenants](../architecture.md#preview-tenants). Only the
   server reads and checks the block. The worker reads the same `Tenants`
@@ -264,6 +268,8 @@ systems.
 - **Client credentials.** A caller is a system, not a browser. It gets an
   OAuth 2.0 access token from the tenant's `Oidc` authority through the
   client credentials grant, and sends it as `Authorization: Bearer <token>`.
+  Under a tenant's `fapi2` profile it sends `Authorization: DPoP <token>` with
+  a DPoP proof, see [machine callers under `fapi2`](#fapi-20-profile).
 - **Tenant setting.** The expected audience is a new tenant setting,
   `Oidc:EndpointAudience`. In the development tenant its value is
   `axis-endpoints`:
@@ -282,7 +288,10 @@ systems.
 
 - **Token checks.** The server checks each token against the tenant
   [resolved from the host](../architecture.md#request-resolution). Any failure is a `401`
-  with `WWW-Authenticate: Bearer`, which never says which check failed.
+  with `WWW-Authenticate: Bearer`, which never says which check failed. Under
+  the `fapi2` profile the `401` says `WWW-Authenticate: DPoP algs="ES256 PS256"`
+  and the token must also be DPoP-bound, see
+  [machine callers under `fapi2`](#fapi-20-profile).
   - The signature, with the keys the authority publishes (its JWKS).
   - The issuer, which must equal the tenant's `Authority`. So another
     tenant's token is a `401`.
@@ -311,10 +320,10 @@ systems.
 - **No session.** On endpoint routes the session cookie is ignored and not
   renewed, so the CSRF header does not apply. A browser cannot attach a bearer token on its
   own, so a cross-site page cannot call an endpoint for a signed-in user.
-- **Not bound to the sender.** A leaked token works until it expires.
-  Sender-constrained tokens (DPoP) stay a later FAPI 2.0 step under D9. Under
-  a tenant's `fapi2` profile only DPoP-bound tokens are accepted
-  _(planned for M16)_, see [FAPI 2.0 profile](#fapi-20-profile).
+- **Not bound to the sender.** Under `standard` a leaked token works until it
+  expires. Under a tenant's `fapi2` profile only DPoP-bound tokens are
+  accepted, so a stolen token is useless without the caller's private key. See
+  [machine callers under `fapi2`](#fapi-20-profile).
 - **Keycloak.** The development realm gets what the purchase request sample
   needs:
   - a confidential client `purchasing-system` with a service account, for
@@ -375,9 +384,10 @@ session-only until then.
   to decide, so a service account never completes one. A bearer token on these
   routes is ignored, as today, and the request needs a session.
 - **Choosing the scheme.** On the routes above, a request with an
-  `Authorization: Bearer` header is a service account request. It never falls
-  back to the session cookie, and does not renew it. A request without the
-  header uses the session.
+  `Authorization: Bearer` or `Authorization: DPoP` header is a service account
+  request. It never falls back to the session cookie, and does not renew it. A
+  request without the header uses the session. A tenant under `fapi2` accepts
+  only the `DPoP` form.
 - **CSRF.** A service account request needs no `X-Axis-Csrf` header. A
   browser cannot add an `Authorization` header to a cross-site request
   without a CORS preflight, which Axis does not allow.
@@ -385,7 +395,9 @@ session-only until then.
   the signature, the issuer, the expiry, and an audience that holds
   `Oidc:ServiceAudience`. Any failure is a `401` with
   `WWW-Authenticate: Bearer`. Under the `fapi2` profile the token must also
-  be DPoP-bound _(planned for M16)_.
+  be DPoP-bound, the `401` says `WWW-Authenticate: DPoP algs="ES256 PS256"` and
+  the token comes with a proof, see
+  [machine callers under `fapi2`](#fapi-20-profile).
 - **Order of checks.** The tenant, the token (`401`), the path (`404`), then
   the grant (`403`), as for a session. The checks that follow are those of
   each route.
@@ -408,14 +420,16 @@ session-only until then.
 
 ## FAPI 2.0 profile
 
-_(Planned for M16.)_ It follows
-[D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant can turn
-on the FAPI 2.0 Security Profile for sign-in and for machine callers.
+It follows [D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant
+can turn on the FAPI 2.0 Security Profile for sign-in and for machine callers.
+The tenant setting, the client key, the startup check and the machine callers
+are built. Nothing uses the profile at sign-in yet, and the sign-in, rotation,
+verification and Keycloak bullets below are _(planned for M16)_.
 
 - **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
   `standard` when unset. Any other value stops the server's start, naming the
   tenant. A preview tenant takes its main tenant's profile.
-- **Sign-in under `fapi2`.**
+- **Sign-in under `fapi2`** _(planned for M16)_.
   - The server sends the authorization request through pushed authorization
     requests (PAR). A provider that does not offer PAR fails the tenant's
     sign-in, and the server logs why.
@@ -426,22 +440,51 @@ on the FAPI 2.0 Security Profile for sign-in and for machine callers.
     against the tenant's `Authority` (RFC 9207).
   - The token request carries a DPoP proof.
 - **Machine callers under `fapi2`.** Inbound endpoints and service accounts
-  accept only access tokens bound to a DPoP key. The request carries a DPoP
-  proof, and its `htu` is checked against the forwarded scheme and host of
-  [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md). Mutual
-  TLS is not offered, because the TLS proxy ends the client's TLS connection.
+  accept only access tokens bound to a DPoP key (RFC 9449). A DPoP proof is a
+  short signed JWT that the caller makes for each request, so a stolen token is
+  useless without the caller's private key. Mutual TLS is not offered, because
+  the TLS proxy ends the client's TLS connection. The same rule holds on every
+  route that takes a bearer token, whichever is built first, because it sits
+  in the token check itself.
+  - The token arrives as `Authorization: DPoP <token>`, with one `DPoP` header
+    that holds the proof. The same token under `Authorization: Bearer` is
+    refused, and so is a plain bearer token.
+  - The proof's `typ` is `dpop+jwt` and its `alg` is `ES256` or `PS256`. Its
+    `jwk` header holds the public key, and a `jwk` with a private key is
+    refused. The signature is checked with that key.
+  - The proof's `htm` is the request's method. Its `htu` is the request's scheme,
+    host and path, without the query and fragment, after the forwarded headers
+    rules of
+    [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md). So a
+    proof made for the address the caller used passes behind a listed proxy,
+    and one made for the proxy's internal address does not.
+  - The proof's `ath` is the hash of the access token, so a proof made for one
+    token never works with another.
+  - The token's `cnf.jkt` must equal the thumbprint of the proof's key.
+  - The proof's `iat` must be within 60 seconds of the server's clock, on
+    either side, and its `jti` must not be blank.
+  - The server keeps no store of seen `jti` values and asks for no `nonce`. A
+    store on one replica would not stop a replay on another. So the same proof
+    can be replayed for up to 60 seconds, but only to the same method and
+    address and with the same token.
+  - Any failure is a `401` with `WWW-Authenticate: DPoP algs="ES256 PS256"`,
+    which never says which check failed. A tenant under `standard` answers
+    `WWW-Authenticate: Bearer`, as before.
 - **The client key.** A tenant under `fapi2` has a private key for
   `private_key_jwt`. Under `configuration` it comes from the environment,
-  such as `Tenants__default__Oidc__ClientKey`, as a PEM. Under `directory` it
-  is stored encrypted in the tenant directory, with the field name
-  `oidc_client_key`, see [platform database](storage.md#platform-database).
-  A tenant under `fapi2` without a key stops the server's start.
-- **Rotation.** The tenant can hold a second key while the identity provider
+  such as `Tenants__default__Oidc__ClientKey`, as a PEM, with its key id in
+  `Oidc:ClientKeyId`. Under `directory` it is stored encrypted in the tenant
+  directory, with the field name `oidc_client_key` and its key id, see
+  [platform database](storage.md#platform-database). A tenant can hold two keys
+  under `directory`, the current one and the previous one, and one under
+  `configuration`. A tenant under `fapi2` without a key, or with a key without a
+  key id, stops the server's start.
+- **Rotation** _(planned for M16)_. The tenant can hold a second key while the identity provider
   changes over, see [tenant setting commands](tenant-setting-commands.md).
-- **Verification.** The OpenID Foundation's conformance suite runs by hand
+- **Verification** _(planned for M16)_. The OpenID Foundation's conformance suite runs by hand
   against the development realm under `fapi2`. Its result is recorded in
   [ASVS](asvs.md). Axis seeks no certification.
-- **Keycloak.** The development realm gets a second client, set up for FAPI
+- **Keycloak** _(planned for M16)_. The development realm gets a second client, set up for FAPI
   2.0 with a client policy, so tests cover both profiles.
 
 ## Authorization
