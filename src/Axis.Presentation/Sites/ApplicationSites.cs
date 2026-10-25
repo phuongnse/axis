@@ -397,6 +397,9 @@ public static class ApplicationSites
             field.MaxLength,
             field.Precision,
             field.Scale,
+            field.Min,
+            field.Max,
+            field.MinLength,
             field.Values,
             field.Type == FieldType.Reference
                 ? new ReferenceTarget(field.Target!.Name, field.TargetDisplayField, RecordsPath(application, field.Target.Name))
