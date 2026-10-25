@@ -95,13 +95,18 @@ query per row. Create and update return their labels from the same statement
 as the write: the write is a data-modifying `WITH` clause, and the labels are
 selected from it with the same joins, because `RETURNING` cannot join.
 
-From M15 _(planned for M15)_, a reference field of a child row has its label
-in the row's place: `"labels": { "lineItems": [{ "product": "Desk" }] }`, one
-object per row in row order. A `references` field has an array of labels in
-the order of its ids.
+A reference field of a child row has its label in the row's place:
+`"labels": { "lineItems": [{ "product": "Desk" }] }`, one object per row in
+row order, read in the same statement as the rows. A collection gets an entry
+only when its child entity has a reference whose label the user may see. The
+object is `{}` for a row without a label, and the entry is `[]` when there are
+no rows. A list response leaves child collections out, so it has no such
+entry. A `references` field has an array of labels in the order of its ids
+_(planned for M15)_.
 
 A label shows when the user may read the reference field and the target
-entity's display field. Otherwise the field has no entry in `labels`, as for a
+entity's display field. For a child row's label, the reference field is the
+owner's `child-collection` field. Otherwise the field has no entry in `labels`, as for a
 `null` reference. The target's record filters do not hide it, so a user who
 reads a request sees its department's name even when no read filter on
 `Department` matches that department. The joins stay as they are.
@@ -559,6 +564,13 @@ A record with a child collection holds its rows inside `values`:
   rows, in the same transaction, and increments the owner's `version`. `null`
   is an error at `/values/<collection>`. A stale `version` is a `409`, and no
   row changes.
+- **References.** A child entity may have `reference` fields. The labels of a
+  row's references come with the rows, as `labels` above describes. A row
+  that names a record that does not exist is a `400` at its cell,
+  `/values/<collection>/<index>/<field>`, with the message of a root
+  reference. A delete of a record that a child row points to is the `409` for
+  a referenced record. Once the owner record is deleted, its rows go with it
+  and the target can be deleted.
 - **No routes of its own.** A child entity has no record routes. Every method
   on `/api/apps/{app}/entities/{child}/records` is a `404` with the same title
   as an unknown entity.

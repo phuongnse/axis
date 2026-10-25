@@ -220,6 +220,39 @@ describe('DetailWidget', () => {
     expect(screen.queryByRole('button', { name: 'Add row' })).toBeNull()
   })
 
+  it('shows the label of a reference in a child row instead of its id', async () => {
+    const lines = noteWidget.entity.fields.find((candidate) => candidate.name === 'lines')!
+    const widget: EntityWidgetMetadata = {
+      ...noteWidget,
+      entity: {
+        ...noteWidget.entity,
+        fields: [
+          {
+            ...lines,
+            fields: [
+              ...lines.fields!,
+              {
+                ...field('product', 'reference', null),
+                target: {
+                  entity: 'Product',
+                  displayField: 'name',
+                  recordsPath: '/api/apps/E2eApp/entities/Product/records',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    }
+    const body = `{"id":"${noteId}","version":1,"values":{"lines":[{"description":"Pens","quantity":2,"product":"${categoryId}"},{"description":"Ink","quantity":1,"product":null}]},"labels":{"lines":[{"product":"Desk"},{}]}}`
+    stubFetch({ status: 200, body })
+
+    renderDetail(widget)
+
+    expect(await screen.findByLabelText('product 1')).toHaveValue('Desk')
+    expect(screen.getByLabelText('product 2')).toHaveValue('')
+  })
+
   it('shows the not-found page when the record API answers 404', async () => {
     stubFetch({ status: 404, body: '{}' })
 

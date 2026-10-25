@@ -1,4 +1,4 @@
-import type { RecordValue } from './records'
+import type { RecordValue, RowLabels } from './records'
 import type { FieldMetadata } from './site'
 
 export interface FormatOptions {
@@ -17,7 +17,7 @@ export interface FormatOptions {
 export function formatValue(
   field: Pick<FieldMetadata, 'name' | 'type'>,
   value: RecordValue,
-  labels: Record<string, string>,
+  labels: Record<string, string | RowLabels[]>,
   options: FormatOptions,
 ): string {
   if (value === null) {
@@ -27,8 +27,10 @@ export function formatValue(
   switch (field.type) {
     case 'boolean':
       return text(value === true ? 'shell.table.yes' : 'shell.table.no')
-    case 'reference':
-      return labels[field.name] ?? String(value)
+    case 'reference': {
+      const label = labels[field.name]
+      return typeof label === 'string' ? label : String(value)
+    }
     case 'date': {
       // A date has no time zone. It is built and formatted in UTC, so it never shifts a day.
       const [year, month, day] = String(value).split('-').map(Number)

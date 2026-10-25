@@ -152,7 +152,7 @@ test('line items are added, edited and removed in the form, in light and dark mo
 
   const read = await request.get(`${notesPath}/${id}`)
   const record = await read.json()
-  expect(record.values.lines).toEqual([{ description: 'Pens', quantity: 5 }])
+  expect(record.values.lines).toEqual([{ description: 'Pens', quantity: 5, category: null }])
 })
 
 // Each test has its own browser context, so the saved session is loaded only into this test's context.
@@ -271,6 +271,34 @@ test('a category is picked in the lookup and shows on the saved note', async ({ 
 
   await expect(page).toHaveURL(tablePath)
   await expect(page.getByRole('row', { name: new RegExp(`Lookup ${run} `) })).toContainText(category)
+})
+
+test('a category is picked in the lookup of a line item and shows on the saved line', async ({ page, request }) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  // Other specs create categories too. A leading digit sorts this one onto the first lookup page.
+  const category = `0 Line lookup ${run}`
+  await createRecord(request, 'Category', { name: category })
+  const title = `Line lookup ${run}`
+  await page.goto('/e2e/notes?pageSize=100&sort=-title')
+
+  await page.getByRole('button', { name: 'New', exact: true }).click()
+  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+  await page.getByRole('button', { name: 'Add row', exact: true }).click()
+  await page.getByLabel('Description 1', { exact: true }).fill('Pens')
+  await page.getByRole('button', { name: 'Choose Category 1', exact: true }).click()
+  const dialog = await waitForDialog(page)
+  await dialog.getByRole('row', { name: new RegExp(category) }).click()
+
+  await expect(dialog).toBeHidden()
+  await expect(page.getByLabel('Category 1', { exact: true })).toHaveValue(category)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/e2e\/notes\?pageSize=100&sort=-title$/)
+  await page
+    .getByRole('row', { name: new RegExp(`${title} `) })
+    .getByRole('button', { name: 'Open', exact: true })
+    .click()
+  await expect(page.getByLabel('Category 1', { exact: true })).toHaveValue(category)
 })
 
 test('a form in two sections shows both titles, and saving keeps its read-only field', async ({ page, request }) => {

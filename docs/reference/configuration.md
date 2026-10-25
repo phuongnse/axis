@@ -75,9 +75,10 @@ flowchart LR
      order of the entity files, then in field order. A later field with the
      same target is `AXC0039` at its `/fields/{i}/target`, naming the owner.
      A `reference` whose target is a child entity is `AXC0040` at
-     `/fields/{i}/target`. A `reference` or `child-collection` field on a
+     `/fields/{i}/target`. A `child-collection` field on a
      child entity is `AXC0041` at its `/fields/{i}/type`, so an entity whose
-     child collection names itself is `AXC0041`. See
+     child collection names itself is `AXC0041`. A `reference` field on a
+     child entity is allowed. See
      [Entity logic](resource-files.md#entity-logic) for why these limits exist.
    - **Sites and pages.** A site belongs to one application. Its `path` is
      lower-case letters, digits and hyphens, starting with a letter. A path

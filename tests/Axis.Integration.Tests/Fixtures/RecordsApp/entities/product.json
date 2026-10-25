@@ -1,0 +1,11 @@
+{
+  "id": "5e1d7a20-8c4b-4f3e-9b2a-3d6c1e0f4a30",
+  "kind": "entity",
+  "name": "Product",
+  "formatVersion": 1,
+  "displayField": "name",
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "price", "type": "decimal", "precision": 20, "scale": 2 }
+  ]
+}
