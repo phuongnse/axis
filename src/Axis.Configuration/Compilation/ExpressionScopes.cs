@@ -22,7 +22,8 @@ namespace Axis.Configuration.Compilation;
 /// resolves paths. A rule call qualified with a module id is allowed only where the scope is given
 /// the application's <c>modules</c>. A navigate action's parameter sees <c>id</c>, as a reference
 /// parameter to the root entity, so a path cannot start at it, and the names of the row or record.
-/// It has no rules and no collections.
+/// It has no rules and no collections. A field default sees no fields, no collections and no
+/// paths, and has the rules it is given.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -70,6 +71,13 @@ public static class ExpressionScopes
             referenceFields: null,
             modules);
     }
+
+    /// <summary>
+    /// The scope of a field default: no fields, no collections and no paths, because no record
+    /// exists yet. It has the named <paramref name="rules"/>.
+    /// </summary>
+    internal static ExpressionScope ForDefault(IEnumerable<ExpressionRule> rules, IEnumerable<string>? modules) =>
+        Build([], rules, collections: null, referenceFields: null, modules);
 
     /// <summary>
     /// The scope of a data source filter: the root entity's fields, then the parameters. A path

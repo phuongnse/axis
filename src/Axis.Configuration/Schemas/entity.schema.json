@@ -79,6 +79,7 @@
         "expression": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "sequence": { "type": "string", "x-axis-reference": "sequence" },
         "creator": { "type": "boolean" },
+        "default": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "sensitive": { "type": "boolean" }
       }
     }

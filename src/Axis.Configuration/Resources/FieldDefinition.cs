@@ -38,6 +38,9 @@ public sealed record FieldDefinition
     /// <summary>Whether the server sets the field to the id of the user who creates the record, or null when not declared.</summary>
     public bool? Creator { get; init; }
 
+    /// <summary>The expression that gives the field its value on create when the body leaves it out, or null when it has none.</summary>
+    public string? Default { get; init; }
+
     /// <summary>Whether the field's value is kept out of process inspection, or null when not declared.</summary>
     public bool? Sensitive { get; init; }
 }
