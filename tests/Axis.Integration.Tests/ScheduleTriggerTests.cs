@@ -305,18 +305,32 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         var tenant = fixture.Tenant("h");
         await DueAtAsync(tenant, _occurrence);
 
-        var (releaseId, _) = await tenant.ActivateAsync(fixture.HourlyFolder, []);
+        var (releaseId, _) = await tenant.ActivateAsync(
+            fixture.HourlyFolder,
+            [],
+            activatedAt: DateTimeOffset.Parse("2026-03-04T10:20:30.123456Z", CultureInfo.InvariantCulture));
 
+        var expected = DateTimeOffset.Parse("2026-03-04T11:00:00Z", CultureInfo.InvariantCulture);
         var state = Assert.Single(await tenant.TriggerSchedulesAsync());
         var item = Assert.Single(await tenant.ScheduleItemsAsync());
         Assert.Equal(releaseId, state.ReleaseId);
-        Assert.Equal(state.NextOccurrenceAt, item.DueAt);
-        Assert.Equal(
-            (true, true, true),
-            (
-                (bool)(await tenant.ScalarAsync("SELECT next_occurrence_at > now() FROM axis.trigger_schedules"))!,
-                (bool)(await tenant.ScalarAsync("SELECT next_occurrence_at <= now() + interval '1 hour' FROM axis.trigger_schedules"))!,
-                (bool)(await tenant.ScalarAsync("SELECT date_trunc('hour', next_occurrence_at) = next_occurrence_at FROM axis.trigger_schedules"))!));
+        Assert.Equal(expected, state.NextOccurrenceAt);
+        Assert.Equal(expected, item.DueAt);
+
+        // Each activation changes the schedule, so each one recomputes the next occurrence.
+        // Activating exactly on the hour gives the following hour, not the same instant.
+        await tenant.ActivateAsync(fixture.Folder, [], activatedAt: DateTimeOffset.Parse("2026-03-04T10:20:30Z", CultureInfo.InvariantCulture));
+        var (hourlyReleaseId, _) = await tenant.ActivateAsync(
+            fixture.HourlyFolder,
+            [],
+            activatedAt: DateTimeOffset.Parse("2026-03-04T12:00:00Z", CultureInfo.InvariantCulture));
+
+        var onTheHour = DateTimeOffset.Parse("2026-03-04T13:00:00Z", CultureInfo.InvariantCulture);
+        state = Assert.Single(await tenant.TriggerSchedulesAsync());
+        item = Assert.Single(await tenant.ScheduleItemsAsync());
+        Assert.Equal(hourlyReleaseId, state.ReleaseId);
+        Assert.Equal(onTheHour, state.NextOccurrenceAt);
+        Assert.Equal(onTheHour, item.DueAt);
     }
 
     /// <summary>
