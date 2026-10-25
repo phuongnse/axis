@@ -971,7 +971,7 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
-    public void A_step_reached_only_through_a_deadline_is_reachable_and_a_deadline_cycle_is_reported()
+    public void A_step_reached_only_through_a_deadline_is_reachable_and_a_deadline_loop_is_allowed()
     {
         using var folder = Folder(Process("Order", """
             [
@@ -987,9 +987,8 @@ public sealed class ProcessCompilerTests
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
-        var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal((DiagnosticCodes.ProcessStepCycle, "/steps/1/deadline/next"), (diagnostic.Code, diagnostic.Path));
-        Assert.Null(result.Model);
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
     }
 
     [Fact]

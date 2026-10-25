@@ -8,7 +8,7 @@ import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
-import { moveSectionTo, removeField } from './formPaletteSupport'
+import { moveSectionTo, removeField, removeSectionAt, removeStepAt } from './formPaletteSupport'
 import { LabelTextsContext } from './labelTextsContext'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -28,8 +28,9 @@ function isContent(value: unknown): value is Content {
 
 /**
  * The properties of the element that is selected on the form canvas, found by its JSON Pointer in the draft. A field
- * has `readOnly`, its three conditions and a Remove field button, a section its name, title, `visibleWhen` and, on a
- * form with steps, a Move to step picker, and a step its title. A field the entity marks required has no
+ * has `readOnly`, its three conditions and a Remove field button, a section its name, title, `visibleWhen`, a Remove
+ * section button and, on a form with steps, a Move to step picker, and a step its title and a Remove step button. A
+ * field the entity marks required has no
  * `visibleWhen` (AXC0226). A computed, sequence or creator field is always read-only. A selection that finds no object
  * in the draft shows a hint, so no edit goes to a stale pointer.
  */
@@ -44,8 +45,8 @@ export function FormProperties({
   draft: Content
   selected: string | null
   entityFields: FieldMetadata[]
-  /** Selects the section where a move lands. */
-  onSelect: (pointer: string) => void
+  /** Selects the element where a move or a removal lands, or nothing. */
+  onSelect: (pointer: string | null) => void
   /** Says a move aloud. */
   onAnnounce: (text: string) => void
   onChange: ChangeHandler
@@ -79,7 +80,16 @@ export function FormProperties({
         />
       )
     } else if (stepPointer.test(selected)) {
-      panel = <StepProperties pointer={selected} step={content} onChange={onChange} />
+      panel = (
+        <StepProperties
+          draft={draft}
+          pointer={selected}
+          step={content}
+          onSelect={onSelect}
+          onAnnounce={onAnnounce}
+          onChange={onChange}
+        />
+      )
     }
   }
   return (
@@ -179,7 +189,7 @@ function SectionProperties({
   draft: Content
   pointer: string
   section: Content
-  onSelect: (pointer: string) => void
+  onSelect: (pointer: string | null) => void
   onAnnounce: (text: string) => void
   onChange: ChangeHandler
 }) {
@@ -229,6 +239,15 @@ function SectionProperties({
         </div>
       )}
       <ConditionBox draft={draft} pointer={pointer} element={section} condition="visibleWhen" onChange={onChange} />
+      <Button
+        danger
+        data-testid="studio-design-remove-section"
+        onClick={() =>
+          removeSectionAt(t, draft, Number(pointer.slice('/sections/'.length)), onChange, onSelect, onAnnounce)
+        }
+      >
+        {t('shell.studio.design.removeSection')}
+      </Button>
     </Flex>
   )
 }
@@ -288,10 +307,32 @@ function SectionNameBox({
   )
 }
 
-function StepProperties({ pointer, step, onChange }: { pointer: string; step: Content; onChange: ChangeHandler }) {
+function StepProperties({
+  draft,
+  pointer,
+  step,
+  onSelect,
+  onAnnounce,
+  onChange,
+}: {
+  draft: Content
+  pointer: string
+  step: Content
+  onSelect: (pointer: string | null) => void
+  onAnnounce: (text: string) => void
+  onChange: ChangeHandler
+}) {
+  const t = useText()
   return (
     <Flex vertical gap="small" data-testid="studio-design-step">
       <TitleEditor pointer={pointer} element={step} onChange={onChange} />
+      <Button
+        danger
+        data-testid="studio-design-remove-step"
+        onClick={() => removeStepAt(t, draft, Number(pointer.slice('/steps/'.length)), onChange, onSelect, onAnnounce)}
+      >
+        {t('shell.studio.design.removeStep')}
+      </Button>
     </Flex>
   )
 }

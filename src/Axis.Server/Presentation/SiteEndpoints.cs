@@ -109,7 +109,7 @@ internal static class SiteEndpoints
             return PageAccess.CanRead(active.Application, user.Roles, model)
                 ? Results.Ok(PageAccess.Shape(active.Application, user.Roles, model, metadata))
                 : Grants.Forbidden();
-        });
+        }).WithQueryTimeout(QueryTimeoutSettings.Interactive);
     }
 
     private static IResult SiteNotFound() =>

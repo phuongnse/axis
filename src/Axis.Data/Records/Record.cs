@@ -17,5 +17,8 @@ public sealed record Record(
     IReadOnlyDictionary<string, JsonNode?> Values,
     IReadOnlyDictionary<string, string> Labels);
 
-/// <summary>One page of records and the number of records in the whole table.</summary>
-public sealed record RecordPage(IReadOnlyList<Record> Items, long TotalCount);
+/// <summary>
+/// One page of records and the number of records that match, which is <see langword="null"/> when
+/// the count ran past the query timeout.
+/// </summary>
+public sealed record RecordPage(IReadOnlyList<Record> Items, long? TotalCount);
