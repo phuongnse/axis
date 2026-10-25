@@ -6,8 +6,8 @@ activate releases, and back up and restore tenants. It follows
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md)
 and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
-The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`,
-`tenant restore`, `migrate`, `activate`, `publisher` and `version`. The commands that change a tenant
+The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
+`tenant list`, `tenant backup`, `tenant restore`, `migrate`, `activate`, `publisher` and `version`. The commands that change a tenant
 after it is created and rotate keys are in [tenant setting commands](tenant-setting-commands.md)
 _(planned for M16)_. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
@@ -31,7 +31,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 
 | Setting | Environment variable | Meaning |
 | --- | --- | --- |
-| `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create` and `tenant restore` read it, so `migrate` needs no admin role. See [admin settings](host-settings.md#admin-settings). |
+| `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create`, `tenant restore` and `tenant rotate-passwords` read it, so `migrate` needs no admin role. See [admin settings](host-settings.md#admin-settings). |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
@@ -76,7 +76,7 @@ Every command writes one line per tenant and step to standard output:
 
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
 `work`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
-`check`, `restore`, `status` and `audit`. An `audit` step prints only when it fails, see
+`check`, `restore`, `status`, `runtime-password`, `schema-password` and `audit`. An `audit` step prints only when it fails, see
 [platform audit records](tenant-setting-commands.md#platform-audit-records). The [publisher](#publisher)
 adds `claim`, `validate` and `rollback`. A line names the
 tenant and never a database host, a password or a connection string. A `failed` message
@@ -876,9 +876,6 @@ admin host carries the same version in its OCI label, see
 
 - Deleting a tenant.
 - An HTTP API for provisioning.
-- Rotating the generated database passwords. `tenant rotate-passwords` is
-  _(planned for M16)_, see
-  [database passwords](tenant-setting-commands.md#database-passwords).
 - Moving a tenant to another database server.
 - Commands that set a tenant's deployment bindings, claim names or endpoint
   audience. `tenant create` sets none of them, so they stay empty. The one

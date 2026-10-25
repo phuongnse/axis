@@ -32,7 +32,8 @@ namespace Axis.Configuration.Compilation;
 /// <c>text</c> expression over the same scope, and a <c>role</c>, which names a declared role
 /// exactly. Its form is a loaded form over the subject entity, its <c>dueIn</c> is a positive fixed
 /// duration, its outcome names are unique ignoring letter case, and each outcome's <c>next</c> is a
-/// transition. Every problem of a process is
+/// transition. Its <c>deadline</c>'s <c>after</c> is a positive fixed duration too, and its <c>next</c> is a
+/// transition that comes after the outcomes. Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
 /// unknown step is not also reported as having no path to an end, and a form, entity, role,
@@ -326,7 +327,10 @@ internal static class ProcessChecker
                     step.Assignee.Role),
                 new FormReference(form.Id, form.Name),
                 dueIn,
-                step.Outcomes!.Select(outcome => new TaskOutcomeModel(outcome.Name, outcome.Label, Resolve(outcome.Next))).ToList());
+                step.Outcomes!.Select(outcome => new TaskOutcomeModel(outcome.Name, outcome.Label, Resolve(outcome.Next))).ToList(),
+                step.Deadline is { } deadline && IsoDuration.TryParse(deadline.After, out var after)
+                    ? new TaskDeadlineModel(after, Resolve(deadline.Next))
+                    : null);
         }
 
         // A checked call names a loaded connector and operation, and each input, output and field once.
@@ -503,6 +507,12 @@ internal static class ProcessChecker
             {
                 var outcomePath = $"{path}/outcomes/{outcome}/next";
                 transitions[index].Add(new Transition(Resolve(step.Outcomes![outcome].Next, outcomePath), outcomePath));
+            }
+
+            if (step.Deadline is { } deadline)
+            {
+                var deadlinePath = $"{path}/deadline/next";
+                transitions[index].Add(new Transition(Resolve(deadline.Next, deadlinePath), deadlinePath));
             }
         }
 
@@ -1273,6 +1283,14 @@ internal static class ProcessChecker
                     DiagnosticCodes.InvalidTaskDueIn,
                     $"The duration '{dueIn}' is not valid. 'dueIn' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P3D', 'PT4H' or 'P1DT12H'. Years and months are not allowed.",
                     $"{path}/dueIn");
+            }
+
+            if (step.Deadline is { } deadline && !IsoDuration.TryParse(deadline.After, out _))
+            {
+                report(
+                    DiagnosticCodes.InvalidTaskDueIn,
+                    $"The duration '{deadline.After}' is not valid. 'deadline.after' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P3D', 'PT4H' or 'P1DT12H'. Years and months are not allowed.",
+                    $"{path}/deadline/after");
             }
 
             var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);

@@ -480,6 +480,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("ended_at");
 
+                    b.Property<string>("Parameters")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("parameters");
+
                     b.Property<Guid>("ProcessId")
                         .HasColumnType("uuid")
                         .HasColumnName("process_id");
@@ -502,11 +506,11 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("step");
 
-                    b.Property<Guid>("SubjectEntityId")
+                    b.Property<Guid?>("SubjectEntityId")
                         .HasColumnType("uuid")
                         .HasColumnName("subject_entity_id");
 
-                    b.Property<Guid>("SubjectId")
+                    b.Property<Guid?>("SubjectId")
                         .HasColumnType("uuid")
                         .HasColumnName("subject_id");
 
@@ -520,6 +524,8 @@ namespace Axis.Processes.Storage.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_process_instances_active_subject")
                         .HasFilter("state IN ('running', 'waiting')");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ApplicationId", "ProcessId", "SubjectId"), false);
 
                     b.HasIndex("ApplicationId", "ProcessId", "CreatedAt", "Id")
                         .IsDescending(false, false, true, true)
@@ -677,6 +683,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.Property<DateTimeOffset?>("DueAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("due_at");
+
+                    b.Property<DateTimeOffset?>("ExpiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expired_at");
 
                     b.Property<Guid>("FormId")
                         .HasColumnType("uuid")
@@ -868,6 +878,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("span_id");
 
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
                     b.Property<string>("TenantId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -898,6 +912,9 @@ namespace Axis.Processes.Storage.Migrations
 
                     b.HasIndex("ProcessInstanceId")
                         .HasDatabaseName("ix_process_work_items_process_instance_id");
+
+                    b.HasIndex("TaskId")
+                        .HasDatabaseName("ix_process_work_items_task_id");
 
                     b.HasIndex("TriggerId")
                         .IsUnique()
@@ -982,6 +999,12 @@ namespace Axis.Processes.Storage.Migrations
                         .HasForeignKey("ProcessInstanceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_process_work_items_process_instances_process_instance_id");
+
+                    b.HasOne("Axis.Processes.Storage.ProcessTaskRow", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_process_work_items_process_tasks_task_id");
                 });
 #pragma warning restore 612, 618
         }

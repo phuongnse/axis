@@ -394,7 +394,7 @@ for `tenant create` and `tenant restore`. `migrate`, `tenant suspend`, `tenant r
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create` and `tenant restore`. |
+| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create`, `tenant restore` and `tenant rotate-passwords`. |
 
 As an environment variable it is `Admin__ConnectionString`.
 

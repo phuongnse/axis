@@ -369,15 +369,19 @@ internal sealed partial class ConnectorCallHandler(
                 new(AxisTelemetry.OperationTag, operation.Name),
             ]);
 
-    /// <summary>Finds the step, the subject entity, the connector and the operation of the call on its release.</summary>
+    /// <summary>
+    /// Finds the step, the subject entity, the connector and the operation of the call on its release.
+    /// A process without a subject has no entity.
+    /// </summary>
     /// <exception cref="InvalidOperationException">The release lacks one of them.</exception>
     private async Task<Target> FindTargetAsync(WorkItemContext context, LoadedConnectorCall call, LoadedInstance instance, CancellationToken cancellationToken)
     {
         var model = await models.GetAsync(context, call.ReleaseId, cancellationToken);
         var process = model.Processes.FirstOrDefault(candidate => candidate.Id == instance.ProcessId)
             ?? throw new InvalidOperationException($"The release has no process '{instance.ProcessId}'.");
-        var entity = model.FindEntity(instance.SubjectEntityId)
-            ?? throw new InvalidOperationException($"The release has no entity '{instance.SubjectEntityId}'.");
+        var entity = instance.SubjectEntityId is { } entityId
+            ? model.FindEntity(entityId) ?? throw new InvalidOperationException($"The release has no entity '{entityId}'.")
+            : null;
         if (!process.TryGetStep(call.Step, out var step) || step is not CallConnectorStepModel callStep)
         {
             throw new InvalidOperationException($"The process '{process.Name}' has no callConnector step '{call.Step}'.");
@@ -532,7 +536,7 @@ internal sealed partial class ConnectorCallHandler(
                 var mapping = target.Step.Output.FirstOrDefault(candidate => string.Equals(candidate.Output, output.Name, StringComparison.OrdinalIgnoreCase));
                 if (present && mapping is not null)
                 {
-                    if (!target.Entity.TryGetField(mapping.Field, out var field))
+                    if (target.Entity is not { } entity || !entity.TryGetField(mapping.Field, out var field))
                     {
                         return null;
                     }
@@ -660,21 +664,31 @@ internal sealed partial class ConnectorCallHandler(
         var call = attempt.Call;
         var connection = transaction.Connection!;
         var entity = target.Entity;
-        if (values.Count > 0)
-        {
-            // The write can start instances through data change triggers. The start lock comes before any
-            // entity table is read, so a migrating activation cannot deadlock with this transaction.
-            await StartLock.TakeSharedAsync(transaction, instance.ApplicationId, cancellationToken);
+        Record? record = null;
 
-            // The lock makes the read below see the latest version, and a concurrent write of the
-            // record waits until this transaction ends.
-            await RecordCommands.LockAsync(connection, entity, instance.SubjectId, cancellationToken);
+        // A process without a subject has no record to lock, read or write, and no outputs to write.
+        if (instance.SubjectId is { } subjectId && entity is not null)
+        {
+            if (values.Count > 0)
+            {
+                // The write can start instances through data change triggers. The start lock comes before any
+                // entity table is read, so a migrating activation cannot deadlock with this transaction.
+                await StartLock.TakeSharedAsync(transaction, instance.ApplicationId, cancellationToken);
+
+                // The lock makes the read below see the latest version, and a concurrent write of the
+                // record waits until this transaction ends.
+                await RecordCommands.LockAsync(connection, entity, subjectId, cancellationToken);
+            }
+
+            record = await RecordQueries.GetAsync(connection, target.Model, entity, subjectId, cancellationToken);
+            if (record is null && values.Count > 0)
+            {
+                return $"No record of '{entity.Name}' has the id '{subjectId}'.";
+            }
         }
-
-        var record = await RecordQueries.GetAsync(connection, target.Model, entity, instance.SubjectId, cancellationToken);
-        if (record is null && values.Count > 0)
+        else if (values.Count > 0)
         {
-            return $"No record of '{entity.Name}' has the id '{instance.SubjectId}'.";
+            return "The step has outputs, but the process has no subject to write them to.";
         }
 
         if (!await ProcessSteps.TryResumeCallAsync(transaction, instance.Id, call.Step, attempt.Revision, target.Step.Next, cancellationToken))
@@ -689,13 +703,13 @@ internal sealed partial class ConnectorCallHandler(
         if (values.Count > 0)
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var result = await RecordCommands.SetAsync(connection, target.Model, entity, call.ReleaseId, record!, values, now, cancellationToken);
+            var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, record!, values, now, cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";
             }
 
-            await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, item.TenantId, target.Model, entity, call.ReleaseId, cancellationToken);
+            await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, item.TenantId, target.Model, entity!, call.ReleaseId, cancellationToken);
             updated = written;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
@@ -732,7 +746,7 @@ internal sealed partial class ConnectorCallHandler(
                 active.Model,
                 active.ReleaseId,
                 call.ReleaseId,
-                entity,
+                entity!,
                 record!,
                 updated,
                 [],
@@ -1091,7 +1105,7 @@ internal sealed partial class ConnectorCallHandler(
     /// <summary>What the call's release declares for it.</summary>
     private sealed record Target(
         ApplicationModel Model,
-        EntityModel Entity,
+        EntityModel? Entity,
         CallConnectorStepModel Step,
         ConnectorModel Connector,
         ConnectorOperationModel Operation);

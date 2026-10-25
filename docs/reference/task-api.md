@@ -245,8 +245,9 @@ is a `403` before any of these checks.
 
 - **`409` for a decided task.** The task is not `open`, because another
   completion came first. This covers a later completion and the loser of two
-  concurrent ones. It covers a `cancelled` task too. A
-  cancelled task is not listed, as no task is that is not `open`.
+  concurrent ones. It covers a `cancelled` task and an `expired` task too, see
+  [Task states](task-deadlines.md#task-states). A task that is not `open` is
+  not listed.
 
   ```json
   {
@@ -345,7 +346,9 @@ One transaction records the decision:
    display name as its actor, and details `{ "outcome", "fields" }`.
    `fields` names the changed fields in declaration order and holds no
    values. A completion writes no `record.updated`.
-7. It inserts the work item for the outcome's `next` step.
+7. It deletes the task's pending `task.deadline` work item, see
+   [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
+8. It inserts the work item for the outcome's `next` step.
 
 The form, the outcomes and the record write all use the release the instance
 is pinned to. When any part fails, nothing is written. The worker then runs

@@ -388,20 +388,20 @@ internal static class InboundEndpoints
         // Another caller's instance, another endpoint's and an unknown one get the same answer, so
         // one system cannot learn of another system's calls.
         var connection = await database.GetConnectionAsync(cancellationToken);
-        if (await ProcessStarts.FindInstanceAsync(connection, id, cancellationToken) is not { } instance
+        if (await ProcessStarts.FindInstanceAsync(connection, id, cancellationToken) is not { SubjectEntityId: { } subjectEntityId, SubjectId: { } subjectId } instance
             || instance.ApplicationId != application.Manifest.Id
             || instance.ProcessId != endpoint.Process.Id
-            || instance.SubjectEntityId != endpoint.Entity.Id
+            || subjectEntityId != endpoint.Entity.Id
             || !await AuditRecords.IsProcessStartedByAsync(
-                connection, instance.SubjectEntityId, instance.SubjectId, id, caller.Id, endpoint.Name, cancellationToken))
+                connection, subjectEntityId, subjectId, id, caller.Id, endpoint.Name, cancellationToken))
         {
             return InstanceNotFound();
         }
 
         var output = instance.State == ProcessStarts.Completed && application.FindEntity(endpoint.Entity.Id) is { } entity
-            ? await ReadOutputAsync(connection, application, entity, endpoint, instance.SubjectId, cancellationToken)
+            ? await ReadOutputAsync(connection, application, entity, endpoint, subjectId, cancellationToken)
             : null;
-        return Results.Ok(new EndpointCallResponse(instance.SubjectId, id, instance.State, output));
+        return Results.Ok(new EndpointCallResponse(subjectId, id, instance.State, output));
     }
 
     /// <summary>
@@ -443,7 +443,7 @@ internal static class InboundEndpoints
 
     private static IResult Unauthorized(HttpRequest request)
     {
-        request.HttpContext.Response.Headers.WWWAuthenticate = "Bearer";
+        BearerChallenge.Write(request.HttpContext);
         return Results.Problem(
             statusCode: StatusCodes.Status401Unauthorized,
             title: "A valid bearer token is needed to call this endpoint.");

@@ -38,7 +38,7 @@ public sealed class ProcessTaskRow
     /// <summary>The creation time plus the step's <c>dueIn</c>, or <see langword="null"/> when the step has none.</summary>
     public DateTimeOffset? DueAt { get; init; }
 
-    /// <summary><c>open</c> or <c>completed</c>.</summary>
+    /// <summary><c>open</c>, <c>completed</c>, <c>cancelled</c> or <c>expired</c>.</summary>
     public required string State { get; init; }
 
     /// <summary>The name of the outcome the task was completed with, or <see langword="null"/> while it is open.</summary>
@@ -48,6 +48,9 @@ public sealed class ProcessTaskRow
     public string? CompletedBy { get; init; }
 
     public DateTimeOffset? CompletedAt { get; init; }
+
+    /// <summary>When the task's deadline passed and the task expired, or <see langword="null"/> when it did not expire.</summary>
+    public DateTimeOffset? ExpiredAt { get; init; }
 
     /// <summary>The role holder who claimed the task, or <see langword="null"/> while no one holds the claim.</summary>
     public string? ClaimedBy { get; init; }
