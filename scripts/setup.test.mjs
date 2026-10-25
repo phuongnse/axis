@@ -30,7 +30,13 @@ const commands = [
   'npx --prefix tests/e2e playwright install chromium',
 ]
 
-function runSetup({ failTimes = 0, failStatus = 1 } = {}) {
+const ciCommands = [
+  ...commands.slice(0, 4),
+  'npx --prefix tests/e2e playwright install-deps chromium',
+  'npx --prefix tests/e2e playwright install chromium',
+]
+
+function runSetup({ failTimes = 0, failStatus = 1, ci = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-setup-'))
   try {
     const bin = join(dir, 'bin')
@@ -60,7 +66,7 @@ function runSetup({ failTimes = 0, failStatus = 1 } = {}) {
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
         HOME: home,
-        CI: '',
+        CI: ci ? 'true' : '',
         AXIS_RETRY_DELAY_SECONDS: '0',
         STUB_LOG: log,
         STUB_COUNTS: counts,
@@ -83,14 +89,23 @@ describe('scripts/setup.sh retries its network steps', () => {
       assert.equal(result.ran.filter((line) => line === command).length, 2, command)
     }
     assert.equal(result.ran.length, commands.length * 2)
-    assert.match(result.stderr, /Attempt 1 of 3 failed with status 1: dotnet restore Axis\.slnx/)
+    assert.match(result.stderr, /Attempt 1 of 4 failed with status 1: dotnet restore Axis\.slnx/)
   })
 
-  test('a step that always fails stops setup with its status after three tries', () => {
+  test('an outage of three failures per step still succeeds on the fourth try', () => {
+    const result = runSetup({ failTimes: 3 })
+    assert.equal(result.status, 0, result.stderr)
+    for (const command of commands) {
+      assert.equal(result.ran.filter((line) => line === command).length, 4, command)
+    }
+    assert.equal(result.ran.length, commands.length * 4)
+  })
+
+  test('a step that always fails stops setup with its status after four tries', () => {
     const result = runSetup({ failTimes: 99, failStatus: 7 })
     assert.equal(result.status, 7, result.stderr)
-    assert.deepEqual(result.ran, [commands[0], commands[0], commands[0]])
-    assert.match(result.stderr, /Failed after 3 attempts: dotnet restore/)
+    assert.deepEqual(result.ran, [commands[0], commands[0], commands[0], commands[0]])
+    assert.match(result.stderr, /Failed after 4 attempts: dotnet restore/)
   })
 
   test('a step that succeeds the first time runs once and logs no retry', () => {
@@ -98,5 +113,25 @@ describe('scripts/setup.sh retries its network steps', () => {
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(result.ran, commands)
     assert.doesNotMatch(result.stderr, /Attempt/)
+  })
+
+  test('on CI the Playwright system packages install as a step of their own', () => {
+    const result = runSetup({ ci: true })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(result.ran, ciCommands)
+  })
+})
+
+describe('scripts/lib/retry.sh waits longer after each failure', () => {
+  test('the waits double from 15 seconds before a fourth try', () => {
+    const result = spawnSync(
+      'bash',
+      ['-c', 'source scripts/lib/retry.sh; sleep() { echo "sleep $1" >&2; }; retry 4 false'],
+      { cwd: root, encoding: 'utf8', env: { ...process.env, AXIS_RETRY_DELAY_SECONDS: '15' } },
+    )
+    assert.equal(result.status, 1, result.stderr)
+    const waits = result.stderr.match(/^sleep \d+$/gm)
+    assert.deepEqual(waits, ['sleep 15', 'sleep 30', 'sleep 60'])
+    assert.match(result.stderr, /Failed after 4 attempts: false/)
   })
 })
