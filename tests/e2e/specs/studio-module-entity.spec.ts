@@ -1,7 +1,7 @@
 import { cp, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../test";
 import { startServer } from "../activate";
 import { e2eApp, leaveRequests } from "../server-settings";
 import { useSession } from "../sessions";

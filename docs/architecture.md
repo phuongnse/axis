@@ -446,10 +446,9 @@ bindings work. Status rules and publishing are built too.
     [service accounts](reference/security.md#service-accounts) and
     [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
 - **Hardening (D82, D84, D85).**
-  - The server rate limits the routes a caller can repeat. See
+  - The server sets security headers on every response and rate limits the routes a caller can
+    repeat. See [security headers](reference/headers-and-rate-limits.md#security-headers) and
     [rate limits](reference/headers-and-rate-limits.md#rate-limits).
-  - _(Planned for M16.)_ The server sets security headers on every response.
-    See [security headers](reference/headers-and-rate-limits.md#security-headers).
   - _(Planned for M16.)_ Axis is verified against ASVS 5.0 Level 2, tracked in
     [ASVS](reference/asvs.md).
   - _(Planned for M16.)_ Performance objectives and the weekly load test are in
@@ -864,6 +863,11 @@ A step that once hung the browser until the test timeout can run through `guardS
 text to the test. The text holds the page URL, the console output, the page errors and the failed
 requests since the step began, the load of the machine and its busiest processes.
 `editInStudio` in `purchase-request-release.spec.ts` uses it with a limit of 60 seconds.
+
+Every spec imports `test` and `expect` from `tests/e2e/test.ts`. Its `test` has an automatic fixture that
+listens for `securitypolicyviolation` on every page of the test, including pages in browser contexts that the
+spec opens itself, and fails the test that caused a violation. `tests/e2e/policy-violations.test.ts` checks the
+listener and fails when a spec imports `test` from `@playwright/test` instead.
 
 The E2E run also starts the worker against the same database, with a 5 second
 lease. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart

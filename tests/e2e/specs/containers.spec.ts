@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../test";
 import { sessionFile } from "../sessions";
 
 // The table and the KPI need a grant, so these journeys start signed in as the employee anna.
