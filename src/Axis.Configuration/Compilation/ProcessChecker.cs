@@ -32,7 +32,9 @@ namespace Axis.Configuration.Compilation;
 /// <c>text</c> expression over the same scope, and a <c>role</c>, which names a declared role
 /// exactly. Its form is a loaded form over the subject entity, its <c>dueIn</c> is a positive fixed
 /// duration, its outcome names are unique ignoring letter case, and each outcome's <c>next</c> is a
-/// transition. A <c>notify</c> step is checked by <see cref="CheckNotify"/>. Every problem of a process is
+/// transition. Its <c>deadline</c>'s <c>after</c> is a positive fixed duration too, and its <c>next</c> is a
+/// transition that comes after the outcomes. A <c>notify</c> step is checked by <see cref="CheckNotify"/>.
+/// Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
 /// unknown step is not also reported as having no path to an end, and a form, entity, role,
@@ -84,6 +86,37 @@ internal static class ProcessChecker
         {
             void Report(string code, string message, string path) =>
                 diagnostics.Add(new Diagnostic(code, message, process.File, path, process.Id));
+
+            if (process.Entity is null)
+            {
+                CheckWithoutSubject(
+                    process,
+                    rules,
+                    modules,
+                    findConnector,
+                    unloadedConnectorNames,
+                    findEvent,
+                    unloadedEventNames,
+                    findPackage,
+                    declaredPackageIds,
+                    findRole,
+                    unloadedRoleNames,
+                    findPage,
+                    unloadedPageNames,
+                    textValues,
+                    references,
+                    Report,
+                    diagnostics);
+                continue;
+            }
+
+            if (process.Parameters is not null)
+            {
+                Report(
+                    DiagnosticCodes.InvalidProcessSubject,
+                    "A process has either an 'entity' or 'parameters', not both. A process with an entity runs for a record of that entity, and a process with parameters has no subject.",
+                    "/parameters");
+            }
 
             var entity = findEntity(process.Entity);
             if (entity is not null)
@@ -144,20 +177,150 @@ internal static class ProcessChecker
 
             CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, findRole, unloadedRoleNames, references, Report);
 
-            if (process.StartCondition is { } startCondition)
+            CheckTextKeys(process, references, diagnostics);
+        }
+    }
+
+    /// <summary>
+    /// Checks a process that has no <c>entity</c>. With no <c>parameters</c> either, it has no
+    /// subject to check against, so only the step graph and the text keys are checked. With
+    /// <c>parameters</c>, a repeated name, ignoring letter case, is reported once, and the start
+    /// condition, decision <c>when</c> and connector or package inputs are checked over the
+    /// parameters and the named rules. A step that needs a subject record is reported once at the
+    /// property to change, and its other properties are not checked.
+    /// </summary>
+    private static void CheckWithoutSubject(
+        ProcessResource process,
+        IEnumerable<ExpressionRule> rules,
+        IReadOnlySet<string> modules,
+        Func<string, ConnectorResource?> findConnector,
+        IReadOnlySet<string> unloadedConnectorNames,
+        Func<string, EventResource?> findEvent,
+        IReadOnlySet<string> unloadedEventNames,
+        Func<string, PinnedOperations?> findPackage,
+        IReadOnlySet<string>? declaredPackageIds,
+        Func<string, RoleResource?> findRole,
+        IReadOnlySet<string> unloadedRoleNames,
+        Func<string, PageResource?> findPage,
+        IReadOnlySet<string> unloadedPageNames,
+        Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report,
+        List<Diagnostic> diagnostics)
+    {
+        if (process.Parameters is not { } parameters)
+        {
+            report(
+                DiagnosticCodes.InvalidProcessSubject,
+                "A process needs either an 'entity', to run for a record of that entity, or 'parameters', to run without a subject.",
+                "");
+            CheckGraph(process, report);
+            CheckTextKeys(process, references, diagnostics);
+            return;
+        }
+
+        var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < parameters.Count; index++)
+        {
+            var name = parameters[index].Name;
+            if (!firstIndexByName.TryAdd(name, index))
             {
-                ApplicationCompiler.CheckTextKey(startCondition.Message, process, "/startCondition/message", references, diagnostics);
+                var firstIndex = firstIndexByName[name];
+                report(
+                    DiagnosticCodes.DuplicateProcessParameter,
+                    $"The parameter name '{name}' is already used by parameter '{parameters[firstIndex].Name}' at '/parameters/{firstIndex}'.",
+                    $"/parameters/{index}/name");
+            }
+        }
+
+        CheckGraph(process, report);
+
+        var scope = ExpressionScopes.ForProcessParameters(parameters, rules, modules);
+        CheckConditions(process, scope, references, report);
+        CheckSubjectSteps(process, report);
+
+        // A step that needs a subject record is skipped, as CheckSubjectSteps has reported it.
+        CheckOperations(
+            process,
+            null,
+            scope,
+            _ => null,
+            findConnector,
+            unloadedConnectorNames,
+            findEvent,
+            unloadedEventNames,
+            findPackage,
+            declaredPackageIds,
+            findRole,
+            unloadedRoleNames,
+            findPage,
+            unloadedPageNames,
+            textValues,
+            references,
+            report,
+            diagnostics);
+
+        CheckTextKeys(process, references, diagnostics);
+    }
+
+    /// <summary>
+    /// Reports each step of a process without a subject that needs a subject record: a task, at its
+    /// <c>type</c>, an <c>updateRecord</c> or <c>raiseEvent</c>, at its <c>operation</c>, and a
+    /// connector or package call that writes outputs, at its <c>output</c>. An output is written to
+    /// a field of the subject, and a task, an update and a raised event are about its record.
+    /// </summary>
+    private static void CheckSubjectSteps(ProcessResource process, Action<string, string, string> report)
+    {
+        for (var index = 0; index < process.Steps.Count; index++)
+        {
+            var step = process.Steps[index];
+            if (step.Type == ProcessStepDefinition.TaskStep)
+            {
+                report(
+                    DiagnosticCodes.StepNeedsSubject,
+                    "A task is about a subject record, so a process without a subject cannot have one. Give the process an 'entity' instead of 'parameters', or remove the task.",
+                    $"/steps/{index}/type");
+                continue;
             }
 
-            for (var index = 0; index < process.Steps.Count; index++)
+            if (step.Type != ProcessStepDefinition.OperationStep)
             {
-                var step = process.Steps[index];
-                ApplicationCompiler.CheckTextKey(step.Label, process, $"/steps/{index}/label", references, diagnostics);
-                var outcomes = step.Outcomes ?? [];
-                for (var outcome = 0; outcome < outcomes.Count; outcome++)
-                {
-                    ApplicationCompiler.CheckTextKey(outcomes[outcome].Label, process, $"/steps/{index}/outcomes/{outcome}/label", references, diagnostics);
-                }
+                continue;
+            }
+
+            if (string.Equals(step.Operation, ProcessStepDefinition.UpdateRecord, StringComparison.Ordinal)
+                || string.Equals(step.Operation, ProcessStepDefinition.RaiseEvent, StringComparison.Ordinal))
+            {
+                report(
+                    DiagnosticCodes.StepNeedsSubject,
+                    $"The operation '{step.Operation}' is about a subject record, so a process without a subject cannot use it. Give the process an 'entity' instead of 'parameters', or remove the step.",
+                    $"/steps/{index}/operation");
+            }
+            else if (step.Output is { Count: > 0 })
+            {
+                report(
+                    DiagnosticCodes.StepNeedsSubject,
+                    "An output is written to a field of the subject record, so a process without a subject cannot have one. Give the process an 'entity' instead of 'parameters', or remove the output.",
+                    $"/steps/{index}/output");
+            }
+        }
+    }
+
+    private static void CheckTextKeys(ProcessResource process, ReferenceIndexBuilder references, List<Diagnostic> diagnostics)
+    {
+        if (process.StartCondition is { } startCondition)
+        {
+            ApplicationCompiler.CheckTextKey(startCondition.Message, process, "/startCondition/message", references, diagnostics);
+        }
+
+        for (var index = 0; index < process.Steps.Count; index++)
+        {
+            var step = process.Steps[index];
+            ApplicationCompiler.CheckTextKey(step.Label, process, $"/steps/{index}/label", references, diagnostics);
+            var outcomes = step.Outcomes ?? [];
+            for (var outcome = 0; outcome < outcomes.Count; outcome++)
+            {
+                ApplicationCompiler.CheckTextKey(outcomes[outcome].Label, process, $"/steps/{index}/outcomes/{outcome}/label", references, diagnostics);
             }
         }
     }
@@ -189,8 +352,12 @@ internal static class ProcessChecker
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules)
     {
-        var entity = findEntity(process.Entity)!;
-        var scope = ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules);
+        // A checked process without a subject has no task, update, raised event or output, so the
+        // builders of those use the entity only when there is one.
+        var entity = process.Entity is { } subjectName ? findEntity(subjectName)! : null;
+        var scope = entity is null
+            ? ExpressionScopes.ForProcessParameters(process.Parameters!, rules, modules)
+            : ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules);
 
         ExpressionModel Compile(string expression) => ExpressionModel.Compile(expression, scope, ExpressionType.Boolean);
 
@@ -204,7 +371,7 @@ internal static class ProcessChecker
             var values = new Dictionary<string, string>(set, StringComparer.OrdinalIgnoreCase);
             return
             [
-                .. entity.Fields
+                .. entity!.Fields
                     .Where(field => values.ContainsKey(field.Name))
                     .Select(field => new RecordAssignmentModel(
                         field.Name,
@@ -225,7 +392,10 @@ internal static class ProcessChecker
                     step.Assignee.Role),
                 new FormReference(form.Id, form.Name),
                 dueIn,
-                step.Outcomes!.Select(outcome => new TaskOutcomeModel(outcome.Name, outcome.Label, Resolve(outcome.Next))).ToList());
+                step.Outcomes!.Select(outcome => new TaskOutcomeModel(outcome.Name, outcome.Label, Resolve(outcome.Next))).ToList(),
+                step.Deadline is { } deadline && IsoDuration.TryParse(deadline.After, out var after)
+                    ? new TaskDeadlineModel(after, Resolve(deadline.Next))
+                    : null);
         }
 
         // A checked call names a loaded connector and operation, and each input, output and field once.
@@ -250,7 +420,7 @@ internal static class ProcessChecker
                 [
                     .. operation.Output
                         .Where(output => outputs.ContainsKey(output.Name))
-                        .Select(output => new ConnectorOutputModel(output.Name, FindField(entity, outputs[output.Name])!.Name)),
+                        .Select(output => new ConnectorOutputModel(output.Name, FindField(entity!, outputs[output.Name])!.Name)),
                 ],
                 new RetryPolicyModel(step.Retry?.Attempts ?? DefaultRetryAttempts, backoff ?? _defaultRetryBackoff),
                 Resolve(step.Next!));
@@ -280,7 +450,7 @@ internal static class ProcessChecker
                 [
                     .. operation.Output
                         .Where(output => outputs.ContainsKey(output.Name))
-                        .Select(output => new ConnectorOutputModel(output.Name, FindField(entity, outputs[output.Name])!.Name)),
+                        .Select(output => new ConnectorOutputModel(output.Name, FindField(entity!, outputs[output.Name])!.Name)),
                 ],
                 new RetryPolicyModel(step.Retry?.Attempts ?? DefaultRetryAttempts, backoff ?? _defaultRetryBackoff),
                 operation.Idempotent,
@@ -350,7 +520,8 @@ internal static class ProcessChecker
             Id = process.Id,
             Name = process.Name,
             File = process.File,
-            Entity = new EntityReference(entity.Id, entity.Name),
+            Entity = entity is null ? null : new EntityReference(entity.Id, entity.Name),
+            Parameters = [.. process.Parameters?.Select(parameter => new ProcessParameterModel(parameter.Name, FieldTypes.Parse(parameter.Type))) ?? []],
             StartCondition = process.StartCondition is { } startCondition
                 ? new ProcessStartConditionModel(Compile(startCondition.Expression), startCondition.Message)
                 : null,
@@ -442,6 +613,12 @@ internal static class ProcessChecker
             {
                 var outcomePath = $"{path}/outcomes/{outcome}/next";
                 transitions[index].Add(new Transition(Resolve(step.Outcomes![outcome].Next, outcomePath), outcomePath));
+            }
+
+            if (step.Deadline is { } deadline)
+            {
+                var deadlinePath = $"{path}/deadline/next";
+                transitions[index].Add(new Transition(Resolve(deadline.Next, deadlinePath), deadlinePath));
             }
         }
 
@@ -685,7 +862,12 @@ internal static class ProcessChecker
 
             if (string.Equals(step.Operation, ProcessStepDefinition.RaiseEvent, StringComparison.Ordinal))
             {
-                CheckRaiseEvent(process, step, index, entity, scope, findEntity, findEvent, unloadedEventNames, references, report);
+                // A process without a subject has no record to raise an event about, which is reported already.
+                if (process.Entity is not null)
+                {
+                    CheckRaiseEvent(process, step, index, entity, scope, findEntity, findEvent, unloadedEventNames, references, report);
+                }
+
                 continue;
             }
 
@@ -969,7 +1151,11 @@ internal static class ProcessChecker
             else
             {
                 CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), scope, references, report);
-                CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
+                // An output of a process without a subject is reported already, as it has no field to write.
+                if (process.Entity is not null)
+                {
+                    CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
+                }
             }
         }
 
@@ -1023,7 +1209,11 @@ internal static class ProcessChecker
             else
             {
                 CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), scope, references, report);
-                CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
+                // An output of a process without a subject is reported already, as it has no field to write.
+                if (process.Entity is not null)
+                {
+                    CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
+                }
             }
         }
 
@@ -1323,7 +1513,9 @@ internal static class ProcessChecker
         for (var index = 0; index < process.Steps.Count; index++)
         {
             var step = process.Steps[index];
-            if (step.Type != ProcessStepDefinition.TaskStep)
+
+            // A task in a process without a subject is reported already, and its other properties are not checked.
+            if (step.Type != ProcessStepDefinition.TaskStep || process.Entity is null)
             {
                 continue;
             }
@@ -1380,6 +1572,14 @@ internal static class ProcessChecker
                     DiagnosticCodes.InvalidTaskDueIn,
                     $"The duration '{dueIn}' is not valid. 'dueIn' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P3D', 'PT4H' or 'P1DT12H'. Years and months are not allowed.",
                     $"{path}/dueIn");
+            }
+
+            if (step.Deadline is { } deadline && !IsoDuration.TryParse(deadline.After, out _))
+            {
+                report(
+                    DiagnosticCodes.InvalidTaskDueIn,
+                    $"The duration '{deadline.After}' is not valid. 'deadline.after' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P3D', 'PT4H' or 'P1DT12H'. Years and months are not allowed.",
+                    $"{path}/deadline/after");
             }
 
             var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);

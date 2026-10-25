@@ -678,6 +678,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("due_at");
 
+                    b.Property<DateTimeOffset?>("ExpiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expired_at");
+
                     b.Property<Guid>("FormId")
                         .HasColumnType("uuid")
                         .HasColumnName("form_id");
@@ -868,6 +872,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("span_id");
 
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
                     b.Property<string>("TenantId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -898,6 +906,9 @@ namespace Axis.Processes.Storage.Migrations
 
                     b.HasIndex("ProcessInstanceId")
                         .HasDatabaseName("ix_process_work_items_process_instance_id");
+
+                    b.HasIndex("TaskId")
+                        .HasDatabaseName("ix_process_work_items_task_id");
 
                     b.HasIndex("TriggerId")
                         .IsUnique()
@@ -982,6 +993,12 @@ namespace Axis.Processes.Storage.Migrations
                         .HasForeignKey("ProcessInstanceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_process_work_items_process_instances_process_instance_id");
+
+                    b.HasOne("Axis.Processes.Storage.ProcessTaskRow", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_process_work_items_process_tasks_task_id");
                 });
 #pragma warning restore 612, 618
         }

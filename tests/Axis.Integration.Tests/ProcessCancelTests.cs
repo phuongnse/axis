@@ -68,6 +68,35 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     }
 
     [Fact]
+    public async Task Cancelling_an_instance_deletes_the_deadline_item_of_its_open_task()
+    {
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var dung = fixture.CreateClient().SignedInAs("dung");
+        var subject = await CreateRequestAsync(anna, 500);
+        var instance = await StartAsync(anna, subject);
+        await fixture.RunUntilIdleAsync(CancellationToken);
+        var task = await OpenTaskAsync(instance);
+
+        // The sample has no deadline, so the item is the one a task step with a deadline would queue.
+        await fixture.ScalarAsync(
+            "INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id, task_id) VALUES (gen_random_uuid(), @tenant, 'task.deadline', now() + interval '1 day', @instance, @task)",
+            ("tenant", Tenant),
+            ("instance", instance),
+            ("task", task));
+        Assert.Equal(
+            1L,
+            await fixture.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE task_id = @id AND kind = 'task.deadline'", ("id", task)));
+
+        using (var response = await CancelAsync(dung, instance, Reason))
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        Assert.Equal("cancelled", await fixture.ScalarAsync("SELECT state FROM axis.process_tasks WHERE id = @id", ("id", task)));
+        Assert.Equal(0L, await fixture.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE task_id = @id", ("id", task)));
+    }
+
+    [Fact]
     public async Task A_cancel_writes_one_audit_record_with_the_user_and_the_reason_and_a_history_row()
     {
         using var anna = fixture.CreateClient().SignedInAs("anna");

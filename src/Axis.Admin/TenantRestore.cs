@@ -36,6 +36,7 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     private readonly CreateSettings _settings;
     private readonly RestorePlan _plan;
+    private readonly TenantAudit _audit;
     private readonly TextWriter _output;
     private readonly CancellationToken _cancellationToken;
     private readonly string _id;
@@ -46,10 +47,11 @@ internal sealed class TenantRestore : IAsyncDisposable
     private TenantProvisioning? _provisioning;
     private TenantDatabaseSteps? _steps;
 
-    public TenantRestore(CreateSettings settings, RestorePlan plan, TextWriter output, CancellationToken cancellationToken)
+    public TenantRestore(CreateSettings settings, RestorePlan plan, TenantAudit audit, TextWriter output, CancellationToken cancellationToken)
     {
         _settings = settings;
         _plan = plan;
+        _audit = audit;
         _output = output;
         _cancellationToken = cancellationToken;
         _id = plan.Request.Id;
@@ -88,6 +90,11 @@ internal sealed class TenantRestore : IAsyncDisposable
         try
         {
             var manifest = _plan.Manifest;
+            if (!await _audit.WriteAsync(_id, _output, _cancellationToken))
+            {
+                return 1;
+            }
+
             var entry = await EntryAsync();
             if (entry is not null)
             {

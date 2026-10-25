@@ -5,7 +5,7 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Model;
 
 /// <summary>
-/// A compiled process: its subject entity, its optional start condition, its first step and its
+/// A compiled process: its subject entity or, without a subject, its parameters, its optional start condition, its first step and its
 /// steps. Every transition names a step of the process by its declared name, every condition
 /// is a boolean expression checked over the subject entity's fields and the named rules, every
 /// value an operation sets is checked against its field's type over the same scope, and a task's
@@ -24,8 +24,11 @@ public sealed record ProcessModel
     /// <summary>The process's file, relative to the application folder with <c>/</c> separators.</summary>
     public required string File { get; init; }
 
-    /// <summary>The subject entity, a root entity.</summary>
-    public required EntityReference Entity { get; init; }
+    /// <summary>The subject entity, a root entity, or null for a process without a subject.</summary>
+    public EntityReference? Entity { get; init; }
+
+    /// <summary>The typed parameters of a process without a subject. Empty when the process has a subject.</summary>
+    public IReadOnlyList<ProcessParameterModel> Parameters { get; init; } = [];
 
     /// <summary>The condition a subject record must meet for a start, or null when every start is allowed.</summary>
     public ProcessStartConditionModel? StartCondition { get; init; }
@@ -43,6 +46,9 @@ public sealed record ProcessModel
         return step is not null;
     }
 }
+
+/// <summary>A parameter of a process without a subject: its name and scalar type.</summary>
+public sealed record ProcessParameterModel(string Name, FieldType Type);
 
 /// <summary>A process start condition: a boolean expression over the subject record, and the text shown when a start fails it.</summary>
 public sealed record ProcessStartConditionModel(ExpressionModel Expression, TextReference Message);
@@ -63,6 +69,7 @@ public sealed record DecisionBranchModel(ExpressionModel When, string Next);
 /// A human task: a person assigned through <see cref="Assignee"/> completes it on
 /// <see cref="Form"/>, shown over the subject record, with one of its <see cref="Outcomes"/>.
 /// <see cref="DueIn"/> is the time from the task's creation to its due date, or null when it has none.
+/// <see cref="Deadline"/> is when the task expires and where the process goes then, or null when it has none.
 /// </summary>
 public sealed record TaskStepModel(
     string Name,
@@ -70,7 +77,8 @@ public sealed record TaskStepModel(
     TaskAssigneeModel Assignee,
     FormReference Form,
     TimeSpan? DueIn,
-    IReadOnlyList<TaskOutcomeModel> Outcomes) : ProcessStepModel(Name);
+    IReadOnlyList<TaskOutcomeModel> Outcomes,
+    TaskDeadlineModel? Deadline) : ProcessStepModel(Name);
 
 /// <summary>
 /// The assignee of a task: exactly one of <see cref="User"/>, a <c>text</c> expression over the
@@ -80,6 +88,9 @@ public sealed record TaskAssigneeModel(ExpressionModel? User, string? Role);
 
 /// <summary>An outcome of a task: its name, its label and the declared name of the step it leads to.</summary>
 public sealed record TaskOutcomeModel(string Name, TextReference Label, string Next);
+
+/// <summary>The deadline of a task: the time from the task's creation until it expires, and the declared name of the step the process then moves to.</summary>
+public sealed record TaskDeadlineModel(TimeSpan After, string Next);
 
 /// <summary>
 /// An <c>updateRecord</c> operation step: it sets each field in

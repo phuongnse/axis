@@ -112,6 +112,21 @@ public sealed class ComputedFieldCompilerTests
         Assert.Equal(ExpressionType.Integer, lineCount.Computed!.Check.Type);
     }
 
+    [Fact]
+    public void Computed_field_cannot_read_a_reference_path_of_a_child_row()
+    {
+        using var folder = Folder(
+            """{ "name": "lines", "type": "child-collection", "target": "Line" }""",
+            """{ "name": "total", "type": "decimal", "expression": "sum(lines, supplier.rating)" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((ExpressionDiagnosticCodes.UnknownName, "/fields/5/expression"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("Unknown field 'rating' after '.'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
     [Theory]
     [InlineData("sum(lines, missing)", ExpressionDiagnosticCodes.UnknownName, "'missing'")]
     // The item expression sees only the child row, not the owner's fields.
@@ -137,7 +152,7 @@ public sealed class ComputedFieldCompilerTests
 
     /// <summary>
     /// An Order entity with quantity, price, status and supplier, then <paramref name="extraFields"/>
-    /// from index 4. A Line entity with a computed <c>amount</c> can be its child.
+    /// from index 4. A Line entity with a computed <c>amount</c> and a <c>supplier</c> reference can be its child.
     /// </summary>
     private static TemporaryFolder Folder(string[] extraFields, string? validations) =>
         new TemporaryFolder()
@@ -154,14 +169,15 @@ public sealed class ComputedFieldCompilerTests
                 """)
             .With("entities/supplier.json", """
                 { "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "Supplier", "formatVersion": 1,
-                  "displayField": "name", "fields": [ { "name": "name", "type": "text", "required": true } ] }
+                  "displayField": "name", "fields": [ { "name": "name", "type": "text", "required": true }, { "name": "rating", "type": "integer" } ] }
                 """)
             .With("entities/line.json", """
                 { "id": "33333333-3333-4333-8333-333333333333", "kind": "entity", "name": "Line", "formatVersion": 1,
                   "fields": [
                     { "name": "quantity", "type": "integer" },
                     { "name": "unitPrice", "type": "decimal", "precision": 18, "scale": 2 },
-                    { "name": "amount", "type": "decimal", "expression": "quantity * unitPrice" }
+                    { "name": "amount", "type": "decimal", "expression": "quantity * unitPrice" },
+                    { "name": "supplier", "type": "reference", "target": "Supplier" }
                   ] }
                 """);
 }

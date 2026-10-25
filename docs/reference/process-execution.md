@@ -54,9 +54,11 @@ sends it, see [Staging and the call](#staging-and-the-call). A package
 operation step stages its call, and a `package.call` item runs it, see
 [Staging a package call](#staging-a-package-call). A `raiseEvent`
 operation step stores its event, see [Raise event step](process-events.md#raise-event-step).
+A `task.deadline` item expires the task of a task step that has a `deadline`,
+see [task deadlines](task-deadlines.md#escalations-and-deadline).
 _(Planned for M14)_ The worker also runs `timer`, `waitEvent` and `subProcess`
 steps and the `createRecord` and `notify` operations, with the work item kinds
-`process.timer`, `process.resume`, `task.escalate`, `task.deadline` and
+`process.timer`, `process.resume`, `task.escalate` and
 `notification.email`, see [process flow](process-flow.md),
 [task deadlines](task-deadlines.md) and [notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
@@ -115,7 +117,10 @@ one transaction:
    and its work item is deleted, so it never runs again.
 5. A task step then inserts its task into `axis.process_tasks` as `open`. Its
    `due_at` is the transaction time, `now()`, plus `dueIn`, or null without
-   `dueIn`. `dueIn` is added as a fixed length of time.
+   `dueIn`. `dueIn` is added as a fixed length of time. A task step with a
+   `deadline` also queues one `task.deadline` work item for the task, due at
+   the transaction time plus the deadline's `after`. See
+   [task deadlines](task-deadlines.md#escalations-and-deadline).
 
    A `callConnector` step then inserts its call into `axis.connector_calls`
    as `pending`, see [Staging and the call](#staging-and-the-call).
