@@ -31,6 +31,15 @@ async function tabTo(page: Page, control: Locator, back = false) {
   await expect(control).toBeFocused()
 }
 
+const formPage = /\/api\/sites\/e2e\/pages\/noteform$/i
+
+/** Clicks `control` and waits for the form page's metadata. The form renders only after it, which can take longer than an expect waits. */
+async function openForm(page: Page, control: Locator) {
+  const loaded = page.waitForResponse((response) => formPage.test(new URL(response.url()).pathname))
+  await control.click()
+  expect((await loaded).ok()).toBe(true)
+}
+
 /** Types a value into a date or date-time picker and confirms it with Enter, as a user does. */
 async function pick(page: Page, label: string, text: string) {
   const input = page.getByLabel(label, { exact: true })
@@ -91,17 +100,26 @@ test('a note saved by a signed-in user shows its creator read-only', async ({ pa
   const me = (await (await page.request.get('/api/me')).json()) as { id: string }
   await page.goto('/e2e/notes?pageSize=100&sort=-title')
 
-  await page.getByRole('button', { name: 'New', exact: true }).click()
+  // Holds back the first form page response, as a slow server does, so the test shows it waits for the form.
+  await page.route(
+    formPage,
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 6_000))
+      await route.continue()
+    },
+    { times: 1 },
+  )
+  await openForm(page, page.getByRole('button', { name: 'New', exact: true }))
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
   await expect(page.getByLabel('Created by', { exact: true })).toHaveValue('')
   await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(/\/e2e\/notes\?pageSize=100&sort=-title$/)
-  await page
-    .getByRole('row', { name: new RegExp(`${title} `) })
-    .getByRole('button', { name: 'Open', exact: true })
-    .click()
+  await openForm(
+    page,
+    page.getByRole('row', { name: new RegExp(`${title} `) }).getByRole('button', { name: 'Open', exact: true }),
+  )
   await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
   const createdBy = page.getByLabel('Created by', { exact: true })
   await expect(createdBy).toHaveValue(me.id)
