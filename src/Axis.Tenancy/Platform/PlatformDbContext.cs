@@ -50,6 +50,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.ClaimDisplayName).HasColumnName("claim_display_name");
             tenant.Property(t => t.ClaimRoles).HasColumnName("claim_roles");
             tenant.Property(t => t.EndpointAudience).HasColumnName("endpoint_audience");
+            tenant.Property(t => t.ServiceAudience).HasColumnName("service_audience");
             tenant.Property(t => t.SchemaVersion).HasColumnName("schema_version").HasDefaultValue("");
             tenant.Property(t => t.PreviewOf).HasColumnName("preview_of");
             tenant.HasIndex(t => t.PreviewOf).IsUnique().HasDatabaseName("ix_tenants_preview_of");

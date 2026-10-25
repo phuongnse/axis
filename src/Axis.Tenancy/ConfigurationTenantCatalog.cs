@@ -97,11 +97,12 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
             }
 
             // A preview tenant signs people in with its main tenant's settings, but never takes the main tenant's
-            // EndpointAudience, so it accepts no machine-caller bearer token. Its bindings are only its own.
+            // EndpointAudience or ServiceAudience, so it accepts no machine-caller or service account bearer token.
+            // Its bindings are only its own.
             var main = string.IsNullOrWhiteSpace(settings.PreviewOf) ? null : settings.PreviewOf;
             var oidc = main is null
                 ? Oidc(tenantSection?.GetSection("Oidc"))
-                : Oidc(section?.GetSection(main).GetSection("Oidc")) is { } mainOidc ? mainOidc with { EndpointAudience = null } : null;
+                : Oidc(section?.GetSection(main).GetSection("Oidc")) is { } mainOidc ? mainOidc with { EndpointAudience = null, ServiceAudience = null } : null;
 
             return new TenantEntry(
                 id,
@@ -121,6 +122,7 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 section["ClientId"],
                 Secret(section["ClientSecret"]),
                 section["EndpointAudience"],
+                section["ServiceAudience"],
                 section["Claims:UserId"],
                 section["Claims:DisplayName"],
                 section["Claims:Roles"]);

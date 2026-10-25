@@ -118,7 +118,7 @@ internal static class ProcessChecker
             ExpressionScope? scope = null;
             if (entity is not null)
             {
-                scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules);
+                scope = ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules);
                 CheckConditions(process, scope, references, Report);
             }
 
@@ -190,7 +190,7 @@ internal static class ProcessChecker
         IReadOnlySet<string> modules)
     {
         var entity = findEntity(process.Entity)!;
-        var scope = ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules);
+        var scope = ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules);
 
         ExpressionModel Compile(string expression) => ExpressionModel.Compile(expression, scope, ExpressionType.Boolean);
 

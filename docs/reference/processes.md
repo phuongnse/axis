@@ -295,17 +295,17 @@ reported in one pass. See
   waiting step, see [Loops](process-flow.md#loops).
 - A decision has at least one branch (`AXC0004`).
 - Each `when` and the `startCondition` expression give a boolean. They see
-  the subject entity's fields, computed ones included, its child collections
-  through aggregates, the named rules, and paths through reference fields
-  such as `department.manager.name`. A path takes at most 3 hops
+  the subject entity's fields, computed ones included, `id`, the subject
+  record's id, its child collections through aggregates, the named rules, and
+  paths through reference fields such as `department.manager.name`. A path takes at most 3 hops
   (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
   See [Scope in a process expression](expressions.md#names-and-references).
 - An operation names `updateRecord`, `callConnector`, `raiseEvent`, `notify`
   or a package operation written `<package>/<operation>`, matched exactly as
   a step `type` is (`AXC0078` at `/steps/{i}/operation`).
 - A `notify` step's checks are listed under
-  [Notify operation](notifications.md#notify-operation) (`AXC0242` to
-  `AXC0249`). The step compiles, but a published process that reaches it
+  [Notify operation](notifications.md#notify-operation) (`AXC0243` to
+  `AXC0250`). The step compiles, but a published process that reaches it
   fails until the runtime part of D73 is built.
 - Each key of an `updateRecord` `set` names a field of the subject entity,
   ignoring letter case, that no earlier key of the step names (`AXC0079`).

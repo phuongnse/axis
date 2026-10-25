@@ -31,10 +31,10 @@ listed as new diagnostics.
 }
 ```
 
-- `to` is a non-empty list (`AXC0242` at `/steps/{i}/to`). Each recipient has
-  exactly one of (`AXC0243` at `/steps/{i}/to/{j}`):
+- `to` is a non-empty list (`AXC0243` at `/steps/{i}/to`). Each recipient has
+  exactly one of (`AXC0244` at `/steps/{i}/to/{j}`):
   - `user`, an expression that gives a user id, as a task's `user` assignee;
-  - `role`, a declared role name, compared exactly (`AXC0244` at
+  - `role`, a declared role name, compared exactly (`AXC0245` at
     `/steps/{i}/to/{j}/role` for an unknown one). A role whose file failed to
     load is not reported again;
   - `email`, an expression that gives an address. It is for the `email`
@@ -42,10 +42,10 @@ listed as new diagnostics.
 - `user` and `email` are `text` expressions with the scope of a `when`. A
   problem is reported with its expression code at `/steps/{i}/to/{j}/user` or
   `/steps/{i}/to/{j}/email`.
-- `channels` is a non-empty list of `inApp` and `email` (`AXC0245` at
+- `channels` is a non-empty list of `inApp` and `email` (`AXC0246` at
   `/steps/{i}/channels`). A channel named twice is a schema violation
   (`AXC0004`).
-- A `role` recipient with the `email` channel is `AXC0246` at
+- A `role` recipient with the `email` channel is `AXC0247` at
   `/steps/{i}/to/{j}/role`. Axis has no directory to expand a role into
   addresses.
 - `message.subject` and `message.body` are text keys, checked as a label is at
@@ -71,11 +71,11 @@ A text value may hold named placeholders, such as
 
 - A name is ASCII letters and digits. `{{` and `}}` write a brace. A name and a
   `values` key match exactly, letter case included.
-- Each placeholder of a message's texts needs a key in `values` (`AXC0247`),
-  and each key of `values` must appear in the subject or the body (`AXC0248`),
+- Each placeholder of a message's texts needs a key in `values` (`AXC0248`),
+  and each key of `values` must appear in the subject or the body (`AXC0249`),
   in every locale that has both texts. Each mismatch is reported at
   `/steps/{i}/message`, naming the locale and the name.
-- A lone or invalid brace is `AXC0249` at `/steps/{i}/message`. A locale with
+- A lone or invalid brace is `AXC0250` at `/steps/{i}/message`. A locale with
   one is reported for that brace only.
 - _(Planned for M14)_ A value whose expression reads a field marked
   `sensitive`, directly or through a path, is a new diagnostic. A notification

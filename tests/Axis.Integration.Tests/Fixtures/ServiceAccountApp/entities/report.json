@@ -1,0 +1,11 @@
+{
+  "id": "a7c3d1e4-5b2f-4e86-9a1d-3c8f6b2e4d02",
+  "kind": "entity",
+  "name": "Report",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "status", "type": "text", "maxLength": 20 },
+    { "name": "createdBy", "type": "text", "maxLength": 100, "creator": true }
+  ]
+}
