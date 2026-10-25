@@ -57,8 +57,8 @@ flowchart LR
      [Modules](modules-and-templates.md#modules).
      Each release carries its own texts, so a newer release can remove a key
      that older running work still shows.
-   - **Labels.** The text key of the application label, an entity label or a
-     field label must be in some locale, otherwise it is `AXC0028` at that
+   - **Labels.** The text key of the application label, an entity label, a
+     field label or an enum value label (`valueLabels`) must be in some locale, otherwise it is `AXC0028` at that
      label's `/textKey`. This applies also when the application has no text
      resource. Unused keys are allowed.
    - **Display field.** An entity's `displayField` must name one of its own
@@ -342,8 +342,10 @@ flowchart LR
      reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
      when `start` is unknown. A step with no path to an `end` step is
      `AXC0072` at `/steps/{i}`. A step with a transition to an unknown step
-     is not also `AXC0072`. A transition that closes a cycle is `AXC0073` at
-     that transition, naming the steps in the cycle. The steps are walked in
+     is not also `AXC0072`. A transition that closes a cycle with no waiting
+     step is `AXC0073` at that transition, naming the steps in the cycle. The
+     transitions out of a `task` step are not followed, so a loop through a
+     task is allowed. The steps are walked in
      file order, with the branches, then `otherwise`, then `next`, then the
      outcomes. A step whose name is
      already `AXC0069` is left out of `AXC0071`, `AXC0072` and `AXC0073`. The
@@ -439,7 +441,7 @@ flowchart LR
      of it is checked. An action its target's kind does not take is `AXC0091`
      at `/grants/{i}/actions/{j}`. An `export` without a `read`, or an
      `import` without a `create`, on the same target in the same policy is
-     `AXC0242` at `/grants/{i}/actions/{j}`. A `filter` or `fields` on a
+     `AXC0243` at `/grants/{i}/actions/{j}`. A `filter` or `fields` on a
      `dataSource`, `process` or `endpoint` grant is `AXC0091` at
      `/grants/{i}/filter` or `/grants/{i}/fields`. A target that names no
      loaded entity, data source, process or endpoint, ignoring letter case, is
@@ -535,7 +537,7 @@ flowchart LR
      `fields` that names no field of the entity, or names a computed field,
      is `AXC0145` at `/fields/{i}`. `when` is parsed and type-checked as a
      boolean over the watched record, with the scope of a process condition:
-     its fields, rules, reference paths and aggregates. Its first problem is
+     its fields, `id`, rules, reference paths and aggregates. Its first problem is
      reported at `/when`. `fields` and `when` are not checked when the entity
      is unknown. Data change triggers fire on every committed write through the
      record command, see [Starts from triggers](process-events.md#starts-from-triggers).
@@ -873,7 +875,7 @@ to show where a resource is used and what it uses.
 
 - **Label paths.** A `label text` edge sits at the `/textKey` of each label the
   `AXC0028` check covers: the application label, entity and
-  field labels, the site title, navigation labels, page titles, action labels,
+  field labels, enum value labels, the site title, navigation labels, page titles, action labels,
   form section titles, role labels, data source parameter labels, task and
   outcome labels, the `startCondition` message and validation messages.
 - **Direct calls only.** A `rule call` edge goes from the expression that

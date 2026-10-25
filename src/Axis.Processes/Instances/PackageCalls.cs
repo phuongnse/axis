@@ -34,17 +34,18 @@ internal static class PackageCalls
 
     /// <summary>
     /// Inserts <paramref name="call"/> as <c>pending</c> with no attempts, and with the retry policy
-    /// and the <c>idempotent</c> flag it carries. It is created at the transaction's time. A second call for the same instance and step violates the
-    /// unique index, unless the first one failed, which <see cref="RestageAsync"/> stages again.
+    /// and the <c>idempotent</c> flag it carries. It is created at the transaction's time. A step stages one call per pass of a loop, told apart by the
+    /// revision it ran at. A second call for the same instance, step and revision violates the unique index. A failed call is
+    /// staged again by <see cref="RestageAsync"/>.
     /// </summary>
     public static async Task InsertAsync(NpgsqlTransaction transaction, NewPackageCall call, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.package_calls
-                (id, process_instance_id, step, release_id, package, version, operation, state, attempts,
+                (id, process_instance_id, step, staged_revision, release_id, package, version, operation, state, attempts,
                  retry_attempts, retry_backoff, idempotent, input, created_at)
-            VALUES (@id, @instance, @step, @release, @package, @version, @operation, @state, 0,
+            VALUES (@id, @instance, @step, @revision, @release, @package, @version, @operation, @state, 0,
                  @retryAttempts, @retryBackoff, @idempotent, @input, now())
             """,
             Connection(transaction),
@@ -52,6 +53,7 @@ internal static class PackageCalls
         command.Parameters.AddWithValue("id", call.Id);
         command.Parameters.AddWithValue("instance", call.ProcessInstanceId);
         command.Parameters.AddWithValue("step", call.Step);
+        command.Parameters.AddWithValue("revision", call.StagedRevision);
         command.Parameters.AddWithValue("release", call.ReleaseId);
         command.Parameters.AddWithValue("package", call.Package);
         command.Parameters.AddWithValue("version", call.Version);
@@ -65,25 +67,29 @@ internal static class PackageCalls
     }
 
     /// <summary>
-    /// Finds the <c>failed</c> call of <paramref name="step"/> for the instance and locks it until the
-    /// transaction ends, or returns <see langword="null"/> when the step has no failed call. An
-    /// operator retry leaves such a call.
+    /// Finds the latest call of <paramref name="step"/> for the instance, the one of the newest pass,
+    /// and locks it until the transaction ends. Returns its id when it is <c>failed</c>, or
+    /// <see langword="null"/> when it is not or the step has no call. An operator retry leaves such a call.
     /// </summary>
     public static async Task<Guid?> FindFailedAsync(NpgsqlTransaction transaction, Guid instanceId, string step, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
-            "SELECT id FROM axis.package_calls WHERE process_instance_id = @instance AND step = @step AND state = @failed FOR UPDATE",
+            """
+            SELECT id, state FROM axis.package_calls
+            WHERE process_instance_id = @instance AND step = @step
+            ORDER BY staged_revision DESC LIMIT 1 FOR UPDATE
+            """,
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("instance", instanceId);
         command.Parameters.AddWithValue("step", step);
-        command.Parameters.AddWithValue("failed", Failed);
-        return await command.ExecuteScalarAsync(cancellationToken) is Guid id ? id : null;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) && reader.GetString(1) == Failed ? reader.GetGuid(0) : null;
     }
 
     /// <summary>
     /// Sets the <c>failed</c> call <paramref name="call"/> back to <c>pending</c> under its id, so its
-    /// operation identity stays. It stores the new input, the step's current retry policy and
+    /// operation identity stays. It stores the new input, the revision of the new run, the step's current retry policy and
     /// <c>idempotent</c> flag, counts attempts from 0 again, and clears the last error and the
     /// settled time. Throws when the call is not failed.
     /// </summary>
@@ -93,7 +99,7 @@ internal static class PackageCalls
             """
             UPDATE axis.package_calls
             SET state = @pending, attempts = 0, retry_attempts = @retryAttempts, retry_backoff = @retryBackoff,
-                idempotent = @idempotent, input = @input, last_error = NULL, settled_at = NULL
+                idempotent = @idempotent, input = @input, staged_revision = @revision, last_error = NULL, settled_at = NULL
             WHERE id = @id AND state = @failed
             """,
             Connection(transaction),
@@ -101,6 +107,7 @@ internal static class PackageCalls
         command.Parameters.AddWithValue("id", call.Id);
         command.Parameters.AddWithValue("pending", Pending);
         command.Parameters.AddWithValue("failed", Failed);
+        command.Parameters.AddWithValue("revision", call.StagedRevision);
         command.Parameters.AddWithValue("retryAttempts", call.Retry.Attempts);
         command.Parameters.Add(new NpgsqlParameter("retryBackoff", NpgsqlDbType.Interval) { Value = call.Retry.Backoff });
         command.Parameters.AddWithValue("idempotent", call.Idempotent);
@@ -272,6 +279,7 @@ internal static class PackageCalls
 
 /// <summary>A package call that a package operation step stages for its instance.</summary>
 /// <param name="Id">The call's operation identity, a version 7 UUID.</param>
+/// <param name="StagedRevision">The instance revision the step ran at.</param>
 /// <param name="Package">The package id.</param>
 /// <param name="Version">The pinned package version.</param>
 /// <param name="Operation">The operation's declared name.</param>
@@ -282,6 +290,7 @@ internal sealed record NewPackageCall(
     Guid Id,
     Guid ProcessInstanceId,
     string Step,
+    long StagedRevision,
     Guid ReleaseId,
     string Package,
     string Version,
