@@ -25,6 +25,8 @@ public static class DataSourceQueries
 {
     private const string RowAlias = "r";
 
+    private const string CountSavepoint = "count";
+
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> rows that pass the filter,
     /// ordered by the sort field and then by the root id ascending, or by the root id alone without
@@ -38,9 +40,14 @@ public static class DataSourceQueries
     /// <see langword="null"/> when the database rejects the filter or the condition for these rows
     /// with a data exception (SQLSTATE class 22), such as an integer overflow or a date out of
     /// range. Any other database error is thrown.
+    /// When <paramref name="transaction"/>, the transaction of <paramref name="connection"/>, is given,
+    /// the count runs under a savepoint. A count that the database cancels at the statement timeout
+    /// (SQLSTATE 57014) then leaves <see cref="DataSourceRowPage.TotalCount"/> null, and the page is still
+    /// read. Without a transaction that error is thrown.
     /// </summary>
     public static async Task<DataSourceRowPage?> ListAsync(
         NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
         ApplicationModel application,
         DataSourceModel dataSource,
         int page,
@@ -60,13 +67,29 @@ public static class DataSourceQueries
         var statement = Statement(application, dataSource, sort, condition);
         try
         {
-            long totalCount;
-            await using (var count = new NpgsqlCommand(statement.CountSql, connection))
+            long? totalCount = null;
+            if (transaction is not null)
             {
+                await transaction.SaveAsync(CountSavepoint, cancellationToken);
+            }
+
+            try
+            {
+                await using var count = new NpgsqlCommand(statement.CountSql, connection);
                 AddValues(count, statement.Values);
                 AddParameters(count, parameters);
                 condition?.AddTo(count);
                 totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
+                if (transaction is not null)
+                {
+                    await transaction.ReleaseAsync(CountSavepoint, cancellationToken);
+                }
+            }
+            catch (PostgresException exception) when (transaction is not null && exception.SqlState == PostgresErrorCodes.QueryCanceled)
+            {
+                // The count alone ran too long, so the page still answers without a total.
+                await transaction.RollbackAsync(CountSavepoint, cancellationToken);
+                await transaction.ReleaseAsync(CountSavepoint, cancellationToken);
             }
 
             await using var command = new NpgsqlCommand(statement.PageSql, connection);
@@ -351,7 +374,7 @@ public static class DataSourceQueries
         string.Join(", ", [
             $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}",
             .. dataSource.Fields.Select(field =>
-                joins.ColumnOf(field.Path) + (field.Field.Type == FieldType.Decimal ? "::text" : "")),
+                joins.ColumnOf(field.Path) + (FieldTypes.HoldsDecimal(field.Field.Type) ? "::text" : "")),
             .. References(dataSource).Select(field =>
                 $"{joins.TargetAlias(field.Path)}.{EntityNaming.Quote(EntityNaming.Column(field.Field.TargetDisplayField!))}"),
         ]);
@@ -382,10 +405,10 @@ public static class DataSourceQueries
             .ToList();
         var select = string.Join(", ", [
             .. aggregate.GroupBy.Select((field, index) =>
-                groupColumns[index] + (field.Field.Type == FieldType.Decimal ? "::text" : "")),
+                groupColumns[index] + (FieldTypes.HoldsDecimal(field.Field.Type) ? "::text" : "")),
             .. aggregate.Measures.Select(measure =>
                 Aggregate(measure, joins)
-                + (measure.Function == AggregateFunction.Sum || measure.Field?.Field.Type == FieldType.Decimal ? "::text" : "")),
+                + (measure.Function == AggregateFunction.Sum || measure.Field is { } measureField && FieldTypes.HoldsDecimal(measureField.Field.Type) ? "::text" : "")),
             .. labelColumns,
         ]);
         string[] grouping = [.. groupColumns, .. labelColumns];

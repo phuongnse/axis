@@ -68,6 +68,9 @@ public sealed class RecordApiFixture : IAsyncLifetime
     /// <summary>Every log entry the server wrote.</summary>
     internal LogCollector Logs => _logs;
 
+    /// <summary>The test host, which a test derives its own host from with <c>WithWebHostBuilder</c>.</summary>
+    internal WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("The test host is not started.");
+
     /// <summary>The services of the test host.</summary>
     internal IServiceProvider Services => (_factory ?? throw new InvalidOperationException("The test host is not started.")).Services;
 
@@ -209,11 +212,13 @@ public sealed class RecordApiFixture : IAsyncLifetime
         Assert.True(Model.TryGetEntity("Department", out var department));
         Assert.True(Model.TryGetEntity("Order", out var order));
         Assert.True(Model.TryGetEntity("Ticket", out var ticket));
+        Assert.True(Model.TryGetEntity("Product", out var product));
+        Assert.True(Model.TryGetEntity("Expense", out var expense));
         Assert.True(Model.TryGetEntity("Reminder", out var reminder));
         Assert.True(Model.TryGetEntity("Gauge", out var gauge));
         foreach (var dataSource in _dataSources.Values)
         {
-            foreach (var entity in new[] { item, department, order, ticket, reminder, gauge })
+            foreach (var entity in new[] { item, department, order, product, ticket, expense, reminder, gauge })
             {
                 await using var command = dataSource.CreateCommand($"DELETE FROM {EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id))}");
                 await command.ExecuteNonQueryAsync();

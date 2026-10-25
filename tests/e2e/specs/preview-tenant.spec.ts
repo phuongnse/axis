@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../test'
 import { createRequest, recordsPath } from '../purchase-requests'
 import { previewURL } from '../server-settings'
 import { expectSessionUser, sessionFile } from '../sessions'

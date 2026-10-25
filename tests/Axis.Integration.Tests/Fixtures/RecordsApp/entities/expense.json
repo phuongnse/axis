@@ -1,0 +1,12 @@
+{
+  "id": "ec0e04ae-459a-439c-a556-b7d1f71b4549",
+  "kind": "entity",
+  "name": "Expense",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "amountVnd", "type": "money", "currency": "VND" },
+    { "name": "currency", "type": "enum", "values": ["USD", "EUR"] },
+    { "name": "amount", "type": "money", "currencyField": "currency" }
+  ]
+}

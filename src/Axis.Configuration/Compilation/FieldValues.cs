@@ -28,7 +28,7 @@ internal static class FieldValues
                 && whole <= long.MaxValue:
                 value = (long)whole;
                 return true;
-            case FieldType.Decimal when element.ValueKind == JsonValueKind.Number && element.TryGetDecimal(out var number):
+            case FieldType.Decimal or FieldType.Money when element.ValueKind == JsonValueKind.Number && element.TryGetDecimal(out var number):
                 value = number;
                 return true;
             case FieldType.Boolean when element.ValueKind is JsonValueKind.True or JsonValueKind.False:

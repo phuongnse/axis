@@ -1311,7 +1311,16 @@ internal static class PresentationChecker
         else
         {
             references.Add(page, $"{actionPath}/process", ReferenceRelations.ActionProcess, ResourceNode.Of(process));
-            if (recordEntity is not null && !string.Equals(process.Entity, recordEntity, StringComparison.OrdinalIgnoreCase))
+            if (recordEntity is not null && process.Entity is null)
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.ActionProcessOverOtherEntity,
+                    $"The process '{process.Name}' has no subject, but the action starts it for a record of '{recordEntity}'.",
+                    page.File,
+                    $"{actionPath}/process",
+                    page.Id));
+            }
+            else if (recordEntity is not null && !string.Equals(process.Entity, recordEntity, StringComparison.OrdinalIgnoreCase))
             {
                 // The action starts the process for the record, so it must be its subject.
                 diagnostics.Add(new Diagnostic(

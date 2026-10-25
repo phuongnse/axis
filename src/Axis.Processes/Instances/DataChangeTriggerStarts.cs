@@ -178,8 +178,11 @@ public static partial class DataChangeTriggerStarts
 
             var process = application.Processes.FirstOrDefault(candidate => candidate.Id == trigger.Process.Id)
                 ?? throw new InvalidOperationException($"The release has no process '{trigger.Process.Name}'.");
-            var subject = application.FindEntity(process.Entity.Id)
-                ?? throw new InvalidOperationException($"The release has no entity '{process.Entity.Name}'.");
+            // The compiler refuses a trigger that names a process without a subject.
+            var subjectReference = process.Entity
+                ?? throw new InvalidOperationException($"The process '{process.Name}' has no subject, so a trigger cannot start it.");
+            var subject = application.FindEntity(subjectReference.Id)
+                ?? throw new InvalidOperationException($"The release has no entity '{subjectReference.Name}'.");
             var started = await ProcessStarter.StartAsync(
                 connection,
                 transaction,

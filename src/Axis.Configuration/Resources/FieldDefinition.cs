@@ -25,6 +25,12 @@ public sealed record FieldDefinition
 
     public string? Target { get; init; }
 
+    /// <summary>The ISO 4217 code of a money field's fixed currency, or null when not declared.</summary>
+    public string? Currency { get; init; }
+
+    /// <summary>The name of the enum or text field of the same entity that holds a money field's currency, or null when not declared.</summary>
+    public string? CurrencyField { get; init; }
+
     public IReadOnlyList<string>? Values { get; init; }
 
     public IReadOnlyDictionary<string, TextReference>? ValueLabels { get; init; }

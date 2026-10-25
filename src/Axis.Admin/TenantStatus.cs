@@ -18,21 +18,23 @@ internal static class TenantStatus
 
     private static readonly string[] _header = ["id", "status", "hosts", "schema version", "preview of"];
 
-    public static Task<int> SuspendAsync(string connectionString, string id, TextWriter output, TextWriter error, CancellationToken cancellationToken) =>
-        SetAsync(connectionString, id, Active, Suspended, output, error, cancellationToken);
+    public static Task<int> SuspendAsync(string connectionString, string id, TenantAudit audit, TextWriter output, TextWriter error, CancellationToken cancellationToken) =>
+        SetAsync(connectionString, id, Active, Suspended, audit, output, error, cancellationToken);
 
-    public static Task<int> ResumeAsync(string connectionString, string id, TextWriter output, TextWriter error, CancellationToken cancellationToken) =>
-        SetAsync(connectionString, id, Suspended, Active, output, error, cancellationToken);
+    public static Task<int> ResumeAsync(string connectionString, string id, TenantAudit audit, TextWriter output, TextWriter error, CancellationToken cancellationToken) =>
+        SetAsync(connectionString, id, Suspended, Active, audit, output, error, cancellationToken);
 
     /// <summary>
     /// Moves a tenant from one status to the other with one conditional update, so a <c>tenant create</c> that finishes
-    /// at the same moment is never overwritten. When no row changed, a read tells a no-op from a refusal.
+    /// at the same moment is never overwritten. A read first refuses an unknown tenant, so that a refusal writes no audit record.
+    /// When the update changed no row, a second read tells a no-op from a refusal.
     /// </summary>
     private static async Task<int> SetAsync(
         string connectionString,
         string id,
         string from,
         string to,
+        TenantAudit audit,
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken)
@@ -41,6 +43,21 @@ internal static class TenantStatus
         {
             await using var connection = new NpgsqlConnection(connectionString);
             await connection.OpenAsync(cancellationToken);
+
+            await using (var exists = new NpgsqlCommand("SELECT status FROM platform.tenants WHERE id = @id", connection))
+            {
+                exists.Parameters.AddWithValue("id", id);
+                if (await exists.ExecuteScalarAsync(cancellationToken) is null)
+                {
+                    error.WriteLine("The tenant does not exist.");
+                    return 2;
+                }
+            }
+
+            if (!await audit.WriteAsync(id, output, cancellationToken))
+            {
+                return 1;
+            }
 
             await using (var update = new NpgsqlCommand(
                 "UPDATE platform.tenants SET status = @to, version = version + 1 WHERE id = @id AND status = @from",
