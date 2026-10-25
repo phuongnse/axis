@@ -6,7 +6,7 @@ import { FormCanvasContext } from './formCanvas'
 import { fetchFormState, type FormStateAnswer } from './formState'
 import { formatValue } from './formatValue'
 import { buildFormStateBody } from './recordBody'
-import type { FieldValue, RecordItem, RecordProblem, RecordRow, RecordValue } from './records'
+import type { FieldValue, RecordItem, RecordProblem, RecordRow, RecordValue, RowLabels } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
 import { useText } from './texts'
@@ -14,7 +14,7 @@ import { useText } from './texts'
 /** The values the form started from, which decide what changed, with the record's labels and version. */
 interface Snapshot {
   initial: Record<string, FieldValue>
-  labels: Record<string, string>
+  labels: Record<string, string | RowLabels[]>
   version: number
 }
 
@@ -98,6 +98,11 @@ function rowsOf(value: FieldValue | undefined): RecordRow[] {
   return Array.isArray(value) ? value : []
 }
 
+/** The labels of a child collection's rows, which are an array only for a collection with references. */
+function rowLabelsOf(label: string | RowLabels[] | undefined): RowLabels[] {
+  return Array.isArray(label) ? label : []
+}
+
 // Rows are compared by value, so an edit that is typed and then undone sends nothing.
 function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValue | undefined): boolean {
   if (field.type !== 'child-collection') {
@@ -138,7 +143,7 @@ export function useRecordForm(
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
   const [values, setValues] = useState<Record<string, FieldValue>>(snapshot.initial)
   // The label of each reference, which follows the record picked in the lookup.
-  const [labels, setLabels] = useState<Record<string, string>>(snapshot.labels)
+  const [labels, setLabels] = useState<Record<string, string | RowLabels[]>>(snapshot.labels)
   // The name of the reference field whose lookup is open.
   const [lookup, setLookup] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
@@ -312,7 +317,7 @@ export function useRecordForm(
   }
 
   // Error keys use row indexes, so adding or removing a row clears the collection's cell errors.
-  const setRows = (field: FieldMetadata, rows: RecordRow[]) => {
+  const setRows = (field: FieldMetadata, rows: RecordRow[], rowLabels: RowLabels[]) => {
     if (rows.length !== rowsOf(values[field.name]).length) {
       setCellErrors((previous) => {
         const next = { ...previous }
@@ -321,6 +326,7 @@ export function useRecordForm(
       })
     }
     set(field.name, rows)
+    setLabels((previous) => ({ ...previous, [field.name]: rowLabels }))
   }
   const labelOf = (field: FieldMetadata) => (field.labelKey ? t(field.labelKey) : field.name)
 
@@ -351,22 +357,25 @@ export function useRecordForm(
       return <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t })} />
     }
     switch (field.type) {
-      case 'reference':
+      case 'reference': {
+        const label = labels[field.name]
         // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
         return (
           <Space.Compact block data-testid={`reference-${field.name}`}>
-            <Input id={id} readOnly value={labels[field.name] ?? ''} />
+            <Input id={id} readOnly value={typeof label === 'string' ? label : ''} />
             <Button onClick={() => setLookup(field.name)}>{t('shell.form.choose')}</Button>
             {!field.required && value !== null && <Button onClick={() => clear(field)}>{t('shell.form.clear')}</Button>}
           </Space.Compact>
         )
+      }
       case 'child-collection':
         return (
           <ChildCollectionTable
             readOnly={readOnly}
             field={field}
             rows={rowsOf(value)}
-            onChange={(rows) => setRows(field, rows)}
+            labels={rowLabelsOf(labels[field.name])}
+            onChange={(rows, rowLabels) => setRows(field, rows, rowLabels)}
             errors={cellErrors[field.name] ?? {}}
             locale={locale}
           />

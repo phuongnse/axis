@@ -90,6 +90,7 @@ internal static class ModelAssert
             Assert.Equal(
                 (expectedProcess.StartCondition?.Expression.Expression, expectedProcess.StartCondition?.Message),
                 (actualProcess.StartCondition?.Expression.Expression, actualProcess.StartCondition?.Message));
+            Assert.Equal(expectedProcess.Parameters, actualProcess.Parameters);
             Assert.Equal(expectedProcess.Steps.Select(Describe), actualProcess.Steps.Select(Describe));
         }
     }

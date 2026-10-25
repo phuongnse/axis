@@ -8,14 +8,19 @@ namespace Axis.Data.Records;
 /// child collection is a <see cref="JsonArray"/> of row objects in position order, and is left
 /// out of a list's records.
 /// <see cref="Labels"/> maps each non-null reference field name to the display field value of the
-/// referenced record, in declaration order; it is empty when there is none. JSON writes it as
-/// <c>labels</c> after <c>values</c>.
+/// referenced record, as a JSON string, in declaration order. A child collection whose child entity
+/// has reference fields maps its name to a <see cref="JsonArray"/> with one object per row, in row
+/// order, holding the labels of that row's references; a row without a label is <c>{}</c>. It is
+/// empty when there is none. JSON writes it as <c>labels</c> after <c>values</c>.
 /// </summary>
 public sealed record Record(
     Guid Id,
     long Version,
     IReadOnlyDictionary<string, JsonNode?> Values,
-    IReadOnlyDictionary<string, string> Labels);
+    IReadOnlyDictionary<string, JsonNode> Labels);
 
-/// <summary>One page of records and the number of records in the whole table.</summary>
-public sealed record RecordPage(IReadOnlyList<Record> Items, long TotalCount);
+/// <summary>
+/// One page of records and the number of records that match, which is <see langword="null"/> when
+/// the count ran past the query timeout.
+/// </summary>
+public sealed record RecordPage(IReadOnlyList<Record> Items, long? TotalCount);

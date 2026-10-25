@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Records;
 using Axis.Policy;
@@ -9,16 +10,19 @@ namespace Axis.Processes.Records;
 /// may see. <see cref="Readable"/> is the union of the <c>fields</c> of the user's <c>read</c>
 /// grants on the entity, or null when a grant covers every field. A reference label shows only
 /// when the user may read the reference field and the target entity's display field. The target's
-/// record filters do not hide it.
+/// record filters do not hide it. A child row's label follows the same rule: the user may read the
+/// owner's child collection field and the target's display field.
 /// </summary>
 public sealed class RecordFieldAccess
 {
     private readonly HashSet<string> _labelled;
+    private readonly Dictionary<string, HashSet<string>> _rowLabelled;
 
-    private RecordFieldAccess(IReadOnlySet<string>? readable, HashSet<string> labelled)
+    private RecordFieldAccess(IReadOnlySet<string>? readable, HashSet<string> labelled, Dictionary<string, HashSet<string>> rowLabelled)
     {
         Readable = readable;
         _labelled = labelled;
+        _rowLabelled = rowLabelled;
     }
 
     /// <summary>The declared names of the fields the user may read, or null for every field.</summary>
@@ -30,22 +34,37 @@ public sealed class RecordFieldAccess
         var held = roles.ToList();
         var readable = PolicyEvaluator.Fields(application, held, model, PolicyAction.Read);
         var labelled = new HashSet<string>(StringComparer.Ordinal);
+        var rowLabelled = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         foreach (var field in model.Fields)
         {
-            if (field.Type != FieldType.Reference || !CanRead(readable, field.Name)
-                || application.FindEntity(field.Target!.Id) is not { } target)
+            if (field.Type == FieldType.ChildCollection)
             {
-                continue;
+                if (CanRead(readable, field.Name) && application.FindEntity(field.Target!.Id) is { } child
+                    && ReferenceLabelled(application, held, child) is { Count: > 0 } childLabelled)
+                {
+                    rowLabelled[field.Name] = childLabelled;
+                }
             }
-
-            if (CanRead(PolicyEvaluator.Fields(application, held, target, PolicyAction.Read), field.TargetDisplayField!))
+            else if (field.Type == FieldType.Reference && CanRead(readable, field.Name)
+                && CanReadLabel(application, held, field))
             {
                 labelled.Add(field.Name);
             }
         }
 
-        return new RecordFieldAccess(readable, labelled);
+        return new RecordFieldAccess(readable, labelled, rowLabelled);
     }
+
+    /// <summary>The reference fields of <paramref name="child"/> whose label the user may read.</summary>
+    private static HashSet<string> ReferenceLabelled(ApplicationModel application, List<string> held, EntityModel child) =>
+        child.Fields
+            .Where(field => field.Type == FieldType.Reference && CanReadLabel(application, held, field))
+            .Select(field => field.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+    private static bool CanReadLabel(ApplicationModel application, List<string> held, FieldModel reference) =>
+        application.FindEntity(reference.Target!.Id) is { } target
+        && CanRead(PolicyEvaluator.Fields(application, held, target, PolicyAction.Read), reference.TargetDisplayField!);
 
     /// <summary>Whether the user may read the field named <paramref name="name"/>.</summary>
     public bool CanRead(string name) => CanRead(Readable, name);
@@ -61,9 +80,44 @@ public sealed class RecordFieldAccess
                 .Where(value => CanRead(value.Key))
                 .ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal),
             Labels = record.Labels
-                .Where(label => _labelled.Contains(label.Key))
-                .ToDictionary(label => label.Key, label => label.Value, StringComparer.Ordinal),
+                .Select(label => (label.Key, Value: VisibleLabel(label.Key, label.Value)))
+                .Where(label => label.Value is not null)
+                .ToDictionary(label => label.Key, label => label.Value!, StringComparer.Ordinal),
         };
+
+    /// <summary>
+    /// A string label when the user may see it. A collection's array keeps each row's object with
+    /// only the labels the user may see. Null when there is nothing to show.
+    /// </summary>
+    private JsonNode? VisibleLabel(string name, JsonNode label)
+    {
+        if (label is not JsonArray rows)
+        {
+            return _labelled.Contains(name) ? label : null;
+        }
+
+        if (!_rowLabelled.TryGetValue(name, out var allowed))
+        {
+            return null;
+        }
+
+        var visible = new JsonArray();
+        foreach (var row in rows)
+        {
+            var kept = new JsonObject();
+            foreach (var (key, value) in row?.AsObject() ?? [])
+            {
+                if (allowed.Contains(key) && value is not null)
+                {
+                    kept[key] = value.DeepClone();
+                }
+            }
+
+            visible.Add(kept);
+        }
+
+        return visible;
+    }
 
     /// <summary>
     /// An error at <c>/values/&lt;field&gt;</c> for each field and child collection

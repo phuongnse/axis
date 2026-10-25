@@ -77,8 +77,7 @@
         "assigned",
         "resolved",
         "closed",
-        "rejected",
-        "reopened"
+        "rejected"
       ],
       "label": {
         "textKey": "ticket.status"

@@ -378,7 +378,7 @@ public static class ApplicationSites
                 : null,
             field.Type == FieldType.ChildCollection ? ChildFields(application, field) : null);
 
-    // A child entity has no reference or child collection fields, so this goes one level deep.
+    // A child entity has no child collection fields, so this goes one level deep.
     private static FieldMetadata[] ChildFields(ApplicationModel application, FieldModel collection)
     {
         var child = application.FindEntity(collection.Target!.Id)
