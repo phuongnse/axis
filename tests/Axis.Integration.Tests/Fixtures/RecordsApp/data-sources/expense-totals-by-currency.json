@@ -1,0 +1,19 @@
+{
+  "id": "1a827505-3dd3-4750-b20a-f10d9272e7b6",
+  "kind": "dataSource",
+  "name": "ExpenseTotalsByCurrency",
+  "formatVersion": 1,
+  "entity": "Expense",
+  "fields": [
+    { "name": "currency", "path": "currency" },
+    { "name": "amount", "path": "amount" }
+  ],
+  "aggregate": {
+    "groupBy": ["currency"],
+    "measures": [
+      { "name": "expenses", "function": "count" },
+      { "name": "amountSum", "function": "sum", "field": "amount" }
+    ]
+  },
+  "sort": "currency"
+}

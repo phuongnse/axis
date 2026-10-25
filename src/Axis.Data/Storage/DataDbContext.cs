@@ -4,8 +4,8 @@ namespace Axis.Data.Storage;
 
 /// <summary>
 /// The data module's tables in a tenant database: what has been provisioned in the
-/// <c>entities</c> schema, the migrations applied to it, the counters of the sequences, the audit records and the
-/// computed fields whose expression failed for a record, and the signed-in sessions. The caller
+/// <c>entities</c> schema, the migrations applied to it, the counters of the sequences, the audit records, the user
+/// profiles, the computed fields whose expression failed for a record, and the signed-in sessions. The caller
 /// supplies the connection to the tenant database.
 /// </summary>
 public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbContext(options)
@@ -27,6 +27,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
     public DbSet<SequenceCounterRow> SequenceCounters => Set<SequenceCounterRow>();
 
     public DbSet<AuditRecordRow> AuditRecords => Set<AuditRecordRow>();
+
+    public DbSet<UserProfileRow> UserProfiles => Set<UserProfileRow>();
 
     public DbSet<ComputedFieldErrorRow> ComputedFieldErrors => Set<ComputedFieldErrorRow>();
 
@@ -113,6 +115,18 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
         });
 
         // A trigger added by the migration rejects every update, delete and truncate.
+        modelBuilder.Entity<UserProfileRow>(profile =>
+        {
+            profile.ToTable("user_profiles");
+            profile.HasKey(p => p.UserId).HasName("pk_user_profiles");
+            profile.Property(p => p.UserId).HasColumnName("user_id").ValueGeneratedNever();
+            profile.Property(p => p.DisplayName).HasColumnName("display_name");
+            profile.Property(p => p.Email).HasColumnName("email");
+            profile.Property(p => p.Locale).HasColumnName("locale");
+            profile.Property(p => p.FirstSignedInAt).HasColumnName("first_signed_in_at");
+            profile.Property(p => p.LastSignedInAt).HasColumnName("last_signed_in_at");
+        });
+
         modelBuilder.Entity<AuditRecordRow>(audit =>
         {
             audit.ToTable("audit_records");

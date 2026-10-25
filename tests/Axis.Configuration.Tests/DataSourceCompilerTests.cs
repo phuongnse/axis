@@ -30,6 +30,31 @@ public sealed class DataSourceCompilerTests
           ] }
         """;
 
+    private const string Expense = """
+        { "id": "55555555-5555-4555-8555-555555555501", "kind": "entity", "name": "Expense", "formatVersion": 1,
+          "displayField": "title", "fields": [
+            { "name": "title", "type": "text", "required": true },
+            { "name": "currency", "type": "enum", "values": ["USD", "EUR"] },
+            { "name": "amount", "type": "money", "currencyField": "currency" },
+            { "name": "fixedAmount", "type": "money", "currency": "VND" }
+          ] }
+        """;
+
+    private const string Ledger = """
+        { "id": "55555555-5555-4555-8555-555555555502", "kind": "entity", "name": "Ledger", "formatVersion": 1,
+          "fields": [
+            { "name": "currency", "type": "enum", "values": ["USD", "EUR"] },
+            { "name": "expense", "type": "reference", "target": "Expense" }
+          ] }
+        """;
+
+    private const string BrokenExpense = """
+        { "id": "55555555-5555-4555-8555-555555555503", "kind": "entity", "name": "BrokenExpense", "formatVersion": 1,
+          "fields": [
+            { "name": "amount", "type": "money", "currencyField": "missing" }
+          ] }
+        """;
+
     private const string LineItem = """
         { "id": "33333333-3333-4333-8333-333333333333", "kind": "entity", "name": "LineItem", "formatVersion": 1,
           "fields": [ { "name": "description", "type": "text" }, { "name": "amount", "type": "decimal" } ] }
@@ -831,6 +856,117 @@ public sealed class DataSourceCompilerTests
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.InvalidDataSourceFieldPath, "/fields/1/path"), (diagnostic.Code, diagnostic.Path));
     }
+
+    [Fact]
+    public void Money_measure_over_a_currency_field_needs_the_currency_group_for_every_function_except_count()
+    {
+        var functions = MeasureFunctions();
+        Assert.Contains("sum", functions);
+        Assert.Contains("min", functions);
+        Assert.Contains("max", functions);
+
+        foreach (var function in functions)
+        {
+            var measure = function is "count" or "countDistinct"
+                ? $$"""{ "name": "m", "function": "{{function}}" }"""
+                : $$"""{ "name": "m", "function": "{{function}}", "field": "amount" }""";
+            var needsGroup = function is not ("count" or "countDistinct");
+
+            var ungrouped = ApplicationCompiler.Compile(ExpenseFolder(MoneyDataSource("[]", measure)).Path);
+            var grouped = ApplicationCompiler.Compile(ExpenseFolder(MoneyDataSource("""["currency"]""", measure)).Path);
+
+            if (needsGroup)
+            {
+                var diagnostic = Assert.Single(ungrouped.Diagnostics);
+                Assert.Equal(
+                    (DiagnosticCodes.UngroupedMoneyCurrency, "data-sources/expenses.json", "/aggregate/measures/0/field"),
+                    (diagnostic.Code, diagnostic.File, diagnostic.Path));
+                Assert.Contains("'amount'", diagnostic.Message, StringComparison.Ordinal);
+                Assert.Contains("'currency'", diagnostic.Message, StringComparison.Ordinal);
+            }
+            else
+            {
+                Assert.Empty(ungrouped.Diagnostics);
+            }
+
+            Assert.Empty(grouped.Diagnostics);
+        }
+    }
+
+    [Theory]
+    [InlineData("sum")]
+    [InlineData("min")]
+    [InlineData("max")]
+    public void Money_measure_over_a_fixed_currency_field_needs_no_currency_group(string function)
+    {
+        using var folder = ExpenseFolder(MoneyDataSource(
+            "[]", $$"""{ "name": "m", "function": "{{function}}", "field": "fixedAmount" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void Money_measure_through_a_reference_needs_the_currency_of_the_same_record()
+    {
+        const string Measure = """{ "name": "m", "function": "sum", "field": "amount" }""";
+        const string Fields = """[{ "name": "amount", "path": "expense.amount" }, { "name": "ledgerCurrency", "path": "currency" }, { "name": "currency", "path": "expense.currency" }]""";
+
+        // The ledger's own currency is another field than the expense's currency.
+        using var other = ExpenseFolder(LedgerDataSource(Fields, """["ledgerCurrency"]""", Measure));
+        using var same = ExpenseFolder(LedgerDataSource(Fields, """["currency"]""", Measure));
+
+        var diagnostic = Assert.Single(ApplicationCompiler.Compile(other.Path).Diagnostics);
+        Assert.Equal((DiagnosticCodes.UngroupedMoneyCurrency, "/aggregate/measures/0/field"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("'expense.currency'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Empty(ApplicationCompiler.Compile(same.Path).Diagnostics);
+    }
+
+    [Fact]
+    public void Money_measure_over_a_broken_currency_field_is_reported_once_as_the_field()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/broken-expense.json", BrokenExpense)
+            .With("data-sources/expenses.json", DataSource(
+                "BrokenExpense",
+                """[{ "name": "amount", "path": "amount" }]""",
+                """, "aggregate": { "groupBy": [], "measures": [{ "name": "m", "function": "sum", "field": "amount" }] } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.InvalidMoneyCurrency, diagnostic.Code);
+    }
+
+    private static string[] MeasureFunctions()
+    {
+        using var stream = typeof(ApplicationCompiler).Assembly.GetManifestResourceStream("Axis.Configuration.Schemas.dataSource.schema.json")!;
+        using var document = System.Text.Json.JsonDocument.Parse(stream);
+        return [.. document.RootElement
+            .GetProperty("$defs").GetProperty("measure").GetProperty("properties").GetProperty("function").GetProperty("enum")
+            .EnumerateArray()
+            .Select(function => function.GetString()!)];
+    }
+
+    private static TemporaryFolder ExpenseFolder(string dataSource) =>
+        new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/expense.json", Expense)
+            .With("entities/ledger.json", Ledger)
+            .With("data-sources/expenses.json", dataSource);
+
+    private static string MoneyDataSource(string groupBy, string measure) =>
+        DataSource(
+            "Expense",
+            """[{ "name": "currency", "path": "currency" }, { "name": "amount", "path": "amount" }, { "name": "fixedAmount", "path": "fixedAmount" }]""",
+            $$""", "aggregate": { "groupBy": {{groupBy}}, "measures": [{{measure}}] } """);
+
+    private static string LedgerDataSource(string fields, string groupBy, string measure) =>
+        DataSource(
+            "Ledger", fields, $$""", "aggregate": { "groupBy": {{groupBy}}, "measures": [{{measure}}] } """);
 
     /// <summary>
     /// A data source grouped by <c>status</c> whose measures are a count, then <paramref name="measure"/>,

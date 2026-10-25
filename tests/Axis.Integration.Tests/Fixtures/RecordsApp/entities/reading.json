@@ -1,0 +1,12 @@
+{
+  "id": "7b638422-74a6-4f52-96c1-6068346dc576",
+  "kind": "entity",
+  "name": "Reading",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "count", "type": "integer", "min": 1, "max": 10 },
+    { "name": "amount", "type": "decimal", "precision": 10, "scale": 2, "min": 0.5, "max": 99.5 },
+    { "name": "takenOn", "type": "date", "min": "2026-01-01", "max": "2026-12-31" },
+    { "name": "code", "type": "text", "minLength": 3, "maxLength": 10 }
+  ]
+}

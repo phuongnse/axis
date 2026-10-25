@@ -480,6 +480,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("ended_at");
 
+                    b.Property<string>("Parameters")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("parameters");
+
                     b.Property<Guid>("ProcessId")
                         .HasColumnType("uuid")
                         .HasColumnName("process_id");
@@ -502,11 +506,11 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("step");
 
-                    b.Property<Guid>("SubjectEntityId")
+                    b.Property<Guid?>("SubjectEntityId")
                         .HasColumnType("uuid")
                         .HasColumnName("subject_entity_id");
 
-                    b.Property<Guid>("SubjectId")
+                    b.Property<Guid?>("SubjectId")
                         .HasColumnType("uuid")
                         .HasColumnName("subject_id");
 
@@ -520,6 +524,8 @@ namespace Axis.Processes.Storage.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_process_instances_active_subject")
                         .HasFilter("state IN ('running', 'waiting')");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ApplicationId", "ProcessId", "SubjectId"), false);
 
                     b.HasIndex("ApplicationId", "ProcessId", "CreatedAt", "Id")
                         .IsDescending(false, false, true, true)
