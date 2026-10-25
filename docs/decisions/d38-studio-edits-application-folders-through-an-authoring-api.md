@@ -26,7 +26,8 @@ The owner confirmed these points on issue #569 on 2026-10-18.
 - **Who may author:**
   - The server setting `Studio:Folders` lists the application folders Studio
     may edit, like `ActivateOnStartup`. It is empty by default, so Production
-    has no Studio. The Development settings list the purchase request sample.
+    has no Studio. The Development settings list every sample under
+    `samples/apps/`.
     New applications that Studio creates live in `Studio:ApplicationsPath`, see
     [D51](d51-creating-applications-and-resources-from-studio.md).
   - The server setting `Studio:AuthorRole` names a roles claim value. Only a

@@ -12,7 +12,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Nine tenants, <c>a</c> to <c>i</c>, each with its own database holding StepApp plus a
 /// schedule trigger. Tenants <c>e</c> and <c>g</c> start with <see cref="HourlyFolder"/>, a copy of
-/// the application whose trigger runs every hour, and the others with the daily one. <c>ReviewLargeRequests</c> runs at 06:00 Berlin time and starts
+/// the application whose trigger runs every hour in UTC, and the others with the daily one. <c>ReviewLargeRequests</c> runs at 06:00 Berlin time and starts
 /// <c>RoleApprove</c> for each request of the data source <c>LargeRequests</c>, those with an
 /// amount of at least the fixed <c>minAmount</c> of 1000. Each test uses its own tenant, so record
 /// sets do not mix. Workers are built from the worker's own registration and never started, so a
@@ -79,7 +79,12 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
         {
             var relativePath = Path.GetRelativePath(_folder.Path, file);
             var content = await File.ReadAllTextAsync(file);
-            _hourlyFolder.With(relativePath, relativePath == "triggers/review-large-requests.json" ? content.Replace("\"0 6 * * *\"", "\"0 * * * *\"", StringComparison.Ordinal) : content);
+            // UTC keeps the hour steps even: Berlin runs a repeated hour once, so the tests would fail around the autumn clock change.
+            _hourlyFolder.With(
+                relativePath,
+                relativePath == "triggers/review-large-requests.json"
+                    ? content.Replace("\"0 6 * * *\"", "\"0 * * * *\"", StringComparison.Ordinal).Replace("\"Europe/Berlin\"", "\"UTC\"", StringComparison.Ordinal)
+                    : content);
         }
 
         foreach (var id in new[] { "a", "b", "c", "d", "e", "f", "g", "h", "i" })

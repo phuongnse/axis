@@ -120,8 +120,8 @@ and a JSON view, and shows the diagnostics.
   such as `"Studio": { "Folders": ["../../samples/apps/purchase-requests"] }`
   or the environment variable `Studio__Folders__0=/path/to/folder`. Relative
   paths are resolved against the server content root. It is empty by default,
-  so Production has no Studio. The Development settings list the purchase
-  request sample. A folder entry that is empty is ignored.
+  so Production has no Studio. The Development settings list every sample under
+  `samples/apps/`. A folder entry that is empty is ignored.
 - **`Studio:ApplicationsPath`**. The folder where Studio
   creates new applications, such as `artifacts/studio-apps`. The environment
   variable is `Studio__ApplicationsPath`. It has no default, and relative paths
