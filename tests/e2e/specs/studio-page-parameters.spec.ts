@@ -1,13 +1,15 @@
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "../test";
+import type { Page } from "@playwright/test";
 import { startServer } from "../activate";
 import { csrfHeaders } from "../csrf";
 import { confirmDialog, waitForDialog } from "../dialogs";
 import { pickOption } from "../select";
 import { e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
+import { createResource, openFormTab } from "../studio-resources";
 
 // A second server starts in beforeAll, and the journey creates an application and publishes it.
 test.setTimeout(240_000);
@@ -92,14 +94,8 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await expect(page).toHaveURL(new RegExp(`app=${name}$`));
     await expect(dialog).toBeHidden();
 
-    await page.getByRole("button", { name: "New resource", exact: true }).click();
-    const resource = await waitForDialog(page);
-    await pickOption(resource.getByRole("combobox", { name: "Kind", exact: true }), "page");
-    await resource.getByRole("textbox", { name: "Name", exact: true }).fill("RequestDetail");
-    await resource.getByRole("button", { name: "Create", exact: true }).click();
-    // The dialog gives the focus back to the New resource button when its close animation ends, and the pick helpers
-    // press Enter, so they start only when it is gone.
-    await expect(resource).toBeHidden();
+    await createResource(page, "page", "RequestDetail");
+    await openFormTab(page);
     const editor = page.getByTestId("studio-page-editor");
     await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
       "RequestDetail",
@@ -107,6 +103,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
 
     // The names load again, so the entities of the new application are offered below.
     await page.reload();
+    await openFormTab(page);
     await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
       "RequestDetail",
     );
@@ -126,10 +123,12 @@ test.describe("Studio declares a page parameter and links to the page", () => {
 
     // The names list the new parameter after a reload, and the link below offers it.
     await page.reload();
-    await page
+    const myRequests = page
       .getByTestId("studio-group-page")
-      .getByRole("button", { name: "MyRequests", exact: true })
-      .click();
+      .getByRole("button", { name: "MyRequests", exact: true });
+    await myRequests.click();
+    await expect(myRequests).toHaveAttribute("aria-current", "true");
+    await openFormTab(page);
     await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
       "MyRequests",
     );

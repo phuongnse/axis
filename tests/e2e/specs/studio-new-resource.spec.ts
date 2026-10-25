@@ -1,13 +1,14 @@
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '../test'
+import type { Page } from '@playwright/test'
 import { startServer } from '../activate'
 import { waitForDialog } from '../dialogs'
 import { pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { createResource } from '../studio-resources'
+import { createResource, openFormTab } from '../studio-resources'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -69,6 +70,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await expect(page.getByTestId('studio-editor')).toBeVisible()
 
     await createResource(page, 'page', 'Overview')
+    await openFormTab(page)
     await expect(page).toHaveURL(/resource=/)
     await expect(page.getByTestId('studio-resource-details')).toContainText('pages/overview.json')
     await expect(page.getByTestId('studio-editor')).toBeVisible()

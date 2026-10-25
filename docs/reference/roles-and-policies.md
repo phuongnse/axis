@@ -157,9 +157,9 @@ outcomes. Operators inspect the approvals and change nothing:
     [Reassign](task-deadlines.md#reassign);
   - an `endpoint` takes `invoke`.
   - `export` reaches only what the user's `read` grants reach, and needs a
-    `read` grant on the same target in the same policy, or it is `AXC0243`.
+    `read` grant on the same target in the same policy, or it is `AXC0244`.
     `import` writes through the user's `create` grants, and needs a `create`
-    grant on the same entity in the same policy, or it is `AXC0243`. The
+    grant on the same entity in the same policy, or it is `AXC0244`. The
     import checks `update` as well for an import with a key
     _(planned for M15)_. See [import and export](import-export.md#grants) and
     [D79](../decisions/d79-import-and-export-under-policies.md).
@@ -247,7 +247,7 @@ Compile checks, each a compile error:
   entity or `read` on an endpoint, is `AXC0091`. So is `inspect` on anything
   but a process.
 - An `export` without a `read`, or an `import` without a `create`, on the
-  same target in the same policy, ignoring letter case, is `AXC0243` at the
+  same target in the same policy, ignoring letter case, is `AXC0244` at the
   action. An action the target's kind does not take is left to `AXC0091`.
 - A grant on a child entity is `AXC0093`. Child rows are read and written
   through their owner's grants.

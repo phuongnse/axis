@@ -13,6 +13,8 @@ public sealed class ColumnTypesTests
     [InlineData(FieldType.Decimal, null, null, null, "numeric")]
     [InlineData(FieldType.Decimal, null, 18, null, "numeric(18,0)")]
     [InlineData(FieldType.Decimal, null, 18, 2, "numeric(18,2)")]
+    [InlineData(FieldType.Money, null, 18, 0, "numeric(18,0)")]
+    [InlineData(FieldType.Money, null, 12, 3, "numeric(12,3)")]
     [InlineData(FieldType.Boolean, null, null, null, "boolean")]
     [InlineData(FieldType.Date, null, null, null, "date")]
     [InlineData(FieldType.DateTime, null, null, null, "timestamp with time zone")]

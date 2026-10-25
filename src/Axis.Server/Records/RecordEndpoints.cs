@@ -84,9 +84,9 @@ internal static class RecordEndpoints
         foreach (var pattern in new[] { "/api/apps/{app}/entities/{entity}/records", "/api/apps/{app}/entities/{module}/{entity}/records" })
         {
             var records = endpoints.MapGroup(pattern).WithMetadata(ServiceAccountRoute.Instance);
-            records.MapGet("", ListAsync);
-            records.MapGet("/{id}", GetAsync);
-            records.MapGet("/{id}/history", HistoryAsync);
+            records.MapGet("", ListAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
+            records.MapGet("/{id}", GetAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
+            records.MapGet("/{id}/history", HistoryAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
             records.MapPost("", CreateAsync);
             records.MapPatch("/{id}", UpdateAsync);
             records.MapDelete("/{id}", DeleteAsync);
@@ -128,7 +128,7 @@ internal static class RecordEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         if (read.Filters is { } pendingFilters
-            && await RecordCommand.ReadsPendingAsync(connection, null, application!, model, pendingFilters, loggerFactory, cancellationToken))
+            && await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application!, model, pendingFilters, loggerFactory, cancellationToken))
         {
             return Grants.PendingFilter();
         }
@@ -171,7 +171,7 @@ internal static class RecordEndpoints
         }
 
         // A sort or a search on a computed field that is being recomputed would order or match by a stale stored value.
-        var pending = await PendingComputedFields.ReadAsync(connection, null, [model.Id], cancellationToken);
+        var pending = await PendingComputedFields.ReadAsync(connection, database.ReadTransaction, [model.Id], cancellationToken);
         if (pending.TryGetValue(model.Id, out var pendingNames))
         {
             if (order is not null && pendingNames.Contains(order.Field.Name))
@@ -193,7 +193,7 @@ internal static class RecordEndpoints
         var condition = read.Filters is { } filters
             ? RecordFilters.Condition(application!, model, Expressions(filters), user.Id)
             : null;
-        if (await RecordQueries.ListAsync(connection, model, pageNumber, size, order, search, condition, cancellationToken) is not { } result)
+        if (await RecordQueries.ListAsync(connection, database.ReadTransaction, model, pageNumber, size, order, search, condition, cancellationToken) is not { } result)
         {
             // PostgreSQL cannot fail one branch of an OR, so every filter of the list is named.
             var logger = Logger(loggerFactory);
@@ -242,13 +242,13 @@ internal static class RecordEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         if (read.Filters is { } pendingFilters
-            && await RecordCommand.ReadsPendingAsync(connection, null, application!, model, pendingFilters, loggerFactory, cancellationToken))
+            && await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application!, model, pendingFilters, loggerFactory, cancellationToken))
         {
             return Grants.PendingFilter();
         }
 
         if (read.Filters is { } filters
-            && await RecordCommand.MatchAsync(connection, null, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+            && await RecordCommand.MatchAsync(connection, database.ReadTransaction, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
         {
             return RecordNotFound();
         }
@@ -259,7 +259,7 @@ internal static class RecordEndpoints
         }
 
         // A computed field that is pending shows as the active release computes it. The read stores nothing.
-        record = await PendingComputedReads.ApplyAsync(connection, null, application!, model, record, cancellationToken);
+        record = await PendingComputedReads.ApplyAsync(connection, database.ReadTransaction, application!, model, record, cancellationToken);
         return Results.Ok(RecordFieldAccess.Read(application!, user.Roles, model).Visible(record));
     }
 
@@ -304,7 +304,7 @@ internal static class RecordEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         if (read.Filters is { } pendingFilters
-            && await RecordCommand.ReadsPendingAsync(connection, null, application!, model, pendingFilters, loggerFactory, cancellationToken))
+            && await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application!, model, pendingFilters, loggerFactory, cancellationToken))
         {
             return Grants.PendingFilter();
         }
@@ -316,7 +316,7 @@ internal static class RecordEndpoints
         }
 
         var readable = read.Filters is { } filters
-            ? await RecordCommand.MatchAsync(connection, null, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is { Found: true, Matched: true }
+            ? await RecordCommand.MatchAsync(connection, database.ReadTransaction, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is { Found: true, Matched: true }
             : await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is not null;
         if (!readable)
         {
@@ -637,8 +637,11 @@ internal static class RecordEndpoints
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: title);
 }
 
-/// <summary>One page of a record list and the number of records that match the search, or of every record without one.</summary>
-internal sealed record RecordListResponse(IReadOnlyList<Record> Items, int Page, int PageSize, long TotalCount);
+/// <summary>
+/// One page of a record list and the number of records that match the search, or of every record
+/// without one. The number is <see langword="null"/> when the count ran past the query timeout.
+/// </summary>
+internal sealed record RecordListResponse(IReadOnlyList<Record> Items, int Page, int PageSize, long? TotalCount);
 
 /// <summary>One page of a record's audit records, newest first, and the number of its audit records.</summary>
 internal sealed record RecordHistoryResponse(IReadOnlyList<RecordHistoryItem> Items, int Page, int PageSize, long TotalCount);

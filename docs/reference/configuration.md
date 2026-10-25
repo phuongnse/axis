@@ -441,7 +441,7 @@ flowchart LR
      of it is checked. An action its target's kind does not take is `AXC0091`
      at `/grants/{i}/actions/{j}`. An `export` without a `read`, or an
      `import` without a `create`, on the same target in the same policy is
-     `AXC0243` at `/grants/{i}/actions/{j}`. A `filter` or `fields` on a
+     `AXC0244` at `/grants/{i}/actions/{j}`. A `filter` or `fields` on a
      `dataSource`, `process` or `endpoint` grant is `AXC0091` at
      `/grants/{i}/filter` or `/grants/{i}/fields`. A target that names no
      loaded entity, data source, process or endpoint, ignoring letter case, is
