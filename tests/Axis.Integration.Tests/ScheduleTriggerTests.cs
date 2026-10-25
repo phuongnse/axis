@@ -306,6 +306,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     public async Task Activating_a_release_with_a_changed_schedule_computes_the_next_occurrence_from_the_activation_time()
     {
         var tenant = fixture.Tenant("h");
+        await AwayFromTheEndOfTheHourAsync(tenant);
         await DueAtAsync(tenant, _occurrence);
 
         var (releaseId, _) = await tenant.ActivateAsync(
@@ -336,6 +337,16 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         Assert.Equal(onTheHour, item.DueAt);
     }
 
+    /// <summary>Waits for the next hour when less than a minute of the current one is left, so that no hourly occurrence falls due while the test runs.</summary>
+    private static async Task AwayFromTheEndOfTheHourAsync(ProcessStepFixture tenant)
+    {
+        var left = (TimeSpan)(await tenant.ScalarAsync("SELECT date_trunc('hour', now()) + interval '1 hour' - now()"))!;
+        if (left < TimeSpan.FromMinutes(1))
+        {
+            await Task.Delay(left + TimeSpan.FromSeconds(1), CancellationToken);
+        }
+    }
+
     /// <summary>
     /// Checks that the trigger is hourly in UTC. The hourly tests rely on even hour steps, which
     /// Berlin breaks at the autumn clock change.
@@ -349,6 +360,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     /// </summary>
     private static async Task<DateTimeOffset> MoveBackThreeHoursAsync(ProcessStepFixture tenant)
     {
+        await AwayFromTheEndOfTheHourAsync(tenant);
         await tenant.ScalarAsync("UPDATE axis.trigger_schedules SET next_occurrence_at = date_trunc('hour', now()) - interval '2 hours'");
         await tenant.ScalarAsync(
             "UPDATE axis.process_work_items SET due_at = date_trunc('hour', now()) - interval '2 hours' WHERE kind = @kind",
@@ -359,7 +371,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     /// <summary>
     /// Checks that the worker skipped the occurrences missed since <paramref name="stored"/> and ran
     /// the latest one once for <paramref name="record"/>, and that the next occurrence is an hour later.
-    /// The checks hold even if the hour rolls over while the test runs.
+    /// The test waits away from the end of the hour first, so no further occurrence falls due before the checks.
     /// </summary>
     private static async Task AssertOnlyTheLatestHourlyOccurrenceRanAsync(ProcessStepFixture tenant, Guid record, DateTimeOffset stored)
     {
