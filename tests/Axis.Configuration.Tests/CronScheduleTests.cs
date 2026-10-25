@@ -49,6 +49,17 @@ public sealed class CronScheduleTests
     }
 
     [Fact]
+    public void An_hourly_schedule_in_berlin_skips_the_second_pass_of_the_repeated_hour_and_one_in_utc_does_not()
+    {
+        var schedule = Parse("0 * * * *");
+        var instant = Utc("2026-10-25T00:00:00Z");
+
+        // 02:00 CEST is 00:00Z, and 02:00 CET (01:00Z) is the repeated time.
+        Assert.Equal(Utc("2026-10-25T02:00:00Z"), schedule.NextAfter(instant, _berlin));
+        Assert.Equal(Utc("2026-10-25T01:00:00Z"), schedule.NextAfter(instant, TimeZoneInfo.Utc));
+    }
+
+    [Fact]
     public void An_instant_inside_the_second_pass_of_the_repeated_hour_does_not_run_it_again()
     {
         var schedule = Parse("*/30 * * * *");
