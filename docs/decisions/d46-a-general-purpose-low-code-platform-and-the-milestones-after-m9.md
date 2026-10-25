@@ -56,6 +56,11 @@ The owner confirmed these points on issue #702 on 2026-10-19.
     milestone is broken down when the one before it is nearly done.
   - Each milestone starts with docs issues that record its design as
     decisions, as M9 did.
+  - [D68](d68-issues-of-several-milestones-run-at-once.md) and
+    [the life of a milestone](../delivery.md#the-life-of-a-milestone) replace
+    these two lines: a milestone is broken down when it passes the readiness
+    check, and the decisions and doc sections it lacks are written first, in
+    the owner's local session, with no NexKit issue.
 - **Effect on earlier decisions:** D8 and D38 link here where this decision
   changes their scope. M10 plans publishing and activation from Studio, so
   [D47](d47-publishing-from-studio.md) replaces the "Studio never

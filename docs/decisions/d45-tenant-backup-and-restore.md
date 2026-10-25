@@ -11,6 +11,8 @@ The owner confirmed these points on issue #642 on 2026-10-19.
 - **Backup:**
   - `tenant backup <id> --out <file>` in `Axis.Admin` writes one archive. It
     holds a `pg_dump` of the tenant database in custom format and a manifest.
+  - [D76](d76-file-money-and-enum-label-field-types.md) stores the files of
+    file fields in the tenant database, so the dump holds them.
   - The manifest holds the tenant id, the Axis version, the tenant's schema
     version, the directory entry without any secret, and every extension
     package and module version that a stored release pins.

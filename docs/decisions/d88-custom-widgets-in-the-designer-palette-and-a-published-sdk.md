@@ -41,6 +41,11 @@ _(planned for M17)_. See [custom widgets](../reference/custom-widgets.md).
   - Page metadata gives each custom widget its entry URL and the content hash
     of the entry. The SPA loads the entry through an import map entry that
     carries that hash as its integrity.
+  - The server writes the import map into the SPA's page when it starts,
+    because installed packages change only with a restart. The map is an
+    inline script, so the content security policy of
+    [D85](d85-rate-limits-and-security-headers.md) lists its `sha256` hash in
+    `script-src`. That is the only inline script it allows.
   - The import map gives the widget `react`, `react-dom` and
     `@axis/widgets-sdk` from the SPA, so there is one React. A widget bundle
     keeps them external and never imports Ant Design.

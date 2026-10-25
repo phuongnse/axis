@@ -108,8 +108,11 @@ stay in this order.
 - **Proving it is general.** From M11 on, each milestone extends a sample of a
   new shape: a service desk, then asset management. Neither needs platform
   code.
-- **Planning.** Each milestone is broken into issues when the one before it is nearly done. Each milestone starts with
-  docs issues that record its design as decisions, as M9 did.
+- **Planning.** A milestone is broken into issues when it passes the readiness
+  check of [D68](decisions/d68-issues-of-several-milestones-run-at-once.md).
+  The decisions and doc sections it lacks are written first, in the owner's
+  local session, as [the life of a milestone](delivery.md#the-life-of-a-milestone)
+  describes.
 
 ## M0 — Foundation
 

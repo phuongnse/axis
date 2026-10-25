@@ -1,7 +1,8 @@
 # Host settings
 
 Detailed reference for the settings of the server and of `Axis.Admin`: startup activation,
-Studio, the operator console, tenancy and preview tenants, forwarded headers, the admin settings and telemetry export.
+Studio, the operator console, tenancy and preview tenants, data settings, forwarded headers, the admin
+settings, rate limits and telemetry export.
 The worker's own settings are in [worker settings](process-execution.md#worker-settings).
 The conventions of [architecture.md](../architecture.md) apply: sections marked
 _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
@@ -227,6 +228,7 @@ read when a refresh fails, and `/health/ready` is Degraded until a refresh works
 | `Tenancy:Source` | `configuration` | `configuration` reads the `Tenants` section. `directory` reads the tenants from the platform database and ignores a `Tenants` section, with a warning at start. |
 | `Tenancy:RefreshInterval` | `00:00:30` | How often the server and the worker read the tenant directory again. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, naming the setting. |
 | `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, and by the worker and `Axis.Admin` under `directory`. A missing or invalid key stops the start. The server also uses it under both sources, to encrypt the data protection keys, and a stored key that does not decrypt stops the start. |
+| `Platform:PreviousSecretKey` | none | _(Planned for M16.)_ The old installation key during a rotation, in the same form as `Platform:SecretKey`. A host decrypts with it when `Platform:SecretKey` does not match, and never encrypts with it. See [installation key](tenant-setting-commands.md#installation-key). |
 | `ConnectionStrings:Platform` | none | A role that may only read the `platform` schema, and insert rows into `platform.data_protection_keys`. Both hosts need it under `directory`. |
 | `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations, under both sources. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. |
 
@@ -311,6 +313,29 @@ the operator sets it with
   redirect and sign-out addresses. An existing Compose volume has no
   `axis_preview` database and needs `docker compose down -v` once.
 
+## Data settings
+
+These are _(planned for M15)_. The server reads them. See
+[D79](../decisions/d79-import-and-export-under-policies.md) and
+[D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Data:QueryTimeout` | `00:00:10` | The `statement_timeout` of every interactive read: record lists and reads, data source rows, lookups and page reads. A read past it is a `503`. |
+| `Data:ExportQueryTimeout` | `00:01:00` | The `statement_timeout` of an export's query. |
+| `Data:ExportMaxRows` | `100000` | The most rows one export writes. |
+| `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. |
+| `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. |
+| `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. A field's `maxSize` cannot exceed it. |
+
+- **Per transaction.** Each timeout is set with `SET LOCAL`, so it never
+  outlives its query's transaction and never reaches a pooled connection's
+  next user.
+- **Writes.** Record writes, activation and the worker's own statements keep
+  their current limits. M16 sets the final values against its SLOs.
+- **Environment.** As environment variables they are `Data__QueryTimeout`
+  and so on.
+
 ## Forwarded headers
 
 Behind a reverse proxy that ends TLS, the server sees plain
@@ -367,6 +392,14 @@ As an environment variable it is `Admin__ConnectionString`.
   `Admin:ConnectionString`.
 - **Not the directory writer.** `Axis.Admin` writes the tenant directory over
   `ConnectionStrings:PlatformSchema`, not over this setting.
+
+## Rate limit settings
+
+_(Planned for M16.)_ The server reads `RateLimits:SignIn`,
+`RateLimits:Session`, `RateLimits:Bearer` and `RateLimits:Publishing`, each a
+number of requests per minute for one replica. See
+[rate limits](headers-and-rate-limits.md#rate-limits) and
+[D85](../decisions/d85-rate-limits-and-security-headers.md).
 
 ## Telemetry export
 

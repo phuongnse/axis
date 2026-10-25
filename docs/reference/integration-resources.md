@@ -26,7 +26,8 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
 ### Deployment bindings
 
 - **Binding.** A named setting that a release refers to by name and never
-  holds as a value. M5 has two kinds: `url` and `secret`.
+  holds as a value. M5 has two kinds: `url` and `secret`. M15 adds a third,
+  `storage`, _(planned for M15)_, see **Storage binding** below.
 - **No binding resource.** No resource kind declares bindings. A connector
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
@@ -84,6 +85,15 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   start and the worker stays not ready.
 - **Resolved at run time.** The worker reads a binding each time it makes a
   call, so changing a secret needs no new release.
+- **Storage binding** _(planned for M15)_. The application manifest names
+  where the files of its file fields go, as
+  `"fileStorage": { "binding": "<name>" }`. That binding has the kind
+  `storage`. In M15 its only value is `database`, which stores the bytes in
+  the tenant database. Any other value fails the startup check. An
+  application without `fileStorage` uses the tenant database too, and its
+  activation needs no binding. Other storage comes later. See
+  [file fields](file-fields.md#storage-and-clean-up) and
+  [D76](../decisions/d76-file-money-and-enum-label-field-types.md).
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
   must be `https`. Activation checks each connector's base URL binding and
   each `url` binding that a package operation step declares (`AXC0101`). The
@@ -341,7 +351,9 @@ Every trigger file has `"kind": "trigger"`. Its trigger kind goes in `type`:
 `event`, `dataChange` or `schedule`. `kind` stays the resource kind, as with
 steps, fields and widgets, see [processes](processes.md#resource-shape).
 Every trigger names the `process` it starts, and each start is for one record
-of the process's subject entity.
+of the process's subject entity. _(Planned for M14)_ A schedule trigger
+without a data source and a delete trigger start a process without a subject,
+see [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
 
 **Event trigger.** It starts `NoteReview` for each closed note of priority 3
 or more, in `triggers/review-closed-notes.json`:
@@ -391,7 +403,10 @@ when its `amount` changes, and the amount is 1000 or more, in
 - `entity` names the entity whose records are watched. It is the process's
   subject entity.
 - `on` is a non-empty, unique list of `create` and `update`. `delete` comes later,
-  because a deleted record cannot be a subject.
+  because a deleted record cannot be a subject. _(Planned for M14)_ `delete`,
+  listed alone, starts a process without a subject, with `parameters` mapped
+  from the record before the delete, see
+  [Delete triggers](process-events.md#delete-triggers).
 - `fields` is optional. If present, it is a non-empty, unique list. On an
   update, the trigger fires only when one of the named fields changed. A
   create always passes it.
@@ -437,7 +452,10 @@ Minh City, for each note the `NoteRows` data source returns, in
 - `dataSource` names a [data source](data-sources.md) that is not grouped.
   Its root entity is the process's subject entity. Each occurrence starts the
   process for every row it returns, in record id order. The data source's
-  `pageSize` and `sort` do not apply.
+  `pageSize` and `sort` do not apply. _(Planned for M14)_ Without
+  `dataSource`, the trigger starts a process without a subject once per
+  occurrence, and `parameters` gives the process's parameters, see
+  [Scheduled jobs](process-events.md#scheduled-jobs).
 - `parameters` maps the data source's declared parameters to literal values.
   It may be left out when there are none. A value uses the record API's JSON
   forms: a number for `integer` and `decimal`, `true` or `false` for

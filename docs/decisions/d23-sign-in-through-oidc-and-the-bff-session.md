@@ -29,6 +29,8 @@ removed. Everything in this decision is in place. See
   provider.
 - **Session:** one HttpOnly, Secure, SameSite=Lax cookie.
   - It holds the user id, the display name, the roles and the tenant id.
+    - [D84](d84-asvs-level-2-and-a-server-side-session.md) replaces this
+      line: the session moves to the server and the cookie holds only its id.
   - It holds no tokens, and no token reaches the browser.
   - It ends after 8 hours, or after 1 hour without requests.
   - The cookie is protected with a key ring shared by every replica, and
@@ -64,6 +66,10 @@ removed. Everything in this decision is in place. See
 - **Audit actor:** the actor is the user id from the session. The display
   name is stored with the audit record, because Axis has no user directory
   to look it up later.
+  - [D73](d73-in-app-and-email-notifications.md) changes this reason: from
+    M14 each sign-in writes a user profile, with the email and locale that
+    notifications need. It is still not a directory, and audit records keep
+    the display name.
 
 _Why:_ see [knowledge](../domain/knowledge.md#authorization). Policies and
 processes need to know who acts, so test users must give way to real

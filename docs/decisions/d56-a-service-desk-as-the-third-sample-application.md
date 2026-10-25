@@ -33,6 +33,9 @@ owner confirmed these points on issue #783 on 2026-10-20.
 - **Reopen without a loop:** a reopened ticket ends the process with the
   status `reopened`. The requester submits it again, as a returned purchase
   request is submitted again today. A loop that holds a task comes in M14.
+  - [D69](d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
+    replaces this point: in M14 a reopened ticket loops back to the agent's
+    task in the same instance.
 - **Security:**
   - The roles are `requester`, `agent` and `service-desk-lead`.
   - A requester reads and edits only their own tickets. An agent reads the

@@ -518,13 +518,22 @@ These are not decided yet.
   nothing, because there is no tenant to migrate. It writes a note to standard
   error and exits with code 0, so running it first, as the order above does, is
   safe on a first install.
+
+Two former open points are decided in
+[D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md), and are
+not built yet:
+
 - **Deployment bindings.** No admin command sets a tenant's deployment
-  bindings, see [administration](administration.md#not-built-yet). So an
+  bindings yet, see [administration](administration.md#not-built-yet). So an
   installation cannot set the purchasing system binding of the purchase request
-  sample through the admin tool alone.
-- **Rotating the installation key.** Axis has no rotation, see
-  [D42](../decisions/d42-tenant-directory-in-the-platform-database.md).
-  After a leaked `Platform:SecretKey`, every stored secret must be set again by
-  hand. Changing `Platform:SecretKey` also means deleting the rows of
+  sample through the admin tool alone. `tenant binding set` is
+  _(planned for M16)_, see
+  [deployment bindings](tenant-setting-commands.md#deployment-bindings).
+- **Rotating the installation key.** Axis has no rotation yet. After a leaked
+  `Platform:SecretKey`, every stored secret must be set again by hand. Changing
+  `Platform:SecretKey` also means deleting the rows of
   `platform.data_protection_keys`, which signs everyone out. See
-  [several server replicas](#several-server-replicas).
+  [several server replicas](#several-server-replicas). Rotation with
+  `Platform:PreviousSecretKey` and `platform rekey`, which signs nobody out, is
+  _(planned for M16)_, see
+  [installation key](tenant-setting-commands.md#installation-key).

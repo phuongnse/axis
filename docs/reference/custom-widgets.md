@@ -99,9 +99,14 @@ only widgets, and then it has no `assembly`. This example uses an illustrative p
   folder of the widget's `entry`.
 - **Page metadata.** Each custom widget in page metadata carries its entry URL, the content hash
   of the entry and its checked properties.
-- **Import map.** The SPA adds an import map entry for each entry URL, with the content hash as
-  its integrity. The map also gives `react`, `react-dom` and `@axis/widgets-sdk` from the SPA's
-  own bundle, so every widget shares one React. A widget bundle keeps these three external.
+- **Import map.** The server writes one import map into the SPA's page when it starts. It has an
+  entry for the entry URL of every installed widget, with the content hash as its integrity, and
+  gives `react`, `react-dom` and `@axis/widgets-sdk` from the SPA's own bundle, so every widget
+  shares one React. A widget bundle keeps these three external. Installed packages change only
+  with a restart, so the map does not change while the host runs. An import map is an inline
+  script, so the `script-src` of the
+  [security headers](headers-and-rate-limits.md#security-headers) lists the map's `sha256` hash.
+  No other inline script is allowed.
 - **No Ant Design.** A widget builds on the SDK's Axis widgets and theme tokens and never imports
   Ant Design, as [D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)
   says.

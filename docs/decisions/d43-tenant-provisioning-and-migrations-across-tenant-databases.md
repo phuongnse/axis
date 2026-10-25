@@ -99,6 +99,8 @@ The owner confirmed these points on issue #640 on 2026-10-19.
   - The worker holds no schema connection of any kind.
 - **Not in M9:** deleting a tenant, an HTTP provisioning API, rotating the
   generated database passwords and moving a tenant to another database server.
+  - [D87](d87-tenant-setting-commands-and-key-rotation.md) adds rotating the
+    database passwords.
 
 _Why:_ a command-line tool keeps database admin rights out of every
 long-running host, and a web console for operators can come later.

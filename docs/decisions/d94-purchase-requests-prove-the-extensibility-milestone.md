@@ -10,7 +10,8 @@ _(planned for M17)_. See
 - **Why this sample:** purchase requests already have a connector, an
   extension package, line items and an approval process, which M17 extends.
   The service desk ([D56](d56-a-service-desk-as-the-third-sample-application.md))
-  and asset management (D81) are built
+  and asset management
+  ([D81](d81-asset-management-as-the-fourth-sample-application.md)) are built
   through Studio only. M17's packages are installed by the operator and its
   modules are not edited in Studio
   ([D89](d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)),

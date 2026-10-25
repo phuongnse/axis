@@ -30,6 +30,10 @@ rule has no milestone. These wait for it:
   `AXC0084` for now.
 - The local year in a sequence's `{yyyy}`, which is UTC today.
 
+[D75](d75-the-application-time-zone.md) settles this rule for M14: each
+application has a time zone. `today()`, taking a date from a `date-time` and
+the local year follow it. Calendar durations stay `AXC0084`.
+
 _Why:_ processes need the time of a step, for example to set `submittedAt`.
 One value per transaction keeps every expression in a step consistent with
 the step's own record. An instant needs no time zone, so `now()` can come

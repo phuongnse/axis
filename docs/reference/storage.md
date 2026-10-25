@@ -103,9 +103,12 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | Primary key             | `pk_` + table                                                             | 37         |
   | Unique constraint       | `uq_` + table + `_` + hash of the column name                             | 54         |
   | Foreign key             | `fk_` + table + `_` + hash of the column name                             | 54         |
+  | Index _(planned for M15)_ | `ix_` + table + `_` + hash of the column list                           | 54         |
+  | Junction table _(planned for M15)_ | `m_` + entity `id` + `_` + hash of the field name              | 51         |
 
   The hash is the first 16 lowercase hex characters of SHA-256 over the UTF-8
-  column name. Because names are ASCII and at most 60 characters, every
+  column name. For an index it is over the column names joined by commas, in
+  order, and for a junction table over the field name in lowercase. Because names are ASCII and at most 60 characters, every
   identifier fits PostgreSQL's 63-byte limit by construction and is never
   truncated. Identifiers are always double-quoted in SQL.
 
@@ -134,6 +137,9 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | `enum`             | `text`; the values are recorded, not enforced by a `CHECK`                                                |
   | `reference`        | `uuid` with a foreign key to the target table's `id`                                                      |
   | `child-collection` | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns) |
+  | `money` _(planned for M15)_ | `numeric(p,s)`, as `decimal` with its defaults. The currency is the field's or the `currencyField` column's |
+  | `file` _(planned for M15)_ | `uuid` with a foreign key to `axis.files`. See [file fields](file-fields.md#storage-and-clean-up) |
+  | `references` _(planned for M15)_ | No column on the owner table. A junction table holds `owner_id` and `target_id`, see [Schema planning](#schema-planning) |
 
 - **SQL safety.** Every SQL statement for entity data is built by the data
   module from compiled metadata. Identifiers are resolved and quoted by the
@@ -178,7 +184,9 @@ and creates no tables. See
   transaction after the migrations, and revokes any wider right the role had
   there. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
   It does not yet check whether the role is a superuser, owns the schema or
-  inherits rights through membership.
+  inherits rights through membership. The planned `platform.audit_records`
+  table is the one exception: the role gets no `SELECT` on it
+  _(planned for M16)_.
 - **One write grant.** The same role also gets `INSERT` on
   `platform.data_protection_keys`, and on no other table. Key rotation happens
   while the server runs, so the server must add keys. It never updates or
@@ -186,7 +194,9 @@ and creates no tables. See
   does not decrypt stops the start. The error names `Platform:SecretKey`. A
   replica with another `Platform:SecretKey` fails this way. Changing the key on
   an installation that holds key rows means deleting the rows by hand, which
-  signs everyone out. The Studio write lock is a PostgreSQL advisory lock. It needs
+  signs everyone out, until the key rotation of M16 replaces this step
+  _(planned for M16)_, see
+  [installation key](tenant-setting-commands.md#installation-key). The Studio write lock is a PostgreSQL advisory lock. It needs
   no grant, see [authoring API](authoring.md#versions).
 - **The writer.** `Axis.Admin` writes the directory over
   `ConnectionStrings:PlatformSchema`, see
@@ -197,10 +207,11 @@ The tables:
 
 | Table                                               | Columns                                                                                                                                                                                                                                                                                                                     |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants` |
+| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants`. The service audience, the sign-in profile and the encrypted client keys are _(planned for M16)_ |
 | `platform.tenant_hosts`                             | The tenant id and the host. The host is unique on `lower(host)` across all tenants                                                                                                                                                                                                                                          |
 | `platform.tenant_bindings`                          | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                         |
 | `platform.data_protection_keys`                     | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. Rows are only inserted, never updated or deleted. Every server replica reads them                                                                                                                                                                   |
+| `platform.audit_records`                            | _(Planned for M16.)_ The time, the `Axis.Admin` command, the tenant id, the operating system user and machine, and the names of what changed. Append-only. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records)                                                    |
 
 The tenant `version` grows on every change to the tenant, its hosts or its
 bindings.
@@ -215,7 +226,10 @@ a tenant only when this value is the one the host was built for, see
   else:
   - the runtime and schema database passwords, in `platform.tenants`;
   - the OIDC client secret, in `platform.tenants`;
-  - the value of a `secret` binding, in `platform.tenant_bindings`.
+  - the value of a `secret` binding, in `platform.tenant_bindings`;
+  - the client keys of a tenant under the `fapi2` sign-in profile, in
+    `platform.tenants`, with the field name `oidc_client_key` and the key id
+    _(planned for M16)_, see [FAPI 2.0 profile](security.md#fapi-20-profile).
 - **Encrypted format.** An encrypted value is a `bytea` that holds a 12-byte
   nonce, the ciphertext and a 16-byte tag. The cipher is AES-256-GCM with the
   installation key `Platform:SecretKey`, see
@@ -233,7 +247,10 @@ a tenant only when this value is the one the host was built for, see
   `SecretValue` does today. No API, log, problem details or backup manifest
   holds a decrypted value.
 - **No key rotation.** Axis has none. After a leaked key, every stored secret
-  must be set again by hand.
+  must be set again by hand. Rotating the installation key with
+  `Platform:PreviousSecretKey` and `platform rekey` is _(planned for M16)_,
+  see [installation key](tenant-setting-commands.md#installation-key) and
+  [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md).
 
 ## Database roles
 
@@ -537,6 +554,29 @@ access. It returns diagnostics, SQL statements and the new records to write.
   [Recomputing computed fields](migrations.md#recomputing-computed-fields).
 - **Errors.** When any diagnostic exists, the plan has no statements and no
   new records; nothing is applied.
+- **Indexes** _(planned for M15)_. See
+  [D77](../decisions/d77-indexes-defaults-and-ranges.md).
+  - Every `reference` column and every child table's `owner_id` gets an
+    `ix_` index without being declared. So do a junction table's `target_id`
+    and every `searchable` field, whose index is a `pg_trgm` GIN index on
+    `lower()` of the column.
+  - The catalog snapshot also reads the `ix_` indexes of each table. The
+    planner adds an index the release declares and the table lacks, and drops
+    an `ix_` index the release no longer declares. A drop needs no migration.
+  - A unique index added to a table with rows is `AXC0016`, as for `unique`.
+    It is built inside the activation transaction.
+  - Another new index on a table with at most
+    `Activation:InlineRecomputeLimit` rows is built inside the activation
+    transaction. On a larger table, activation commits without it and the
+    worker builds it with `CREATE INDEX CONCURRENTLY`. An index the build
+    leaves `INVALID` is dropped and built again. Until it is valid, queries
+    work without it.
+- **Junction tables** _(planned for M15)_. A `references` field gets a
+  junction table with `owner_id`, a foreign key to the owner deleted with it,
+  and `target_id`, a foreign key to the target that refuses a delete while
+  linked. Its primary key is both columns. Removing the field drops nothing
+  and is `AXC0015`, as for a column. See
+  [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md).
 
 ## Child tables and computed columns
 
