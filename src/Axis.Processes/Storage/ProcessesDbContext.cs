@@ -63,6 +63,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.SubjectEntityId).HasColumnName("subject_entity_id");
             instance.Property(i => i.SubjectId).HasColumnName("subject_id");
             instance.Property(i => i.ReleaseId).HasColumnName("release_id");
+            instance.Property(i => i.Parameters).HasColumnName("parameters").HasColumnType("jsonb");
             instance.Property(i => i.State).HasColumnName("state");
             instance.Property(i => i.Revision).HasColumnName("revision");
             instance.Property(i => i.Step).HasColumnName("step");
@@ -70,8 +71,11 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.EndedAt).HasColumnName("ended_at");
 
             // One start per submission: a record has at most one running or waiting instance of a process.
+            // A process without a subject has a null subject id, and NULLS NOT DISTINCT makes the nulls
+            // equal, so it has at most one running or waiting instance.
             instance.HasIndex(i => new { i.ApplicationId, i.ProcessId, i.SubjectId })
                 .IsUnique()
+                .AreNullsDistinct(false)
                 .HasFilter("state IN ('running', 'waiting')")
                 .HasDatabaseName(ProcessStarts.ActiveSubjectIndex);
 

@@ -161,10 +161,11 @@ internal static class ProcessInspectionEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
         }
 
+        // The list filters by the subject entity, so every instance has a subject.
         var items = result.Items
             .Select(instance => new ProcessInstanceListItem(
                 instance.Id,
-                instance.SubjectId,
+                instance.SubjectId!.Value,
                 instance.State,
                 instance.Step,
                 instance.ReleaseId,
@@ -241,8 +242,10 @@ internal static class ProcessInspectionEndpoints
             return InstanceNotFound();
         }
 
+        // FindAsync filters by the subject entity, so the instance has a subject.
+        var subjectId = row.SubjectId!.Value;
         if (read.Filters is { } filters
-            && await RecordCommand.MatchAsync(connection, null, application, entity, row.SubjectId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+            && await RecordCommand.MatchAsync(connection, null, application, entity, subjectId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
         {
             return InstanceNotFound();
         }
@@ -273,7 +276,7 @@ internal static class ProcessInspectionEndpoints
         return Results.Ok(new ProcessInstanceDetailResponse(
             row.Id,
             model.Name,
-            row.SubjectId,
+            subjectId,
             row.ReleaseId,
             row.State,
             row.Step,
