@@ -49,6 +49,39 @@ public sealed class CronScheduleTests
     }
 
     [Fact]
+    public void An_hourly_schedule_in_berlin_skips_the_second_pass_of_the_repeated_hour()
+    {
+        var schedule = Parse("0 * * * *");
+        var instant = Utc("2026-10-24T23:30:00Z");
+
+        var occurrences = new List<DateTimeOffset>();
+        for (var count = 0; count < 2; count++)
+        {
+            instant = schedule.NextAfter(instant, _berlin);
+            occurrences.Add(instant);
+        }
+
+        // 01:00Z is the second 02:00 local, which runs once by D26.
+        Assert.Equal([Utc("2026-10-25T00:00:00Z"), Utc("2026-10-25T02:00:00Z")], occurrences);
+    }
+
+    [Fact]
+    public void An_hourly_schedule_in_utc_runs_every_hour_through_the_autumn_clock_change()
+    {
+        var schedule = Parse("0 * * * *");
+        var instant = Utc("2026-10-24T23:30:00Z");
+
+        var occurrences = new List<DateTimeOffset>();
+        for (var count = 0; count < 3; count++)
+        {
+            instant = schedule.NextAfter(instant, TimeZoneInfo.Utc);
+            occurrences.Add(instant);
+        }
+
+        Assert.Equal([Utc("2026-10-25T00:00:00Z"), Utc("2026-10-25T01:00:00Z"), Utc("2026-10-25T02:00:00Z")], occurrences);
+    }
+
+    [Fact]
     public void An_instant_inside_the_second_pass_of_the_repeated_hour_does_not_run_it_again()
     {
         var schedule = Parse("*/30 * * * *");
