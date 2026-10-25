@@ -315,14 +315,15 @@ the operator sets it with
 
 ## Data settings
 
-These are _(planned for M15)_. The server reads them. See
+`Data:QueryTimeout` and `Data:ExportQueryTimeout` are built. The rest are
+_(planned for M15)_. The server reads them. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Data:QueryTimeout` | `00:00:10` | The `statement_timeout` of every interactive read: record lists and reads, data source rows, lookups and page reads. A read past it is a `503`. |
-| `Data:ExportQueryTimeout` | `00:01:00` | The `statement_timeout` of an export's query. |
+| `Data:QueryTimeout` | `00:00:10` | The `statement_timeout` of every interactive read: record lists, single reads and histories, data source rows, lookups and page reads. A read past it is a `503`. |
+| `Data:ExportQueryTimeout` | `00:01:00` | The `statement_timeout` of an export's query. The server reads and checks it, and no export uses it until exports are built. |
 | `Data:ExportMaxRows` | `100000` | The most rows one export writes. |
 | `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. |
 | `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. |
@@ -330,7 +331,14 @@ These are _(planned for M15)_. The server reads them. See
 
 - **Per transaction.** Each timeout is set with `SET LOCAL`, so it never
   outlives its query's transaction and never reaches a pooled connection's
-  next user.
+  next user. An interactive read runs in one short read-only transaction that
+  is always rolled back.
+- **Page reads.** These are the page metadata route
+  `GET /api/sites/{path}/pages/{page}` and the record and data source routes
+  that a page's widgets call. Lookups use the record list route. Form state,
+  task, process inspection and site list reads have no timeout.
+- **A bad value.** A value that is not a duration of at least one millisecond
+  stops the start. A missing value takes its default.
 - **Writes.** Record writes, activation and the worker's own statements keep
   their current limits. M16 sets the final values against its SLOs.
 - **Environment.** As environment variables they are `Data__QueryTimeout`

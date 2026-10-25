@@ -186,6 +186,7 @@ if (startupFolders.Length > 0)
 builder.Services.AddHostedService<StartupReleaseCheck>();
 
 // Studio is off unless folders or an applications path, and an author role, are set, which is the Production default.
+builder.Services.AddSingleton(QueryTimeoutSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath));
 
 builder.Services.AddScoped<TenantDatabase>();

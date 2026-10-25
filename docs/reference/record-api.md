@@ -163,9 +163,10 @@ table. From M15 every reference column and declared index has one, see
   collation.
 - **Past the end.** A page past the last one is `200` with empty `items` and
   the real `totalCount`.
-- **Count.** `totalCount` is counted in a separate statement from the page,
-  without a transaction. Under concurrent writes it can differ from the items
-  by a few rows.
+- **Count.** `totalCount` is counted in a separate statement from the page.
+  Both run in one read-only `READ COMMITTED` transaction, so under concurrent
+  writes it can still differ from the items by a few rows. When only the count
+  runs past `Data:QueryTimeout`, `totalCount` is `null`.
 
 The paging parameters are digits only: a sign, a space or a repeated parameter
 (`page=1&page=2`) is invalid.
@@ -431,12 +432,13 @@ otherwise the answer is the stale-version `409`. See
   [start lock](processes.md#releases-and-running-work). The server already ran
   the request again on the new release each time. Nothing was written, and the
   client may send the request again. The title is fixed: "The application's active release changed while the request ran. Try again."
-- **`503` for a query timeout** _(planned for M15)_. A read that runs past
+- **`503` for a query timeout.** A read that runs past
   `Data:QueryTimeout` is cancelled by PostgreSQL. The title is fixed: "The
   query took too long. Try again or narrow it." The server logs the entity
-  name and the duration. When only the count of a list times out, the answer
-  is `200` with `totalCount: null`. See
-  [data settings](host-settings.md#data-settings).
+  name and the duration, and adds one to the counter `axis.queries.timeouts`
+  (unit `{query}`, attributes `axis.tenant` and `axis.application`). When only
+  the count of a list times out, the answer is `200` with `totalCount: null`.
+  See [data settings](host-settings.md#data-settings).
 - **`500`.** An unexpected error on any path is caught by the exception
   handler. The response has no exception type, message or stack trace.
 - **`traceId`**. Every problem details answer has a

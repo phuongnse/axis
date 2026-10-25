@@ -34,6 +34,9 @@ public static class AxisMetrics
     /// <summary>Whether each tenant database answered the last readiness probe of the server, 1 or 0, by tenant.</summary>
     public const string TenantDatabaseAvailable = "axis.tenant.database.available";
 
+    /// <summary>The interactive reads that ran past the query timeout, by tenant and application.</summary>
+    public const string QueryTimeouts = "axis.queries.timeouts";
+
     /// <summary>
     /// The attribute keys that the HTTP client and DNS metrics keep. Any other key, such as
     /// <c>server.address</c>, <c>server.port</c>, <c>network.peer.address</c> or <c>dns.question.name</c>,
@@ -71,6 +74,11 @@ public static class AxisMetrics
         "{attempt}",
         "Attempts of connector calls and package operations.");
 
+    private static readonly Counter<long> _queryTimeouts = Meter.CreateCounter<long>(
+        QueryTimeouts,
+        "{query}",
+        "Interactive reads that ran past the query timeout.");
+
     /// <summary>Records one run of a work item. <paramref name="outcome"/> is <c>completed</c>, <c>failed</c> or <c>fenced</c>.</summary>
     public static void RecordWorkItem(string tenant, string kind, string outcome, TimeSpan duration) =>
         _workItemDurations.Record(
@@ -78,6 +86,14 @@ public static class AxisMetrics
             new KeyValuePair<string, object?>(AxisTelemetry.TenantTag, tenant),
             new KeyValuePair<string, object?>(AxisTelemetry.WorkItemKindTag, kind),
             new KeyValuePair<string, object?>(AxisTelemetry.OutcomeTag, outcome));
+
+    /// <summary>Counts one interactive read that ran past the query timeout. A <see langword="null"/> application is left out.</summary>
+    public static void RecordQueryTimeout(string tenant, string? application)
+    {
+        var tags = new TagList { { AxisTelemetry.TenantTag, tenant } };
+        Add(ref tags, AxisTelemetry.ApplicationTag, application);
+        _queryTimeouts.Add(1, tags);
+    }
 
     /// <summary>
     /// Counts a process instance that ended in <paramref name="state"/>, <c>completed</c> or <c>failed</c>.
