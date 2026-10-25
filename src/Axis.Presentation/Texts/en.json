@@ -196,6 +196,8 @@
   "shell.studio.design.addSection": "Add section",
   "shell.studio.design.addStep": "Add step",
   "shell.studio.design.added": "Added",
+  "shell.studio.design.removed": "Removed",
+  "shell.studio.design.removeField": "Remove field",
   "shell.studio.design.dropFieldHere": "Drop a field here",
   "shell.studio.design.moveToStep": "Move to step",
   "shell.studio.palette": "Widget palette",
