@@ -672,6 +672,54 @@ public static class ApplicationCompiler
         references.Add(owner, $"{pathPrefix}/textKey", ReferenceRelations.LabelText, new TextKeyNode(label.TextKey));
     }
 
+    /// <summary>
+    /// Checks the <c>valueLabels</c> of an enum field or parameter: every value has a label, no label names
+    /// an unknown value, and each label's text key is in some locale. Values are compared exactly. A field
+    /// that is not an enum, or an enum without values, is already reported by <c>CheckField</c>.
+    /// </summary>
+    internal static void CheckValueLabels(
+        FieldDefinition field,
+        Resource owner,
+        string path,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics)
+    {
+        if (FieldTypes.Parse(field.Type) != FieldType.Enum || field.Values is not { } values || field.ValueLabels is not { } labels)
+        {
+            return;
+        }
+
+        var labelsPath = $"{path}/valueLabels";
+        var missing = values.Where(value => !labels.ContainsKey(value)).ToList();
+        if (missing.Count > 0)
+        {
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.InvalidValueLabels,
+                $"'valueLabels' has no label for the {(missing.Count == 1 ? "value" : "values")} {string.Join(", ", missing.Select(value => $"'{value}'"))}.",
+                owner.File,
+                labelsPath,
+                owner.Id));
+        }
+
+        var known = new HashSet<string>(values, StringComparer.Ordinal);
+        foreach (var (value, label) in labels)
+        {
+            var valuePath = $"{labelsPath}/{EscapePointerSegment(value)}";
+            if (!known.Contains(value))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.InvalidValueLabels,
+                    $"'valueLabels' names the value '{value}', which 'values' does not have.",
+                    owner.File,
+                    valuePath,
+                    owner.Id));
+                continue;
+            }
+
+            CheckTextKey(label, owner, valuePath, references, diagnostics);
+        }
+    }
+
     /// <summary>Escapes a text key as an RFC 6901 JSON Pointer segment.</summary>
     private static string EscapePointerSegment(string segment) =>
         segment.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
@@ -749,6 +797,7 @@ public static class ApplicationCompiler
             }
 
             CheckTextKey(field.Label, entity, $"{path}/label", references, diagnostics);
+            CheckValueLabels(field, entity, path, references, diagnostics);
             CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, moduleReferences, Report);
             AddFieldTarget(entity, field, path, findEntity, references);
             CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
@@ -1135,6 +1184,11 @@ public static class ApplicationCompiler
             report(DiagnosticCodes.MissingTypeProperty, "An enum field must list its 'values'.", path);
         }
 
+        if (field.ValueLabels is not null)
+        {
+            Fits("valueLabels", "enum", FieldType.Enum);
+        }
+
         // The expression itself is checked by CheckComputedFields, against the other fields.
         if (field.Expression is not null)
         {
@@ -1387,6 +1441,7 @@ public static class ApplicationCompiler
                     Required = parameter.Required,
                     Label = parameter.Label,
                     Values = parameter.Values,
+                    ValueLabels = parameter.ValueLabels,
                     Target = parameter.Target,
                 };
                 CheckField(
@@ -1397,6 +1452,7 @@ public static class ApplicationCompiler
                     loaded.UnloadedEntityNames,
                     moduleReferences,
                     Report);
+                CheckValueLabels(parameterField, dataSource, path, references, diagnostics);
                 AddFieldTarget(dataSource, parameterField, path, findEntity, references);
             }
 
@@ -1636,6 +1692,7 @@ public static class ApplicationCompiler
             Precision = field.Precision,
             Scale = field.Scale,
             Values = field.Values,
+            ValueLabels = field.ValueLabels,
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
             TargetDisplayField = type == FieldType.Reference && target?.DisplayField is { } displayField ? FindField(target, displayField)?.Name : null,
             Computed = field.Expression is null
@@ -1918,7 +1975,8 @@ public static class ApplicationCompiler
                 parameter.Required ?? false,
                 parameter.Label,
                 parameter.Values,
-                parameter.Target is not null && Find(parameter.Target) is { } target ? new EntityReference(target.Id, target.Name) : null))
+                parameter.Target is not null && Find(parameter.Target) is { } target ? new EntityReference(target.Id, target.Name) : null,
+                parameter.ValueLabels))
             .ToList();
         var fields = dataSource.Fields
             .Select(field =>

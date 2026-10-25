@@ -27,6 +27,8 @@ public sealed record FieldDefinition
 
     public IReadOnlyList<string>? Values { get; init; }
 
+    public IReadOnlyDictionary<string, TextReference>? ValueLabels { get; init; }
+
     /// <summary>The expression of a computed field, or null for a field that clients write.</summary>
     public string? Expression { get; init; }
 

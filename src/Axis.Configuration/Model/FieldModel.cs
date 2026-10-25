@@ -29,6 +29,9 @@ public sealed record FieldModel
 
     public IReadOnlyList<string>? Values { get; init; }
 
+    /// <summary>The text key of each enum value, or null when the field declares no labels.</summary>
+    public IReadOnlyDictionary<string, TextReference>? ValueLabels { get; init; }
+
     public EntityReference? Target { get; init; }
 
     /// <summary>The declared name of the target entity's display field, set only for reference fields.</summary>
