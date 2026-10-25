@@ -144,6 +144,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.Id).HasColumnName("id").ValueGeneratedNever();
             call.Property(c => c.ProcessInstanceId).HasColumnName("process_instance_id");
             call.Property(c => c.Step).HasColumnName("step");
+            call.Property(c => c.StagedRevision).HasColumnName("staged_revision");
             call.Property(c => c.ReleaseId).HasColumnName("release_id");
             call.Property(c => c.Connector).HasColumnName("connector");
             call.Property(c => c.Operation).HasColumnName("operation");
@@ -156,10 +157,10 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             call.Property(c => c.SettledAt).HasColumnName("settled_at");
 
-            // A step stages at most one call.
-            call.HasIndex(c => new { c.ProcessInstanceId, c.Step })
+            // A step stages at most one call per pass.
+            call.HasIndex(c => new { c.ProcessInstanceId, c.Step, c.StagedRevision })
                 .IsUnique()
-                .HasDatabaseName("ux_connector_calls_process_instance_id_step");
+                .HasDatabaseName("ux_connector_calls_process_instance_id_step_staged_revision");
             call.HasOne<ProcessInstanceRow>()
                 .WithMany()
                 .HasForeignKey(c => c.ProcessInstanceId)
@@ -174,6 +175,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.Id).HasColumnName("id").ValueGeneratedNever();
             call.Property(c => c.ProcessInstanceId).HasColumnName("process_instance_id");
             call.Property(c => c.Step).HasColumnName("step");
+            call.Property(c => c.StagedRevision).HasColumnName("staged_revision");
             call.Property(c => c.ReleaseId).HasColumnName("release_id");
             call.Property(c => c.Package).HasColumnName("package");
             call.Property(c => c.Version).HasColumnName("version");
@@ -190,10 +192,10 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             call.Property(c => c.SettledAt).HasColumnName("settled_at");
 
-            // A step stages at most one call.
-            call.HasIndex(c => new { c.ProcessInstanceId, c.Step })
+            // A step stages at most one call per pass.
+            call.HasIndex(c => new { c.ProcessInstanceId, c.Step, c.StagedRevision })
                 .IsUnique()
-                .HasDatabaseName("ux_package_calls_process_instance_id_step");
+                .HasDatabaseName("ux_package_calls_process_instance_id_step_staged_revision");
             call.HasOne<ProcessInstanceRow>()
                 .WithMany()
                 .HasForeignKey(c => c.ProcessInstanceId)

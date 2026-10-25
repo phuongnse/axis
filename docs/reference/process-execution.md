@@ -281,8 +281,10 @@ and `next`.
 2. It sets the instance to `waiting` on the step.
 3. It inserts the call into `axis.connector_calls` as `pending`, with
    0 attempts and the evaluated input. The row's id is the call's operation
-   identity, a version 7 UUID. A unique index on instance and step lets a
-   step stage only one call.
+   identity, a version 7 UUID. It stores the instance revision the step ran
+   at as `staged_revision`. A unique index on instance, step and
+   `staged_revision` lets a step stage one call per pass of a
+   [loop](process-flow.md#loops).
 4. It writes the step's history row, with output
    `{ "state": "waiting", "operationId" }`.
 5. It writes the audit record `connector.callStaged` with the actor `system`
@@ -293,16 +295,18 @@ and `next`.
 While its call is pending, retrying or unknown, the instance stays `waiting`.
 So a second start for the same record is blocked, as with an open task.
 
-**A step that runs again after a retry** finds its call row `failed`, because
-a unique index lets a step stage only one call. It reuses the row instead of
-inserting one, in the same transaction. The row keeps its id, so
+**A step that runs again after a retry** finds that the latest call of the
+step, the one with the highest `staged_revision`, is `failed`. It reuses that
+row instead of inserting one, in the same transaction. A call of an earlier
+pass of a loop is never reused. The row keeps its id, so
 the operation identity and the idempotency key do not change. The step
 evaluates the input again from the subject record as it is now, on purpose, so
 the retry sends the current data. A failed connector call keeps its stored
 input, but the step still evaluates it again. A failed package call's stored
 input is cleared when it settles. It sets the call to
 `pending` with that input, 0 attempts and 0 lookups, and clears the last status,
-the last error and the settled time. Only a `failed` row is reused. The history
+the last error and the settled time. It sets `staged_revision` to the revision
+the step runs at again. Only a `failed` row is reused. The history
 row, the audit record and the work item are written again as above, with the
 same `operationId`. See [Retry](process-inspection.md#retry).
 
@@ -558,7 +562,8 @@ the operation in place of the HTTP request:
 - **Staging.** The step's transaction evaluates the input, stores the call
   as `pending` with a stable operation identity and the evaluated input, sets
   the instance to `waiting` on the step, and queues a work item. A unique
-  index on instance and step lets a step stage only one call. The table is
+  index on instance, step and `staged_revision` lets a step stage one call per
+  pass of a [loop](process-flow.md#loops). The table is
   `axis.package_calls` and the work item kind is `package.call`. The step
   writes the history row `{ "state": "waiting", "operationId" }` and the audit
   record `operation.staged`. A required input that gives `null` fails the
@@ -568,8 +573,8 @@ the operation in place of the HTTP request:
   A step that runs again after an operator [retry](process-inspection.md#retry) reuses its
   `failed` row, as a connector call does, under the same operation identity.
   It stores fresh input, the step's current retry policy, the operation's
-  `idempotent` flag and 0 attempts, and clears the last error and the settled
-  time.
+  `idempotent` flag, the new `staged_revision` and 0 attempts, and clears the
+  last error and the settled time.
 - **Mark.** Before each attempt, a short transaction marks the call
   `sending`, counts the attempt and extends the item's lease past the
   operation's `timeout`.
