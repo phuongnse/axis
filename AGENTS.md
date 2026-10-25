@@ -42,6 +42,8 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
   acts, never a development user.
 - All work goes through NexKit, see [delivery](docs/delivery.md). Changes in paths NexKit may not
   change are hand-made pull requests.
+- When merging `main` brings a decision with the number yours uses, keep `main`'s and move yours
+  to the next free number, with its row in `docs/decisions.md` and every link to it.
 
 ## Commands
 
