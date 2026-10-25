@@ -8,7 +8,7 @@ import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { createResource } from '../studio-resources'
+import { createResource, openFormTab } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -56,6 +56,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   async function createPage(page: Page, name: string) {
     await createResource(page, 'page', name)
+    await openFormTab(page)
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   }
 
@@ -63,6 +64,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   // panel as `scope`, so that only the panel's field matches.
   async function openPage(page: Page, name: string) {
     await page.getByTestId('studio-group-page').getByRole('button', { name, exact: true }).click()
+    await openFormTab(page)
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   }
 
@@ -519,7 +521,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     const en = await texts('en')
     const form = await sample<SampleForm>('forms/ticket-edit.json')
     await createResource(page, 'form', 'TicketEdit')
-    await expectForm(page)
+    await openFormTab(page)
     // The Design pane has no editor for the entity, so it is picked on the Form tab.
     await pick(page, 'studio-field-/entity', form.entity)
     await openDesign(page)
@@ -602,7 +604,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     ]) {
       const form = await sample<SampleForm>(file)
       await createResource(page, 'form', name)
-      await expectForm(page)
+      await openFormTab(page)
       await pick(page, 'studio-field-/entity', form.entity)
       for (const [sectionIndex, section] of form.sections.entries()) {
         if (sectionIndex > 0) {
@@ -870,7 +872,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     // The sample has no Home page, and nothing points to it now.
     const home = page.getByTestId('studio-group-page').getByRole('button', { name: 'Home', exact: true })
     await home.click()
-    await expectForm(page)
+    await openFormTab(page)
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
     await confirmDialog(page, 'Delete')
     await expect(page.getByTestId("studio-group-page").getByRole("button", { name: /Home/i })).toHaveCount(0)
