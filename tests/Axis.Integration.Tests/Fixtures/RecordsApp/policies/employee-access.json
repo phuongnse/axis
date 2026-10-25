@@ -8,7 +8,9 @@
     { "entity": "Item", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Department", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Order", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Product", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Ticket", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Reading", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Expense", "actions": ["read", "create", "update", "delete"] },
     { "dataSource": "ActiveItems", "actions": ["read"] },
     { "dataSource": "ItemTotalsByDepartment", "actions": ["read"] },
@@ -21,6 +23,7 @@
     { "dataSource": "ItemsNamed", "actions": ["read"] },
     { "dataSource": "ItemsOverflow", "actions": ["read"] },
     { "dataSource": "OverdueTickets", "actions": ["read"] },
-    { "dataSource": "ItemNames", "actions": ["read"] }
+    { "dataSource": "ItemNames", "actions": ["read"] },
+    { "dataSource": "ExpenseTotalsByCurrency", "actions": ["read"] }
   ]
 }

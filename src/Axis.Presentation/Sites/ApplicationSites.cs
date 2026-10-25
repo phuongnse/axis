@@ -294,6 +294,18 @@ public static class ApplicationSites
             [.. entity.Fields.Select(field => Field(application, field))]);
     }
 
+    /// <summary>
+    /// The metadata of the data source named <paramref name="dataSourceName"/>, as a widget's page
+    /// metadata gives it. The name must be one the model resolved, such as a widget's.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The model has no data source with this name.</exception>
+    public static DataSourceMetadata DescribeDataSource(ApplicationModel application, string dataSourceName)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+
+        return DataSource(application, dataSourceName);
+    }
+
     private static DataSourceMetadata DataSource(ApplicationModel application, string name)
     {
         // The compiler resolves every widget data source, so the lookup always succeeds.
@@ -316,7 +328,7 @@ public static class ApplicationSites
             dataSource.PageSize,
             // A grouped row holds the group fields, then the measures, not the projected fields.
             dataSource.Aggregate is { } aggregate
-                ? [.. aggregate.GroupBy.Select(field => Column(application, field)), .. aggregate.Measures.Select(Measure)]
+                ? [.. aggregate.GroupBy.Select(field => Column(application, field)), .. aggregate.Measures.Select(measure => Measure(aggregate, measure))]
                 : [.. dataSource.Fields.Select(field => Column(application, field))]);
     }
 
@@ -330,20 +342,36 @@ public static class ApplicationSites
                 ? new ReferenceTarget(column.Field.Target!.Name, column.Field.TargetDisplayField, RecordsPath(application, column.Field.Target.Name))
                 : null);
 
-    // A measure has no label, so its header is its name. A count is an integer and a sum is
-    // written like a decimal. A min or max keeps the type of its field.
-    private static DataSourceColumnMetadata Measure(DataSourceMeasureModel measure) =>
-        new(
-            measure.Name,
-            measure.Function switch
-            {
-                AggregateFunction.Count => FieldTypes.Name(FieldType.Integer),
-                AggregateFunction.Sum => FieldTypes.Name(FieldType.Decimal),
-                _ => FieldTypes.Name(measure.Field!.Field.Type),
-            },
-            null,
-            null,
-            null);
+    // A measure has no label, so its header is its name. A count is an integer. A sum of integers or
+    // decimals is written like a decimal, and a sum of money stays money. A min or max keeps the type
+    // of its field. A money measure names its fixed currency or the group column that holds it.
+    private static DataSourceColumnMetadata Measure(DataSourceAggregateModel aggregate, DataSourceMeasureModel measure)
+    {
+        var field = measure.Field?.Field;
+        var type = measure.Function switch
+        {
+            AggregateFunction.Count => FieldTypes.Name(FieldType.Integer),
+            AggregateFunction.Sum when !FieldTypes.HoldsDecimal(field!.Type) => FieldTypes.Name(FieldType.Decimal),
+            _ => FieldTypes.Name(field!.Type),
+        };
+        if (field?.Type != FieldType.Money)
+        {
+            return new(measure.Name, type, null, null, null);
+        }
+
+        return field.CurrencyField is null
+            ? new(measure.Name, type, null, null, null, Currency: field.Currency)
+            : new(measure.Name, type, null, null, null, CurrencyColumn: CurrencyGroup(aggregate, measure.Field!, field.CurrencyField)?.Name);
+    }
+
+    // The group field that reads the currency field on the same record as the money field: the same
+    // reference fields, then the currency field. The model holds resolved names, so they compare exactly.
+    private static DataSourceFieldModel? CurrencyGroup(
+        DataSourceAggregateModel aggregate, DataSourceFieldModel money, string currencyField) =>
+        aggregate.GroupBy.FirstOrDefault(group =>
+            group.Path.Count == money.Path.Count
+            && string.Equals(group.Field.Name, currencyField, StringComparison.Ordinal)
+            && group.Path.Take(group.Path.Count - 1).Zip(money.Path, (left, right) => string.Equals(left.Name, right.Name, StringComparison.Ordinal)).All(same => same));
 
     // A parameter's model holds only its target entity, so the display field comes from that entity.
     private static ReferenceTarget Target(ApplicationModel application, string entityName)
@@ -369,13 +397,16 @@ public static class ApplicationSites
             field.MaxLength,
             field.Precision,
             field.Scale,
+            field.Min,
+            field.Max,
+            field.MinLength,
             field.Values,
             field.Type == FieldType.Reference
                 ? new ReferenceTarget(field.Target!.Name, field.TargetDisplayField, RecordsPath(application, field.Target.Name))
                 : null,
             field.Type == FieldType.ChildCollection ? ChildFields(application, field) : null);
 
-    // A child entity has no reference or child collection fields, so this goes one level deep.
+    // A child entity has no child collection fields, so this goes one level deep.
     private static FieldMetadata[] ChildFields(ApplicationModel application, FieldModel collection)
     {
         var child = application.FindEntity(collection.Target!.Id)

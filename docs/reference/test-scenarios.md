@@ -167,8 +167,8 @@ Every step has a `type`. These are the step kinds:
 - It needs `now`. The runner sets the new time on every connection of the
   scenario, including the work item runner's. Every later step reads it.
 - The runner then runs every due work item (`process.step`, `connector.call`,
-  `package.call`, `event.deliver`, `trigger.schedule` and `trigger.fanOut`) until
-  none is due.
+  `package.call`, `event.deliver`, `trigger.schedule`, `trigger.fanOut` and
+  `task.deadline`) until none is due.
   If more than 1,000 items run in one step, the scenario fails at that step.
 - A schedule that missed several occurrences runs only the latest one, once, as
   a worker does after an outage. See [schedules](process-events.md#schedules). To
@@ -178,6 +178,11 @@ Every step has a `type`. These are the step kinds:
   clock.
 - Schedule triggers run only in an `advanceTime` step. A scenario stays
   repeatable, because no schedule fires on the real clock.
+- A task's `deadline` counts from the step's time, which follows the
+  scenario's `now`. The task expires only in an `advanceTime` step that
+  moves `now` to its deadline or past it. No action runs a deadline early. The
+  instance then moves to the deadline's `next` step, which `expectInstance` can
+  check. See [task deadlines](task-deadlines.md#escalations-and-deadline).
 - `advanceTime` is not an action. It takes no `as` and no `expect`.
 - Time never goes back. No step sets an earlier time.
 

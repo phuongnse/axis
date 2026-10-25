@@ -43,7 +43,7 @@ public static class DiagnosticCodes
     public const string DuplicateSeedRecordId = "AXC0034";
     public const string ChildEntityOwnedTwice = "AXC0039";
     public const string ReferenceToChildEntity = "AXC0040";
-    public const string ChildEntityWithReference = "AXC0041";
+    public const string ChildEntityWithChildCollection = "AXC0041";
 
     public const string UnknownDataSourceEntity = "AXC0042";
     public const string InvalidDataSourceFieldPath = "AXC0043";
@@ -236,4 +236,5 @@ public static class DiagnosticCodes
     public const string InvalidChartMeasure = "AXC0241";
     public const string InvalidValueLabels = "AXC0242";
     public const string InvalidMoneyCurrency = "AXC0243";
+    public const string UngroupedMoneyCurrency = "AXC0248";
 }

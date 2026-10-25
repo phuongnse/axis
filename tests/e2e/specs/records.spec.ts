@@ -34,6 +34,7 @@ test('a record of the E2E application is created and read through the record API
       createdBy: 'anna',
       lines: [],
     },
-    labels: {},
+    // A collection whose rows have references holds one label object per row, none here.
+    labels: { lines: [] },
   })
 })

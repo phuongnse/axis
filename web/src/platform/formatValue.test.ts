@@ -15,6 +15,9 @@ function field(name: string, type: FieldType, valueLabelKeys?: Record<string, st
     maxLength: null,
     precision: null,
     scale: null,
+    min: null,
+    max: null,
+    minLength: null,
     values: null,
     valueLabelKeys,
     target: null,
@@ -49,6 +52,18 @@ describe('formatValue', () => {
   it('shows a reference as its label', () => {
     const id = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
     expect(formatValue(field('category', 'reference'), id, { category: 'Finance' }, options)).toBe('Finance')
+  })
+
+  it('shows the id of a reference whose label is not a string', () => {
+    const id = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
+    expect(formatValue(field('lines', 'reference'), id, { lines: [{ lines: 'Desk' }] }, options)).toBe(id)
+  })
+
+  it('shows a reference of a child row as the label of that row', () => {
+    const id = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
+    const rowLabels = { product: 'Desk' }
+    expect(formatValue(field('product', 'reference'), id, rowLabels, options)).toBe('Desk')
+    expect(formatValue(field('product', 'reference'), id, {}, options)).toBe(id)
   })
 
   it('shows an enum with a label key as its translated text', () => {

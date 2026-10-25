@@ -100,13 +100,18 @@ query per row. Create and update return their labels from the same statement
 as the write: the write is a data-modifying `WITH` clause, and the labels are
 selected from it with the same joins, because `RETURNING` cannot join.
 
-From M15 _(planned for M15)_, a reference field of a child row has its label
-in the row's place: `"labels": { "lineItems": [{ "product": "Desk" }] }`, one
-object per row in row order. A `references` field has an array of labels in
-the order of its ids.
+A reference field of a child row has its label in the row's place:
+`"labels": { "lineItems": [{ "product": "Desk" }] }`, one object per row in
+row order, read in the same statement as the rows. A collection gets an entry
+only when its child entity has a reference whose label the user may see. The
+object is `{}` for a row without a label, and the entry is `[]` when there are
+no rows. A list response leaves child collections out, so it has no such
+entry. A `references` field has an array of labels in the order of its ids
+_(planned for M15)_.
 
 A label shows when the user may read the reference field and the target
-entity's display field. Otherwise the field has no entry in `labels`, as for a
+entity's display field. For a child row's label, the reference field is the
+owner's `child-collection` field. Otherwise the field has no entry in `labels`, as for a
 `null` reference. The target's record filters do not hide it, so a user who
 reads a request sees its department's name even when no read filter on
 `Department` matches that department. The joins stay as they are.
@@ -519,8 +524,24 @@ is not a `text`. A wrong JSON type or a value outside its bounds is an error at
 | `file` _(planned for M15)_ | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field, see [file fields](file-fields.md#upload) | `Guid` |
 | `references` _(planned for M15)_ | An array of distinct record ids, at most 1,000. The whole set replaces the stored one | `Guid[]` |
 
-From M15 _(planned for M15)_, a value outside a field's `min`, `max` or
-`minLength` is an error at the field's pointer, as for `maxLength`.
+A value outside a field's limits is an error at the field's pointer, as for
+`maxLength`. A value equal to a limit is accepted, and a missing or `null`
+value is never checked against a limit.
+
+- `min` and `max` apply to `integer`, `decimal`, `money`, `date` and
+  `date-time` values. The messages are "Must be at least 1." and "Must be at most 10.",
+  with the limit as written in the entity file. A `decimal` or `money` is compared
+  exactly, with no rounding, so `0.49999999999999999999999999999999` is below
+  `0.5`. A `date-time` is compared as an instant in UTC, whatever offset the
+  value or the limit is written with.
+- `minLength` applies to `text` values and counts code points, as `maxLength`
+  does. The message is "Must be at least 3 characters.".
+- The check is part of the request parser, so the record API, processes, task
+  completion, form state, inbound endpoints and seeds all apply it. The limits
+  are not stored as a `CHECK` constraint, so a stored row outside a tightened
+  limit keeps its values and is read back unchanged.
+- An endpoint `input` field has no limits of its own. An endpoint that writes
+  a record is still checked by the entity field's limits.
 
 **Errors** are a dictionary from RFC 6901 JSON Pointer into the body to its
 messages, in ordinal key order, usable as is for a validation problem
@@ -570,6 +591,13 @@ A record with a child collection holds its rows inside `values`:
   rows, in the same transaction, and increments the owner's `version`. `null`
   is an error at `/values/<collection>`. A stale `version` is a `409`, and no
   row changes.
+- **References.** A child entity may have `reference` fields. The labels of a
+  row's references come with the rows, as `labels` above describes. A row
+  that names a record that does not exist is a `400` at its cell,
+  `/values/<collection>/<index>/<field>`, with the message of a root
+  reference. A delete of a record that a child row points to is the `409` for
+  a referenced record. Once the owner record is deleted, its rows go with it
+  and the target can be deleted.
 - **No routes of its own.** A child entity has no record routes. Every method
   on `/api/apps/{app}/entities/{child}/records` is a `404` with the same title
   as an unknown entity.

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
@@ -7,6 +9,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Expressions;
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Evaluation;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Sql;
 using Axis.Expressions.Typing;
@@ -812,14 +815,12 @@ public static class ApplicationCompiler
             CheckMoney(entity, field, path, Report);
             CheckDefault(entity, field, path, defaultScope, references, Report);
 
-            // A child entity's rows are read and written only through its owner, so they point nowhere else.
-            var type = FieldTypes.Parse(field.Type);
-            if (childOwner is not null && type is FieldType.Reference or FieldType.ChildCollection)
+            // A child entity's rows are read and written only through its owner, so it has no collections of its own.
+            if (childOwner is not null && FieldTypes.Parse(field.Type) == FieldType.ChildCollection)
             {
-                var kind = type == FieldType.Reference ? "a reference" : "a child collection";
                 Report(
-                    DiagnosticCodes.ChildEntityWithReference,
-                    $"The field '{field.Name}' is {kind}, but '{entity.Name}' is a child entity owned by '{childOwner}'. A child entity has no reference or child collection fields.",
+                    DiagnosticCodes.ChildEntityWithChildCollection,
+                    $"The field '{field.Name}' is a child collection, but '{entity.Name}' is a child entity owned by '{childOwner}'. A child entity has no child collection fields.",
                     $"{path}/type");
             }
         }
@@ -1186,6 +1187,47 @@ public static class ApplicationCompiler
         }
     }
 
+    /// <summary>
+    /// Says why <paramref name="limit"/> is not a literal of the limited field type
+    /// <paramref name="type"/>, in the record API's forms, or returns null when it is one. Integer
+    /// and decimal limits are JSON numbers, and a decimal limit must fit a .NET decimal.
+    /// </summary>
+    private static string? LimitProblem(FieldType type, JsonElement limit) => type switch
+    {
+        FieldType.Integer when limit.ValueKind != JsonValueKind.Number || !limit.TryGetInt64(out _) =>
+            "must be an integral number within the signed 64-bit range.",
+        FieldType.Decimal or FieldType.Money when limit.ValueKind != JsonValueKind.Number || !TryReadDecimalLimit(limit, out _) =>
+            "must be a number that fits a decimal of at most 28 digits.",
+        FieldType.Date when limit.ValueKind != JsonValueKind.String || !DateLiterals.TryParseDate(limit.GetString()!, out _) =>
+            "must be a date in the form yyyy-MM-dd.",
+        FieldType.DateTime when limit.ValueKind != JsonValueKind.String || !DateLiterals.TryParseDateTime(limit.GetString()!, out _) =>
+            "must be an RFC 3339 date-time with an offset and at most 6 fraction digits.",
+        _ => null,
+    };
+
+    /// <summary>The limit as the model keeps it: the text of a date or date-time, and the number text as written.</summary>
+    private static string LimitText(JsonElement limit) =>
+        limit.ValueKind == JsonValueKind.String ? limit.GetString()! : limit.GetRawText();
+
+    private static bool TryReadDecimalLimit(JsonElement limit, out decimal value) =>
+        decimal.TryParse(limit.GetRawText(), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+
+    /// <summary>Compares two limits that <see cref="LimitProblem"/> accepted for <paramref name="type"/>.</summary>
+    private static int CompareLimits(FieldType type, JsonElement left, JsonElement right) => type switch
+    {
+        FieldType.Integer => left.GetInt64().CompareTo(right.GetInt64()),
+        FieldType.Decimal or FieldType.Money => ReadDecimalLimit(left).CompareTo(ReadDecimalLimit(right)),
+        FieldType.Date => DateOnly.ParseExact(left.GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture)
+            .CompareTo(DateOnly.ParseExact(right.GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture)),
+        _ => ReadDateTimeLimit(left).CompareTo(ReadDateTimeLimit(right)),
+    };
+
+    private static decimal ReadDecimalLimit(JsonElement limit) =>
+        TryReadDecimalLimit(limit, out var value) ? value : throw new InvalidOperationException("The limit is not a decimal.");
+
+    private static DateTimeOffset ReadDateTimeLimit(JsonElement limit) =>
+        DateLiterals.TryParseDateTime(limit.GetString()!, out var value) ? value : throw new InvalidOperationException("The limit is not a date-time.");
+
     private static void CheckField(
         FieldDefinition field,
         string path,
@@ -1283,6 +1325,69 @@ public static class ApplicationCompiler
                     $"'scale' must be between 0 and the precision ({field.Precision}), but is {scale}.",
                     $"{path}/scale");
             }
+        }
+
+        // A limit on a field the server sets would do nothing, because a request never carries its value.
+        bool FitsLimit(string property, string fittingTypeNames, params FieldType[] fittingTypes)
+        {
+            if (!Fits(property, fittingTypeNames, fittingTypes))
+            {
+                return false;
+            }
+
+            if (field.Expression is null && field.Sequence is null && field.Creator != true)
+            {
+                return true;
+            }
+
+            report(
+                DiagnosticCodes.InvalidConstraint,
+                $"'{property}' cannot be set on a field the server sets.",
+                $"{path}/{property}");
+            return false;
+        }
+
+        const string LimitedTypeNames = "integer, decimal, money, date and date-time";
+        FieldType[] limitedTypes = [FieldType.Integer, FieldType.Decimal, FieldType.Money, FieldType.Date, FieldType.DateTime];
+        var minValid = field.Min is { } min && FitsLimit("min", LimitedTypeNames, limitedTypes) && CheckLimit("min", min);
+        var maxValid = field.Max is { } max && FitsLimit("max", LimitedTypeNames, limitedTypes) && CheckLimit("max", max);
+        if (minValid && maxValid && CompareLimits(type, field.Min!.Value, field.Max!.Value) > 0)
+        {
+            report(
+                DiagnosticCodes.InvalidConstraint,
+                $"'max' must be at least 'min' ({LimitText(field.Min.Value)}), but is {LimitText(field.Max.Value)}.",
+                $"{path}/max");
+        }
+
+        if (field.MinLength is { } minLength && FitsLimit("minLength", "text", FieldType.Text))
+        {
+            if (minLength is < 1 or > MaxTextLength)
+            {
+                report(
+                    DiagnosticCodes.InvalidConstraint,
+                    $"'minLength' must be between 1 and {MaxTextLength}, but is {minLength}.",
+                    $"{path}/minLength");
+            }
+            else if (field.MaxLength is { } declaredMaxLength && minLength > declaredMaxLength)
+            {
+                report(
+                    DiagnosticCodes.InvalidConstraint,
+                    $"'minLength' must be at most the 'maxLength' ({declaredMaxLength}), but is {minLength}.",
+                    $"{path}/minLength");
+            }
+        }
+
+        // Reports a limit that is not a literal of the field's type. Returns whether it is one.
+        bool CheckLimit(string property, JsonElement limit)
+        {
+            var problem = LimitProblem(type, limit);
+            if (problem is null)
+            {
+                return true;
+            }
+
+            report(DiagnosticCodes.InvalidConstraint, $"'{property}' {problem}", $"{path}/{property}");
+            return false;
         }
 
         if (field.Currency is not null)
@@ -1487,6 +1592,7 @@ public static class ApplicationCompiler
             }
 
             var fieldsByName = new Dictionary<string, FieldDefinition?>(StringComparer.Ordinal);
+            var hopsByName = new Dictionary<string, IReadOnlyList<FieldDefinition>>(StringComparer.Ordinal);
             for (var index = 0; index < dataSource.Fields.Count; index++)
             {
                 var projected = dataSource.Fields[index];
@@ -1500,6 +1606,11 @@ public static class ApplicationCompiler
                 // A path that does not resolve, or ends at a child collection, has no column. It is
                 // stored as an invalid path for the sort check.
                 var field = pathProblem is null && hops.Count > 0 ? hops[^1] : null;
+                if (field is not null)
+                {
+                    hopsByName.TryAdd(projected.Name, hops);
+                }
+
                 if (!fieldsByName.TryAdd(projected.Name, field))
                 {
                     Report(
@@ -1548,6 +1659,10 @@ public static class ApplicationCompiler
                     if (CheckMeasure(measure, fieldsByName) is ({ } message, { } problemPath))
                     {
                         Report(DiagnosticCodes.InvalidDataSourceMeasure, message, path + problemPath);
+                    }
+                    else if (CheckMeasureCurrency(measure, aggregate.GroupBy, hopsByName, entity, findEntity) is { } currencyMessage)
+                    {
+                        Report(DiagnosticCodes.UngroupedMoneyCurrency, currencyMessage, $"{path}/field");
                     }
                 }
             }
@@ -1656,7 +1771,8 @@ public static class ApplicationCompiler
     /// The problem of a measure and its path below the measure, or null when it is valid.
     /// <c>count</c> takes no field. <c>sum</c>, <c>min</c> and <c>max</c> need a projected field:
     /// <c>sum</c> of an integer or a decimal, <c>min</c> and <c>max</c> of an integer, a decimal, a
-    /// date or a date-time. A projected field with an invalid path is not reported again.
+    /// date or a date-time, and <c>sum</c>, <c>min</c> and <c>max</c> also of a money field. A
+    /// projected field with an invalid path is not reported again.
     /// </summary>
     private static (string Message, string Path)? CheckMeasure(
         DataSourceMeasureDefinition measure, Dictionary<string, FieldDefinition?> fieldsByName)
@@ -1684,14 +1800,81 @@ public static class ApplicationCompiler
 
         var type = FieldTypes.Parse(field.Type);
         var accepted = function == AggregateFunction.Sum
-            ? type is FieldType.Integer or FieldType.Decimal
-            : type is FieldType.Integer or FieldType.Decimal or FieldType.Date or FieldType.DateTime;
+            ? type == FieldType.Integer || FieldTypes.HoldsDecimal(type)
+            : type == FieldType.Integer || FieldTypes.HoldsDecimal(type) || type is FieldType.Date or FieldType.DateTime;
         return accepted
             ? null
             : (
                 $"The measure function '{measure.Function}' cannot take the {field.Type} field '{name}'. "
-                    + "'sum' takes an integer or a decimal. 'min' and 'max' take an integer, a decimal, a date or a date-time.",
+                    + "'sum' takes an integer, a decimal or a money field. 'min' and 'max' take an integer, a decimal, a money field, a date or a date-time.",
                 "/field");
+    }
+
+    /// <summary>
+    /// The functions that add or compare amounts, so a money field with a <c>currencyField</c> must
+    /// be grouped by that currency.
+    /// </summary>
+    private static readonly HashSet<AggregateFunction> _currencyMixingFunctions =
+        [AggregateFunction.Sum, AggregateFunction.Min, AggregateFunction.Max];
+
+    /// <summary>
+    /// The message of a <c>sum</c>, <c>min</c> or <c>max</c> over a money field with a
+    /// <c>currencyField</c> when no group field reaches that currency field on the same record,
+    /// through the same reference fields. Null when the measure needs no currency group, or when the
+    /// currency field is itself invalid, which <see cref="CheckMoney"/> already reports.
+    /// </summary>
+    private static string? CheckMeasureCurrency(
+        DataSourceMeasureDefinition measure,
+        IReadOnlyList<string> groupBy,
+        Dictionary<string, IReadOnlyList<FieldDefinition>> hopsByName,
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity)
+    {
+        if (!_currencyMixingFunctions.Contains(ParseAggregateFunction(measure.Function))
+            || measure.Field is not { } name
+            || !hopsByName.TryGetValue(name, out var hops)
+            || FieldTypes.Parse(hops[^1].Type) != FieldType.Money
+            || hops[^1].CurrencyField is not { } currencyFieldName)
+        {
+            return null;
+        }
+
+        var owner = hops.Count == 1 ? entity : hops[^2].Target is { } target ? findEntity(target) : null;
+        if (owner is null
+            || FindField(owner, currencyFieldName) is not { } currencyField
+            || FieldTypes.Parse(currencyField.Type) is not (FieldType.Text or FieldType.Enum))
+        {
+            return null;
+        }
+
+        if (groupBy.Any(group => hopsByName.TryGetValue(group, out var groupHops)
+            && ReachesCurrency(groupHops, hops, currencyField)))
+        {
+            return null;
+        }
+
+        var prefix = string.Concat(hops.Take(hops.Count - 1).Select(hop => hop.Name + "."));
+        return $"The measure '{measure.Name}' adds or compares the money field '{name}', whose currency comes from '{currencyFieldName}'. "
+            + $"Group by a projected field with the path '{prefix}{currencyFieldName}' so that each total has one currency.";
+    }
+
+    private static bool ReachesCurrency(
+        IReadOnlyList<FieldDefinition> group, IReadOnlyList<FieldDefinition> money, FieldDefinition currencyField)
+    {
+        if (group.Count != money.Count || !string.Equals(group[^1].Name, currencyField.Name, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        for (var index = 0; index < money.Count - 1; index++)
+        {
+            if (!ReferenceEquals(group[index], money[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static AggregateFunction ParseAggregateFunction(string function) =>
@@ -1860,6 +2043,9 @@ public static class ApplicationCompiler
             Required = field.Required ?? false,
             Unique = field.Unique ?? false,
             MaxLength = field.MaxLength,
+            MinLength = field.MinLength,
+            Min = field.Min is { } min ? LimitText(min) : null,
+            Max = field.Max is { } max ? LimitText(max) : null,
             Precision = type == FieldType.Money ? field.Precision ?? MoneyDefaultPrecision : field.Precision,
             Scale = type == FieldType.Money ? field.Scale ?? MoneyDefaultScaleOf(field) : field.Scale,
             Currency = field.Currency,

@@ -1,9 +1,12 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Axis.Core.Tenancy;
+using Axis.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace Axis.Server.Authentication;
 
@@ -11,8 +14,10 @@ namespace Axis.Server.Authentication;
 /// Another system that calls an inbound endpoint with a bearer token from its tenant's identity
 /// provider, through the client credentials grant. The server checks the token's signature, issuer,
 /// audience and expiry against the tenant resolved from the host, with one JWT bearer scheme per
-/// tenant. It accepts a token only on endpoint paths, and there it reads no session cookie. The routes of the record API, the data source rows, process start and
-/// process inspection take a bearer token too, through <see cref="ServiceAccount"/>.
+/// tenant. It accepts a token only on endpoint paths, and there it reads no session cookie. The routes of the record API,
+/// the data source rows, process start and process inspection take a bearer token too, through
+/// <see cref="ServiceAccount"/>. A tenant under <c>fapi2</c> accepts only a token that is bound to a DPoP key, sent as
+/// <c>Authorization: DPoP</c> with a proof (see <see cref="DpopProof"/>).
 /// </summary>
 internal static class EndpointCaller
 {
@@ -137,6 +142,17 @@ internal static class EndpointCaller
 internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool allowHttp, TimeProvider clock)
     : IConfigureNamedOptions<JwtBearerOptions>
 {
+    private const string DpopScheme = "DPoP ";
+
+    /// <summary>The thumbprint in the token's <c>cnf.jkt</c> claim, or null when the token is not bound to a key.</summary>
+    private static string? BoundThumbprint(JsonWebToken token) =>
+        token.TryGetPayloadValue<JsonElement>("cnf", out var cnf)
+        && cnf.ValueKind == JsonValueKind.Object
+        && cnf.TryGetProperty("jkt", out var jkt)
+        && jkt.ValueKind == JsonValueKind.String
+            ? jkt.GetString()
+            : null;
+
     public void Configure(JwtBearerOptions options) => Configure(Options.DefaultName, options);
 
     public void Configure(string? name, JwtBearerOptions options)
@@ -167,6 +183,7 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
         }
 
         var audience = prefix == ServiceAccount.SchemePrefix ? tenant.ServiceAudience : tenant.EndpointAudience;
+        var dpopRequired = tenant.Profile == TenantSignInProfiles.Fapi2;
         options.Authority = tenant.Authority;
         options.Audience = audience;
         options.RequireHttpsMetadata = !allowHttp;
@@ -181,18 +198,45 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
                 if (current?.TenantId != tenantId || string.IsNullOrWhiteSpace(audience))
                 {
                     context.NoResult();
+                    return Task.CompletedTask;
+                }
+
+                // Under fapi2 a token is read only from "Authorization: DPoP", so a bound token never works as a plain
+                // bearer token. The header's scheme is the first word and is matched in any letter case.
+                if (dpopRequired)
+                {
+                    var header = context.Request.Headers.Authorization.ToString();
+                    if (header.StartsWith(DpopScheme, StringComparison.OrdinalIgnoreCase))
+                    {
+                        context.Token = header[DpopScheme.Length..].Trim();
+                    }
+                    else
+                    {
+                        context.Fail("A DPoP-bound token is required.");
+                    }
                 }
 
                 return Task.CompletedTask;
             },
-            OnTokenValidated = context =>
+            OnTokenValidated = async context =>
             {
+                if (dpopRequired)
+                {
+                    // The proof is made for the token as the caller sent it, and the token holds the key's thumbprint.
+                    if (context.SecurityToken is not JsonWebToken token
+                        || !await DpopProof.IsValidAsync(context.Request, token.EncodedToken, BoundThumbprint(token), clock.GetUtcNow()))
+                    {
+                        context.Fail("The access token is not bound to a valid DPoP proof.");
+                        return;
+                    }
+                }
+
                 var principal = context.Principal;
                 var callerId = principal?.FindFirst(tenant.Claims.UserId)?.Value;
                 if (principal is null || string.IsNullOrWhiteSpace(callerId))
                 {
                     context.Fail("The access token has no user id claim.");
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 // Service-account tokens often have no name, and a bare id is hard to read in a history.
@@ -208,7 +252,6 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
                     callerId,
                     string.IsNullOrWhiteSpace(displayName) ? callerId : displayName,
                     roles);
-                return Task.CompletedTask;
             },
         };
 

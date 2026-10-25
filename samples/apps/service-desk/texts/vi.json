@@ -38,7 +38,7 @@
     "ticket.status": "Trạng thái",
     "ticket.resolution": "Cách giải quyết",
     "ticket.submit": "Gửi",
-    "ticket.cannotSubmit": "Chỉ có thể gửi yêu cầu nháp hoặc được mở lại.",
+    "ticket.cannotSubmit": "Chỉ có thể gửi yêu cầu nháp.",
     "ticket.triage": "Phân loại yêu cầu",
     "ticket.resolve": "Xử lý yêu cầu",
     "ticket.confirm": "Xác nhận cách giải quyết",
