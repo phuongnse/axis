@@ -34,6 +34,9 @@ public static class AxisMetrics
     /// <summary>Whether each tenant database answered the last readiness probe of the server, 1 or 0, by tenant.</summary>
     public const string TenantDatabaseAvailable = "axis.tenant.database.available";
 
+    /// <summary>The requests that a rate limit refused, by partition.</summary>
+    public const string RateLimitRefusals = "axis.rate_limits.refused";
+
     /// <summary>
     /// The attribute keys that the HTTP client and DNS metrics keep. Any other key, such as
     /// <c>server.address</c>, <c>server.port</c>, <c>network.peer.address</c> or <c>dns.question.name</c>,

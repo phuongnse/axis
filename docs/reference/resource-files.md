@@ -491,13 +491,24 @@ new check is a new compile diagnostic.
   expression type is `list<Target>`.
 - **`valueLabels`.** On an `enum` field, a map from every value to a
   `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
-  "priority.low" } }`. It covers every value, and its keys join `AXC0028`.
+  "priority.low" } }`. It covers every value, and its keys join `AXC0028`. An
+  enum parameter of a data source takes it too. A value that has no label, or a
+  label for a value that `values` does not have, is `AXC0242`, at
+  `/fields/{i}/valueLabels` or `/fields/{i}/valueLabels/{value}`. Values are
+  compared exactly, by letter case too. On a field of another type it is
+  `AXC0013`. The compile checks are built. Showing the labels on pages is
+  planned for M15.
 - **`default`.** An expression with no record in scope: literals, rule calls
   and `now()`. Its type must fit the field. It is not allowed with
   `expression`, `sequence` or `creator`, or on `reference`, `file`,
-  `references` and `child-collection` fields. The record command applies it
-  on create when the body leaves the field out, see
-  [create, update and delete](record-api.md#create-update-and-delete).
+  `references` and `child-collection` fields. The compiler checks it now. A
+  forbidden combination is `AXC0013` at `/fields/{i}/default`, and an
+  expression problem reports its own code at the same path. The compiled field
+  carries the checked default. The record command will apply it on create when
+  the body leaves the field out, see
+  [create, update and delete](record-api.md#create-update-and-delete). That is
+  still planned, so a default is not applied yet. `file` and `references` are
+  refused when those types arrive.
 - **`min` and `max`.** On `integer`, `decimal`, `money`, `date` and
   `date-time` fields, a literal of the field's type, with `min` at most `max`.
   **`minLength`** on `text`, at most `maxLength`. A value outside is a `400`
@@ -856,7 +867,7 @@ The `application` manifest may name the application's time zone, see [D75](../de
 - `timeZone` is optional. It is an IANA time zone id. Without it, the time
   zone is `UTC`, so an application that names none behaves as before. An id
   is known when .NET finds it as an IANA id written with its exact letter
-  case, as for a schedule trigger. An unknown id is `AXC0242` at
+  case, as for a schedule trigger. An unknown id is `AXC0243` at
   `/timeZone`. Studio's application form offers `timeZone`.
 - It is part of the release. A change applies to work that runs on the new
   release.

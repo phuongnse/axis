@@ -683,6 +683,54 @@ public static class ApplicationCompiler
         references.Add(owner, $"{pathPrefix}/textKey", ReferenceRelations.LabelText, new TextKeyNode(label.TextKey));
     }
 
+    /// <summary>
+    /// Checks the <c>valueLabels</c> of an enum field or parameter: every value has a label, no label names
+    /// an unknown value, and each label's text key is in some locale. Values are compared exactly. A field
+    /// that is not an enum, or an enum without values, is already reported by <c>CheckField</c>.
+    /// </summary>
+    internal static void CheckValueLabels(
+        FieldDefinition field,
+        Resource owner,
+        string path,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics)
+    {
+        if (FieldTypes.Parse(field.Type) != FieldType.Enum || field.Values is not { } values || field.ValueLabels is not { } labels)
+        {
+            return;
+        }
+
+        var labelsPath = $"{path}/valueLabels";
+        var missing = values.Where(value => !labels.ContainsKey(value)).ToList();
+        if (missing.Count > 0)
+        {
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.InvalidValueLabels,
+                $"'valueLabels' has no label for the {(missing.Count == 1 ? "value" : "values")} {string.Join(", ", missing.Select(value => $"'{value}'"))}.",
+                owner.File,
+                labelsPath,
+                owner.Id));
+        }
+
+        var known = new HashSet<string>(values, StringComparer.Ordinal);
+        foreach (var (value, label) in labels)
+        {
+            var valuePath = $"{labelsPath}/{EscapePointerSegment(value)}";
+            if (!known.Contains(value))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.InvalidValueLabels,
+                    $"'valueLabels' names the value '{value}', which 'values' does not have.",
+                    owner.File,
+                    valuePath,
+                    owner.Id));
+                continue;
+            }
+
+            CheckTextKey(label, owner, valuePath, references, diagnostics);
+        }
+    }
+
     /// <summary>Escapes a text key as an RFC 6901 JSON Pointer segment.</summary>
     private static string EscapePointerSegment(string segment) =>
         segment.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
@@ -744,6 +792,7 @@ public static class ApplicationCompiler
         CheckTextKey(entity.Label, entity, "/label", references, diagnostics);
 
         var childOwner = ownersByChildName.GetValueOrDefault(entity.Name);
+        var defaultScope = ExpressionScopes.ForDefault(rules, modules);
         var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < entity.Fields.Count; index++)
         {
@@ -760,10 +809,12 @@ public static class ApplicationCompiler
             }
 
             CheckTextKey(field.Label, entity, $"{path}/label", references, diagnostics);
+            CheckValueLabels(field, entity, path, references, diagnostics);
             CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, moduleReferences, Report);
             AddFieldTarget(entity, field, path, findEntity, references);
             CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
             CheckCreator(field, path, childOwner, Report);
+            CheckDefault(entity, field, path, defaultScope, references, Report);
 
             // A child entity's rows are read and written only through its owner, so they point nowhere else.
             var type = FieldTypes.Parse(field.Type);
@@ -987,6 +1038,70 @@ public static class ApplicationCompiler
         }
     }
 
+    /// <summary>
+    /// Checks a field's <c>default</c>: it applies only to text, integer, decimal, boolean, date,
+    /// date-time and enum fields, and not together with an <c>expression</c>, a <c>sequence</c> or a
+    /// <c>creator</c>. Only the first problem is reported, and then the expression is not checked.
+    /// Otherwise the expression parses and type-checks to the field's type with no record in scope,
+    /// so it may use literals, the named rules and <c>now()</c>. An expression problem is reported
+    /// at the expression with its own code.
+    /// </summary>
+    private static void CheckDefault(
+        EntityResource entity,
+        FieldDefinition field,
+        string path,
+        ExpressionScope scope,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        if (field.Default is not { } defaultExpression)
+        {
+            return;
+        }
+
+        var type = FieldTypes.Parse(field.Type);
+        var problem = type is FieldType.Reference or FieldType.ChildCollection
+                ? $"'default' applies only to text, integer, decimal, boolean, date, date-time and enum fields, not to {field.Type} fields."
+            : field.Expression is not null ? "A field with a 'default' cannot have an 'expression': it is either computed or has a default."
+            : field.Sequence is not null ? "A field with a 'default' cannot have a 'sequence': the server fills it from the sequence."
+            : field.Creator == true ? "A field with a 'default' cannot be a 'creator' field: the server sets it to the user who created the record."
+            : null;
+        if (problem is not null)
+        {
+            report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/default");
+            return;
+        }
+
+        // CheckField already reports an enum without values.
+        if (type == FieldType.Enum && field.Values is null)
+        {
+            return;
+        }
+
+        var parsed = ExpressionParser.Parse(defaultExpression);
+        ExpressionDiagnostic? expressionProblem = parsed.Succeeded ? null : parsed.Diagnostic;
+        ExpressionType? checkedType = null;
+        if (parsed.Succeeded)
+        {
+            var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!);
+            // Module rule calls add no edges, as for module rules.
+            if (check.Succeeded && !IsModuleResource(entity))
+            {
+                references.AddRuleCalls(entity, $"{path}/default", check);
+            }
+
+            expressionProblem = check.Diagnostic;
+            checkedType = check.Type;
+        }
+
+        references.RecordExpression(entity, $"{path}/default", checkedType, expressionProblem);
+
+        if (expressionProblem is not null)
+        {
+            report(expressionProblem.Code, expressionProblem.Message, $"{path}/default");
+        }
+    }
+
     /// <summary>Finds a field by name, ignoring letter case, as the model does.</summary>
     internal static FieldDefinition? FindField(EntityResource entity, string name) =>
         entity.Fields.FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -1144,6 +1259,11 @@ public static class ApplicationCompiler
         else if (type == FieldType.Enum)
         {
             report(DiagnosticCodes.MissingTypeProperty, "An enum field must list its 'values'.", path);
+        }
+
+        if (field.ValueLabels is not null)
+        {
+            Fits("valueLabels", "enum", FieldType.Enum);
         }
 
         // The expression itself is checked by CheckComputedFields, against the other fields.
@@ -1398,6 +1518,7 @@ public static class ApplicationCompiler
                     Required = parameter.Required,
                     Label = parameter.Label,
                     Values = parameter.Values,
+                    ValueLabels = parameter.ValueLabels,
                     Target = parameter.Target,
                 };
                 CheckField(
@@ -1408,6 +1529,7 @@ public static class ApplicationCompiler
                     loaded.UnloadedEntityNames,
                     moduleReferences,
                     Report);
+                CheckValueLabels(parameterField, dataSource, path, references, diagnostics);
                 AddFieldTarget(dataSource, parameterField, path, findEntity, references);
             }
 
@@ -1610,7 +1732,8 @@ public static class ApplicationCompiler
         // The child models are not built yet, so both scopes come from the definitions.
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
         var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: FindEntity);
-        var fields = entity.Fields.Select(field => BuildField(field, inputScope, entitiesByName, sequencesByName)).ToList();
+        var defaultScope = ExpressionScopes.ForDefault(rules, modules);
+        var fields = entity.Fields.Select(field => BuildField(field, inputScope, defaultScope, entitiesByName, sequencesByName)).ToList();
         var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: FindEntity, modules: modules);
         return new EntityModel
         {
@@ -1630,6 +1753,7 @@ public static class ApplicationCompiler
     private static FieldModel BuildField(
         FieldDefinition field,
         ExpressionScope inputScope,
+        ExpressionScope defaultScope,
         Dictionary<string, EntityResource> entitiesByName,
         Dictionary<string, SequenceResource> sequencesByName)
     {
@@ -1647,6 +1771,7 @@ public static class ApplicationCompiler
             Precision = field.Precision,
             Scale = field.Scale,
             Values = field.Values,
+            ValueLabels = field.ValueLabels,
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
             TargetDisplayField = type == FieldType.Reference && target?.DisplayField is { } displayField ? FindField(target, displayField)?.Name : null,
             Computed = field.Expression is null
@@ -1654,6 +1779,9 @@ public static class ApplicationCompiler
                 : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),
             Sequence = sequence is null ? null : new SequenceModel(sequence.Id, sequence.Name, sequence.Format),
             Creator = field.Creator == true,
+            Default = field.Default is null
+                ? null
+                : ExpressionModel.Compile(field.Default, defaultScope, ExpressionScopes.TypeOf(field)!),
             Sensitive = field.Sensitive == true,
         };
     }
@@ -1929,7 +2057,8 @@ public static class ApplicationCompiler
                 parameter.Required ?? false,
                 parameter.Label,
                 parameter.Values,
-                parameter.Target is not null && Find(parameter.Target) is { } target ? new EntityReference(target.Id, target.Name) : null))
+                parameter.Target is not null && Find(parameter.Target) is { } target ? new EntityReference(target.Id, target.Name) : null,
+                parameter.ValueLabels))
             .ToList();
         var fields = dataSource.Fields
             .Select(field =>

@@ -23,6 +23,7 @@ public static class RecordExpressions
     /// <see cref="ExpressionRuntimeErrorKind.DecimalOverflow"/> error, as no value is rounded.
     /// <c>now()</c> gives <paramref name="now"/>, which is the start time of the caller's transaction.
     /// <c>today()</c> and <c>toDate</c> take the date in the application's time zone.
+    /// <c>id</c> gives the record's id.
     /// </summary>
     public static async Task<ExpressionEvaluationResult> EvaluateAsync(
         NpgsqlConnection connection,
@@ -59,6 +60,9 @@ public static class RecordExpressions
             var child = application.FindEntity(collection!.Target!.Id)!;
             return Inexact(child.Name, pointer[4]);
         }
+
+        // The record's own id comes last, so it wins over a field named id, as in the checker's scope.
+        subject["id"] = (record.Id, true);
 
         // Each record read, by its entity's id and its own, or null when the reference names none.
         var loaded = new Dictionary<(Guid Entity, Guid Id), (Record Row, ExpressionValues Values)?>();

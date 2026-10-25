@@ -188,7 +188,7 @@ internal static class TriggerChecker
             if (parsed.Succeeded)
             {
                 var check = ExpressionTypeChecker.Check(
-                    parsed.Expression!, ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules), ExpressionType.Boolean);
+                    parsed.Expression!, ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules), ExpressionType.Boolean);
                 if (check.Succeeded)
                 {
                     references.AddRuleCalls(trigger, "/when", check);
@@ -462,7 +462,7 @@ internal static class TriggerChecker
             Fields = trigger.Fields?.Select(name => FindField(entity, name)!.Name).ToList(),
             Process = new ProcessReference(process.Id, process.Name),
             When = trigger.When is { } when
-                ? ExpressionModel.Compile(when, ExpressionScopes.ForProcess(entity.Fields, rules, findEntity, modules), ExpressionType.Boolean)
+                ? ExpressionModel.Compile(when, ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules), ExpressionType.Boolean)
                 : null,
         };
     }
