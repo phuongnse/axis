@@ -68,6 +68,9 @@ public sealed class RecordApiFixture : IAsyncLifetime
     /// <summary>Every log entry the server wrote.</summary>
     internal LogCollector Logs => _logs;
 
+    /// <summary>The test host, which a test derives its own host from with <c>WithWebHostBuilder</c>.</summary>
+    internal WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("The test host is not started.");
+
     /// <summary>The services of the test host.</summary>
     internal IServiceProvider Services => (_factory ?? throw new InvalidOperationException("The test host is not started.")).Services;
 
