@@ -462,27 +462,27 @@ Run and the Test results list, the read-only view of a module entity, and the re
   editor, the process editor's step list, with its decision, end, task and operation panels, and the entity designer are
   built. The last column lists what still needs the JSON view, because the form cannot show it.
 
-  | Kind          | Editor                                                        | Still needs the JSON view                                             |
-  | ------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
-  | `application` | Generic form                                                  | Nothing                                                               |
-  | `entity`      | Entity designer                                               | Nothing                                                               |
-  | `page`        | Typed editor, Design tab (partly built, see Page designer)    | Nothing                                                               |
-  | `form`        | Generic form, typed steps panel, Design tab (planned for M13) | Nothing                                                               |
-  | `site`        | Generic form                                                  | Nothing                                                               |
-  | `process`     | Typed editor with the process graph                           | Nothing                                                               |
-  | `rule`        | Generic form                                                  | Nothing                                                               |
-  | `sequence`    | Generic form                                                  | Nothing                                                               |
-  | `role`        | Generic form                                                  | Nothing                                                               |
-  | `policy`      | Generic form                                                  | Nothing                                                               |
-  | `dataSource`  | Generic form                                                  | Nothing                                                               |
-  | `connector`   | Typed editor                                                  | Nothing                                                               |
-  | `endpoint`    | Generic form, typed rows for `values`                         | Nothing                                                               |
-  | `event`       | Generic form                                                  | Nothing                                                               |
-  | `trigger`     | Generic form                                                  | Nothing                                                               |
-  | `migration`   | Generic form                                                  | The `changes` list, because each change's fields depend on its `type` |
-  | `seed`        | Typed editor                                                  | Nothing                                                               |
-  | `scenario`    | Typed editor                                                  | Nothing                                                               |
-  | `text`        | Typed editor                                                  | Nothing                                                               |
+  | Kind          | Editor                                                          | Still needs the JSON view                                             |
+  | ------------- | --------------------------------------------------------------- | --------------------------------------------------------------------- |
+  | `application` | Generic form                                                    | Nothing                                                               |
+  | `entity`      | Entity designer                                                 | Nothing                                                               |
+  | `page`        | Typed editor, Design tab (see Page designer)                    | Nothing                                                               |
+  | `form`        | Generic form, typed steps panel, Design tab (see Form designer) | Nothing                                                               |
+  | `site`        | Generic form                                                    | Nothing                                                               |
+  | `process`     | Typed editor with the process graph                             | Nothing                                                               |
+  | `rule`        | Generic form                                                    | Nothing                                                               |
+  | `sequence`    | Generic form                                                    | Nothing                                                               |
+  | `role`        | Generic form                                                    | Nothing                                                               |
+  | `policy`      | Generic form                                                    | Nothing                                                               |
+  | `dataSource`  | Generic form                                                    | Nothing                                                               |
+  | `connector`   | Typed editor                                                    | Nothing                                                               |
+  | `endpoint`    | Generic form, typed rows for `values`                           | Nothing                                                               |
+  | `event`       | Generic form                                                    | Nothing                                                               |
+  | `trigger`     | Generic form                                                    | Nothing                                                               |
+  | `migration`   | Generic form                                                    | The `changes` list, because each change's fields depend on its `type` |
+  | `seed`        | Typed editor                                                    | Nothing                                                               |
+  | `scenario`    | Typed editor                                                    | Nothing                                                               |
+  | `text`        | Typed editor                                                    | Nothing                                                               |
 
   The generic form sends a part to the JSON view when it holds `oneOf` or
   `anyOf`, when it holds `allOf` with an item that has more than `if`, `then`
@@ -787,25 +787,24 @@ Run and the Test results list, the read-only view of a module entity, and the re
     error-coloured border, "has diagnostics" in its text label, and
     `data-marked`. The marks come from the panel's last loaded list, so they
     change on a load, a save or a request, not on every edit.
-- **Page designer** _(partly built, planned for M13)_. The page editor gets a Design tab
+- **Page designer** _(built)_. The page editor gets a Design tab
   that builds a page by drag and drop, per
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md).
-  The form designer is partly built and planned for M13, see
+  The form designer is built, see
   [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md), and the
   process designer for M14, see
   [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
   The process graph is read-only, and not a designer.
-  - **Design tab.** It sits next to the Form and JSON tabs and is the default
-    tab. The three tabs edit one draft. _Partly built:_ the tab is there, but
-    Form stays the default tab until the designer is complete. The canvas is
-    mounted only while the Design tab is active, so it asks again when the
-    author returns.
+  - **Design tab.** It sits next to the Form and JSON tabs. The three tabs edit
+    one draft. _Built:_ the tab is there, and Form is the default tab. Opening a
+    page on the Design tab is _(planned for M14)_. The canvas is mounted only
+    while the Design tab is active, so it asks again when the author returns.
   - **Canvas.** It draws the unsaved draft with the site's own widget
     components. Tables, charts and other data widgets show placeholder rows and
     values made from the field types, as the widget previews do with fixtures.
     Actions run nothing. The canvas asks
     [the draft page metadata route](authoring.md#draft-page-metadata) 300 ms
-    after the last edit and redraws from its answer. _Partly built:_ the canvas
+    after the last edit and redraws from its answer. _Built:_ the canvas
     draws the page, with labels from the application's texts and no request to
     `/api/apps/`. It cancels every click and form submit, so a navigate action
     or a link leaves Studio where it is. A page parameter gets a placeholder
@@ -822,7 +821,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     process graph has. The marks follow the route's latest answer, so the
     unsaved draft.
   - **Selection.** A click on the canvas or a pick in the widget tree selects a
-    widget in both. The selected widget has `aria-current`. _Partly built:_ a
+    widget in both. The selected widget has `aria-current`. _Built:_ a
     click selects the innermost widget under the pointer, and a click on the
     empty area of a container selects the container. A pick in the tree outlines
     the widget on the canvas in the primary colour. Every frame is a Tab stop,
@@ -832,8 +831,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     stays open. It is not in the URL's `path`, which opens the Form tab.
   - **Property panel.** It sits beside the canvas and shows the widget's
     existing panel. Each action draws as a button on the canvas, and selecting
-    it opens its action in the panel, including a `delete` action. _Partly
-    built:_ the side pane of the Design tab holds the whole widget tree and the
+    it opens its action in the panel, including a `delete` action. _Built:_
+    the side pane of the Design tab holds the whole widget tree and the
     panel of the selected widget, the same as the Form tab. An edit redraws the
     canvas through the 300 ms draft post. On the canvas, every action of a table
     (row and toolbar), a form, a detail and a KPI draws as a button, also one
@@ -858,7 +857,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     cannot take it under a limit of
     [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md):
     a second table, a second form, task inbox or process inspector, or a
-    container past 4 levels. _Partly built:_ the side pane of the Design tab
+    container past 4 levels. _Built:_ the side pane of the Design tab
     lists the ten types above the widget tree. Enter, Space or a click inserts a
     new widget after the selected widget, at the end of the selected container's
     first list, or at the end of the page's list on an empty page. The new
@@ -878,7 +877,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Moves.** The author drags a widget to reorder it or to move it into or out
     of a container. Alt+ArrowDown and Alt+ArrowUp move the selected widget to
     the next or previous allowed place, skipping refused ones, and focus follows
-    it. The Move to picker stays. _Partly built:_ the author can drag any widget
+    it. The Move to picker stays. _Built:_ the author can drag any widget
     of the canvas. The innermost widget under the pointer drags, so a press on a
     KPI in a column moves the KPI. It drops on the same targets as a palette
     type. A move the format refuses is flagged while it is dragged: the drag
@@ -890,8 +889,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     or that it cannot move further. A drop on the widget itself changes nothing.
   - **Data panel.** It lists the entities and the data sources. Dropping an
     entity offers a table, a form or a detail. Dropping a data source offers a
-    table, and a chart with one group field or a KPI with a total row. _Partly
-    built:_ the side pane of the Design tab lists every entity and every data
+    table, and a chart with one group field or a KPI with a total row. _Built:_ the
+    side pane of the Design tab lists every entity and every data
     source, module ones too, between the palette and the widget tree. A drop
     lands where a palette drop lands, and opens a dialog with one button for
     each widget that can show the name, disabled with the palette's reason when
@@ -931,6 +930,6 @@ Run and the Test results list, the read-only view of a module entity, and the re
     `@dnd-kit/sortable`.
   - **Format.** The designer writes only the order of the widget tree and the
     properties the format has. It writes no pixels, and widths stay in twelfths.
-- **Form designer** _(partly built, planned for M13)_. It is in [the form designer](form-designer.md).
+- **Form designer** _(built)_. It is in [the form designer](form-designer.md).
 - **Texts.** Its texts, including those of the lists above, are the platform
   texts under `shell.studio.*`, in `en` and `vi`, like the other shell texts.
