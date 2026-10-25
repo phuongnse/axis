@@ -14,8 +14,8 @@ internal static class Grants
         Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to read or write this data.");
 
     /// <summary>
-    /// The 401 of a request. A service account request, which has a bearer token, gets <c>WWW-Authenticate: Bearer</c>
-    /// and its own title. Any other request gets the sign-in problem.
+    /// The 401 of a request. A service account request, which has a bearer or DPoP token, gets the tenant's
+    /// <c>WWW-Authenticate</c> challenge (see <see cref="BearerChallenge"/>) and its own title. Any other request gets the sign-in problem.
     /// </summary>
     public static IResult SignInRequired(HttpContext context)
     {
@@ -24,7 +24,7 @@ internal static class Grants
             return SignInRequired();
         }
 
-        context.Response.Headers.WWWAuthenticate = "Bearer";
+        BearerChallenge.Write(context);
         return Results.Problem(
             statusCode: StatusCodes.Status401Unauthorized,
             title: "A valid bearer token is needed for this request.");
