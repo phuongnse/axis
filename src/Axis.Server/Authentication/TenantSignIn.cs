@@ -134,6 +134,9 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
         {
             var user = Session.Read(context.Principal!)
                 ?? throw new InvalidOperationException("The sign-in ticket holds no session user.");
+            // The cookie handler would renew the session that the request's cookie names. This flag makes the
+            // session store refuse that session, so every sign-in gets a new session id.
+            context.HttpContext.Items[Session.SigningInItem] = true;
             await SessionAudit.AppendAsync(
                 context.HttpContext,
                 AuditActions.SessionSignedIn,

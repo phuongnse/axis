@@ -251,6 +251,41 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("sequence_counters", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.SessionRow", b =>
+                {
+                    b.Property<byte[]>("IdHash")
+                        .HasColumnType("bytea")
+                        .HasColumnName("id_hash");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("display_name");
+
+                    b.Property<DateTimeOffset>("LastRequestAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_request_at");
+
+                    b.PrimitiveCollection<string[]>("Roles")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("roles");
+
+                    b.Property<DateTimeOffset>("SignedInAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("signed_in_at");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("IdHash")
+                        .HasName("pk_sessions");
+
+                    b.ToTable("sessions", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.ProvisionedEnumValueRow", b =>
                 {
                     b.HasOne("Axis.Data.Storage.ProvisionedEntityRow", null)

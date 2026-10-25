@@ -99,32 +99,31 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     user agent. The address follows the
     [forwarded headers](host-settings.md#forwarded-headers) rules of
     [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
-- **Session.** One HttpOnly, Secure, SameSite=Lax cookie, `Axis.Session`.
-  - It holds the user id, the display name, the roles and the tenant id.
-  - It holds no access, refresh or ID token, and no token reaches the
-    browser.
-  - It ends 8 hours after sign-in, or after 1 hour without requests,
-    whichever comes first. Every request with a session renews the cookie,
-    so the hour counts from the last request.
-  - _(Planned for M16.)_ The session moves to the server, see
-    [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md):
-    - The session state is a row of `axis.sessions` in the tenant database:
-      a hash of the session id, the user id, the display name, the roles,
-      the time of sign-in and the time of the last request. The table never
-      holds the session id itself, or a token.
-    - The cookie holds only a random session id of at least 128 bits. It
-      holds no claim.
-    - Sign-in always creates a new session id. Sign-out deletes the row, so a
-      copied cookie stops working at once, on every replica.
-    - A request reads the row and updates the time of the last request. A
-      row past one of the two lifetimes counts as no session, and is deleted.
-    - The worker removes expired rows.
-    - `tenant restore` empties the table, so no session comes back with an
-      archive.
-    - The cookie is named `__Host-Axis.Session`, with `Path=/` and no
-      domain, so the browser refuses it on plain http or from a subdomain.
-      In `Development` and `Testing` over plain http it keeps the name
-      `Axis.Session`.
+- **Session.** The session state is a row of `axis.sessions` in the tenant
+  database, see [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
+  - The row holds a hash of the session id, the user id, the display name,
+    the roles, the time of sign-in and the time of the last request. The
+    table never holds the session id itself, or a token, and no token
+    reaches the browser.
+  - The cookie is one HttpOnly, SameSite=Lax cookie. It holds only the random
+    session id, 256 bits, wrapped and protected by the key ring below. It
+    holds no claim. The row's key is the SHA-256 hash of the id.
+  - Sign-in always creates a new session id, even when the browser already
+    sends a valid session, and the old session ends. Sign-out deletes the row,
+    so a copied cookie stops working at once, on every replica.
+  - A request reads the row and updates the time of the last request. A row
+    ends 8 hours after sign-in, or after 1 hour without requests, whichever
+    comes first. A request past either limit counts as no session, and the
+    row is deleted. Every request with a session renews the cookie.
+  - The row has no tenant id, because each tenant has its own database. A
+    cookie on another tenant's host finds no row there, so it counts as no
+    session.
+  - The cookie is named `__Host-Axis.Session`, with `Secure`, `Path=/` and no
+    domain, so the browser refuses it on plain http or from a subdomain. In
+    `Development` and `Testing`, which run over plain http, it keeps the name
+    `Axis.Session`. The name depends only on the environment.
+  - _(Planned for M16.)_ The worker removes expired rows. `tenant restore`
+    empties the table, so no session comes back with an archive.
   - In `Development` and `Testing`, which run over plain http, the session
     cookie and the OIDC helper cookies are Secure only on https requests.
   - Behind a named proxy, the callback and sign-out addresses and the cookie's
@@ -133,17 +132,17 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     [forwarded headers settings](host-settings.md#forwarded-headers).
   - The cookie is protected with a key ring that every server replica shares.
     The keys are in `platform.data_protection_keys`, encrypted with
-    `Platform:SecretKey`, so a session survives a restart and works on every
-    replica. The server fixes the data protection application name to `Axis`,
+    `Platform:SecretKey`. It protects the cookie's session id wrapper, so
+    every replica reads it. The session itself survives a restart and works
+    on every replica because its row is in the database. The server fixes the data protection application name to `Axis`,
     so replicas at different paths read the same keys. A key that does not
     decrypt stops the start.
 - **Tenant binding.** A session whose tenant id differs from the tenant
   [resolved from the host](../architecture.md#request-resolution) counts as no session. So a
   cookie taken to another tenant's host signs nobody in there.
 - **Roles.** The roles come from the roles claim at sign-in and are kept in
-  the session. A role change at the identity provider applies at the next
-  sign-in. Under the server-side session of M16 they are kept in the session
-  row, and the rule does not change.
+  the session row. A role change at the identity provider applies at the next
+  sign-in.
 - **Current user.** `GET /api/me` keeps its shape,
   `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean
   `studio`, true when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set, and the user holds
@@ -201,7 +200,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   [Machine callers](#machine-callers).
 - **Tests.** Tests of sign-in itself start the development realm in Keycloak
   through Testcontainers, and drive its login page. Tests of the session
-  lifetime create the session through a test-only hook and use a test clock.
+  lifetime run on real PostgreSQL, create the session through a test-only hook
+  and use a test clock, so they see the row deleted. Server tests that only
+  need some session use an in-memory session store.
   Tests of [machine callers](#machine-callers) get client credentials tokens
   from the same container, and expire them with a test clock.
   Integration tests of other endpoints sign in through a test authentication

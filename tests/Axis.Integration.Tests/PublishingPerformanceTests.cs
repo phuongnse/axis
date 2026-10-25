@@ -244,6 +244,7 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
     public async Task One_thousand_me_requests_on_two_instances_with_the_shared_key_ring_all_answer_200_within_the_time_limit()
     {
         var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
+        await DataDatabaseFixture.MigrateTenantAsync(database.ConnectionString, CancellationToken);
 
         // The instances start one after the other, because both run the platform migrations.
         await using var first = CreateSessionFactory(platform);

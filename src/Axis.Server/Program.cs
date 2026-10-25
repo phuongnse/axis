@@ -159,7 +159,7 @@ builder.Services.AddTemplates(builder.Configuration, builder.Environment);
 var oidcTenants = new TenantSignInSettings(TenantOidcSettings.Load(tenants));
 
 // The development, E2E and test servers run over http, where a Secure cookie never comes back.
-var plainHttpAllowed = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing");
+var plainHttpAllowed = Session.AllowsPlainHttp(builder.Environment);
 var sessionCookiePolicy = plainHttpAllowed ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
 builder.Services.TryAddSingleton(TimeProvider.System);
 
@@ -167,7 +167,7 @@ builder.Services.TryAddSingleton(TimeProvider.System);
 // everywhere except endpoint paths, so a request that carries a session renews it. On endpoint
 // paths the default is the caller's bearer token, so a session cookie there is never read or renewed.
 builder.Services.AddAuthentication(EndpointCaller.RequestScheme)
-    .AddSession(sessionCookiePolicy)
+    .AddSession(plainHttpAllowed)
     .AddTenantSignIn(oidcTenants, sessionCookiePolicy, allowHttp: plainHttpAllowed)
     .AddEndpointCallers(oidcTenants, allowHttp: plainHttpAllowed);
 
