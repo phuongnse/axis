@@ -155,6 +155,13 @@ outcomes. Operators inspect the approvals and change nothing:
     and `reassign` _(planned for M14)_, see
     [Reassign](task-deadlines.md#reassign);
   - an `endpoint` takes `invoke`.
+  - From M15 _(planned for M15)_, an `entity` also takes `export` and
+    `import`, and a `dataSource` takes `export`. `export` reaches only what
+    the user's `read` grants reach, and needs a `read` grant on the same
+    target, or the policy is a new compile diagnostic. `import` writes through
+    the user's `create` grants, and their `update` grants for an import with
+    a key. See [import and export](import-export.md#grants) and
+    [D79](../decisions/d79-import-and-export-under-policies.md).
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
   the entity's fields, paths through `reference` fields of up to 3 hops, the

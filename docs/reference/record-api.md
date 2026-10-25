@@ -95,6 +95,11 @@ query per row. Create and update return their labels from the same statement
 as the write: the write is a data-modifying `WITH` clause, and the labels are
 selected from it with the same joins, because `RETURNING` cannot join.
 
+From M15 _(planned for M15)_, a reference field of a child row has its label
+in the row's place: `"labels": { "lineItems": [{ "product": "Desk" }] }`, one
+object per row in row order. A `references` field has an array of labels in
+the order of its ids.
+
 A label shows when the user may read the reference field and the target
 entity's display field. Otherwise the field has no entry in `labels`, as for a
 `null` reference. The target's record filters do not hide it, so a user who
@@ -109,7 +114,8 @@ one. A list holds only records that match one of the user's read filters,
 and `totalCount` counts only those. A grant without a `filter` matches every
 record. Each reference step of a read filter finds the target record through its
 primary key. No field has an index yet, so a filtered list reads the whole entity
-table.
+table. From M15 every reference column and declared index has one, see
+[schema planning](storage.md#schema-planning) _(planned for M15)_.
 
 ## Reading values
 
@@ -123,6 +129,9 @@ table.
 | `date-time` | A string in UTC with exactly six fraction digits and `Z`, such as `2026-10-06T02:00:00.123456Z`. PostgreSQL stores microseconds, so no precision is lost |
 | `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
 | `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](#child-rows-computed-fields-and-validations) |
+| `money` _(planned for M15)_ | A number written as for `decimal`. The currency is the field's, or the value of its `currencyField` |
+| `file` _(planned for M15)_ | An object `{ "id", "name", "mediaType", "size" }`. See [file fields](file-fields.md#field-and-value) |
+| `references` _(planned for M15)_ | An array of record ids, in the order they were written. Its labels are an array in the same order in `labels`. List responses leave it out, as for a child collection |
 
 ## Paging and sorting
 
@@ -141,6 +150,12 @@ table.
   display field, when repeated, when longer than 200 characters, or when it
   contains U+0000. The filter cannot use an index, so it reads the whole
   table. A `search` is invalid when the user may not read the display field.
+  From M15 _(planned for M15)_, `search` matches the display field and every
+  `searchable` field the user may read, and a `pg_trgm` index serves it. It
+  stays a substring match ignoring letter case, with the same limits. A
+  searchable field the user may not read is skipped, and only an unreadable
+  display field makes `search` invalid. See
+  [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by
   `id` alone. `NULL` values follow the PostgreSQL defaults: last when
@@ -171,7 +186,9 @@ HTTP also call. The record API maps its outcome to the responses below.
 
 - **Create.** `POST` takes `{ "values": { ... } }`. The record gets a new
   version 7 UUID as its id and `version` 1. Fields the body leaves out are
-  SQL `NULL`. The response is `201` with the record, and `Location` is
+  SQL `NULL`. From M15 a field with a `default` that the body leaves out gets
+  its default, and a body that sends `null` keeps `null`
+  _(planned for M15)_. The response is `201` with the record, and `Location` is
   `/api/apps/{app}/entities/{entity}/records/{id}`. It uses the application
   and entity names from the active model, not the letter case of the request,
   so a record always has one URL. The id is in the lowercase hyphenated form.
@@ -412,6 +429,12 @@ otherwise the answer is the stale-version `409`. See
   [start lock](processes.md#releases-and-running-work). The server already ran
   the request again on the new release each time. Nothing was written, and the
   client may send the request again. The title is fixed: "The application's active release changed while the request ran. Try again."
+- **`503` for a query timeout** _(planned for M15)_. A read that runs past
+  `Data:QueryTimeout` is cancelled by PostgreSQL. The title is fixed: "The
+  query took too long. Try again or narrow it." The server logs the entity
+  name and the duration. When only the count of a list times out, the answer
+  is `200` with `totalCount: null`. See
+  [data settings](host-settings.md#data-settings).
 - **`500`.** An unexpected error on any path is caught by the exception
   handler. The response has no exception type, message or stack trace.
 - **`traceId`**. Every problem details answer has a
@@ -479,6 +502,12 @@ is not a `text`. A wrong JSON type or a value outside its bounds is an error at
 | `date-time` | An RFC 3339 string `yyyy-MM-ddTHH:mm:ss` with an optional fraction of 1 to 6 digits and `Z` or `±HH:mm`; `T` and `Z` may be lower case. A missing offset, an offset beyond ±14:00, a leap second (`:60`), more than 6 fraction digits (PostgreSQL stores microseconds) or an instant outside 0001..9999 in UTC is an error | `DateTimeOffset` converted to UTC with offset zero, the only offset Npgsql writes to `timestamp with time zone` |
 | `enum` | A string equal to one of `values`, compared ordinally | `string` |
 | `reference` | A string in the hyphenated 8-4-4-4-12 hex form, in either letter case; whether the record exists is checked when it is written | `Guid` |
+| `money` _(planned for M15)_ | A number, checked as for `decimal` with the field's `precision` and `scale` | `string`, as for `decimal` |
+| `file` _(planned for M15)_ | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field, see [file fields](file-fields.md#upload) | `Guid` |
+| `references` _(planned for M15)_ | An array of distinct record ids, at most 1,000. The whole set replaces the stored one | `Guid[]` |
+
+From M15 _(planned for M15)_, a value outside a field's `min`, `max` or
+`minLength` is an error at the field's pointer, as for `maxLength`.
 
 **Errors** are a dictionary from RFC 6901 JSON Pointer into the body to its
 messages, in ordinal key order, usable as is for a validation problem

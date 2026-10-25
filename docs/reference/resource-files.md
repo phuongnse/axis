@@ -469,6 +469,48 @@ is `AXC0013`.
   is `AXC0013` at `/fields/{i}/sensitive`. See
   [Sensitive fields](roles-and-policies.md#sensitive-fields).
 
+### Types and properties added in M15
+
+These are _(planned for M15)_. They follow
+[D76](../decisions/d76-file-money-and-enum-label-field-types.md),
+[D77](../decisions/d77-indexes-defaults-and-ranges.md),
+[D78](../decisions/d78-references-from-child-rows-and-many-to-many.md) and
+[D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md). Each
+new check is a new compile diagnostic.
+
+- **`file`.** One file, with optional `maxSize` and `accept`. It takes
+  `required` and `sensitive`, and no `unique`, `default` or `expression`. See
+  [file fields](file-fields.md).
+- **`money`.** An amount, with `precision` (default 18) and `scale`, and
+  exactly one of `currency`, a fixed ISO 4217 code such as `"VND"`, or
+  `currencyField`, which names an `enum` or `text` field of the same entity.
+  `scale` defaults to the currency's minor units, or 2 with `currencyField`.
+  It takes the properties of `decimal`, and its expression type is `decimal`.
+- **`references`.** A set of records of `target`, at most 1,000. It takes
+  `required` and `sensitive`, and no `unique`, `default` or `expression`. Its
+  expression type is `list<Target>`.
+- **`valueLabels`.** On an `enum` field, a map from every value to a
+  `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
+  "priority.low" } }`. It covers every value, and its keys join `AXC0028`.
+- **`default`.** An expression with no record in scope: literals, rule calls
+  and `now()`. Its type must fit the field. It is not allowed with
+  `expression`, `sequence` or `creator`, or on `reference`, `file`,
+  `references` and `child-collection` fields. The record command applies it
+  on create when the body leaves the field out, see
+  [create, update and delete](record-api.md#create-update-and-delete).
+- **`min` and `max`.** On `integer`, `decimal`, `money`, `date` and
+  `date-time` fields, a literal of the field's type, with `min` at most `max`.
+  **`minLength`** on `text`, at most `maxLength`. A value outside is a `400`
+  at the field's pointer. There is no `CHECK` constraint.
+- **`searchable`.** On a `text` field. `search` reads every searchable field,
+  and the display field is always searchable. See
+  [paging and sorting](record-api.md#paging-and-sorting).
+- **`indexes`.** On the entity, a list of `{ "fields": [ ... ] }` with an
+  optional `"unique": true`. Each field is a root field that is not a
+  `child-collection`, `references` or `file`. Two indexes over the same
+  fields in the same order are a diagnostic. See
+  [schema planning](storage.md#schema-planning).
+
 ## Entity logic
 
 This section adds validations, computed fields and child collections to an
@@ -588,14 +630,19 @@ validation calls the rules of its own module, see [modules](modules-and-template
   [the record API](record-api.md#child-rows-computed-fields-and-validations)
   describes.
 - **M2 limits on a child entity.** These are limits of M2, not permanent
-  rules. Real line items often point to a product, so a later milestone is
-  expected to lift the last one. A child entity:
+  rules. Real line items often point to a product, so
+  [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md)
+  lifts part of the last one _(planned for M15)_. A child entity:
   - is owned by exactly one `child-collection` field (`AXC0039`);
   - is never the `target` of a `reference` (`AXC0040`);
   - is never the `entity` of a data source (`AXC0064`) or of a process
     (`AXC0068`);
   - has no record routes of its own;
-  - has no `reference` or `child-collection` fields (`AXC0041`).
+  - has no `reference` or `child-collection` fields (`AXC0041`). From M15 it
+    may have `reference` fields, and `AXC0041` refuses only a
+    `child-collection` field _(planned for M15)_. A reference from a child
+    row gets a foreign key and an index, and its labels follow the rows, see
+    [child rows](record-api.md#child-rows-computed-fields-and-validations).
 
 ## Form conditions and steps
 

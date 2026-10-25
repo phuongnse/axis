@@ -110,13 +110,18 @@ Every expression has a type, found at compile time.
 | `date-time` | `date-time` | A UTC instant, to the microsecond. |
 | `enum` | `enum` | One value of one field's `values`. |
 | `reference` | `reference` | A record of the target entity. |
+| `money` _(planned for M15)_ | `decimal` | The amount. The currency is not part of the value. |
+| `file` _(planned for M15)_ | `file` | Only `is null` and `is not null` accept it. |
+| `references` _(planned for M15)_ | `list<Entity>` | The set of target records. Only aggregates accept it. |
 
 Two more types exist only inside expressions:
 
 - **`null`.** The type of the literal `null`. It fits any type.
-- **`list<Entity>`.** The type of a child collection field. Only
-  [aggregates](#aggregates) accept it, as their first argument. Anywhere
-  else it is a type diagnostic.
+- **`list<Entity>`.** The type of a child collection field, and from M15 of a
+  `references` field _(planned for M15)_. Only [aggregates](#aggregates)
+  accept it, as their first argument. Anywhere else it is a type diagnostic.
+  Over a `references` field, names in the item expression are the target's
+  fields, with paths through its references.
 
 Rules:
 
@@ -471,6 +476,7 @@ included. Computed fields and validations can use aggregates.
 | `max(list, item)` | type of `item` | `null` |
 | `any(list, condition)` | boolean | false |
 | `all(list, condition)` | boolean | true |
+| `avg(list, item)` _(planned for M15)_ | decimal | `null` |
 
 - **Example.** `sum(lines, quantity * unitPrice)` adds up the line totals.
 - **Item types.** `sum` takes integer or decimal items. `min` and `max` take
@@ -486,7 +492,11 @@ included. Computed fields and validations can use aggregates.
   inside the item expression, where `and` and `or` short-circuit.
 - **Errors.** A `sum` past the integer range, or one that a .NET `decimal`
   cannot hold exactly, is a [run-time error](#run-time-errors).
-- **SQL.** No aggregate is in the SQL subset.
+- **`avg`** _(planned for M15)_. It takes integer or decimal items, skips
+  `null` items and is `null` when none is left. Its result is a decimal
+  rounded to 6 digits after the point.
+- **SQL.** No aggregate is in the SQL subset. From M15 `any` and `count` are,
+  see [SQL subset](#sql-subset) _(planned for M15)_.
 
 ## Cost bounds
 
@@ -626,7 +636,22 @@ These are left out:
 - **`trim`.** The two systems define whitespace differently.
 - **Aggregates.** A child collection has no column in the entity's table.
   A filter type-checks with the entity's child collections, so an aggregate
-  in it is `AXC0053`.
+  in it is `AXC0053`. From M15 `any` and `count` are in the subset, below,
+  and the other aggregates stay out _(planned for M15)_.
+
+From M15 _(planned for M15)_, `any(list, condition)`, `count(list)` and
+`count(list, condition)` translate when `list` is a child collection or a
+`references` field of the filter's root entity. See
+[D78](../decisions/d78-references-from-child-rows-and-many-to-many.md).
+
+- `any` becomes `EXISTS (SELECT 1 FROM <child or junction> WHERE <owner
+  match> AND <condition>)`, and `count` a `(SELECT count(*) ...)` subquery of
+  the same shape.
+- The condition is in the subset itself. Its names are the child row's
+  fields, or for `references` the target's fields through a join on
+  `target_id`, with paths through their references.
+- A `null` condition counts as false, as `WHERE` drops it.
+- The indexes on `owner_id` and `target_id` serve these subqueries.
 
 Rules:
 

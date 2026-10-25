@@ -86,3 +86,9 @@ files agree, title and status included.
 | [D73](decisions/d73-in-app-and-email-notifications.md) | In-app and email notifications | **Agreed** |
 | [D74](decisions/d74-a-visual-process-designer.md) | A visual process designer | **Agreed** |
 | [D75](decisions/d75-the-application-time-zone.md) | The application time zone | **Agreed** |
+| [D76](decisions/d76-file-money-and-enum-label-field-types.md) | File, money and enum label field types | **Agreed** |
+| [D77](decisions/d77-indexes-defaults-and-ranges.md) | Indexes, defaults and ranges | **Agreed** |
+| [D78](decisions/d78-references-from-child-rows-and-many-to-many.md) | References from child rows and many-to-many | **Agreed** |
+| [D79](decisions/d79-import-and-export-under-policies.md) | Import and export under policies | **Agreed** |
+| [D80](decisions/d80-search-more-aggregates-and-query-timeouts.md) | Search, more aggregates and query timeouts | **Agreed** |
+| [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md) | Asset management as the fourth sample application | **Agreed** |

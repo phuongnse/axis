@@ -31,6 +31,8 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 | **Data source** | A named, parameterized query over entities. It declares projections, filters, sorting, paging, related entities and aggregates. Pages, widgets, rules and processes read data only through data sources or entity APIs. See [data sources](../reference/data-sources.md). | M2 |
 | **Sequence** | A `sequence` resource that hands out business numbers from a format such as `PR-{yyyy}-{n:5}`, giving `PR-2026-00042`. A `text` field names it and gets its number on create, in the create's transaction, so there are no gaps. When the format has a year, the counter restarts each UTC year. See [configuration](../reference/resource-files.md#sequences). | M3 |
 | **Seed data** | Reference or demo records shipped with an application and applied idempotently. Seed data is not created by process code. A seed can be synced so changed values update the seeded records on start. | M1 (basic), M2 |
+| **File** | A file that a `file` field holds: uploaded first as `pending`, then attached by a record write, downloaded by id under the owner record's read grants, and stored where the application's `storage` binding says. M15 stores the bytes in the tenant database. See [file fields](../reference/file-fields.md) and [D76](../decisions/d76-file-money-and-enum-label-field-types.md). *(planned for M15)* | M15 |
+| **Import and export** | Writing the rows of a data source or an entity to a CSV or spreadsheet file, and creating or updating records from one. Each needs its own grant action, `export` or `import`. An export runs the rows query under the user's read grants. An import runs on the worker, checks every row in a dry run, then writes all rows or none through the record command. See [import and export](../reference/import-export.md) and [D79](../decisions/d79-import-and-export-under-policies.md). *(planned for M15)* | M15 |
 | **Migration** | A `migration` resource that changes one entity's stored data in a way that is not additive: rename or drop a field, drop the entity, fill nulls or convert values. Activation runs it once per tenant, before additive provisioning, in the same transaction. Rename field, drop field, drop entity, fill and convert are built, and so is the refusal of a destructive migration while old-release instances use the column. A retry of a `failed` instance after a destructive migration on a column its pinned release uses is refused. A fill or convert on a child entity or of a field a computed field reads recomputes the changed rows and their owners at activation. See [storage](../reference/migrations.md#migrations). | M6 |
 
 **Field types** start with:
@@ -46,10 +48,16 @@ See [the life of a milestone](../delivery.md#the-life-of-a-milestone).
 - child collection (owned rows such as line items). The record API reads and
   writes its rows through the owner record.
 
+M15 adds *(planned for M15)*, see
+[entity field types](../reference/resource-files.md#types-and-properties-added-in-m15):
+
+- money, with a fixed currency or a currency field
+- file
+- references (a set of records, many-to-many)
+- labels for enum values
+
 Later types:
 
-- money
-- file
 - JSON object
 
 **Field constraints** in M1:
@@ -59,15 +67,19 @@ Later types:
 - maxLength (text)
 - precision and scale (decimal)
 
-Later constraints:
+M15 adds *(planned for M15)*:
 
-- range
-- index
+- range (`min`, `max` and `minLength`)
+- index, declared on the entity, and added by the platform on every
+  reference and owner column
 - default value
 
-**Field flags** (later):
+**Field flags**:
 
-- searchable
+- searchable *(planned for M15)*
+
+Later field flags:
+
 - audited
 - masked in logs
 - encrypted at rest
@@ -139,7 +151,7 @@ Inbound endpoints are their own resource, not a trigger kind. See
 | **Site** | An entry point of one application, with its own path, title, locales (default, fallback and available) and navigation. Theme, identity provider binding and domain come later. | M1 |
 | **Page** | A route in a site. It has a title, and its content is its widgets: a tree of widgets, drawn in order (M12). A page has no entity or template of its own. It can declare typed parameters, filled by navigate actions (M12). | M1, M12 (widget tree, parameters) |
 | **Widget** | A UI block on a page. M1 has `table` and `form` widgets over one entity, a `table` may bind a data source instead of an entity (M2), and a table opens and creates records through navigate actions (M12). M3 adds the `taskInbox` widget, which lists the user's open tasks. The process inspector widget, which lists the instances of one process and shows one, is built in M7. M12 adds the container widgets `columns`, `tabs` and `section`, which hold other widgets and are drawn by the SPA. M12 adds `detail`, `chart` and `kpi`, see [D64](../decisions/d64-detail-chart-and-kpi-widgets.md). A chart and a KPI bind page parameters into their data source with the name map of a table (M13). A list widget and custom widgets come later. | M1, M12 (containers, detail, chart and KPI widgets), M13 (chart and KPI page parameters) |
-| **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. M1 has a basic form over all of an entity's fields. M3 builds the `form` resource: sections of fields, any of them read-only, used by both pages and tasks. Conditional visible, required and read-only states, validation as the user types and wizard steps are built in M12. The form schema, compile checks, metadata, the record and task form state endpoints, the SPA's form widget conditions and the task page's conditions are built, and so are the wizard steps on form pages and task pages ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)). Refusing a value for a hidden or read-only field in the task API is built in M13. File upload comes later. See [frontend](../reference/frontend.md). | M1 (basic), M3 (form resource), M12 (states, steps), M13 (task API refusal), later |
+| **Form** | Fields laid out in sections and steps, with visibility, enabled and required conditions, validation rules, child collections (line items), lookups and file upload. M1 has a basic form over all of an entity's fields. M3 builds the `form` resource: sections of fields, any of them read-only, used by both pages and tasks. Conditional visible, required and read-only states, validation as the user types and wizard steps are built in M12. The form schema, compile checks, metadata, the record and task form state endpoints, the SPA's form widget conditions and the task page's conditions are built, and so are the wizard steps on form pages and task pages ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)). Refusing a value for a hidden or read-only field in the task API is built in M13. File upload is *(planned for M15)*, see [file fields](../reference/file-fields.md#in-the-spa). See [frontend](../reference/frontend.md). | M1 (basic), M3 (form resource), M12 (states, steps), M13 (task API refusal), M15 (file upload) |
 | **Action** | A user command on a page or widget: start a process, complete a task, run an operation or navigate. Actions are always authorized on the server. M3 builds the `startProcess` action on a form widget and the outcomes of a task. Run operation comes later. Navigate actions with page parameters are built in M12, see [D63](../decisions/d63-navigate-actions-and-page-parameters.md). Table row and toolbar actions, delete included, are built in M12, see [D59](../decisions/d59-table-row-and-toolbar-actions.md). A delete of a record that a running or waiting process instance works on is refused with `409`. Page metadata lists them, and the SPA shows their buttons on table rows, the table toolbar and saved forms. | M3, M12 (navigate, row and toolbar actions), M13 (delete refusal) |
 | **Theme** | Design tokens for light and dark mode, shared by every site. M1 has the shared tokens. A site will be able to adjust tokens later, but never add per-page styling. | M1 (shared tokens), later (site adjustments) |
 | **Text resource** | A localized text with a stable key. Every UI string comes from text resources. An application has one `text` resource per locale, and every locale has the same keys. A key used by a label must exist in every locale. Texts are never shared across applications. Each release carries its own texts, so removing a key in a newer release does not affect work still running on an older one. | M1 (basic), M6 (full) |
@@ -155,6 +167,6 @@ Inbound endpoints are their own resource, not a trigger kind. See
 | **Tenant** | An isolated customer scope with its own database, users, applications and settings. | M1 (context), M9 (management) |
 | **Tenant directory** | The list of tenants in the platform database: each tenant's status, hosts, database, sign-in settings and deployment bindings, with secrets stored encrypted. The server and the worker read it and pick up changes without a restart. Host configuration stays the default source. See [D42](../decisions/d42-tenant-directory-in-the-platform-database.md). | M9 |
 | **Preview tenant** | A tenant that belongs to one main tenant, where an author tries an application before publishing it. It has its own database, hosts and deployment bindings, and its data never mixes with the main tenant's. Its bindings are empty by default, so it never calls a real system by accident. It signs people in with its main tenant's sign-in settings. See [preview tenants](../architecture.md#preview-tenants) and [D48](../decisions/d48-preview-tenants.md). Built under the `configuration` and `directory` tenant sources, with `PreviewOf`, sign-in and bindings. The publisher runs preview requests on it, and the Studio **Preview** button and its route send them. Each tenant keeps its own status. | M10 |
-| **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. M5 has two kinds, `url` and `secret`. Their values are set per tenant in host configuration or in the tenant directory under `Tenancy:Source=directory`. See [deployment bindings](../reference/integration-resources.md#deployment-bindings). | M5 |
+| **Deployment binding** | Environment-specific settings that a release resolves at run time, held as references and never as values in configuration. Examples: database, storage, identity provider, connector endpoints and secrets. M5 has two kinds, `url` and `secret`. M15 adds `storage`, for the files of file fields *(planned for M15)*. Their values are set per tenant in host configuration or in the tenant directory under `Tenancy:Source=directory`. See [deployment bindings](../reference/integration-resources.md#deployment-bindings). | M5, M15 (storage) |
 | **Audit record** | An append-only record of a consequential action, committed in the same transaction as the action. It holds the time, the actor, the action, the application, the entity, the record, the process instance and a details object. It also holds the actor's display name at the time of the action. The database rejects every update and delete. See [storage](../reference/storage.md#audit-records-and-sequence-counters). | M3 |
 | **Test scenario** | A `scenario` resource. It is a configuration-level test that runs against its own temporary tenant database. It applies the seed data, runs actions as given users with stubbed connector and package calls, and asserts record, task and process outcomes, including denied actions. It is compiled with the application, and its names and values are checked, but it is not part of its release. The runner runs record actions, process starts, task completions and the `expect` steps, and runs the process steps, the connector and package calls and the event deliveries after each action. Stubs answer the calls. Schedule triggers run through the `advanceTime` step, which moves `now` forward and runs every due work item. Studio runs scenarios through a `test` publish request and the publisher, see [D55](../decisions/d55-running-test-scenarios-from-studio.md). | M6 |

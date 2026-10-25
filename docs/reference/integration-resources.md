@@ -26,7 +26,8 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
 ### Deployment bindings
 
 - **Binding.** A named setting that a release refers to by name and never
-  holds as a value. M5 has two kinds: `url` and `secret`.
+  holds as a value. M5 has two kinds: `url` and `secret`. M15 adds a third,
+  `storage`, _(planned for M15)_, see **Storage binding** below.
 - **No binding resource.** No resource kind declares bindings. A connector
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
@@ -82,6 +83,15 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   start and the worker stays not ready.
 - **Resolved at run time.** The worker reads a binding each time it makes a
   call, so changing a secret needs no new release.
+- **Storage binding** _(planned for M15)_. The application manifest names
+  where the files of its file fields go, as
+  `"fileStorage": { "binding": "<name>" }`. That binding has the kind
+  `storage`. In M15 its only value is `database`, which stores the bytes in
+  the tenant database. Any other value fails the startup check. An
+  application without `fileStorage` uses the tenant database too, and its
+  activation needs no binding. Other storage comes later. See
+  [file fields](file-fields.md#storage-and-clean-up) and
+  [D76](../decisions/d76-file-money-and-enum-label-field-types.md).
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
   must be `https`. Activation checks each connector's base URL binding and
   each `url` binding that a package operation step declares (`AXC0101`). The

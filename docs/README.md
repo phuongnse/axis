@@ -33,6 +33,8 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Expressions](reference/expressions.md)                                | The expression language, its functions and its SQL translation                        |
 | [Data sources](reference/data-sources.md)                              | The `dataSource` resource and its endpoint                                            |
 | [Record API](reference/record-api.md)                                  | Record routes, values, paging, errors, child rows, audit history                      |
+| [File fields](reference/file-fields.md)                                | The `file` field type: values, upload, download, storage and clean-up                |
+| [Import and export](reference/import-export.md)                        | Exporting records to CSV and spreadsheets, and importing them under policies          |
 | [Inbound endpoint calls](reference/inbound-endpoints.md)               | How another system calls an inbound endpoint: checks, responses, idempotency          |
 | [Processes](reference/processes.md)                                    | The `process` resource, steps, compile checks, start endpoint, states, process tables |
 | [Task API](reference/task-api.md)                                      | Listing, reading and completing tasks                                                 |
