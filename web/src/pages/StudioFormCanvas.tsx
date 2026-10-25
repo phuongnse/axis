@@ -1,3 +1,4 @@
+import { useDndContext, useDroppable } from '@dnd-kit/core'
 import { Flex, Segmented, Tag } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
@@ -39,8 +40,10 @@ const fieldConditions: ConditionKey[] = ['visibleWhen', 'requiredWhen', 'readOnl
  * that picks the step the canvas shows. No condition is evaluated, so every field and section shows. An element with
  * `visibleWhen`, `requiredWhen` or `readOnlyWhen` has a mark for each condition with its text from the draft. A
  * section, field or step that a diagnostic names is marked. A click, Enter or Space on a field or a section selects it,
- * and a click on a step selects it too. The selected element has an outline and `aria-current`, and a panel beside the
- * canvas shows its properties. An edit there changes the draft, and so does the Move to step picker of a section. An `aside` goes in the panel above the properties.
+ * and a click on a step selects it too. While a section moves, a step's entry in the switch takes the section on a drop.
+ * The selected element has an outline and `aria-current`, and a panel beside the canvas shows its properties. An edit
+ * there changes the draft, and so does the Move to step picker of a section. An `aside` goes in the panel above the
+ * properties.
  */
 export function StudioFormCanvas({
   application,
@@ -57,7 +60,7 @@ export function StudioFormCanvas({
   draft: Record<string, unknown>
   /** The pointer of the selected field, section or step, or null. */
   selected: string | null
-  onSelect: (path: string) => void
+  onSelect: (path: string | null) => void
   onChange: ChangeHandler
   /** Says a move aloud in the live region. */
   onAnnounce: (text: string) => void
@@ -250,19 +253,53 @@ function StepSwitch({
       options={steps.map((step, index) => ({
         value: index,
         label: (
-          <span
-            data-testid="studio-form-step"
-            data-path={step.path}
-            data-marked={step.marked ? 'true' : undefined}
-            aria-current={step.path !== undefined && step.path === selected ? 'true' : undefined}
+          <StepSwitchEntry
+            index={index}
+            step={step}
+            selected={selected}
             // The switch fires onChange only when the value changes, so a click on the step already shown needs this.
             onClick={() => onChange(index)}
-          >
-            {step.marked ? `${t(step.titleKey)} · ${t('shell.studio.design.hasDiagnostics')}` : t(step.titleKey)}
-          </span>
+          />
         ),
       }))}
     />
+  )
+}
+
+/** A step's entry in the switch. While a section moves, it is a drop target that appends the section to the step. */
+function StepSwitchEntry({
+  index,
+  step,
+  selected,
+  onClick,
+}: {
+  index: number
+  step: { titleKey: string; path: string | undefined; marked: boolean }
+  selected: string | null
+  onClick: () => void
+}) {
+  const t = useText()
+  const { colour, radius } = useDesignTokens()
+  const { active } = useDndContext()
+  const sectionMoving = typeof (active?.data.current as { section?: unknown } | undefined)?.section === 'number'
+  const pointer = step.path ?? `/steps/${index}`
+  const { setNodeRef, isOver } = useDroppable({
+    id: `switch:${pointer}`,
+    data: { pointer },
+    disabled: !sectionMoving,
+  })
+  return (
+    <span
+      ref={setNodeRef}
+      data-testid="studio-form-step"
+      data-path={step.path}
+      data-marked={step.marked ? 'true' : undefined}
+      aria-current={step.path !== undefined && step.path === selected ? 'true' : undefined}
+      onClick={onClick}
+      style={{ outline: isOver ? `2px solid ${colour.primary}` : undefined, borderRadius: radius.base }}
+    >
+      {step.marked ? `${t(step.titleKey)} · ${t('shell.studio.design.hasDiagnostics')}` : t(step.titleKey)}
+    </span>
   )
 }
 

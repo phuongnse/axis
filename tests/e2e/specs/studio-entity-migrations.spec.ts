@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { expect, test } from "../test";
+import type { Page, TestInfo } from "@playwright/test";
 import { startServer } from "../activate";
 import { confirmDialog } from "../dialogs";
 import { useSession } from "../sessions";

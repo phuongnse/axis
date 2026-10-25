@@ -90,7 +90,9 @@ internal sealed class SessionStore : ITicketStore
                     reader.GetString(0),
                     reader.GetString(1),
                     reader.GetFieldValue<string[]>(2));
-                return new AuthenticationTicket(principal, new AuthenticationProperties(), Session.Scheme);
+                // The handler renews a cookie only for a ticket that carries both times.
+                var properties = new AuthenticationProperties { IssuedUtc = now, ExpiresUtc = now + Session.IdleTimeout };
+                return new AuthenticationTicket(principal, properties, Session.Scheme);
             }
         }
 

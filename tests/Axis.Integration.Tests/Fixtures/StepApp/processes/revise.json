@@ -1,0 +1,22 @@
+{
+  "id": "3e961ecb-9184-4dee-b496-9960faf2c785",
+  "kind": "process",
+  "name": "Revise",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "review",
+  "steps": [
+    {
+      "name": "review",
+      "type": "task",
+      "label": { "textKey": "request.approve" },
+      "assignee": { "role": "finance" },
+      "form": "RequestReview",
+      "outcomes": [
+        { "name": "again", "label": { "textKey": "task.reject" }, "next": "review" },
+        { "name": "accept", "label": { "textKey": "task.approve" }, "next": "done" }
+      ]
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

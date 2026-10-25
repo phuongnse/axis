@@ -79,6 +79,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("settled_at");
 
+                    b.Property<long>("StagedRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staged_revision");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasColumnType("text")
@@ -92,9 +96,9 @@ namespace Axis.Processes.Storage.Migrations
                     b.HasKey("Id")
                         .HasName("pk_connector_calls");
 
-                    b.HasIndex("ProcessInstanceId", "Step")
+                    b.HasIndex("ProcessInstanceId", "Step", "StagedRevision")
                         .IsUnique()
-                        .HasDatabaseName("ux_connector_calls_process_instance_id_step");
+                        .HasDatabaseName("ux_connector_calls_process_instance_id_step_staged_revision");
 
                     b.ToTable("connector_calls", "axis");
                 });
@@ -368,6 +372,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("settled_at");
 
+                    b.Property<long>("StagedRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staged_revision");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasColumnType("text")
@@ -386,9 +394,9 @@ namespace Axis.Processes.Storage.Migrations
                     b.HasKey("Id")
                         .HasName("pk_package_calls");
 
-                    b.HasIndex("ProcessInstanceId", "Step")
+                    b.HasIndex("ProcessInstanceId", "Step", "StagedRevision")
                         .IsUnique()
-                        .HasDatabaseName("ux_package_calls_process_instance_id_step");
+                        .HasDatabaseName("ux_package_calls_process_instance_id_step_staged_revision");
 
                     b.ToTable("package_calls", "axis");
                 });

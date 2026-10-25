@@ -12,6 +12,7 @@ using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Server.Authentication;
+using Axis.Server.Tenancy;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
@@ -360,17 +361,18 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
-            app.Use(async (context, nextMiddleware) =>
-            {
-                if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/test/session")
+            // The session store reads the tenant, which the real pipeline resolves only after this filter.
+            app.UseWhen(
+                context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/test/session",
+                branch =>
                 {
-                    await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("a", "anna", "Anna Employee", ["employee"]));
-                    context.Response.StatusCode = StatusCodes.Status204NoContent;
-                    return;
-                }
-
-                await nextMiddleware(context);
-            });
+                    branch.UseTenantResolution();
+                    branch.Run(async context =>
+                    {
+                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("a", "anna", "Anna Employee", ["employee"]));
+                        context.Response.StatusCode = StatusCodes.Status204NoContent;
+                    });
+                });
             next(app);
         };
     }

@@ -53,10 +53,10 @@ public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : I
         var condition = ManagerCondition(model, request);
         await using var dataSource = NpgsqlDataSource.Create(fixture.ConnectionString);
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken);
-        await RecordQueries.ListAsync(connection, request, 1, PageSize, null, null, condition, CancellationToken);
+        await RecordQueries.ListAsync(connection, null, request, 1, PageSize, null, null, condition, CancellationToken);
 
         var stopwatch = Stopwatch.StartNew();
-        var page = await RecordQueries.ListAsync(connection, request, 1, PageSize, null, null, condition, CancellationToken);
+        var page = await RecordQueries.ListAsync(connection, null, request, 1, PageSize, null, null, condition, CancellationToken);
         stopwatch.Stop();
 
         TestContext.Current.TestOutputHelper?.WriteLine($"The record list took {stopwatch.Elapsed}.");
@@ -80,10 +80,10 @@ public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : I
         var condition = ManagerCondition(model, request);
         await using var dataSource = NpgsqlDataSource.Create(fixture.ConnectionString);
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken);
-        await DataSourceQueries.ListAsync(connection, model, totals, 1, PageSize, null, [], condition, CancellationToken);
+        await DataSourceQueries.ListAsync(connection, null, model, totals, 1, PageSize, null, [], condition, CancellationToken);
 
         var stopwatch = Stopwatch.StartNew();
-        var page = await DataSourceQueries.ListAsync(connection, model, totals, 1, PageSize, null, [], condition, CancellationToken);
+        var page = await DataSourceQueries.ListAsync(connection, null, model, totals, 1, PageSize, null, [], condition, CancellationToken);
         stopwatch.Stop();
 
         TestContext.Current.TestOutputHelper?.WriteLine($"The data source took {stopwatch.Elapsed}.");

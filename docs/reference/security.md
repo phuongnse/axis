@@ -47,7 +47,11 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 
 - **Startup checks.** The server's startup fails, naming every problem as
   for the tenant configuration, when a tenant has no `Oidc` block, or when
-  its `Authority`, `ClientId` or `ClientSecret` is missing or blank.
+  its `Authority`, `ClientId` or `ClientSecret` is missing or blank. Under the
+  `fapi2` profile the client key replaces the client secret: the tenant needs a
+  client key with a key id, and no client secret. A `Profile` other than
+  `standard` or `fapi2` fails the start too. The check confirms that the key and
+  its key id are present and does not parse the PEM. No message holds a key.
   A preview tenant has no `Oidc` block, and takes its
   main tenant's, see [preview tenants](../architecture.md#preview-tenants). Only the
   server reads and checks the block. The worker reads the same `Tenants`
@@ -409,14 +413,16 @@ session-only until then.
 
 ## FAPI 2.0 profile
 
-_(Planned for M16.)_ It follows
-[D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant can turn
-on the FAPI 2.0 Security Profile for sign-in and for machine callers.
+It follows [D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant
+can turn on the FAPI 2.0 Security Profile for sign-in and for machine callers.
+The tenant setting, the client key and the startup check are built. Nothing
+uses the profile at sign-in yet, and the sign-in, machine-caller, rotation,
+verification and Keycloak bullets below are _(planned for M16)_.
 
 - **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
   `standard` when unset. Any other value stops the server's start, naming the
   tenant. A preview tenant takes its main tenant's profile.
-- **Sign-in under `fapi2`.**
+- **Sign-in under `fapi2`** _(planned for M16)_.
   - The server sends the authorization request through pushed authorization
     requests (PAR). A provider that does not offer PAR fails the tenant's
     sign-in, and the server logs why.
@@ -426,23 +432,26 @@ on the FAPI 2.0 Security Profile for sign-in and for machine callers.
   - The server checks the `iss` parameter of the authorization response
     against the tenant's `Authority` (RFC 9207).
   - The token request carries a DPoP proof.
-- **Machine callers under `fapi2`.** Inbound endpoints and service accounts
+- **Machine callers under `fapi2`** _(planned for M16)_. Inbound endpoints and service accounts
   accept only access tokens bound to a DPoP key. The request carries a DPoP
   proof, and its `htu` is checked against the forwarded scheme and host of
   [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md). Mutual
   TLS is not offered, because the TLS proxy ends the client's TLS connection.
 - **The client key.** A tenant under `fapi2` has a private key for
   `private_key_jwt`. Under `configuration` it comes from the environment,
-  such as `Tenants__default__Oidc__ClientKey`, as a PEM. Under `directory` it
-  is stored encrypted in the tenant directory, with the field name
-  `oidc_client_key`, see [platform database](storage.md#platform-database).
-  A tenant under `fapi2` without a key stops the server's start.
-- **Rotation.** The tenant can hold a second key while the identity provider
+  such as `Tenants__default__Oidc__ClientKey`, as a PEM, with its key id in
+  `Oidc:ClientKeyId`. Under `directory` it is stored encrypted in the tenant
+  directory, with the field name `oidc_client_key` and its key id, see
+  [platform database](storage.md#platform-database). A tenant can hold two keys
+  under `directory`, the current one and the previous one, and one under
+  `configuration`. A tenant under `fapi2` without a key, or with a key without a
+  key id, stops the server's start.
+- **Rotation** _(planned for M16)_. The tenant can hold a second key while the identity provider
   changes over, see [tenant setting commands](tenant-setting-commands.md).
-- **Verification.** The OpenID Foundation's conformance suite runs by hand
+- **Verification** _(planned for M16)_. The OpenID Foundation's conformance suite runs by hand
   against the development realm under `fapi2`. Its result is recorded in
   [ASVS](asvs.md). Axis seeks no certification.
-- **Keycloak.** The development realm gets a second client, set up for FAPI
+- **Keycloak** _(planned for M16)_. The development realm gets a second client, set up for FAPI
   2.0 with a client policy, so tests cover both profiles.
 
 ## Authorization
