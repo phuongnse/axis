@@ -7,7 +7,8 @@ namespace Axis.Processes;
 public static class ProcessesServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the work item runner, the handler that runs process steps, the handler that sends
+    /// Registers the work item runner, the handler that runs process steps, the handler that expires
+    /// tasks at their deadline, the handler that sends
     /// connector calls, the handler that runs package operation calls, the handler that delivers
     /// raised events to their triggers, the handler that runs the occurrences of schedule triggers,
     /// the handler that starts their processes for the records of their data sources, and the handler that
@@ -25,6 +26,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<WorkItemRunner>();
         services.AddSingleton<ReleaseModelCache>();
         services.AddSingleton<IWorkItemHandler, ProcessStepHandler>();
+        services.AddSingleton<IWorkItemHandler, TaskDeadlineHandler>();
         services.AddSingleton(new ConnectorCallSettings(allowHttpConnectorUrls));
         services.AddSingleton(new DeliverySettings(deliveryAttempts));
         services.AddSingleton<ConnectorClient>();

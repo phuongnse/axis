@@ -4,7 +4,8 @@ namespace Axis.Configuration.Model;
 
 /// <summary>
 /// A compiled field. Type-specific properties are set only for the type they belong to:
-/// <see cref="MaxLength"/> for text, <see cref="Precision"/> and <see cref="Scale"/> for decimal and
+/// <see cref="MaxLength"/> and <see cref="MinLength"/> for text, <see cref="Min"/> and
+/// <see cref="Max"/> for integer, decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal and
 /// money, <see cref="Currency"/> and <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum, <see cref="Target"/> for reference and child collection,
 /// <see cref="TargetDisplayField"/> for reference, and <see cref="Sequence"/> and
 /// <see cref="Creator"/> for text, and <see cref="Default"/> for text, integer, decimal, money, boolean,
@@ -23,6 +24,17 @@ public sealed record FieldModel
     public bool Unique { get; init; }
 
     public int? MaxLength { get; init; }
+
+    public int? MinLength { get; init; }
+
+    /// <summary>
+    /// The lowest value the record API accepts, as the literal was written: the integer or decimal
+    /// number text, or the date or date-time string. Null when the field has no lower limit.
+    /// </summary>
+    public string? Min { get; init; }
+
+    /// <summary>The highest value the record API accepts, written as <see cref="Min"/> is. Null when the field has no upper limit.</summary>
+    public string? Max { get; init; }
 
     public int? Precision { get; init; }
 

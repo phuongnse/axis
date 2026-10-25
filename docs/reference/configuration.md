@@ -303,8 +303,12 @@ flowchart LR
      or a `sum`, `min` or `max` without one, is `AXC0063` at
      `/aggregate/measures/{i}`. A measure `field` that names no projected
      field, or whose type the function does not take, is `AXC0063` at
-     `/aggregate/measures/{i}/field`. A measure field whose path is already
-     `AXC0043` is not reported again. When the data source is grouped, the
+     `/aggregate/measures/{i}/field`. `sum` takes an integer, a decimal or a
+     money field, and `min` and `max` also take a date or a date-time. A measure
+     field whose path is already `AXC0043` is not reported again. A `sum`, `min`
+     or `max` over a money field with a `currencyField`, without a group field
+     that reaches that currency field on the same record, is `AXC0248` at
+     `/aggregate/measures/{i}/field`. When the data source is grouped, the
      `sort` must exactly match a group field that is not a `reference`, or a
      measure, otherwise it is `AXC0045`. A parameter name that is
      also a field of the entity, is `page`, `pageSize` or `sort`, or repeats
@@ -339,8 +343,8 @@ flowchart LR
      [Compile checks](processes.md#compile-checks). Step names are unique ignoring letter case: a later step with a
      name already used is `AXC0069` at `/steps/{i}/name`, naming the first
      step. `start`, each branch `next`, each `otherwise`, each operation
-     `next` and each task outcome `next` must name a step, ignoring letter
-     case, otherwise it is `AXC0070` at that property. A
+     `next`, each task outcome `next` and each task `deadline` `next` must name a
+     step, ignoring letter case, otherwise it is `AXC0070` at that property. A
      transition goes to the first step with its name. A step that cannot be
      reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
      when `start` is unknown. A step with no path to an `end` step is
@@ -350,7 +354,7 @@ flowchart LR
      transitions out of a `task` step are not followed, so a loop through a
      task is allowed. The steps are walked in
      file order, with the branches, then `otherwise`, then `next`, then the
-     outcomes. A step whose name is
+     outcomes, then the deadline's `next`. A step whose name is
      already `AXC0069` is left out of `AXC0071`, `AXC0072` and `AXC0073`. The
      `startCondition` expression and each decision `when` are parsed and
      type-checked as a boolean over the entity's fields, computed ones
@@ -423,7 +427,8 @@ flowchart LR
      reported again. A form over another entity than the process's is
      `AXC0083` at `/steps/{i}/form`. It is not checked when either entity is
      unknown. A `dueIn` that is not a positive whole-number duration is
-     `AXC0084` at `/steps/{i}/dueIn`. A later outcome with a name already
+     `AXC0084` at `/steps/{i}/dueIn`, and so is a `deadline` `after`, at
+     `/steps/{i}/deadline/after`. A later outcome with a name already
      used in the step, ignoring letter case, is `AXC0085` at
      `/steps/{i}/outcomes/{j}/name`. The task `label` and each outcome
      `label` join the `AXC0028` check. A decision with no branches, an
