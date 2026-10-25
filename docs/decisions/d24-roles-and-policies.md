@@ -23,6 +23,8 @@ may not read. Everything below is in place. See
   - an `entity`, with `read`, `create`, `update` and `delete`;
   - a `dataSource`, with `read`;
   - a `process`, with `start`.
+  - [D79](d79-import-and-export-under-policies.md) adds `export` and
+    `import` to entity grants and `export` to data source grants.
 - **Record filter:** an entity grant may have a `filter`, a boolean
   expression over the record. It may use reference paths, rules and
   `currentUser()`.

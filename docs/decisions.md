@@ -79,3 +79,9 @@ files agree, title and status included.
 | [D66](decisions/d66-a-visual-form-designer-for-form-resources.md) | A visual form designer for form resources | **Agreed** |
 | [D67](decisions/d67-live-widget-previews-in-the-design-system.md) | Live widget previews in the design system | **Agreed** |
 | [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) | Issues of several milestones run at once | **Agreed** |
+| [D76](decisions/d76-file-money-and-enum-label-field-types.md) | File, money and enum label field types | **Agreed** |
+| [D77](decisions/d77-indexes-defaults-and-ranges.md) | Indexes, defaults and ranges | **Agreed** |
+| [D78](decisions/d78-references-from-child-rows-and-many-to-many.md) | References from child rows and many-to-many | **Agreed** |
+| [D79](decisions/d79-import-and-export-under-policies.md) | Import and export under policies | **Agreed** |
+| [D80](decisions/d80-search-more-aggregates-and-query-timeouts.md) | Search, more aggregates and query timeouts | **Agreed** |
+| [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md) | Asset management as the fourth sample application | **Agreed** |

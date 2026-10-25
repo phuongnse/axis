@@ -131,7 +131,8 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 - **`groupBy`.** A list of names from `fields`. An empty list gives one total
   row.
 - **`measures`.** Each has a `name` and a `function`: `count`, `sum`, `min` or
-  `max`.
+  `max`. `avg` and `countDistinct` are _(planned for M15)_, see
+  [Added in M15](#added-in-m15).
 - **`count`.** It takes no `field` and counts rows.
 - **`sum`, `min` and `max`.** They need a `field` that names an entry of
   `fields`. `sum` takes an integer or a decimal. `min` and `max` take an
@@ -150,6 +151,44 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   projected names.
 - **Empty `groupBy`.** The data source has one total row, even when no row
   passes the filter. Then `count` is 0 and the other measures are `null`.
+
+### Added in M15
+
+These are _(planned for M15)_. See
+[D76](../decisions/d76-file-money-and-enum-label-field-types.md) and
+[D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
+
+- **`avg`.** Needs a `field` of type integer, decimal or money, and gives a
+  decimal rounded to the field's scale, or to 6 digits for an integer. It
+  skips `null` values and is `null` over none.
+- **`countDistinct`.** Needs a `field` of any type a `groupBy` accepts, and
+  counts its distinct values that are not `null`.
+- **Measure `filter`.** A measure takes an optional `filter`, a boolean
+  expression in the [SQL subset](expressions.md#sql-subset) over the same
+  names as the data source filter. The measure counts only the rows where it
+  is `true`, as SQL `FILTER (WHERE ...)`. So one data source can count open
+  and closed tickets side by side.
+- **Date buckets.** A `groupBy` entry may be `{ "field": "<name>", "bucket":
+  "day" }`, with `day`, `week`, `month` or `year`, on a date or date-time
+  field. The row holds the first date of the bucket. A week starts on
+  Monday. Date-time values are bucketed in the application time zone that
+  M14's time zone decision sets.
+- **Money.** `sum`, `avg`, `min` and `max` over a `money` field whose
+  currency comes from a `currencyField` need that field among the group
+  fields, or the data source mixes currencies. Without it the data source is
+  a new compile diagnostic. A grouped row keeps the currency with each
+  amount.
+- **Enum labels and files.** Rows hold enum values, and page metadata gives
+  their labels. A `file` field cannot be a group field or a measure field.
+- **Search.** `"search": true` lets the rows route take `search`, matched
+  against the projected fields that are `searchable` or the root's display
+  field, as the [record API](record-api.md#paging-and-sorting) matches.
+- **Export.** A data source can be exported to CSV or a spreadsheet, see
+  [import and export](import-export.md#export).
+- **Timeout.** The rows query and its count run under `Data:QueryTimeout`. A
+  timeout is a `503` with the record API's title, and a count that times out
+  gives `totalCount: null`. See
+  [data settings](host-settings.md#data-settings).
 
 ## Compile checks
 

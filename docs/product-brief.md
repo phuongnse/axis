@@ -256,3 +256,74 @@ Studio, publishes it and takes one ticket through the process on the site.
 - A second, smaller journey creates an application from the
   `request-approval` template in Studio, runs its test scenario, publishes it,
   and takes one request through the approval on the site.
+
+## Fourth application: asset management
+
+A fourth application, of a shape none of the first three has, is a register
+of the company's assets with a dashboard. A Playwright journey builds it only
+through Studio. It lives as configuration in
+`samples/apps/asset-management/`. It is not platform code. It proves the data
+modeling of M15: files, money, labelled enum values, many-to-many, references
+from child rows, import and export. All of it is _(planned for M15)_. See
+[D81](decisions/d81-asset-management-as-the-fourth-sample-application.md).
+
+### Data
+
+- **Asset**: number (sequence `AS-{n:6}`), name, category, status (`in-stock`,
+  `assigned`, `in-repair` or `retired`, each with a label), location, holder,
+  purchase cost (money, with a currency field), purchase date and warranty end
+  date. The name is the display field and is searchable.
+- **Attachment**: child rows of an asset, each with a file and a note.
+- **Maintenance entry**: child rows of an asset, each with a date, a vendor (a
+  reference from the child row), a cost in money and a note.
+- **Software**: the software installed on an asset, a `references` field to
+  software records.
+- **Category**, **location**, **vendor** and **software**: reference data.
+  Categories and locations are seeded. A new asset's status defaults to
+  `in-stock`, and a cost cannot be negative.
+
+### Flow
+
+1. An asset manager registers assets, one by one or by importing a CSV file,
+   and attaches invoices and photos.
+2. The asset manager assigns an asset to a holder, and records maintenance.
+3. An auditor exports the asset register.
+4. A scheduled job reminds the asset manager of warranties that end within 30
+   days, through M14's notifications.
+
+### Security
+
+- The roles are `asset-manager`, `employee` and `auditor`.
+- The realm adds one user with `asset-manager` and one with `auditor`. An
+  existing employee keeps `employee` and holds assets. See the
+  [development users](reference/security.md#development-users) table.
+- An asset manager reads, writes, imports and exports everything.
+- An employee reads only the assets they hold, and cannot export.
+- An auditor reads and exports everything and writes nothing.
+- Everything else is denied by default.
+
+### Pages
+
+The asset register, the asset form, the asset detail page and the dashboard,
+in a site at path `assets`. Texts are in `en` and `vi`.
+
+- The dashboard has asset value by location in each currency, assets by
+  status, and a KPI of warranties that end within 30 days.
+- The asset register searches by name and exports to CSV or Excel, and has an
+  Import button for the asset manager.
+
+### Scenarios the application must pass
+
+- An import of valid assets, and an import whose dry run reports a bad row and
+  writes nothing.
+- An asset with an attachment, a maintenance entry with a vendor, and software.
+- Denied access for each role. An employee cannot read another holder's asset
+  or download its attachment, cannot export, and an auditor cannot write or
+  import.
+
+### Built through Studio
+
+As for the service desk, the main Playwright journey builds the whole
+application with Studio only, compares it with the committed folder, runs its
+scenarios from Studio and publishes it. On the site, the asset manager imports
+assets and attaches a file, and the auditor exports the register.

@@ -541,7 +541,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     | `integer`, `decimal` | exactly as the API wrote them, right-aligned |
     | `boolean` | a localized yes or no |
     | `reference` | the label from `labels` |
-    | `text`, `enum` | the value |
+    | `text`, `enum` | the value. An enum with `valueLabels` shows the label, money shows its currency, and a file its name as a download link _(planned for M15, [D76](../decisions/d76-file-money-and-enum-label-field-types.md))_ |
     | `null` | an empty cell |
 
   - **Number source text.** The SPA parses record responses with the source
@@ -730,7 +730,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     | `boolean` | a checkbox |
     | `date` | a date picker |
     | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction |
-    | `enum` | a choice of the declared values, as written in the entity file |
+    | `enum` | a choice of the declared values, as written in the entity file, or their labels with `valueLabels`. A `file` field gets the [file input](file-fields.md#in-the-spa), and `min`, `max` and `minLength` show as limits _(planned for M15)_ |
     | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
     | `child-collection` | a table of its rows, described under **Child collections** |
     | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
