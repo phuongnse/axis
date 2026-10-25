@@ -176,11 +176,11 @@ A `createRecord` operation creates a record of another entity:
 ## Processes without a subject
 
 A process may leave out `entity`. It then declares typed `parameters`. The
-compile checks in this section are built, and so are the instance storage and
-running such an instance on the engine. The start endpoint, the other starts and
-inspection described below are _(planned for M14)_. Until the start endpoint is
-built, it answers `400` for such a process, the instance list is empty, and the
-instance detail and the operator commands answer `404`.
+compile checks in this section are built, and so are the instance storage,
+running such an instance on the engine and the start endpoint. The other starts
+and inspection described below are _(planned for M14)_. Until inspection is
+built, the instance list is empty, and the instance detail and the operator
+commands answer `404`.
 
 ```json
 {
@@ -240,7 +240,8 @@ instance detail and the operator commands answer `404`.
 - **Start endpoint.** The body is `{ "parameters": { … } }` instead of
   `{ "subjectId" }`. A missing, unknown or mistyped parameter is a `400` keyed
   `/parameters/{name}`. The `startCondition` sees the parameters. A running
-  instance is the `409`. The user needs the `start` grant only.
+  instance is the `409`. The user needs the `start` grant only. See
+  [the start endpoint](processes.md#a-process-without-a-subject).
 - **Other starts.** A [schedule trigger without a data
   source](process-events.md#scheduled-jobs), a [delete
   trigger](process-events.md#delete-triggers) and a sub-process step give the

@@ -374,7 +374,8 @@ reported in one pass. See
 
 ## Start endpoint
 
-A start creates an instance for one subject record:
+A start creates an instance for one subject record. A process without a subject
+takes [parameters instead](#a-process-without-a-subject):
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances
@@ -486,6 +487,43 @@ caller, and its details add the endpoint's name.
   after the record is fixed.
 - Concurrent repeats are serialized by the receipt's unique key, so only one
   of them starts an instance.
+
+### A process without a subject
+
+A [process without a subject](process-flow.md#processes-without-a-subject)
+takes its typed parameters instead of a record id:
+
+```http
+POST /api/apps/{app}/processes/{process}/instances
+Content-Type: application/json
+
+{ "parameters": { "days": 31 } }
+```
+
+The checks run in the order above, and so do the answers. The differences are
+these:
+
+- **`201`.** The body has the same keys, and `subjectId` is `null`. The
+  instance stores the parameter values.
+- **`400` for a body.** The body must be exactly one `parameters` property,
+  and its value must be an object. Anything else is one error keyed
+  `/parameters`.
+- **`400` for a parameter.** Each declared parameter must be given once, by its
+  exact name, letter case included, with a value of its type, read as a record
+  field value of that type is. A missing, unknown, repeated, `null` or
+  mistyped parameter is an error keyed `/parameters/{name}`. All the errors
+  are in one response.
+- **`400` for a start condition.** The `startCondition` is checked over the
+  parameters. A failure is an error keyed `/parameters` that holds the
+  condition's message text key.
+- **`409`.** A `running` or `waiting` instance of the process exists. The title
+  is "A running or waiting instance of this process already exists.".
+- **`403`.** The user needs the `start` grant only. There is no record, so no
+  `read` check runs and there is no policy `409`.
+- **`422`.** The `Idempotency-Key` was used before with other parameter values.
+  The receipt stores a null subject, and the values are compared with those
+  stored on the receipt's instance. Decimals count as equal when they are the
+  same number.
 
 ## Instance states
 
@@ -691,7 +729,8 @@ database, with history in `axis.__processes_migrations` (see
     batch of up to 500 rows. See
     [Recomputing computed fields](migrations.md#recomputing-computed-fields).
 - `axis.process_start_receipts`: the stored `201` response of each
-  `Idempotency-Key`, unique per application, process and key.
+  `Idempotency-Key`, unique per application, process and key. The subject is
+  null for a process without a subject.
 - `axis.endpoint_receipts`: the record and instance of each endpoint call's
   `Idempotency-Key`, unique per application, endpoint, caller and key, with a
   hash of the input. See [Idempotency](inbound-endpoints.md#idempotency).

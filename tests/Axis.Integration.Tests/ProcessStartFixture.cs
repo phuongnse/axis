@@ -163,6 +163,15 @@ public sealed class ProcessStartFixture : IAsyncLifetime
         Assert.Equal(1, await command.ExecuteNonQueryAsync());
     }
 
+    /// <summary>Completes every running or waiting instance of the process <paramref name="processId"/>, so that it can be started again.</summary>
+    public async Task EndInstancesAsync(Guid processId)
+    {
+        await using var command = DataSource.CreateCommand(
+            "UPDATE axis.process_instances SET state = 'completed', ended_at = now() WHERE process_id = @process AND state IN ('running', 'waiting')");
+        command.Parameters.AddWithValue("process", processId);
+        await command.ExecuteNonQueryAsync();
+    }
+
     /// <summary>Runs <paramref name="sql"/>, a <c>SELECT count(*)</c>, with the named parameters.</summary>
     public async Task<long> CountAsync(string sql, params (string Name, object Value)[] parameters)
     {
