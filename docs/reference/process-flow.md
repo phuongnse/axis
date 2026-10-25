@@ -140,8 +140,8 @@ task in it. See [Compile checks](processes.md#compile-checks).
   under the same operation identity, and sets its `staged_revision` to the
   revision the step runs at again. Resolve finds its call by id. The
   inspector lists every pass's calls, oldest first.
-- **Service desk.** _(Planned for M14)_ A reopened ticket loops back to the
-  agent's resolve task.
+- **Service desk.** A reopened ticket loops back to the agent's resolve task,
+  and its status goes back to `assigned`.
 
 ## Create record operation
 
