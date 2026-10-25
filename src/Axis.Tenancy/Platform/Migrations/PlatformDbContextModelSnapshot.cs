@@ -191,10 +191,33 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("oidc_client_id");
 
+                    b.Property<byte[]>("OidcClientKey")
+                        .HasColumnType("bytea")
+                        .HasColumnName("oidc_client_key");
+
+                    b.Property<string>("OidcClientKeyId")
+                        .HasColumnType("text")
+                        .HasColumnName("oidc_client_key_id");
+
                     b.Property<byte[]>("OidcClientSecret")
                         .IsRequired()
                         .HasColumnType("bytea")
                         .HasColumnName("oidc_client_secret");
+
+                    b.Property<byte[]>("OidcPreviousClientKey")
+                        .HasColumnType("bytea")
+                        .HasColumnName("oidc_previous_client_key");
+
+                    b.Property<string>("OidcPreviousClientKeyId")
+                        .HasColumnType("text")
+                        .HasColumnName("oidc_previous_client_key_id");
+
+                    b.Property<string>("OidcProfile")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("standard")
+                        .HasColumnName("oidc_profile");
 
                     b.Property<string>("PreviewOf")
                         .HasColumnType("text")
@@ -251,6 +274,14 @@ namespace Axis.Tenancy.Platform.Migrations
 
                     b.ToTable("tenants", "platform", t =>
                         {
+                            t.HasCheckConstraint("ck_tenants_oidc_client_key", "(oidc_client_key IS NULL) = (oidc_client_key_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_tenants_oidc_previous_client_key", "(oidc_previous_client_key IS NULL) = (oidc_previous_client_key_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_tenants_oidc_previous_needs_current", "oidc_previous_client_key IS NULL OR oidc_client_key IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_tenants_oidc_profile", "oidc_profile IN ('standard', 'fapi2')");
+
                             t.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended')");
                         });
                 });

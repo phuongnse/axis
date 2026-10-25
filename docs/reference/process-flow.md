@@ -175,7 +175,12 @@ A `createRecord` operation creates a record of another entity:
 
 ## Processes without a subject
 
-A process may leave out `entity`. It then declares typed `parameters`:
+A process may leave out `entity`. It then declares typed `parameters`. The
+compile checks in this section are built. Starting these processes, and the
+instance storage, other starts and inspection described below, are _(planned for
+M14)_. Until the start endpoint is built, it answers `400` for such a process,
+the instance list is empty, and the instance detail and the operator commands
+answer `404`.
 
 ```json
 {
@@ -205,15 +210,26 @@ A process may leave out `entity`. It then declares typed `parameters`:
 ```
 
 - `parameters` is a list of `{ "name", "type" }`. The types are the scalar
-  types of rule parameters. Names are unique, ignoring letter case. A process
-  has `entity` or `parameters`, not both. Each is a new diagnostic.
+  types of rule parameters. Names are unique, ignoring letter case, and a
+  repeated name is `AXC0245`. A process has `entity` or `parameters`, not both
+  and not neither. Either mistake is `AXC0244`, reported at `/parameters` when
+  there are both and at the root of the file when there is neither.
 - Expressions see the parameters by name, and the named rules. There is no
-  record, so there is no `id` and no field path.
+  record, so there is no `id` and no field path. The start condition, a
+  decision `when` and the inputs of a connector or package operation are
+  checked over this scope.
 - **Steps.** `decision`, `createRecord`, `callConnector`, package operations,
   `timer`, `subProcess`, `notify` and `end` are allowed. `updateRecord`,
-  `raiseEvent`, `task` and `waitEvent` need a subject and are a new
-  diagnostic. So is the `output` of a `callConnector` or package operation
-  step, because it writes the subject.
+  `raiseEvent`, `task` and `waitEvent` need a subject and are `AXC0246`. So is
+  the `output` of a `callConnector` or package operation step, because it
+  writes the subject. Only the step types that exist today are checked: `task`,
+  `updateRecord`, `raiseEvent` and the outputs. The compiler reports no other
+  problem in such a step.
+- **Triggers and other starts by name.** An event, data change or schedule
+  trigger that names a process without a subject is `AXC0247`. An endpoint, a
+  page `startProcess` action and a scenario step that name one are reported
+  with their usual codes for a process over another entity: `AXC0117`,
+  `AXC0088` and `AXC0184`.
 - **Instance.** `axis.process_instances` stores `subject_id` as null and the
   values in a `parameters` `jsonb` column. The partial unique index treats a
   null subject as one value (`NULLS NOT DISTINCT`), so one instance of the

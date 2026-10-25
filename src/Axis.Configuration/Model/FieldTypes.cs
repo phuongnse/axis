@@ -14,6 +14,7 @@ public static class FieldTypes
         ["enum"] = FieldType.Enum,
         ["reference"] = FieldType.Reference,
         ["child-collection"] = FieldType.ChildCollection,
+        ["money"] = FieldType.Money,
     };
 
     private static readonly Dictionary<FieldType, string> _namesByType = _typesByName.ToDictionary(pair => pair.Value, pair => pair.Key);
@@ -22,6 +23,9 @@ public static class FieldTypes
 
     public static FieldType Parse(string name) =>
         TryParse(name, out var type) ? type : throw new ArgumentException($"Unknown field type '{name}'.", nameof(name));
+
+    /// <summary>Whether values of <paramref name="type"/> are decimal numbers, as decimal and money fields are.</summary>
+    public static bool HoldsDecimal(FieldType type) => type is FieldType.Decimal or FieldType.Money;
 
     /// <summary>The name of <paramref name="type"/> as written in configuration files.</summary>
     public static string Name(FieldType type) =>

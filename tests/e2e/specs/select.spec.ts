@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../test'
 import { pickOption } from '../select'
 
 // The page has no server data. Its option click does nothing, so the pick never lands.

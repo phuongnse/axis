@@ -19,7 +19,7 @@ internal static class RecordClrValues
     public static object? FromInput(RecordValue value, out bool exact)
     {
         exact = true;
-        if (value.Value is null || value.Field.Type != FieldType.Decimal)
+        if (value.Value is null || !FieldTypes.HoldsDecimal(value.Field.Type))
         {
             return value.Value;
         }
@@ -60,7 +60,7 @@ internal static class RecordClrValues
             case FieldType.Integer:
                 value = node.GetValue<long>();
                 return true;
-            case FieldType.Decimal:
+            case FieldType.Decimal or FieldType.Money:
                 // The stored number text is kept as read, so every digit is still there.
                 if (!TryParseDecimal(node.ToJsonString(), out var number))
                 {

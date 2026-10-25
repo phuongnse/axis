@@ -30,6 +30,21 @@ public sealed class TenantRow
 
     public byte[] OidcClientSecret { get; set; } = [];
 
+    /// <summary><c>standard</c> or <c>fapi2</c>. See <see cref="TenantSignInProfiles"/>.</summary>
+    public string OidcProfile { get; set; } = TenantSignInProfiles.Standard;
+
+    /// <summary>The id of the current client key, the newest one. <c>null</c> when the tenant has no client key.</summary>
+    public string? OidcClientKeyId { get; set; }
+
+    /// <summary>The current client key as a PEM, stored encrypted. <c>null</c> when the tenant has no client key.</summary>
+    public byte[]? OidcClientKey { get; set; }
+
+    /// <summary>The id of the previous client key, kept beside the current one during a rotation.</summary>
+    public string? OidcPreviousClientKeyId { get; set; }
+
+    /// <summary>The previous client key as a PEM, stored encrypted. Only a tenant with a current key has one.</summary>
+    public byte[]? OidcPreviousClientKey { get; set; }
+
     public string? ClaimUserId { get; set; }
 
     public string? ClaimDisplayName { get; set; }

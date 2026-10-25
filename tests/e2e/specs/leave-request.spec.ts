@@ -1,9 +1,5 @@
-import {
-  expect,
-  test,
-  type APIRequest,
-  type APIRequestContext,
-} from "@playwright/test";
+import { expect, test } from "../test";
+import type { APIRequest, APIRequestContext } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
 import { expectChosen } from "../select";
 import { sessionFile, useSession, type SampleUser } from "../sessions";

@@ -127,7 +127,14 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 section["Claims:DisplayName"],
                 section["Claims:Roles"],
                 section["Claims:Email"],
-                section["Claims:Locale"]);
+                section["Claims:Locale"],
+                Blank(section["Profile"]),
+                ClientKeys(section));
+
+    private static IReadOnlyList<TenantClientKey> ClientKeys(IConfigurationSection section) =>
+        Secret(section["ClientKey"]) is { } key ? [new TenantClientKey(section["ClientKeyId"] ?? "", key)] : [];
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     // A blank value counts as missing.
     private static SecretValue? Secret(string? value) =>

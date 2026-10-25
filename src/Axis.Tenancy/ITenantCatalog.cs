@@ -44,6 +44,8 @@ public sealed record TenantEntry(
     string? PreviewOf = null);
 
 /// <summary>How one tenant signs people in. A value the source leaves blank is <c>null</c>.</summary>
+/// <param name="Profile">The sign-in profile as the source wrote it, or <c>null</c> when unset, which counts as <c>standard</c>. See <see cref="TenantSignInProfiles"/>.</param>
+/// <param name="ClientKeys">The client keys, newest first. <c>null</c> or empty means none. A tenant holds at most two.</param>
 public sealed record TenantOidc(
     string? Authority,
     string? ClientId,
@@ -54,7 +56,15 @@ public sealed record TenantOidc(
     string? DisplayNameClaim,
     string? RolesClaim,
     string? EmailClaim,
-    string? LocaleClaim);
+    string? LocaleClaim,
+    string? Profile = null,
+    IReadOnlyList<TenantClientKey>? ClientKeys = null);
+
+/// <summary>
+/// A client key for <c>private_key_jwt</c>: a private key as a PEM, with its key id. The key is a
+/// <see cref="SecretValue"/>, so the text form never shows it.
+/// </summary>
+public sealed record TenantClientKey(string KeyId, SecretValue PrivateKey);
 
 /// <summary>
 /// One deployment binding. A <c>url</c> binding has <see cref="Url"/>, as written, and a <c>secret</c> binding has

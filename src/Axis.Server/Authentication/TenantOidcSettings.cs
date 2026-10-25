@@ -17,6 +17,12 @@ internal sealed class TenantOidcSettings
 
     public SecretValue? ClientSecret { get; set; }
 
+    /// <summary><c>standard</c> or <c>fapi2</c>. An unset profile is <c>standard</c>.</summary>
+    public string Profile { get; set; } = TenantSignInProfiles.Standard;
+
+    /// <summary>The client keys for <c>private_key_jwt</c>, newest first. A <c>fapi2</c> tenant has at least one.</summary>
+    public IReadOnlyList<TenantClientKey> ClientKeys { get; set; } = [];
+
     /// <summary>
     /// The audience that a machine caller's bearer token must contain. A blank value means the
     /// tenant accepts no bearer token, so every endpoint call there is a <c>401</c>.
@@ -50,6 +56,8 @@ internal sealed class TenantOidcSettings
             Authority = source.Authority,
             ClientId = source.ClientId,
             ClientSecret = source.ClientSecret,
+            Profile = source.Profile ?? TenantSignInProfiles.Standard,
+            ClientKeys = source.ClientKeys ?? [],
             EndpointAudience = source.EndpointAudience,
             ServiceAudience = source.ServiceAudience,
             Claims =
@@ -71,7 +79,23 @@ internal sealed class TenantOidcSettings
             problems.Add($"Tenant '{tenant.Id}' has no Oidc client id.");
         }
 
-        if (oidc.ClientSecret is null)
+        if (oidc.Profile is not (TenantSignInProfiles.Standard or TenantSignInProfiles.Fapi2))
+        {
+            problems.Add($"Tenant '{tenant.Id}' has Oidc profile '{oidc.Profile}': use '{TenantSignInProfiles.Standard}' or '{TenantSignInProfiles.Fapi2}'.");
+        }
+        else if (oidc.Profile == TenantSignInProfiles.Fapi2)
+        {
+            // Under fapi2 the client key replaces the client secret. The key's value never goes into a message.
+            if (oidc.ClientKeys.Count == 0)
+            {
+                problems.Add($"Tenant '{tenant.Id}' has no Oidc client key.");
+            }
+            else if (oidc.ClientKeys.Any(key => string.IsNullOrWhiteSpace(key.KeyId)))
+            {
+                problems.Add($"Tenant '{tenant.Id}' has an Oidc client key without a key id.");
+            }
+        }
+        else if (oidc.ClientSecret is null)
         {
             problems.Add($"Tenant '{tenant.Id}' has no Oidc client secret.");
         }
@@ -82,7 +106,8 @@ internal sealed class TenantOidcSettings
     /// <summary>Reads the Oidc settings of every tenant and checks them.</summary>
     /// <returns>The settings keyed by tenant id.</returns>
     /// <exception cref="InvalidOperationException">
-    /// A tenant has no <c>Oidc</c> block, or its authority, client id or client secret is blank.
+    /// A tenant has no <c>Oidc</c> block, its authority or client id is blank, its profile is unknown, a <c>standard</c>
+    /// tenant has no client secret, or a <c>fapi2</c> tenant has no client key or a client key without a key id.
     /// </exception>
     public static IReadOnlyDictionary<string, TenantOidcSettings> Load(ITenantCatalog catalog)
     {

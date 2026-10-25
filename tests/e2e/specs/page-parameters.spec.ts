@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test } from "../test";
+import type { APIRequestContext } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
 import { sessionFile } from "../sessions";
 
