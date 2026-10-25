@@ -26,6 +26,9 @@ public sealed record ProcessStepDefinition
     /// <summary>The built-in operation that raises an event about the subject record.</summary>
     public const string RaiseEvent = "raiseEvent";
 
+    /// <summary>The built-in operation that sends a notification to people.</summary>
+    public const string Notify = "notify";
+
     public required string Name { get; init; }
 
     /// <summary>The step type: <c>decision</c>, <c>task</c>, <c>operation</c> or <c>end</c>.</summary>
@@ -37,7 +40,7 @@ public sealed record ProcessStepDefinition
     /// <summary>The step a decision takes when no branch is true, or null for any other step.</summary>
     public string? Otherwise { get; init; }
 
-    /// <summary>The operation an operation step runs, such as <c>updateRecord</c>, <c>callConnector</c> or <c>raiseEvent</c>, or null for any other step.</summary>
+    /// <summary>The operation an operation step runs, such as <c>updateRecord</c>, <c>callConnector</c>, <c>raiseEvent</c> or <c>notify</c>, or null for any other step.</summary>
     public string? Operation { get; init; }
 
     /// <summary>
@@ -72,6 +75,18 @@ public sealed record ProcessStepDefinition
     /// file order, or null for any other step.
     /// </summary>
     public IReadOnlyDictionary<string, string>? Fields { get; init; }
+
+    /// <summary>The recipients of a <c>notify</c> step, in file order, or null for any other step.</summary>
+    public IReadOnlyList<NotifyRecipientDefinition>? To { get; init; }
+
+    /// <summary>The channels a <c>notify</c> step sends on, <c>inApp</c> or <c>email</c>, in file order, or null for any other step.</summary>
+    public IReadOnlyList<string>? Channels { get; init; }
+
+    /// <summary>The subject, body and placeholder values of a <c>notify</c> step, or null for any other step.</summary>
+    public NotifyMessageDefinition? Message { get; init; }
+
+    /// <summary>The page a <c>notify</c> step's notification opens, or null when it opens none or for any other step.</summary>
+    public NotifyOpenDefinition? Open { get; init; }
 
     /// <summary>The step an operation step leads to, or null for any other step.</summary>
     public string? Next { get; init; }

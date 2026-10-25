@@ -230,4 +230,12 @@ public static class DiagnosticCodes
     public const string InvalidDetailRecord = "AXC0239";
     public const string ChartDataSourceNotGrouped = "AXC0240";
     public const string InvalidChartMeasure = "AXC0241";
+    public const string EmptyNotifyRecipients = "AXC0242";
+    public const string InvalidNotifyRecipient = "AXC0243";
+    public const string UnknownNotifyRole = "AXC0244";
+    public const string EmptyNotifyChannels = "AXC0245";
+    public const string RoleRecipientWithEmail = "AXC0246";
+    public const string MissingPlaceholderValue = "AXC0247";
+    public const string UnusedPlaceholderValue = "AXC0248";
+    public const string InvalidPlaceholder = "AXC0249";
 }

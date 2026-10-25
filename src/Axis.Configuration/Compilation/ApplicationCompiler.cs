@@ -429,6 +429,9 @@ public static class ApplicationCompiler
             loaded.UnloadedEventNames,
             FindPackage,
             declaredPackageIds,
+            FindPage,
+            loaded.UnloadedPageNames,
+            key => [.. texts.Where(text => text.Texts.ContainsKey(key)).Select(text => (text.Locale, text.Texts[key]))],
             references,
             rules,
             declaredModules,
@@ -565,7 +568,7 @@ public static class ApplicationCompiler
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(
                 dataSourcesByName[dataSource.Name], entities, IsModuleResource(dataSource) ? [] : rules, IsModuleResource(dataSource) ? null : declaredModules)).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, rules, declaredModules)).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, FindPage, rules, declaredModules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName, IsModuleResource(form) ? [] : rules, IsModuleResource(form) ? null : declaredModules)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules, declaredModules)).ToList(),

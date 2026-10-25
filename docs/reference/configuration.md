@@ -356,7 +356,7 @@ flowchart LR
      [expression diagnostic](expressions.md#diagnostics) code. The
      `startCondition` message joins the `AXC0028` check. An operation step
      whose `operation` is not `updateRecord`, `callConnector`,
-     `raiseEvent` or a package operation written `<package>/<operation>`,
+     `raiseEvent`, `notify` or a package operation written `<package>/<operation>`,
      matched exactly, is `AXC0078` at `/steps/{i}/operation`, and its other
      properties are not checked. Each key of an
      `updateRecord` `set` must name a field of the entity, ignoring letter
@@ -427,8 +427,12 @@ flowchart LR
      `callConnector` step without `connector` or `input` or with `set`, a
      `raiseEvent` step without `event` or `fields` or with `set`,
      `connector`, `input`, `output` or `retry`, a package operation step
-     without `input` or with `set`, `connector`, `event` or `fields`, an
-     `event` or `fields` on any other step, a retry `attempts` outside 1 to 10, a task without
+     without `input` or with `set`, `connector`, `event` or `fields`, a
+     `notify` step without `to`, `channels` or `message` or with `set`,
+     `connector`, `input`, `output`, `retry`, `event` or `fields`, a channel
+     other than `inApp` or `email` or one named twice, a `values` key that is
+     not letters and digits, an `event` or `fields` on any other step, `to`,
+     `channels`, `message` or `open` on any other step, a retry `attempts` outside 1 to 10, a task without
      `label`, `assignee`, `form` or an outcome, and an `end` step with
      `branches`, `otherwise` or any other property, are `AXC0004`. See
      [processes](processes.md#compile-checks).
@@ -834,13 +838,14 @@ to show where a resource is used and what it uses.
 | `field target` | Entity, data source, page | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
 | `field target` | Endpoint | `/input/{i}/target` | Entity |
 | `field sequence` | Entity | `/fields/{i}/sequence` | Sequence |
-| `rule call` | Entity, data source, rule, process, policy | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/grants/{i}/filter` | Rule |
+| `rule call` | Entity, data source, rule, process, policy | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/steps/{i}/to/{j}/user`, `/steps/{i}/to/{j}/email`, `/steps/{i}/message/values/{key}`, `/grants/{i}/filter` | Rule |
 | `rule call` | Trigger | `/when` of a data change trigger | Rule |
 | `navigation page` | Site | `/navigation/{i}/page` | Page |
 | `widget entity` | Page | `/widgets/{i}/entity` | Entity |
 | `widget data source` | Page | `/widgets/{i}/dataSource` | Data source |
 | `widget form` | Page | `/widgets/{i}/form` | Form |
 | `navigate page` | Page | `/widgets/{i}/rowActions/{j}/page`, `/widgets/{i}/toolbarActions/{j}/page`, `/widgets/{i}/actions/{j}/page` | Page |
+| `navigate page` | Process | `/steps/{i}/open/page` | Page |
 | `widget process` | Page | `/widgets/{i}/process` | Process |
 | `action process` | Page | `/widgets/{i}/actions/{j}/process`, `/widgets/{i}/rowActions/{j}/process` | Process |
 | `form entity` | Form | `/entity` | Entity |

@@ -96,7 +96,7 @@ sorted by file and then path.
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
 | `AXC0077` | A `form` widget's `form` names no loaded form. Reported at `/widgets/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
-| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector`, `raiseEvent` or a package operation written `<package>/<operation>`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
+| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector`, `raiseEvent`, `notify` or a package operation written `<package>/<operation>`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
 | `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0080` | A key of an `updateRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0081` | A process task step's `assignee` has both or neither of `user` and `role`. Reported at `/steps/{i}/assignee`. |
@@ -240,3 +240,11 @@ sorted by file and then path.
 | `AXC0239` | A `detail` widget's `record` names no page parameter, or a parameter that is optional, not a `reference`, or whose `target` is not the widget's entity, ignoring letter case. Reported at `/widgets/{i}/record`. |
 | `AXC0240` | A `chart` widget names a data source whose `aggregate` does not have exactly one `groupBy` field, or a `category` that is not that field, ignoring letter case. Reported at the widget's `dataSource` or `category`. |
 | `AXC0241` | A `chart` widget names a measure that its data source's `aggregate` does not declare, or one that is not a number, or lists more than one measure on a `pie`. A measure is a number when it is a `count` or a `sum`, or a `min` or `max` over an integer or a decimal. Reported at the measure's `name`, or at `measures` for a `pie`. |
+| `AXC0242` | A `notify` step has an empty `to`. Reported at `/steps/{i}/to`. |
+| `AXC0243` | A recipient of a `notify` step has none or more than one of `user`, `role` and `email`. Reported at `/steps/{i}/to/{j}`. |
+| `AXC0244` | A `role` recipient of a `notify` step names no declared role, compared exactly. A role file that was not loaded is not reported again. Reported at `/steps/{i}/to/{j}/role`. |
+| `AXC0245` | A `notify` step has an empty `channels`. Reported at `/steps/{i}/channels`. |
+| `AXC0246` | A `role` recipient of a `notify` step is used with the `email` channel. A role has no email address. Reported at `/steps/{i}/to/{j}/role`. |
+| `AXC0247` | A placeholder of a `notify` step's subject or body has no key in `values`, in a locale that has both texts. Reported at `/steps/{i}/message`, naming the locale and the placeholder. |
+| `AXC0248` | A key of a `notify` step's `values` has no placeholder in the subject or the body, in a locale that has both texts. Reported at `/steps/{i}/message`, naming the locale and the key. |
+| `AXC0249` | A text of a `notify` step holds a lone or invalid brace. A placeholder is `{name}` with ASCII letters and digits, and `{{` and `}}` write a brace. Reported at `/steps/{i}/message`, naming the locale, the text key and the offset. |

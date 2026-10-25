@@ -12,7 +12,8 @@ namespace Axis.Configuration.Model;
 /// <c>user</c> assignee is a <c>text</c> expression over that scope too. Every input a connector
 /// or package operation call sends is checked against the input's type over that scope, and every
 /// output it writes names a field that fits the output's type. Every payload field a raised event carries is checked
-/// against the field's type over that scope.
+/// against the field's type over that scope. A notify step's recipient expressions, placeholder values and
+/// page parameters are compiled over that scope too.
 /// </summary>
 public sealed record ProcessModel
 {
@@ -164,6 +165,42 @@ public sealed record RaiseEventStepModel(string Name, string Event, IReadOnlyLis
 /// step are in the event's declaration order.
 /// </summary>
 public sealed record EventPayloadModel(string Field, ExpressionModel Value);
+
+/// <summary>
+/// A <c>notify</c> operation step: it sends a notification to <see cref="Recipients"/> on each of
+/// <see cref="Channels"/>, <c>inApp</c> or <c>email</c>, then moves to <see cref="Next"/>. The
+/// notification's subject and body are the texts <see cref="Subject"/> and <see cref="Body"/> name, and
+/// each <c>{name}</c> placeholder in them takes the value <see cref="Values"/> gives. The values are
+/// in ordinal order of their names. <see cref="Open"/> is the page the notification opens, or null.
+/// </summary>
+public sealed record NotifyStepModel(
+    string Name,
+    IReadOnlyList<NotifyRecipientModel> Recipients,
+    IReadOnlyList<string> Channels,
+    TextReference Subject,
+    TextReference Body,
+    IReadOnlyList<NotifyValueModel> Values,
+    NotifyOpenModel? Open,
+    string Next) : ProcessStepModel(Name);
+
+/// <summary>
+/// A recipient of a <c>notify</c> step: exactly one of <see cref="User"/>, a <c>text</c> expression
+/// over the subject record that gives a user id, <see cref="Role"/>, a role name, and
+/// <see cref="Email"/>, a <c>text</c> expression over the subject record that gives an email address.
+/// </summary>
+public sealed record NotifyRecipientModel(ExpressionModel? User, string? Role, ExpressionModel? Email);
+
+/// <summary>A placeholder value of a <c>notify</c> step: the placeholder's name, and the expression over the subject record that gives its value.</summary>
+public sealed record NotifyValueModel(string Name, ExpressionModel Value);
+
+/// <summary>
+/// The page a <c>notify</c> step's notification opens, and the parameters it gives, each by the
+/// declared name of the page's parameter. The parameters are in the page's declaration order.
+/// </summary>
+public sealed record NotifyOpenModel(PageReference Page, IReadOnlyList<NotifyParameterModel> Parameters);
+
+/// <summary>A parameter a <c>notify</c> step gives the page it opens: the parameter's declared name, and the expression over the subject record that gives its value, checked against the parameter's type.</summary>
+public sealed record NotifyParameterModel(string Parameter, ExpressionModel Value);
 
 /// <summary>An end step. An instance that reaches it is completed.</summary>
 public sealed record EndStepModel(string Name) : ProcessStepModel(Name);
