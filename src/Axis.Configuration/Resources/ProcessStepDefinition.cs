@@ -93,4 +93,7 @@ public sealed record ProcessStepDefinition
 
     /// <summary>The outcomes a task is completed with, in file order, or null for any other step.</summary>
     public IReadOnlyList<TaskOutcomeDefinition>? Outcomes { get; init; }
+
+    /// <summary>When a task expires and the step it then leads to, or null when the task has no deadline or for any other step.</summary>
+    public TaskDeadlineDefinition? Deadline { get; init; }
 }

@@ -78,6 +78,30 @@ public sealed class TriggerCompilerTests
     }
 
     [Fact]
+    public void An_event_trigger_that_names_a_process_without_a_subject_is_a_diagnostic_at_the_process()
+    {
+        using var folder = WithSubjectlessProcess(Folder())
+            .With("triggers/review.json", Trigger("ReviewClosedNotes", "NoteClosed", "NightlyJob"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.TriggerProcessWithoutSubject, "triggers/review.json", "/process"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_data_change_trigger_that_names_a_process_without_a_subject_is_a_diagnostic_at_the_process()
+    {
+        using var folder = WithSubjectlessProcess(Folder())
+            .With("triggers/review.json", DataChangeTrigger("Note", "NightlyJob", """, "on": ["create"] """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.TriggerProcessWithoutSubject, "triggers/review.json", "/process"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
     public void Process_and_event_mistakes_are_each_a_diagnostic_at_their_path_in_one_pass()
     {
         using var folder = Folder()
@@ -611,6 +635,14 @@ public sealed class TriggerCompilerTests
         { "id": "{{id}}", "kind": "trigger", "name": "{{name}}", "formatVersion": 1, "type": "event",
           "event": "{{@event}}", "process": "{{process}}" {{rest}} }
         """;
+
+    /// <summary>Adds the process <c>NightlyJob</c>, which has the integer parameter <c>days</c> and no subject.</summary>
+    private static TemporaryFolder WithSubjectlessProcess(TemporaryFolder folder) =>
+        folder.With("processes/nightly-job.json", """
+            { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "NightlyJob", "formatVersion": 1,
+              "parameters": [{ "name": "days", "type": "integer" }],
+              "start": "done", "steps": [{ "name": "done", "type": "end" }] }
+            """);
 
     /// <summary>
     /// An application with the root entities <c>Note</c> and <c>Person</c>, the event

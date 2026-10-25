@@ -73,8 +73,11 @@ internal static class EventTriggerStarts
 
         var process = model.Processes.FirstOrDefault(candidate => candidate.Id == trigger.Process.Id)
             ?? throw new InvalidOperationException($"The release has no process '{trigger.Process.Name}'.");
-        var entity = model.FindEntity(process.Entity.Id)
-            ?? throw new InvalidOperationException($"The release has no entity '{process.Entity.Name}'.");
+        // The compiler refuses a trigger that names a process without a subject.
+        var subjectReference = process.Entity
+            ?? throw new InvalidOperationException($"The process '{process.Name}' has no subject, so a trigger cannot start it.");
+        var entity = model.FindEntity(subjectReference.Id)
+            ?? throw new InvalidOperationException($"The release has no entity '{subjectReference.Name}'.");
 
         // The lock makes the read below and the start condition see the latest version, and a
         // concurrent write of the record waits until this start commits.

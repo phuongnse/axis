@@ -1,0 +1,25 @@
+{
+  "id": "69b96d2b-b00b-46b2-bb85-055f61b7225f",
+  "kind": "process",
+  "name": "Expire",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "decide",
+  "steps": [
+    {
+      "name": "decide",
+      "type": "task",
+      "label": { "textKey": "request.decide" },
+      "assignee": { "user": "department.manager" },
+      "form": "RequestDecision",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "task.approve" }, "next": "approved" },
+        { "name": "reject", "label": { "textKey": "task.reject" }, "next": "rejected" }
+      ],
+      "deadline": { "after": "P1D", "next": "expired" }
+    },
+    { "name": "approved", "type": "end" },
+    { "name": "rejected", "type": "end" },
+    { "name": "expired", "type": "end" }
+  ]
+}

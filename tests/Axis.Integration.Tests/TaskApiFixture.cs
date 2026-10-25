@@ -320,6 +320,28 @@ public sealed class TaskApiFixture : IAsyncLifetime
         await command.ExecuteNonQueryAsync();
     }
 
+    /// <summary>Opens a superuser connection to the database of <paramref name="tenant"/>, which the caller disposes.</summary>
+    public async Task<NpgsqlConnection> OpenConnectionAsync(string tenant) => await DataSource(tenant).OpenConnectionAsync();
+
+    /// <summary>Runs <paramref name="sql"/> with <paramref name="parameters"/> in <paramref name="tenant"/> and returns the number of rows it changed.</summary>
+    public async Task<int> ExecuteAsync(string tenant, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var command = DataSource(tenant).CreateCommand(sql);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        return await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Runs the <c>SELECT count(*)</c> <paramref name="sql"/> on the database of <paramref name="tenant"/> as the
+    /// admin role, which is the only role that sees the sessions of other roles.
+    /// </summary>
+    public async Task<long> AdminCountAsync(string tenant, string sql) =>
+        (long)(await PostgreSqlServer.AdminScalarAsync(_tenants[tenant].ConnectionString, sql, TestContext.Current.CancellationToken))!;
+
     /// <summary>Runs <paramref name="sql"/> in <paramref name="tenant"/> with <paramref name="parameters"/> and returns its first value, or null.</summary>
     public async Task<object?> ScalarAsync(string tenant, string sql, params (string Name, object Value)[] parameters)
     {
