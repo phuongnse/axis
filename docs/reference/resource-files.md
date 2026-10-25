@@ -257,7 +257,7 @@ A `seed` holds records with fixed ids for one entity:
 - `values` has the shape of the `values` of a record API create body (see
   [Request bodies and values](record-api.md#request-bodies-and-values)).
   A seed cannot set a `file` field, in a record or in a child row
-  _(planned for M15)_ (`AXC0250`).
+  _(planned for M15)_ (`AXC0251`).
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
@@ -435,20 +435,37 @@ Value ranges follow what PostgreSQL accepts, so an invalid value fails at
 compile time rather than when the table is created; a value outside the range
 is `AXC0013`.
 
-| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` | `creator` | `sensitive` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `text` | yes | yes | 1..10485760 | | | | | yes | yes | yes | yes |
-| `integer` | yes | yes | | | | | | yes | | | yes |
-| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | | yes | | | yes |
-| `boolean` | yes | yes | | | | | | yes | | | yes |
-| `date` | yes | yes | | | | | | yes | | | yes |
-| `date-time` | yes | yes | | | | | | yes | | | yes |
-| `enum` | yes | yes | | | | | needed | yes | | | yes |
-| `reference` | yes | yes | | | | needed | | | | | yes |
-| `child-collection` | | | | | | needed | | | | | |
-| `money` | yes | yes | | 1..1000, default 18 | 0..`precision`, default from the currency | | | yes | | | yes |
+| Type | `required` | `unique` | `maxLength` | `minLength` | `min`, `max` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` | `creator` | `sensitive` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `text` | yes | yes | 1..10485760 | 1..`maxLength` | | | | | | yes | yes | yes | yes |
+| `integer` | yes | yes | | | yes | | | | | yes | | | yes |
+| `decimal` | yes | yes | | | yes | 1..1000 | 0..`precision`, only with `precision` | | | yes | | | yes |
+| `boolean` | yes | yes | | | | | | | | yes | | | yes |
+| `date` | yes | yes | | | yes | | | | | yes | | | yes |
+| `date-time` | yes | yes | | | yes | | | | | yes | | | yes |
+| `enum` | yes | yes | | | | | | | needed | yes | | | yes |
+| `reference` | yes | yes | | | | | | needed | | | | | yes |
+| `child-collection` | | | | | | | | needed | | | | | |
+| `money` | yes | yes | | | yes | 1..1000, default 18 | 0..`precision`, default from the currency | | | yes | | | yes |
 - `required` and `unique` default to `false`.
 - `maxLength` is capped at 10485760, the largest `varchar` length.
+- `min` and `max` are literals of the field's type, written as the record API
+  reads a value. An `integer` limit is a JSON integer in the signed 64-bit
+  range. A `decimal` or `money` limit is a JSON number that fits a .NET
+  `decimal`, at most 28 digits. A `date` limit is a string `yyyy-MM-dd`. A `date-time` limit is an
+  RFC 3339 string with an offset, compared as an instant in UTC. Either can be
+  left out. A limit of another JSON type, an invalid literal or `max` below
+  `min` is `AXC0013`, at `/fields/{i}/min` or `/fields/{i}/max`. `min` equal to
+  `max` is allowed.
+- `minLength` is 1 or more, and at most `maxLength` when that is set, else
+  `AXC0013` at `/fields/{i}/minLength`.
+- `min`, `max` and `minLength` cannot be combined with `expression`, `sequence`
+  or `creator`, because the server sets the value and a request never carries
+  it. Each is `AXC0013` at the property.
+- The server checks the limits when it reads a request, and the database has no
+  `CHECK` constraint for them. So tightening a limit needs no migration, and a
+  stored row outside the new limit keeps its values and still reads back. See
+  [request bodies and values](record-api.md#request-bodies-and-values).
 - `values` is a non-empty list of distinct strings; the JSON Schema checks
   this (`AXC0004`).
 - `target` names an entity in the same application, ignoring letter case.
@@ -465,8 +482,9 @@ is `AXC0013`.
   `currencyField` that is not a `text` or `enum` field of the entity is
   `AXC0243`, at `/fields/{i}` when the currency is missing and at
   `/fields/{i}/currency` or `/fields/{i}/currencyField` otherwise. `currency`
-  or `currencyField` on another type is `AXC0013`. A data source measure still
-  refuses `money`, see [data sources](data-sources.md#aggregates).
+  or `currencyField` on another type is `AXC0013`. A data source measure may
+  `sum`, `min` or `max` a money field, and must then group by its
+  `currencyField` (`AXC0248`), see [data sources](data-sources.md#aggregates).
 - `child-collection` owns the rows of the entity that `target` names. It
   allows no other type-specific property. It has no `required`, because a
   missing collection means no rows, and no `unique`. Setting either, even to
@@ -499,9 +517,9 @@ new check is a new compile diagnostic.
 - **`file`.** One file, with optional `maxSize` and `accept`. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. See
   [file fields](file-fields.md). The compiler reports a `maxSize` below 1 or
-  above the file size limit (`AXC0248`), an `accept` entry that is not
-  `type/subtype` or `type/*` (`AXC0249`), and `unique` on the field
-  (`AXC0250`). `maxSize` or `accept` on another type, and `expression` on a
+  above the file size limit (`AXC0249`), an `accept` entry that is not
+  `type/subtype` or `type/*` (`AXC0250`), and `unique` on the field
+  (`AXC0251`). `maxSize` or `accept` on another type, and `expression` on a
   `file`, are `AXC0013`. In an expression a file allows only `is null` and
   `is not null`.
 - **`references`.** A set of records of `target`, at most 1,000. It takes
@@ -527,10 +545,6 @@ new check is a new compile diagnostic.
   [create, update and delete](record-api.md#create-update-and-delete). That is
   still planned, so a default is not applied yet. `file` and `references` are
   refused when those types arrive.
-- **`min` and `max`.** On `integer`, `decimal`, `money`, `date` and
-  `date-time` fields, a literal of the field's type, with `min` at most `max`.
-  **`minLength`** on `text`, at most `maxLength`. A value outside is a `400`
-  at the field's pointer. There is no `CHECK` constraint.
 - **`searchable`.** On a `text` field. `search` reads every searchable field,
   and the display field is always searchable. See
   [paging and sorting](record-api.md#paging-and-sorting).

@@ -236,7 +236,8 @@ public static class DiagnosticCodes
     public const string InvalidChartMeasure = "AXC0241";
     public const string InvalidValueLabels = "AXC0242";
     public const string InvalidMoneyCurrency = "AXC0243";
-    public const string InvalidFileMaxSize = "AXC0248";
-    public const string InvalidFileAccept = "AXC0249";
-    public const string FileFieldNotAllowed = "AXC0250";
+    public const string UngroupedMoneyCurrency = "AXC0248";
+    public const string InvalidFileMaxSize = "AXC0249";
+    public const string InvalidFileAccept = "AXC0250";
+    public const string FileFieldNotAllowed = "AXC0251";
 }

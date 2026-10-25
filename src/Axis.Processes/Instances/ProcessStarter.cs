@@ -12,7 +12,9 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Starts a process instance on a subject record inside the caller's transaction, as the process
 /// start endpoint, the endpoint call and an event trigger's delivery do. It checks the start
-/// condition against the record the caller passes. Callers that start on a pending computed field pass
+/// condition against the record the caller passes. A process without a subject starts with
+/// <see cref="StartWithParametersAsync"/> instead, which checks the start condition over the
+/// parameter values and reads no record. Callers that start on a pending computed field pass
 /// the record computed with <see cref="PendingComputedReads"/>. It inserts the running instance pinned to
 /// <c>releaseId</c>, queues its first work item and appends the audit record
 /// <c>process.started</c>. The instance insert runs in a savepoint, so a start that finds the
@@ -70,7 +72,79 @@ public static class ProcessStarter
             Revision = 1,
             Step = process.Start,
         };
+        return await InsertAsync(connection, transaction, tenantId, application, releaseId, process, instance, actorId, actorName, details, cancellationToken);
+    }
 
+    /// <summary>
+    /// Starts an instance of a process without a subject, with <paramref name="parameters"/> as its
+    /// values in the record API's JSON form. The start condition is checked over the parameter values,
+    /// with no record read. The values are stored as they are, so rejecting a missing, unknown or
+    /// mistyped parameter is the caller's job. A process without a subject has at most one running
+    /// or waiting instance, so a start while one is open is <see cref="ProcessStartOutcome.AlreadyRunning"/>.
+    /// </summary>
+    /// <param name="actorName">The actor's display name, or null for <c>system</c>.</param>
+    /// <param name="details">More audit details, added after <c>processId</c> and <c>releaseId</c>.</param>
+    /// <exception cref="ArgumentException">The process has a subject entity.</exception>
+    public static async Task<ProcessStartResult> StartWithParametersAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel application,
+        Guid releaseId,
+        ProcessModel process,
+        JsonObject parameters,
+        Guid instanceId,
+        string actorId,
+        string? actorName,
+        JsonObject? details,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        ArgumentNullException.ThrowIfNull(parameters);
+        if (process.Entity is not null)
+        {
+            throw new ArgumentException($"The process '{process.Name}' has a subject, so it starts on a record.", nameof(process));
+        }
+
+        // Only true passes: false, null and a run-time error all fail the start. now() is this
+        // transaction's start time.
+        if (process.StartCondition is { } condition)
+        {
+            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+            var result = ProcessParameters.Evaluate(condition.Expression, ProcessParameters.Values(process, parameters), now);
+            if (result.Value is not true)
+            {
+                return new ProcessStartResult(ProcessStartOutcome.ConditionFailed, condition.Message.TextKey, result.Error?.Kind);
+            }
+        }
+
+        var instance = new ProcessInstanceRow
+        {
+            Id = instanceId,
+            ApplicationId = application.Manifest.Id,
+            ProcessId = process.Id,
+            ReleaseId = releaseId,
+            State = ProcessStarts.Running,
+            Revision = 1,
+            Step = process.Start,
+            Parameters = parameters.ToJsonString(),
+        };
+        return await InsertAsync(connection, transaction, tenantId, application, releaseId, process, instance, actorId, actorName, details, cancellationToken);
+    }
+
+    private static async Task<ProcessStartResult> InsertAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel application,
+        Guid releaseId,
+        ProcessModel process,
+        ProcessInstanceRow instance,
+        string actorId,
+        string? actorName,
+        JsonObject? details,
+        CancellationToken cancellationToken)
+    {
         // A unique violation aborts the transaction, so the insert runs in a savepoint that the
         // caller's transaction can roll back to.
         await transaction.SaveAsync(StartSavepoint, cancellationToken);
@@ -92,7 +166,7 @@ public static class ProcessStarter
             ProcessStarts.StepWorkItemKind,
             DateTimeOffset.UtcNow,
             cancellationToken,
-            processInstanceId: instanceId);
+            processInstanceId: instance.Id);
 
         var auditDetails = new JsonObject { ["processId"] = process.Id, ["releaseId"] = releaseId };
         foreach (var (name, value) in details ?? [])
@@ -102,7 +176,7 @@ public static class ProcessStarter
 
         await AuditRecords.AppendAsync(
             transaction,
-            new AuditEntry(actorId, AuditActions.ProcessStarted, application.Manifest.Id, entity.Id, subjectId, instanceId, auditDetails, actorName),
+            new AuditEntry(actorId, AuditActions.ProcessStarted, application.Manifest.Id, instance.SubjectEntityId, instance.SubjectId, instance.Id, auditDetails, actorName),
             cancellationToken);
         return new ProcessStartResult(ProcessStartOutcome.Started);
     }
@@ -117,7 +191,7 @@ public enum ProcessStartOutcome
     /// <summary>The start condition was not true. <see cref="ProcessStartResult.TextKey"/> holds its message's text key.</summary>
     ConditionFailed,
 
-    /// <summary>An instance of the process is already running or waiting for the record.</summary>
+    /// <summary>An instance of the process is already running or waiting for the record, or for a process without a subject, at all.</summary>
     AlreadyRunning,
 }
 

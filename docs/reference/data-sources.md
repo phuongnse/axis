@@ -135,10 +135,21 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   [Added in M15](#added-in-m15).
 - **`count`.** It takes no `field` and counts rows.
 - **`sum`, `min` and `max`.** They need a `field` that names an entry of
-  `fields`. `sum` takes an integer or a decimal. `min` and `max` take an
-  integer, a decimal, a date or a date-time.
-- **Result types.** `count` is an integer. `sum` is written like a decimal.
-  `min` and `max` keep the type of their field.
+  `fields`. `sum` takes an integer, a decimal or a money field. `min` and
+  `max` take an integer, a decimal, a money field, a date or a date-time.
+- **Result types.** `count` is an integer. `sum` is written like a decimal,
+  except that a `sum` over a money field is money. `min` and `max` keep the
+  type of their field.
+- **Money.** A `sum`, `min` or `max` over a `money` field whose currency
+  comes from a `currencyField` must group by that field, or the data source
+  mixes currencies. The group field is a projected field whose path reaches
+  the money field's `currencyField` on the same record, through the same
+  reference fields. A root `currency` field does not cover `order.amount`,
+  whose currency is `order.currency`. Without it the compile fails with
+  `AXC0248`. A `count` and a money field with a fixed `currency` need no
+  currency group. A grouped row keeps the currency with each amount: the
+  currency code is in the group column, and the total is summed in
+  PostgreSQL `numeric`, so no digit is lost.
 - **`null` values.** `sum`, `min` and `max` skip `null` values. Over only
   `null` values they are `null`, not 0, as in SQL. This tells "no values"
   apart from a real zero. `count` counts every row, whatever its values.
@@ -173,11 +184,10 @@ These are _(planned for M15)_. See
   field. The row holds the first date of the bucket. A week starts on
   Monday. Date-time values are bucketed in the application time zone of
   [D75](../decisions/d75-the-application-time-zone.md).
-- **Money.** `sum`, `avg`, `min` and `max` over a `money` field whose
-  currency comes from a `currencyField` need that field among the group
-  fields, or the data source mixes currencies. Without it the data source is
-  a new compile diagnostic. A grouped row keeps the currency with each
-  amount.
+- **Money and `avg`.** `avg` over a `money` field whose currency comes from a
+  `currencyField` needs that field among the group fields, as `sum`, `min`
+  and `max` do now, see [Aggregates](#aggregates). The compile check keeps
+  its list of such functions, and `avg` joins it.
 - **Enum labels and files.** Rows hold enum values, and page metadata gives
   their labels. A `file` field cannot be a group field or a measure field.
 - **Search.** `"search": true` lets the rows route take `search`, matched
@@ -248,11 +258,16 @@ see the Data sources bullet of the Resolve step in
   aggregate rules above. Otherwise it is `AXC0063` at
   `/aggregate/measures/{i}/field`. A field whose path is already `AXC0043`
   is not reported again.
+- A `sum`, `min` or `max` over a money field with a `currencyField` needs a
+  group field that reaches that currency field on the same record. Otherwise
+  it is `AXC0248` at `/aggregate/measures/{i}/field`. A `count`, a money field
+  with a fixed `currency`, and a money field whose `currencyField` is
+  already `AXC0243` are not reported.
 - When the data source is grouped, `sort` names a group field whose path
   does not end at a `reference`, or a measure, instead of a projected field
   (`AXC0045`).
 - `sort` and a `groupBy` entry cannot name a projected `file` field
-  _(planned for M15)_ (`AXC0250`, at `/sort` or `/aggregate/groupBy/{i}`).
+  _(planned for M15)_ (`AXC0251`, at `/sort` or `/aggregate/groupBy/{i}`).
 
 ## Endpoint
 
@@ -541,8 +556,8 @@ data sources.
   - Each chart measure names a measure of the data source, ignoring letter
     case, and it is numeric, otherwise it is `AXC0241` at
     `/widgets/{i}/measures/{j}/name`. A `count` and a `sum` are numeric. A
-    `min` or `max` is numeric over an integer or a decimal, not over a date or
-    a date-time. A `pie` has exactly one measure, otherwise it is `AXC0241` at
+    `min` or `max` is numeric over an integer, a decimal or a money field, not
+    over a date or a date-time. A `pie` has exactly one measure, otherwise it is `AXC0241` at
     `/widgets/{i}/measures`.
   - `parameters` binds page parameters with the table's name map, under the
     same type and required rules as above.
@@ -566,4 +581,8 @@ data sources.
     follows the checks of
     [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Schema.** The data source's schema reaches the SPA in page metadata, in
-  the widget's `dataSource` object. There is no separate schema endpoint.
+  the widget's `dataSource` object. There is no separate schema endpoint. A
+  money measure has the type `money`. It also has `currency`, the fixed
+  currency code, or `currencyColumn`, the name of the group column that holds
+  the code. Both are left out of the JSON when they do not apply. Projected
+  and group columns of type `money` carry no currency yet.

@@ -68,9 +68,12 @@ Later types:
 - maxLength (text)
 - precision and scale (decimal)
 
+Ranges follow: `min` and `max` on integer, decimal, date and date-time, and
+`minLength` on text. The server checks them and the database does not, so
+changing one needs no migration.
+
 M15 adds *(planned for M15)*:
 
-- range (`min`, `max` and `minLength`)
 - index, declared on the entity, and added by the platform on every
   reference and owner column
 - default value
@@ -106,7 +109,7 @@ Later field flags:
 | **Retry policy** | A `callConnector` step and a package operation step declare their attempts and their backoff. The platform fixes which errors are retried, and the instance fails when attempts run out. Operator [retry](../reference/process-inspection.md#retry) is built. Alerts and compensation come later. See [call outcomes](../reference/process-execution.md#call-outcomes) and [package call outcomes](../reference/process-execution.md#package-call-outcomes). | M5 |
 | **Dead letter** | A delivery that kept failing after `Worker:DeliveryAttempts` tries: an event to a trigger or a waiting instance, a schedule fan-out or an email. It is kept in `axis.dead_letters` until an operator redelivers or discards it, with a reason. See [dead letters](../reference/process-events.md#dead-letters) and [D72](../decisions/d72-a-delivery-limit-and-dead-letters.md). *(Planned for M14.)* | M14 |
 | **Notification** | A message a `notify` operation or a task escalation sends to users, roles or email addresses, in the site (in-app) or by email. Its texts have named placeholders filled from typed values, never from a `sensitive` field. Email goes through an outbox and is sent at least once. See [notifications](../reference/notifications.md) and [D73](../decisions/d73-in-app-and-email-notifications.md). *(Planned for M14.)* | M14 |
-| **User profile** | What Axis keeps about a user who signed in: the user id, display name, email and locale, from the identity provider's claims. It gives notifications an address and a locale, and a reassign its known users. It is not a user directory. See [user profiles](../reference/notifications.md#user-profiles). *(Planned for M14.)* | M14 |
+| **User profile** | What Axis keeps about a user who signed in: the user id, display name, email and locale, from the identity provider's claims. It gives notifications an address and a locale, and a reassign its known users. It is not a user directory. See [user profiles](../reference/notifications.md#user-profiles). | M14 |
 | **Process inspector** | A widget that names one process, lists its instances and opens one. It shows the graph with the path drawn on it, the tasks, and the connector and package calls with their attempts. A call's input is shown only when the user may read every field its mapping reads or writes, and a field marked `sensitive` is never shown. It needs an `inspect` grant on the process. The purchase request sample has one, the Approvals page, for its `operator` role. The record history links to an instance. See [process inspection](../reference/process-inspection.md#process-inspection). | M7 |
 
 **Step kinds:**
