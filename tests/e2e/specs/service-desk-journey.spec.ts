@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test } from '../test'
+import type { Locator, Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { dragTo } from '../design-drag'
 import { compareApplicationFolders } from '../folder-comparison'

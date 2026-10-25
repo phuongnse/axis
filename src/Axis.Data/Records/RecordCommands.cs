@@ -499,7 +499,7 @@ public static class RecordCommands
         var name = $"p{index}";
         var type = value.Field.Type switch
         {
-            FieldType.Text or FieldType.Enum or FieldType.Decimal => NpgsqlDbType.Text,
+            FieldType.Text or FieldType.Enum or FieldType.Decimal or FieldType.Money => NpgsqlDbType.Text,
             FieldType.Integer => NpgsqlDbType.Bigint,
             FieldType.Boolean => NpgsqlDbType.Boolean,
             FieldType.Date => NpgsqlDbType.Date,
@@ -508,7 +508,7 @@ public static class RecordCommands
             _ => throw new ArgumentOutOfRangeException(nameof(value), value.Field.Type, "Unknown field type."),
         };
         command.Parameters.Add(new NpgsqlParameter(name, type) { Value = value.Value ?? DBNull.Value });
-        return value.Field.Type == FieldType.Decimal ? $"@{name}::numeric" : $"@{name}";
+        return FieldTypes.HoldsDecimal(value.Field.Type) ? $"@{name}::numeric" : $"@{name}";
     }
 
     private static RecordWriteResult Failure(RecordWriteOutcome outcome, string key, string message) =>

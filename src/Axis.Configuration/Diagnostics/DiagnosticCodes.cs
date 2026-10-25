@@ -231,7 +231,8 @@ public static class DiagnosticCodes
     public const string ChartDataSourceNotGrouped = "AXC0240";
     public const string InvalidChartMeasure = "AXC0241";
     public const string InvalidValueLabels = "AXC0242";
-    public const string DuplicateIndex = "AXC0243";
-    public const string UnknownIndexField = "AXC0244";
-    public const string InvalidIndexField = "AXC0245";
+    public const string InvalidMoneyCurrency = "AXC0243";
+    public const string DuplicateIndex = "AXC0244";
+    public const string UnknownIndexField = "AXC0245";
+    public const string InvalidIndexField = "AXC0246";
 }

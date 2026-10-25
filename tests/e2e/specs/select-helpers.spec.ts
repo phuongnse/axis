@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '../test'
+import type { Page } from '@playwright/test'
 import { expectChosen, pickOption, pickOptions } from '../select'
 import { useSession } from '../sessions'
 

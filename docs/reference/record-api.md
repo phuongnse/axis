@@ -135,7 +135,7 @@ covers reads the whole entity table.
 | `date-time` | A string in UTC with exactly six fraction digits and `Z`, such as `2026-10-06T02:00:00.123456Z`. PostgreSQL stores microseconds, so no precision is lost |
 | `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
 | `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](#child-rows-computed-fields-and-validations) |
-| `money` _(planned for M15)_ | A number written as for `decimal`. The currency is the field's, or the value of its `currencyField` |
+| `money` | A number written as for `decimal`. The currency is the field's, or the value of its `currencyField` |
 | `file` _(planned for M15)_ | An object `{ "id", "name", "mediaType", "size" }`. See [file fields](file-fields.md#field-and-value) |
 | `references` _(planned for M15)_ | An array of record ids, in the order they were written. Its labels are an array in the same order in `labels`. List responses leave it out, as for a child collection |
 
@@ -169,9 +169,10 @@ covers reads the whole entity table.
   collation.
 - **Past the end.** A page past the last one is `200` with empty `items` and
   the real `totalCount`.
-- **Count.** `totalCount` is counted in a separate statement from the page,
-  without a transaction. Under concurrent writes it can differ from the items
-  by a few rows.
+- **Count.** `totalCount` is counted in a separate statement from the page.
+  Both run in one read-only `READ COMMITTED` transaction, so under concurrent
+  writes it can still differ from the items by a few rows. When only the count
+  runs past `Data:QueryTimeout`, `totalCount` is `null`.
 
 The paging parameters are digits only: a sign, a space or a repeated parameter
 (`page=1&page=2`) is invalid.
@@ -443,12 +444,13 @@ otherwise the answer is the stale-version `409`. See
   [start lock](processes.md#releases-and-running-work). The server already ran
   the request again on the new release each time. Nothing was written, and the
   client may send the request again. The title is fixed: "The application's active release changed while the request ran. Try again."
-- **`503` for a query timeout** _(planned for M15)_. A read that runs past
+- **`503` for a query timeout.** A read that runs past
   `Data:QueryTimeout` is cancelled by PostgreSQL. The title is fixed: "The
   query took too long. Try again or narrow it." The server logs the entity
-  name and the duration. When only the count of a list times out, the answer
-  is `200` with `totalCount: null`. See
-  [data settings](host-settings.md#data-settings).
+  name and the duration, and adds one to the counter `axis.queries.timeouts`
+  (unit `{query}`, attributes `axis.tenant` and `axis.application`). When only
+  the count of a list times out, the answer is `200` with `totalCount: null`.
+  See [data settings](host-settings.md#data-settings).
 - **`500`.** An unexpected error on any path is caught by the exception
   handler. The response has no exception type, message or stack trace.
 - **`traceId`**. Every problem details answer has a
@@ -516,7 +518,7 @@ is not a `text`. A wrong JSON type or a value outside its bounds is an error at
 | `date-time` | An RFC 3339 string `yyyy-MM-ddTHH:mm:ss` with an optional fraction of 1 to 6 digits and `Z` or `±HH:mm`; `T` and `Z` may be lower case. A missing offset, an offset beyond ±14:00, a leap second (`:60`), more than 6 fraction digits (PostgreSQL stores microseconds) or an instant outside 0001..9999 in UTC is an error | `DateTimeOffset` converted to UTC with offset zero, the only offset Npgsql writes to `timestamp with time zone` |
 | `enum` | A string equal to one of `values`, compared ordinally | `string` |
 | `reference` | A string in the hyphenated 8-4-4-4-12 hex form, in either letter case; whether the record exists is checked when it is written | `Guid` |
-| `money` _(planned for M15)_ | A number, checked as for `decimal` with the field's `precision` and `scale` | `string`, as for `decimal` |
+| `money` | A number, checked as for `decimal` with the field's `precision` and `scale` | `string`, as for `decimal` |
 | `file` _(planned for M15)_ | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field, see [file fields](file-fields.md#upload) | `Guid` |
 | `references` _(planned for M15)_ | An array of distinct record ids, at most 1,000. The whole set replaces the stored one | `Guid[]` |
 
