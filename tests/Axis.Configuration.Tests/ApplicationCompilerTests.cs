@@ -208,6 +208,161 @@ public sealed class ApplicationCompilerTests
         Assert.Equal(("name", "number"), (order.Fields[0].TargetDisplayField, order.Fields[1].TargetDisplayField));
     }
 
+    [Fact]
+    public void File_field_with_a_size_and_media_types_compiles_on_a_root_and_a_child_entity()
+    {
+        const string file = """{ "name": "receipt", "type": "file", "required": true, "sensitive": true, "maxSize": 1000, "accept": ["image/*", "application/pdf", "Text/Vnd.Custom+json"] }""";
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("line-item.json", Entity("LineItem", $$"""{ "name": "description", "type": "text" }, {{file}}""", LineItemId))
+            .With("order.json", Entity("Order", $$"""{{file}}, { "name": "lineItems", "type": "child-collection", "target": "LineItem" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        foreach (var name in new[] { "Order", "LineItem" })
+        {
+            Assert.True(result.Model.TryGetEntity(name, out var entity));
+            var receipt = entity.Fields.Single(field => field.Name == "receipt");
+            Assert.Equal(FieldType.File, receipt.Type);
+            Assert.Equal((true, true, 1000L), (receipt.Required, receipt.Sensitive, receipt.MaxSize));
+            Assert.Equal(["image/*", "application/pdf", "Text/Vnd.Custom+json"], receipt.Accept);
+            Assert.True(receipt.HasColumn);
+        }
+    }
+
+    [Fact]
+    public void File_field_without_a_size_or_media_types_compiles_with_neither_in_the_model()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", """{ "name": "receipt", "type": "file" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetEntity("Order", out var order));
+        Assert.Equal((null, null), (order.Fields[0].MaxSize, order.Fields[0].Accept));
+    }
+
+    [Theory]
+    [InlineData(0L, "/fields/0/maxSize")]
+    [InlineData(1001L, "/fields/0/maxSize")]
+    public void File_max_size_below_one_or_above_the_limit_is_reported_at_the_max_size(long maxSize, string path)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", $$"""{ "name": "receipt", "type": "file", "maxSize": {{maxSize}} }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path, maxFileSize: 1000);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidFileMaxSize, "order.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("1000", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void File_max_size_up_to_the_limit_compiles_and_the_default_limit_is_25_megabytes()
+    {
+        using var atLimit = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", """{ "name": "receipt", "type": "file", "maxSize": 1000 }"""));
+        using var aboveDefault = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", """{ "name": "receipt", "type": "file", "maxSize": 26214401 }"""));
+        using var atDefault = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", """{ "name": "receipt", "type": "file", "maxSize": 26214400 }"""));
+
+        Assert.Empty(ApplicationCompiler.Compile(atLimit.Path, maxFileSize: 1000).Diagnostics);
+        Assert.Empty(ApplicationCompiler.Compile(atDefault.Path).Diagnostics);
+        var diagnostic = Assert.Single(ApplicationCompiler.Compile(aboveDefault.Path).Diagnostics);
+        Assert.Equal(DiagnosticCodes.InvalidFileMaxSize, diagnostic.Code);
+    }
+
+    [Fact]
+    public void File_max_size_limit_applies_to_resources_and_files_in_memory()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", """{ "name": "receipt", "type": "file", "maxSize": 2000 }"""));
+        var resources = ReadResources(folder.Path);
+
+        Assert.Equal(
+            DiagnosticCodes.InvalidFileMaxSize,
+            Assert.Single(ApplicationCompiler.Compile(resources, maxFileSize: 1000).Diagnostics).Code);
+        Assert.Equal(
+            DiagnosticCodes.InvalidFileMaxSize,
+            Assert.Single(ApplicationCompiler.CompileFiles(resources, null, null, maxFileSize: 1000).Diagnostics).Code);
+        Assert.Empty(ApplicationCompiler.Compile(resources, maxFileSize: 2000).Diagnostics);
+        Assert.Empty(ApplicationCompiler.Compile(resources).Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("image")]
+    [InlineData("*/*")]
+    [InlineData("text/plain;charset=utf-8")]
+    [InlineData("image/")]
+    [InlineData("/png")]
+    [InlineData("*/png")]
+    [InlineData("image/*/x")]
+    [InlineData("image /png")]
+    [InlineData(".png")]
+    [InlineData("")]
+    public void Malformed_accept_entry_is_reported_at_that_entry(string entry)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", $$"""{ "name": "receipt", "type": "file", "accept": ["image/png", "{{entry}}"] }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidFileAccept, "order.json", "/fields/0/accept/1"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "f", "type": "text", "maxSize": 10 }""", "/fields/0/maxSize")]
+    [InlineData("""{ "name": "f", "type": "text", "accept": ["image/*"] }""", "/fields/0/accept")]
+    [InlineData("""{ "name": "f", "type": "integer", "maxSize": 10 }""", "/fields/0/maxSize")]
+    [InlineData("""{ "name": "f", "type": "file", "expression": "'a'" }""", "/fields/0/expression")]
+    public void File_properties_on_another_type_and_expression_on_a_file_are_reported_as_a_type_property(string field, string path)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", field));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidConstraint, "order.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("true")]
+    [InlineData("false")]
+    public void Unique_on_a_file_field_is_reported_at_unique(string unique)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", $$"""{ "name": "receipt", "type": "file", "unique": {{unique}} }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.FileFieldNotAllowed, "order.json", "/fields/0/unique"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
     [Theory]
     [InlineData("""{ "name": "f", "type": "integer", "maxLength": 10 }""", "/fields/0/maxLength")]
     [InlineData("""{ "name": "f", "type": "text", "precision": 10 }""", "/fields/0/precision")]

@@ -38,6 +38,31 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_with_a_file_size_above_a_lower_limit_still_compiles_back()
+    {
+        // The release was stored under a larger limit than the default, so rebuilding it applies no limit.
+        var largeSize = ApplicationCompiler.DefaultMaxFileSize * 2;
+        List<ResourceContent> files =
+        [
+            new ResourceContent("application.json", Manifest),
+            new ResourceContent("entities/order.json", $$"""
+                { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1,
+                  "fields": [ { "name": "number", "type": "text", "maxLength": 20 }, { "name": "receipt", "type": "file", "maxSize": {{largeSize}} } ] }
+                """),
+        ];
+        var compiled = ApplicationCompiler.Compile(files, maxFileSize: largeSize);
+        Assert.Empty(compiled.Diagnostics);
+        Assert.NotEmpty(ApplicationCompiler.Compile(files).Diagnostics);
+        var release = StoredRelease(compiled);
+
+        var model = ReleaseCompiler.BuildModel(release);
+
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        Assert.Equal(largeSize, Assert.Single(model.Entities).Fields.Single(field => field.Name == "receipt").MaxSize);
+    }
+
+    [Fact]
     public void Stored_release_keeps_the_text_files_and_compiles_back_into_its_texts()
     {
         var compiled = ApplicationCompiler.Compile(

@@ -6,8 +6,8 @@ namespace Axis.Configuration.Model;
 /// A compiled field. Type-specific properties are set only for the type they belong to:
 /// <see cref="MaxLength"/> for text, <see cref="Precision"/> and <see cref="Scale"/> for decimal,
 /// <see cref="Values"/> for enum, <see cref="Target"/> for reference and child collection,
-/// <see cref="TargetDisplayField"/> for reference, and <see cref="Sequence"/> and
-/// <see cref="Creator"/> for text.
+/// <see cref="TargetDisplayField"/> for reference, <see cref="MaxSize"/> and <see cref="Accept"/>
+/// for file, and <see cref="Sequence"/> and <see cref="Creator"/> for text.
 /// </summary>
 public sealed record FieldModel
 {
@@ -26,6 +26,12 @@ public sealed record FieldModel
     public int? Precision { get; init; }
 
     public int? Scale { get; init; }
+
+    /// <summary>The largest size in bytes of a file field's file, or null when the host limit applies.</summary>
+    public long? MaxSize { get; init; }
+
+    /// <summary>The media types a file field accepts, or null for any.</summary>
+    public IReadOnlyList<string>? Accept { get; init; }
 
     public IReadOnlyList<string>? Values { get; init; }
 

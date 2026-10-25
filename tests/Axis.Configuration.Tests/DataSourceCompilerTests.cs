@@ -17,7 +17,8 @@ public sealed class DataSourceCompilerTests
             { "name": "customer", "type": "reference", "target": "Customer" },
             { "name": "status", "type": "enum", "values": ["open", "closed"] },
             { "name": "paid", "type": "boolean" },
-            { "name": "dueAt", "type": "date-time" }
+            { "name": "dueAt", "type": "date-time" },
+            { "name": "receipt", "type": "file" }
           ] }
         """;
 
@@ -289,6 +290,58 @@ public sealed class DataSourceCompilerTests
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Contains($"'{sort}'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("receipt")]
+    [InlineData("-receipt")]
+    public void Sort_that_names_a_projected_file_field_is_reported_at_the_sort(string sort)
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }, { "name": "receipt", "path": "receipt" }]""",
+            $$""", "sort": "{{sort}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.FileFieldNotAllowed, "data-sources/orders.json", "/sort"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'receipt'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Group_by_a_projected_file_field_is_reported_at_that_group_field()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }, { "name": "receipt", "path": "receipt" }]""",
+            """, "aggregate": { "groupBy": ["number", "receipt"], "measures": [{ "name": "orders", "function": "count" }] } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.FileFieldNotAllowed, "data-sources/orders.json", "/aggregate/groupBy/1"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'receipt'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Projected_file_field_compiles_when_it_is_not_sorted_or_grouped_by_and_the_filter_tests_it_for_null()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }, { "name": "receipt", "path": "receipt" }]""",
+            """, "sort": "number", "filter": "receipt is not null" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
     }
 
     [Fact]

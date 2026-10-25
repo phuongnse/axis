@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
@@ -33,7 +35,7 @@ namespace Axis.Configuration.Compilation;
 /// sorted list. An application without errors also gets its content hash, which covers its pins and the files of its modules.
 /// Both inputs give the same result for the same resources and installed packages.
 /// </summary>
-public static class ApplicationCompiler
+public static partial class ApplicationCompiler
 {
     /// <summary>The largest length PostgreSQL accepts for <c>varchar(n)</c>.</summary>
     public const int MaxTextLength = 10_485_760;
@@ -41,39 +43,51 @@ public static class ApplicationCompiler
     /// <summary>The largest precision PostgreSQL accepts for <c>numeric(p, s)</c>.</summary>
     public const int MaxPrecision = 1000;
 
+    /// <summary>The size limit of a <c>file</c> field's <c>maxSize</c> when the caller passes none: 25 MB, the default of <c>Files:MaxSize</c>.</summary>
+    public const long DefaultMaxFileSize = 26_214_400;
+
+    // A media type 'type/subtype' or 'type/*', with the name characters of RFC 6838 and no parameters.
+    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}/([A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}|\*)$", RegexOptions.CultureInvariant)]
+    private static partial Regex AcceptEntryPattern();
+
     /// <summary>
     /// Compiles the folder at <paramref name="folderPath"/> against <paramref name="installedPackages"/>
-    /// and <paramref name="installedModules"/>. Null means none is installed.
+    /// and <paramref name="installedModules"/>. Null means none is installed. A <c>file</c> field's <c>maxSize</c> may be at most
+    /// <paramref name="maxFileSize"/> bytes.
     /// </summary>
     public static CompilationResult Compile(
         string folderPath,
         IReadOnlyCollection<PackageVersion>? installedPackages = null,
-        IReadOnlyCollection<InstalledModule>? installedModules = null) =>
-        Compile(folderPath, installedPackages, installedModules, collectReferences: true);
+        IReadOnlyCollection<InstalledModule>? installedModules = null,
+        long maxFileSize = DefaultMaxFileSize) =>
+        Compile(folderPath, installedPackages, installedModules, collectReferences: true, maxFileSize);
 
     /// <summary>Lets the performance tests measure what the reference index adds to a compile.</summary>
     internal static CompilationResult Compile(
         string folderPath,
         IReadOnlyCollection<PackageVersion>? installedPackages,
         IReadOnlyCollection<InstalledModule>? installedModules,
-        bool collectReferences) =>
-        Compile(ApplicationLoader.Load(folderPath), installedPackages ?? [], installedModules ?? [], collectReferences);
+        bool collectReferences,
+        long maxFileSize = DefaultMaxFileSize) =>
+        Compile(ApplicationLoader.Load(folderPath), installedPackages ?? [], installedModules ?? [], collectReferences, maxFileSize);
 
     /// <summary>
     /// Compiles the files of an application held in memory, such as a publish snapshot, as the folder overload compiles a
     /// folder: the paths are the application's own, relative with <c>/</c>, and the pinned modules come from
     /// <paramref name="installedModules"/>. Null means none is installed. Unlike the overload for the resources of a stored
-    /// release, an entry under <c>modules/</c> is not a release copy of a module.
+    /// release, an entry under <c>modules/</c> is not a release copy of a module. A <c>file</c> field's <c>maxSize</c> may be at most
+    /// <paramref name="maxFileSize"/> bytes.
     /// </summary>
     /// <exception cref="ArgumentException">A path appears more than once.</exception>
     public static CompilationResult CompileFiles(
         IReadOnlyList<ResourceContent> files,
         IReadOnlyCollection<PackageVersion>? installedPackages,
-        IReadOnlyCollection<InstalledModule>? installedModules)
+        IReadOnlyCollection<InstalledModule>? installedModules,
+        long maxFileSize = DefaultMaxFileSize)
     {
         ArgumentNullException.ThrowIfNull(files);
 
-        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: true);
+        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: true, maxFileSize);
     }
 
     /// <summary>
@@ -85,22 +99,27 @@ public static class ApplicationCompiler
         IReadOnlyList<ResourceContent> files,
         IReadOnlyCollection<PackageVersion>? installedPackages,
         IReadOnlyCollection<InstalledModule>? installedModules,
-        ExpressionProbe probe)
+        ExpressionProbe probe,
+        long maxFileSize = DefaultMaxFileSize)
     {
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(probe);
 
-        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: false, probe);
+        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: false, maxFileSize, probe);
     }
 
     /// <summary>
     /// Compiles resources held in memory, such as the stored resources of a release, against
     /// <paramref name="installedPackages"/>. Null means no package is installed. Entries under
     /// <c>modules/&lt;id&gt;/</c> are the release's own copies of its pinned modules, and the
-    /// application compiles against those copies alone.
+    /// application compiles against those copies alone. A <c>file</c> field's <c>maxSize</c> may be at most
+    /// <paramref name="maxFileSize"/> bytes.
     /// </summary>
     /// <exception cref="ArgumentException">A path appears more than once.</exception>
-    public static CompilationResult Compile(IReadOnlyList<ResourceContent> resources, IReadOnlyCollection<PackageVersion>? installedPackages = null)
+    public static CompilationResult Compile(
+        IReadOnlyList<ResourceContent> resources,
+        IReadOnlyCollection<PackageVersion>? installedPackages = null,
+        long maxFileSize = DefaultMaxFileSize)
     {
         ArgumentNullException.ThrowIfNull(resources);
 
@@ -121,7 +140,7 @@ public static class ApplicationCompiler
         var copyDiagnostics = new List<Diagnostic>();
         var copies = ReadModuleCopies(moduleResources, copyDiagnostics);
         var applicationResources = resources.Where(resource => !IsModuleCopy(resource)).ToList();
-        var result = Compile(ApplicationLoader.Load(applicationResources), installedPackages ?? [], copies, collectReferences: true);
+        var result = Compile(ApplicationLoader.Load(applicationResources), installedPackages ?? [], copies, collectReferences: true, maxFileSize);
         if (copyDiagnostics.Count == 0)
         {
             return result;
@@ -196,6 +215,7 @@ public static class ApplicationCompiler
         IReadOnlyCollection<PackageVersion> installedPackages,
         IReadOnlyCollection<InstalledModule> installedModules,
         bool collectReferences,
+        long maxFileSize,
         ExpressionProbe? probe = null)
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
@@ -396,6 +416,7 @@ public static class ApplicationCompiler
                 references,
                 RulesFor(entity),
                 IsModuleResource(entity) ? null : declaredModules,
+                maxFileSize,
                 diagnostics);
         }
 
@@ -406,7 +427,7 @@ public static class ApplicationCompiler
             FindDataSource,
             FindForm,
             FindProcess,
-            (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, report),
+            (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, maxFileSize, report),
             moduleReferences,
             references,
             rules,
@@ -466,7 +487,7 @@ public static class ApplicationCompiler
             loaded.UnloadedEntityNames,
             FindProcess,
             loaded.UnloadedProcessNames,
-            (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, report),
+            (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, maxFileSize, report),
             references,
             diagnostics);
         TriggerChecker.Check(
@@ -725,6 +746,7 @@ public static class ApplicationCompiler
         ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string>? modules,
+        long maxFileSize,
         List<Diagnostic> diagnostics)
     {
         void Report(string code, string message, string path) =>
@@ -749,7 +771,7 @@ public static class ApplicationCompiler
             }
 
             CheckTextKey(field.Label, entity, $"{path}/label", references, diagnostics);
-            CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, moduleReferences, Report);
+            CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, moduleReferences, maxFileSize, Report);
             AddFieldTarget(entity, field, path, findEntity, references);
             CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
             CheckCreator(field, path, childOwner, Report);
@@ -814,10 +836,10 @@ public static class ApplicationCompiler
         {
             var field = entity.Fields[index];
 
-            // A reference or child collection is reported by CheckField, and so is an enum without values.
+            // A reference, child collection or file is reported by CheckField, and so is an enum without values.
             var type = FieldTypes.Parse(field.Type);
             if (field.Expression is null
-                || type is FieldType.Reference or FieldType.ChildCollection
+                || type is FieldType.Reference or FieldType.ChildCollection or FieldType.File
                 || (type == FieldType.Enum && field.Values is null))
             {
                 continue;
@@ -999,6 +1021,7 @@ public static class ApplicationCompiler
         IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
         IReadOnlySet<string> unloadedEntityNames,
         ModuleReferences moduleReferences,
+        long maxFileSize,
         Action<string, string, string> report)
     {
         var type = FieldTypes.Parse(field.Type);
@@ -1045,6 +1068,35 @@ public static class ApplicationCompiler
                 DiagnosticCodes.InvalidConstraint,
                 $"'maxLength' must be between 1 and {MaxTextLength}, but is {maxLength}.",
                 $"{path}/maxLength");
+        }
+
+        if (field.MaxSize is { } maxSize
+            && Fits("maxSize", "file", FieldType.File)
+            && (maxSize < 1 || maxSize > maxFileSize))
+        {
+            report(
+                DiagnosticCodes.InvalidFileMaxSize,
+                $"'maxSize' must be between 1 and {maxFileSize} bytes, the file size limit, but is {maxSize}.",
+                $"{path}/maxSize");
+        }
+
+        if (field.Accept is { } accept && Fits("accept", "file", FieldType.File))
+        {
+            for (var index = 0; index < accept.Count; index++)
+            {
+                if (!AcceptEntryPattern().IsMatch(accept[index]))
+                {
+                    report(
+                        DiagnosticCodes.InvalidFileAccept,
+                        $"The 'accept' entry '{accept[index]}' must be a media type 'type/subtype' or 'type/*'. '*/*' and parameters such as ';charset=' are not allowed.",
+                        $"{path}/accept/{index}");
+                }
+            }
+        }
+
+        if (type == FieldType.File && field.Unique is not null)
+        {
+            report(DiagnosticCodes.FileFieldNotAllowed, "'unique' does not apply to file fields.", $"{path}/unique");
         }
 
         var precisionValid = false;
@@ -1158,8 +1210,9 @@ public static class ApplicationCompiler
 
     /// <summary>
     /// Checks the seeds, which come in path order: each names a loaded entity, and every seed record
-    /// id is used once across all seeds, compared as a UUID. The values are not checked here; the
-    /// startup step checks them with the record API's rules before it inserts any record.
+    /// id is used once across all seeds, compared as a UUID. A record cannot set a file field, in its
+    /// own values or in a child row's. The other values are not checked here; the startup step
+    /// checks them with the record API's rules before it inserts any record.
     /// </summary>
     private static void CheckSeeds(
         IReadOnlyList<SeedResource> seeds,
@@ -1171,7 +1224,8 @@ public static class ApplicationCompiler
         var firstFileById = new Dictionary<Guid, string>();
         foreach (var seed in seeds)
         {
-            if (findEntity(seed.Entity) is { } entity)
+            var entity = findEntity(seed.Entity);
+            if (entity is not null)
             {
                 references.Add(seed, "/entity", ReferenceRelations.SeedEntity, ResourceNode.Of(entity));
             }
@@ -1188,6 +1242,11 @@ public static class ApplicationCompiler
 
             for (var index = 0; index < seed.Records.Count; index++)
             {
+                if (entity is not null)
+                {
+                    CheckSeedFiles(seed, entity, seed.Records[index].Values, $"/records/{index}/values", findEntity, diagnostics);
+                }
+
                 var id = seed.Records[index].Id;
                 if (!firstFileById.TryAdd(id, seed.File))
                 {
@@ -1197,6 +1256,55 @@ public static class ApplicationCompiler
                         seed.File,
                         $"/records/{index}/id",
                         seed.Id));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports each property of a seed record's <paramref name="values"/> that names a file field of <paramref name="entity"/>, and
+    /// does the same for the rows of a child collection among them. A name resolves ignoring letter case.
+    /// </summary>
+    private static void CheckSeedFiles(
+        SeedResource seed,
+        EntityResource entity,
+        JsonElement values,
+        string path,
+        Func<string, EntityResource?> findEntity,
+        List<Diagnostic> diagnostics)
+    {
+        if (values.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        foreach (var property in values.EnumerateObject())
+        {
+            if (FindField(entity, property.Name) is not { } field)
+            {
+                continue;
+            }
+
+            var type = FieldTypes.Parse(field.Type);
+            if (type == FieldType.File)
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.FileFieldNotAllowed,
+                    $"The field '{field.Name}' is a file field. A seed record cannot set a file.",
+                    seed.File,
+                    $"{path}/{property.Name}",
+                    seed.Id));
+            }
+            else if (type == FieldType.ChildCollection
+                && property.Value.ValueKind == JsonValueKind.Array
+                && field.Target is { } target
+                && findEntity(target) is { } child)
+            {
+                var row = 0;
+                foreach (var item in property.Value.EnumerateArray())
+                {
+                    CheckSeedFiles(seed, child, item, $"{path}/{property.Name}/{row}", findEntity, diagnostics);
+                    row++;
                 }
             }
         }
@@ -1218,7 +1326,7 @@ public static class ApplicationCompiler
     /// has a diagnostic. An <c>aggregate</c> groups by projected names, its measure names differ
     /// from the group fields and from each other, and each measure is valid as
     /// <see cref="CheckMeasure"/> describes. A grouped data source's sort names a group field that
-    /// is not a reference, or a measure.
+    /// is not a reference, or a measure. No group field or sort names a file field.
     /// </summary>
     private static void CheckDataSources(
         ApplicationLoadResult loaded,
@@ -1309,6 +1417,13 @@ public static class ApplicationCompiler
                             $"The group field '{name}' must name a projected field.",
                             $"/aggregate/groupBy/{index}");
                     }
+                    else if (fieldsByName[name] is { } groupField && FieldTypes.Parse(groupField.Type) == FieldType.File)
+                    {
+                        Report(
+                            DiagnosticCodes.FileFieldNotAllowed,
+                            $"The group field '{name}' is a file field. A data source cannot group by a file.",
+                            $"/aggregate/groupBy/{index}");
+                    }
                 }
 
                 for (var index = 0; index < aggregate.Measures.Count; index++)
@@ -1356,6 +1471,16 @@ public static class ApplicationCompiler
                         $"The sort '{sort}' names the reference field '{name}'. A data source cannot sort by a reference.",
                         "/sort");
                 }
+                else if (!isMeasure
+                    && fieldsByName.TryGetValue(name, out var fileField)
+                    && fileField is not null
+                    && FieldTypes.Parse(fileField.Type) == FieldType.File)
+                {
+                    Report(
+                        DiagnosticCodes.FileFieldNotAllowed,
+                        $"The sort '{sort}' names the file field '{name}'. A data source cannot sort by a file.",
+                        "/sort");
+                }
             }
 
             var countBeforeParameters = diagnostics.Count;
@@ -1396,6 +1521,7 @@ public static class ApplicationCompiler
                     ownersByChildName,
                     loaded.UnloadedEntityNames,
                     moduleReferences,
+                    long.MaxValue,
                     Report);
                 AddFieldTarget(dataSource, parameterField, path, findEntity, references);
             }
@@ -1635,6 +1761,8 @@ public static class ApplicationCompiler
             MaxLength = field.MaxLength,
             Precision = field.Precision,
             Scale = field.Scale,
+            MaxSize = field.MaxSize,
+            Accept = field.Accept,
             Values = field.Values,
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
             TargetDisplayField = type == FieldType.Reference && target?.DisplayField is { } displayField ? FindField(target, displayField)?.Name : null,
