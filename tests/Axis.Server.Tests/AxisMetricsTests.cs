@@ -22,6 +22,7 @@ public sealed class AxisMetricsTests
         ["axis.computed.pending_fields"] = ["axis.tenant", "axis.application"],
         ["axis.tenant.database.available"] = ["axis.tenant"],
         ["axis.calls.attempts"] = ["axis.tenant", "axis.application", "axis.connector", "axis.package", "axis.operation", "axis.outcome"],
+        ["axis.dead_letters.created"] = ["axis.tenant", "axis.work_item.kind"],
     };
 
     [Fact]
@@ -67,6 +68,7 @@ public sealed class AxisMetricsTests
         AxisMetrics.RecordInstanceEnded("default", null, null, "failed");
         AxisMetrics.RecordCallAttempt("default", "PurchaseRequests", AxisTelemetry.ConnectorTag, "PurchasingSystem", "createOrder", "succeeded");
         AxisMetrics.RecordCallAttempt("default", null, AxisTelemetry.PackageTag, "PaymentReferences", "reserve", "retryable");
+        AxisMetrics.RecordDeadLetter("default", "event.deliver");
 
         gauges.Publish("default", [new WorkItemGauge("process.step", 3, 12.5)], [new PendingFieldsGauge("PurchaseRequests", 2)]);
         tenantDatabases.Record("default", true);
