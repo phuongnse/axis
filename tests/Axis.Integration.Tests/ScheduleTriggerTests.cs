@@ -335,6 +335,21 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         Assert.Equal(hourlyReleaseId, state.ReleaseId);
         Assert.Equal(onTheHour, state.NextOccurrenceAt);
         Assert.Equal(onTheHour, item.DueAt);
+
+        // 00:20Z falls just before Berlin's repeated hour. A Berlin hourly schedule would give 02:00Z, so UTC keeps the hour steps even.
+        await tenant.ActivateAsync(fixture.Folder, [], activatedAt: DateTimeOffset.Parse("2026-10-25T00:10:00Z", CultureInfo.InvariantCulture));
+        var (autumnReleaseId, _) = await tenant.ActivateAsync(
+            fixture.HourlyFolder,
+            [],
+            activatedAt: DateTimeOffset.Parse("2026-10-25T00:20:00Z", CultureInfo.InvariantCulture));
+        await AssertHourlyInUtcAsync(tenant);
+
+        var afterClockChange = DateTimeOffset.Parse("2026-10-25T01:00:00Z", CultureInfo.InvariantCulture);
+        state = Assert.Single(await tenant.TriggerSchedulesAsync());
+        item = Assert.Single(await tenant.ScheduleItemsAsync());
+        Assert.Equal(autumnReleaseId, state.ReleaseId);
+        Assert.Equal(afterClockChange, state.NextOccurrenceAt);
+        Assert.Equal(afterClockChange, item.DueAt);
     }
 
     /// <summary>Waits for the next hour when less than a minute of the current one is left, so that no hourly occurrence falls due while the test runs.</summary>
