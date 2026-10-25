@@ -25,6 +25,9 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
     public const string TestSecretKey = TestPlatform.SecretKey;
 
+    /// <summary>The settings that make the tenant setting commands run: they need the directory source. It is not the default, because the publisher tests branch on it.</summary>
+    public static readonly IReadOnlyDictionary<string, string?> Directory = new Dictionary<string, string?> { ["Tenancy:Source"] = "directory" };
+
     public const string Authority = "https://127.0.0.1:1/realms/axis";
 
     public static readonly TenantSecretCipher Cipher = TenantSecretCipher.Load(
@@ -125,7 +128,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         string? path = null,
         IReadOnlyDictionary<string, string?>? extra = null,
         TimeSpan? publisherLease = null,
-        TimeSpan? publisherTestLimit = null)
+        TimeSpan? publisherTestLimit = null,
+        string? input = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -149,12 +153,13 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             ? await AdminCommands.RunAsync(
                 args,
                 configuration,
+                new StringReader(input ?? ""),
                 output,
                 error,
                 publisherLease ?? Publisher.DefaultLeaseDuration,
                 publisherTestLimit ?? Publisher.DefaultTestLimit,
                 stop?.Token ?? CancellationToken)
-            : await AdminCommands.RunAsync(args, configuration, output, error, stop?.Token ?? CancellationToken);
+            : await AdminCommands.RunAsync(args, configuration, new StringReader(input ?? ""), output, error, stop?.Token ?? CancellationToken);
         var text = output.ToString()!;
         _texts.Add(text);
         _texts.Add(error.ToString());
@@ -174,15 +179,6 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
     {
         await using var context = NewContext();
         return await context.TenantHosts.AsNoTracking().Where(host => host.TenantId == id).Select(host => host.Host).ToArrayAsync(CancellationToken);
-    }
-
-    /// <summary>Changes a binding of a tenant in the directory, as the operator does until a command sets bindings.</summary>
-    public async Task SetBindingAsync(string id, string name, Action<TenantBindingRow> change)
-    {
-        await using var context = NewContext();
-        var binding = await context.TenantBindings.SingleAsync(row => row.TenantId == id && row.Name == name, CancellationToken);
-        change(binding);
-        await context.SaveChangesAsync(CancellationToken);
     }
 
     public async Task<int> CountBindingsAsync(string id)
@@ -277,6 +273,11 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 {
                     secrets.Add(Cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
                 }
+            }
+
+            foreach (var binding in migrated ? await context.TenantBindings.AsNoTracking().Where(row => row.Kind == "secret" && row.SecretValue != null).ToListAsync(CancellationToken) : [])
+            {
+                secrets.Add(Cipher.Decrypt(binding.TenantId, TenantSecretFields.Binding(binding.Name), binding.SecretValue!).Reveal());
             }
         }
 

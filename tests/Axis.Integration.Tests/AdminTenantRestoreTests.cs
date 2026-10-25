@@ -9,6 +9,7 @@ using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Server.Tenancy;
 using Axis.Server.Tests;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -79,7 +80,9 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         }
 
         // The operator sets the secret binding, which the archive never held, and resumes the tenant.
-        await scenario.SetBindingAsync(newId, SecretBinding, binding => binding.SecretValue = AdminScenario.Cipher.Encrypt(newId, TenantSecretFields.Binding(SecretBinding), "restored-token"));
+        var setBinding = await scenario.RunAsync(["tenant", "binding", "set", newId, SecretBinding, "--secret"], input: "restored-token", extra: AdminScenario.Directory);
+        Assert.Equal(0, setBinding.Exit);
+        Assert.Equal([$"{newId} binding ok"], setBinding.Output);
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "resume", newId])).Exit);
         await RefreshAsync(server);
 
@@ -87,6 +90,9 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         {
             Assert.Equal(HttpStatusCode.OK, served.StatusCode);
         }
+
+        var tenant = server.Services.GetRequiredService<ITenantCatalog>().Find(newId);
+        Assert.Equal("restored-token", tenant!.Bindings[SecretBinding].Secret!.Reveal());
 
         foreach (var id in ids)
         {
