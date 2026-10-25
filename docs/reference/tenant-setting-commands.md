@@ -8,8 +8,9 @@ sections marked _(planned for Mx)_ are not built yet, and Dn refers to [decision
 The design follows [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md). The
 `platform.audit_records` table, `PlatformAuditRecords.WriteAsync` and the records of the commands
 that already exist are built, see [platform audit records](#platform-audit-records). The database
-password rotation, [`tenant rotate-passwords`](#database-passwords), is built. The other setting
-commands on this page, and the key rotation, are _(planned for M16)_.
+password rotation, [`tenant rotate-passwords`](#database-passwords), is built. So is
+[`tenant oidc set`](#sign-in-settings), except `--client-key` and `--retire-client-key`. The other
+setting commands on this page, and the key rotation, are _(planned for M16)_.
 
 ## Common rules
 
@@ -57,14 +58,34 @@ commands on this page, and the key rotation, are _(planned for M16)_.
 | `--endpoint-audience <value>`  | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it |
 | `--service-audience <value>`   | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it |
 | `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](security.md#fapi-20-profile)                      |
-| `--client-key`                 | Adds a client key for `private_key_jwt`, as a PEM from `AXIS_OIDC_CLIENT_KEY` or standard input |
-| `--retire-client-key <kid>`    | Removes the client key with that key id                                                       |
+| `--client-key`                 | _(planned for M16)_ Adds a client key for `private_key_jwt`, as a PEM from `AXIS_OIDC_CLIENT_KEY` or standard input |
+| `--retire-client-key <kid>`    | _(planned for M16)_ Removes the client key with that key id                                   |
 
-- **Client key rotation.** A tenant holds at most two client keys. The server signs with the newest
+A successful run prints `<id> oidc ok`.
+
+- **The secret.** `--client-secret` takes no value. The secret comes from `AXIS_OIDC_CLIENT_SECRET`,
+  or from the first line of standard input when the variable is not set, as in
+  `printf %s "$SECRET" | tenant oidc set <id> --client-secret`. An empty secret exits with code 2.
+  The secret is stored encrypted and never printed.
+- **Empty values.** An empty `--endpoint-audience` or `--service-audience` removes the audience. A
+  tenant without a service audience refuses service account tokens again after the next refresh. An
+  empty claim, as in `--claim Email=`, removes the stored claim name, so the default claim applies
+  again.
+- **Any status.** The command works on a tenant in any status, including `provisioning` and
+  `suspended`, because sign-in settings need neither the tenant's database nor its roles. It needs
+  `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, and not `Admin:ConnectionString`.
+- **Audit.** One [platform audit record](#platform-audit-records) names every setting the command
+  was given, even when the new value equals the stored one. The names are `authority`, `clientId`,
+  `clientSecret`, `claimUserId`, `claimDisplayName`, `claimRoles`, `claimEmail`, `claimLocale`,
+  `endpointAudience`, `serviceAudience` and `profile`, in that order. A name is never a value.
+- **Client key rotation _(planned for M16)_.** A tenant holds at most two client keys. The server signs with the newest
   and publishes both, so the identity provider can accept either while it changes over. Retiring the
   last key of a `fapi2` tenant exits with code 2.
-- **Checks.** `--profile fapi2` without a client key exits with code 2. A preview tenant has no
-  sign-in settings of its own, so the command exits with code 2 for one.
+- **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, the tenant is unknown, the
+  tenant is a preview tenant, which has no sign-in settings of its own, no setting is given, a claim
+  name or the profile is unknown, `--profile fapi2` is given for a tenant without a client key, the
+  authority is not an absolute `http` or `https` URL, the client id is blank, or the secret is
+  empty. The `version` stays and no audit record is written.
 
 ## Hosts
 
@@ -127,8 +148,8 @@ keys. It can be rotated without signing anyone out.
   truncate with SQLSTATE `23001`, as it does for the audit table of a tenant database. The table is
   built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record.
 - **What writes it.** Every `Axis.Admin` command that acts on a tenant: `tenant create`,
-  `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant backup`, `tenant restore`,
-  `migrate` and `activate` are built. `tenant backup` writes one because an archive holds a tenant's data. The other setting
+  `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant oidc set`, `tenant backup`,
+  `tenant restore`, `migrate` and `activate` are built. `tenant backup` writes one because an archive holds a tenant's data. The other setting
   commands on this page and `platform rekey` are _(planned for M16)_. `tenant list`, `version` and
   `publisher` write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is
   marked as writing one record per tenant or none. A command without a mark fails a test.
@@ -136,9 +157,11 @@ keys. It can be rotated without signing anyone out.
   before its first change for that tenant. A usage error, a missing setting, an unknown tenant or a
   host that another tenant holds writes none, because nothing started. A record means the command
   started work for the tenant, not that the work succeeded. The `changed` names of these commands
-  are empty, because the command already says what changed. `tenant rotate-passwords` is the
-  exception: its record names both roles, `axis_<id>_runtime` and `axis_<id>_schema`, and never a
-  password.
+  are empty, because the command already says what changed. `tenant rotate-passwords` and
+  `tenant oidc set` are the exceptions. The record of `tenant rotate-passwords` names both roles,
+  `axis_<id>_runtime` and `axis_<id>_schema`, and never a password. The record of `tenant oidc set`
+  names the [settings](#sign-in-settings) it was given and never a value. `tenant oidc set` writes
+  its record after its checks and before the change.
 - **A record that cannot be written.** That tenant stops with an `audit` step, and nothing changes
   for it. The line is `<tenant> audit failed: <message>`, and the command exits `1`. The other
   tenants of `migrate` and `activate` go on. A record that is written prints no line.

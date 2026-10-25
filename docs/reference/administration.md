@@ -7,7 +7,7 @@ activate releases, and back up and restore tenants. It follows
 and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
-`tenant list`, `tenant backup`, `tenant restore`, `migrate`, `activate`, `publisher` and `version`. The commands that change a tenant
+`tenant oidc set`, `tenant list`, `tenant backup`, `tenant restore`, `migrate`, `activate`, `publisher` and `version`. The commands that change a tenant
 after it is created and rotate keys are in [tenant setting commands](tenant-setting-commands.md)
 _(planned for M16)_. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
@@ -39,7 +39,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
 | `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate`, `publisher` and `tenant restore` read it. |
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
-| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. Only `tenant create` and `tenant restore` read it. It is never a command-line option, so it does not appear in a process list. |
+| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. `tenant create` and `tenant restore` read it, and so does `tenant oidc set --client-secret`, which reads the first line of standard input when the variable is not set. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
 A missing or invalid setting exits with code 2 before any tenant work. The
@@ -181,7 +181,8 @@ with code 2.
   `PUBLIC`, and grants both only to the runtime role. Without this, any login
   role of the database server could connect to the tenant database.
 - The command sets no claim names, endpoint audience or service audience. They stay empty, so the
-  hosts use their defaults. It sets no deployment binding either, except the
+  hosts use their defaults. [`tenant oidc set`](tenant-setting-commands.md#sign-in-settings) sets
+  them later. It sets no deployment binding either, except the
   `url` bindings that `--binding` gives a preview tenant.
 
 **Names.** The role and database names come from the id. PostgreSQL names hold
@@ -442,8 +443,9 @@ option or a missing setting.
 2. Run [`tenant resume <id>`](#tenant-resume).
 
 No command sets a binding yet, see [Not built yet](#not-built-yet).
-`tenant oidc set --client-secret` and `tenant binding set` do step 1
-_(planned for M16)_, see [tenant setting commands](tenant-setting-commands.md).
+[`tenant oidc set --client-secret`](tenant-setting-commands.md#sign-in-settings) sets the client
+secret again. `tenant binding set` will set the bindings again _(planned for M16)_, see
+[tenant setting commands](tenant-setting-commands.md).
 
 **Restoring over an existing tenant.** There is no in-place overwrite.
 
@@ -882,10 +884,9 @@ admin host carries the same version in its OCI label, see
 - Deleting a tenant.
 - An HTTP API for provisioning.
 - Moving a tenant to another database server.
-- Commands that set a tenant's deployment bindings, claim names or endpoint
-  audience. `tenant create` sets none of them, so they stay empty. The one
-  exception is `--binding` on a `tenant create --preview-of`. `tenant binding`
-  and `tenant oidc set` are _(planned for M16)_, see
+- Commands that set a tenant's deployment bindings. `tenant create` sets none of
+  them, so they stay empty. The one exception is `--binding` on a
+  `tenant create --preview-of`. `tenant binding` is _(planned for M16)_, see
   [tenant setting commands](tenant-setting-commands.md) and
   [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md).
 - Point-in-time recovery of a tenant, and restoring a tenant into another

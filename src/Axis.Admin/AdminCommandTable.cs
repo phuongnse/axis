@@ -21,6 +21,7 @@ internal sealed record AdminRun(
     AdminCommand Command,
     string[] Args,
     IConfiguration Configuration,
+    TextReader Input,
     TextWriter Output,
     TextWriter Error,
     TimeSpan PublisherLease,

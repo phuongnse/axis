@@ -20,6 +20,7 @@ public sealed class AdminCommandTableTests
                 ["tenant suspend"] = AuditMark.OnePerTenant,
                 ["tenant resume"] = AuditMark.OnePerTenant,
                 ["tenant rotate-passwords"] = AuditMark.OnePerTenant,
+                ["tenant oidc set"] = AuditMark.OnePerTenant,
                 ["migrate"] = AuditMark.OnePerTenant,
                 ["activate"] = AuditMark.OnePerTenant,
                 ["tenant list"] = AuditMark.None,
