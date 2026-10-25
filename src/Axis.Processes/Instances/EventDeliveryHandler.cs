@@ -1,5 +1,6 @@
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
+using Axis.Core.Telemetry;
 using Axis.Processes.Work;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -20,9 +21,15 @@ namespace Axis.Processes.Instances;
 /// transaction then evaluates the trigger's <c>when</c> on the stored payload, locks and reads the occurrence's
 /// record, and starts the process for it as <c>system</c>, pinned to the active release. A start
 /// marks the receipt <c>started</c>. A skip leaves it <c>skipped</c> and is logged with its reason.
-/// A last transaction deletes the item.
+/// A trigger whose transaction fails does not stop the others. After the failed transaction has
+/// rolled back, a transaction of its own counts the failure in <c>axis.delivery_failures</c> for the
+/// trigger and the event, storing only the exception type and SQLSTATE. At the limit of
+/// <see cref="DeliverySettings.Attempts"/> failures it writes an <c>open</c> dead letter and a
+/// <c>deadLettered</c> receipt instead, so the trigger is not tried again. A last transaction
+/// deletes the item. When a trigger failed below the limit it instead makes the item due again
+/// after the shortest backoff among the failed triggers of the pass.
 /// </summary>
-internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILogger<EventDeliveryHandler> logger) : IExternalWorkItemHandler
+internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, DeliverySettings settings, ILogger<EventDeliveryHandler> logger) : IExternalWorkItemHandler
 {
     public string Kind => ProcessStarts.EventDeliverWorkItemKind;
 
@@ -62,16 +69,37 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
             await transaction.RollbackAsync(cancellationToken);
         }
 
+        TimeSpan? backoff = null;
         foreach (var trigger in delivery.Triggers)
         {
-            if (!await DeliverAsync(item, connection, occurrence!, trigger, cancellationToken))
+            try
             {
-                return WorkItemOutcome.LostClaim;
+                if (!await DeliverAsync(item, connection, occurrence!, trigger, cancellationToken))
+                {
+                    return WorkItemOutcome.LostClaim;
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                // The failed transaction is disposed, so it has rolled back and the connection is free.
+                var (held, delay) = await CountFailureAsync(item, connection, occurrence!, trigger, exception, cancellationToken);
+                if (!held)
+                {
+                    return WorkItemOutcome.LostClaim;
+                }
+
+                if (delay is { } wait && (backoff is not { } shortest || wait < shortest))
+                {
+                    backoff = wait;
+                }
             }
         }
 
         await using var completion = await connection.BeginTransactionAsync(cancellationToken);
-        if (!await WorkItemQueue.CompleteAsync(connection, completion, item, cancellationToken))
+        var settled = backoff is { } due
+            ? await WorkItemQueue.RescheduleAsync(connection, completion, item, due, cancellationToken)
+            : await WorkItemQueue.CompleteAsync(connection, completion, item, cancellationToken);
+        if (!settled)
         {
             await completion.RollbackAsync(cancellationToken);
             LogLostClaim(item.Id, item.EventId);
@@ -79,7 +107,58 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
         }
 
         await completion.CommitAsync(cancellationToken);
-        return WorkItemOutcome.Completed;
+        return backoff is null ? WorkItemOutcome.Completed : WorkItemOutcome.Rescheduled;
+    }
+
+    /// <summary>
+    /// Counts a failed start of one trigger in a transaction of its own. Below the limit it returns
+    /// the backoff after which the item is due again. At the limit it writes the dead letter and the
+    /// <c>deadLettered</c> receipt and returns no backoff. Returns <c>Held</c> as <see langword="false"/>
+    /// when another worker holds the item now, so nothing was written.
+    /// </summary>
+    private async Task<(bool Held, TimeSpan? Delay)> CountFailureAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        StoredEvent occurrence,
+        TriggerModel trigger,
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        // Only the type and SQLSTATE are kept: the message of the exception can quote a payload value.
+        var error = DeliveryFailures.ErrorText(exception);
+        var target = $"{trigger.Id:D}/{occurrence.Id:D}";
+        int attempts;
+        Guid? deadLetterId = null;
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        {
+            if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id, item.EventId);
+                return (false, null);
+            }
+
+            attempts = await DeliveryFailures.CountAsync(transaction, DeliveryFailures.EventDeliverKind, target, error, cancellationToken);
+            if (attempts >= settings.Attempts)
+            {
+                deadLetterId = await DeliveryFailures.InsertDeadLetterAsync(
+                    transaction, occurrence.ApplicationId, trigger.Process.Id, occurrence.Id, trigger.Id, attempts, error, cancellationToken);
+                await TriggerStarts.InsertDeadLetteredAsync(transaction, trigger.Id, occurrence.Id.ToString("D"), occurrence.SubjectId, cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        if (deadLetterId is { } deadLetter)
+        {
+            AxisMetrics.RecordDeadLetter(item.TenantId, DeliveryFailures.EventDeliverKind);
+            LogDeadLettered(trigger.Id, occurrence.Id, attempts, deadLetter, DeliveryFailures.EventDeliverKind);
+            return (true, null);
+        }
+
+        var delay = DeliveryFailures.Backoff(attempts);
+        LogDeliveryFailed(trigger.Name, occurrence.Id, error, attempts, settings.Attempts, delay);
+        return (true, delay);
     }
 
     /// <summary>
@@ -190,6 +269,12 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, ILo
 
     [LoggerMessage(LogLevel.Information, "Trigger {Trigger} skipped the start of process {Process} for record {SubjectId} of event {EventId}: {Reason}.")]
     private partial void LogSkipped(string trigger, string process, Guid subjectId, Guid eventId, string reason);
+
+    [LoggerMessage(LogLevel.Warning, "Trigger {Trigger} failed to start for event {EventId} with {Error}, failure {Attempts} of {Limit}. Delivery is due again in {Delay}.")]
+    private partial void LogDeliveryFailed(string trigger, Guid eventId, string error, int attempts, int limit, TimeSpan delay);
+
+    [LoggerMessage(LogLevel.Warning, "Event delivery to trigger {TriggerId} for event {EventId} failed {Attempts} times and became dead letter {DeadLetterId} of kind {Kind}.")]
+    private partial void LogDeadLettered(Guid triggerId, Guid eventId, int attempts, Guid deadLetterId, string kind);
 
     [LoggerMessage(LogLevel.Warning, "Event delivery work item {ItemId} names no stored event {EventId}, so it was discarded.")]
     private partial void LogNoEvent(Guid itemId, Guid? eventId);

@@ -43,6 +43,11 @@ public static class WorkerServiceCollectionExtensions
             throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.MetricsInterval)}' must be positive.");
         }
 
+        if (options.DeliveryAttempts < 1)
+        {
+            throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.DeliveryAttempts)}' must be at least 1.");
+        }
+
         var health = new HealthOptions();
         configuration.GetSection(HealthOptions.SectionName).Bind(health);
         if (string.IsNullOrWhiteSpace(health.Urls))
@@ -83,7 +88,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton(catalog);
         services.AddExtensionPackages(configuration, environment);
         services.AddModules(configuration, environment);
-        services.AddProcesses(environment.IsDevelopment());
+        services.AddProcesses(environment.IsDevelopment(), options.DeliveryAttempts);
         services.AddSingleton(options);
         services.AddSingleton(health);
         services.TryAddSingleton(TimeProvider.System);

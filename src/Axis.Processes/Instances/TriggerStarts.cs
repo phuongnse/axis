@@ -15,6 +15,9 @@ internal static class TriggerStarts
     /// <summary>The outcome of a receipt whose start was skipped.</summary>
     internal const string Skipped = "skipped";
 
+    /// <summary>The outcome of a receipt whose delivery failed too often and became a dead letter.</summary>
+    internal const string DeadLettered = "deadLettered";
+
     /// <summary>
     /// Stores a <c>skipped</c> receipt unless one exists for the key. Returns
     /// <see langword="false"/> when the key is taken, so the trigger already handled the cause. A
@@ -41,6 +44,32 @@ internal static class TriggerStarts
         command.Parameters.AddWithValue("subject", subjectId);
         command.Parameters.AddWithValue("outcome", Skipped);
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>
+    /// Stores a <c>deadLettered</c> receipt unless one exists for the key, so the trigger handles the
+    /// cause no more.
+    /// </summary>
+    internal static async Task InsertDeadLetteredAsync(
+        NpgsqlTransaction transaction,
+        Guid triggerId,
+        string source,
+        Guid subjectId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO axis.trigger_starts (trigger_id, source, subject_id, outcome, process_instance_id, created_at)
+            VALUES (@trigger, @source, @subject, @outcome, NULL, now())
+            ON CONFLICT (trigger_id, source, subject_id) DO NOTHING
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("trigger", triggerId);
+        command.Parameters.AddWithValue("source", source);
+        command.Parameters.AddWithValue("subject", subjectId);
+        command.Parameters.AddWithValue("outcome", DeadLettered);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>Marks the receipt of the key <c>started</c>, with the instance the start inserted.</summary>

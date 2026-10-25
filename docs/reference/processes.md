@@ -806,7 +806,7 @@ database, with history in `axis.__processes_migrations` (see
   | `trigger_id` | `uuid` | The trigger |
   | `source` | `text` | The event id for an event trigger, or the occurrence time for a schedule trigger |
   | `subject_id` | `uuid` | The record |
-  | `outcome` | `text` | `started` or `skipped` |
+  | `outcome` | `text` | `started`, `skipped` or `deadLettered` |
   | `process_instance_id` | `uuid`, null | The instance it started. Null when skipped |
   | `created_at` | `timestamptz` | The start of the transaction, `now()` |
 
