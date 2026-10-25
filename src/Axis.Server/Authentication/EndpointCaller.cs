@@ -11,7 +11,8 @@ namespace Axis.Server.Authentication;
 /// Another system that calls an inbound endpoint with a bearer token from its tenant's identity
 /// provider, through the client credentials grant. The server checks the token's signature, issuer,
 /// audience and expiry against the tenant resolved from the host, with one JWT bearer scheme per
-/// tenant. It accepts a token only on endpoint paths, and there it reads no session cookie.
+/// tenant. It accepts a token only on endpoint paths, and there it reads no session cookie. The record API takes a
+/// bearer token too, through <see cref="ServiceAccount"/>.
 /// </summary>
 internal static class EndpointCaller
 {
@@ -19,8 +20,8 @@ internal static class EndpointCaller
     public const string Scheme = "Axis.EndpointCaller";
 
     /// <summary>
-    /// The default scheme of every request: the bearer token on endpoint paths, and the
-    /// <see cref="Session"/> everywhere else.
+    /// The default scheme of every request: the bearer token on endpoint paths, the service account's bearer token on a
+    /// record route that has one, and the <see cref="Session"/> everywhere else.
     /// </summary>
     public const string RequestScheme = "Axis.Request";
 
@@ -74,10 +75,11 @@ internal static class EndpointCaller
             : null;
 
     /// <summary>
-    /// Registers the default request scheme, the endpoint caller scheme and one JWT bearer scheme
-    /// for each tenant in <paramref name="settings"/>. A refresh of the tenant directory adds and removes bearer
-    /// schemes later through <see cref="TenantSignInSchemes"/>. A tenant without <c>Oidc:EndpointAudience</c> accepts
-    /// no bearer token.
+    /// Registers the default request scheme, the endpoint caller and service account schemes and two JWT bearer
+    /// schemes for each tenant in <paramref name="settings"/>, one for each audience. A refresh of the tenant directory
+    /// adds and removes bearer schemes later through <see cref="TenantSignInSchemes"/>. A tenant without
+    /// <c>Oidc:EndpointAudience</c> accepts no endpoint caller token, and one without <c>Oidc:ServiceAudience</c>
+    /// accepts no service account token.
     /// </summary>
     /// <param name="allowHttp">Whether the identity provider may be reached over http, in Development and Testing only.</param>
     public static AuthenticationBuilder AddEndpointCallers(
@@ -86,15 +88,18 @@ internal static class EndpointCaller
         bool allowHttp)
     {
         builder.Services.TryAddSingleton(settings);
-        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<JwtBearerOptions>, EndpointCallerOptions>(
-            sp => new EndpointCallerOptions(settings, allowHttp, sp.GetRequiredService<TimeProvider>())));
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<JwtBearerOptions>, BearerCallerOptions>(
+            sp => new BearerCallerOptions(settings, allowHttp, sp.GetRequiredService<TimeProvider>())));
 
         // A tenant added at a refresh has no AddJwtBearer call, so the post-configuration is registered here.
         builder.Services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IPostConfigureOptions<JwtBearerOptions>, JwtBearerPostConfigureOptions>());
 
         builder.AddPolicyScheme(RequestScheme, displayName: null, options =>
-            options.ForwardDefaultSelector = context => IsEndpointPath(context.Request.Path) ? Scheme : Session.Scheme);
+            options.ForwardDefaultSelector = context =>
+                IsEndpointPath(context.Request.Path) ? Scheme
+                : ServiceAccount.Applies(context) ? ServiceAccount.Scheme
+                : Session.Scheme);
 
         // Tenant resolution answers a request without a tenant before authentication runs, so one should
         // never get here without a tenant.
@@ -106,36 +111,64 @@ internal static class EndpointCaller
                 return SchemeName(current.TenantId);
             });
 
+        builder.AddPolicyScheme(ServiceAccount.Scheme, displayName: null, options =>
+            options.ForwardDefaultSelector = context =>
+            {
+                var current = context.RequestServices.GetRequiredService<ITenantContextAccessor>().Current
+                    ?? throw new InvalidOperationException("No tenant context is set.");
+                return ServiceAccount.SchemeName(current.TenantId);
+            });
+
         foreach (var tenantId in settings.Current.Keys)
         {
             builder.AddScheme<JwtBearerOptions, JwtBearerHandler>(SchemeName(tenantId), displayName: null, configureOptions: null);
+            builder.AddScheme<JwtBearerOptions, JwtBearerHandler>(ServiceAccount.SchemeName(tenantId), displayName: null, configureOptions: null);
         }
 
         return builder;
     }
 }
 
-/// <summary>Builds the options of a tenant's bearer scheme from its settings, each time the options are created.</summary>
-internal sealed class EndpointCallerOptions(TenantSignInSettings settings, bool allowHttp, TimeProvider clock)
+/// <summary>
+/// Builds the options of a tenant's bearer schemes from its settings, each time the options are created. The endpoint
+/// caller scheme expects <c>Oidc:EndpointAudience</c> and the service account scheme <c>Oidc:ServiceAudience</c>. The
+/// token checks and the claim mapping are the same for both.
+/// </summary>
+internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool allowHttp, TimeProvider clock)
     : IConfigureNamedOptions<JwtBearerOptions>
 {
     public void Configure(JwtBearerOptions options) => Configure(Options.DefaultName, options);
 
     public void Configure(string? name, JwtBearerOptions options)
     {
-        if (name is null || !name.StartsWith(EndpointCaller.SchemePrefix, StringComparison.Ordinal))
+        if (name is null)
         {
             return;
         }
 
-        var tenantId = name[EndpointCaller.SchemePrefix.Length..];
+        string prefix;
+        if (name.StartsWith(EndpointCaller.SchemePrefix, StringComparison.Ordinal))
+        {
+            prefix = EndpointCaller.SchemePrefix;
+        }
+        else if (name.StartsWith(ServiceAccount.SchemePrefix, StringComparison.Ordinal))
+        {
+            prefix = ServiceAccount.SchemePrefix;
+        }
+        else
+        {
+            return;
+        }
+
+        var tenantId = name[prefix.Length..];
         if (settings.Find(tenantId) is not { } tenant)
         {
             return;
         }
 
+        var audience = prefix == ServiceAccount.SchemePrefix ? tenant.ServiceAudience : tenant.EndpointAudience;
         options.Authority = tenant.Authority;
-        options.Audience = tenant.EndpointAudience;
+        options.Audience = audience;
         options.RequireHttpsMetadata = !allowHttp;
         options.MapInboundClaims = false;
         options.IncludeErrorDetails = false;
@@ -145,7 +178,7 @@ internal sealed class EndpointCallerOptions(TenantSignInSettings settings, bool 
             OnMessageReceived = context =>
             {
                 var current = context.HttpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current;
-                if (current?.TenantId != tenantId || string.IsNullOrWhiteSpace(tenant.EndpointAudience))
+                if (current?.TenantId != tenantId || string.IsNullOrWhiteSpace(audience))
                 {
                     context.NoResult();
                 }

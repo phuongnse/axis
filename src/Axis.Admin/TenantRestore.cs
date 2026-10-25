@@ -364,6 +364,7 @@ internal sealed class TenantRestore : IAsyncDisposable
             _row.ClaimDisplayName = directory.ClaimDisplayName;
             _row.ClaimRoles = directory.ClaimRoles;
             _row.EndpointAudience = directory.EndpointAudience;
+            _row.ServiceAudience = directory.ServiceAudience;
             _platform.TenantHosts.AddRange(hosts.Select(host => new TenantHostRow { TenantId = _id, Host = host }));
 
             // A secret binding comes back by name and kind only: the archive holds no value.

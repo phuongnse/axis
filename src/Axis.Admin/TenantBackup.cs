@@ -373,6 +373,7 @@ internal sealed class TenantBackup : IAsyncDisposable
             row.ClaimDisplayName,
             row.ClaimRoles,
             row.EndpointAudience,
+            row.ServiceAudience,
             [.. _plan.Bindings
                 .OrderBy(binding => binding.Name, StringComparer.Ordinal)
                 .Select(binding => new ManifestBinding(binding.Name, binding.Kind, binding.Kind == "url" ? binding.Url : null))]);
@@ -457,6 +458,7 @@ internal sealed record ManifestDirectory(
     string? ClaimDisplayName,
     string? ClaimRoles,
     string? EndpointAudience,
+    string? ServiceAudience,
     IReadOnlyList<ManifestBinding> Bindings);
 
 /// <summary>A binding in the manifest. <c>Url</c> is set only for a <c>url</c> binding.</summary>

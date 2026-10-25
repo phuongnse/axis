@@ -1,3 +1,5 @@
+using Axis.Server.Authentication;
+
 namespace Axis.Server.Http;
 
 /// <summary>
@@ -10,6 +12,23 @@ internal static class Grants
 {
     public static IResult SignInRequired() =>
         Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to read or write this data.");
+
+    /// <summary>
+    /// The 401 of a request. A service account request, which has a bearer token, gets <c>WWW-Authenticate: Bearer</c>
+    /// and its own title. Any other request gets the sign-in problem.
+    /// </summary>
+    public static IResult SignInRequired(HttpContext context)
+    {
+        if (!ServiceAccount.Applies(context))
+        {
+            return SignInRequired();
+        }
+
+        context.Response.Headers.WWWAuthenticate = "Bearer";
+        return Results.Problem(
+            statusCode: StatusCodes.Status401Unauthorized,
+            title: "A valid bearer token is needed for this request.");
+    }
 
     public static IResult Forbidden() =>
         Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You have no grant for this action.");

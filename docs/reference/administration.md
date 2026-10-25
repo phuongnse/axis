@@ -130,7 +130,7 @@ the same, and the entry also names its main tenant.
 - The entry stores no sign-in settings of its own. The server reads them from
   the main tenant at every refresh, so a change to the main tenant's settings
   reaches the preview, and the client secret is stored only once. The preview
-  never takes the main tenant's endpoint audience, so it accepts no
+  never takes the main tenant's endpoint audience or service audience, so it accepts no
   machine-caller token. The preview uses the main tenant's settings whatever the
   main tenant's status.
 - A rerun on a `provisioning` preview replaces its main tenant and its bindings,
@@ -179,7 +179,7 @@ with code 2.
 - `grants` first revokes `CONNECT` and `TEMPORARY` on the database from
   `PUBLIC`, and grants both only to the runtime role. Without this, any login
   role of the database server could connect to the tenant database.
-- The command sets no claim names or endpoint audience. They stay empty, so the
+- The command sets no claim names, endpoint audience or service audience. They stay empty, so the
   hosts use their defaults. It sets no deployment binding either, except the
   `url` bindings that `--binding` gives a preview tenant.
 
@@ -322,6 +322,7 @@ A tenant in any status except `provisioning` can be backed up, also a
 | `claimDisplayName` | The claim name of the display name, or `null` for the default. |
 | `claimRoles` | The claim name of the roles, or `null` for the default. |
 | `endpointAudience` | The endpoint audience, or `null` for the default. |
+| `serviceAudience` | The service audience, or `null` when the tenant accepts no service account token. An archive from before the field reads as `null`. |
 | `bindings` | The bindings, in ordinal order of the name. Each has `name`, `kind` and, for a `url` binding, `url`. |
 
 A `secret` binding holds only its name and kind. The database server, the

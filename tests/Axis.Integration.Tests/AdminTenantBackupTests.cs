@@ -31,6 +31,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         await AdminBackupFixture.CreateRequestAsync(client);
         var release = await fixture.ActiveReleaseAsync();
         await fixture.InsertInstanceAsync(release, ProcessStarts.Waiting);
+        await fixture.Scenario.SetServiceAudienceAsync(fixture.TenantId, "axis-services");
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.tar");
 
@@ -69,6 +70,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         Assert.Equal([AdminBackupFixture.Host], directory.GetProperty("hosts").EnumerateArray().Select(host => host.GetString()));
         Assert.Equal(AdminScenario.Authority, directory.GetProperty("oidcAuthority").GetString());
         Assert.Equal("axis", directory.GetProperty("oidcClientId").GetString());
+        Assert.Equal("axis-services", directory.GetProperty("serviceAudience").GetString());
         var bindings = directory.GetProperty("bindings").EnumerateArray().ToDictionary(binding => binding.GetProperty("name").GetString()!);
         Assert.Equal("url", bindings["PurchasingSystemUrl"].GetProperty("kind").GetString());
         Assert.Equal("https://purchasing.example.test", bindings["PurchasingSystemUrl"].GetProperty("url").GetString());

@@ -377,8 +377,9 @@ bindings work. Status rules and publishing are built too.
   entry stores no sign-in settings. The catalog copies the main tenant's at each
   refresh.
 - **Sign-in.** A preview tenant uses its main tenant's authority, client id,
-  client secret and claim names. It does not use `Oidc:EndpointAudience`, so it
-  accepts no machine-caller token. The operator registers the preview host's
+  client secret and claim names. It uses neither `Oidc:EndpointAudience` nor
+  `Oidc:ServiceAudience`, so it accepts no machine-caller or service account
+  token. The operator registers the preview host's
   redirect address at the identity provider.
 - **Bindings.** A preview tenant's bindings are its own and empty by default.
   A missing binding is a warning at activation there, not an error, see
@@ -435,9 +436,11 @@ bindings work. Status rules and publishing are built too.
   - See [Sign-in and the session](reference/security.md#sign-in-and-the-session).
   - Other systems call inbound endpoints with a bearer token instead of the
     session. See [Machine callers](reference/security.md#machine-callers).
+  - Service accounts call the record API with a bearer token (D86). See
+    [service accounts](reference/security.md#service-accounts).
   - _(Planned for M16.)_ The session state moves to the tenant database, so
-    sign-out revokes it at once (D84). Service accounts call the record API,
-    data source rows and the process API with a bearer token (D86). A tenant
+    sign-out revokes it at once (D84). Service accounts also call data source
+    rows and the process API (D86). A tenant
     can turn on the FAPI 2.0 profile (D83). See
     [service accounts](reference/security.md#service-accounts) and
     [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
