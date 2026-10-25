@@ -45,6 +45,9 @@ function asField(parameter: DataSourceParameter): FieldMetadata {
     maxLength: null,
     precision: null,
     scale: null,
+    min: null,
+    max: null,
+    minLength: null,
     fields: null,
   }
 }

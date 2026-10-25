@@ -35,10 +35,10 @@ one through a delete trigger
 ([D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md)).
 See [Scheduled jobs](#scheduled-jobs) and [Delete triggers](#delete-triggers).
 
-Deliveries to `async` triggers that keep failing back off, stop after a limit and
-become dead letters ([D72](../decisions/d72-a-delivery-limit-and-dead-letters.md)).
-_(Planned for M14)_ Fan-out and email deliveries follow. See
-[Dead letters](#dead-letters).
+Deliveries to `async` triggers and schedule fan-outs that keep failing back off,
+stop after a limit and become dead letters
+([D72](../decisions/d72-a-delivery-limit-and-dead-letters.md)).
+_(Planned for M14)_ Email deliveries follow. See [Dead letters](#dead-letters).
 
 ## Raise event step
 
@@ -312,9 +312,12 @@ the data source:
    item. A full batch of 100 stores the last record id as the item's `cursor`
    and makes the item due again at once. A shorter batch deletes the item.
 
-**Failures.** A fan-out transaction that fails leaves the item claimed. It
-runs again after the lease expires, as event delivery does, and the receipts
-make each record start at most once per occurrence. A data error in the data
+**Failures.** A fan-out transaction that fails rolls the batch back. A
+separate transaction counts the failure for the trigger and the occurrence, and
+the item is due again after the [backoff](#dead-letters). After
+`Worker:DeliveryAttempts` failures the occurrence becomes a `trigger.fanOut`
+dead letter and the item is deleted. The receipts make each record start at most
+once per occurrence. A data error in the data
 source's filter, an SQLSTATE of class 22, is different. It is logged as a
 warning and the item is deleted, because trying again would fail the same way.
 A fan-out whose data source reads a
@@ -406,8 +409,9 @@ process without a subject when a record is deleted:
 Deliveries that keep failing stop after a limit and are kept as dead letters, see
 [D72](../decisions/d72-a-delivery-limit-and-dead-letters.md). The counting, the
 backoff, the limit, the two tables, the log and the metric are built for the start
-of an `async` trigger from `event.deliver`. _(Planned for M14)_ The fan-out and
-email kinds, the waiting-instance target and the routes below are not built yet.
+of an `async` trigger from `event.deliver` and for `trigger.fanOut`.
+_(Planned for M14)_ The email kind, the waiting-instance target and the routes
+below are not built yet.
 
 **What counts.** Three kinds of work item deliver something, and each
 failure is counted for its own target:
@@ -429,7 +433,7 @@ fan-out's SQLSTATE class 22, still ends the item at once, as today.
 *n* − 1, at most one hour. After `Worker:DeliveryAttempts` failures, default 5,
 the counting transaction writes a dead letter instead. For `event.deliver` it
 also writes the receipt with the outcome `deadLettered`, so delivery carries on
-with the other targets. A fan-out item and an email are set aside.
+with the other targets. A fan-out item is deleted, and an email is set aside.
 
 For an `async` trigger, the failure is counted in `axis.delivery_failures` under
 the kind `event.deliver` and the target `{triggerId}/{eventId}`. When more than
@@ -438,6 +442,13 @@ backoff among them. The count stays after a later success or a dead letter, and
 only a redeliver clears it. The scenario runner of
 [test scenarios](test-scenarios.md) makes the item due at once, so a delivery
 that keeps failing runs 5 times there and is quietly dead-lettered.
+
+For a schedule fan-out, the failure is counted under the kind `trigger.fanOut`
+and the target `{triggerId}/{occurrenceAt}`, with the occurrence in UTC as the
+receipts write it, such as `2026-01-01T05:00:00Z`. The count belongs to the
+occurrence, so a failure in any batch adds to it. The stored cursor is kept while
+the item backs off. The dead letter names the application, the trigger's process,
+the trigger and `occurrence_at`.
 
 **The counter.** `axis.delivery_failures` holds one row per target:
 

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// Nine tenants, <c>a</c> to <c>i</c>, each with its own database holding StepApp plus a
+/// Eleven tenants, <c>a</c> to <c>k</c>, each with its own database holding StepApp plus a
 /// schedule trigger. Tenants <c>e</c> and <c>g</c> start with <see cref="HourlyFolder"/>, a copy of
 /// the application whose trigger runs every hour in UTC, and the others with the daily one. <c>ReviewLargeRequests</c> runs at 06:00 Berlin time and starts
 /// <c>RoleApprove</c> for each request of the data source <c>LargeRequests</c>, those with an
@@ -87,7 +87,7 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
                     : content);
         }
 
-        foreach (var id in new[] { "a", "b", "c", "d", "e", "f", "g", "h", "i" })
+        foreach (var id in new[] { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k" })
         {
             var tenant = new ProcessStepFixture(id, id is "e" or "g" ? _hourlyFolder.Path : _folder.Path);
             _tenantList.Add(tenant);
@@ -124,15 +124,31 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
     /// <summary>The database of <paramref name="tenantId"/>.</summary>
     public ProcessStepFixture Tenant(string tenantId) => _tenants[tenantId];
 
-    /// <summary>Builds a worker for the nine tenants. The fixture disposes it.</summary>
-    public WorkItemRunner NewWorker()
+    /// <summary>
+    /// Builds a worker for the eleven tenants. The fixture disposes it. <paramref name="deliveryAttempts"/>
+    /// sets <c>Worker:DeliveryAttempts</c> and leaves the default when it is <see langword="null"/>.
+    /// </summary>
+    public WorkItemRunner NewWorker(int? deliveryAttempts = null) =>
+        NewWorkerServices(deliveryAttempts).GetRequiredService<WorkItemRunner>();
+
+    /// <summary>Builds the services of a worker like <see cref="NewWorker"/>, so a test can read its handlers. The fixture disposes them.</summary>
+    internal ServiceProvider NewWorkerServices(int? deliveryAttempts = null)
     {
+        var settings = _settings ?? throw new InvalidOperationException("The fixture is not initialized.");
+        if (deliveryAttempts is { } attempts)
+        {
+            settings = new ConfigurationBuilder()
+                .AddConfiguration(settings)
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:DeliveryAttempts"] = attempts.ToString(System.Globalization.CultureInfo.InvariantCulture) })
+                .Build();
+        }
+
         var worker = new ServiceCollection()
             .AddLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace))
-            .AddAxisWorker(_settings ?? throw new InvalidOperationException("The fixture is not initialized."), new HostingEnvironment { EnvironmentName = "Testing" })
+            .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" })
             .BuildServiceProvider();
         _workers.Add(worker);
-        return worker.GetRequiredService<WorkItemRunner>();
+        return worker;
     }
 
     /// <summary>Claims and runs the tenant's due work items of every kind on <paramref name="worker"/> until none is left.</summary>

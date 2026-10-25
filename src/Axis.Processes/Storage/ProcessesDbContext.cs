@@ -63,6 +63,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.SubjectEntityId).HasColumnName("subject_entity_id");
             instance.Property(i => i.SubjectId).HasColumnName("subject_id");
             instance.Property(i => i.ReleaseId).HasColumnName("release_id");
+            instance.Property(i => i.Parameters).HasColumnName("parameters").HasColumnType("jsonb");
             instance.Property(i => i.State).HasColumnName("state");
             instance.Property(i => i.Revision).HasColumnName("revision");
             instance.Property(i => i.Step).HasColumnName("step");
@@ -70,8 +71,11 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.EndedAt).HasColumnName("ended_at");
 
             // One start per submission: a record has at most one running or waiting instance of a process.
+            // A process without a subject has a null subject id, and NULLS NOT DISTINCT makes the nulls
+            // equal, so it has at most one running or waiting instance.
             instance.HasIndex(i => new { i.ApplicationId, i.ProcessId, i.SubjectId })
                 .IsUnique()
+                .AreNullsDistinct(false)
                 .HasFilter("state IN ('running', 'waiting')")
                 .HasDatabaseName(ProcessStarts.ActiveSubjectIndex);
 
@@ -128,6 +132,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             task.Property(t => t.Outcome).HasColumnName("outcome");
             task.Property(t => t.CompletedBy).HasColumnName("completed_by");
             task.Property(t => t.CompletedAt).HasColumnName("completed_at");
+            task.Property(t => t.ExpiredAt).HasColumnName("expired_at");
             task.Property(t => t.ClaimedBy).HasColumnName("claimed_by");
             task.Property(t => t.ClaimedAt).HasColumnName("claimed_at");
             task.Property(t => t.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
@@ -358,6 +363,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.ClaimToken).HasColumnName("claim_token");
             item.Property(i => i.ProcessInstanceId).HasColumnName("process_instance_id");
             item.Property(i => i.ConnectorCallId).HasColumnName("connector_call_id");
+            item.Property(i => i.TaskId).HasColumnName("task_id");
             item.Property(i => i.PackageCallId).HasColumnName("package_call_id");
             item.Property(i => i.EventId).HasColumnName("event_id");
             item.Property(i => i.TriggerId).HasColumnName("trigger_id");
@@ -371,6 +377,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.HasIndex(i => i.ProcessInstanceId).HasDatabaseName("ix_process_work_items_process_instance_id");
             item.HasIndex(i => i.ConnectorCallId).HasDatabaseName("ix_process_work_items_connector_call_id");
             item.HasIndex(i => i.PackageCallId).HasDatabaseName("ix_process_work_items_package_call_id");
+            item.HasIndex(i => i.TaskId).HasDatabaseName("ix_process_work_items_task_id");
             item.HasIndex(i => i.EventId).HasDatabaseName("ix_process_work_items_event_id");
 
             // A schedule trigger has at most one item that waits for its next occurrence.
@@ -387,6 +394,11 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .WithMany()
                 .HasForeignKey(i => i.ConnectorCallId)
                 .HasConstraintName("fk_process_work_items_connector_calls_connector_call_id")
+                .OnDelete(DeleteBehavior.Restrict);
+            item.HasOne<ProcessTaskRow>()
+                .WithMany()
+                .HasForeignKey(i => i.TaskId)
+                .HasConstraintName("fk_process_work_items_process_tasks_task_id")
                 .OnDelete(DeleteBehavior.Restrict);
             item.HasOne<PackageCallRow>()
                 .WithMany()
