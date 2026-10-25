@@ -231,12 +231,13 @@ public static class DiagnosticCodes
     public const string ChartDataSourceNotGrouped = "AXC0240";
     public const string InvalidChartMeasure = "AXC0241";
     public const string InvalidValueLabels = "AXC0242";
-    public const string EmptyNotifyRecipients = "AXC0243";
-    public const string InvalidNotifyRecipient = "AXC0244";
-    public const string UnknownNotifyRole = "AXC0245";
-    public const string EmptyNotifyChannels = "AXC0246";
-    public const string RoleRecipientWithEmail = "AXC0247";
-    public const string MissingPlaceholderValue = "AXC0248";
-    public const string UnusedPlaceholderValue = "AXC0249";
-    public const string InvalidPlaceholder = "AXC0250";
+    public const string InvalidMoneyCurrency = "AXC0243";
+    public const string EmptyNotifyRecipients = "AXC0244";
+    public const string InvalidNotifyRecipient = "AXC0245";
+    public const string UnknownNotifyRole = "AXC0246";
+    public const string EmptyNotifyChannels = "AXC0247";
+    public const string RoleRecipientWithEmail = "AXC0248";
+    public const string MissingPlaceholderValue = "AXC0249";
+    public const string UnusedPlaceholderValue = "AXC0250";
+    public const string InvalidPlaceholder = "AXC0251";
 }

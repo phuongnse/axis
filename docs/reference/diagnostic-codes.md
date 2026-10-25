@@ -91,7 +91,7 @@ sorted by file and then path.
 | `AXC0070` | A process's `start`, a branch `next`, an `otherwise`, an operation's `next` or a task outcome's `next` names no step of the process, ignoring letter case. Reported at that property, such as `/start`, `/steps/{i}/branches/{j}/next`, `/steps/{i}/next` or `/steps/{i}/outcomes/{j}/next`. |
 | `AXC0071` | A process step cannot be reached from `start`. Reported at `/steps/{i}`. Not checked when `start` names no step. |
 | `AXC0072` | A process step has no path to an `end` step. Reported at `/steps/{i}`. Not reported for a step with a transition to an unknown step, which is already `AXC0070`. |
-| `AXC0073` | Process steps form a cycle, such as a → b → a. Reported at the transition that closes the cycle, walking the steps in file order and each step's transitions in order: the branches, then `otherwise`, then `next`, then the outcomes. The message names the steps in the cycle. See [Limits in M3](processes.md#limits-in-m3). |
+| `AXC0073` | Process steps form a cycle with no waiting step, such as a → b → a of `decision` and `operation` steps, which would run for ever. A cycle through a `task` step is allowed, because the transitions of a `task` step are not followed. Reported at the transition that closes the cycle, walking the steps in file order and each step's transitions in order: the branches, then `otherwise`, then `next`, then the outcomes. The message names the steps in the cycle. See [Limits in M3](processes.md#limits-in-m3) and [Loops](process-flow.md#loops). |
 | `AXC0074` | A form's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
@@ -241,11 +241,12 @@ sorted by file and then path.
 | `AXC0240` | A `chart` widget names a data source whose `aggregate` does not have exactly one `groupBy` field, or a `category` that is not that field, ignoring letter case. Reported at the widget's `dataSource` or `category`. |
 | `AXC0241` | A `chart` widget names a measure that its data source's `aggregate` does not declare, or one that is not a number, or lists more than one measure on a `pie`. A measure is a number when it is a `count` or a `sum`, or a `min` or `max` over an integer or a decimal. Reported at the measure's `name`, or at `measures` for a `pie`. |
 | `AXC0242` | A `valueLabels` on an enum field or data source parameter misses a value from `values`, reported at `valueLabels`, or names a value that `values` does not have, reported at `valueLabels/{value}`. Values are compared exactly. |
-| `AXC0243` | A `notify` step has an empty `to`. Reported at `/steps/{i}/to`. |
-| `AXC0244` | A recipient of a `notify` step has none or more than one of `user`, `role` and `email`. Reported at `/steps/{i}/to/{j}`. |
-| `AXC0245` | A `role` recipient of a `notify` step names no declared role, compared exactly. A role file that was not loaded is not reported again. Reported at `/steps/{i}/to/{j}/role`. |
-| `AXC0246` | A `notify` step has an empty `channels`. Reported at `/steps/{i}/channels`. |
-| `AXC0247` | A `role` recipient of a `notify` step is used with the `email` channel. A role has no email address. Reported at `/steps/{i}/to/{j}/role`. |
-| `AXC0248` | A placeholder of a `notify` step's subject or body has no key in `values`, in a locale that has both texts. Reported at `/steps/{i}/message`, naming the locale and the placeholder. |
-| `AXC0249` | A key of a `notify` step's `values` has no placeholder in the subject or the body, in a locale that has both texts. Reported at `/steps/{i}/message`, naming the locale and the key. |
-| `AXC0250` | A text of a `notify` step holds a lone or invalid brace. A placeholder is `{name}` with ASCII letters and digits, and `{{` and `}}` write a brace. Reported at `/steps/{i}/message`, naming the locale, the text key and the offset. |
+| `AXC0243` | A `money` field names no currency, names both `currency` and `currencyField`, has a `currency` that is not an ISO 4217 code with minor units, written in upper case, or has a `currencyField` that names no field of the entity or a field that is not `text` or `enum`. Reported at `/fields/{i}` for no currency, at `/fields/{i}/currencyField` for both properties or a wrong `currencyField`, and at `/fields/{i}/currency` for an unknown code. |
+| `AXC0244` | A `notify` step has an empty `to`. Reported at `/steps/{i}/to`. |
+| `AXC0245` | A recipient of a `notify` step has none or more than one of `user`, `role` and `email`. Reported at `/steps/{i}/to/{j}`. |
+| `AXC0246` | A `role` recipient of a `notify` step names no declared role, compared exactly. A role file that was not loaded is not reported again. Reported at `/steps/{i}/to/{j}/role`. |
+| `AXC0247` | A `notify` step has an empty `channels`. Reported at `/steps/{i}/channels`. |
+| `AXC0248` | A `role` recipient of a `notify` step is used with the `email` channel. A role has no email address. Reported at `/steps/{i}/to/{j}/role`. |
+| `AXC0249` | A placeholder of a `notify` step's subject or body has no key in `values`, in a locale that has both texts. Reported at `/steps/{i}/message`, naming the locale and the placeholder. |
+| `AXC0250` | A key of a `notify` step's `values` has no placeholder in the subject or the body, in a locale that has both texts. Reported at `/steps/{i}/message`, naming the locale and the key. |
+| `AXC0251` | A text of a `notify` step holds a lone or invalid brace. A placeholder is `{name}` with ASCII letters and digits, and `{{` and `}}` write a brace. Reported at `/steps/{i}/message`, naming the locale, the text key and the offset. |

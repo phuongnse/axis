@@ -137,7 +137,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | `enum`             | `text`; the values are recorded, not enforced by a `CHECK`                                                |
   | `reference`        | `uuid` with a foreign key to the target table's `id`                                                      |
   | `child-collection` | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns) |
-  | `money` _(planned for M15)_ | `numeric(p,s)`, as `decimal` with its defaults. The currency is the field's or the `currencyField` column's |
+  | `money` | `numeric(p,s)`, as `decimal` with its defaults. The currency is the field's or the `currencyField` column's |
   | `file` _(planned for M15)_ | `uuid` with a foreign key to `axis.files`. See [file fields](file-fields.md#storage-and-clean-up) |
   | `references` _(planned for M15)_ | No column on the owner table. A junction table holds `owner_id` and `target_id`, see [Schema planning](#schema-planning) |
 
@@ -184,9 +184,9 @@ and creates no tables. See
   transaction after the migrations, and revokes any wider right the role had
   there. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
   It does not yet check whether the role is a superuser, owns the schema or
-  inherits rights through membership. The planned `platform.audit_records`
-  table is the one exception: the role gets no `SELECT` on it
-  _(planned for M16)_.
+  inherits rights through membership. The `platform.audit_records` table is
+  the one exception: the role gets no right on it at all. The same step revokes
+  the right that the default privileges would give it on that table.
 - **One write grant.** The same role also gets `INSERT` on
   `platform.data_protection_keys`, and on no other table. Key rotation happens
   while the server runs, so the server must add keys. It never updates or
@@ -207,11 +207,11 @@ The tables:
 
 | Table                                               | Columns                                                                                                                                                                                                                                                                                                                     |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the service audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants`. The sign-in profile and the encrypted client keys are _(planned for M16)_ |
+| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the service audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants`, the sign-in profile (`standard` or `fapi2`), and two encrypted client keys, the current and the previous one, each with its key id. A previous key needs a current key |
 | `platform.tenant_hosts`                             | The tenant id and the host. The host is unique on `lower(host)` across all tenants                                                                                                                                                                                                                                          |
 | `platform.tenant_bindings`                          | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                         |
 | `platform.data_protection_keys`                     | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. Rows are only inserted, never updated or deleted. Every server replica reads them                                                                                                                                                                   |
-| `platform.audit_records`                            | _(Planned for M16.)_ The time, the `Axis.Admin` command, the tenant id, the operating system user and machine, and the names of what changed. Append-only. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records)                                                    |
+| `platform.audit_records`                            | The `id`, `occurred_at`, `command`, the `tenant_id`, which can be empty and has no foreign key, `os_user`, `machine` and `changed` (`text[]`), the names of what changed. Triggers reject every update, delete and truncate with SQLSTATE `23001`. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records) |
 
 The tenant `version` grows on every change to the tenant, its hosts or its
 bindings.
@@ -228,8 +228,8 @@ a tenant only when this value is the one the host was built for, see
   - the OIDC client secret, in `platform.tenants`;
   - the value of a `secret` binding, in `platform.tenant_bindings`;
   - the client keys of a tenant under the `fapi2` sign-in profile, in
-    `platform.tenants`, with the field name `oidc_client_key` and the key id
-    _(planned for M16)_, see [FAPI 2.0 profile](security.md#fapi-20-profile).
+    `platform.tenants`, with the field name `oidc_client_key` and the key id,
+    see [FAPI 2.0 profile](security.md#fapi-20-profile).
 - **Encrypted format.** An encrypted value is a `bytea` that holds a 12-byte
   nonce, the ciphertext and a 16-byte tag. The cipher is AES-256-GCM with the
   installation key `Platform:SecretKey`, see
@@ -237,7 +237,7 @@ a tenant only when this value is the one the host was built for, see
   is the tenant id and the field name, so a value copied to another tenant or
   field does not decrypt. The associated data is the UTF-8 bytes of the tenant
   id, one zero byte, and the UTF-8 bytes of the field name. The field names are
-  `runtime_password`, `schema_password`, `oidc_client_secret`, and `binding:`
+  `runtime_password`, `schema_password`, `oidc_client_secret`, `oidc_client_key`, and `binding:`
   followed by the binding name in lower case. Every writer must use these
   exact bytes and names. A data protection key uses an
   empty tenant id, so the associated data is one zero byte and the field name
@@ -300,7 +300,7 @@ What each database role may do:
 | Objects                                                                                                                                                                                                                                     | Schema database role                                             | Runtime database role                                             |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `entities` tables                                                                                                                                                                                                                           | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields` | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                     | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                         | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                          | Owns it. The publisher changes the status and the lease | `SELECT` and `INSERT` only. It never updates or deletes a request |

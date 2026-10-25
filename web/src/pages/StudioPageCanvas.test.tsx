@@ -216,8 +216,8 @@ function renderEditor(provided: StudioNames = names) {
 
 const slow = { timeout: 5000 }
 
-function openTab(name: string) {
-  return userEvent.click(screen.getByRole('tab', { name }))
+async function openTab(name: string) {
+  await userEvent.click(await screen.findByRole('tab', { name }, slow))
 }
 
 function appRequests(fetchMock: ReturnType<typeof vi.fn>) {
@@ -276,6 +276,7 @@ describe('the Design tab of a page', () => {
     const { fetchMock } = stub(content([{ type: 'kpi', navigate: { page: 'Tickets' } }]))
     renderEditor()
 
+    await openTab('Form')
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     const canvas = await screen.findByTestId('studio-page-canvas')
@@ -295,6 +296,7 @@ describe('the Design tab of a page', () => {
     stub(content([{ type: 'kpi' }, { type: 'columns' }]))
     renderEditor()
 
+    await openTab('Form')
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     const box = await screen.findByTestId('studio-canvas-placeholder', {}, slow)
@@ -310,6 +312,7 @@ describe('the Design tab of a page', () => {
     )
     renderEditor()
 
+    await openTab('Form')
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     expect(await screen.findByTestId('studio-canvas-cannot-draw', {}, slow)).toHaveTextContent(
@@ -323,6 +326,7 @@ describe('the Design tab of a page', () => {
     stub(content([{ type: 'kpi' }]), () => new Response(null, { status: 500 }))
     renderEditor()
 
+    await openTab('Form')
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     expect(await screen.findByTestId('studio-canvas-failed', {}, slow)).toHaveTextContent(
@@ -336,6 +340,7 @@ describe('the Design tab of a page', () => {
     )
     renderEditor()
 
+    await openTab('Form')
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
@@ -358,6 +363,7 @@ describe('the Design tab of a page', () => {
     })
     renderEditor()
 
+    await openTab('Form')
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
@@ -382,6 +388,7 @@ describe('the Design tab of a page', () => {
     stub(content([{ type: 'columns' }]), (draft) => respond({ ...metadataOf(draft), widgets: [columns] }, []))
     renderEditor()
 
+    await openTab('Form')
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
@@ -401,6 +408,7 @@ describe('the Design tab of a page', () => {
     async function openDesign(widgets: Record<string, unknown>[]) {
       const stubbed = stub(content(widgets))
       renderEditor()
+      await openTab('Form')
       await screen.findByTestId('studio-page-editor', {}, slow)
       await openTab('Design')
       const design = await screen.findByTestId('studio-page-design', {}, slow)
@@ -496,6 +504,7 @@ describe('the Design tab of a page', () => {
     ) {
       const stubbed = stub(content(widgets), answer)
       renderEditor()
+      await openTab('Form')
       await screen.findByTestId('studio-page-editor', {}, slow)
       await openTab('Design')
       const design = await screen.findByTestId('studio-page-design', {}, slow)
@@ -618,6 +627,7 @@ describe('the Design tab of a page', () => {
     async function openActions() {
       const stubbed = stub(content(draftWidgets), answer)
       renderEditor()
+      await openTab('Form')
       await screen.findByTestId('studio-page-editor', {}, slow)
       await openTab('Design')
       const design = await screen.findByTestId('studio-page-design', {}, slow)
@@ -769,6 +779,7 @@ describe('the Design tab of a page', () => {
     async function openDesign(widgets: Record<string, unknown>[]) {
       const stubbed = stub(content(widgets))
       renderEditor()
+      await openTab('Form')
       await screen.findByTestId('studio-page-editor', {}, slow)
       await openTab('Design')
       const design = await screen.findByTestId('studio-design-panel', {}, slow)
@@ -850,6 +861,7 @@ describe('the Design tab of a page', () => {
     async function openDesign(widgets: Record<string, unknown>[]) {
       const stubbed = stub(content(widgets))
       renderEditor()
+      await openTab('Form')
       await screen.findByTestId('studio-page-editor', {}, slow)
       await openTab('Design')
       const design = await screen.findByTestId('studio-design-panel', {}, slow)
@@ -972,6 +984,7 @@ describe('the Design tab of a page', () => {
     async function openDesign(widgets: Record<string, unknown>[]) {
       const stubbed = stub(content(widgets))
       renderEditor(bound)
+      await openTab('Form')
       await screen.findByTestId('studio-page-editor', {}, slow)
       await openTab('Design')
       const design = await screen.findByTestId('studio-design-panel', {}, slow)
@@ -1077,6 +1090,7 @@ describe('the Design tab of a page', () => {
     async function openDesign(widgets: Record<string, unknown>[]) {
       const stubbed = stub(content(widgets))
       renderEditor()
+      await openTab('Form')
       await screen.findByTestId('studio-page-editor', {}, slow)
       await openTab('Design')
       const design = await screen.findByTestId('studio-design-panel', {}, slow)

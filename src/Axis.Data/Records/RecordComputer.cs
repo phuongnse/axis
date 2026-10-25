@@ -225,7 +225,7 @@ public static class RecordComputer
 
         switch (field.Type)
         {
-            case FieldType.Decimal:
+            case FieldType.Decimal or FieldType.Money:
                 // An integer result widens to a decimal, and the digits are checked like a body's.
                 var text = (computed is long integer ? integer : (decimal)computed).ToString(CultureInfo.InvariantCulture);
                 if (RecordInputParser.CheckDecimalText(field, text) is { } digits)

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Axis.Tenancy\Axis.Tenancy.csproj" />
+  </ItemGroup>
+
+</Project>

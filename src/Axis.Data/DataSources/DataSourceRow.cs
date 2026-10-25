@@ -15,5 +15,8 @@ public sealed record DataSourceRow(
     IReadOnlyDictionary<string, JsonValue?> Values,
     IReadOnlyDictionary<string, string> Labels);
 
-/// <summary>One page of data source rows and the number of rows that pass the filter, or of groups when the data source is grouped.</summary>
-public sealed record DataSourceRowPage(IReadOnlyList<DataSourceRow> Items, long TotalCount);
+/// <summary>
+/// One page of data source rows and the number of rows that pass the filter, or of groups when the
+/// data source is grouped. The number is <see langword="null"/> when the count ran past the query timeout.
+/// </summary>
+public sealed record DataSourceRowPage(IReadOnlyList<DataSourceRow> Items, long? TotalCount);

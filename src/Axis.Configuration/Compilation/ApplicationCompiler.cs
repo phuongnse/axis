@@ -41,6 +41,12 @@ public static class ApplicationCompiler
     /// <summary>The largest precision PostgreSQL accepts for <c>numeric(p, s)</c>.</summary>
     public const int MaxPrecision = 1000;
 
+    /// <summary>The precision of a money field that does not set one.</summary>
+    public const int MoneyDefaultPrecision = 18;
+
+    /// <summary>The scale of a money field with a <c>currencyField</c> that does not set one.</summary>
+    public const int MoneyDefaultScale = 2;
+
     /// <summary>
     /// Compiles the folder at <paramref name="folderPath"/> against <paramref name="installedPackages"/>
     /// and <paramref name="installedModules"/>. Null means none is installed.
@@ -806,6 +812,7 @@ public static class ApplicationCompiler
             AddFieldTarget(entity, field, path, findEntity, references);
             CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
             CheckCreator(field, path, childOwner, Report);
+            CheckMoney(entity, field, path, Report);
             CheckDefault(entity, field, path, defaultScope, references, Report);
 
             // A child entity's rows are read and written only through its owner, so they point nowhere else.
@@ -1031,8 +1038,80 @@ public static class ApplicationCompiler
     }
 
     /// <summary>
-    /// Checks a field's <c>default</c>: it applies only to text, integer, decimal, boolean, date,
-    /// date-time and enum fields, and not together with an <c>expression</c>, a <c>sequence</c> or a
+    /// Checks a money field's currency: exactly one of <c>currency</c>, a known ISO 4217 code, or
+    /// <c>currencyField</c>, a text or enum field of the entity. The defaults must also fit together:
+    /// the scale from the currency's minor units cannot exceed the precision.
+    /// </summary>
+    private static void CheckMoney(
+        EntityResource entity, FieldDefinition field, string path, Action<string, string, string> report)
+    {
+        if (FieldTypes.Parse(field.Type) != FieldType.Money)
+        {
+            return;
+        }
+
+        if (field.Currency is null && field.CurrencyField is null)
+        {
+            report(
+                DiagnosticCodes.InvalidMoneyCurrency,
+                "A money field must name its currency in 'currency' or 'currencyField'.",
+                path);
+            return;
+        }
+
+        if (field.Currency is not null && field.CurrencyField is not null)
+        {
+            report(
+                DiagnosticCodes.InvalidMoneyCurrency,
+                "A money field names its currency in 'currency' or in 'currencyField', not in both.",
+                $"{path}/currencyField");
+            return;
+        }
+
+        int minorUnits;
+        if (field.Currency is { } code)
+        {
+            if (!Currencies.TryGetMinorUnits(code, out minorUnits))
+            {
+                report(
+                    DiagnosticCodes.InvalidMoneyCurrency,
+                    $"'{code}' is not a known ISO 4217 currency code. A code is three upper case letters, such as 'VND'.",
+                    $"{path}/currency");
+                return;
+            }
+        }
+        else
+        {
+            var currencyFieldName = field.CurrencyField!;
+            var currencyField = FindField(entity, currencyFieldName);
+            if (currencyField is null
+                || FieldTypes.Parse(currencyField.Type) is not (FieldType.Text or FieldType.Enum))
+            {
+                report(
+                    DiagnosticCodes.InvalidMoneyCurrency,
+                    currencyField is null
+                        ? $"'currencyField' names '{currencyFieldName}', but '{entity.Name}' has no field with that name."
+                        : $"'currencyField' names the {currencyField.Type} field '{currencyField.Name}'. It must be a text or an enum field.",
+                    $"{path}/currencyField");
+                return;
+            }
+
+            minorUnits = MoneyDefaultScale;
+        }
+
+        // An explicit scale is compared with the precision by CheckField.
+        if (field.Scale is null && field.Precision is { } precision and >= 1 and <= MaxPrecision && minorUnits > precision)
+        {
+            report(
+                DiagnosticCodes.InvalidConstraint,
+                $"The default 'scale' is {minorUnits}, the minor units of the currency, but 'precision' is {precision}. Set 'precision' to at least {minorUnits} or set 'scale'.",
+                $"{path}/precision");
+        }
+    }
+
+    /// <summary>
+    /// Checks a field's <c>default</c>: it applies only to text, integer, decimal, money, boolean,
+    /// date, date-time and enum fields, and not together with an <c>expression</c>, a <c>sequence</c> or a
     /// <c>creator</c>. Only the first problem is reported, and then the expression is not checked.
     /// Otherwise the expression parses and type-checks to the field's type with no record in scope,
     /// so it may use literals, the named rules and <c>now()</c>. An expression problem is reported
@@ -1053,7 +1132,7 @@ public static class ApplicationCompiler
 
         var type = FieldTypes.Parse(field.Type);
         var problem = type is FieldType.Reference or FieldType.ChildCollection
-                ? $"'default' applies only to text, integer, decimal, boolean, date, date-time and enum fields, not to {field.Type} fields."
+                ? $"'default' applies only to text, integer, decimal, money, boolean, date, date-time and enum fields, not to {field.Type} fields."
             : field.Expression is not null ? "A field with a 'default' cannot have an 'expression': it is either computed or has a default."
             : field.Sequence is not null ? "A field with a 'default' cannot have a 'sequence': the server fills it from the sequence."
             : field.Creator == true ? "A field with a 'default' cannot be a 'creator' field: the server sets it to the user who created the record."
@@ -1166,7 +1245,7 @@ public static class ApplicationCompiler
         }
 
         var precisionValid = false;
-        if (field.Precision is { } precision && Fits("precision", "decimal", FieldType.Decimal))
+        if (field.Precision is { } precision && Fits("precision", "decimal and money", FieldType.Decimal, FieldType.Money))
         {
             precisionValid = precision is >= 1 and <= MaxPrecision;
             if (!precisionValid)
@@ -1178,9 +1257,21 @@ public static class ApplicationCompiler
             }
         }
 
-        if (field.Scale is { } scale && Fits("scale", "decimal", FieldType.Decimal))
+        if (field.Scale is { } scale && Fits("scale", "decimal and money", FieldType.Decimal, FieldType.Money))
         {
-            if (field.Precision is null)
+            if (type == FieldType.Money)
+            {
+                // A money field's precision has a default, so scale can stand alone.
+                var moneyPrecision = field.Precision ?? MoneyDefaultPrecision;
+                if ((field.Precision is null || precisionValid) && scale > moneyPrecision)
+                {
+                    report(
+                        DiagnosticCodes.InvalidConstraint,
+                        $"'scale' must be between 0 and the precision ({moneyPrecision}), but is {scale}.",
+                        $"{path}/scale");
+                }
+            }
+            else if (field.Precision is null)
             {
                 report(
                     DiagnosticCodes.InvalidConstraint,
@@ -1195,6 +1286,16 @@ public static class ApplicationCompiler
                     $"'scale' must be between 0 and the precision ({field.Precision}), but is {scale}.",
                     $"{path}/scale");
             }
+        }
+
+        if (field.Currency is not null)
+        {
+            Fits("currency", "money", FieldType.Money);
+        }
+
+        if (field.CurrencyField is not null)
+        {
+            Fits("currencyField", "money", FieldType.Money);
         }
 
         if (field.Target is { } target)
@@ -1263,10 +1364,11 @@ public static class ApplicationCompiler
         {
             Fits(
                 "expression",
-                "text, integer, decimal, boolean, date, date-time and enum",
+                "text, integer, decimal, money, boolean, date, date-time and enum",
                 FieldType.Text,
                 FieldType.Integer,
                 FieldType.Decimal,
+                FieldType.Money,
                 FieldType.Boolean,
                 FieldType.Date,
                 FieldType.DateTime,
@@ -1725,7 +1827,7 @@ public static class ApplicationCompiler
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
         var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: FindEntity);
         var defaultScope = ExpressionScopes.ForDefault(rules, modules);
-        var fields = entity.Fields.Select(field => BuildField(field, inputScope, defaultScope, entitiesByName, sequencesByName)).ToList();
+        var fields = entity.Fields.Select(field => BuildField(entity, field, inputScope, defaultScope, entitiesByName, sequencesByName)).ToList();
         var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: FindEntity, modules: modules);
         return new EntityModel
         {
@@ -1743,6 +1845,7 @@ public static class ApplicationCompiler
     }
 
     private static FieldModel BuildField(
+        EntityResource entity,
         FieldDefinition field,
         ExpressionScope inputScope,
         ExpressionScope defaultScope,
@@ -1760,8 +1863,10 @@ public static class ApplicationCompiler
             Required = field.Required ?? false,
             Unique = field.Unique ?? false,
             MaxLength = field.MaxLength,
-            Precision = field.Precision,
-            Scale = field.Scale,
+            Precision = type == FieldType.Money ? field.Precision ?? MoneyDefaultPrecision : field.Precision,
+            Scale = type == FieldType.Money ? field.Scale ?? MoneyDefaultScaleOf(field) : field.Scale,
+            Currency = field.Currency,
+            CurrencyField = field.CurrencyField is null ? null : FindField(entity, field.CurrencyField)!.Name,
             Values = field.Values,
             ValueLabels = field.ValueLabels,
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
@@ -1777,6 +1882,10 @@ public static class ApplicationCompiler
             Sensitive = field.Sensitive == true,
         };
     }
+
+    /// <summary>The scale of a money field that does not set one: the currency's minor units, or 2 with a currency field.</summary>
+    private static int MoneyDefaultScaleOf(FieldDefinition field) =>
+        field.Currency is { } code && Currencies.TryGetMinorUnits(code, out var minorUnits) ? minorUnits : MoneyDefaultScale;
 
     private static SiteModel BuildSite(SiteResource site, Dictionary<string, PageResource> pagesByName) =>
         new()

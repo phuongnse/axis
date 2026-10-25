@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test } from '../test'
+import type { APIRequestContext, Page } from '@playwright/test'
 import { useSession } from '../sessions'
 
 // The purchasing system submits purchase requests through the sample's SubmitPurchaseRequest

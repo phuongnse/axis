@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../test'
 import { csrfHeaders } from '../csrf'
 import { sessionFile, useSession } from '../sessions'
 

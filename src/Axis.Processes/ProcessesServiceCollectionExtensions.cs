@@ -19,12 +19,14 @@ public static class ProcessesServiceCollectionExtensions
     /// Whether a connector call, or a package operation through a <c>url</c> binding, may go to an
     /// <c>http</c> URL. Pass <see langword="true"/> only in Development.
     /// </param>
-    public static IServiceCollection AddProcesses(this IServiceCollection services, bool allowHttpConnectorUrls)
+    /// <param name="deliveryAttempts">The failures of a delivery that make it a dead letter. At least 1.</param>
+    public static IServiceCollection AddProcesses(this IServiceCollection services, bool allowHttpConnectorUrls, int deliveryAttempts)
     {
         services.AddSingleton<WorkItemRunner>();
         services.AddSingleton<ReleaseModelCache>();
         services.AddSingleton<IWorkItemHandler, ProcessStepHandler>();
         services.AddSingleton(new ConnectorCallSettings(allowHttpConnectorUrls));
+        services.AddSingleton(new DeliverySettings(deliveryAttempts));
         services.AddSingleton<ConnectorClient>();
         services.AddSingleton<PackageHttpTransport>();
         services.AddSingleton<IExternalWorkItemHandler, ConnectorCallHandler>();
