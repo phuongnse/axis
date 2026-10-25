@@ -143,9 +143,8 @@ loops through a waiting step and the `createRecord` and `notify` operations,
   *(planned for M14)*.
 - **Event:** a named event was raised.
 - **Schedule:** a cron schedule in an IANA time zone. Without a data source
-  it starts a process without a subject once, a scheduled job *(planned for
-  M14)*. With one, it fans out over the
-  records of a data source.
+  it starts a process without a subject once, a scheduled job. With one, it
+  fans out over the records of a data source.
 
 Inbound endpoints are their own resource, not a trigger kind. See
 [D27](../decisions/d27-inbound-endpoints.md).

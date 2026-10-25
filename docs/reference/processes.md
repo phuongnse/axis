@@ -294,7 +294,9 @@ reported in one pass. See
   A process without a subject has no `task`, `updateRecord` or `raiseEvent`
   step and no `output` on a connector or package step (`AXC0246`). Its start
   condition and each `when` see its parameters and the named rules, and no
-  field, path or `id`. A trigger that names such a process is `AXC0247`. The
+  field, path or `id`. A trigger that names such a process is `AXC0247`, except a schedule trigger
+  without a data source, see [Scheduled
+  jobs](process-events.md#scheduled-jobs). The
   start endpoint answers `400` for it until starting these processes is built,
   see [Processes without a
   subject](process-flow.md#processes-without-a-subject).
