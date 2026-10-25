@@ -54,5 +54,7 @@ export default mergeConfig(config, {
       fileName: () => 'axis-design-system.js',
     },
     rollupOptions: { output: { exports: 'default' } },
+    // The main config names a drag and drop chunk, and a single script cannot have one.
+    rolldownOptions: { output: { codeSplitting: false } },
   },
 })
