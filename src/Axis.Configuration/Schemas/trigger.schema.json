@@ -50,7 +50,7 @@
     {
       "if": { "required": ["type"], "properties": { "type": { "const": "schedule" } } },
       "then": {
-        "required": ["schedule", "timeZone", "dataSource"],
+        "required": ["schedule", "timeZone"],
         "properties": { "event": false, "entity": false, "on": false, "fields": false, "when": false, "mode": false }
       }
     }

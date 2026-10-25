@@ -20,7 +20,8 @@ creates and updates, on an inbound endpoint's record create, on task form
 saves, on `updateRecord` steps, on connector outputs and on package operation
 outputs, see [Starts from triggers](#starts-from-triggers). The worker runs
 schedule triggers too, once for each occurrence and for each record of the
-trigger's data source, see [Schedules](#schedules).
+trigger's data source, or once for each occurrence when the trigger has no data
+source, see [Schedules](#schedules) and [Scheduled jobs](#scheduled-jobs).
 A `raiseEvent` step raises an
 [event](integration-resources.md#event-resource) for its subject record. A
 [trigger](integration-resources.md#trigger-resource) starts a process for one record
@@ -30,10 +31,9 @@ same cause, even after a worker crash.
 
 _(Planned for M14)_ Event delivery also wakes the instances that wait for an
 event ([D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)).
-A schedule trigger may start a process without a subject, and a delete starts
-one through a delete trigger
+A delete starts a process without a subject through a delete trigger
 ([D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md)).
-See [Scheduled jobs](#scheduled-jobs) and [Delete triggers](#delete-triggers).
+See [Delete triggers](#delete-triggers).
 
 Deliveries to `async` triggers and schedule fan-outs that keep failing back off,
 stop after a limit and become dead letters
@@ -180,7 +180,7 @@ record.
 | Event, `async` | The `event.deliver` transaction, one for each occurrence and trigger | The trigger already handled the occurrence, the `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Data change | The write's transaction: a record API create or update, an inbound endpoint's create, a task form save, an `updateRecord` step, a connector output or a package operation output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
-| Schedule | The `trigger.fanOut` transaction of one batch, which holds the starts of up to 100 records | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
+| Schedule | The `trigger.fanOut` transaction of one batch, which holds the starts of up to 100 records. Without a data source, the one start of the occurrence | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true. Without a data source: the occurrence was already handled, the process is already running, or the `startCondition` is not true |
 
 A `when` or a `startCondition` is not true when it gives `false` or `null`,
 or hits a run-time error.
@@ -312,6 +312,11 @@ the data source:
    item. A full batch of 100 stores the last record id as the item's `cursor`
    and makes the item due again at once. A shorter batch deletes the item.
 
+A trigger without a data source is a [scheduled job](#scheduled-jobs). Its
+fan-out runs one start in one transaction, with no data source, cursor or
+batches. The receipt uses the nil UUID as the record, and the start passes the
+trigger's parameter values.
+
 **Failures.** A fan-out transaction that fails rolls the batch back. A
 separate transaction counts the failure for the trigger and the occurrence, and
 the item is due again after the [backoff](#dead-letters). After
@@ -341,7 +346,7 @@ further occurrence runs, but a running fan-out finishes.
 
 ## Scheduled jobs
 
-_(Planned for M14.)_ A schedule trigger may leave out `dataSource`. It then
+A schedule trigger may leave out `dataSource`. It then
 starts a [process without a subject](process-flow.md#processes-without-a-subject)
 once per occurrence, see
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md):
@@ -364,14 +369,22 @@ once per occurrence, see
   gives each of the process's parameters a literal value, in the JSON forms
   the [trigger resource](integration-resources.md#trigger-resource) uses for a
   data source's parameters. With `dataSource`, the process must have a subject
-  and `parameters` keeps its meaning, the data source's parameters. Each
-  mismatch is a new diagnostic.
+  and `parameters` keeps its meaning, the data source's parameters. A job
+  whose process has a subject is `AXC0249`. A parameter that is unknown,
+  repeated, mistyped or missing is `AXC0165`, `AXC0166` or `AXC0167`, as for a
+  data source. A `null` is a mistyped value, because a process parameter has no
+  optional flag.
 - Occurrences, daylight saving and downtime work as in [Schedules](#schedules).
 - The `trigger.fanOut` item of the occurrence starts the process once, in one
   transaction. Its receipt in `axis.trigger_starts` uses the nil UUID as
-  `subject_id`, so the occurrence starts at most once.
+  `subject_id`, so the occurrence starts at most once. The instance holds the
+  trigger's parameter values.
 - A start that finds the process still running from an earlier occurrence is
-  skipped and logged.
+  skipped and logged at Information level. The receipt stays `skipped`, and the
+  log names no record.
+- The process comes from the release that is active when the fan-out runs. When
+  that process has a subject now, or its parameters no longer match the
+  trigger's values, the start is skipped and logged.
 
 ## Delete triggers
 
