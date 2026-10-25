@@ -9,6 +9,9 @@
 //   Agreed or Proposed.
 // - docs/decisions.md has one row per decision file, numbered from 1 with no gaps, in order, with
 //   the file's title and status.
+// - docs/reference/asvs.md, when it exists, has one row for each requirement of the committed ASVS list
+//   (docs/reference/asvs-5.0.0.json) in chapters V1 to V8 for now, with no unknown or repeated id, a
+//   status from the list and some evidence. A Met row names only test classes that exist.
 // - A doc under docs/ has at most 1,000 lines, AGENTS.md at most 100 and a SKILL.md under
 //   .claude/skills/ at most 250, so agents can read what they need without reading whole books.
 //
@@ -23,11 +26,21 @@ const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 export const maxDocLines = 1000
 export const maxAgentsLines = 100
 export const maxSkillLines = 250
+export const asvsListFile = 'docs/reference/asvs-5.0.0.json'
+export const asvsStatuses = ['Met', 'Gap', 'Delegated', 'Not applicable']
+/** The chapters V1 to V<n> of the ASVS list that need a row. The next issue raises it to 17. */
+export const asvsCheckedChapters = 8
 
 const decisionFilePattern = /^d(\d+)-([a-z0-9-]+)\.md$/
 const decisionTitlePattern = /^# D(\d+)\. (.+)$/
 const statusPattern = /^Status: \*\*((?:Agreed|Proposed)\b[^*]*)\*\*$/
 const decisionRowPattern = /^\| \[D(\d+)\]\(decisions\/([^)]+)\) \| (.+?) \| \*\*(.+?)\*\* \|$/
+const asvsFile = 'docs/reference/asvs.md'
+const asvsChapterPattern = /^V(\d+)\./
+const cellSeparator = /(?<!\\)\|/
+const testClassPattern = /`([A-Z]\w*Tests)`/g
+const classPattern = /\bclass\s+(\w+)/g
+const ignoredFolders = new Set(['bin', 'obj', 'node_modules'])
 const linkPattern = /\]\(([^)\s#]+)(?:#[^)\s]*)?\)/g
 
 function markdownFiles(directory) {
@@ -40,7 +53,72 @@ function markdownFiles(directory) {
   return files
 }
 
+function sourceFiles(directory) {
+  if (!existsSync(directory)) return []
+  const files = []
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const fullPath = path.join(directory, entry.name)
+    if (entry.isDirectory()) {
+      if (!ignoredFolders.has(entry.name)) files.push(...sourceFiles(fullPath))
+    } else if (entry.isFile() && entry.name.endsWith('.cs')) files.push(fullPath)
+  }
+  return files
+}
+
 const lines = (file) => readFileSync(file, 'utf8').replace(/\n$/, '').split('\n')
+
+/** Checks the requirements table of the ASVS page against the committed list of ASVS ids. */
+function checkAsvs(root, asvs, report) {
+  const listPath = path.join(root, asvsListFile)
+  if (!existsSync(listPath)) {
+    report(asvs, 1, `missing ${asvsListFile}: the requirements table is checked against it`)
+    return
+  }
+  const list = JSON.parse(readFileSync(listPath, 'utf8')).requirements
+  const known = new Set(list.map((requirement) => requirement.id))
+
+  const text = lines(asvs)
+  const heading = text.findIndex((line) => line === '## Requirements') + 1
+  const seen = new Map()
+  let classes
+  const testClasses = () => {
+    if (!classes) {
+      classes = new Set()
+      for (const file of [...sourceFiles(path.join(root, 'tests')), ...sourceFiles(path.join(root, 'samples'))]) {
+        for (const match of readFileSync(file, 'utf8').matchAll(classPattern)) classes.add(match[1])
+      }
+    }
+    return classes
+  }
+
+  for (let i = Math.max(heading, 0); i < text.length; i++) {
+    const cells = text[i].split(cellSeparator)
+    if (cells.length < 6 || cells[0].trim() !== '') continue
+    const [id, , status, evidence] = cells.slice(1, 5).map((cell) => cell.trim().replace(/^`(.*)`$/, '$1'))
+    if (id === 'Id' || /^-+$/.test(id)) continue
+    const line = i + 1
+    if (!known.has(id)) report(asvs, line, `${id} is not a Level 1 or Level 2 id in ${asvsListFile}`)
+    else if (seen.has(id)) report(asvs, line, `${id} has a row already, on line ${seen.get(id)}`)
+    else seen.set(id, line)
+    const statusName = /^\*\*(.+)\*\*$/.exec(status)?.[1]
+    if (!asvsStatuses.includes(statusName)) {
+      report(asvs, line, `${id} status '${status}' is not one of ${asvsStatuses.map((name) => `**${name}**`).join(', ')}`)
+    }
+    if (evidence === '') report(asvs, line, `${id} has no evidence`)
+    else if (statusName === 'Met') {
+      for (const match of text[i].split(cellSeparator)[4].matchAll(testClassPattern)) {
+        if (!testClasses().has(match[1])) report(asvs, line, `${id} names the test class ${match[1]}, which no .cs file under tests/ or samples/ declares`)
+      }
+    }
+  }
+
+  for (const { id, level } of list) {
+    const chapter = Number(asvsChapterPattern.exec(id)?.[1])
+    if (chapter <= asvsCheckedChapters && !seen.has(id)) {
+      report(asvs, Math.max(heading, 1), `${id} (Level ${level}) has no row in the requirements table`)
+    }
+  }
+}
 
 /** Checks the docs under root and returns the problems as { file, line, message }. */
 export function checkDocs(root) {
@@ -85,6 +163,9 @@ export function checkDocs(root) {
       if (!linked.has(file)) report(map, 1, `does not list ${relative(file)}`)
     }
   }
+
+  const asvs = path.join(root, asvsFile)
+  if (existsSync(asvs)) checkAsvs(root, asvs, report)
 
   // The decisions.
   const index = path.join(docs, 'decisions.md')
@@ -149,7 +230,7 @@ function main(args) {
   const problems = checkDocs(root).sort((a, b) => (a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1))
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index and the doc and skill sizes are in order.')
+  console.log('The docs map, the decisions index, the ASVS table and the doc and skill sizes are in order.')
   return 0
 }
 

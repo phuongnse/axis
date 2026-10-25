@@ -153,7 +153,7 @@ public static class PendingComputedReads
         {
             FieldType.Text or FieldType.Enum => JsonValue.Create((string)value.Value),
             FieldType.Integer => JsonValue.Create((long)value.Value),
-            FieldType.Decimal => JsonNode.Parse(DecimalText(value.Field, (string)value.Value)),
+            FieldType.Decimal or FieldType.Money => JsonNode.Parse(DecimalText(value.Field, (string)value.Value)),
             FieldType.Boolean => JsonValue.Create((bool)value.Value),
             FieldType.Date => JsonValue.Create(((DateOnly)value.Value).ToString(DateFormat, CultureInfo.InvariantCulture)),
             FieldType.DateTime => JsonValue.Create(((DateTimeOffset)value.Value).UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture)),

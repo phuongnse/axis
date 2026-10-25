@@ -286,7 +286,7 @@ public static class ExpressionScopes
         {
             FieldType.Text => ExpressionType.Text,
             FieldType.Integer => ExpressionType.Integer,
-            FieldType.Decimal => ExpressionType.Decimal,
+            FieldType.Decimal or FieldType.Money => ExpressionType.Decimal,
             FieldType.Boolean => ExpressionType.Boolean,
             FieldType.Date => ExpressionType.Date,
             FieldType.DateTime => ExpressionType.DateTime,

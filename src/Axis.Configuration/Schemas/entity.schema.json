@@ -57,7 +57,7 @@
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "type": {
-          "enum": ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference", "child-collection", "file"]
+          "enum": ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference", "child-collection", "money", "file"]
         },
         "label": { "$ref": "#/$defs/textReference" },
         "required": { "type": "boolean" },
@@ -73,6 +73,8 @@
           "items": { "type": "string" }
         },
         "target": { "type": "string", "x-axis-reference": "entity" },
+        "currency": { "type": "string" },
+        "currencyField": { "type": "string" },
         "values": {
           "type": "array",
           "minItems": 1,

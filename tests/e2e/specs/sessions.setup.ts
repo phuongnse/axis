@@ -1,4 +1,4 @@
-import { expect, test as setup } from '@playwright/test'
+import { expect, test as setup } from '../test'
 import { journeySessionFile, journeyUsers, sampleUsers, sessionFile, type SampleUser } from '../sessions'
 import { journeyURL } from '../server-settings'
 

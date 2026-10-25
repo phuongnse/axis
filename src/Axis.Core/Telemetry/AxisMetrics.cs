@@ -37,6 +37,9 @@ public static class AxisMetrics
     /// <summary>Whether each tenant database answered the last readiness probe of the server, 1 or 0, by tenant.</summary>
     public const string TenantDatabaseAvailable = "axis.tenant.database.available";
 
+    /// <summary>The interactive reads that ran past the query timeout, by tenant and application.</summary>
+    public const string QueryTimeouts = "axis.queries.timeouts";
+
     /// <summary>The requests that a rate limit refused, by partition.</summary>
     public const string RateLimitRefusals = "axis.rate_limits.refused";
 
@@ -77,6 +80,11 @@ public static class AxisMetrics
         "{attempt}",
         "Attempts of connector calls and package operations.");
 
+    private static readonly Counter<long> _queryTimeouts = Meter.CreateCounter<long>(
+        QueryTimeouts,
+        "{query}",
+        "Interactive reads that ran past the query timeout.");
+
     private static readonly Counter<long> _createdDeadLetters = Meter.CreateCounter<long>(
         DeadLettersCreated,
         "{dead_letter}",
@@ -89,6 +97,14 @@ public static class AxisMetrics
             new KeyValuePair<string, object?>(AxisTelemetry.TenantTag, tenant),
             new KeyValuePair<string, object?>(AxisTelemetry.WorkItemKindTag, kind),
             new KeyValuePair<string, object?>(AxisTelemetry.OutcomeTag, outcome));
+
+    /// <summary>Counts one interactive read that ran past the query timeout. A <see langword="null"/> application is left out.</summary>
+    public static void RecordQueryTimeout(string tenant, string? application)
+    {
+        var tags = new TagList { { AxisTelemetry.TenantTag, tenant } };
+        Add(ref tags, AxisTelemetry.ApplicationTag, application);
+        _queryTimeouts.Add(1, tags);
+    }
 
     /// <summary>Counts a dead letter of the work item kind <paramref name="kind"/>.</summary>
     public static void RecordDeadLetter(string tenant, string kind) =>

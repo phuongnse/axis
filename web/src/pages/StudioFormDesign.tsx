@@ -10,12 +10,11 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { Button, Flex } from 'antd'
 import { useState } from 'react'
-import { dropPlace, movePlace, sectionMovePlace, type FieldPlace } from '../platform/formLayout'
 import { useText } from '../platform/texts'
 import { outlineCollision, silent } from './designDrag'
 import { FormOutline } from './FormOutline'
 import { FormPalette } from './FormPalette'
-import { insertField, moveFieldTo, moveSectionTo } from './formPaletteSupport'
+import { dropOnForm } from './formPaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 import { StudioFormCanvas } from './StudioFormCanvas'
 import { type FormUse, StudioFormUsedOn } from './StudioFormUsedOn'
@@ -28,7 +27,7 @@ import type { OpenResource } from './StudioReferences'
  * field is selected. A field row of the outline moves by pointer drag onto another field row or an empty section, or by
  * Space, the arrow keys and Space, and takes the place of the field it is dropped on. Escape cancels a move. The moved
  * field stays selected. A section row of the outline moves the same way, onto another section row, which it takes the
- * place of, or onto a step's heading, which takes it at the end of the step. On a form with steps, `sections` then
+ * place of, or onto a step's heading or a step's entry in the step switch, which takes it at the end of the step. On a form with steps, `sections` then
  * follows the order of the steps. The section stays selected, and one undo reverses the move. For all of them, the
  * live region names the element, its section or step and its position. The canvas, the palette, the outline and the drag
  * library are one lazy chunk, which loads when the tab opens.
@@ -48,7 +47,7 @@ export default function StudioFormDesign({
   draft: Record<string, unknown>
   /** The pointer of the selected field, section or step, or null. */
   selected: string | null
-  onSelect: (pointer: string) => void
+  onSelect: (pointer: string | null) => void
   onChange: ChangeHandler
   usedOn: FormUse[] | 'failed' | undefined
   onOpen: OpenResource
@@ -66,33 +65,7 @@ export default function StudioFormDesign({
 
   function drop({ active, over }: DragEndEvent) {
     setDragging(undefined)
-    const data = active.data.current as { field?: unknown; move?: FieldPlace; section?: unknown } | undefined
-    const pointer = (over?.data.current as { pointer?: unknown } | undefined)?.pointer
-    if (typeof pointer !== 'string') {
-      return
-    }
-    if (typeof data?.section === 'number') {
-      const to = sectionMovePlace(draft, pointer)
-      if (to !== undefined) {
-        moveSectionTo(t, draft, data.section, to, onChange, onSelect, setAnnouncement)
-      }
-      return
-    }
-    if (data?.move !== undefined) {
-      const to = movePlace(draft, pointer)
-      if (to !== undefined) {
-        moveFieldTo(t, draft, data.move, to, onChange, onSelect, setAnnouncement)
-      }
-      return
-    }
-    const field = data?.field
-    if (typeof field !== 'string') {
-      return
-    }
-    const place = dropPlace(draft, pointer)
-    if (place !== undefined) {
-      insertField(t, draft, field, place, onChange, onSelect, setAnnouncement)
-    }
+    dropOnForm(t, draft, active.data.current, over?.data.current, onChange, onSelect, setAnnouncement)
   }
 
   return (

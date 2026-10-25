@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../test'
 import { expectSessionUser, useSession } from '../sessions'
 
 test('a switch made while the previous user loads a page signs in the new user', async ({ page }) => {
