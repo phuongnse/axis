@@ -1,0 +1,14 @@
+{
+  "id": "034adef3-6ae8-4928-a2f2-cc4e4c0867f0",
+  "kind": "migration",
+  "name": "TicketChange20261025120000",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "changes": [
+    {
+      "type": "convert",
+      "field": "status",
+      "value": "'draft'"
+    }
+  ]
+}
