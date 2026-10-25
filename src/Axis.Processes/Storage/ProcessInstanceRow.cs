@@ -1,8 +1,9 @@
 namespace Axis.Processes.Storage;
 
 /// <summary>
-/// A row of <c>axis.process_instances</c>: one run of a process for one subject record, pinned to
-/// the release that was active when it started.
+/// A row of <c>axis.process_instances</c>: one run of a process for one subject record, or for a
+/// set of parameter values when the process has no subject. It is pinned to the release that was
+/// active when it started.
 /// </summary>
 public sealed class ProcessInstanceRow
 {
@@ -13,10 +14,11 @@ public sealed class ProcessInstanceRow
     /// <summary>The id of the process resource.</summary>
     public required Guid ProcessId { get; init; }
 
-    public required Guid SubjectEntityId { get; init; }
+    /// <summary>The entity of the subject record, or <see langword="null"/> for a process without a subject.</summary>
+    public Guid? SubjectEntityId { get; init; }
 
-    /// <summary>The id of the subject record.</summary>
-    public required Guid SubjectId { get; init; }
+    /// <summary>The id of the subject record, or <see langword="null"/> for a process without a subject.</summary>
+    public Guid? SubjectId { get; init; }
 
     /// <summary>The release the instance is pinned to.</summary>
     public required Guid ReleaseId { get; init; }
@@ -29,6 +31,12 @@ public sealed class ProcessInstanceRow
 
     /// <summary>The declared name of the step the instance runs next.</summary>
     public required string Step { get; init; }
+
+    /// <summary>
+    /// The JSON text of the parameter values the instance started with, in the record API's JSON
+    /// form, or <see langword="null"/> for an instance with a subject.
+    /// </summary>
+    public string? Parameters { get; init; }
 
     public DateTimeOffset CreatedAt { get; init; }
 

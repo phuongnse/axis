@@ -62,6 +62,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.ClaimUserId).HasColumnName("claim_user_id");
             tenant.Property(t => t.ClaimDisplayName).HasColumnName("claim_display_name");
             tenant.Property(t => t.ClaimRoles).HasColumnName("claim_roles");
+            tenant.Property(t => t.ClaimEmail).HasColumnName("claim_email");
+            tenant.Property(t => t.ClaimLocale).HasColumnName("claim_locale");
             tenant.Property(t => t.EndpointAudience).HasColumnName("endpoint_audience");
             tenant.Property(t => t.ServiceAudience).HasColumnName("service_audience");
             tenant.Property(t => t.SchemaVersion).HasColumnName("schema_version").HasDefaultValue("");

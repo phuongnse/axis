@@ -215,16 +215,26 @@ public static class ProcessRetryCommand
             transaction);
         command.Parameters.AddWithValue("id", instanceId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken)
-            ? new LockedInstance(
-                reader.GetGuid(0),
-                reader.GetGuid(1),
-                reader.GetGuid(2),
-                reader.GetGuid(3),
-                reader.GetGuid(4),
-                reader.GetString(5),
-                reader.GetString(6))
-            : null;
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        // An instance of a process without a subject has null subject columns. It is not found here until
+        // inspection and operator support for it are built.
+        if (reader.IsDBNull(3))
+        {
+            return null;
+        }
+
+        return new LockedInstance(
+            reader.GetGuid(0),
+            reader.GetGuid(1),
+            reader.GetGuid(2),
+            reader.GetGuid(3),
+            reader.GetGuid(4),
+            reader.GetString(5),
+            reader.GetString(6));
     }
 
     private static async Task<bool> ExistsActiveInstanceAsync(
