@@ -8,7 +8,7 @@ drop on a canvas that the site's own widgets draw. This builds on
 [D53](d53-typed-editors-and-the-process-graph-in-studio.md),
 [D61](d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md),
 [D63](d63-navigate-actions-and-page-parameters.md) and
-[D64](d64-detail-chart-and-kpi-widgets.md). All of it is _(planned for M13)_.
+[D64](d64-detail-chart-and-kpi-widgets.md). It is built in M13, except that a page opens on the Design tab by default, which is _(planned for M14)_.
 The owner confirmed these points on issue #1140 on 2026-10-24.
 
 - **Canvas:**
