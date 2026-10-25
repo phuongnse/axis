@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
+import { dragTo } from '../design-drag'
 import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
@@ -57,8 +58,21 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   }
 
-  async function pick(page: Page, testId: string, option: string, filter?: string) {
-    await pickOption(page.getByTestId(testId).getByRole('combobox'), option, filter)
+  // The Form tab stays mounted while the Design tab shows, and repeats its test ids. A Design step passes the design
+  // panel as `scope`, so that only the panel's field matches.
+  async function openPage(page: Page, name: string) {
+    await page.getByTestId('studio-group-page').getByRole('button', { name, exact: true }).click()
+    await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
+  }
+
+  // The dialog fades out after a choice, and a drag that starts under it does not reach the canvas.
+  async function chooseBinding(page: Page, type: string) {
+    await page.getByTestId(`studio-binding-${type}`).click()
+    await expect(page.getByTestId('studio-binding-choice')).toBeHidden()
+  }
+
+  async function pick(scope: Page | Locator, testId: string, option: string, filter?: string) {
+    await pickOption(scope.getByTestId(testId).getByRole('combobox'), option, filter)
   }
 
   // A row with more than one select names the one to pick, since pick() would match them all.
@@ -95,8 +109,8 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page.getByRole('tab', { name: 'Form', exact: true })).toHaveAttribute('aria-selected', 'true')
   }
 
-  async function writeLabel(page: Page, field: string, key: string, en: string) {
-    const label = page.getByTestId(field).getByTestId('studio-label')
+  async function writeLabel(scope: Page | Locator, field: string, key: string, en: string) {
+    const label = scope.getByTestId(field).getByTestId('studio-label')
     const keyBox = label.getByRole('textbox', { name: 'Text key', exact: true })
     const english = label.getByRole('textbox', { name: 'en', exact: true })
     // The label editor fills the texts when the key is typed, from the names it has then. An editor that was replaced
@@ -110,17 +124,13 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(label.getByTestId('studio-label-written')).toBeVisible()
   }
 
-  /** Adds a widget of the type to the end of the widget list at `listPointer`, and expects it at `target`. */
-  async function addWidget(page: Page, listPointer: string, type: string, target: string) {
-    await pickAction(
-      page
-        .getByTestId(`studio-widget-list-${listPointer}`)
-        .locator('xpath=..')
-        .locator('xpath=./div[not(@data-testid)]')
-        .getByRole('combobox'),
-      type,
-      page.getByTestId(`studio-widget-${target}`),
-    )
+  async function openDesign(page: Page) {
+    await page.getByRole('tab', { name: 'Design', exact: true }).click()
+  }
+
+  /** The canvas frame of the widget at `pointer`. */
+  function frame(page: Page, pointer: string) {
+    return page.locator(`[data-testid="studio-canvas-widget"][data-path="${pointer}"]`)
   }
 
   async function grantIn(
@@ -499,13 +509,92 @@ test.describe('the author builds the service desk with Studio only', () => {
     }
   })
 
-  test('the author builds the ticket form and the three task forms', async ({ page }) => {
+  test('the author lays out the TicketEdit form on the Design tab', async ({ page }) => {
+    // A tall window keeps the palette and the outline in view together, away from the edges where a drag scrolls.
+    await page.setViewportSize({ width: 1280, height: 1000 })
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    const form = await sample<SampleForm>('forms/ticket-edit.json')
+    await createResource(page, 'form', 'TicketEdit')
+    await expectForm(page)
+    // The Design pane has no editor for the entity, so it is picked on the Form tab.
+    await pick(page, 'studio-field-/entity', form.entity)
+    await openDesign(page)
+    const panel = page.getByTestId('studio-design-panel')
+    await expect(panel.getByTestId('studio-form-palette-number')).toBeVisible()
+
+    const sectionTitle = (index: number) =>
+      panel.locator(`[data-testid="studio-outline-section"][data-path="/sections/${index}"] > span`).first()
+    const outlineRow = (testId: string, pointer: string) =>
+      panel.locator(`[data-testid="${testId}"][data-path="${pointer}"]`)
+
+    // A section gets its name and title, then its fields. The first field is dragged from the palette onto the section's
+    // line in the outline. The others are clicked, and each lands after the field selected before it.
+    async function layOutSection(index: number) {
+      const section = form.sections[index]
+      await sectionTitle(index).click()
+      const name = panel.getByTestId('studio-design-section-name')
+      await name.fill(section.name!)
+      await name.press('Enter')
+      await expect(sectionTitle(index)).toHaveText(section.name!)
+      const titleKey = section.title.textKey
+      await writeLabel(panel, `studio-field-/sections/${index}/title`, titleKey, en[titleKey])
+      for (const [position, field] of section.fields.entries()) {
+        const button = panel.getByTestId(`studio-form-palette-${field.field}`)
+        if (position === 0) {
+          await dragTo(page, 'studio-form-design', button, sectionTitle(index))
+        } else {
+          await button.click()
+        }
+        await expect(outlineRow('studio-outline-field', `/sections/${index}/fields/${position}`)).toHaveAttribute(
+          'aria-current',
+          'true',
+        )
+      }
+    }
+
+    // The starter section holds one empty field, which the sample does not have. Its outline row has no name and no size
+    // to click, so Enter selects it.
+    await outlineRow('studio-outline-field', '/sections/0/fields/0').press('Enter')
+    await panel.getByTestId('studio-design-remove-field').click()
+    await expect(panel.getByTestId('studio-outline-empty-section')).toBeVisible()
+
+    await layOutSection(0)
+
+    // Each step takes the key of its title. The first step lists the section, and the second is empty and selected, so
+    // the section added next joins it.
+    for (const [index, step] of form.steps!.entries()) {
+      await panel.getByTestId('studio-form-add-step').click()
+      await expect(outlineRow('studio-outline-step', `/steps/${index}`)).toHaveAttribute('aria-current', 'true')
+      await writeLabel(panel, `studio-field-/steps/${index}/title`, step.title.textKey, en[step.title.textKey])
+    }
+    await panel.getByTestId('studio-form-add-section').click()
+    await expect(sectionTitle(1)).toBeVisible()
+    await layOutSection(1)
+
+    // The conditions of a field are in the property panel of the field.
+    for (const [position, field] of form.sections[1].fields.entries()) {
+      for (const condition of ['visibleWhen', 'requiredWhen'] as const) {
+        const expression = field[condition]
+        if (expression) {
+          await outlineRow('studio-outline-field', `/sections/1/fields/${position}`).click()
+          const box = panel.getByTestId(`studio-field-/sections/1/fields/${position}/${condition}`)
+          await expect(box.locator('.cm-editor')).toBeVisible()
+          await box.getByRole('textbox').fill(expression)
+        }
+      }
+    }
+    await save(page)
+  })
+
+  test('the author builds the three task forms', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
     for (const [name, file] of [
-      ['TicketEdit', 'forms/ticket-edit.json'],
       ['TicketTriage', 'forms/ticket-triage.json'],
       ['TicketResolution', 'forms/ticket-resolution.json'],
       ['TicketConfirmation', 'forms/ticket-confirmation.json'],
@@ -524,9 +613,6 @@ test.describe('the author builds the service desk with Studio only', () => {
         }
         const titleKey = section.title.textKey
         await writeLabel(page, `studio-field-/sections/${sectionIndex}/title`, titleKey, en[titleKey])
-        if (section.name) {
-          await page.getByTestId(`studio-field-/sections/${sectionIndex}/name`).getByRole('textbox').fill(section.name)
-        }
         for (const [fieldIndex, field] of section.fields.entries()) {
           // A new section starts with no fields. The starter section has its first field already.
           if (sectionIndex > 0 || fieldIndex > 0) {
@@ -542,25 +628,7 @@ test.describe('the author builds the service desk with Studio only', () => {
               .getByRole('checkbox')
               .check()
           }
-          if (field.visibleWhen) {
-            const condition = page.getByTestId(`studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/visibleWhen`)
-            await expect(condition.locator('.cm-editor')).toBeVisible()
-            await condition.getByRole('textbox').fill(field.visibleWhen)
-          }
-          if (field.requiredWhen) {
-            const condition = page.getByTestId(`studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/requiredWhen`)
-            await expect(condition.locator('.cm-editor')).toBeVisible()
-            await condition.getByRole('textbox').fill(field.requiredWhen)
-          }
         }
-      }
-      for (const [stepIndex, step] of (form.steps ?? []).entries()) {
-        await page
-          .getByTestId('studio-field-/steps')
-          .getByRole('button', { name: 'Add step', exact: true })
-          .click()
-        await writeLabel(page, `studio-field-/steps/${stepIndex}/title`, step.title.textKey, en[step.title.textKey])
-        await pickOptions(page.getByTestId(`studio-field-/steps/${stepIndex}/sections`).getByRole('combobox'), step.sections)
       }
       await save(page)
       await expectForm(page)
@@ -708,7 +776,9 @@ test.describe('the author builds the service desk with Studio only', () => {
     await writeLabel(page, 'studio-field-/title', 'pages.myTasks.title', en['pages.myTasks.title'])
     await save(page)
 
-    // The detail page takes the ticket as a required parameter, and its detail widget shows that ticket.
+    // The detail page takes the ticket as a required parameter. Its detail widget is laid out on the Design tab later,
+    // because the canvas draws nothing while any file has an error. The starter Home page and its site entry have errors
+    // until the author finishes the site.
     await createPage(page, 'TicketDetail')
     await writeLabel(page, 'studio-field-/title', 'pages.ticketDetail.title', en['pages.ticketDetail.title'])
     await page.getByRole('button', { name: 'Add parameter', exact: true }).click()
@@ -716,9 +786,6 @@ test.describe('the author builds the service desk with Studio only', () => {
     await pick(page, 'studio-field-/parameters/0/type', 'reference')
     await pick(page, 'studio-field-/parameters/0/target', 'Ticket')
     await page.getByRole('switch', { name: 'Required', exact: true }).click()
-    await pick(page, 'studio-field-/widgets/0/type', 'detail')
-    await pick(page, 'studio-field-/widgets/0/entity', 'Ticket')
-    await pick(page, 'studio-field-/widgets/0/record', 'ticket')
     await save(page)
   })
 
@@ -761,63 +828,13 @@ test.describe('the author builds the service desk with Studio only', () => {
     }
   })
 
-  test('the author builds the Dashboard page with two tiles, a chart and the ticket table', async ({ page }) => {
+  test('the author creates the Dashboard page', async ({ page }) => {
     await useJourneySession(page, 'hoa')
-    // The names load with the application, so the new data sources and AllTickets are offered below.
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
     await createPage(page, 'Dashboard')
     await writeLabel(page, 'studio-field-/title', 'pages.dashboard.title', en['pages.dashboard.title'])
-
-    // The starter widget becomes the table, which the columns widget then moves above.
-    await pick(page, 'studio-field-/widgets/0/type', 'table')
-    await pick(page, 'studio-field-/widgets/0/dataSource', 'AllTicketList')
-    await addWidget(page, '/widgets', 'columns', '/widgets/1')
-    await page
-      .getByTestId('studio-widget-row-/widgets/1')
-      .getByRole('button', { name: 'Move up', exact: true })
-      .click()
-    await page.getByTestId('studio-widget-/widgets/0').click()
-    await page.getByTestId('studio-field-/widgets/0/columns/0/width').getByRole('spinbutton').fill('4')
-    await page.getByTestId('studio-field-/widgets/0/columns/1/width').getByRole('spinbutton').fill('8')
-
-    const tiles = '/widgets/0/columns/0/widgets'
-    for (const [index, tile] of [
-      { dataSource: 'OpenTicketTotals', measure: 'openCount', label: 'dashboard.open.label', show: 'dashboard.open.show' },
-      { dataSource: 'UrgentTicketTotals', measure: 'urgentCount', label: 'dashboard.urgent.label' },
-    ].entries()) {
-      const base = `${tiles}/${index}`
-      await addWidget(page, tiles, 'kpi', base)
-      await page.getByTestId(`studio-widget-${base}`).click()
-      await pick(page, `studio-field-${base}/dataSource`, tile.dataSource)
-      await pick(page, `studio-field-${base}/measure`, tile.measure)
-      await writeLabel(page, `studio-field-${base}/label`, tile.label, en[tile.label])
-      if (tile.show) {
-        // The open tile links to the table of every ticket.
-        await page
-          .getByTestId(`studio-field-${base}/navigate`)
-          .getByRole('button', { name: 'Add navigate action', exact: true })
-          .click()
-        await pick(page, `studio-field-${base}/navigate/page`, 'AllTickets')
-        await writeLabel(page, `studio-field-${base}/navigate/label`, tile.show, en[tile.show])
-      }
-    }
-
-    // A new chart is a bar chart with one measure.
-    const chart = '/widgets/0/columns/1/widgets/0'
-    await addWidget(page, '/widgets/0/columns/1/widgets', 'chart', chart)
-    await page.getByTestId(`studio-widget-${chart}`).click()
-    await pick(page, `studio-field-${chart}/dataSource`, 'OpenTicketsByCategory')
-    await pick(page, `studio-field-${chart}/category`, 'category')
-    await pick(page, `studio-field-${chart}/measures/0/name`, 'openCount')
-    await writeLabel(
-      page,
-      `studio-field-${chart}/measures/0/label`,
-      'dashboard.byCategory.open',
-      en['dashboard.byCategory.open'],
-    )
-    await writeLabel(page, `studio-field-${chart}/title`, 'dashboard.byCategory.title', en['dashboard.byCategory.title'])
     await save(page)
   })
 
@@ -856,6 +873,113 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
     await confirmDialog(page, 'Delete')
     await expect(page.getByTestId("studio-group-page").getByRole("button", { name: /Home/i })).toHaveCount(0)
+  })
+
+  test('the author lays out the TicketDetail page on the Design tab', async ({ page }) => {
+    // A tall, wide window keeps the data panel and the canvas in view together, away from the edges where a drag scrolls.
+    // A table makes the canvas wider than a narrow window, which pushes the panel out of sight of the mouse.
+    await page.setViewportSize({ width: 1920, height: 1000 })
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    await openPage(page, 'TicketDetail')
+    // The Ticket entity dropped on the starter widget binds a detail widget to the required ticket parameter. The
+    // starter task inbox is not in the sample, so the author removes it from the widget tree.
+    await openDesign(page)
+    const panel = page.getByTestId('studio-design-panel')
+    const starter = frame(page, '/widgets/0')
+    await expect(starter).toBeVisible()
+    await dragTo(page, 'studio-page-design', panel.getByTestId('studio-data-entity-Ticket'), starter, 0.75)
+    await chooseBinding(page, 'detail')
+    await expect(frame(page, '/widgets/1')).toBeVisible()
+    await panel
+      .getByTestId('studio-widget-row-/widgets/0')
+      .getByRole('button', { name: 'Remove widget', exact: true })
+      .click()
+    await expect(panel.getByTestId('studio-widget-/widgets/1')).toHaveCount(0)
+    await save(page)
+  })
+
+  test('the author lays out the Dashboard on the Design tab with two tiles, a chart and the ticket table', async ({ page }) => {
+    // A tall, wide window keeps the palette, the data panel and the canvas in view together, away from the edges where a
+    // drag scrolls. A table makes the canvas wider than a narrow window, which pushes the panel out of sight of the mouse.
+    await page.setViewportSize({ width: 1920, height: 1000 })
+    await useJourneySession(page, 'hoa')
+    // The names load with the application, so the new data sources and AllTickets are offered below.
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    await openPage(page, 'Dashboard')
+    await openDesign(page)
+    const panel = page.getByTestId('studio-design-panel')
+    const dragOnto = (source: string, target: Locator, fraction?: number) =>
+      dragTo(page, 'studio-page-design', panel.getByTestId(source), target, fraction)
+    const list = (pointer: string) => page.locator(`[data-testid="studio-canvas-list"][data-list="${pointer}"]`)
+    await expect(frame(page, '/widgets/0')).toBeVisible()
+
+    // The ticket table goes below the starter widget, and the columns widget above it. Then the author removes the
+    // starter task inbox, which the sample does not have.
+    await dragOnto('studio-data-dataSource-AllTicketList', frame(page, '/widgets/0'), 0.75)
+    await chooseBinding(page, 'table')
+    await expect(frame(page, '/widgets/1')).toBeVisible()
+    await dragOnto('studio-palette-columns', frame(page, '/widgets/0'), 0.25)
+    await expect(panel.getByTestId('studio-widget-/widgets/2')).toBeVisible()
+    await panel
+      .getByTestId('studio-widget-row-/widgets/1')
+      .getByRole('button', { name: 'Remove widget', exact: true })
+      .click()
+    await expect(panel.getByTestId('studio-widget-/widgets/2')).toHaveCount(0)
+    await panel.getByTestId('studio-widget-/widgets/0').click()
+    await panel.getByTestId('studio-field-/widgets/0/columns/0/width').getByRole('spinbutton').fill('4')
+    await panel.getByTestId('studio-field-/widgets/0/columns/1/width').getByRole('spinbutton').fill('8')
+
+    // Each tile is a data source dropped on the first column's list, which puts it at the end. The data source sets the
+    // measure, and the author writes the label. The columns widget does not compile until its tiles have labels and its
+    // second column has a widget, so the canvas draws it as a placeholder with its lists, and the tiles are found in the
+    // widget tree.
+    const tiles = '/widgets/0/columns/0/widgets'
+    for (const [index, tile] of [
+      { dataSource: 'OpenTicketTotals', label: 'dashboard.open.label', show: 'dashboard.open.show' },
+      { dataSource: 'UrgentTicketTotals', label: 'dashboard.urgent.label' },
+    ].entries()) {
+      const base = `${tiles}/${index}`
+      await dragOnto(`studio-data-dataSource-${tile.dataSource}`, list(tiles))
+      await chooseBinding(page, 'kpi')
+      await expect(panel.getByTestId(`studio-widget-${base}`)).toBeVisible()
+      await writeLabel(panel, `studio-field-${base}/label`, tile.label, en[tile.label])
+      if (tile.show) {
+        // The open tile links to the table of every ticket.
+        await panel
+          .getByTestId(`studio-field-${base}/navigate`)
+          .getByRole('button', { name: 'Add navigate action', exact: true })
+          .click()
+        await pick(panel, `studio-field-${base}/navigate/page`, 'AllTickets')
+        await writeLabel(panel, `studio-field-${base}/navigate/label`, tile.show, en[tile.show])
+      }
+    }
+
+    // The chart is a data source with one group field dropped in the second column. The binding picks the category and
+    // the measure.
+    const chart = '/widgets/0/columns/1/widgets/0'
+    await dragOnto('studio-data-dataSource-OpenTicketsByCategory', list('/widgets/0/columns/1/widgets'))
+    await chooseBinding(page, 'chart')
+    await expect(panel.getByTestId(`studio-widget-${chart}`)).toBeVisible()
+    await writeLabel(
+      panel,
+      `studio-field-${chart}/measures/0/label`,
+      'dashboard.byCategory.open',
+      en['dashboard.byCategory.open'],
+    )
+    await writeLabel(panel, `studio-field-${chart}/title`, 'dashboard.byCategory.title', en['dashboard.byCategory.title'])
+
+    // A table that is dragged into the chart's column by mistake is one move, and one undo puts it back below the columns.
+    await dragTo(page, 'studio-page-design', frame(page, '/widgets/1'), frame(page, chart), 0.75)
+    await expect(page.getByTestId('studio-palette-announcement')).toContainText('Moved table')
+    await expect(frame(page, '/widgets/0/columns/1/widgets/1')).toBeVisible()
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    await expect(frame(page, '/widgets/0/columns/1/widgets/1')).toHaveCount(0)
+    await expect(frame(page, '/widgets/1').getByRole('columnheader', { name: 'Title', exact: true })).toBeVisible()
+    await save(page)
   })
 
   test('the author builds the three access policies in the policy matrix', async ({ page }) => {

@@ -1,8 +1,9 @@
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { startServer } from "../activate";
+import { dragTo } from "../design-drag";
 import { pickOption } from "../select";
 import { e2eApp, serviceDesk } from "../server-settings";
 import { useSession } from "../sessions";
@@ -16,69 +17,6 @@ const allTicketsId = "4ff52d55-8194-45c4-901b-bdc18e269096";
 const ticketDetailId = "e6a7b810-39ed-4751-a0cc-b761ffc812e5";
 const ticketTriageId = "e5650c79-b0cb-449b-a5c2-1bd8d9acd452";
 const ticketResolutionId = "e9311296-cc52-47fd-ac30-01d9051fab1d";
-
-/**
- * Drags `source`, a palette type or a data panel name, with the mouse to the point of `target` that is `fraction` of its height
- * down: a small move starts the drag, then steps reach the point. The designer is scrolled to the top of the window first,
- * and both points are measured after that, because the page scrolls while it loads and a mouse outside the window hits
- * nothing.
- */
-async function dragFrom(
-  page: Page,
-  source: Locator,
-  target: Locator,
-  fraction = 0.5,
-) {
-  await page
-    .getByTestId("studio-page-design")
-    .evaluate((element) => element.scrollIntoView({ block: "start" }));
-  const from = (await source.boundingBox())!;
-  const to = (await target.boundingBox())!;
-  const startX = from.x + from.width / 2;
-  const startY = from.y + from.height / 2;
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + 10, startY + 10);
-  await page.mouse.move(to.x + to.width / 2, to.y + to.height * fraction, {
-    steps: 15,
-  });
-  await page.mouse.up();
-}
-
-/**
- * Drags a form palette field with the mouse to the middle of `target`, as `dragType` does for a page: a small move
- * starts the drag, then steps reach the point, both measured after the designer is scrolled to the top.
- */
-async function dragField(page: Page, name: string, target: Locator) {
-  await dragPointer(
-    page,
-    page.getByTestId(`studio-form-palette-${name}`),
-    target,
-  );
-}
-
-/** Drags `source` with the mouse to the middle of `target`: a small move starts the drag, then steps reach the point. */
-async function dragPointer(page: Page, source: Locator, target: Locator) {
-  await page
-    .getByTestId("studio-form-design")
-    .evaluate((element) => element.scrollIntoView({ block: "start" }));
-  const from = (await source.boundingBox())!;
-  const to = (await target.boundingBox())!;
-  const startX = from.x + from.width / 2;
-  const startY = from.y + from.height / 2;
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + 10, startY + 10);
-  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, {
-    steps: 15,
-  });
-  await page.mouse.up();
-}
-
-/** Drags a palette type or a data panel name, by its test id, to the point of `target` that is `fraction` of its height down. */
-function dragType(page: Page, testId: string, target: Locator, fraction = 0.5) {
-  return dragFrom(page, page.getByTestId(testId), target, fraction);
-}
 
 // The main server's Studio edits the purchase request copy only. This server's Studio folder is a copy of the service
 // desk sample, whose Dashboard page has KPIs, a chart and a table.
@@ -176,14 +114,25 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       '[data-testid="studio-canvas-widget"][data-path="/widgets/0"]',
     );
     await expect(detail).toBeVisible();
-    await dragType(page, "studio-palette-section", detail, 0.75);
+    await dragTo(
+      page,
+      "studio-page-design",
+      page.getByTestId("studio-palette-section"),
+      detail,
+      0.75,
+    );
 
     // A section without a widget does not compile, so the canvas draws it as a placeholder with a drop area.
     const list = page.locator(
       '[data-testid="studio-canvas-list"][data-list="/widgets/1/widgets"]',
     );
     await expect(list).toBeVisible();
-    await dragType(page, "studio-palette-table", list);
+    await dragTo(
+      page,
+      "studio-page-design",
+      page.getByTestId("studio-palette-table"),
+      list,
+    );
 
     await expect(page.getByTestId("studio-palette-announcement")).toContainText(
       "Inserted table",
@@ -256,9 +205,10 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       '[data-testid="studio-canvas-widget"][data-path="/widgets/0"]',
     );
     await expect(detail).toBeVisible();
-    await dragType(
+    await dragTo(
       page,
-      "studio-data-dataSource-OpenTicketsByCategory",
+      "studio-page-design",
+      page.getByTestId("studio-data-dataSource-OpenTicketsByCategory"),
       detail,
       0.75,
     );
@@ -306,7 +256,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     const chart = frame("/widgets/0/columns/1/widgets/0");
     await expect(table).toBeVisible();
     await expect(chart).toBeVisible();
-    await dragFrom(page, table, chart, 0.75);
+    await dragTo(page, "studio-page-design", table, chart, 0.75);
 
     await expect(page.getByTestId("studio-palette-announcement")).toContainText(
       "Moved table",
@@ -340,7 +290,13 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       '[data-testid="studio-canvas-widget"][data-path="/widgets/0"]',
     );
     await expect(detail).toBeVisible();
-    await dragType(page, "studio-palette-section", detail, 0.75);
+    await dragTo(
+      page,
+      "studio-page-design",
+      page.getByTestId("studio-palette-section"),
+      detail,
+      0.75,
+    );
     const save = page.getByRole("button", { name: "Save", exact: true });
     await save.click();
     await expect(page.getByTestId("studio-saved")).toBeVisible();
@@ -426,7 +382,12 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       '[data-testid="studio-outline-section"][data-path="/sections/1"]',
     );
     await expect(section).toBeVisible();
-    await dragField(page, "resolution", section.locator("> span").first());
+    await dragTo(
+      page,
+      "studio-form-design",
+      page.getByTestId("studio-form-palette-resolution"),
+      section.locator("> span").first(),
+    );
 
     await expect(
       page.getByTestId("studio-form-palette-announcement"),
@@ -454,8 +415,9 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     const row = (path: string) =>
       page.locator(`[data-testid="studio-outline-field"][data-path="${path}"]`);
     await expect(row("/sections/1/fields/0")).toBeVisible();
-    await dragPointer(
+    await dragTo(
       page,
+      "studio-form-design",
       row("/sections/0/fields/0"),
       row("/sections/1/fields/0"),
     );
@@ -511,7 +473,12 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       '[data-testid="studio-outline-step"][data-path="/steps/1"]',
     );
     await expect(step).toBeVisible();
-    await dragPointer(page, section.locator("> span").first(), step);
+    await dragTo(
+      page,
+      "studio-form-design",
+      section.locator("> span").first(),
+      step,
+    );
 
     await expect(
       page.getByTestId("studio-form-palette-announcement"),
