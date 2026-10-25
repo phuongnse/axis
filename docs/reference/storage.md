@@ -660,7 +660,7 @@ schema of the tenant database.
       action takes effect. If it cannot be written, the callback fails and
       creates no session, or sign-out fails with a `500` and the session stays.
       If a `session.signInRefused` record cannot be written, the server logs a
-      warning and the callback still answers its `500`.
+      warning and the callback still redirects to the shell's sign-in page.
     - `otherTenant` means the callback's `state` came from a sign-in that
       another tenant's client started.
     - They never hold a token, a cookie or the user agent.
