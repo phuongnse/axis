@@ -66,7 +66,7 @@ marks between issues, in NexKit's `request` skill.
    terms of [concepts.md](../../../docs/domain/concepts.md).
 2. Read the labels with `gh label list` and pick every one whose description
    fits.
-3. Create it in the current milestone:
+3. Create it in the milestone that delivers it:
    `gh issue create --title "<behaviour>" --milestone "<milestone>" --label "<a>,<b>" --body-file <file>`.
 4. Mark what it waits for, as NexKit's `request` skill says, before the next
    sweep, or autopilot plans it at once. When the milestone's docs sweep is
@@ -74,9 +74,11 @@ marks between issues, in NexKit's `request` skill.
 
 ## Breaking down a milestone
 
-When the owner asks:
+When the owner asks, give the readiness verdicts of
+[D68](../../../docs/decisions/d68-issues-of-several-milestones-run-at-once.md)
+first, with the decisions, docs and open issues behind each. On *ready*:
 
-- Create the next milestone's issues as in [Writing an issue](#writing-an-issue).
+- Create the milestone's issues as in [Writing an issue](#writing-an-issue).
 - Check that each risky concept the **From** column of
   [concepts.md](../../../docs/domain/concepts.md) lists for the new milestone
   falls under `hard` by its consequence, and that work the platform has not

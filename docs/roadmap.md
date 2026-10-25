@@ -4,9 +4,11 @@
 
 - **Milestones are vertical slices.** Each one ends with a running feature
   covered by automated tests, including at least one end-to-end journey.
-- **Rolling wave.** Only the current milestone is broken into issues. The next
-  milestone is broken down when the current one is nearly done, using what was
-  learned.
+- **Rolling wave.** A milestone is broken into issues only when it is meant to
+  run and passes the readiness check, using what was learned. The issues of
+  several milestones run at once, as
+  [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) describes.
+  How is in [the life of a milestone](delivery.md#the-life-of-a-milestone).
 - **Issue size.** One issue is one behaviour that fits in a single NexKit
   agent session. The sizing rule and how a `too_large` issue is split are in
   [the life of an issue](delivery.md#the-life-of-an-issue).

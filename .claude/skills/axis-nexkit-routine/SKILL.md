@@ -58,9 +58,10 @@ When the latest plan says the change is in paths NexKit may not change:
 
 ## Issues the driver opens
 
-An issue the driver opens for one CI failure goes in the current milestone, so
-autopilot takes it. Mark that milestone's docs sweep *blocked by* it, then
-start a sweep.
+An issue the driver opens for one CI failure is in no milestone, like the
+`bug` issues NexKit opens, as
+[D68](../../../docs/decisions/d68-issues-of-several-milestones-run-at-once.md)
+says. Autopilot takes it all the same.
 
 ## Hand to the owner
 

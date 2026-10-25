@@ -22,7 +22,8 @@ profiles' models, are not copied here. Look them up where they live.
   passes. NexKit mentions the owner when a run needs a person; the owner's
   login is in NexKit's `notify` setting.
 - **The local agent session** works for the owner when the owner asks. It
-  writes issues and their order, breaks milestones down, proposes changes to
+  writes issues and their order, checks whether a milestone is ready and
+  breaks it down, proposes changes to
   the NexKit settings as hand-made pull requests, and publishes the Design
   System artifact in Claude from the repository, as
   [Design changes](#design-changes) describes. Its runbooks are the
@@ -48,10 +49,14 @@ These are the settings Axis chooses in `.nexkit/config.json` and on GitHub,
 with the reasons. What each one does is in NexKit's
 [configuration][nexkit-config].
 
-- **Autopilot is on, on the earliest open milestone.** NexKit's
-  [`autopilot`][nexkit-autopilot] setting is on with the milestone scope, so
-  no person posts `/nexkit plan` or `/nexkit go`, and the next milestone waits
-  until the owner closes the current one.
+- **Autopilot takes every open issue,** as
+  [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) agrees.
+  NexKit's [`autopilot`][nexkit-autopilot] setting is on with its scope set to
+  every open issue, so no person posts `/nexkit plan` or `/nexkit go`.
+  Milestones group the work and do not order it: the issues of several
+  milestones run at once, and only *blocked by* marks make one issue wait for
+  another, in the same milestone or across milestones. A `bug` issue for CI on
+  `main` is in no milestone.
 - **Autopilot answers with the recommended option,** with `answer` set to
   `recommended`, even when the recommendation rests on a **Proposed**
   decision. The owner sees the answers on the issue and can change one with a
@@ -149,7 +154,8 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   criteria that a test or command can check, as
   [D13](decisions/d13-delivery-workflow.md) says.
 - **Docs and concepts.** The issue links to the doc sections it implements, is
-  in the current milestone, and names the concepts it touches in its own text,
+  in the milestone that delivers it, and names the concepts it touches in its
+  own text,
   in the terms of [concepts.md](domain/concepts.md), so triage can choose the
   [profile](#profiles).
 - **Labels.** It gets at least one label, and every repository label whose
@@ -166,17 +172,24 @@ follows NexKit's rules too. Axis adds these rules for writing it.
 
 ## The life of a milestone
 
-1. **Break it down.** When the current milestone is nearly done, the local
-   agent breaks the next one into issues, as the
-   [roadmap](roadmap.md#how-work-is-planned) describes, and checks the
-   [profiles](#profiles) against the new milestone's concepts and the models
-   now available. Profile fixes are hand-made pull requests.
-2. **Deliver the issues.** Each one follows the life of an issue above.
-   Autopilot runs every ready issue of the milestone at once.
-3. **Docs sweep.** Before the owner closes the milestone, one issue in it
+1. **Check it is ready.** When the owner asks whether a milestone can be
+   broken down, the local agent runs the readiness check of
+   [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) and answers
+   with its verdict for that milestone and the other planned ones. A milestone
+   that is not ready first gets the decisions and doc sections it lacks. That
+   work needs no NexKit, so it can go on while other milestones run.
+2. **Break it down.** On a *ready* verdict, the local agent breaks the
+   milestone into issues, as the [roadmap](roadmap.md#how-work-is-planned)
+   describes, and checks the [profiles](#profiles) against the new milestone's
+   concepts and the models now available. Profile fixes are hand-made pull
+   requests.
+3. **Deliver the issues.** Each one follows the life of an issue above.
+   Autopilot runs every ready issue of every milestone at once.
+4. **Docs sweep.** Before the owner closes the milestone, one issue in it
    checks the docs and fixes what the milestone made stale. It is marked
-   *blocked by* every other issue of the milestone, so it runs last. It checks
-   at least:
+   *blocked by* every other issue of the milestone, so it runs last. It
+   leaves what other milestones are still building to their own sweeps. It
+   checks at least:
    - the roadmap status of this milestone and the next one;
    - the **From** column of [concepts.md](domain/concepts.md) for every
      concept listed for this milestone, moved to a later milestone when the
@@ -187,9 +200,9 @@ follows NexKit's rules too. Axis adds these rules for writing it.
      holds;
    - every skill under `.claude/skills/`: its links still resolve and its
      statements still hold.
-4. **Close.** When the last issue of the milestone closes, NexKit mentions
+5. **Close.** When the last issue of the milestone closes, NexKit mentions
    the owner once. The owner closes the milestone on GitHub once the docs
-   sweep is merged.
+   sweep is merged. Nothing waits for the close.
 
 ## Design changes
 
