@@ -193,13 +193,14 @@ and creates no tables. See
 - **One write grant.** The same role also gets `INSERT` on
   `platform.data_protection_keys`, and on no other table. Key rotation happens
   while the server runs, so the server must add keys. It never updates or
-  deletes one. At start the server decrypts every stored key, and a key that
-  does not decrypt stops the start. The error names `Platform:SecretKey`. A
-  replica with another `Platform:SecretKey` fails this way. Changing the key on
-  an installation that holds key rows means deleting the rows by hand, which
-  signs everyone out, until the key rotation of M16 replaces this step
-  _(planned for M16)_, see
-  [installation key](tenant-setting-commands.md#installation-key). The Studio write lock is a PostgreSQL advisory lock. It needs
+  deletes one. `platform rekey` is the one writer that updates these rows. It
+  re-encrypts them with a new installation key, over the schema role, see
+  [installation key](tenant-setting-commands.md#installation-key). At start the
+  server decrypts every stored key, with `Platform:SecretKey` and then with
+  `Platform:PreviousSecretKey` when that is set. A key that decrypts with
+  neither stops the start. The error names the setting or settings it tried. A
+  replica with another `Platform:SecretKey`, and no previous key that matches,
+  fails this way. The Studio write lock is a PostgreSQL advisory lock. It needs
   no grant, see [authoring API](authoring.md#versions).
 - **The writer.** `Axis.Admin` writes the directory over
   `ConnectionStrings:PlatformSchema`, see
@@ -213,7 +214,7 @@ The tables:
 | `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the service audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants`, the sign-in profile (`standard` or `fapi2`), and two encrypted client keys, the current and the previous one, each with its key id. A previous key needs a current key |
 | `platform.tenant_hosts`                             | The tenant id and the host. The host is unique on `lower(host)` across all tenants                                                                                                                                                                                                                                          |
 | `platform.tenant_bindings`                          | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                         |
-| `platform.data_protection_keys`                     | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. Rows are only inserted, never updated or deleted. Every server replica reads them                                                                                                                                                                   |
+| `platform.data_protection_keys`                     | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. The server only inserts rows and never updates or deletes one. `platform rekey` updates the encrypted XML. Every server replica reads them                                                                                                                                                                   |
 | `platform.audit_records`                            | The `id`, `occurred_at`, `command`, the `tenant_id`, which can be empty and has no foreign key, `os_user`, `machine` and `changed` (`text[]`), the names of what changed. Triggers reject every update, delete and truncate with SQLSTATE `23001`. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records) |
 
 The tenant `version` grows on every change to the tenant, its hosts or its
@@ -249,10 +250,12 @@ a tenant only when this value is the one the host was built for, see
 - **Decryption.** A value is decrypted only at the moment of use, as
   `SecretValue` does today. No API, log, problem details or backup manifest
   holds a decrypted value.
-- **No key rotation.** Axis has none. After a leaked key, every stored secret
-  must be set again by hand. Rotating the installation key with
-  `Platform:PreviousSecretKey` and `platform rekey` is _(planned for M16)_,
-  see [installation key](tenant-setting-commands.md#installation-key) and
+- **Key rotation.** The installation key rotates without signing anyone out
+  and without setting a secret again. The hosts accept the old key as
+  `Platform:PreviousSecretKey`, and `platform rekey` re-encrypts every tenant
+  secret and every data protection key with the new key, in one transaction.
+  The format and the associated data do not change. See
+  [installation key](tenant-setting-commands.md#installation-key) and
   [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md).
 
 ## Database roles

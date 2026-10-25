@@ -2,14 +2,15 @@
 
 Detailed reference for `Axis.Admin`, the command-line host
 that a platform operator runs to create tenants, migrate tenant databases,
-activate releases, and back up and restore tenants. It follows
+activate releases, rotate the installation key, and back up and restore tenants. It follows
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md)
 and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`,
-`tenant restore`, `migrate`, `activate`, `publisher` and `version`. The commands that change a tenant
-after it is created and rotate keys are in [tenant setting commands](tenant-setting-commands.md)
-_(planned for M16)_. A tenant can also come from the `Tenants`
+`tenant restore`, `migrate`, `activate`, `platform rekey`, `publisher` and `version`.
+`platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). The commands
+that change a tenant after it is created and rotate passwords are in
+[tenant setting commands](tenant-setting-commands.md) _(planned for M16)_. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
 [startup activation](host-settings.md#startup-activation).
 
@@ -34,6 +35,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create` and `tenant restore` read it, so `migrate` needs no admin role. See [admin settings](host-settings.md#admin-settings). |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
+| `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key). |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
 | `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads it. An unset value is `Production`. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
@@ -49,6 +51,9 @@ message names the setting and never holds its value.
 `ConnectionStrings:PlatformSchema`. They decrypt nothing and create no role or
 database, so they need neither `Platform:SecretKey`, `Admin:ConnectionString`
 nor `AXIS_OIDC_CLIENT_SECRET`.
+
+`platform rekey` reads only `ConnectionStrings:PlatformSchema`, `Platform:SecretKey` and
+`Platform:PreviousSecretKey`. It needs no admin role, no client secret and no `Tenancy:Source`.
 
 `tenant backup` reads only `ConnectionStrings:PlatformSchema`,
 `Platform:SecretKey` and `PATH`. It creates no role or database, so it needs
@@ -865,6 +870,14 @@ installation. See [D45](../decisions/d45-tenant-backup-and-restore.md). The oper
 Point-in-time recovery and restoring into another installation are out of scope,
 see [Not built yet](#not-built-yet).
 
+## Platform rekey
+
+`platform rekey` re-encrypts every tenant secret and every stored data protection key with
+`Platform:SecretKey`, after the installation key changed. It works under both tenancy sources, takes
+no other argument and writes one platform audit record with no tenant. It prints one line,
+`platform rekey ok: <n> tenant secrets, <m> data protection keys`. The steps, the exit codes and
+the locks are in [installation key](tenant-setting-commands.md#installation-key).
+
 ## Version
 
 `version` prints the Axis version on one line. It takes no
@@ -892,7 +905,5 @@ admin host carries the same version in its OCI label, see
 - A command that moves a host from one tenant to another. Restoring over an
   existing tenant ends with this step. `tenant host move` is
   _(planned for M16)_, see [hosts](tenant-setting-commands.md#hosts).
-- Rotating the installation key. It is _(planned for M16)_, see
-  [installation key](tenant-setting-commands.md#installation-key). The platform audit records of
-  the setting commands are planned with them, see
+- The platform audit records of the setting commands are planned with them, see
   [platform audit records](tenant-setting-commands.md#platform-audit-records).

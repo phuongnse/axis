@@ -21,6 +21,7 @@ public sealed class AdminCommandTableTests
                 ["tenant resume"] = AuditMark.OnePerTenant,
                 ["migrate"] = AuditMark.OnePerTenant,
                 ["activate"] = AuditMark.OnePerTenant,
+                ["platform rekey"] = AuditMark.OnePerRun,
                 ["tenant list"] = AuditMark.None,
                 ["version"] = AuditMark.None,
                 ["publisher"] = AuditMark.None,

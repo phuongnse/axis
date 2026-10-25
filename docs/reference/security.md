@@ -139,7 +139,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - The cookie is protected with a key ring that every server replica shares.
     The keys are in `platform.data_protection_keys`, encrypted with
     `Platform:SecretKey`, so a session survives a restart and works on every
-    replica. The server fixes the data protection application name to `Axis`,
+    replica. During a key rotation a key that `Platform:PreviousSecretKey`
+    encrypted still decrypts, and `platform rekey` then re-encrypts it, so
+    nobody is signed out. The server fixes the data protection application name to `Axis`,
     so replicas at different paths read the same keys. A key that does not
     decrypt stops the start.
 - **Tenant binding.** A session whose tenant id differs from the tenant
