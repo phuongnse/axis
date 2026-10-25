@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
@@ -546,18 +547,33 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// <summary>
     /// Compiles the application in <paramref name="folder"/> against <paramref name="packages"/> and activates it.
     /// Activation recomputes at most <paramref name="inlineRecomputeLimit"/> rows of an entity inline and leaves
-    /// more to the backfill. Returns the release's id and model.
+    /// more to the backfill. The schedules are written as of <paramref name="activatedAt"/> when it is given.
+    /// Returns the release's id and model.
     /// </summary>
     internal async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(
         string folder,
         IReadOnlyCollection<PackageVersion> packages,
         ActivationBindings? bindings = null,
-        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit)
+        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit,
+        DateTimeOffset? activatedAt = null)
     {
         var (compiled, activated) = await TryActivateAsync(folder, packages, bindings ?? StepAppBindings(_tenantId), inlineRecomputeLimit);
         Assert.Empty(activated.Diagnostics);
-        await using (var connection = await DataSource.OpenConnectionAsync())
+        if (activatedAt is null)
         {
+            await using var connection = await DataSource.OpenConnectionAsync();
+            await TriggerSchedules.ActivateAsync(connection, _tenantId, compiled.Model!, compiled.Release!.Id, CancellationToken.None);
+        }
+        else
+        {
+            // A session setting on a pooled connection could leak into later statements, so the fixed time gets its own connection.
+            var builder = new NpgsqlConnectionStringBuilder(ConnectionString)
+            {
+                Pooling = false,
+                Options = "-c axis.now=" + activatedAt.Value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", CultureInfo.InvariantCulture),
+            };
+            await using var connection = new NpgsqlConnection(builder.ConnectionString);
+            await connection.OpenAsync();
             await TriggerSchedules.ActivateAsync(connection, _tenantId, compiled.Model!, compiled.Release!.Id, CancellationToken.None);
         }
 
