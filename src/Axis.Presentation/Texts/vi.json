@@ -198,6 +198,8 @@
   "shell.studio.design.added": "Đã thêm",
   "shell.studio.design.removed": "Đã xóa",
   "shell.studio.design.removeField": "Xóa trường",
+  "shell.studio.design.removeSection": "Xóa phần",
+  "shell.studio.design.removeStep": "Xóa bước",
   "shell.studio.design.dropFieldHere": "Thả một trường vào đây",
   "shell.studio.design.moveToStep": "Chuyển sang bước",
   "shell.studio.design.name": "Tên",

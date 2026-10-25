@@ -198,6 +198,8 @@
   "shell.studio.design.added": "Added",
   "shell.studio.design.removed": "Removed",
   "shell.studio.design.removeField": "Remove field",
+  "shell.studio.design.removeSection": "Remove section",
+  "shell.studio.design.removeStep": "Remove step",
   "shell.studio.design.dropFieldHere": "Drop a field here",
   "shell.studio.design.moveToStep": "Move to step",
   "shell.studio.design.name": "Name",
