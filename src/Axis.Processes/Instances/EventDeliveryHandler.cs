@@ -29,7 +29,7 @@ namespace Axis.Processes.Instances;
 /// deletes the item. When a trigger failed below the limit it instead makes the item due again
 /// after the shortest backoff among the failed triggers of the pass.
 /// </summary>
-internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, DeliverySettings settings, ILogger<EventDeliveryHandler> logger) : IExternalWorkItemHandler
+internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, DeliverySettings settings, ILogger<EventDeliveryHandler> logger) : IDeliveryWorkItemHandler
 {
     public string Kind => ProcessStarts.EventDeliverWorkItemKind;
 
