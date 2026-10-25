@@ -312,14 +312,14 @@ Paths in validations and computed fields are not built. There a path is
   result types are the scalar field types except `enum`, which comes later
   (see [Resource file shape](resource-files.md#resource-file-shape)). A rule
   name may not reuse a built-in function or aggregate name. A validation, a
-  data source filter, a process condition and a policy filter can call rules,
-  but not inside
+  field default, a data source filter, a process condition and a policy filter
+  can call rules, but not inside
   an aggregate's item expression. A filter's SQL inlines the rule's body, see
   [SQL subset](#sql-subset). Calls from computed fields come later.
 - **Qualified rule call.** A rule of a [module](modules-and-templates.md#modules) the
   application declares is called as `departments:IsManager(x)`. It is allowed
-  wherever a rule call is: a rule body, a validation, a data source filter, a
-  process condition and a policy filter. The module id must match exactly. The
+  wherever a rule call is: a rule body, a validation, a field default, a data
+  source filter, a process condition and a policy filter. The module id must match exactly. The
   rule name ignores letter case. A bare name in an application expression never
   reaches a module rule. A module's rule bodies and entity validations call that
   module's rules by bare name. A qualified name never reaches an application rule
@@ -335,6 +335,10 @@ Paths in validations and computed fields are not built. There a path is
   name. Inside an item expression, names are the child row's fields,
   computed ones included, and no rules. It cannot call `now()`, which is
   `AXC0086`.
+- **Scope in a field default.** The expression sees no fields, no
+  collections and no reference path, because no record exists yet. It has the
+  named rules, and may call `now()`. Its type must fit the field, so a `date`
+  field needs `toDate(now())`. Naming a field is an unknown name.
 - **Scope in a validation.** The expression sees the entity's fields,
   computed ones included, its child collections through aggregates, and the
   named rules at its top level.

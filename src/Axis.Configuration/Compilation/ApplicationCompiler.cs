@@ -733,6 +733,7 @@ public static class ApplicationCompiler
         CheckTextKey(entity.Label, entity, "/label", references, diagnostics);
 
         var childOwner = ownersByChildName.GetValueOrDefault(entity.Name);
+        var defaultScope = ExpressionScopes.ForDefault(rules, modules);
         var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < entity.Fields.Count; index++)
         {
@@ -753,6 +754,7 @@ public static class ApplicationCompiler
             AddFieldTarget(entity, field, path, findEntity, references);
             CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
             CheckCreator(field, path, childOwner, Report);
+            CheckDefault(entity, field, path, defaultScope, references, Report);
 
             // A child entity's rows are read and written only through its owner, so they point nowhere else.
             var type = FieldTypes.Parse(field.Type);
@@ -973,6 +975,70 @@ public static class ApplicationCompiler
         if (problem is not null)
         {
             report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/creator");
+        }
+    }
+
+    /// <summary>
+    /// Checks a field's <c>default</c>: it applies only to text, integer, decimal, boolean, date,
+    /// date-time and enum fields, and not together with an <c>expression</c>, a <c>sequence</c> or a
+    /// <c>creator</c>. Only the first problem is reported, and then the expression is not checked.
+    /// Otherwise the expression parses and type-checks to the field's type with no record in scope,
+    /// so it may use literals, the named rules and <c>now()</c>. An expression problem is reported
+    /// at the expression with its own code.
+    /// </summary>
+    private static void CheckDefault(
+        EntityResource entity,
+        FieldDefinition field,
+        string path,
+        ExpressionScope scope,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        if (field.Default is not { } defaultExpression)
+        {
+            return;
+        }
+
+        var type = FieldTypes.Parse(field.Type);
+        var problem = type is FieldType.Reference or FieldType.ChildCollection
+                ? $"'default' applies only to text, integer, decimal, boolean, date, date-time and enum fields, not to {field.Type} fields."
+            : field.Expression is not null ? "A field with a 'default' cannot have an 'expression': it is either computed or has a default."
+            : field.Sequence is not null ? "A field with a 'default' cannot have a 'sequence': the server fills it from the sequence."
+            : field.Creator == true ? "A field with a 'default' cannot be a 'creator' field: the server sets it to the user who created the record."
+            : null;
+        if (problem is not null)
+        {
+            report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/default");
+            return;
+        }
+
+        // CheckField already reports an enum without values.
+        if (type == FieldType.Enum && field.Values is null)
+        {
+            return;
+        }
+
+        var parsed = ExpressionParser.Parse(defaultExpression);
+        ExpressionDiagnostic? expressionProblem = parsed.Succeeded ? null : parsed.Diagnostic;
+        ExpressionType? checkedType = null;
+        if (parsed.Succeeded)
+        {
+            var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!);
+            // Module rule calls add no edges, as for module rules.
+            if (check.Succeeded && !IsModuleResource(entity))
+            {
+                references.AddRuleCalls(entity, $"{path}/default", check);
+            }
+
+            expressionProblem = check.Diagnostic;
+            checkedType = check.Type;
+        }
+
+        references.RecordExpression(entity, $"{path}/default", checkedType, expressionProblem);
+
+        if (expressionProblem is not null)
+        {
+            report(expressionProblem.Code, expressionProblem.Message, $"{path}/default");
         }
     }
 
@@ -1599,7 +1665,8 @@ public static class ApplicationCompiler
         // The child models are not built yet, so both scopes come from the definitions.
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
         var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: FindEntity);
-        var fields = entity.Fields.Select(field => BuildField(field, inputScope, entitiesByName, sequencesByName)).ToList();
+        var defaultScope = ExpressionScopes.ForDefault(rules, modules);
+        var fields = entity.Fields.Select(field => BuildField(field, inputScope, defaultScope, entitiesByName, sequencesByName)).ToList();
         var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: FindEntity, modules: modules);
         return new EntityModel
         {
@@ -1619,6 +1686,7 @@ public static class ApplicationCompiler
     private static FieldModel BuildField(
         FieldDefinition field,
         ExpressionScope inputScope,
+        ExpressionScope defaultScope,
         Dictionary<string, EntityResource> entitiesByName,
         Dictionary<string, SequenceResource> sequencesByName)
     {
@@ -1643,6 +1711,9 @@ public static class ApplicationCompiler
                 : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),
             Sequence = sequence is null ? null : new SequenceModel(sequence.Id, sequence.Name, sequence.Format),
             Creator = field.Creator == true,
+            Default = field.Default is null
+                ? null
+                : ExpressionModel.Compile(field.Default, defaultScope, ExpressionScopes.TypeOf(field)!),
             Sensitive = field.Sensitive == true,
         };
     }
