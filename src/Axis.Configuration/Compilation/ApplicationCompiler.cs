@@ -1487,6 +1487,7 @@ public static class ApplicationCompiler
             }
 
             var fieldsByName = new Dictionary<string, FieldDefinition?>(StringComparer.Ordinal);
+            var hopsByName = new Dictionary<string, IReadOnlyList<FieldDefinition>>(StringComparer.Ordinal);
             for (var index = 0; index < dataSource.Fields.Count; index++)
             {
                 var projected = dataSource.Fields[index];
@@ -1500,6 +1501,11 @@ public static class ApplicationCompiler
                 // A path that does not resolve, or ends at a child collection, has no column. It is
                 // stored as an invalid path for the sort check.
                 var field = pathProblem is null && hops.Count > 0 ? hops[^1] : null;
+                if (field is not null)
+                {
+                    hopsByName.TryAdd(projected.Name, hops);
+                }
+
                 if (!fieldsByName.TryAdd(projected.Name, field))
                 {
                     Report(
@@ -1548,6 +1554,10 @@ public static class ApplicationCompiler
                     if (CheckMeasure(measure, fieldsByName) is ({ } message, { } problemPath))
                     {
                         Report(DiagnosticCodes.InvalidDataSourceMeasure, message, path + problemPath);
+                    }
+                    else if (CheckMeasureCurrency(measure, aggregate.GroupBy, hopsByName, entity, findEntity) is { } currencyMessage)
+                    {
+                        Report(DiagnosticCodes.UngroupedMoneyCurrency, currencyMessage, $"{path}/field");
                     }
                 }
             }
@@ -1656,7 +1666,8 @@ public static class ApplicationCompiler
     /// The problem of a measure and its path below the measure, or null when it is valid.
     /// <c>count</c> takes no field. <c>sum</c>, <c>min</c> and <c>max</c> need a projected field:
     /// <c>sum</c> of an integer or a decimal, <c>min</c> and <c>max</c> of an integer, a decimal, a
-    /// date or a date-time. A projected field with an invalid path is not reported again.
+    /// date or a date-time, and <c>sum</c>, <c>min</c> and <c>max</c> also of a money field. A
+    /// projected field with an invalid path is not reported again.
     /// </summary>
     private static (string Message, string Path)? CheckMeasure(
         DataSourceMeasureDefinition measure, Dictionary<string, FieldDefinition?> fieldsByName)
@@ -1684,14 +1695,81 @@ public static class ApplicationCompiler
 
         var type = FieldTypes.Parse(field.Type);
         var accepted = function == AggregateFunction.Sum
-            ? type is FieldType.Integer or FieldType.Decimal
-            : type is FieldType.Integer or FieldType.Decimal or FieldType.Date or FieldType.DateTime;
+            ? type == FieldType.Integer || FieldTypes.HoldsDecimal(type)
+            : type == FieldType.Integer || FieldTypes.HoldsDecimal(type) || type is FieldType.Date or FieldType.DateTime;
         return accepted
             ? null
             : (
                 $"The measure function '{measure.Function}' cannot take the {field.Type} field '{name}'. "
-                    + "'sum' takes an integer or a decimal. 'min' and 'max' take an integer, a decimal, a date or a date-time.",
+                    + "'sum' takes an integer, a decimal or a money field. 'min' and 'max' take an integer, a decimal, a money field, a date or a date-time.",
                 "/field");
+    }
+
+    /// <summary>
+    /// The functions that add or compare amounts, so a money field with a <c>currencyField</c> must
+    /// be grouped by that currency.
+    /// </summary>
+    private static readonly HashSet<AggregateFunction> _currencyMixingFunctions =
+        [AggregateFunction.Sum, AggregateFunction.Min, AggregateFunction.Max];
+
+    /// <summary>
+    /// The message of a <c>sum</c>, <c>min</c> or <c>max</c> over a money field with a
+    /// <c>currencyField</c> when no group field reaches that currency field on the same record,
+    /// through the same reference fields. Null when the measure needs no currency group, or when the
+    /// currency field is itself invalid, which <see cref="CheckMoney"/> already reports.
+    /// </summary>
+    private static string? CheckMeasureCurrency(
+        DataSourceMeasureDefinition measure,
+        IReadOnlyList<string> groupBy,
+        Dictionary<string, IReadOnlyList<FieldDefinition>> hopsByName,
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity)
+    {
+        if (!_currencyMixingFunctions.Contains(ParseAggregateFunction(measure.Function))
+            || measure.Field is not { } name
+            || !hopsByName.TryGetValue(name, out var hops)
+            || FieldTypes.Parse(hops[^1].Type) != FieldType.Money
+            || hops[^1].CurrencyField is not { } currencyFieldName)
+        {
+            return null;
+        }
+
+        var owner = hops.Count == 1 ? entity : hops[^2].Target is { } target ? findEntity(target) : null;
+        if (owner is null
+            || FindField(owner, currencyFieldName) is not { } currencyField
+            || FieldTypes.Parse(currencyField.Type) is not (FieldType.Text or FieldType.Enum))
+        {
+            return null;
+        }
+
+        if (groupBy.Any(group => hopsByName.TryGetValue(group, out var groupHops)
+            && ReachesCurrency(groupHops, hops, currencyField)))
+        {
+            return null;
+        }
+
+        var prefix = string.Concat(hops.Take(hops.Count - 1).Select(hop => hop.Name + "."));
+        return $"The measure '{measure.Name}' adds or compares the money field '{name}', whose currency comes from '{currencyFieldName}'. "
+            + $"Group by a projected field with the path '{prefix}{currencyFieldName}' so that each total has one currency.";
+    }
+
+    private static bool ReachesCurrency(
+        IReadOnlyList<FieldDefinition> group, IReadOnlyList<FieldDefinition> money, FieldDefinition currencyField)
+    {
+        if (group.Count != money.Count || !string.Equals(group[^1].Name, currencyField.Name, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        for (var index = 0; index < money.Count - 1; index++)
+        {
+            if (!ReferenceEquals(group[index], money[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static AggregateFunction ParseAggregateFunction(string function) =>

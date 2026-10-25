@@ -21,6 +21,7 @@
     { "dataSource": "ItemsNamed", "actions": ["read"] },
     { "dataSource": "ItemsOverflow", "actions": ["read"] },
     { "dataSource": "OverdueTickets", "actions": ["read"] },
-    { "dataSource": "ItemNames", "actions": ["read"] }
+    { "dataSource": "ItemNames", "actions": ["read"] },
+    { "dataSource": "ExpenseTotalsByCurrency", "actions": ["read"] }
   ]
 }

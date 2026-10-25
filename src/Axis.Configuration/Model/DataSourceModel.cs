@@ -111,13 +111,13 @@ public enum AggregateFunction
     /// <summary>The number of rows in the group. It takes no field.</summary>
     Count,
 
-    /// <summary>The sum of an integer or decimal field, written like a decimal.</summary>
+    /// <summary>The sum of an integer, decimal or money field. A sum of integers or decimals is written like a decimal.</summary>
     Sum,
 
-    /// <summary>The smallest value of an integer, decimal, date or date-time field.</summary>
+    /// <summary>The smallest value of an integer, decimal, money, date or date-time field.</summary>
     Min,
 
-    /// <summary>The largest value of an integer, decimal, date or date-time field.</summary>
+    /// <summary>The largest value of an integer, decimal, money, date or date-time field.</summary>
     Max,
 }
 
