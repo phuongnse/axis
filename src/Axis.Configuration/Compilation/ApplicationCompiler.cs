@@ -812,19 +812,14 @@ public static class ApplicationCompiler
             CheckMoney(entity, field, path, Report);
             CheckDefault(entity, field, path, defaultScope, references, Report);
 
-            // A child entity's rows are read and written only through its owner, so they point nowhere else.
+            // A child entity's rows are read and written only through its owner, so it has no collections of its own.
             var type = FieldTypes.Parse(field.Type);
-            if (childOwner is not null && type is FieldType.Reference or FieldType.References or FieldType.ChildCollection)
+            if (childOwner is not null && type is FieldType.References or FieldType.ChildCollection)
             {
-                var kind = type switch
-                {
-                    FieldType.Reference => "a reference",
-                    FieldType.References => "a references field",
-                    _ => "a child collection",
-                };
+                var kind = type == FieldType.References ? "a references field" : "a child collection";
                 Report(
-                    DiagnosticCodes.ChildEntityWithReference,
-                    $"The field '{field.Name}' is {kind}, but '{entity.Name}' is a child entity owned by '{childOwner}'. A child entity has no reference, references or child collection fields.",
+                    DiagnosticCodes.ChildEntityWithChildCollection,
+                    $"The field '{field.Name}' is {kind}, but '{entity.Name}' is a child entity owned by '{childOwner}'. A child entity has no child collection or references fields.",
                     $"{path}/type");
             }
         }

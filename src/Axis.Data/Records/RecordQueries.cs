@@ -238,7 +238,9 @@ public static class RecordQueries
     /// <summary>
     /// Adds the rows of each child collection of <paramref name="entity"/> to
     /// <paramref name="record"/>, in position order, with one query per collection. The values
-    /// keep the entity's field declaration order. A references field has no value.
+    /// keep the entity's field declaration order. A collection whose child entity has reference
+    /// fields also adds the row labels, read in the same query, under the collection's name.
+    /// A references field has no value.
     /// </summary>
     internal static async Task<Record> WithRowsAsync(
         NpgsqlConnection connection,
@@ -248,6 +250,7 @@ public static class RecordQueries
         CancellationToken cancellationToken)
     {
         var values = new Dictionary<string, JsonNode?>(entity.Fields.Count, StringComparer.Ordinal);
+        var labels = new Dictionary<string, JsonNode>(record.Labels, StringComparer.Ordinal);
         foreach (var field in entity.Fields)
         {
             // A references field has no column yet, so a record carries no value for it.
@@ -256,15 +259,29 @@ public static class RecordQueries
                 continue;
             }
 
-            values[field.Name] = field.Type == FieldType.ChildCollection
-                ? await ReadRowsAsync(connection, application, field, record.Id, cancellationToken)
-                : record.Values[field.Name];
+            if (field.Type == FieldType.ChildCollection)
+            {
+                var (rows, rowLabels) = await ReadRowsAsync(connection, application, field, record.Id, cancellationToken);
+                values[field.Name] = rows;
+                if (rowLabels is not null)
+                {
+                    labels[field.Name] = rowLabels;
+                }
+            }
+            else
+            {
+                values[field.Name] = record.Values[field.Name];
+            }
         }
 
-        return record with { Values = values };
+        return record with { Values = values, Labels = labels };
     }
 
-    private static async Task<JsonArray> ReadRowsAsync(
+    /// <summary>
+    /// The rows of a child collection, and one object of labels per row when the child entity has
+    /// reference fields, otherwise <see langword="null"/>. A reference without a label is left out of its row's object.
+    /// </summary>
+    private static async Task<(JsonArray Rows, JsonArray? Labels)> ReadRowsAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         FieldModel collection,
@@ -274,14 +291,19 @@ public static class RecordQueries
         var child = application.FindEntity(collection.Target!.Id)
             ?? throw new InvalidOperationException("The application has no entity for the child collection.");
         var columns = Columns(child);
+        var references = References(child).ToList();
+        var alias = EntityNaming.Quote(RowAlias);
         var selected = columns.Select(field =>
-            EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : ""));
+            alias + "." + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : ""))
+            .Concat(references.Select((field, index) =>
+                $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"));
         await using var command = new NpgsqlCommand(
-            $"SELECT {string.Join(", ", selected)} FROM {Table(child)} WHERE {EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner ORDER BY {EntityNaming.Quote(EntityNaming.PositionColumn)}",
+            $"SELECT {string.Join(", ", selected)} FROM {Table(child)} AS {alias}{LabelJoins(child, RowAlias)} WHERE {alias}.{EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner ORDER BY {alias}.{EntityNaming.Quote(EntityNaming.PositionColumn)}",
             connection);
         command.Parameters.AddWithValue("owner", ownerId);
 
         var rows = new JsonArray();
+        var labels = references.Count > 0 ? new JsonArray() : null;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
@@ -292,9 +314,24 @@ public static class RecordQueries
             }
 
             rows.Add(row);
+
+            if (labels is not null)
+            {
+                var rowLabels = new JsonObject();
+                for (var index = 0; index < references.Count; index++)
+                {
+                    var ordinal = columns.Count + index;
+                    if (!reader.IsDBNull(ordinal))
+                    {
+                        rowLabels[references[index].Name] = reader.GetString(ordinal);
+                    }
+                }
+
+                labels.Add(rowLabels);
+            }
         }
 
-        return rows;
+        return (rows, labels);
     }
 
     internal static string Table(EntityModel entity) => EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id));
@@ -353,13 +390,13 @@ public static class RecordQueries
         }
 
         // A null reference, or a target whose display column is NULL, has no label.
-        var labels = new Dictionary<string, string>(StringComparer.Ordinal);
+        var labels = new Dictionary<string, JsonNode>(StringComparer.Ordinal);
         var labelOrdinal = columns.Count + 2;
         foreach (var field in References(entity))
         {
             if (!reader.IsDBNull(labelOrdinal))
             {
-                labels[field.Name] = reader.GetString(labelOrdinal);
+                labels[field.Name] = JsonValue.Create(reader.GetString(labelOrdinal))!;
             }
 
             labelOrdinal++;

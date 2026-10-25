@@ -117,6 +117,27 @@ public sealed class EndpointCompilerTests
     }
 
     [Fact]
+    public void An_endpoint_that_names_a_process_without_a_subject_is_reported_at_its_process()
+    {
+        using var folder = Folder()
+            .With("processes/nightly-job.json", """
+                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "NightlyJob", "formatVersion": 1,
+                  "parameters": [{ "name": "days", "type": "integer" }],
+                  "start": "done", "steps": [{ "name": "done", "type": "end" }] }
+                """)
+            .With("endpoints/import-note.json", Endpoint(
+                "ImportNote", "Note", "NightlyJob", """[{ "name": "title", "type": "text", "required": true }]""", """{ "title": "title" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.EndpointProcessOverOtherEntity, "endpoints/import-note.json", "/process"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("has no subject", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Entity_process_output_and_wait_mistakes_are_each_a_diagnostic_at_their_path_in_one_pass()
     {
         using var folder = Folder()

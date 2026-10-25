@@ -15,6 +15,7 @@ namespace Axis.Processes.Work;
 /// <param name="Lease">The length the item was claimed for.</param>
 /// <param name="EntityId">The entity a <c>computed.backfill</c> item recomputes, or <see langword="null"/> for other work.</param>
 /// <param name="QueuedBy">The span that queued the item, which the item's run links to, or <see langword="null"/> when the item stores none.</param>
+/// <param name="TaskId">The task a <c>task.deadline</c> item expires, or <see langword="null"/> for other work.</param>
 public sealed record ClaimedWorkItem(
     Guid Id,
     string TenantId,
@@ -31,4 +32,5 @@ public sealed record ClaimedWorkItem(
     Guid? Cursor,
     TimeSpan Lease,
     Guid? EntityId,
-    ActivityContext? QueuedBy = null);
+    ActivityContext? QueuedBy = null,
+    Guid? TaskId = null);

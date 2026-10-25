@@ -29,6 +29,9 @@ public static class ProcessStarts
     /// <summary>The kind of the work item that starts the process of a schedule trigger for each record of its data source, for one occurrence.</summary>
     public const string TriggerFanOutWorkItemKind = "trigger.fanOut";
 
+    /// <summary>The kind of the work item that expires one open task at its step's deadline.</summary>
+    public const string TaskDeadlineWorkItemKind = "task.deadline";
+
     /// <summary>The state of an instance that has work ready or claimed.</summary>
     public const string Running = "running";
 

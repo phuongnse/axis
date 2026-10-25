@@ -72,7 +72,7 @@ public sealed class ReferencesFieldCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.ChildEntityWithReference, "entities/line.json", "/fields/0/type"),
+            (DiagnosticCodes.ChildEntityWithChildCollection, "entities/line.json", "/fields/0/type"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Contains("a references field", diagnostic.Message, StringComparison.Ordinal);
     }

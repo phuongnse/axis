@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "entity": "Ticket",
   "startCondition": {
-    "expression": "status in ('draft', 'reopened')",
+    "expression": "status == 'draft'",
     "message": {
       "textKey": "ticket.cannotSubmit"
     }
@@ -113,7 +113,7 @@
           "label": {
             "textKey": "task.reopen"
           },
-          "next": "markReopened"
+          "next": "markAssigned"
         }
       ]
     },
@@ -132,15 +132,6 @@
       "operation": "updateRecord",
       "set": {
         "status": "'rejected'"
-      },
-      "next": "done"
-    },
-    {
-      "name": "markReopened",
-      "type": "operation",
-      "operation": "updateRecord",
-      "set": {
-        "status": "'reopened'"
       },
       "next": "done"
     },

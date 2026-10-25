@@ -487,7 +487,9 @@ once, at the first. The worker runs schedule triggers, see
 and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
 `mode` on a schedule trigger and the properties of other types are `AXC0004`.
 
-- The `process` exists.
+- The `process` exists and has a subject. A trigger that names a process
+  without a subject is `AXC0247`, whatever the trigger type, until a schedule
+  trigger without a data source and a delete trigger are built.
 - The subject entity matches. The event's entity, the `entity`, or the data
   source's root entity is the process's subject entity.
 - The `event` exists.
@@ -627,7 +629,8 @@ The compiler reports these as compile errors, all in one pass. The
 
 - The `entity` exists and is not a child entity: `AXC0114` and `AXC0115`.
 - The `process` exists, and its subject entity is `entity`: `AXC0116` and
-  `AXC0117`.
+  `AXC0117`. A process without a subject is `AXC0117` too, because the call
+  starts the process on the record it creates.
 - An input field's type is an entity field type, with only that type's
   properties. A property on the wrong type is `AXC0013`, and a missing
   `target` or `values` is `AXC0014`. The schema refuses `label`, `unique`,

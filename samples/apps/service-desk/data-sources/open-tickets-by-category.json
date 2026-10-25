@@ -10,7 +10,7 @@
       "path": "category"
     }
   ],
-  "filter": "status in ('submitted', 'assigned', 'resolved', 'reopened')",
+  "filter": "status in ('submitted', 'assigned', 'resolved')",
   "aggregate": {
     "groupBy": ["category"],
     "measures": [
