@@ -544,7 +544,7 @@ The `{id}` names the saved page.
   lookup, so the answer says nothing about which applications or resources
   exist. An unknown application, an unknown resource or a resource that is
   neither a page nor a form gets `404`.
-- **Speed.** It answers within 500 ms on a typical application.
+- **Speed.** It answers within 500 ms on a typical application. `StudioPageMetadataPerformanceTests` fails when the best of three attempts of any timed post takes 500 ms or more.
 
 ## Writes
 
