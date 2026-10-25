@@ -109,7 +109,7 @@ public static class ProcessStarts
     /// <summary>
     /// Inserts <paramref name="instance"/> as <c>running</c> at revision 1. Returns
     /// <see langword="false"/> when the process already has a running or waiting instance for the
-    /// subject record. The failed insert aborts the transaction, so the caller must roll back,
+    /// subject record, or, for a process without a subject, already has one. The failed insert aborts the transaction, so the caller must roll back,
     /// either the transaction or to a savepoint taken before the insert.
     /// </summary>
     public static async Task<bool> TryInsertInstanceAsync(
@@ -122,19 +122,20 @@ public static class ProcessStarts
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.process_instances
-                (id, application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step)
-            VALUES (@id, @application, @process, @entity, @subject, @release, @state, 1, @step)
+                (id, application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, parameters)
+            VALUES (@id, @application, @process, @entity, @subject, @release, @state, 1, @step, @parameters)
             """,
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("id", instance.Id);
         command.Parameters.AddWithValue("application", instance.ApplicationId);
         command.Parameters.AddWithValue("process", instance.ProcessId);
-        command.Parameters.AddWithValue("entity", instance.SubjectEntityId);
-        command.Parameters.AddWithValue("subject", instance.SubjectId);
+        command.Parameters.Add(new NpgsqlParameter("entity", NpgsqlDbType.Uuid) { Value = (object?)instance.SubjectEntityId ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("subject", NpgsqlDbType.Uuid) { Value = (object?)instance.SubjectId ?? DBNull.Value });
         command.Parameters.AddWithValue("release", instance.ReleaseId);
         command.Parameters.AddWithValue("state", Running);
         command.Parameters.AddWithValue("step", instance.Step);
+        command.Parameters.Add(new NpgsqlParameter("parameters", NpgsqlDbType.Jsonb) { Value = (object?)instance.Parameters ?? DBNull.Value });
         try
         {
             await command.ExecuteNonQueryAsync(cancellationToken);
@@ -191,7 +192,8 @@ public static class ProcessStarts
         command.Parameters.AddWithValue("id", id);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
-            ? new ProcessInstanceState(id, reader.GetGuid(0), reader.GetGuid(1), reader.GetGuid(2), reader.GetGuid(3), reader.GetString(4))
+            ? new ProcessInstanceState(id, reader.GetGuid(0), reader.GetGuid(1),
+                reader.IsDBNull(2) ? null : reader.GetGuid(2), reader.IsDBNull(3) ? null : reader.GetGuid(3), reader.GetString(4))
             : null;
     }
 
@@ -202,5 +204,8 @@ public static class ProcessStarts
 /// <summary>A stored start response: the subject record it started for, its status code and its body as JSON text.</summary>
 public sealed record ProcessStartReceipt(Guid SubjectId, int StatusCode, string Body);
 
-/// <summary>An instance's application, process, subject record and state.</summary>
-public sealed record ProcessInstanceState(Guid Id, Guid ApplicationId, Guid ProcessId, Guid SubjectEntityId, Guid SubjectId, string State);
+/// <summary>
+/// An instance's application, process, subject record and state. The subject fields are
+/// <see langword="null"/> for an instance of a process without a subject.
+/// </summary>
+public sealed record ProcessInstanceState(Guid Id, Guid ApplicationId, Guid ProcessId, Guid? SubjectEntityId, Guid? SubjectId, string State);

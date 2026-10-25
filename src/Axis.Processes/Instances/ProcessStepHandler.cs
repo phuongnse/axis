@@ -139,39 +139,65 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
     private async Task RunStepCoreAsync(WorkItemContext context, LoadedInstance instance, JsonObject input, ApplicationModel model, ProcessModel process, CancellationToken cancellationToken)
     {
-        var entity = model.FindEntity(instance.SubjectEntityId)
-            ?? throw Failure($"The release has no entity '{instance.SubjectEntityId}'.", instance, input);
         if (!process.TryGetStep(instance.Step, out var step))
         {
             throw Failure($"The process '{process.Name}' has no step '{instance.Step}'.", instance, input);
         }
 
-        if (step is OperationStepModel or RaiseEventStepModel)
+        // With a subject, the step's expressions read the record. Without one, they read the stored
+        // parameter values, and no record is locked, read or written.
+        EntityModel? entity = null;
+        Record? stored = null;
+        Record? record = null;
+        (Guid ReleaseId, ApplicationModel Model)? active = null;
+        Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate;
+        if (instance.SubjectId is { } subjectId && instance.SubjectEntityId is { } entityId)
         {
-            // These steps can start an instance: an operation through a data change trigger and a raised
-            // event through a sync trigger. The start lock comes before any entity table is read, so a
-            // migrating activation cannot deadlock with the step, and the active release read later is
-            // read under it. The step keeps the release the instance is pinned to.
-            await StartLock.TakeSharedAsync(context.Transaction, instance.ApplicationId, cancellationToken);
-        }
+            var subjectEntity = model.FindEntity(entityId)
+                ?? throw Failure($"The release has no entity '{entityId}'.", instance, input);
+            entity = subjectEntity;
 
-        if (step is OperationStepModel)
+            if (step is OperationStepModel or RaiseEventStepModel)
+            {
+                // These steps can start an instance: an operation through a data change trigger and a raised
+                // event through a sync trigger. The start lock comes before any entity table is read, so a
+                // migrating activation cannot deadlock with the step, and the active release read later is
+                // read under it. The step keeps the release the instance is pinned to.
+                await StartLock.TakeSharedAsync(context.Transaction, instance.ApplicationId, cancellationToken);
+            }
+
+            if (step is OperationStepModel)
+            {
+                // The lock makes the read below see the latest version, and a concurrent write of the
+                // record waits until this step commits or rolls back.
+                await RecordCommands.LockAsync(context.Connection, subjectEntity, subjectId, cancellationToken);
+            }
+
+            stored = await RecordQueries.GetAsync(context.Connection, model, subjectEntity, subjectId, cancellationToken)
+                ?? throw Failure($"No record of '{subjectEntity.Name}' has the id '{subjectId}'.", instance, input);
+            input["subjectVersion"] = stored.Version;
+
+            // The step's expressions read the record with its pending computed fields computed by the active release,
+            // whatever release the instance is pinned to. The write of an updateRecord step starts from the stored record.
+            active = await models.FindActiveAsync(context, instance.ApplicationId, cancellationToken);
+            record = active is { } release
+                ? await PendingComputedReads.ApplyAsync(context.Connection, context.Transaction, release.Model, subjectEntity, stored, cancellationToken, model)
+                : stored;
+            var subject = record;
+            evaluate = expression => RecordExpressions.EvaluateAsync(context.Connection, model, subjectEntity, subject, expression, instance.Now, cancellationToken);
+        }
+        else
         {
-            // The lock makes the read below see the latest version, and a concurrent write of the
-            // record waits until this step commits or rolls back.
-            await RecordCommands.LockAsync(context.Connection, entity, instance.SubjectId, cancellationToken);
+            // The compiler rejects these steps in a process without a subject (AXC0246), so this only
+            // guards against a broken release. It runs before any lock or record read.
+            if (step is OperationStepModel or RaiseEventStepModel or TaskStepModel)
+            {
+                throw Failure($"The step '{step.Name}' needs a subject.", instance, input);
+            }
+
+            var values = ProcessParameters.Values(process, instance.Parameters);
+            evaluate = expression => Task.FromResult(ProcessParameters.Evaluate(expression, values, instance.Now));
         }
-
-        var stored = await RecordQueries.GetAsync(context.Connection, model, entity, instance.SubjectId, cancellationToken)
-            ?? throw Failure($"No record of '{entity.Name}' has the id '{instance.SubjectId}'.", instance, input);
-        input["subjectVersion"] = stored.Version;
-
-        // The step's expressions read the record with its pending computed fields computed by the active release,
-        // whatever release the instance is pinned to. The write of an updateRecord step starts from the stored record.
-        var active = await models.FindActiveAsync(context, instance.ApplicationId, cancellationToken);
-        var record = active is { } release
-            ? await PendingComputedReads.ApplyAsync(context.Connection, context.Transaction, release.Model, entity, stored, cancellationToken, model)
-            : stored;
 
         string state;
         string nextStep;
@@ -186,10 +212,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         var restagesCall = false;
         var restagesPackageCall = false;
         NewEvent? occurrence = null;
+
+        // An updateRecord, raiseEvent or task step ran only with a subject, so its entity and record are set below.
         switch (step)
         {
             case DecisionStepModel decisionStep:
-                (decision, var target) = await DecideAsync(context, model, entity, record, decisionStep, instance, input, cancellationToken);
+                (decision, var target) = await DecideAsync(evaluate, decisionStep, instance, input);
                 if (!process.TryGetStep(target, out var next))
                 {
                     throw Failure($"The process '{process.Name}' has no step '{target}'.", instance, input);
@@ -207,7 +235,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     throw Failure($"The process '{process.Name}' has no step '{operationStep.Next}'.", instance, input);
                 }
 
-                assignments = await EvaluateAsync(context, model, entity, record, operationStep, instance, input, cancellationToken);
+                assignments = await EvaluateAsync(evaluate, entity!, operationStep, instance, input);
                 state = ProcessStarts.Running;
                 nextStep = after.Name;
                 decision = null;
@@ -224,7 +252,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 action = AuditActions.ProcessCompleted;
                 break;
             case TaskStepModel taskStep:
-                var (assigneeKind, assignee) = await AssignAsync(context, model, entity, record, taskStep, instance, input, cancellationToken);
+                var (assigneeKind, assignee) = await AssignAsync(evaluate, taskStep, instance, input);
                 task = new NewTask(
                     Guid.CreateVersion7(),
                     instance.Id,
@@ -232,8 +260,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     instance.ReleaseId,
                     instance.ApplicationId,
                     step.Name,
-                    instance.SubjectEntityId,
-                    instance.SubjectId,
+                    instance.SubjectEntityId!.Value,
+                    instance.SubjectId!.Value,
                     assigneeKind,
                     assignee,
                     taskStep.Form.Id,
@@ -265,16 +293,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     connector.Name,
                     operation.Name,
                     await StageAsync(
-                        context,
-                        model,
-                        entity,
-                        record,
+                        evaluate,
                         callStep,
                         callStep.Input,
                         name => operation.Input.Any(field => field.Required && string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)),
                         instance,
-                        input,
-                        cancellationToken));
+                        input));
                 state = ProcessStarts.Waiting;
                 nextStep = step.Name;
                 decision = null;
@@ -302,8 +326,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     raised.Name,
                     instance.ReleaseId,
                     raised.Entity.Id,
-                    instance.SubjectId,
-                    await PayloadAsync(context, model, entity, record, raiseStep, instance, input, cancellationToken),
+                    instance.SubjectId!.Value,
+                    await PayloadAsync(evaluate, raiseStep, instance, input),
                     instance.Id);
                 state = ProcessStarts.Running;
                 nextStep = following.Name;
@@ -339,16 +363,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     packageStep.Retry,
                     packageStep.Idempotent,
                     await StageAsync(
-                        context,
-                        model,
-                        entity,
-                        record,
+                        evaluate,
                         packageStep,
                         packageStep.Input,
                         name => packageOperation.Input.Any(field => field.Required && string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)),
                         instance,
-                        input,
-                        cancellationToken));
+                        input));
                 state = ProcessStarts.Waiting;
                 nextStep = step.Name;
                 decision = null;
@@ -385,13 +405,13 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         Record? updated = null;
         if (assignments is not null)
         {
-            var result = await RecordCommands.SetAsync(context.Connection, model, entity, instance.ReleaseId, stored, assignments, instance.Now, cancellationToken);
+            var result = await RecordCommands.SetAsync(context.Connection, model, entity!, instance.ReleaseId, stored!, assignments, instance.Now, cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
             }
 
-            await ComputedBackfill.MarkStaleWriteAsync(context.Connection, context.Transaction, context.Item.TenantId, model, entity, instance.ReleaseId, cancellationToken);
+            await ComputedBackfill.MarkStaleWriteAsync(context.Connection, context.Transaction, context.Item.TenantId, model, entity!, instance.ReleaseId, cancellationToken);
             updated = written;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
@@ -471,8 +491,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 activeNow.Model,
                 activeNow.ReleaseId,
                 instance.ReleaseId,
-                entity,
-                stored,
+                entity!,
+                stored!,
                 updated,
                 [],
                 logger,
@@ -553,19 +573,15 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     /// gives null counts as false, and one that fails at run time fails the step.
     /// </summary>
     private static async Task<(string Decision, string Next)> DecideAsync(
-        WorkItemContext context,
-        ApplicationModel model,
-        EntityModel entity,
-        Record record,
+        Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
         DecisionStepModel step,
         LoadedInstance instance,
-        JsonObject input,
-        CancellationToken cancellationToken)
+        JsonObject input)
     {
         for (var index = 0; index < step.Branches.Count; index++)
         {
             var branch = step.Branches[index];
-            var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, branch.When, instance.Now, cancellationToken);
+            var result = await evaluate(branch.When);
             if (result.Error is { } error)
             {
                 throw ExpressionFailure($"when of branch {index}", step, error, instance, input);
@@ -585,14 +601,11 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     /// declaration order. A value that fails at run time fails the step.
     /// </summary>
     private static async Task<List<KeyValuePair<FieldModel, object?>>> EvaluateAsync(
-        WorkItemContext context,
-        ApplicationModel model,
+        Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
         EntityModel entity,
-        Record record,
         OperationStepModel step,
         LoadedInstance instance,
-        JsonObject input,
-        CancellationToken cancellationToken)
+        JsonObject input)
     {
         var values = new List<KeyValuePair<FieldModel, object?>>();
         foreach (var assignment in step.Set)
@@ -602,7 +615,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 throw Failure($"The entity '{entity.Name}' has no field '{assignment.Field}'.", instance, input);
             }
 
-            var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, assignment.Value, instance.Now, cancellationToken);
+            var result = await evaluate(assignment.Value);
             if (result.Error is { } error)
             {
                 throw ExpressionFailure($"value of the field '{field.Name}'", step, error, instance, input);
@@ -619,21 +632,17 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     /// name. A <c>user</c> expression that fails at run time, or gives no non-blank text, fails the step.
     /// </summary>
     private static async Task<(string Kind, string Assignee)> AssignAsync(
-        WorkItemContext context,
-        ApplicationModel model,
-        EntityModel entity,
-        Record record,
+        Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
         TaskStepModel step,
         LoadedInstance instance,
-        JsonObject input,
-        CancellationToken cancellationToken)
+        JsonObject input)
     {
         if (step.Assignee.User is not { } user)
         {
             return (ProcessTasks.RoleAssignee, step.Assignee.Role!);
         }
 
-        var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, user, instance.Now, cancellationToken);
+        var result = await evaluate(user);
         if (result.Error is { } error)
         {
             throw ExpressionFailure("assignee of the task step", step, error, instance, input);
@@ -669,21 +678,17 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     /// gives null, fails the step.
     /// </summary>
     private static async Task<JsonObject> StageAsync(
-        WorkItemContext context,
-        ApplicationModel model,
-        EntityModel entity,
-        Record record,
+        Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
         ProcessStepModel step,
         IReadOnlyList<ConnectorInputModel> inputs,
         Func<string, bool> isRequired,
         LoadedInstance instance,
-        JsonObject input,
-        CancellationToken cancellationToken)
+        JsonObject input)
     {
         var body = new JsonObject();
         foreach (var mapping in inputs)
         {
-            var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, mapping.Value, instance.Now, cancellationToken);
+            var result = await evaluate(mapping.Value);
             if (result.Error is { } error)
             {
                 throw ExpressionFailure($"input '{mapping.Input}'", step, error, instance, input);
@@ -707,19 +712,15 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     /// the step.
     /// </summary>
     private static async Task<JsonObject> PayloadAsync(
-        WorkItemContext context,
-        ApplicationModel model,
-        EntityModel entity,
-        Record record,
+        Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
         RaiseEventStepModel step,
         LoadedInstance instance,
-        JsonObject input,
-        CancellationToken cancellationToken)
+        JsonObject input)
     {
         var payload = new JsonObject();
         foreach (var field in step.Fields)
         {
-            var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, field.Value, instance.Now, cancellationToken);
+            var result = await evaluate(field.Value);
             if (result.Error is { } error)
             {
                 throw ExpressionFailure($"payload field '{field.Field}'", step, error, instance, input);
