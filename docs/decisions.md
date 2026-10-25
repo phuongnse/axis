@@ -79,3 +79,10 @@ files agree, title and status included.
 | [D66](decisions/d66-a-visual-form-designer-for-form-resources.md) | A visual form designer for form resources | **Agreed** |
 | [D67](decisions/d67-live-widget-previews-in-the-design-system.md) | Live widget previews in the design system | **Agreed** |
 | [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) | Issues of several milestones run at once | **Agreed** |
+| [D69](decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md) | Timer, wait for event and sub-process steps, loops and create record | **Agreed** |
+| [D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md) | Processes without a subject, scheduled jobs and delete triggers | **Agreed** |
+| [D71](decisions/d71-task-deadlines-escalation-claim-and-reassign.md) | Task deadlines, escalation, claim and reassign | **Agreed** |
+| [D72](decisions/d72-a-delivery-limit-and-dead-letters.md) | A delivery limit and dead letters | **Agreed** |
+| [D73](decisions/d73-in-app-and-email-notifications.md) | In-app and email notifications | **Agreed** |
+| [D74](decisions/d74-a-visual-process-designer.md) | A visual process designer | **Agreed** |
+| [D75](decisions/d75-the-application-time-zone.md) | The application time zone | **Agreed** |

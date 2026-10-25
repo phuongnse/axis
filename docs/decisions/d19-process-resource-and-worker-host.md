@@ -11,6 +11,9 @@ Processes and the worker host arrive in M3. See
 - **Step kinds in M3:** `decision`, `task` (a human task), `operation` and
   `end`. Each step has a name, and a transition names the next step. Wait for
   event, timer and sub-process come later.
+  - [D69](d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
+    replaces this line: M14 adds timer, wait for event and sub-process steps,
+    and loops.
 - **Decision:** a decision has ordered branches, each a boolean expression and
   a next step, plus an `otherwise` step. The first branch that is true wins.
 - **Process expressions:** they see the subject record's fields, paths

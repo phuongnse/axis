@@ -28,6 +28,16 @@ when an event is raised, when a record is created or updated, or when a
 schedule is due. Every start happens at most once for the
 same cause, even after a worker crash.
 
+_(Planned for M14)_ Event delivery also wakes the instances that wait for an
+event ([D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)).
+A schedule trigger may start a process without a subject, and a delete starts
+one through a delete trigger
+([D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md)).
+Deliveries that keep failing stop after a limit and become dead letters
+([D72](../decisions/d72-a-delivery-limit-and-dead-letters.md)). See
+[Scheduled jobs](#scheduled-jobs), [Delete triggers](#delete-triggers) and
+[Dead letters](#dead-letters).
+
 ## Raise event step
 
 `NoteClose` in the E2E fixture can announce that a note was closed. `close`
@@ -222,7 +232,18 @@ instance they started has already ended.
 
 A transaction that fails for another reason leaves the item claimed until its
 lease expires, and the delivery is then tried again. There is no limit on
-these retries yet.
+these retries yet. _(Planned for M14)_ A limit, a backoff and dead letters
+replace this, see [Dead letters](#dead-letters).
+
+**Waking waiting instances** _(planned for M14)_. After the triggers, the
+item delivers the occurrence to each instance that waits in a `waitEvent` step
+for this event on the occurrence's record. Each instance gets its own
+transaction, which checks the item's claim, then matches and resumes the
+instance as [Wait for event step](process-flow.md#wait-for-event-step)
+describes. The unique key of `axis.process_event_matches` makes a repeat after
+a crash do nothing. Every occurrence already gets an `event.deliver` item, so
+an occurrence with no trigger still wakes its waiting instances. Step 1's early
+delete then happens only when there is no trigger and no waiting instance.
 
 ## Schedules
 
@@ -305,3 +326,142 @@ trigger and data source of the release it started under, and starts the
 process in the release that is active when each batch runs. A release that
 removes the trigger deletes its state and its `trigger.schedule` item, so no
 further occurrence runs, but a running fan-out finishes.
+
+## Scheduled jobs
+
+_(Planned for M14.)_ A schedule trigger may leave out `dataSource`. It then
+starts a [process without a subject](process-flow.md#processes-without-a-subject)
+once per occurrence, see
+[D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md):
+
+```json
+{
+  "id": "5f0e2d1c-3b4a-4c5d-8e6f-7a8b9c0d1e21",
+  "kind": "trigger",
+  "name": "EveryMorning",
+  "formatVersion": 1,
+  "type": "schedule",
+  "schedule": "0 8 * * 1-5",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "process": "DailyOverdueReminder",
+  "parameters": { "daysOverdue": 1 }
+}
+```
+
+- Without `dataSource`, the process must have no subject, and `parameters`
+  gives each of the process's parameters a literal value, in the JSON forms
+  the [trigger resource](integration-resources.md#trigger-resource) uses for a
+  data source's parameters. With `dataSource`, the process must have a subject
+  and `parameters` keeps its meaning, the data source's parameters. Each
+  mismatch is a new diagnostic.
+- Occurrences, daylight saving and downtime work as in [Schedules](#schedules).
+- The `trigger.fanOut` item of the occurrence starts the process once, in one
+  transaction. Its receipt in `axis.trigger_starts` uses the nil UUID as
+  `subject_id`, so the occurrence starts at most once.
+- A start that finds the process still running from an earlier occurrence is
+  skipped and logged.
+
+## Delete triggers
+
+_(Planned for M14.)_ A data change trigger with `"on": ["delete"]` starts a
+process without a subject when a record is deleted:
+
+```json
+{
+  "id": "9b8a7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c31",
+  "kind": "trigger",
+  "name": "TicketDeleted",
+  "formatVersion": 1,
+  "type": "dataChange",
+  "entity": "Ticket",
+  "on": ["delete"],
+  "process": "TellLeadTicketDeleted",
+  "parameters": { "number": "number", "title": "title" }
+}
+```
+
+- `delete` is listed alone. With `create` or `update` it is a new diagnostic,
+  and so is a `fields` list.
+- The process must have no subject. `parameters` maps each process parameter
+  to an expression over the record as it was before the delete, with the scope
+  of a data change trigger's `when`. So does `when`.
+- It fires on every delete through the record command. The start commits in
+  the delete's transaction, after the `record.deleted` audit record. A run-time
+  error in `when` or a parameter skips the start, and the delete still
+  commits.
+- A record that a `running` or `waiting` instance names still cannot be
+  deleted: that `409` comes first, and no trigger runs.
+
+## Dead letters
+
+_(Planned for M14.)_ Deliveries that keep failing stop after a limit and are
+kept as dead letters, see
+[D72](../decisions/d72-a-delivery-limit-and-dead-letters.md).
+
+**What counts.** Three kinds of work item deliver something, and each
+failure is counted for its own target:
+
+| Kind | Target |
+| --- | --- |
+| `event.deliver` | One occurrence and one `async` trigger, or one occurrence and one waiting instance |
+| `trigger.fanOut` | One occurrence of a schedule trigger |
+| `notification.email` | One email in the outbox |
+
+**Counting.** When a delivery's transaction fails, a separate transaction
+adds one to the target's count in `axis.delivery_failures`, with the error as
+a fixed text, and makes the item due again after the backoff. Targets that
+already committed, such as the other triggers of an occurrence, are skipped by
+their receipts. A data error that would fail the same way again, as the
+fan-out's SQLSTATE class 22, still ends the item at once, as today.
+
+**Backoff and limit.** Attempt *n* waits 30 seconds times 2 to the power
+*n* − 1, at most one hour. After `Worker:DeliveryAttempts` failures, default 5,
+the counting transaction writes a dead letter instead. For `event.deliver` it
+also writes the receipt with the outcome `deadLettered`, so delivery carries on
+with the other targets. A fan-out item and an email are set aside.
+
+**The table.** `axis.dead_letters` holds one row per dead letter:
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `id` | `uuid` | A version 7 UUID |
+| `kind` | `text` | `event.deliver`, `trigger.fanOut` or `notification.email` |
+| `application_id` | `uuid` | The application |
+| `process_id` | `uuid` | The process whose grants govern it: the trigger's process, the waiting instance's process or the process that sent the email |
+| `event_id`, `trigger_id`, `process_instance_id`, `email_id` | `uuid`, null | What failed, as the kind needs |
+| `occurrence_at` | `timestamptz`, null | The schedule occurrence, for a fan-out |
+| `attempts` | `integer` | The failures counted |
+| `last_error` | `text` | A fixed text. It holds no value, body, address or exception message |
+| `state` | `text` | `open`, `redelivered` or `discarded` |
+| `reason` | `text`, null | The operator's reason |
+| `settled_by` | `text`, null | The user who redelivered or discarded it |
+| `created_at`, `settled_at` | `timestamptz` | When it was written and settled |
+
+**Routes.**
+
+```http
+GET /api/apps/{app}/processes/{process}/dead-letters?state=open
+POST /api/apps/{app}/processes/{process}/dead-letters/{id}/redeliver
+POST /api/apps/{app}/processes/{process}/dead-letters/{id}/discard
+Content-Type: application/json
+
+{ "reason": "The supplier system is back." }
+```
+
+- Listing needs the `inspect` grant on the process. Redeliver and discard need
+  its `retry` grant. The `reason` follows the rule of the
+  [operator commands](process-inspection.md#operator-commands).
+- **Redeliver** clears the target's count, removes a `deadLettered` receipt,
+  and queues the delivery again for that target only. **Discard** closes the
+  dead letter. Either one on a dead letter that is not `open` is a `409`.
+- The audit records are `deadLetter.redelivered` and `deadLetter.discarded`,
+  with the reason.
+- The [process inspector widget](process-inspector-widget.md) lists the open
+  dead letters of its process, with Redeliver and Discard for a user with the
+  grant.
+
+**Logs and metrics.** The worker logs each dead letter at Warning level with
+its kind and target ids, and counts it in `axis.dead_letters.created`, with
+`axis.tenant` and `axis.work_item.kind` as attributes, as the other
+[worker metrics](process-execution.md#worker-metrics) do. The limit is the
+`Worker:DeliveryAttempts` [worker setting](process-execution.md#worker-settings).

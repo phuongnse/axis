@@ -2,6 +2,8 @@
 
 Detailed reference for the task API: the routes that list a user's tasks, read one task and
 complete it, and their errors. The task states are in [processes.md](processes.md#task-states).
+Claim, release, reassign, overdue tasks, escalations and deadlines are in
+[task-deadlines.md](task-deadlines.md) _(planned for M14)_.
 The conventions of [architecture.md](../architecture.md) apply: sections marked
 _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
@@ -15,7 +17,9 @@ when the task's assignee is a role and the user holds it. The user's roles
 are the roles kept in their session. A role counts only when the active
 release declares it, so a task assigned to a role the active release no
 longer declares can be listed, read or completed by nobody. This is checked on every request, at
-the moment of action. Policies add to this check and never replace it.
+the moment of action. Policies add to this check and never replace it. _(Planned for M14)_ A
+claimed role task may be completed only by its claimer, see
+[Claim and release](task-deadlines.md#claim-and-release).
 
 **Policies on tasks.** These follow
 [D24](../decisions/d24-roles-and-policies.md).

@@ -764,7 +764,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
 - **Process graph** _(built)_. A process shows a
   drawn graph of its steps and transitions above its editor, see
   [D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md).
-  It is read-only. The author edits steps in the list.
+  It is read-only. The author edits steps in the list. _(Planned for M14)_ The
+  graph becomes the process designer, on a Design tab, see
+  [process designer](process-designer.md).
   - Dagre, `@dagrejs/dagre`, lays out the graph, and React Flow,
     `@xyflow/react`, draws it. Their sizes are about 30 KB and 50 KB min+gzip.
     The SPA loads them in their own chunk when a process opens. M14's process
@@ -793,7 +795,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
   The form designer is built, see
   [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md), and the
   process designer for M14, see
-  [D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
+  [D74](../decisions/d74-a-visual-process-designer.md) and
+  [process designer](process-designer.md).
   The process graph is read-only, and not a designer.
   - **Design tab.** It sits next to the Form and JSON tabs. The three tabs edit
     one draft. _Built:_ the tab is there, and Form is the default tab. Opening a

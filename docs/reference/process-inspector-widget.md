@@ -85,3 +85,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     and the messages. The texts `shell.inspector.commands.*` hold the command
     buttons, the dialog's labels, the reason errors, the retry warning and the
     resolve labels and errors.
+- **Dead letters and sub-processes** _(planned for M14)_. The widget lists the
+  open dead letters of its process, with Redeliver and Discard for a user with
+  the `retry` grant, see [Dead letters](process-events.md#dead-letters). The
+  instance detail shows a waiting timer's due time and an instance's
+  sub-processes, and an instance without a subject shows "no subject".

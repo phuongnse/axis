@@ -86,3 +86,9 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - The task page has no history panel.
   - The platform texts `shell.task.*` hold the assigned elsewhere and
     already completed messages, and the load and complete errors.
+- **Claim, release, reassign and overdue** _(planned for M14)_. The inbox
+  marks an overdue task and shows who claimed a task. The task page shows
+  Claim, Release and Reassign, see
+  [Inbox and task page](task-deadlines.md#inbox-and-task-page). An `expired`
+  task shows a message that the deadline passed, with no form or outcome
+  buttons.
