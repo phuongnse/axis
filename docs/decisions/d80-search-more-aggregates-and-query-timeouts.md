@@ -29,7 +29,7 @@ these points on 2026-10-25. All of it is _(planned for M15)_. See
     an optional `filter` that keeps only the rows it counts.
   - A `groupBy` entry on a date or date-time field takes a bucket: `day`,
     `week`, `month` or `year`. Date-time buckets use the application time zone
-    that M14's time zone decision sets.
+    of [D75](d75-the-application-time-zone.md).
   - Expressions add `avg(list, item)`.
   - A data source over a child entity stays refused (`AXC0064`).
 - **Query timeouts:**

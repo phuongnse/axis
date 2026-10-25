@@ -191,6 +191,15 @@ the parts built in M12,
    reopens it.
 5. A reopened ticket ends the process with the status `reopened`. The
    requester submits it again. A loop that holds a task comes in M14.
+   _(Planned for M14)_ A reopened ticket loops back to the agent's task in the
+   same instance
+   ([D69](decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)).
+   The agent's task escalates to the service desk lead when it is late, the
+   requester is notified when the ticket is resolved, a daily job reminds the
+   lead of overdue tickets, and a deleted ticket is reported to the lead
+   ([D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md),
+   [D71](decisions/d71-task-deadlines-escalation-claim-and-reassign.md),
+   [D73](decisions/d73-in-app-and-email-notifications.md)).
 
 ### Security
 
@@ -289,7 +298,8 @@ from child rows, import and export. All of it is _(planned for M15)_. See
 2. The asset manager assigns an asset to a holder, and records maintenance.
 3. An auditor exports the asset register.
 4. A scheduled job reminds the asset manager of warranties that end within 30
-   days, through M14's notifications.
+   days, through the notifications of
+   [D73](decisions/d73-in-app-and-email-notifications.md).
 
 ### Security
 

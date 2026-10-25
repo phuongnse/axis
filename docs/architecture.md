@@ -42,7 +42,9 @@ flowchart LR
   the `decision`, `task`, `operation` and `end` steps of process instances.
   Operation steps include `updateRecord`, `callConnector` calls with their
   retries and reconciliation, and package operations. `raiseEvent` steps raise
-  events. Wait for event, timer and sub-process steps come later. It
+  events. Wait for event, timer and sub-process steps come later. _(Planned
+  for M14)_ It runs them, task escalations and deadlines, and email sending,
+  see [process flow](reference/process-flow.md). It
   delivers raised events to async event triggers, see
   [events and triggers](reference/process-events.md). It also
   runs the backfill of pending computed fields, see

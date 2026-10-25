@@ -33,7 +33,8 @@ of the product brief for the data, security, pages and scenarios.
   assets they hold. An auditor reads and exports everything and writes
   nothing.
 - **Warranty reminders:** a scheduled job reminds the asset manager of
-  warranties that end soon, with M14's notifications. That part waits for
+  warranties that end soon, with the notifications of
+  [D73](d73-in-app-and-email-notifications.md). That part waits for
   them, so its issue is blocked by theirs.
 - **Built through Studio:** a Playwright journey builds the whole application
   through Studio only, compares it with the committed folder, runs its

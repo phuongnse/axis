@@ -263,6 +263,8 @@ and in [functions](#functions).
   time zone, and every call in one transaction gives the same value. See
   [Functions](#functions). `today()` and taking a date from an instant wait
   for the [time zone rule](../decisions/d22-current-time-and-time-zones.md).
+  _(Planned for M14)_ They follow the
+  [application time zone](resource-files.md#application-time-zone).
 
 ## Names and references
 
@@ -363,7 +365,10 @@ Paths in validations and computed fields are not built. There a path is
   An `updateRecord` value sees the same scope, and is type-checked against
   its field's type. A task's `assignee.user` sees the same scope too, and is
   type-checked as `text`. Validations and computed fields keep their scope.
-  See [processes](processes.md#steps).
+  See [processes](processes.md#steps). _(Planned for M14)_ The scope adds
+  `id`, the subject record's id, typed as a reference to the subject entity,
+  as in a navigate action. A process without a subject sees its parameters
+  and the named rules instead. See [process flow](process-flow.md).
 
 ## Functions
 
@@ -400,6 +405,18 @@ argument is `null`.
 The date functions work on `date` only, not on `date-time`. Taking a calendar
 day from an instant needs a time zone, so it waits for the
 [time zone rule](../decisions/d22-current-time-and-time-zones.md).
+
+_(Planned for M14)_ Two functions use the
+[application time zone](resource-files.md#application-time-zone), per
+[D75](../decisions/d75-the-application-time-zone.md):
+
+- `today()` gives a `date`: the calendar date of the transaction's time in the
+  application's time zone. Every call in one transaction gives the same value.
+- `toDate(date-time)` gives the calendar `date` of an instant in that time
+  zone. `null` gives `null`.
+- Neither is allowed in a computed field, as `now()` is not. The
+  SQL translation converts with `AT TIME ZONE`, so the interpreter and SQL
+  agree.
 
 `now()` gives the same instant for every call in one transaction, and the
 interpreter and the SQL translation agree on it:

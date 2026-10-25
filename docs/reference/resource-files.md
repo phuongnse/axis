@@ -800,7 +800,9 @@ record create fills a field that names a sequence with the next number.
 
 - **Tokens.** `{yyyy}` is the four-digit UTC year of the create's transaction
   time. The local year waits for
-  the [time zone rule](../decisions/d22-current-time-and-time-zones.md). `{n}` is the number, and
+  the [time zone rule](../decisions/d22-current-time-and-time-zones.md).
+  _(Planned for M14)_ It is the year in the
+  [application time zone](#application-time-zone). `{n}` is the number, and
   `{n:k}` is the number zero-padded to `k` digits, with `k` from 1 to 18.
   Every other character is literal.
 - **One number.** The format holds exactly one `{n}` or `{n:k}` token. It
@@ -810,6 +812,8 @@ record create fills a field that names a sequence with the next number.
   format holds `{yyyy}`. Without a year, a restart would hand out the same
   number twice. Application time zones wait for the
   [time zone rule](../decisions/d22-current-time-and-time-zones.md).
+  _(Planned for M14)_ The restart follows the year in the
+  [application time zone](#application-time-zone).
 
 An entity `text` field names the sequence in its `sequence` property:
 
@@ -836,3 +840,31 @@ An entity `text` field names the sequence in its `sequence` property:
 - A field with `sequence` cannot be `required` or have an `expression`,
   because the server always assigns its value. A child entity's field cannot
   have a `sequence` either. Each of these is `AXC0013`.
+
+## Application time zone
+
+_(Planned for M14.)_ The `application` manifest may name the application's
+time zone, see [D75](../decisions/d75-the-application-time-zone.md):
+
+```json
+{
+  "id": "6ec71db1-5b21-43d9-95d2-dcc45055eb0e",
+  "kind": "application",
+  "name": "ServiceDesk",
+  "formatVersion": 1,
+  "timeZone": "Asia/Ho_Chi_Minh"
+}
+```
+
+- `timeZone` is optional. It is an IANA time zone id. Without it, the time
+  zone is `UTC`, so an application that names none behaves as before. An
+  unknown id is a new diagnostic at `/timeZone`.
+- It is part of the release. A change applies to work that runs on the new
+  release.
+- **What uses it.** [`today()` and `toDate`](expressions.md#functions), a
+  sequence's [`{yyyy}`](#sequences) and its yearly restart, the dates in
+  [notifications](notifications.md#placeholders), and M15's date buckets of
+  data sources.
+- **What does not.** `now()` stays an instant. A schedule trigger keeps its own
+  `timeZone`. The SPA shows a `date-time` in the browser's time zone, as
+  before. Calendar durations such as `P1M` stay `AXC0084`.

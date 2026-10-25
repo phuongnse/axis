@@ -17,6 +17,9 @@ decision. Only the items under **Later** are not built.
     as `department.manager`, or `role`, a role name. Queues come later.
   - `dueIn` is an ISO 8601 duration. It is stored as the task's due date and
     shown. Escalation needs timers, so it comes later.
+  - [D71](d71-task-deadlines-escalation-claim-and-reassign.md) replaces the
+    "Queues come later" and "Escalation … comes later" points: M14 adds
+    deadlines, escalation, claim and reassign.
   - Each outcome has a name, a label text key and a next step.
 - **Exactly one decision:** an open task can be completed once. A later or
   concurrent completion is a `409`. An outcome the step does not allow is a

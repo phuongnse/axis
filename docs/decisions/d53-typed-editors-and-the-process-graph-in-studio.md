@@ -72,6 +72,8 @@ confirmed these points on issue #780 on 2026-10-20.
     dependencies) to draw, and dagre (`@dagrejs/dagre`, MIT, about 30 KB
     min+gzip) to lay out. M14's process designer builds on both.
   - Both packages came with the graph, in their own lazy chunk.
+- **Designer:** [D74](d74-a-visual-process-designer.md) makes the graph the
+  process designer in M14. It still stores no position.
 - **Effect on earlier decisions:** D39 says there is no graph drawing library.
   [D39](d39-reference-index-and-where-a-resource-is-used.md) links here
   where M11 changes that.

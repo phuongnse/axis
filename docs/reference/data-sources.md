@@ -171,8 +171,8 @@ These are _(planned for M15)_. See
 - **Date buckets.** A `groupBy` entry may be `{ "field": "<name>", "bucket":
   "day" }`, with `day`, `week`, `month` or `year`, on a date or date-time
   field. The row holds the first date of the bucket. A week starts on
-  Monday. Date-time values are bucketed in the application time zone that
-  M14's time zone decision sets.
+  Monday. Date-time values are bucketed in the application time zone of
+  [D75](../decisions/d75-the-application-time-zone.md).
 - **Money.** `sum`, `avg`, `min` and `max` over a `money` field whose
   currency comes from a `currencyField` need that field among the group
   fields, or the data source mixes currencies. Without it the data source is
