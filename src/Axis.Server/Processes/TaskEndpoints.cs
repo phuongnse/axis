@@ -18,8 +18,8 @@ using Npgsql;
 namespace Axis.Server.Processes;
 
 /// <summary>
-/// The task API endpoints that list the current user's open human tasks, read one task and
-/// complete one. The current user is the session user. A user may act on a task assigned to their
+/// The task API endpoints that list the current user's open human tasks, read one task, complete
+/// one, and claim or release one. The current user is the session user. A user may act on a task assigned to their
 /// id, or to a role they hold. A request is checked in order:
 /// signed-in user (401), application (404), then for a list the paging (400), and for a read or a
 /// completion the task id and the task's application (404) and who may act (403).
@@ -38,6 +38,14 @@ namespace Axis.Server.Processes;
 /// who may act (403), the task being open (409), then the content type (415) and the body (400).
 /// It answers with the form of the task's release laid over the stored subject record, and a
 /// subject record that no longer exists is a 404.
+/// The claim and release routes check in the same order: signed-in user (401), application, task id
+/// and task (404), who may act (403), the task being open (409). A claim then refuses a task
+/// assigned to a user and a task already claimed (409). A release refuses a task that is not
+/// claimed (409), and a holder who is not the claimer (403). Each runs in one transaction on the
+/// locked task, takes no start lock, appends <c>task.claimed</c> or <c>task.released</c> and
+/// answers with the task as a single read returns it.
+/// A claimed role task is listed and completed only by its claimer. Other holders may still read it
+/// and ask for its form state.
 /// The assignee check is the only gate: no entity grant is needed and no record filter applies.
 /// A role assignee counts only when the active release declares the role, so a user whose role the
 /// active release drops can no longer list, read or complete the task.
@@ -56,6 +64,8 @@ internal static class TaskEndpoints
         tasks.MapGet("/{id}", GetAsync);
         tasks.MapPost("/{id}/complete", CompleteAsync);
         tasks.MapPost("/{id}/form-state", FormStateAsync);
+        tasks.MapPost("/{id}/claim", ClaimAsync);
+        tasks.MapPost("/{id}/release", ReleaseAsync);
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
@@ -113,6 +123,7 @@ internal static class TaskEndpoints
                 step.Name,
                 step.Label.TextKey,
                 Subject(release, task, labels, fields),
+                task.ClaimedBy,
                 task.DueAt?.UtcDateTime,
                 task.CreatedAt.UtcDateTime));
         }
@@ -292,6 +303,79 @@ internal static class TaskEndpoints
         return Results.Ok(FormStateEvaluator.Evaluate(release, form, entity, stored, body.Draft!, body.Touched!, readable, user.Id, now));
     }
 
+    private static Task<IResult> ClaimAsync(
+        string app,
+        string id,
+        HttpContext httpContext,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken) =>
+        ChangeClaimAsync(app, id, httpContext, resolver, database, TaskClaimCommand.ClaimLockedAsync, cancellationToken);
+
+    private static Task<IResult> ReleaseAsync(
+        string app,
+        string id,
+        HttpContext httpContext,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken) =>
+        ChangeClaimAsync(app, id, httpContext, resolver, database, TaskClaimCommand.ReleaseLockedAsync, cancellationToken);
+
+    // A claim or a release only changes the task row and writes an audit record. It never resumes
+    // the instance, so it takes no start lock and does not depend on the active release changing.
+    private static async Task<IResult> ChangeClaimAsync(
+        string app,
+        string id,
+        HttpContext httpContext,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        Func<NpgsqlTransaction, Guid, ProcessTaskRow?, RecordActor, CancellationToken, Task<TaskClaimOutcome>> change,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return SignInRequired();
+        }
+
+        if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
+        {
+            return ApplicationNotFound();
+        }
+
+        if (!TryParseId(id, out var taskId))
+        {
+            return TaskNotFound();
+        }
+
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        {
+            var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
+            var outcome = await change(
+                transaction, active.Model.Manifest.Id, task, new RecordActor(user.Id, user.DisplayName, roles), cancellationToken);
+            if (outcome != TaskClaimOutcome.Done)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return outcome switch
+                {
+                    TaskClaimOutcome.NotFound => TaskNotFound(),
+                    TaskClaimOutcome.Denied => AssignedToSomeoneElse(),
+                    TaskClaimOutcome.NotOpen => AlreadyCompleted(),
+                    TaskClaimOutcome.NotRoleTask => NotARoleTask(),
+                    TaskClaimOutcome.AlreadyClaimed => AlreadyClaimed(),
+                    _ => NotClaimed(),
+                };
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        var changed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
+            ?? throw new InvalidOperationException($"The task '{taskId}' could not be read.");
+        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, changed, cancellationToken));
+    }
+
     /// <summary>
     /// Completes the locked <paramref name="task"/> in <paramref name="transaction"/> with
     /// <see cref="TaskCompletionCommand"/>, or returns the failure, after which the caller rolls
@@ -370,6 +454,7 @@ internal static class TaskEndpoints
             new TaskAssignee(
                 task.AssigneeKind == ProcessTasks.UserAssignee ? task.Assignee : null,
                 task.AssigneeKind == ProcessTasks.RoleAssignee ? task.Assignee : null),
+            task.ClaimedBy,
             Subject(release, task, labels, readable),
             new TaskForm(form.Name, form.Sections, form.Steps, entity),
             [.. step.Outcomes.Select(outcome => new TaskOutcome(outcome.Name, outcome.Label.TextKey))],
@@ -449,6 +534,15 @@ internal static class TaskEndpoints
     private static IResult AlreadyCompleted() =>
         Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This task is already completed.");
 
+    private static IResult NotARoleTask() =>
+        Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Only a task assigned to a role can be claimed.");
+
+    private static IResult AlreadyClaimed() =>
+        Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This task is already claimed.");
+
+    private static IResult NotClaimed() =>
+        Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This task is not claimed.");
+
     private static IResult StaleVersion() =>
         Results.ValidationProblem(
             new Dictionary<string, string[]> { ["/version"] = ["Must be the record's current version."] },
@@ -463,7 +557,7 @@ internal static class TaskEndpoints
 /// <summary>One page of the open tasks the user may act on, and the number of them on every page.</summary>
 internal sealed record TaskListResponse(IReadOnlyList<TaskListItem> Items, int Page, int PageSize, long TotalCount);
 
-/// <summary>An open task as a task list shows it, with the release it started on. <see cref="DueAt"/> is null when the step has no <c>dueIn</c>.</summary>
+/// <summary>An open task as a task list shows it, with the release it started on. <see cref="ClaimedBy"/> is the claimer's user id, or null. <see cref="DueAt"/> is null when the step has no <c>dueIn</c>.</summary>
 internal sealed record TaskListItem(
     Guid Id,
     Guid ReleaseId,
@@ -471,6 +565,7 @@ internal sealed record TaskListItem(
     string Step,
     string LabelKey,
     TaskSubject Subject,
+    string? ClaimedBy,
     DateTime? DueAt,
     DateTime CreatedAt);
 
@@ -496,6 +591,7 @@ internal sealed record TaskResponse(
     string LabelKey,
     string State,
     TaskAssignee Assignee,
+    string? ClaimedBy,
     TaskSubject Subject,
     TaskForm Form,
     IReadOnlyList<TaskOutcome> Outcomes,

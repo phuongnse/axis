@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { formatValue, type FormatOptions } from './formatValue'
 import type { FieldMetadata, FieldType } from './site'
 
-function field(name: string, type: FieldType): FieldMetadata {
+function field(name: string, type: FieldType, valueLabelKeys?: Record<string, string>): FieldMetadata {
   return {
     name,
     type,
@@ -16,12 +16,17 @@ function field(name: string, type: FieldType): FieldMetadata {
     precision: null,
     scale: null,
     values: null,
+    valueLabelKeys,
     target: null,
     fields: null,
   }
 }
 
-const texts: Record<string, string> = { 'shell.table.yes': 'Yes', 'shell.table.no': 'No' }
+const texts: Record<string, string> = {
+  'shell.table.yes': 'Yes',
+  'shell.table.no': 'No',
+  'request.status.submitted': 'Đã gửi',
+}
 const options: FormatOptions = { locale: 'en', timeZone: 'UTC', text: (key) => texts[key] ?? key }
 
 describe('formatValue', () => {
@@ -56,6 +61,18 @@ describe('formatValue', () => {
     const rowLabels = { product: 'Desk' }
     expect(formatValue(field('product', 'reference'), id, rowLabels, options)).toBe('Desk')
     expect(formatValue(field('product', 'reference'), id, {}, options)).toBe(id)
+  })
+
+  it('shows an enum with a label key as its translated text', () => {
+    const status = field('status', 'enum', { submitted: 'request.status.submitted' })
+    expect(formatValue(status, 'submitted', {}, options)).toBe('Đã gửi')
+  })
+
+  it('shows an enum without a label key as the raw value', () => {
+    expect(formatValue(field('status', 'enum'), 'submitted', {}, options)).toBe('submitted')
+    expect(formatValue(field('status', 'enum', null as never), 'submitted', {}, options)).toBe('submitted')
+    const status = field('status', 'enum', { submitted: 'request.status.submitted' })
+    expect(formatValue(status, 'draft', {}, options)).toBe('draft')
   })
 
   it('shows a boolean as the localized yes or no', () => {

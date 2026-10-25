@@ -10,12 +10,22 @@ export interface FormatOptions {
   text: (key: string) => string
 }
 
+/** An enum value's label in the current locale, or the value itself when it has no label key. */
+export function enumLabel(
+  field: Pick<FieldMetadata, 'valueLabelKeys'>,
+  value: string,
+  text: (key: string) => string,
+): string {
+  const key = field.valueLabelKeys?.[value]
+  return key ? text(key) : value
+}
+
 /**
  * Formats a record value for display. Formatting never changes the value: numbers show exactly as
  * the API wrote them, and a reference shows the label of the record it points to.
  */
 export function formatValue(
-  field: Pick<FieldMetadata, 'name' | 'type'>,
+  field: Pick<FieldMetadata, 'name' | 'type' | 'valueLabelKeys'>,
   value: RecordValue,
   labels: Record<string, string | RowLabels[]>,
   options: FormatOptions,
@@ -27,6 +37,8 @@ export function formatValue(
   switch (field.type) {
     case 'boolean':
       return text(value === true ? 'shell.table.yes' : 'shell.table.no')
+    case 'enum':
+      return enumLabel(field, String(value), text)
     case 'reference': {
       const label = labels[field.name]
       return typeof label === 'string' ? label : String(value)

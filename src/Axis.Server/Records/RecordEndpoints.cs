@@ -7,6 +7,7 @@ using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Server.Applications;
+using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
@@ -16,11 +17,15 @@ namespace Axis.Server.Records;
 
 /// <summary>
 /// Endpoints for the records of an entity in the active release of an application. Every request
-/// is checked in order: session (401), then the path (404), then the user's grant for the entity
-/// and the action (403), and only then the query or body. A request without a session is a 401
-/// before the path is read, so it learns nothing about what exists. A path that names no active
-/// application, entity or record is a 404; a child entity is no entity here. A list, a read and a
-/// history need <c>read</c>, and a create, an update and a delete need that action.
+/// is checked in order: session or bearer token (401), then the path (404), then the user's grant for
+/// the entity and the action (403), and only then the query or body. A request without a session or with
+/// a bad bearer token is a 401 before the path is read, so it learns nothing about what exists.
+/// A request with an <c>Authorization: Bearer</c> header is a service account request. It is judged by the
+/// token alone, never reads or renews the session cookie and needs no CSRF header. Its roles come from the
+/// token, and policies, record filters and field limits apply as for a user. A 401 for it carries
+/// <c>WWW-Authenticate: Bearer</c>. In the text below, the session user stands for the service account too.
+/// A path that names no active application, entity or record is a 404; a child entity is no entity here.
+/// A list, a read and a history need <c>read</c>, and a create, an update and a delete need that action.
 /// A grant with a record filter reaches only the records that match it, and the grants combine
 /// with OR. A list holds only the records that match a <c>read</c> filter, and a single read, a
 /// history, an update or a delete of any other record is a 404, as is an update or a delete by a
@@ -78,7 +83,7 @@ internal static class RecordEndpoints
         // and the entity name as two, so no entity has two URLs.
         foreach (var pattern in new[] { "/api/apps/{app}/entities/{entity}/records", "/api/apps/{app}/entities/{module}/{entity}/records" })
         {
-            var records = endpoints.MapGroup(pattern);
+            var records = endpoints.MapGroup(pattern).WithMetadata(ServiceAccountRoute.Instance);
             records.MapGet("", ListAsync);
             records.MapGet("/{id}", GetAsync);
             records.MapGet("/{id}/history", HistoryAsync);
@@ -106,7 +111,7 @@ internal static class RecordEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(request.HttpContext);
         }
 
         var (application, model, notFound, _) = await ResolveEntityAsync(app, EntityName(request.HttpContext, entity), resolver, cancellationToken);
@@ -215,7 +220,7 @@ internal static class RecordEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(httpContext);
         }
 
         var (application, model, notFound, _) = await ResolveEntityAsync(app, EntityName(httpContext, entity), resolver, cancellationToken);
@@ -277,7 +282,7 @@ internal static class RecordEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(httpContext);
         }
 
         var (application, model, notFound, _) = await ResolveEntityAsync(app, EntityName(httpContext, entity), resolver, cancellationToken);
@@ -375,7 +380,7 @@ internal static class RecordEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(request.HttpContext);
         }
 
         // A release change under the start lock sends the create back to resolution, so every check runs on the new release.
@@ -429,7 +434,7 @@ internal static class RecordEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(request.HttpContext);
         }
 
         // A release change under the start lock sends the update back to resolution, so every check runs on the new release.
@@ -486,7 +491,7 @@ internal static class RecordEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(httpContext);
         }
 
         var (application, model, notFound, _) = await ResolveEntityAsync(app, EntityName(httpContext, entity), resolver, cancellationToken);

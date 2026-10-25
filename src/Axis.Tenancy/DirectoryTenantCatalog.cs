@@ -230,14 +230,14 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         $"{row.DatabaseHost}\n{row.DatabasePort}\n{row.DatabaseName}\n{row.RuntimeUser}\n{Convert.ToBase64String(row.RuntimePassword)}";
 
     // Compares the stored encrypted client secret, so nothing is decrypted to tell whether the sign-in settings changed.
-    // A preview tenant is keyed by the settings of its main tenant, without the endpoint audience it never takes, so a
-    // change to the main tenant's sign-in reaches the preview at the next refresh.
+    // A preview tenant is keyed by the settings of its main tenant, without the endpoint and service audiences it never
+    // takes, so a change to the main tenant's sign-in reaches the preview at the next refresh.
     private static string OidcKey(TenantRow signIn, bool preview) =>
-        string.Join('\n', signIn.OidcAuthority, signIn.OidcClientId, Convert.ToBase64String(signIn.OidcClientSecret), preview ? null : signIn.EndpointAudience, signIn.ClaimUserId, signIn.ClaimDisplayName, signIn.ClaimRoles);
+        string.Join('\n', signIn.OidcAuthority, signIn.OidcClientId, Convert.ToBase64String(signIn.OidcClientSecret), preview ? null : signIn.EndpointAudience, preview ? null : signIn.ServiceAudience, signIn.ClaimUserId, signIn.ClaimDisplayName, signIn.ClaimRoles);
 
     // A preview tenant signs people in with the sign-in settings of its main tenant, whatever the main tenant's status,
-    // and decrypts the client secret under the main tenant's id. It never takes the main tenant's EndpointAudience, so it
-    // accepts no machine-caller bearer token. Its bindings are only its own.
+    // and decrypts the client secret under the main tenant's id. It never takes the main tenant's EndpointAudience or
+    // ServiceAudience, so it accepts no machine-caller or service account bearer token. Its bindings are only its own.
     private static TenantEntry Entry(
         TenantRow row,
         IReadOnlyList<string> hosts,
@@ -274,6 +274,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 ? null
                 : SecretValue.Deferred(() => cipher.Decrypt(signIn.Id, TenantSecretFields.OidcClientSecret, signIn.OidcClientSecret).Reveal()),
             main is null ? Blank(signIn.EndpointAudience) : null,
+            main is null ? Blank(signIn.ServiceAudience) : null,
             Blank(signIn.ClaimUserId),
             Blank(signIn.ClaimDisplayName),
             Blank(signIn.ClaimRoles));

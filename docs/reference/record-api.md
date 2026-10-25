@@ -12,9 +12,14 @@ the entities of the active release of an application, in the tenant that the
 request host resolves to. A record of another tenant does not exist for the
 request, so it is a 404 like any unknown record.
 
-Every record endpoint needs a session and a policy grant for the action on
-the entity, as [Authorization](security.md#authorization) describes.
-Without a session the answer is a `401`, and without a grant a `403`. A
+Every record endpoint needs a session, or a bearer token of a
+[service account](security.md#service-accounts), and a policy grant for the
+action on the entity, as [Authorization](security.md#authorization) describes.
+A request with an `Authorization: Bearer` header is a service account request.
+It is judged by the token alone, never reads or renews the session cookie and
+needs no CSRF header. Its caller id is the audit actor and the creator of a new
+record. Without a session or with a bad token the answer is a `401`, with
+`WWW-Authenticate: Bearer` for a token, and without a grant a `403`. A
 grant with a `filter` reaches only the records that match it, so a record
 outside every read filter is a `404`. A grant with a `fields` list covers
 only those fields: fields the user may not read are left out, and a write of
@@ -228,7 +233,7 @@ HTTP also call. The record API maps its outcome to the responses below.
   `POST /api/apps/{app}/endpoints/{name}` is exempt from the header and
   takes no session. See [Inbound endpoints](inbound-endpoints.md). A
   [service account](security.md#service-accounts) request, which carries a
-  bearer token, is exempt too, and takes no session _(planned for M16)_.
+  bearer token, is exempt too, and takes no session.
 - **One transaction.** A create or update writes the record and the rows of
   its child collections in one transaction. When any write fails, nothing is
   written, neither the owner nor any row. A delete also runs in a
@@ -297,8 +302,9 @@ storage: see
 then for a running process (`409`), then in storage (`404` or `409`).
 
 A write without the [CSRF header](#create-update-and-delete) is a `403`
-before any of these checks. The session comes next: a request without a
-session is a `401`, before the path. So a caller without a session cannot
+before any of these checks. A service account request has no such check. The
+session comes next: a request without a session, or with a bad bearer token, is
+a `401`, before the path. So a caller without a session cannot
 find out which applications or records exist. See
 [Sign-in and the session](security.md#sign-in-and-the-session).
 After the path, the user needs a grant for the action on the entity, or the
@@ -309,7 +315,7 @@ takes no session. Its own order is in [Inbound endpoints](inbound-endpoints.md).
 Policies add more checks. The full order is:
 
 1. The CSRF header, `403`.
-2. The session, `401`.
+2. The session or the bearer token, `401`.
 3. The path, `404`.
 4. A grant for the action on the entity, `403`.
 5. The stored record: unknown or outside every read filter, `404`. On
@@ -346,8 +352,11 @@ otherwise the answer is the stale-version `409`. See
 - **`403` for the CSRF header.** A `POST`, `PUT`, `PATCH` or `DELETE`
   without `X-Axis-Csrf: 1`.
 - **`401`.** A request without a session, or with a session from another
-  tenant. It comes before the path, so it is a `401` even for an unknown
-  application. The title is fixed.
+  tenant. A request with a bearer token that fails the checks of
+  [service accounts](security.md#service-accounts) is a `401` too, with
+  `WWW-Authenticate: Bearer`, and so is a token for another tenant's identity
+  provider or the wrong audience. It comes before the path, so it is a `401`
+  even for an unknown application. The title is fixed.
 - **`403` without a grant.** The user has no grant for the action on the
   entity. A list or a single read needs `read`, a create `create`, an update
   `update` and a delete `delete`. History needs `read`. Only roles claim
@@ -777,7 +786,7 @@ can be read as its history (D21).
   returns the audit records of one record.
   - It lists every audit record that names the record. That covers the
     record API's writes, and the [process start](processes.md#start-endpoint),
-    each step and each [task decision](task-api.md#completing-a-task) on it,
+    each step and each [task decision](task-api.md#completing-a-task), claim and release on it,
     including those whose actor is `system`.
   - The path follows the 404 rules of a single read. An unknown record, a
     deleted record, or an id from another tenant is a `404`.
