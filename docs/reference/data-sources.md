@@ -252,7 +252,7 @@ see the Data sources bullet of the Resolve step in
   does not end at a `reference`, or a measure, instead of a projected field
   (`AXC0045`).
 - `sort` and a `groupBy` entry cannot name a projected `file` field
-  _(planned for M15)_ (`AXC0246`, at `/sort` or `/aggregate/groupBy/{i}`).
+  _(planned for M15)_ (`AXC0250`, at `/sort` or `/aggregate/groupBy/{i}`).
 
 ## Endpoint
 

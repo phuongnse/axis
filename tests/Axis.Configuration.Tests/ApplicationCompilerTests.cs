@@ -826,14 +826,27 @@ public sealed class ApplicationCompilerTests
         Assert.Null(result.Model);
     }
 
-    [Theory]
-    [InlineData("""{ "name": "customer", "type": "reference", "target": "Customer" }""", "a reference")]
-    [InlineData("""{ "name": "notes", "type": "child-collection", "target": "Customer" }""", "a child collection")]
-    public void Reference_or_child_collection_on_a_child_entity_is_reported_at_the_field_type(string field, string kind)
+    [Fact]
+    public void Reference_on_a_child_entity_is_accepted()
     {
         using var folder = new TemporaryFolder()
             .With("application.json", Manifest)
-            .With("line-item.json", Entity("LineItem", $$"""{ "name": "description", "type": "text" }, {{field}}""", LineItemId))
+            .With("line-item.json", Entity("LineItem", """{ "name": "description", "type": "text" }, { "name": "customer", "type": "reference", "target": "Customer" }""", LineItemId))
+            .With("customer.json", Entity("Customer", """{ "name": "name", "type": "text", "required": true }""", CustomerId, displayField: "name"))
+            .With("order.json", Entity("Order", """{ "name": "lineItems", "type": "child-collection", "target": "LineItem" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void Child_collection_on_a_child_entity_is_reported_at_the_field_type()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("line-item.json", Entity("LineItem", """{ "name": "description", "type": "text" }, { "name": "notes", "type": "child-collection", "target": "Customer" }""", LineItemId))
             .With("customer.json", Entity("Customer", """{ "name": "name", "type": "text", "required": true }""", CustomerId, displayField: "name"))
             .With("order.json", Entity("Order", """{ "name": "lineItems", "type": "child-collection", "target": "LineItem" }"""));
 
@@ -841,9 +854,9 @@ public sealed class ApplicationCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.ChildEntityWithReference, "line-item.json", "/fields/1/type", Guid.Parse(LineItemId)),
+            (DiagnosticCodes.ChildEntityWithChildCollection, "line-item.json", "/fields/1/type", Guid.Parse(LineItemId)),
             (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
-        Assert.Contains(kind, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("a child collection", diagnostic.Message, StringComparison.Ordinal);
         Assert.Contains("'Order.lineItems'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
     }
@@ -859,7 +872,7 @@ public sealed class ApplicationCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.ChildEntityWithReference, "order.json", "/fields/1/type"),
+            (DiagnosticCodes.ChildEntityWithChildCollection, "order.json", "/fields/1/type"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Contains("'Order' is a child entity owned by 'Order.children'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);

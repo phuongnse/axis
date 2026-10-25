@@ -153,6 +153,39 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_compiles_a_process_without_a_subject_back_with_its_parameters()
+    {
+        var compiled = ApplicationCompiler.Compile(
+        [
+            new ResourceContent("application.json", Manifest),
+            new ResourceContent("rules/needs-review.json", """
+                { "id": "66666666-6666-4666-8666-666666666601", "kind": "rule", "name": "NeedsReview", "formatVersion": 1,
+                  "parameters": [{ "name": "total", "type": "decimal" }], "resultType": "boolean", "expression": "total >= 10000" }
+                """),
+            new ResourceContent("processes/nightly.json", """
+                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "Nightly", "formatVersion": 1,
+                  "parameters": [{ "name": "limit", "type": "decimal" }, { "name": "label", "type": "text" }],
+                  "start": "check",
+                  "steps": [
+                    { "name": "check", "type": "decision", "branches": [{ "when": "NeedsReview(limit)", "next": "big" }], "otherwise": "small" },
+                    { "name": "big", "type": "end" },
+                    { "name": "small", "type": "end" }
+                  ] }
+                """),
+        ]);
+        Assert.Empty(compiled.Diagnostics);
+        var release = StoredRelease(compiled);
+
+        var model = ReleaseCompiler.BuildModel(release);
+
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        Assert.True(model.TryGetProcess("nightly", out var process));
+        Assert.Null(process.Entity);
+        Assert.Equal([new ProcessParameterModel("limit", FieldType.Decimal), new ProcessParameterModel("label", FieldType.Text)], process.Parameters);
+    }
+
+    [Fact]
     public void Stored_release_compiles_an_operation_step_back_with_its_fields_in_declaration_order()
     {
         // The stored file sorts the set keys, so the model lists them in declaration order instead.

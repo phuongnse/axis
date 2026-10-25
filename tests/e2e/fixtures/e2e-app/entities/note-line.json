@@ -11,6 +11,7 @@
       "maxLength": 100,
       "label": { "textKey": "noteLine.description" }
     },
-    { "name": "quantity", "type": "integer", "label": { "textKey": "noteLine.quantity" } }
+    { "name": "quantity", "type": "integer", "label": { "textKey": "noteLine.quantity" } },
+    { "name": "category", "type": "reference", "target": "Category", "label": { "textKey": "noteLine.category" } }
   ]
 }

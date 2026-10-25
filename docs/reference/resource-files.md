@@ -257,7 +257,7 @@ A `seed` holds records with fixed ids for one entity:
 - `values` has the shape of the `values` of a record API create body (see
   [Request bodies and values](record-api.md#request-bodies-and-values)).
   A seed cannot set a `file` field, in a record or in a child row
-  _(planned for M15)_ (`AXC0246`).
+  _(planned for M15)_ (`AXC0250`).
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
@@ -499,16 +499,11 @@ new check is a new compile diagnostic.
 - **`file`.** One file, with optional `maxSize` and `accept`. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. See
   [file fields](file-fields.md). The compiler reports a `maxSize` below 1 or
-  above the file size limit (`AXC0244`), an `accept` entry that is not
-  `type/subtype` or `type/*` (`AXC0245`), and `unique` on the field
-  (`AXC0246`). `maxSize` or `accept` on another type, and `expression` on a
+  above the file size limit (`AXC0248`), an `accept` entry that is not
+  `type/subtype` or `type/*` (`AXC0249`), and `unique` on the field
+  (`AXC0250`). `maxSize` or `accept` on another type, and `expression` on a
   `file`, are `AXC0013`. In an expression a file allows only `is null` and
   `is not null`.
-- **`money`.** An amount, with `precision` (default 18) and `scale`, and
-  exactly one of `currency`, a fixed ISO 4217 code such as `"VND"`, or
-  `currencyField`, which names an `enum` or `text` field of the same entity.
-  `scale` defaults to the currency's minor units, or 2 with `currencyField`.
-  It takes the properties of `decimal`, and its expression type is `decimal`.
 - **`references`.** A set of records of `target`, at most 1,000. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. Its
   expression type is `list<Target>`.
@@ -663,20 +658,20 @@ validation calls the rules of its own module, see [modules](modules-and-template
   owner record, as
   [the record API](record-api.md#child-rows-computed-fields-and-validations)
   describes.
-- **M2 limits on a child entity.** These are limits of M2, not permanent
-  rules. Real line items often point to a product, so
-  [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md)
-  lifts part of the last one _(planned for M15)_. A child entity:
+- **Limits on a child entity.** A child entity:
   - is owned by exactly one `child-collection` field (`AXC0039`);
   - is never the `target` of a `reference` (`AXC0040`);
   - is never the `entity` of a data source (`AXC0064`) or of a process
     (`AXC0068`);
   - has no record routes of its own;
-  - has no `reference` or `child-collection` fields (`AXC0041`). From M15 it
-    may have `reference` fields, and `AXC0041` refuses only a
-    `child-collection` field _(planned for M15)_. A reference from a child
-    row gets a foreign key and an index, and its labels follow the rows, see
+  - has no `child-collection` fields (`AXC0041`). It may have `reference`
+    fields, as real line items point to a product, see
+    [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md). A
+    reference from a child row gets a foreign key, and its labels follow the
+    rows, see
     [child rows](record-api.md#child-rows-computed-fields-and-validations).
+    Its index comes with the platform indexes on every reference column
+    _(planned for M15)_.
 
 ## Form conditions and steps
 

@@ -86,7 +86,15 @@ internal static class EndpointChecker
                 references.Add(endpoint, "/process", ReferenceRelations.EndpointProcess, ResourceNode.Of(process));
             }
 
-            if (process is not null && entity is not null && findEntity(process.Entity) is { } subject && !ReferenceEquals(subject, entity))
+            if (process is { Entity: null })
+            {
+                // The call starts the process on the record it creates, so the process needs a subject.
+                Report(
+                    DiagnosticCodes.EndpointProcessOverOtherEntity,
+                    $"The process '{process.Name}' has no subject, but the endpoint starts it on the record it creates.",
+                    "/process");
+            }
+            else if (process is not null && entity is not null && process.Entity is { } subjectName && findEntity(subjectName) is { } subject && !ReferenceEquals(subject, entity))
             {
                 // The call starts the process on the record it creates, so that record is its subject.
                 Report(

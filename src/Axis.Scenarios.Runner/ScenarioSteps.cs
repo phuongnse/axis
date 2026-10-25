@@ -106,9 +106,11 @@ internal sealed class ScenarioSteps(
     private async Task StartProcessAsync(ScenarioStepDefinition step, CancellationToken cancellationToken)
     {
         var process = Process(step.Process);
-        var entity = model.TryGetEntity(process.Entity.Name, out var found)
+        var subject = process.Entity
+            ?? throw new StepFailedException($"process '{process.Name}' has no subject");
+        var entity = model.TryGetEntity(subject.Name, out var found)
             ? found
-            : throw new StepFailedException($"entity '{process.Entity.Name}' of process '{process.Name}' does not exist");
+            : throw new StepFailedException($"entity '{subject.Name}' of process '{process.Name}' does not exist");
         var (_, id) = Saved(step.Record);
         var (user, roles) = User(step);
         if (!PolicyEvaluator.AllowsStart(model, roles, process))
@@ -253,7 +255,7 @@ internal sealed class ScenarioSteps(
     private async Task<ProcessTaskRow?> NewestTaskAsync(EntityModel entity, Guid id, string? stepName, CancellationToken cancellationToken)
     {
         var declared = model.Processes
-            .Where(process => process.Entity.Id == entity.Id)
+            .Where(process => process.Entity?.Id == entity.Id)
             .SelectMany(process => process.Steps.OfType<TaskStepModel>()
                 .Where(task => string.Equals(task.Name, stepName, StringComparison.OrdinalIgnoreCase))
                 .Select(task => (ProcessId: process.Id, task.Name)))
