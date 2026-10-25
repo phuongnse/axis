@@ -50,6 +50,7 @@
     "note.lines": "Các dòng",
     "noteLine.description": "Mô tả",
     "noteLine.quantity": "Số lượng",
+    "noteLine.category": "Danh mục",
     "noteSections.main": "Chính",
     "noteSections.details": "Chi tiết",
     "noteWizard.main": "Ghi chú",

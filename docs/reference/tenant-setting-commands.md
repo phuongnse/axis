@@ -6,8 +6,9 @@ keys and passwords, and the platform audit records they write. The other command
 sections marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The design follows [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md). The
-`platform.audit_records` table and `PlatformAuditRecords.WriteAsync` are built. The rest of this
-page is _(planned for M16)_.
+`platform.audit_records` table, `PlatformAuditRecords.WriteAsync` and the records of the commands
+that already exist are built, see [platform audit records](#platform-audit-records). The setting
+commands on this page, and the key rotation, are _(planned for M16)_.
 
 ## Common rules
 
@@ -106,11 +107,21 @@ keys. It can be rotated without signing anyone out.
 
 - **Table.** `platform.audit_records` is append-only. The database rejects every update, delete and
   truncate with SQLSTATE `23001`, as it does for the audit table of a tenant database. The table is
-  built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record. No command
-  calls it yet, so the commands that write records are _(planned for M16)_.
-- **What writes it.** Every `Axis.Admin` command that changes the directory, a tenant database, a key
-  or a password. `tenant backup` writes one too, because an archive holds a tenant's data.
-  `tenant list` and `version` write none.
+  built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record.
+- **What writes it.** Every `Axis.Admin` command that acts on a tenant: `tenant create`,
+  `tenant suspend`, `tenant resume`, `tenant backup`, `tenant restore`, `migrate` and `activate` are
+  built. `tenant backup` writes one because an archive holds a tenant's data. The setting commands
+  on this page and `platform rekey` are _(planned for M16)_. `tenant list`, `version` and
+  `publisher` write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is
+  marked as writing one record per tenant or none. A command without a mark fails a test.
+- **When.** One record per tenant, when tenant work starts: after the checks of the command and
+  before its first change for that tenant. A usage error, a missing setting, an unknown tenant or a
+  host that another tenant holds writes none, because nothing started. A record means the command
+  started work for the tenant, not that the work succeeded. The `changed` names of these seven
+  commands are empty, because the command already says what changed.
+- **A record that cannot be written.** That tenant stops with an `audit` step, and nothing changes
+  for it. The line is `<tenant> audit failed: <message>`, and the command exits `1`. The other
+  tenants of `migrate` and `activate` go on. A record that is written prints no line.
 - **A record.** The time, the command, the tenant id, the operating system user and the machine that
   ran it, and the names of what changed, such as a binding name or a setting name. It never holds a
   secret value.

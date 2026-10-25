@@ -76,7 +76,8 @@ Every command writes one line per tenant and step to standard output:
 
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
 `work`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
-`check`, `restore` and `status`. The [publisher](#publisher)
+`check`, `restore`, `status` and `audit`. An `audit` step prints only when it fails, see
+[platform audit records](tenant-setting-commands.md#platform-audit-records). The [publisher](#publisher)
 adds `claim`, `validate` and `rollback`. A line names the
 tenant and never a database host, a password or a connection string. A `failed` message
 never holds one either. A restore refusal does name the tenant host the operator gave on the
@@ -482,8 +483,16 @@ It covers every tenant except `provisioning` ones, in ordinal order of the id,
 `n` at a time. A `suspended` tenant is migrated too, so it is current when it is
 resumed.
 
+**Platform migrations first.** Before it reads the tenants, `migrate` applies the pending EF Core
+migrations of the `platform` schema over `ConnectionStrings:PlatformSchema`. So an installation
+that upgrades with `migrate` before the new server starts has the audit table in time. It does not
+run the grants for the reader role, which the server applies at its next start. A failed platform
+migration exits `2`, with the message of the setting that could not be used.
+
 **Steps for each tenant.**
 
+0. `audit`: write the [platform audit record](tenant-setting-commands.md#platform-audit-records)
+   of the tenant. It prints a line only when it fails, and that tenant then stops.
 1. `grants`: run the grant step.
 2. `migrations`: run the configuration, data and processes EF Core migrations.
 3. `grants`: run the grant step again.
@@ -600,7 +609,9 @@ runs until it is stopped.
 
 `publisher`
 
-It takes no option. It has no HTTP endpoint and listens on no port, so nothing
+It takes no option. It writes no [platform audit record](tenant-setting-commands.md#platform-audit-records),
+because it acts on no tenant on its own: the audit of a publish is the release's own record in the tenant
+database. It has no HTTP endpoint and listens on no port, so nothing
 can call it. The `axis-admin` image runs it. Both production installs start
 one, see [installation](installation.md). `scripts/dev.sh`, the Docker Compose
 file in the repository root and the E2E script each start one too.
@@ -881,7 +892,7 @@ admin host carries the same version in its OCI label, see
 - A command that moves a host from one tenant to another. Restoring over an
   existing tenant ends with this step. `tenant host move` is
   _(planned for M16)_, see [hosts](tenant-setting-commands.md#hosts).
-- Rotating the installation key, and a platform audit record of each command.
-  Both are _(planned for M16)_, see
-  [installation key](tenant-setting-commands.md#installation-key) and
+- Rotating the installation key. It is _(planned for M16)_, see
+  [installation key](tenant-setting-commands.md#installation-key). The platform audit records of
+  the setting commands are planned with them, see
   [platform audit records](tenant-setting-commands.md#platform-audit-records).

@@ -292,5 +292,5 @@ public sealed class FormStateEvaluatorTests
     }
 
     private static Record Stored(Dictionary<string, JsonNode?> values) =>
-        new(Guid.Parse("6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f8"), 1, values, new Dictionary<string, string>());
+        new(Guid.Parse("6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f8"), 1, values, new Dictionary<string, JsonNode>());
 }

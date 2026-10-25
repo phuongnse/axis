@@ -107,8 +107,11 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
                     }
                     else
                     {
-                        var entity = current.Model.FindEntity(process.Entity.Id)
-                            ?? throw new InvalidOperationException($"The release has no entity '{process.Entity.Name}'.");
+                        // The compiler refuses a trigger that names a process without a subject.
+                        var subjectReference = process.Entity
+                            ?? throw new InvalidOperationException($"The process '{process.Name}' has no subject, so a trigger cannot start it.");
+                        var entity = current.Model.FindEntity(subjectReference.Id)
+                            ?? throw new InvalidOperationException($"The release has no entity '{subjectReference.Name}'.");
                         foreach (var id in ids)
                         {
                             if (await StartAsync(item, transaction, current.Model, current.ReleaseId, trigger, process, entity, occurrence, id, cancellationToken) is { } skipped)
