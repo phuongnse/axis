@@ -351,7 +351,7 @@ public static class DataSourceQueries
         string.Join(", ", [
             $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}",
             .. dataSource.Fields.Select(field =>
-                joins.ColumnOf(field.Path) + (field.Field.Type == FieldType.Decimal ? "::text" : "")),
+                joins.ColumnOf(field.Path) + (FieldTypes.HoldsDecimal(field.Field.Type) ? "::text" : "")),
             .. References(dataSource).Select(field =>
                 $"{joins.TargetAlias(field.Path)}.{EntityNaming.Quote(EntityNaming.Column(field.Field.TargetDisplayField!))}"),
         ]);
@@ -382,10 +382,10 @@ public static class DataSourceQueries
             .ToList();
         var select = string.Join(", ", [
             .. aggregate.GroupBy.Select((field, index) =>
-                groupColumns[index] + (field.Field.Type == FieldType.Decimal ? "::text" : "")),
+                groupColumns[index] + (FieldTypes.HoldsDecimal(field.Field.Type) ? "::text" : "")),
             .. aggregate.Measures.Select(measure =>
                 Aggregate(measure, joins)
-                + (measure.Function == AggregateFunction.Sum || measure.Field?.Field.Type == FieldType.Decimal ? "::text" : "")),
+                + (measure.Function == AggregateFunction.Sum || measure.Field is { } measureField && FieldTypes.HoldsDecimal(measureField.Field.Type) ? "::text" : "")),
             .. labelColumns,
         ]);
         string[] grouping = [.. groupColumns, .. labelColumns];

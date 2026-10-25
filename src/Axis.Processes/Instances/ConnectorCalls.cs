@@ -34,22 +34,23 @@ public static class ConnectorCalls
 
     /// <summary>
     /// Inserts <paramref name="call"/> as <c>pending</c> with no attempts. It is created at the
-    /// transaction's time. A second call for the same instance and step violates the unique index, unless
-    /// the first one failed, which <see cref="RestageAsync"/> stages again.
+    /// transaction's time. A step stages one call per pass of a loop, told apart by the revision it ran at. A second call for the same
+    /// instance, step and revision violates the unique index. A failed call is staged again by <see cref="RestageAsync"/>.
     /// </summary>
     internal static async Task InsertAsync(NpgsqlTransaction transaction, NewConnectorCall call, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.connector_calls
-                (id, process_instance_id, step, release_id, connector, operation, state, attempts, input, created_at)
-            VALUES (@id, @instance, @step, @release, @connector, @operation, @state, 0, @input, now())
+                (id, process_instance_id, step, staged_revision, release_id, connector, operation, state, attempts, input, created_at)
+            VALUES (@id, @instance, @step, @revision, @release, @connector, @operation, @state, 0, @input, now())
             """,
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("id", call.Id);
         command.Parameters.AddWithValue("instance", call.ProcessInstanceId);
         command.Parameters.AddWithValue("step", call.Step);
+        command.Parameters.AddWithValue("revision", call.StagedRevision);
         command.Parameters.AddWithValue("release", call.ReleaseId);
         command.Parameters.AddWithValue("connector", call.Connector);
         command.Parameters.AddWithValue("operation", call.Operation);
@@ -59,33 +60,37 @@ public static class ConnectorCalls
     }
 
     /// <summary>
-    /// Finds the <c>failed</c> call of <paramref name="step"/> for the instance and locks it until the
-    /// transaction ends, or returns <see langword="null"/> when the step has no failed call. An
-    /// operator retry leaves such a call.
+    /// Finds the latest call of <paramref name="step"/> for the instance, the one of the newest pass,
+    /// and locks it until the transaction ends. Returns its id when it is <c>failed</c>, or
+    /// <see langword="null"/> when it is not or the step has no call. An operator retry leaves such a call.
     /// </summary>
     internal static async Task<Guid?> FindFailedAsync(NpgsqlTransaction transaction, Guid instanceId, string step, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
-            "SELECT id FROM axis.connector_calls WHERE process_instance_id = @instance AND step = @step AND state = @failed FOR UPDATE",
+            """
+            SELECT id, state FROM axis.connector_calls
+            WHERE process_instance_id = @instance AND step = @step
+            ORDER BY staged_revision DESC LIMIT 1 FOR UPDATE
+            """,
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("instance", instanceId);
         command.Parameters.AddWithValue("step", step);
-        command.Parameters.AddWithValue("failed", Failed);
-        return await command.ExecuteScalarAsync(cancellationToken) is Guid id ? id : null;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) && reader.GetString(1) == Failed ? reader.GetGuid(0) : null;
     }
 
     /// <summary>
     /// Sets the <c>failed</c> call <paramref name="call"/> back to <c>pending</c> under its id, so its
-    /// operation identity stays. It stores the new input, counts attempts and lookups from 0 again,
-    /// and clears the last status, the last error and the settled time. Throws when the call is not failed.
+    /// operation identity stays. It stores the new input and the revision of the new run, counts
+    /// attempts and lookups from 0 again, and clears the last status, the last error and the settled time. Throws when the call is not failed.
     /// </summary>
     internal static async Task RestageAsync(NpgsqlTransaction transaction, NewConnectorCall call, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             UPDATE axis.connector_calls
-            SET state = @pending, attempts = 0, lookups = 0, input = @input,
+            SET state = @pending, attempts = 0, lookups = 0, input = @input, staged_revision = @revision,
                 last_status = NULL, last_error = NULL, settled_at = NULL
             WHERE id = @id AND state = @failed
             """,
@@ -94,6 +99,7 @@ public static class ConnectorCalls
         command.Parameters.AddWithValue("id", call.Id);
         command.Parameters.AddWithValue("pending", Pending);
         command.Parameters.AddWithValue("failed", Failed);
+        command.Parameters.AddWithValue("revision", call.StagedRevision);
         command.Parameters.Add(new NpgsqlParameter("input", NpgsqlDbType.Jsonb) { Value = call.Input.ToJsonString() });
         if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
         {
@@ -277,6 +283,7 @@ public static class ConnectorCalls
 
 /// <summary>A connector call that a <c>callConnector</c> step stages for its instance.</summary>
 /// <param name="Id">The call's operation identity, a version 7 UUID.</param>
+/// <param name="StagedRevision">The instance revision the step ran at.</param>
 /// <param name="Connector">The connector's declared name.</param>
 /// <param name="Operation">The operation's declared name.</param>
 /// <param name="Input">The evaluated input, keyed by the inputs' declared names.</param>
@@ -284,6 +291,7 @@ internal sealed record NewConnectorCall(
     Guid Id,
     Guid ProcessInstanceId,
     string Step,
+    long StagedRevision,
     Guid ReleaseId,
     string Connector,
     string Operation,

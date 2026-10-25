@@ -231,4 +231,5 @@ public static class DiagnosticCodes
     public const string ChartDataSourceNotGrouped = "AXC0240";
     public const string InvalidChartMeasure = "AXC0241";
     public const string InvalidValueLabels = "AXC0242";
+    public const string InvalidMoneyCurrency = "AXC0243";
 }

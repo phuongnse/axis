@@ -90,12 +90,13 @@ Dn refers to [decisions.md](../decisions.md).
     and a section without a `name` cannot move between steps. The live region
     names the section, its step and its position, and the section stays
     selected. A move is one change of the draft, so one undo reverses it. A drop
-    on a step in the step switch is _(planned for M14)_.
+    on a step in the step switch appends the section to that step, as a drop on
+    the step's heading does. While a section moves, the switch entries show an
+    outline under the pointer, and a field drag never targets them.
   - **Sections and steps.** The palette adds a section, with a unique `name`
     and a new title key that the label editor opens, and a step. A new section
     joins the selected step. Adding the first step names every unnamed section
     and puts all sections into it, so the form stays valid (`AXC0230`).
-    Removing the last step removes `steps` _(planned for M14)_.
     _Built:_ the palette has Add section and Add step below the field
     list. Add section appends a section named with the lowest unused
     `section{n}`, ignoring letter case, and a title key such as
@@ -107,14 +108,23 @@ Dn refers to [decisions.md](../decisions.md).
     where a palette field can land. Each add is one undo step, and a live
     region names what was added. Until a field goes into an empty section or
     step and the texts are written, the canvas shows its cannot-be-drawn
-    notice. Removing a section or a step is _(planned for M14)_.
+    notice. Remove section, in a section's panel, takes it out of `sections` and
+    of every step that lists it, and its fields return to the palette. The step
+    that listed it is selected. Remove step, in a step's panel, keeps the
+    step's sections in `sections`; they are then listed by no step, which the
+    diagnostics flag (`AXC0230`), and nothing stays selected. Removing the last
+    step removes `steps`, so the form goes back to one page. Conditions that
+    name a removed section's fields are not rewritten. Each remove is one undo
+    step, and a live region says "Removed" with the section's name or the
+    step's title.
   - **Property panel.** A field shows `readOnly` and its three conditions in
     the expression editor, which offers only the fields the form lists. A field
     that the entity marks `required` has no `visibleWhen` box. A computed,
     sequence or creator field shows `readOnly` on and locked. A field also has
     a Remove field button below its conditions, described in the field palette
-    bullet. A section shows its name, title and `visibleWhen`. A step shows its
-    title.
+    bullet. A section shows its name, title and `visibleWhen`, and a Remove
+    section button, described in the sections and steps bullet. A step shows
+    its title and a Remove step button, also described there.
     _Built:_ a click, Enter or Space selects a field or a section. A
     click on a step selects it and shows its sections. The selected element has
     `aria-current` and an outline in the primary colour. The panel asks the

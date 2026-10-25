@@ -369,7 +369,7 @@ public sealed class ApplicationCompilerTests
                 { "name": "status", "type": "enum" },
                 { "name": "total", "type": "decimal", "precision": 1001, "scale": 2 }
                 """))
-            .With("entities/c-invoice.json", Entity("Invoice", """{ "name": "amount", "type": "money" }""", "22222222-2222-4222-8222-222222222222"));
+            .With("entities/c-invoice.json", Entity("Invoice", """{ "name": "amount", "type": "colour" }""", "22222222-2222-4222-8222-222222222222"));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 

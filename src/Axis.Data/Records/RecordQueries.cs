@@ -264,7 +264,7 @@ public static class RecordQueries
         var references = References(child).ToList();
         var alias = EntityNaming.Quote(RowAlias);
         var selected = columns.Select(field =>
-            alias + "." + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (field.Type == FieldType.Decimal ? "::text" : ""))
+            alias + "." + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : ""))
             .Concat(references.Select((field, index) =>
                 $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"));
         await using var command = new NpgsqlCommand(
@@ -318,7 +318,7 @@ public static class RecordQueries
             row + EntityNaming.Quote(EntityNaming.IdColumn),
             row + EntityNaming.Quote(EntityNaming.VersionColumn),
             .. Columns(entity).Select(field =>
-                row + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (field.Type == FieldType.Decimal ? "::text" : "")),
+                row + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : "")),
             .. References(entity).Select((field, index) =>
                 $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"),
         ]);
@@ -381,7 +381,7 @@ public static class RecordQueries
             FieldType.Text or FieldType.Enum => JsonValue.Create(reader.GetString(ordinal)),
             FieldType.Integer => JsonValue.Create(reader.GetInt64(ordinal)),
             // The number text is written as is, so trailing zeros and every digit are kept.
-            FieldType.Decimal => (JsonValue)JsonNode.Parse(reader.GetString(ordinal))!,
+            FieldType.Decimal or FieldType.Money => (JsonValue)JsonNode.Parse(reader.GetString(ordinal))!,
             FieldType.Boolean => JsonValue.Create(reader.GetBoolean(ordinal)),
             FieldType.Date => JsonValue.Create(reader.GetFieldValue<DateOnly>(ordinal).ToString(DateFormat, CultureInfo.InvariantCulture)),
             // Npgsql reads timestamp with time zone as a UTC DateTime.

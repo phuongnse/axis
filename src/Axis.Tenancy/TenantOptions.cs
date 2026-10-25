@@ -41,3 +41,10 @@ public static class DeploymentBindingKinds
     public const string Url = "url";
     public const string Secret = "secret";
 }
+
+/// <summary>The sign-in profiles a tenant can have.</summary>
+public static class TenantSignInProfiles
+{
+    public const string Standard = "standard";
+    public const string Fapi2 = "fapi2";
+}

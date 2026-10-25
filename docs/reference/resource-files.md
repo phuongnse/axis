@@ -444,11 +444,27 @@ is `AXC0013`.
 | `enum` | yes | yes | | | | | needed | yes | | | yes |
 | `reference` | yes | yes | | | | needed | | | | | yes |
 | `child-collection` | | | | | | needed | | | | | |
+| `money` | yes | yes | | 1..1000, default 18 | 0..`precision`, default from the currency | | | yes | | | yes |
 - `required` and `unique` default to `false`.
 - `maxLength` is capped at 10485760, the largest `varchar` length.
 - `values` is a non-empty list of distinct strings; the JSON Schema checks
   this (`AXC0004`).
 - `target` names an entity in the same application, ignoring letter case.
+- `money` is an amount stored as `numeric(precision,scale)`. It takes exactly
+  one of `currency`, a fixed ISO 4217 code written in upper case such as
+  `"VND"`, or `currencyField`, which names an `enum` or `text` field of the
+  same entity, ignoring letter case. `precision` defaults to 18. `scale`
+  defaults to the currency's minor units (`VND` 0, `USD` 2, `KWD` 3), or to 2
+  with `currencyField`. `scale` can be set without `precision`, but cannot
+  exceed it. The compiled field holds the resolved values. The record API
+  reads and writes it as a `decimal` with the same `precision` and `scale`,
+  and its expression type is `decimal`. A field with neither property, with
+  both, with a code that is not an ISO 4217 code with minor units, or with a
+  `currencyField` that is not a `text` or `enum` field of the entity is
+  `AXC0243`, at `/fields/{i}` when the currency is missing and at
+  `/fields/{i}/currency` or `/fields/{i}/currencyField` otherwise. `currency`
+  or `currencyField` on another type is `AXC0013`. A data source measure still
+  refuses `money`, see [data sources](data-sources.md#aggregates).
 - `child-collection` owns the rows of the entity that `target` names. It
   allows no other type-specific property. It has no `required`, because a
   missing collection means no rows, and no `unique`. Setting either, even to
@@ -481,11 +497,6 @@ new check is a new compile diagnostic.
 - **`file`.** One file, with optional `maxSize` and `accept`. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. See
   [file fields](file-fields.md).
-- **`money`.** An amount, with `precision` (default 18) and `scale`, and
-  exactly one of `currency`, a fixed ISO 4217 code such as `"VND"`, or
-  `currencyField`, which names an `enum` or `text` field of the same entity.
-  `scale` defaults to the currency's minor units, or 2 with `currencyField`.
-  It takes the properties of `decimal`, and its expression type is `decimal`.
 - **`references`.** A set of records of `target`, at most 1,000. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. Its
   expression type is `list<Target>`.
