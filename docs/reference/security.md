@@ -27,7 +27,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   has an `Oidc` block. `Claims` names the claims that give the user id, the
   display name and the roles. Each claim name is optional, and the defaults
   are `sub`, `name` and `roles`. The optional `EndpointAudience` is for
-  [machine callers](#machine-callers). `Claims` also names `Email` and
+  [machine callers](#machine-callers), and the optional `ServiceAudience` is
+  for [service accounts](#service-accounts). `Claims` also names `Email` and
   `Locale`, by default `email` and `locale`, which each sign-in writes to the
   user's profile, see [User profiles](notifications.md#user-profiles).
 
@@ -78,10 +79,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     response. A missing `returnUrl` means `/`.
   - `GET /api/auth/callback` is where the identity provider returns. It
     creates the session and redirects to `returnUrl`. A callback that fails
-    creates no session. For now it answers a `500` problem details response,
-    for example when the person cancels at the identity provider. A failed
-    callback is to redirect to the shell's sign-in page instead, which says
-    that sign-in did not complete and shows no reason _(planned for M16)_. See
+    creates no session and redirects to the shell's sign-in page, `/?signIn=failed`,
+    for example when the person cancels at the identity provider. The page says
+    that sign-in did not complete and shows no reason, and the address holds
+    none. See the [home page](frontend.md) and
     [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
   - `POST /api/auth/sign-out` ends the session and returns `200` with
     `{ "signOutUrl" }`. The SPA then sends the browser to that URL, and the
@@ -96,7 +97,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   [D50](../decisions/d50-sign-in-audit-records-and-security-scanning-in-ci.md).
   - The callback writes `session.signedIn` when it creates a session. It writes
     `session.signInRefused`, with a reason code, when it refuses. A refused
-    callback still answers the `500` above, until the redirect of M16.
+    callback still redirects to the sign-in page.
   - `POST /api/auth/sign-out` writes `session.signedOut` only when a session
     existed.
   - An expired session writes nothing. A host that resolves to no tenant writes
@@ -302,15 +303,15 @@ systems.
   name claim. When the token has none, it is the token's client id (`azp`).
   Keycloak service-account tokens have no `name` claim, and a bare id would
   be hard to read in a record's history.
-- **Endpoint routes only.** The server accepts a bearer token only on
+- **Endpoint routes only.** The endpoint audience is accepted only on
   `POST /api/apps/{app}/endpoints/{name}` and its status location. Everywhere
-  else a bearer token is ignored, so it never reaches the record API, the
-  data source endpoint or the task API. The request's default
+  else a bearer token with that audience is ignored, so it never reaches the
+  record API, the data source endpoint or the task API. The request's default
   authentication is the bearer token on paths under
   `/api/apps/{app}/endpoints/`, and the session everywhere else.
-  [Service accounts](#service-accounts) also send bearer tokens to the record
-  API, data source rows and the process API _(planned for M16)_. The task API
-  stays closed to bearer tokens.
+  [Service accounts](#service-accounts) send bearer tokens with another
+  audience to the record API, and to data source rows and the process API
+  _(planned for M16)_. The task API stays closed to bearer tokens.
 - **Clock.** The expiry is checked against the server's clock service, with
   the usual 5 minutes of clock skew, so tests can replace the clock.
 - **No session.** On endpoint routes the session cookie is ignored and not
@@ -341,12 +342,14 @@ systems.
 
 ## Service accounts
 
-_(Planned for M16.)_ It follows
+It follows
 [D86](../decisions/d86-service-accounts-for-the-record-and-process-apis.md).
 A service account lets another system read and write records, read data
 source rows, and start and inspect processes, under the same policies as a
 user. It replaces the point of D27 that accepts bearer tokens only on endpoint
-routes.
+routes. The record API takes service accounts now. Data source rows, the
+process API and the operator commands are _(planned for M16)_ and stay
+session-only until then.
 
 - **What it is.** A client of the tenant's identity provider that gets
   access tokens through the client credentials grant. Axis issues no API key.
@@ -354,17 +357,25 @@ routes.
   people.
 - **Tenant setting.** The expected audience is a new tenant setting,
   `Oidc:ServiceAudience`, separate from `Oidc:EndpointAudience`. In the
-  development tenant its value is `axis-services`. A tenant without it accepts
-  no service account token. Under `Tenancy:Source=directory` the setting is in
-  the tenant directory and `tenant oidc set` changes it, see
-  [tenant setting commands](tenant-setting-commands.md).
+  development tenant, the E2E server and the test hosts its value is
+  `axis-services`. A tenant without it accepts no service account token, and
+  neither does a preview tenant, which takes neither audience from its main
+  tenant. Under `Tenancy:Source=directory` the setting is the
+  `service_audience` column of `platform.tenants`. `tenant oidc set` will
+  change it _(planned for M16)_, see
+  [tenant setting commands](tenant-setting-commands.md). Until then an operator
+  sets the column by hand.
 - **Routes.** A service account may call:
   - every route of the [record API](record-api.md), record history included;
-  - `GET /api/apps/{app}/data-sources/{dataSource}/rows`;
-  - `POST /api/apps/{app}/processes/{process}/instances`;
+  - `GET /api/apps/{app}/data-sources/{dataSource}/rows` _(planned for M16)_;
+  - `POST /api/apps/{app}/processes/{process}/instances` _(planned for M16)_;
   - the instance list and one instance of
-    [process inspection](process-inspection.md);
-  - the operator commands retry, cancel and resolve.
+    [process inspection](process-inspection.md) _(planned for M16)_;
+  - the operator commands retry, cancel and resolve _(planned for M16)_.
+
+  The server marks each of these routes, so the choice of scheme, the CSRF
+  exemption and the test of every route read the same mark and no path is
+  matched by text.
 - **Not reached.** The task API, the form state endpoint, site and page
   metadata, `GET /api/me`, Studio and the authoring API. A task asks a person
   to decide, so a service account never completes one. A bearer token on these
@@ -380,7 +391,7 @@ routes.
   the signature, the issuer, the expiry, and an audience that holds
   `Oidc:ServiceAudience`. Any failure is a `401` with
   `WWW-Authenticate: Bearer`. Under the `fapi2` profile the token must also
-  be DPoP-bound.
+  be DPoP-bound _(planned for M16)_.
 - **Order of checks.** The tenant, the token (`401`), the path (`404`), then
   the grant (`403`), as for a session. The checks that follow are those of
   each route.
@@ -392,11 +403,14 @@ routes.
   name falls back to the client id, `azp`.
 - **Rate limits.** Service account requests count in the bearer partition,
   by tenant and caller id, see
-  [rate limits](headers-and-rate-limits.md#rate-limits).
-- **Keycloak.** The development realm gets a confidential client
+  [rate limits](headers-and-rate-limits.md#rate-limits) _(planned for M16)_.
+- **Keycloak.** The development realm has a confidential client
   `reporting-system` with a service account, a role in the roles claim and an
-  audience mapper that adds `axis-services`. Tests use it for allowed and
-  denied calls.
+  audience mapper that adds `axis-services`. The service account holds the
+  `axis` client role `reporting-system` and has the fixed user id
+  `reporting-system`, which is the token's `sub` and so the caller id. The
+  client secret is `reporting-system-development-secret`, for development only.
+  Tests use it for allowed and denied calls.
 
 ## FAPI 2.0 profile
 

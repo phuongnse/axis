@@ -15,6 +15,13 @@ public sealed class ConnectorCallRow
     /// <summary>The declared name of the <c>callConnector</c> step.</summary>
     public required string Step { get; init; }
 
+    /// <summary>
+    /// The instance revision the step ran at, which matches the step's history row for that run. A
+    /// step stages one call per pass of a loop, and this tells the passes apart. A retry restage sets it to
+    /// the revision of the new run.
+    /// </summary>
+    public required long StagedRevision { get; init; }
+
     /// <summary>The release the instance is pinned to.</summary>
     public required Guid ReleaseId { get; init; }
 

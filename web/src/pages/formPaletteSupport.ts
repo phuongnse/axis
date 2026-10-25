@@ -1,4 +1,14 @@
-import { moveField, moveSection, type FieldPlace, type SectionPlace } from '../platform/formLayout'
+import {
+  dropPlace,
+  moveField,
+  movePlace,
+  moveSection,
+  removeSection,
+  removeStep,
+  sectionMovePlace,
+  type FieldPlace,
+  type SectionPlace,
+} from '../platform/formLayout'
 import type { ChangeHandler } from './SchemaForm'
 
 /** The name of the section at `index` for the outline and the live region: its `name`, or `Section N` without one. */
@@ -127,4 +137,87 @@ export function moveSectionTo(
   onAnnounce(
     `${t('shell.studio.palette.moved')} ${label}${where} · ${t('shell.studio.palette.position')} ${position + 1}`,
   )
+}
+
+/** Removes a section from `sections` and the steps, selects its step and says which section left. */
+export function removeSectionAt(
+  t: (key: string) => string,
+  draft: Record<string, unknown>,
+  index: number,
+  onChange: ChangeHandler,
+  onSelect: (pointer: string | null) => void,
+  onAnnounce: (text: string) => void,
+) {
+  const result = removeSection(draft, index)
+  if (result === undefined) {
+    return
+  }
+  const label = sectionLabel(t, draft, index)
+  onChange('/sections', result.sections)
+  if (result.steps !== undefined) {
+    onChange('/steps', result.steps)
+  }
+  onSelect(result.step === undefined ? null : `/steps/${result.step}`)
+  onAnnounce(`${t('shell.studio.design.removed')} ${label}`)
+}
+
+/** Removes a step, keeps its sections, selects nothing and says which step left. */
+export function removeStepAt(
+  t: (key: string) => string,
+  draft: Record<string, unknown>,
+  index: number,
+  onChange: ChangeHandler,
+  onSelect: (pointer: string | null) => void,
+  onAnnounce: (text: string) => void,
+) {
+  const result = removeStep(draft, index)
+  if (result === undefined) {
+    return
+  }
+  const steps = draft.steps as { title?: { textKey?: unknown } }[]
+  const textKey = steps[index].title?.textKey
+  onChange('/steps', result.steps)
+  onSelect(null)
+  onAnnounce(
+    `${t('shell.studio.design.removed')} ${typeof textKey === 'string' && textKey !== '' ? t(textKey) : `/steps/${index}`}`,
+  )
+}
+
+/** Applies a drop of a section, a field move or a palette field on the element under the pointer. */
+export function dropOnForm(
+  t: (key: string) => string,
+  draft: Record<string, unknown>,
+  active: unknown,
+  over: unknown,
+  onChange: ChangeHandler,
+  onSelect: (pointer: string) => void,
+  onAnnounce: (text: string) => void,
+) {
+  const pointer = (over as { pointer?: unknown } | undefined)?.pointer
+  if (typeof pointer !== 'string') {
+    return
+  }
+  const data = active as { field?: unknown; move?: FieldPlace; section?: unknown } | undefined
+  if (typeof data?.section === 'number') {
+    const to = sectionMovePlace(draft, pointer)
+    if (to !== undefined) {
+      moveSectionTo(t, draft, data.section, to, onChange, onSelect, onAnnounce)
+    }
+    return
+  }
+  if (data?.move !== undefined) {
+    const to = movePlace(draft, pointer)
+    if (to !== undefined) {
+      moveFieldTo(t, draft, data.move, to, onChange, onSelect, onAnnounce)
+    }
+    return
+  }
+  const field = data?.field
+  if (typeof field !== 'string') {
+    return
+  }
+  const place = dropPlace(draft, pointer)
+  if (place !== undefined) {
+    insertField(t, draft, field, place, onChange, onSelect, onAnnounce)
+  }
 }

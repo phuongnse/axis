@@ -268,6 +268,47 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task A_preview_tenants_archive_is_refused_with_the_preview_message_and_creates_nothing()
+    {
+        var scenario = fixture.Scenario;
+        var mainId = scenario.NewTenantId();
+        var previewId = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(mainId, $"{mainId}.example.test")).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(AdminScenario.PreviewArgs(previewId, mainId, $"{previewId}.example.test"), withClientSecret: false)).Exit);
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", previewId, "--out", file], path: fixture.Tools.PathSetting)).Exit);
+
+        // An archive from before previewOf existed has the empty sign-in settings of a preview entry only.
+        var old = Rewrite(file, folder.Path, "old-preview", manifest => ((JsonObject)manifest["directory"]!).Remove("previewOf"));
+
+        foreach (var source in new[] { file, old })
+        {
+            var id = scenario.NewTenantId();
+            var entries = await scenario.CountEntriesAsync();
+
+            var result = await RestoreAsync(source, id, $"{id}.example.test");
+
+            Assert.Equal(2, result.Exit);
+            var line = Assert.Single(result.Output);
+            Assert.StartsWith($"{id} check failed: ", line, StringComparison.Ordinal);
+            Assert.Contains("preview tenant", line, StringComparison.Ordinal);
+            Assert.Contains("tenant create --preview-of", line, StringComparison.Ordinal);
+            Assert.DoesNotContain("OIDC", line, StringComparison.Ordinal);
+            Assert.Empty(result.Error);
+            await AssertNothingCreatedAsync(id, entries);
+        }
+
+        // The other checks are still reported next to the preview refusal.
+        var other = scenario.NewTenantId();
+        var taken = await RestoreAsync(file, other, AdminBackupFixture.Host);
+        Assert.Equal(2, taken.Exit);
+        Assert.Equal(2, taken.Output.Length);
+        Assert.Single(taken.Output, text => text.Contains("preview tenant", StringComparison.Ordinal));
+        Assert.Single(taken.Output, text => text.Contains(AdminBackupFixture.Host, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task An_archive_with_several_problems_reports_every_one_and_creates_nothing()
     {
         using var folder = new TemporaryFolder();

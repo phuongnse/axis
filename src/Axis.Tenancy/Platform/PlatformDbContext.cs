@@ -4,7 +4,8 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts
-/// and their deployment bindings, and the data protection keys of the server. The caller supplies the connection to the platform database.
+/// and their deployment bindings, the data protection keys of the server and the append-only platform audit records.
+/// The caller supplies the connection to the platform database.
 /// </summary>
 public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> options) : DbContext(options)
 {
@@ -19,6 +20,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantBindingRow> TenantBindings => Set<TenantBindingRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
+
+    public DbSet<PlatformAuditRecordRow> AuditRecords => Set<PlatformAuditRecordRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
@@ -52,6 +55,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.ClaimEmail).HasColumnName("claim_email");
             tenant.Property(t => t.ClaimLocale).HasColumnName("claim_locale");
             tenant.Property(t => t.EndpointAudience).HasColumnName("endpoint_audience");
+            tenant.Property(t => t.ServiceAudience).HasColumnName("service_audience");
             tenant.Property(t => t.SchemaVersion).HasColumnName("schema_version").HasDefaultValue("");
             tenant.Property(t => t.PreviewOf).HasColumnName("preview_of");
             tenant.HasIndex(t => t.PreviewOf).IsUnique().HasDatabaseName("ix_tenants_preview_of");
@@ -101,6 +105,19 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             key.Property(k => k.FriendlyName).HasColumnName("friendly_name");
             key.HasIndex(k => k.FriendlyName).IsUnique().HasDatabaseName("ix_data_protection_keys_friendly_name");
             key.Property(k => k.Xml).HasColumnName("xml").HasColumnType("bytea");
+        });
+
+        modelBuilder.Entity<PlatformAuditRecordRow>(record =>
+        {
+            record.ToTable("audit_records");
+            record.HasKey(r => r.Id).HasName("pk_audit_records");
+            record.Property(r => r.Id).HasColumnName("id").ValueGeneratedNever();
+            record.Property(r => r.OccurredAt).HasColumnName("occurred_at");
+            record.Property(r => r.Command).HasColumnName("command");
+            record.Property(r => r.TenantId).HasColumnName("tenant_id");
+            record.Property(r => r.OsUser).HasColumnName("os_user");
+            record.Property(r => r.Machine).HasColumnName("machine");
+            record.Property(r => r.Changed).HasColumnName("changed").HasColumnType("text[]");
         });
     }
 }

@@ -4,10 +4,12 @@ Detailed reference for the security headers the server sets on every response, a
 on the routes a caller can repeat. The conventions of [architecture.md](../architecture.md) apply:
 sections marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-The design follows [D85](../decisions/d85-rate-limits-and-security-headers.md). All of this page is
-_(planned for M16)_.
+The design follows [D85](../decisions/d85-rate-limits-and-security-headers.md). The rate limits are
+built. The security headers are _(planned for M16)_.
 
 ## Security headers
+
+_(Planned for M16.)_
 
 The server sets these headers itself, so they are the same under `scripts/dev.sh`, Docker Compose
 and the Helm chart, and behind any proxy.
@@ -48,10 +50,12 @@ The server uses the ASP.NET Core rate limiter.
   installation sees is the number of replicas times the setting.
 - **No override per tenant.** Every tenant gets the same limits.
 - **Where it runs.** After the tenant is resolved, the CSRF check and authentication. A refused write
-  costs nothing, and the caller is known.
+  costs nothing, and the caller is known. A request that fails the CSRF check, or has no valid
+  session or token, still gets its `403` or `401`, never a `429`. The one exception is the sign-in
+  callback, see below.
 - **Refused.** A request over a limit answers `429` problem details titled "Too many requests.", with
-  a `Retry-After` header in seconds. It writes no audit record. The server counts refusals in a
-  metric, by partition.
+  a `Retry-After` header in seconds. The route never runs, so it writes nothing and no audit record.
+  The server counts refusals in the metric `axis.rate_limits.refused`, by partition.
 
 | Partition    | Routes                                                                  | Counted by                  | Setting                     |
 | ------------ | ----------------------------------------------------------------------- | --------------------------- | --------------------------- |
@@ -61,10 +65,31 @@ The server uses the ASP.NET Core rate limiter.
 | Publishing   | Studio validate, publish, preview, rollback and test requests           | Tenant and user             | `RateLimits:Publishing`     |
 
 - **Client address.** It follows the [forwarded headers](host-settings.md#forwarded-headers) rules.
-- **Settings.** Each setting is a number of requests per minute, with a short burst allowance. The
-  defaults are set so that the [load test](performance.md#load-test) never reaches them. A value of
-  zero or less stops the server's start, naming the setting.
+  Requests with no client address, such as those on a Unix socket, share one sign-in count.
+- **Settings.** Each setting is a number of requests per minute for one replica, see
+  [rate limit settings](host-settings.md#rate-limit-settings). A value of zero or less, or one that is
+  not a number, stops the server's start, naming the setting. The defaults are set so that the
+  [load test](performance.md#load-test) never reaches them.
+- **Short burst.** Each caller has a bucket of request allowances. It holds one minute's worth, which
+  is the setting, and gets a sixth of it back every 10 seconds. So a page that makes a burst of API
+  calls passes, and `Retry-After` is at most about 10 seconds.
+- **The partition follows the route and the kind of caller.** A bearer request on a route that also
+  takes a session counts as bearer. The status poll `GET /api/studio/apps/{application}/requests/{id}`
+  and `POST /api/auth/sign-out` count as session, not as publishing or sign-in.
+- **No valid session or token.** A request on a session or bearer route with no valid session or token
+  counts in that route's partition by tenant and client address. So it is not unlimited, and a user's
+  empty bucket never turns an anonymous `401` into a `429`.
+- **The callback.** The OIDC handler answers `GET /api/auth/callback` inside authentication, so the
+  limiter counts the callback just before authentication. It shares the sign-in count of its client
+  address.
 - **Open routes.** `GET /api/site`, `GET /api/texts/{locale}`, `/health` and the SPA's static files
-  have no limit.
-- **Tests.** An integration test sends requests past a limit and expects the `429` with
-  `Retry-After`, and a request in another partition still passes.
+  and pages have no limit.
+- **Metric.** `axis.rate_limits.refused` counts the refused requests, with the attribute
+  `axis.partition`: `sign_in`, `session`, `bearer` or `publishing`. It carries no tenant, user or
+  address.
+- **Tests.** An integration test sends requests past each partition's limit and expects the `429` with
+  `Retry-After`, and a request in another partition, of another user, from another client address or
+  of another tenant still passes. Another shows a bearer caller is refused past `RateLimits:Bearer`,
+  and a refused write still gets its CSRF `403` first. A unit test reads every route from the server's
+  endpoint data source and fails on a route that is not open and has no partition, or that takes a
+  bearer token and has no bearer partition.

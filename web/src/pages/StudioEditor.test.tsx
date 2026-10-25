@@ -1325,8 +1325,20 @@ describe('StudioEditor for a form', () => {
     ],
   } as unknown as StudioNames
 
-  function stubForm() {
-    const { fetchMock } = stubResource(formItem, formContent)
+  const steppedContent = {
+    ...formContent,
+    sections: [
+      { name: 'problem', title: { textKey: 'ticket.sections.problem' }, fields: [{ field: 'title' }] },
+      { name: 'details', title: { textKey: 'ticket.sections.details' }, fields: [{ field: 'resolution' }] },
+    ],
+    steps: [
+      { title: { textKey: 'ticket.steps.problem' }, sections: ['problem'] },
+      { title: { textKey: 'ticket.steps.details' }, sections: ['details'] },
+    ],
+  }
+
+  function stubForm(content: unknown = formContent) {
+    const { fetchMock } = stubResource(formItem, content)
     const base = fetchMock.getMockImplementation()!
     fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
       input === `${folder}/resources/${formId}/references` ? json({ usedBy: [] }) : base(input, init),
@@ -1406,6 +1418,41 @@ describe('StudioEditor for a form', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect(screen.getAllByTestId('studio-outline-section')).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
+  })
+
+  it('undoes a Remove section in one step, restoring sections and steps and returning the fields to the palette', async () => {
+    stubForm(steppedContent)
+    renderForm()
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Design' }, slow))
+    await userEvent.click(screen.getAllByTestId('studio-outline-section')[0])
+    await userEvent.click(screen.getByRole('button', { name: 'Remove section' }))
+    expect(screen.getAllByTestId('studio-outline-section')).toHaveLength(1)
+    expect(screen.getByTestId('studio-form-palette-title')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    const draft = JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)
+    expect(draft.sections).toEqual(steppedContent.sections)
+    expect(draft.steps).toEqual(steppedContent.steps)
+  })
+
+  it('undoes a Remove step in one step, restoring the step', async () => {
+    stubForm(steppedContent)
+    renderForm()
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Design' }, slow))
+    await userEvent.click(screen.getAllByTestId('studio-outline-step')[1])
+    await userEvent.click(screen.getByRole('button', { name: 'Remove step' }))
+    expect(screen.getAllByTestId('studio-outline-step')).toHaveLength(1)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getAllByTestId('studio-outline-step')).toHaveLength(2)
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    const draft = JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)
+    expect(draft.sections).toEqual(steppedContent.sections)
+    expect(draft.steps).toEqual(steppedContent.steps)
   })
 })
 

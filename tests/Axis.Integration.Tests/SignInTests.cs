@@ -215,7 +215,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         using var callback = await Factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false })
             .SendAsync(request, CancellationToken);
 
-        Assert.Equal(HttpStatusCode.InternalServerError, callback.StatusCode);
+        AssertRedirectedToSignInPage(callback);
         var record = Assert.Single(await ReadAuditAsync("b", "session.signInRefused"));
         Assert.Equal("anonymous", record.Actor);
         Assert.Null(record.ActorName);
@@ -233,14 +233,16 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
 
         var callback = await SendAsync(client, HttpMethod.Get, "/api/auth/callback?code=x&state=not-a-state");
 
-        Assert.Equal(HttpStatusCode.InternalServerError, callback.StatusCode);
+        AssertRedirectedToSignInPage(callback);
+        var me = await SendAsync(client, HttpMethod.Get, "/api/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
         var record = Assert.Single(await ReadAuditAsync("a", "session.signInRefused"));
         using var details = JsonDocument.Parse(record.Details);
         Assert.Equal("invalidState", details.RootElement.GetProperty("reason").GetString());
     }
 
     [Fact]
-    public async Task A_callback_with_an_error_from_the_identity_provider_is_refused_as_a_provider_error()
+    public async Task A_cancel_at_the_identity_provider_redirects_to_the_sign_in_page_and_is_recorded_as_a_provider_error()
     {
         using var client = CreateClient();
         var challenge = await SendAsync(client, HttpMethod.Get, "/api/auth/sign-in");
@@ -248,10 +250,28 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
 
         var callback = await SendAsync(client, HttpMethod.Get, $"/api/auth/callback?error=access_denied&state={state}");
 
-        Assert.Equal(HttpStatusCode.InternalServerError, callback.StatusCode);
+        AssertRedirectedToSignInPage(callback);
         var record = Assert.Single(await ReadAuditAsync("a", "session.signInRefused"));
         using var details = JsonDocument.Parse(record.Details);
         Assert.Equal("providerError", details.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task A_rejected_id_token_redirects_to_the_sign_in_page_and_is_recorded_as_an_invalid_token()
+    {
+        // Tenant a reads the user id from a claim that Keycloak's token lacks, so the token is rejected.
+        using var factory = Factory.WithWebHostBuilder(builder => builder.UseSetting("Tenants:a:Oidc:Claims:UserId", "axis_missing_claim"));
+        using var client = CreateClient(factory);
+        var callbackPath = await LoginAtKeycloakAsync(client, "anna", returnUrl: null);
+
+        var callback = await SendAsync(client, HttpMethod.Get, callbackPath);
+
+        AssertRedirectedToSignInPage(callback);
+        var me = await SendAsync(client, HttpMethod.Get, "/api/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+        var record = Assert.Single(await ReadAuditAsync("a", "session.signInRefused"));
+        using var details = JsonDocument.Parse(record.Details);
+        Assert.Equal("invalidToken", details.RootElement.GetProperty("reason").GetString());
     }
 
     [Fact]
@@ -441,6 +461,22 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     /// </summary>
     private async Task<SignInResult> SignInAsync(HttpClient client, string username, string? returnUrl)
     {
+        var callback = await LoginAtKeycloakAsync(client, username, returnUrl);
+
+        var signedIn = await SendAsync(client, HttpMethod.Get, callback);
+        Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+        var sessionCookie = signedIn.Headers.GetValues("Set-Cookie")
+            .Select(cookie => cookie[..cookie.IndexOf(';', StringComparison.Ordinal)])
+            .Single(cookie => cookie.StartsWith($"{Session.Scheme}=", StringComparison.Ordinal));
+        return new SignInResult(signedIn.Headers.Location!.OriginalString, sessionCookie[(Session.Scheme.Length + 1)..]);
+    }
+
+    /// <summary>
+    /// Starts sign-in at the server and logs in on Keycloak's login form. Returns the path and query
+    /// of the callback address that Keycloak sends the browser to, which the caller sends to the server.
+    /// </summary>
+    private async Task<string> LoginAtKeycloakAsync(HttpClient client, string username, string? returnUrl)
+    {
         var path = returnUrl is null ? "/api/auth/sign-in" : $"/api/auth/sign-in?returnUrl={Uri.EscapeDataString(returnUrl)}";
         var challenge = await SendAsync(client, HttpMethod.Get, path);
         Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
@@ -474,12 +510,20 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         var callback = login.Headers.Location!;
         Assert.Equal("http://localhost:5206/api/auth/callback", callback.GetLeftPart(UriPartial.Path));
 
-        var signedIn = await SendAsync(client, HttpMethod.Get, callback.PathAndQuery);
-        Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
-        var sessionCookie = signedIn.Headers.GetValues("Set-Cookie")
-            .Select(cookie => cookie[..cookie.IndexOf(';', StringComparison.Ordinal)])
-            .Single(cookie => cookie.StartsWith($"{Session.Scheme}=", StringComparison.Ordinal));
-        return new SignInResult(signedIn.Headers.Location!.OriginalString, sessionCookie[(Session.Scheme.Length + 1)..]);
+        return callback.PathAndQuery;
+    }
+
+    /// <summary>
+    /// A failed callback redirects to the shell's sign-in page, with no reason in the address and no session cookie.
+    /// </summary>
+    private static void AssertRedirectedToSignInPage(HttpResponseMessage callback)
+    {
+        Assert.Equal(HttpStatusCode.Found, callback.StatusCode);
+        Assert.Equal("/?signIn=failed", callback.Headers.Location?.OriginalString);
+        if (callback.Headers.TryGetValues("Set-Cookie", out var cookies))
+        {
+            Assert.DoesNotContain(cookies, cookie => cookie.StartsWith($"{Session.Scheme}=", StringComparison.Ordinal));
+        }
     }
 
     private static async Task<HttpResponseMessage> GetMeWithCookieAsync(HttpClient client, string host, string sessionCookie)

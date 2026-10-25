@@ -6,6 +6,7 @@ import { startServer } from "../activate";
 import { pickOptions } from "../select";
 import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
+import { openFormTab } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -67,6 +68,7 @@ test.describe("Studio edits form conditions and steps", () => {
     await page.goto(
       `${server.url}/studio?app=PurchaseRequests&resource=${review.id}`,
     );
+    await openFormTab(page);
     const condition = page.getByTestId(
       "studio-field-/sections/1/fields/0/requiredWhen",
     );

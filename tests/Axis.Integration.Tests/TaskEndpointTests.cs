@@ -40,12 +40,13 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
 
         var item = Item(mariaList, userTask);
         Assert.Equal(
-            ["id", "releaseId", "process", "step", "labelKey", "subject", "dueAt", "createdAt"],
+            ["id", "releaseId", "process", "step", "labelKey", "subject", "claimedBy", "dueAt", "createdAt"],
             item.EnumerateObject().Select(property => property.Name));
         Assert.Equal("Approve", item.GetProperty("process").GetString());
         Assert.Equal("approve", item.GetProperty("step").GetString());
         Assert.Equal("request.approve", item.GetProperty("labelKey").GetString());
         AssertSubject(item.GetProperty("subject"), userSubject);
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("claimedBy").ValueKind);
         Assert.EndsWith("Z", item.GetProperty("dueAt").GetString(), StringComparison.Ordinal);
         Assert.Equal(TimeSpan.FromDays(3), item.GetProperty("dueAt").GetDateTimeOffset() - item.GetProperty("createdAt").GetDateTimeOffset());
 
@@ -88,7 +89,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
         var root = body.RootElement;
         Assert.Equal(
             [
-                "id", "releaseId", "process", "instanceId", "step", "labelKey", "state", "assignee", "subject", "form", "outcomes",
+                "id", "releaseId", "process", "instanceId", "step", "labelKey", "state", "assignee", "claimedBy", "subject", "form", "outcomes",
                 "dueAt", "createdAt", "completedAt", "completedBy", "outcome",
             ],
             root.EnumerateObject().Select(property => property.Name));
@@ -99,6 +100,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
         Assert.Equal("open", root.GetProperty("state").GetString());
         Assert.Equal("maria", root.GetProperty("assignee").GetProperty("user").GetString());
         Assert.Equal(JsonValueKind.Null, root.GetProperty("assignee").GetProperty("role").ValueKind);
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("claimedBy").ValueKind);
         AssertSubject(root.GetProperty("subject"), subject);
         Assert.Equal(
             [("approve", "task.approve")],

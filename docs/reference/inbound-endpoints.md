@@ -16,9 +16,9 @@ below. An
 another system create a record and start a process on it in one call. The
 caller signs in with a bearer token, as
 [Machine callers](security.md#machine-callers) describes. Endpoints
-are the one exception to the session and CSRF rules above, until
-[service accounts](security.md#service-accounts) add a second one
-_(planned for M16)_. Under a tenant's `fapi2` profile an endpoint accepts
+are an exception to the session and CSRF rules above, as are the
+[service accounts](security.md#service-accounts) of the record API. Data source
+rows and the process API add to them _(planned for M16)_. Under a tenant's `fapi2` profile an endpoint accepts
 only DPoP-bound tokens _(planned for M16)_.
 
 ## The call

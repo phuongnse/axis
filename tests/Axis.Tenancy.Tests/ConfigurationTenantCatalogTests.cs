@@ -148,6 +148,7 @@ public sealed class ConfigurationTenantCatalogTests
                 "Tenants:default:Oidc:ClientId=client",
                 $"Tenants:default:Oidc:ClientSecret={ClientSecret}",
                 "Tenants:default:Oidc:EndpointAudience=axis-endpoints",
+                "Tenants:default:Oidc:ServiceAudience=axis-services",
                 "Tenants:default:Oidc:Claims:UserId=preferred_username",
                 "Tenants:default:Oidc:Claims:Roles=groups",
                 "Tenants:default:Oidc:Claims:Email=mail",
@@ -163,6 +164,7 @@ public sealed class ConfigurationTenantCatalogTests
         Assert.Equal("client", oidc.ClientId);
         Assert.Equal(ClientSecret, oidc.ClientSecret?.Reveal());
         Assert.Equal("axis-endpoints", oidc.EndpointAudience);
+        Assert.Equal("axis-services", oidc.ServiceAudience);
         Assert.Equal("preferred_username", oidc.UserIdClaim);
         Assert.Null(oidc.DisplayNameClaim);
         Assert.Equal("groups", oidc.RolesClaim);
@@ -178,7 +180,7 @@ public sealed class ConfigurationTenantCatalogTests
     }
 
     [Fact]
-    public void A_preview_tenant_signs_in_with_the_main_tenants_settings_without_its_audience_or_bindings()
+    public void A_preview_tenant_signs_in_with_the_main_tenants_settings_without_its_audiences_or_bindings()
     {
         var catalog = Load(
             [
@@ -187,6 +189,7 @@ public sealed class ConfigurationTenantCatalogTests
                 "Tenants:main:Oidc:ClientId=client",
                 $"Tenants:main:Oidc:ClientSecret={ClientSecret}",
                 "Tenants:main:Oidc:EndpointAudience=axis-endpoints",
+                "Tenants:main:Oidc:ServiceAudience=axis-services",
                 "Tenants:main:Oidc:Claims:UserId=preferred_username",
                 "Tenants:main:Oidc:Claims:DisplayName=name",
                 "Tenants:main:Oidc:Claims:Roles=groups",
@@ -203,6 +206,7 @@ public sealed class ConfigurationTenantCatalogTests
 
         Assert.Null(main.PreviewOf);
         Assert.Equal("axis-endpoints", main.Oidc?.EndpointAudience);
+        Assert.Equal("axis-services", main.Oidc?.ServiceAudience);
         Assert.Equal("main", preview.PreviewOf);
         var oidc = Assert.IsType<TenantOidc>(preview.Oidc);
         Assert.Equal("https://idp.example.test/realm", oidc.Authority);
@@ -214,6 +218,7 @@ public sealed class ConfigurationTenantCatalogTests
         Assert.Equal("mail", oidc.EmailClaim);
         Assert.Equal("lang", oidc.LocaleClaim);
         Assert.Null(oidc.EndpointAudience);
+        Assert.Null(oidc.ServiceAudience);
         Assert.Equal(["Own"], preview.Bindings.Keys);
         Assert.Single(main.Bindings);
     }

@@ -141,6 +141,7 @@ internal sealed class TenantRestore : IAsyncDisposable
         var problems = new List<string>();
         var manifest = ReadManifest(request.File);
         var trusted = false;
+        var preview = false;
         if (manifest is null)
         {
             problems.Add("the archive cannot be read");
@@ -166,16 +167,21 @@ internal sealed class TenantRestore : IAsyncDisposable
                 problems.Add($"the schema version {Printable(version)} of the archive is not one of this build");
             }
 
+            // Preview data is disposable. An archive from before previewOf is recognised by its empty sign-in settings, which only a preview entry has.
             var directory = manifest.Directory;
-            if (!Uri.TryCreate(directory.OidcAuthority, UriKind.Absolute, out var authority)
-                || (authority.Scheme != Uri.UriSchemeHttp && authority.Scheme != Uri.UriSchemeHttps))
+            preview = directory.PreviewOf is not null || (directory.OidcAuthority.Length == 0 && directory.OidcClientId.Length == 0);
+            if (!preview)
             {
-                problems.Add("the OIDC authority of the archive is not an absolute http or https URL");
-            }
+                if (!Uri.TryCreate(directory.OidcAuthority, UriKind.Absolute, out var authority)
+                    || (authority.Scheme != Uri.UriSchemeHttp && authority.Scheme != Uri.UriSchemeHttps))
+                {
+                    problems.Add("the OIDC authority of the archive is not an absolute http or https URL");
+                }
 
-            if (string.IsNullOrWhiteSpace(directory.OidcClientId))
-            {
-                problems.Add("the OIDC client id of the archive is blank");
+                if (string.IsNullOrWhiteSpace(directory.OidcClientId))
+                {
+                    problems.Add("the OIDC client id of the archive is blank");
+                }
             }
         }
 
@@ -209,6 +215,11 @@ internal sealed class TenantRestore : IAsyncDisposable
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
         {
             problems.Add($"the setting {AdminCommands.PlatformSetting} could not be used to read the tenant directory");
+        }
+
+        if (preview)
+        {
+            problems.Add("the archive is of a preview tenant, so create the preview again with tenant create --preview-of");
         }
 
         if (trusted)
@@ -355,6 +366,7 @@ internal sealed class TenantRestore : IAsyncDisposable
             _row.ClaimEmail = directory.ClaimEmail;
             _row.ClaimLocale = directory.ClaimLocale;
             _row.EndpointAudience = directory.EndpointAudience;
+            _row.ServiceAudience = directory.ServiceAudience;
             _platform.TenantHosts.AddRange(hosts.Select(host => new TenantHostRow { TenantId = _id, Host = host }));
 
             // A secret binding comes back by name and kind only: the archive holds no value.

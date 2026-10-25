@@ -505,6 +505,78 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     });
   });
 
+  test("an author drops a section on a step in the switch, removes a step and a section with the keyboard, and saves the form", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    const file = path.join(copy, "forms", "ticket-edit.json");
+    const original = await readFile(file, "utf8");
+    try {
+      await page.goto(
+        `${server.url}/studio?app=ServiceDesk&resource=${ticketEditId}`,
+      );
+      await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+      const firstStep = page.locator(
+        '[data-testid="studio-form-step"][data-path="/steps/0"]',
+      );
+      await expect(firstStep).toBeVisible();
+      const details = page.locator(
+        '[data-testid="studio-outline-section"][data-path="/sections/1"]',
+      );
+      await dragTo(
+        page,
+        "studio-form-design",
+        details.locator("> span").first(),
+        firstStep,
+      );
+
+      const announcement = page.getByTestId("studio-form-palette-announcement");
+      await expect(announcement).toContainText("Moved details");
+      await expect(announcement).toContainText("position 2");
+      await expect(details).toHaveAttribute("aria-current", "true");
+
+      await page
+        .locator('[data-testid="studio-outline-step"][data-path="/steps/1"]')
+        .focus();
+      await page.keyboard.press("Enter");
+      await page.getByTestId("studio-design-remove-step").focus();
+      await page.keyboard.press("Enter");
+      await expect(announcement).toContainText("Removed");
+
+      await details.focus();
+      await page.keyboard.press("Enter");
+      await page.getByTestId("studio-design-remove-section").focus();
+      await page.keyboard.press("Enter");
+      await expect(announcement).toContainText("Removed details");
+      await expect(
+        page.getByTestId("studio-form-palette-category"),
+      ).toBeVisible();
+
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await expect(page.getByTestId("studio-saved")).toBeVisible();
+
+      const problem = JSON.parse(original).sections[0];
+      await expect
+        .poll(async () => {
+          const form = JSON.parse(await readFile(file, "utf8"));
+          return { sections: form.sections, steps: form.steps };
+        })
+        .toEqual({
+          sections: [problem],
+          steps: [
+            {
+              title: { textKey: "ticket.steps.problem" },
+              sections: ["problem"],
+            },
+          ],
+        });
+    } finally {
+      await writeFile(file, original);
+    }
+  });
+
   test("an author renames the ticket edit form's problem section, and the first step follows", async ({
     page,
   }) => {

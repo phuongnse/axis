@@ -1,0 +1,7 @@
+{
+  "id": "a7c3d1e4-5b2f-4e86-9a1d-3c8f6b2e4d04",
+  "kind": "role",
+  "name": "reporting-system",
+  "formatVersion": 1,
+  "label": { "textKey": "role.reportingSystem" }
+}
