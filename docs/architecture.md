@@ -793,8 +793,10 @@ real metadata and records:
 
 The E2E server's `Studio:Folders` does not list that sample. It lists a copy
 that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on
-exit, and passes in `AXIS_E2E_STUDIO_FOLDER`. No spec writes to that copy, so a
-spec that saves a resource in Studio never changes a file under `samples/`.
+exit, and passes in `AXIS_E2E_STUDIO_FOLDER`. The E2E
+settings blank the other entries that `appsettings.Development.json` lists, so
+the server lists only that copy. No spec writes to that copy, so a spec that
+saves a resource in Studio never changes a file under `samples/`.
 
 A spec that writes a Studio folder gives it a folder of its own. It copies the
 committed sample, or another folder it made, into a temporary folder, starts a

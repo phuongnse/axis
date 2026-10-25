@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
@@ -32,6 +33,9 @@ const studioFolder = required(
   'AXIS_E2E_STUDIO_FOLDER',
   'the copy of the purchase request sample that Studio edits',
 )
+const developmentStudioFolders: string[] = JSON.parse(
+  readFileSync(path.join(serverProject, 'appsettings.Development.json'), 'utf8'),
+).Studio.Folders
 const connectionString = required('AXIS_E2E_DATABASE', 'the PostgreSQL connection string of the runtime role')
 const schemaConnectionString = required(
   'AXIS_E2E_SCHEMA_DATABASE',
@@ -113,8 +117,9 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // The sample templates, which scripts/build.sh installs. Only the server reads them.
     Templates__Path: templatesPath,
     // Studio edits the copy of the purchase request sample for the author role. appsettings.Development.json
-    // lists the sample itself.
+    // lists every sample itself, and these blank entries keep the others out of every E2E server.
     Studio__Folders__0: studioFolder,
+    ...Object.fromEntries(developmentStudioFolders.slice(1).map((_, i) => [`Studio__Folders__${i + 1}`, ''])),
     Studio__AuthorRole: 'author',
     Studio__PublisherRole: 'publisher',
     // Makes GET /api/me answer studioTest: true for an author, which shows the test controls.
