@@ -585,18 +585,28 @@ public static class CallResolveCommand
             transaction);
         command.Parameters.AddWithValue("id", instanceId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken)
-            ? new LockedInstance(
-                instanceId,
-                reader.GetGuid(0),
-                reader.GetGuid(1),
-                reader.GetGuid(2),
-                reader.GetGuid(3),
-                reader.GetGuid(4),
-                reader.GetString(5),
-                reader.GetInt64(6),
-                reader.GetString(7))
-            : null;
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        // An instance of a process without a subject has null subject columns. It is not found here until
+        // inspection and operator support for it are built.
+        if (reader.IsDBNull(3))
+        {
+            return null;
+        }
+
+        return new LockedInstance(
+            instanceId,
+            reader.GetGuid(0),
+            reader.GetGuid(1),
+            reader.GetGuid(2),
+            reader.GetGuid(3),
+            reader.GetGuid(4),
+            reader.GetString(5),
+            reader.GetInt64(6),
+            reader.GetString(7));
     }
 
     // The column is one of two constants of this class, never text from a request.

@@ -147,6 +147,14 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("claim_display_name");
 
+                    b.Property<string>("ClaimEmail")
+                        .HasColumnType("text")
+                        .HasColumnName("claim_email");
+
+                    b.Property<string>("ClaimLocale")
+                        .HasColumnType("text")
+                        .HasColumnName("claim_locale");
+
                     b.Property<string>("ClaimRoles")
                         .HasColumnType("text")
                         .HasColumnName("claim_roles");

@@ -28,7 +28,7 @@ A `timer` step waits for a time, then goes on to `next`:
 { "name": "untilDue", "type": "timer", "until": "dueDate", "next": "remind" }
 ```
 
-- It has exactly one of `wait` and `until` (`AXC0248`), and a `next`.
+- It has exactly one of `wait` and `until` (`AXC0249`), and a `next`.
 - `wait` is a positive fixed-length duration, by the rule of a task's `dueIn`
   (`AXC0084`, reported at `/steps/{i}/wait`). The time is the step's
   transaction time plus `wait`.
@@ -186,11 +186,11 @@ A `createRecord` operation creates a record of another entity:
 ## Processes without a subject
 
 A process may leave out `entity`. It then declares typed `parameters`. The
-compile checks in this section are built. Starting these processes, and the
-instance storage, other starts and inspection described below, are _(planned for
-M14)_. Until the start endpoint is built, it answers `400` for such a process,
-the instance list is empty, and the instance detail and the operator commands
-answer `404`.
+compile checks in this section are built, and so are the instance storage and
+running such an instance on the engine. The start endpoint, the other starts and
+inspection described below are _(planned for M14)_. Until the start endpoint is
+built, it answers `400` for such a process, the instance list is empty, and the
+instance detail and the operator commands answer `404`.
 
 ```json
 {
@@ -243,7 +243,10 @@ answer `404`.
 - **Instance.** `axis.process_instances` stores `subject_id` as null and the
   values in a `parameters` `jsonb` column. The partial unique index treats a
   null subject as one value (`NULLS NOT DISTINCT`), so one instance of the
-  process runs at a time.
+  process runs at a time. The engine evaluates a decision `when` and the inputs
+  of a connector or package operation over the stored values, and locks, reads
+  and writes no record. The step history `input` has a null `subjectId` and
+  `subjectVersion`.
 - **Start endpoint.** The body is `{ "parameters": { … } }` instead of
   `{ "subjectId" }`. A missing, unknown or mistyped parameter is a `400` keyed
   `/parameters/{name}`. The `startCondition` sees the parameters. A running

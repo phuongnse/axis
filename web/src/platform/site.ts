@@ -68,6 +68,12 @@ export interface FieldMetadata {
   maxLength: number | null
   precision: number | null
   scale: number | null
+  /** The lowest accepted value as the literal was written, such as `10`, `0.5` or `2026-01-01`. */
+  min: string | null
+  /** The highest accepted value, written like `min`. */
+  max: string | null
+  /** The fewest characters a text value may have. */
+  minLength: number | null
   values: string[] | null
   /** The text key of each enum value's label, by value, or missing or `null` when the enum has no labels. */
   valueLabelKeys?: Record<string, string> | null
@@ -108,6 +114,10 @@ export interface DataSourceColumn {
   /** The text key of each enum value's label, by value, or missing or `null` when the enum has no labels. */
   valueLabelKeys?: Record<string, string> | null
   target: ReferenceTarget | null
+  /** The fixed currency code of a money measure, or missing or `null` otherwise. */
+  currency?: string | null
+  /** The name of the group column that holds the currency code of a money measure, or missing or `null` otherwise. */
+  currencyColumn?: string | null
 }
 
 /**

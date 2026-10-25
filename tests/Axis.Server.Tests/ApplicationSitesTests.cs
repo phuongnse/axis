@@ -25,6 +25,64 @@ public sealed class ApplicationSitesTests
     }
 
     [Fact]
+    public void Money_measures_are_typed_money_and_name_their_fixed_currency_or_the_currency_group_column()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
+        try
+        {
+            Write(root, "application.json", """{ "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }""");
+            Write(root, "entities/expense.json", """
+                { "id": "55555555-5555-4555-8555-555555555501", "kind": "entity", "name": "Expense", "formatVersion": 1,
+                  "fields": [
+                    { "name": "currency", "type": "enum", "values": ["USD", "EUR"] },
+                    { "name": "amount", "type": "money", "currencyField": "currency" },
+                    { "name": "fixedAmount", "type": "money", "currency": "VND" },
+                    { "name": "quantity", "type": "decimal" }
+                  ] }
+                """);
+            Write(root, "data-sources/expense-totals.json", """
+                { "id": "99999999-9999-4999-8999-999999999991", "kind": "dataSource", "name": "ExpenseTotals", "formatVersion": 1, "entity": "Expense",
+                  "fields": [ { "name": "currency", "path": "currency" }, { "name": "amount", "path": "amount" },
+                              { "name": "fixedAmount", "path": "fixedAmount" }, { "name": "quantity", "path": "quantity" } ],
+                  "aggregate": { "groupBy": ["currency"], "measures": [
+                    { "name": "amountSum", "function": "sum", "field": "amount" },
+                    { "name": "amountMax", "function": "max", "field": "amount" },
+                    { "name": "fixedSum", "function": "sum", "field": "fixedAmount" },
+                    { "name": "quantitySum", "function": "sum", "field": "quantity" } ] } }
+                """);
+
+            var result = ApplicationCompiler.Compile(root);
+            Assert.Empty(result.Diagnostics);
+            Assert.NotNull(result.Model);
+
+            var columns = ApplicationSites.DescribeDataSource(result.Model, "ExpenseTotals").Columns;
+
+            Assert.Equal(
+                [
+                    ("currency", "enum", null, null),
+                    ("amountSum", "money", null, "currency"),
+                    ("amountMax", "money", null, "currency"),
+                    ("fixedSum", "money", "VND", null),
+                    ("quantitySum", "decimal", null, null),
+                ],
+                columns.Select(column => (column.Name, column.Type, column.Currency, column.CurrencyColumn)));
+            var json = System.Text.Json.JsonSerializer.Serialize(columns[4], System.Text.Json.JsonSerializerOptions.Web);
+            Assert.DoesNotContain("currency", json, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static void Write(string root, string relativePath, string content)
+    {
+        var fullPath = Path.Combine(root, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        File.WriteAllText(fullPath, content);
+    }
+
+    [Fact]
     public void Form_marks_only_the_purchase_request_number_as_a_sequence_field()
     {
         var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
