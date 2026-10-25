@@ -9,8 +9,7 @@ on [D20](d20-human-tasks-task-inbox-and-forms.md),
 [D53](d53-typed-editors-and-the-process-graph-in-studio.md),
 [D62](d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md),
 [D65](d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md) and
-[D39](d39-reference-index-and-where-a-resource-is-used.md). All of it is
-_(planned for M13)_. The owner confirmed these points on issue #1141 on
+[D39](d39-reference-index-and-where-a-resource-is-used.md). It is built in M13, except three parts, which are _(planned for M14)_: a form opens on the Design tab by default, a section moves to another step by a drop on the step switch, and the designer removes a section or a step. The owner confirmed these points on issue #1141 on
 2026-10-24.
 
 - **Canvas:**
