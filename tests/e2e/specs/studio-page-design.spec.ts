@@ -603,6 +603,50 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     expect(draft.sections[0].fields).toHaveLength(4);
   });
 
+  test("an author removes the triage form's priority field, sees it back in the palette, and one undo restores it", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketTriageId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    await page
+      .locator(
+        '[data-testid="studio-outline-field"][data-path="/sections/1/fields/1"]',
+      )
+      .click();
+    await page
+      .getByRole("button", { name: "Remove field", exact: true })
+      .click();
+
+    await expect(
+      page.getByTestId("studio-form-palette-priority"),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("studio-form-palette-announcement"),
+    ).toContainText("Removed priority · Section 2");
+    await expect(
+      page.locator(
+        '[data-testid="studio-outline-section"][data-path="/sections/1"]',
+      ),
+    ).toHaveAttribute("aria-current", "true");
+
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect(page.getByTestId("studio-form-palette-priority")).toHaveCount(
+      0,
+    );
+
+    await page.getByRole("tab", { name: "JSON", exact: true }).click();
+    const json = page.getByRole("textbox", { name: "JSON", exact: true });
+    const draft = JSON.parse(await json.inputValue());
+    expect(
+      draft.sections[1].fields.map((field: { field: string }) => field.field),
+    ).toEqual(["category", "priority", "assignedAgent"]);
+  });
+
   test("an author selects a row action on the canvas and adds a navigate action that maps the record, and no request goes to the application's API", async ({
     page,
   }) => {

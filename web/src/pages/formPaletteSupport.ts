@@ -63,6 +63,38 @@ export function moveFieldTo(
 }
 
 /**
+ * Takes the field at `place` out of its section, keeps the other fields in order, selects the section and says which
+ * field left. The removal is one change of the draft, so one undo puts the field back. Nothing happens when the draft
+ * has no such field.
+ */
+export function removeField(
+  t: (key: string) => string,
+  draft: Record<string, unknown>,
+  place: FieldPlace,
+  onChange: ChangeHandler,
+  onSelect: (pointer: string) => void,
+  onAnnounce: (text: string) => void,
+) {
+  const section = Array.isArray(draft.sections) ? (draft.sections[place.section] as unknown) : undefined
+  if (typeof section !== 'object' || section === null) {
+    return
+  }
+  const current = (section as { fields?: unknown }).fields
+  const fields = Array.isArray(current) ? (current as { field?: unknown }[]) : []
+  if (place.index >= fields.length) {
+    return
+  }
+  const field = fields[place.index].field
+  const name = typeof field === 'string' && field !== '' ? field : `/sections/${place.section}/fields/${place.index}`
+  onChange(
+    `/sections/${place.section}/fields`,
+    fields.filter((_, index) => index !== place.index),
+  )
+  onSelect(`/sections/${place.section}`)
+  onAnnounce(`${t('shell.studio.design.removed')} ${name} · ${sectionLabel(t, draft, place.section)}`)
+}
+
+/**
  * Moves the section at `from` to `to`, selects it where it landed and says where that is: its name, its step when the
  * draft has steps, and its position in the step or in `sections`. `sections` and `steps` change in the same event, so
  * one undo reverses the move. Nothing happens when `moveSection` finds nothing to move.

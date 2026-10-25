@@ -59,7 +59,13 @@ Dn refers to [decisions.md](../decisions.md).
     only inside the canvas. The outline lists the steps, sections and fields of
     the draft. A click selects a row. A pointer drag from the palette onto a
     section row appends to it, and onto a field row inserts after it. The
-    innermost row wins. Removing a field is not built yet.
+    innermost row wins. The Remove field button in a field's property panel
+    takes the field out of its section. The field returns to this palette,
+    and the section stays selected. A live region says "Removed" with the field
+    and its section, such as "Removed priority · Section 2". A field with no
+    name is named by its pointer, such as `/sections/0/fields/0`. One undo puts
+    the field back. Conditions that name the removed field are not rewritten.
+    The diagnostics flag them.
   - **Moves.** The author drags fields within and between sections, and
     sections within and between steps. To move a section to another step, drop
     it on that step in the switch, or use the Move to step picker. Every move
@@ -104,8 +110,10 @@ Dn refers to [decisions.md](../decisions.md).
   - **Property panel.** A field shows `readOnly` and its three conditions in
     the expression editor, which offers only the fields the form lists. A field
     that the entity marks `required` has no `visibleWhen` box. A computed,
-    sequence or creator field shows `readOnly` on and locked. A section shows
-    its name, title and `visibleWhen`. A step shows its title.
+    sequence or creator field shows `readOnly` on and locked. A field also has
+    a Remove field button below its conditions, described in the field palette
+    bullet. A section shows its name, title and `visibleWhen`. A step shows its
+    title.
     _Partly built:_ a click, Enter or Space selects a field or a section. A
     click on a step selects it and shows its sections. The selected element has
     `aria-current` and an outline in the primary colour. The panel asks the

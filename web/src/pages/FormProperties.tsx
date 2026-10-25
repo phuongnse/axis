@@ -1,4 +1,4 @@
-import { Checkbox, Flex, Input, Select, Typography } from 'antd'
+import { Button, Checkbox, Flex, Input, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext, useState } from 'react'
 import { renameSection } from '../platform/formLayout'
 import { getAt } from '../platform/jsonPatch'
@@ -8,7 +8,7 @@ import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
-import { moveSectionTo } from './formPaletteSupport'
+import { moveSectionTo, removeField } from './formPaletteSupport'
 import { LabelTextsContext } from './labelTextsContext'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -18,7 +18,7 @@ type Content = Record<string, unknown>
 
 type Condition = 'visibleWhen' | 'requiredWhen' | 'readOnlyWhen'
 
-const fieldPointer = /^\/sections\/\d+\/fields\/\d+$/
+const fieldPointer = /^\/sections\/(\d+)\/fields\/(\d+)$/
 const sectionPointer = /^\/sections\/\d+$/
 const stepPointer = /^\/steps\/\d+$/
 
@@ -28,9 +28,10 @@ function isContent(value: unknown): value is Content {
 
 /**
  * The properties of the element that is selected on the form canvas, found by its JSON Pointer in the draft. A field
- * has `readOnly` and its three conditions, a section its name, title, `visibleWhen` and, on a form with steps, a Move
- * to step picker, and a step its title. A field the entity marks required has no `visibleWhen` (AXC0226). A computed, sequence or creator field is always read-only. A
- * selection that finds no object in the draft shows a hint, so no edit goes to a stale pointer.
+ * has `readOnly`, its three conditions and a Remove field button, a section its name, title, `visibleWhen` and, on a
+ * form with steps, a Move to step picker, and a step its title. A field the entity marks required has no
+ * `visibleWhen` (AXC0226). A computed, sequence or creator field is always read-only. A selection that finds no object
+ * in the draft shows a hint, so no edit goes to a stale pointer.
  */
 export function FormProperties({
   draft,
@@ -61,6 +62,8 @@ export function FormProperties({
           pointer={selected}
           field={content}
           entityFields={entityFields}
+          onSelect={onSelect}
+          onAnnounce={onAnnounce}
           onChange={onChange}
         />
       )
@@ -95,12 +98,16 @@ function FieldProperties({
   pointer,
   field,
   entityFields,
+  onSelect,
+  onAnnounce,
   onChange,
 }: {
   draft: Content
   pointer: string
   field: Content
   entityFields: FieldMetadata[]
+  onSelect: (pointer: string) => void
+  onAnnounce: (text: string) => void
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -138,6 +145,25 @@ function FieldProperties({
           onChange={onChange}
         />
       ))}
+      <Button
+        danger
+        data-testid="studio-design-remove-field"
+        onClick={() => {
+          const match = fieldPointer.exec(pointer)
+          if (match !== null) {
+            removeField(
+              t,
+              draft,
+              { section: Number(match[1]), index: Number(match[2]) },
+              onChange,
+              onSelect,
+              onAnnounce,
+            )
+          }
+        }}
+      >
+        {t('shell.studio.design.removeField')}
+      </Button>
     </Flex>
   )
 }

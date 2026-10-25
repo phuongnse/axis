@@ -123,3 +123,29 @@ describe('FormProperties section', () => {
     expect(screen.getByText('A section needs a name.')).toBeInTheDocument()
   })
 })
+
+describe('FormProperties field', () => {
+  it('removes the field from its section, keeps the others in order and selects the section', async () => {
+    renderHarness(
+      { sections: [{ name: 'a', fields: [{ field: 'x' }] }, { fields: [{ field: 'p' }, { field: 'q' }] }] },
+      '/sections/1/fields/0',
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove field' }))
+
+    const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
+    expect(draft.sections[1].fields).toEqual([{ field: 'q' }])
+    expect(screen.getByTestId('selected')).toHaveTextContent('/sections/1')
+    expect(screen.getByTestId('announcement')).toHaveTextContent('Removed p · Section 2')
+  })
+
+  it('removes a field with an empty name and announces its pointer', async () => {
+    renderHarness({ sections: [{ title: { textKey: '' }, fields: [{ field: '' }] }] }, '/sections/0/fields/0')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove field' }))
+
+    const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
+    expect(draft.sections[0].fields).toEqual([])
+    expect(screen.getByTestId('announcement')).toHaveTextContent('/sections/0/fields/0')
+  })
+})
