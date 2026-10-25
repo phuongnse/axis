@@ -230,4 +230,7 @@ public static class DiagnosticCodes
     public const string InvalidDetailRecord = "AXC0239";
     public const string ChartDataSourceNotGrouped = "AXC0240";
     public const string InvalidChartMeasure = "AXC0241";
+    public const string DuplicateIndex = "AXC0242";
+    public const string UnknownIndexField = "AXC0243";
+    public const string InvalidIndexField = "AXC0244";
 }

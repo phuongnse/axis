@@ -788,7 +788,56 @@ public static class ApplicationCompiler
 
         CheckComputedFields(entity, findEntity, references, Report);
         CheckValidations(entity, findEntity, references, rules, modules, diagnostics, Report);
+        CheckIndexes(entity, Report);
     }
+
+    /// <summary>
+    /// Checks each declared index: every field names a field of the entity that an index can hold,
+    /// and no earlier index lists the same fields in the same order, ignoring letter case.
+    /// </summary>
+    private static void CheckIndexes(EntityResource entity, Action<string, string, string> report)
+    {
+        var firstIndexByFields = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < entity.Indexes.Count; index++)
+        {
+            var declared = entity.Indexes[index];
+            var path = $"/indexes/{index}";
+
+            for (var position = 0; position < declared.Fields.Count; position++)
+            {
+                var name = declared.Fields[position];
+                var field = FindField(entity, name);
+                if (field is null)
+                {
+                    report(
+                        DiagnosticCodes.UnknownIndexField,
+                        $"The index field '{name}' names no field of this entity.",
+                        $"{path}/fields/{position}");
+                }
+                else if (!CanIndex(FieldTypes.Parse(field.Type)))
+                {
+                    report(
+                        DiagnosticCodes.InvalidIndexField,
+                        $"The index field '{field.Name}' has the type '{field.Type}', which an index cannot hold.",
+                        $"{path}/fields/{position}");
+                }
+            }
+
+            // The names are joined with a comma, which no field name holds.
+            var key = string.Join(',', declared.Fields);
+            if (!firstIndexByFields.TryAdd(key, index))
+            {
+                var firstIndex = firstIndexByFields[key];
+                report(
+                    DiagnosticCodes.DuplicateIndex,
+                    $"The index lists the same fields in the same order as the index at '/indexes/{firstIndex}'.",
+                    $"{path}/fields");
+            }
+        }
+    }
+
+    // A child collection has no column. The reference and file types of a later issue can be added here.
+    private static bool CanIndex(FieldType type) => type != FieldType.ChildCollection;
 
     /// <summary>
     /// Checks the expression of each computed field of a scalar type: it parses and type-checks to
@@ -1612,6 +1661,11 @@ public static class ApplicationCompiler
             Validations = entity.Validations
                 .Select(validation => ValidationModel.Compile(
                     validation.Expression, scope, validation.Message, FindField(entity, validation.Field)!.Name))
+                .ToList(),
+            Indexes = entity.Indexes
+                .Select(declared => new EntityIndexModel(
+                    [.. declared.Fields.Select(name => FindField(entity, name)!.Name)],
+                    declared.Unique ?? false))
                 .ToList(),
         };
     }

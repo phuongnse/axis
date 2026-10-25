@@ -34,7 +34,7 @@ sorted by file and then path.
 | `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. This includes `required` on a computed field, and an `expression` on a `reference` or `child-collection` field. A `sequence` on a field that is not `text`, is `required`, has an `expression` or belongs to a child entity is reported once, at `/fields/{i}/sequence`. |
 | `AXC0014` | A field lacks a property its type needs: `target` on a reference or child collection, `values` on an enum. |
 | `AXC0015` | An entity table has a column whose field was removed and that no pending `renameField` or `dropField` migration covers. Reported at `/fields` of the entity file. |
-| `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. |
+| `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. A unique index added to a table with records is reported at `/indexes/{i}/unique`. |
 | `AXC0017` | An entity provisioned for the application is missing from it and no pending `dropEntity` migration covers it. Reported at `application.json` with an empty path. |
 | `AXC0018` | The entity's `id` is already provisioned for another application. Reported at `/id` of the entity file. |
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
@@ -240,3 +240,6 @@ sorted by file and then path.
 | `AXC0239` | A `detail` widget's `record` names no page parameter, or a parameter that is optional, not a `reference`, or whose `target` is not the widget's entity, ignoring letter case. Reported at `/widgets/{i}/record`. |
 | `AXC0240` | A `chart` widget names a data source whose `aggregate` does not have exactly one `groupBy` field, or a `category` that is not that field, ignoring letter case. Reported at the widget's `dataSource` or `category`. |
 | `AXC0241` | A `chart` widget names a measure that its data source's `aggregate` does not declare, or one that is not a number, or lists more than one measure on a `pie`. A measure is a number when it is a `count` or a `sum`, or a `min` or `max` over an integer or a decimal. Reported at the measure's `name`, or at `measures` for a `pie`. |
+| `AXC0242` | An entity declares an index that lists the same fields in the same order as an earlier index, ignoring letter case. Reported at `/indexes/{j}/fields` of the later index, naming the earlier one. |
+| `AXC0243` | A field of an entity's index names no field of the entity, ignoring letter case. Reported at `/indexes/{j}/fields/{k}`. |
+| `AXC0244` | A field of an entity's index has a type an index cannot hold, which today is `child-collection`. Reported at `/indexes/{j}/fields/{k}`. |

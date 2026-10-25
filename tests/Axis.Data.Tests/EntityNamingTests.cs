@@ -26,7 +26,7 @@ public sealed class EntityNamingTests
         Assert.Equal("e_4b6f0c1e6a0e4c479a530f5f8f8b1a01", table);
         Assert.Equal("f_f" + new string('y', 59), column);
         Assert.All(
-            [table, column, EntityNaming.PrimaryKey(table), EntityNaming.Unique(table, column), EntityNaming.ForeignKey(table, column)],
+            [table, column, EntityNaming.PrimaryKey(table), EntityNaming.Unique(table, column), EntityNaming.ForeignKey(table, column), EntityNaming.Index(table, [column, column])],
             name => Assert.InRange(Encoding.UTF8.GetByteCount(name), 1, MaxIdentifierBytes));
     }
 
@@ -40,6 +40,19 @@ public sealed class EntityNamingTests
         Assert.Equal(EntityNaming.Unique(table, "f_code")[^16..], EntityNaming.ForeignKey(table, "f_code")[^16..]);
         Assert.NotEqual(EntityNaming.Unique(table, "f_code"), EntityNaming.Unique(table, "f_name"));
         Assert.Equal("pk_e_4b6f0c1e6a0e4c479a530f5f8f8b1a01", EntityNaming.PrimaryKey(table));
+    }
+
+    [Fact]
+    public void Index_names_hash_the_ordered_column_list_and_fit_in_63_bytes_for_the_longest_list()
+    {
+        var table = EntityNaming.Table(_entityId);
+        var longest = Enumerable.Range(0, 32).Select(position => EntityNaming.Column("F" + new string('y', 59) + position)).ToList();
+
+        Assert.Matches("^ix_e_4b6f0c1e6a0e4c479a530f5f8f8b1a01_[0-9a-f]{16}$", EntityNaming.Index(table, ["f_code"]));
+        Assert.Equal(EntityNaming.Index(table, ["f_code", "f_name"]), EntityNaming.Index(table, ["f_code", "f_name"]));
+        Assert.NotEqual(EntityNaming.Index(table, ["f_code", "f_name"]), EntityNaming.Index(table, ["f_name", "f_code"]));
+        Assert.NotEqual(EntityNaming.Index(table, ["f_code"]), EntityNaming.Index(table, ["f_code", "f_name"]));
+        Assert.Equal(54, Encoding.UTF8.GetByteCount(EntityNaming.Index(table, longest)));
     }
 
     [Fact]

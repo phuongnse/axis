@@ -113,6 +113,7 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
         Assert.Equal(
             [
                 $"""CREATE TABLE "entities"."{lineTable}" ("id" uuid NOT NULL, "owner_id" uuid NOT NULL, "position" integer NOT NULL, "f_description" character varying(200), CONSTRAINT "pk_{lineTable}" PRIMARY KEY ("id"))""",
+                $"""CREATE INDEX "{EntityNaming.Index(lineTable, ["owner_id"])}" ON "entities"."{lineTable}" ("owner_id")""",
                 $"""ALTER TABLE "entities"."{lineTable}" ADD CONSTRAINT "{EntityNaming.ForeignKey(lineTable, "owner_id")}" FOREIGN KEY ("owner_id") REFERENCES "entities"."{EntityNaming.Table(_customerId)}" ("id") ON DELETE CASCADE""",
             ],
             result.Statements);
@@ -544,6 +545,9 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
         foreach (var (expectedTable, actualTable) in expected.Zip(actual))
         {
             Assert.Equal(expectedTable.Columns, actualTable.Columns);
+            Assert.Equal(
+                expectedTable.Indexes.Select(index => (index.Name, Columns: string.Join(',', index.Columns), index.Unique)),
+                actualTable.Indexes.Select(index => (index.Name, Columns: string.Join(',', index.Columns), index.Unique)));
         }
     }
 }

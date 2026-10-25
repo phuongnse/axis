@@ -471,7 +471,8 @@ is `AXC0013`.
 
 ### Types and properties added in M15
 
-These are _(planned for M15)_. They follow
+These are _(planned for M15)_, except [`indexes`](#indexes), which is built.
+They follow
 [D76](../decisions/d76-file-money-and-enum-label-field-types.md),
 [D77](../decisions/d77-indexes-defaults-and-ranges.md),
 [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md) and
@@ -505,11 +506,28 @@ new check is a new compile diagnostic.
 - **`searchable`.** On a `text` field. `search` reads every searchable field,
   and the display field is always searchable. See
   [paging and sorting](record-api.md#paging-and-sorting).
-- **`indexes`.** On the entity, a list of `{ "fields": [ ... ] }` with an
-  optional `"unique": true`. Each field is a root field that is not a
-  `child-collection`, `references` or `file`. Two indexes over the same
-  fields in the same order are a diagnostic. See
-  [schema planning](storage.md#schema-planning).
+
+### Indexes
+
+`indexes` is built. On the entity, it is a list of
+`{ "fields": [ ... ] }` with an optional `"unique": true`. See
+[D77](../decisions/d77-indexes-defaults-and-ranges.md) and
+[schema planning](storage.md#schema-planning).
+
+- **`fields`.** One to 32 distinct field names of the entity, matched
+  ignoring letter case. They are the index columns, in order. An empty list,
+  a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
+- **Field types.** An index holds a field that has a column. A
+  `child-collection` field is `AXC0244`. `references` and `file` fields join
+  it when they are built.
+- **Compile diagnostics.** Each is reported in the entity file:
+  - `AXC0242`: an index lists the same fields in the same order as an earlier
+    one, at `/indexes/{j}/fields`.
+  - `AXC0243`: a name in `fields` is no field of the entity, at
+    `/indexes/{j}/fields/{k}`.
+  - `AXC0244`: a field of a type an index cannot hold, at the same path.
+- **Every reference.** Every `reference` field and every child table's
+  `owner_id` is indexed without a declaration.
 
 ## Entity logic
 
