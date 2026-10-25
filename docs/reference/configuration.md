@@ -533,7 +533,7 @@ flowchart LR
      `fields` that names no field of the entity, or names a computed field,
      is `AXC0145` at `/fields/{i}`. `when` is parsed and type-checked as a
      boolean over the watched record, with the scope of a process condition:
-     its fields, rules, reference paths and aggregates. Its first problem is
+     its fields, `id`, rules, reference paths and aggregates. Its first problem is
      reported at `/when`. `fields` and `when` are not checked when the entity
      is unknown. Data change triggers fire on every committed write through the
      record command, see [Starts from triggers](process-events.md#starts-from-triggers).
