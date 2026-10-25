@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Axis.Administration;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
@@ -49,6 +50,7 @@ internal static partial class AdminCommands
                activate <folder> [--tenant <id>]
                tenant suspend <id>
                tenant resume <id>
+               tenant rotate-passwords <id>
                tenant list
                publisher
                version
@@ -77,42 +79,61 @@ internal static partial class AdminCommands
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
 
-        if (args.Length > 0 && args[0] == "migrate")
+        var command = Commands.FirstOrDefault(row => Matches(row, args));
+        if (command is null)
         {
-            return await MigrateAsync(args, configuration, output, error, cancellationToken);
+            error.WriteLine(Usage);
+            return 2;
         }
 
-        if (args.Length > 0 && args[0] == "activate")
+        return await command.RunAsync(new AdminRun(command, args, configuration, output, error, publisherLease, publisherTestLimit, cancellationToken));
+    }
+
+    /// <summary>
+    /// The commands of the host. The dispatcher picks the first row whose name is the leading arguments, and a test reads every row's
+    /// audit mark, so a command without one fails it.
+    /// </summary>
+    internal static IReadOnlyList<AdminCommand> Commands { get; } =
+    [
+        new("tenant create", AuditMark.OnePerTenant, run => CreateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant backup", AuditMark.OnePerTenant, run => BackupAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant restore", AuditMark.OnePerTenant, run => RestoreAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant suspend", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant rotate-passwords", AuditMark.OnePerTenant, run => RotatePasswordsAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant list", AuditMark.None, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("migrate", AuditMark.OnePerTenant, run => MigrateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.CancellationToken)),
+        new("version", AuditMark.None, VersionAsync),
+    ];
+
+    private static bool Matches(AdminCommand command, string[] args)
+    {
+        var words = command.Name.Split(' ');
+        return args.Length >= words.Length && words.Select((word, index) => args[index] == word).All(equal => equal);
+    }
+
+    private static Task<int> VersionAsync(AdminRun run)
+    {
+        if (run.Args.Length != 1)
         {
-            return await ActivateAsync(args, configuration, output, error, cancellationToken);
+            run.Error.WriteLine(Usage);
+            return Task.FromResult(2);
         }
 
-        if (args.Length > 0 && args[0] == "publisher")
-        {
-            return await PublisherAsync(args, configuration, output, error, publisherLease, publisherTestLimit, cancellationToken);
-        }
+        run.Output.WriteLine(typeof(AdminCommands).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
+        return Task.FromResult(0);
+    }
 
-        if (args is ["version"])
-        {
-            output.WriteLine(typeof(AdminCommands).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
-            return 0;
-        }
-
-        if (args.Length >= 2 && args[0] == "tenant" && args[1] == "backup")
-        {
-            return await BackupAsync(args, configuration, output, error, cancellationToken);
-        }
-
-        if (args.Length >= 2 && args[0] == "tenant" && args[1] == "restore")
-        {
-            return await RestoreAsync(args, configuration, output, error, cancellationToken);
-        }
-
-        if (args.Length >= 2 && args[0] == "tenant" && args[1] is "suspend" or "resume" or "list")
-        {
-            return await StatusAsync(args, configuration, output, error, cancellationToken);
-        }
-
+    private static async Task<int> CreateAsync(
+        string command,
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
         var request = ParseTenantCreate(args);
         if (request is null)
         {
@@ -142,10 +163,11 @@ internal static partial class AdminCommands
             return 1;
         }
 
-        return await new TenantCreate(settings, request, output, cancellationToken).RunAsync();
+        return await new TenantCreate(settings, request, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
     }
 
     private static async Task<int> StatusAsync(
+        string command,
         string[] args,
         IConfiguration configuration,
         TextWriter output,
@@ -183,13 +205,133 @@ internal static partial class AdminCommands
 
         return args[1] switch
         {
-            "suspend" => await TenantStatus.SuspendAsync(connectionString, args[2], output, error, cancellationToken),
-            "resume" => await TenantStatus.ResumeAsync(connectionString, args[2], output, error, cancellationToken),
+            "suspend" => await TenantStatus.SuspendAsync(connectionString, args[2], new TenantAudit(command, connectionString), output, error, cancellationToken),
+            "resume" => await TenantStatus.ResumeAsync(connectionString, args[2], new TenantAudit(command, connectionString), output, error, cancellationToken),
             _ => await TenantStatus.ListAsync(connectionString, output, error, cancellationToken),
         };
     }
 
+    /// <summary>
+    /// <c>tenant rotate-passwords</c>. Everything that can be refused is checked before the audit record, so a refusal changes
+    /// nothing. The rules of the rotation are in <see cref="TenantPasswordRotation"/>.
+    /// </summary>
+    private static async Task<int> RotatePasswordsAsync(
+        string command,
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        if (args.Length != 3 || args[2].StartsWith("--", StringComparison.Ordinal))
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        // A setting's own message holds its value, so this says only which setting is wrong.
+        TenancySource source;
+        try
+        {
+            source = TenancySettings.Source(configuration);
+        }
+        catch (InvalidOperationException)
+        {
+            error.WriteLine($"The setting {TenancySettings.SourceSetting} must be 'configuration' or 'directory'.");
+            return 2;
+        }
+
+        if (source != TenancySource.Directory)
+        {
+            error.WriteLine("This command needs Tenancy:Source=directory.");
+            return 2;
+        }
+
+        var settings = ReadCreateSettings(configuration, needsClientSecret: false, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        var id = args[2];
+        TenantRow? row;
+        try
+        {
+            var refusal = await AdminRoleProblemAsync(settings, cancellationToken)
+                ?? await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+            if (refusal is not null)
+            {
+                error.WriteLine(refusal);
+                return 2;
+            }
+
+            await using var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(settings.PlatformConnectionString).Options);
+            row = await platform.Tenants.AsNoTracking().SingleOrDefaultAsync(tenant => tenant.Id == id, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+        {
+            error.WriteLine($"The setting {PlatformSetting} could not be used to read the tenant directory.");
+            return 2;
+        }
+
+        if (row is null)
+        {
+            error.WriteLine("The tenant does not exist.");
+            return 2;
+        }
+
+        if (row.Status == Provisioning)
+        {
+            error.WriteLine($"The tenant '{id}' is still provisioning. Finish it with tenant create.");
+            return 2;
+        }
+
+        if (!await new TenantAudit(command, settings.PlatformConnectionString).WriteAsync(id, output, cancellationToken, [row.RuntimeUser, row.SchemaUser]))
+        {
+            return 1;
+        }
+
+        try
+        {
+            await using var admin = new NpgsqlConnection(settings.Admin.ConnectionString);
+            await admin.OpenAsync(cancellationToken);
+
+            // The runtime role first, so that the server gets its new password as early as possible.
+            return await RotateStepAsync(id, "runtime-password", () => TenantPasswordRotation.RotateRuntimeAsync(settings.Cipher, settings.PlatformConnectionString, admin, row, cancellationToken), output)
+                && await RotateStepAsync(id, "schema-password", () => TenantPasswordRotation.RotateSchemaAsync(settings.Cipher, settings.PlatformConnectionString, admin, row, cancellationToken), output)
+                ? 0
+                : 1;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
+        {
+            output.WriteLine($"{id} runtime-password failed: {TenantDatabaseSteps.Safe(exception)}");
+            return 1;
+        }
+    }
+
+    private static async Task<bool> RotateStepAsync(string id, string step, Func<Task> rotate, TextWriter output)
+    {
+        try
+        {
+            await rotate();
+            output.WriteLine($"{id} {step} ok");
+            return true;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
+        {
+            output.WriteLine($"{id} {step} failed: {TenantDatabaseSteps.Safe(exception)}");
+            return false;
+        }
+    }
+
     private static async Task<int> BackupAsync(
+        string command,
         string[] args,
         IConfiguration configuration,
         TextWriter output,
@@ -221,10 +363,13 @@ internal static partial class AdminCommands
             return 1;
         }
 
-        return plan is null ? 2 : await new TenantBackup(settings, plan, output, cancellationToken).RunAsync();
+        return plan is null
+            ? 2
+            : await new TenantBackup(settings, plan, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
     }
 
     private static async Task<int> RestoreAsync(
+        string command,
         string[] args,
         IConfiguration configuration,
         TextWriter output,
@@ -270,7 +415,9 @@ internal static partial class AdminCommands
             return 1;
         }
 
-        return plan is null ? 2 : await new TenantRestore(settings.Create, plan, output, cancellationToken).RunAsync();
+        return plan is null
+            ? 2
+            : await new TenantRestore(settings.Create, plan, new TenantAudit(command, settings.Create.PlatformConnectionString), output, cancellationToken).RunAsync();
     }
 
     private static TenantRestoreRequest? ParseTenantRestore(string[] args)
@@ -395,6 +542,7 @@ internal static partial class AdminCommands
     }
 
     private static async Task<int> MigrateAsync(
+        string command,
         string[] args,
         IConfiguration configuration,
         TextWriter output,
@@ -431,7 +579,9 @@ internal static partial class AdminCommands
                 return 0;
             }
 
+            // An installation upgrades with this command before the new server starts, so the platform tables are brought up first.
             await using var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(settings.PlatformConnectionString).Options);
+            await platform.Database.MigrateAsync(cancellationToken);
             var rows = await platform.Tenants.AsNoTracking().ToListAsync(cancellationToken);
             tenants = [.. rows.OrderBy(row => row.Id, StringComparer.Ordinal)];
         }
@@ -473,10 +623,11 @@ internal static partial class AdminCommands
             tenants = [.. tenants.Where(row => row.Status != Provisioning)];
         }
 
-        return await new TenantMigrate(settings, tenants, request.Parallel, output, cancellationToken).RunAsync();
+        return await new TenantMigrate(settings, tenants, request.Parallel, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
     }
 
     private static async Task<int> ActivateAsync(
+        string command,
         string[] args,
         IConfiguration configuration,
         TextWriter output,
@@ -558,7 +709,17 @@ internal static partial class AdminCommands
         }
 
         return await new TenantActivate(
-            settings.Platform, tenants, bindings, folder, settings.Packages, settings.Modules, settings.InlineRecomputeLimit, output, error, cancellationToken).RunAsync();
+            settings.Platform,
+            tenants,
+            bindings,
+            folder,
+            settings.Packages,
+            settings.Modules,
+            settings.InlineRecomputeLimit,
+            new TenantAudit(command, settings.Platform.PlatformConnectionString),
+            output,
+            error,
+            cancellationToken).RunAsync();
     }
 
     private static async Task<int> PublisherAsync(

@@ -14,6 +14,7 @@ internal sealed class TenantMigrate(
     PlatformSettings settings,
     IReadOnlyList<TenantRow> tenants,
     int parallel,
+    TenantAudit audit,
     TextWriter output,
     CancellationToken cancellationToken)
 {
@@ -45,6 +46,11 @@ internal sealed class TenantMigrate(
 
     private async Task<bool> MigrateTenantAsync(TenantRow row)
     {
+        if (!await audit.WriteAsync(row.Id, _output, cancellationToken))
+        {
+            return false;
+        }
+
         await using var steps = new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, cancellationToken);
         return await Step(row.Id, "grants", steps.GrantAsync)
             && await Step(row.Id, "migrations", steps.MigrateAsync)

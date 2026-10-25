@@ -244,6 +244,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             signIn.ClaimUserId,
             signIn.ClaimDisplayName,
             signIn.ClaimRoles,
+            signIn.ClaimEmail,
+            signIn.ClaimLocale,
             signIn.OidcProfile,
             signIn.OidcClientKeyId,
             signIn.OidcClientKey is null ? null : Convert.ToBase64String(signIn.OidcClientKey),
@@ -293,6 +295,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             Blank(signIn.ClaimUserId),
             Blank(signIn.ClaimDisplayName),
             Blank(signIn.ClaimRoles),
+            Blank(signIn.ClaimEmail),
+            Blank(signIn.ClaimLocale),
             signIn.OidcProfile,
             ClientKeys(signIn, cipher));
 

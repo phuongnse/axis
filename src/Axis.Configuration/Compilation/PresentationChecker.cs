@@ -1021,7 +1021,7 @@ internal static class PresentationChecker
             {
                 report(
                     DiagnosticCodes.InvalidChartMeasure,
-                    $"The measure '{measure.Name}' is not a number. A chart draws a 'count' or a 'sum', or a 'min' or 'max' of an integer or a decimal.",
+                    $"The measure '{measure.Name}' is not a number. A chart draws a 'count' or a 'sum', or a 'min' or 'max' of an integer, a decimal or a money field.",
                     $"{path}/measures/{index}/name");
             }
         }
@@ -1037,7 +1037,7 @@ internal static class PresentationChecker
 
     /// <summary>
     /// Whether a measure is a number. A <c>count</c> and a <c>sum</c> are. A <c>min</c> or <c>max</c> keeps the type of
-    /// its field, so it is a number only over an integer or a decimal. A field whose path does not resolve is not
+    /// its field, so it is a number only over an integer, a decimal or a money field. A field whose path does not resolve is not
     /// reported again.
     /// </summary>
     private static bool IsNumericMeasure(DataSourceMeasureDefinition measure, DataSourceResource dataSource, Func<string, EntityResource?> findEntity)
@@ -1055,7 +1055,7 @@ internal static class PresentationChecker
             return true;
         }
 
-        return FieldTypes.Parse(hops[^1].Type) is FieldType.Integer or FieldType.Decimal;
+        return FieldTypes.Parse(hops[^1].Type) is FieldType.Integer or FieldType.Decimal or FieldType.Money;
     }
 
     /// <summary>Reports <c>parameters</c> on a widget that has no data source parameter to bind.</summary>
@@ -1311,7 +1311,16 @@ internal static class PresentationChecker
         else
         {
             references.Add(page, $"{actionPath}/process", ReferenceRelations.ActionProcess, ResourceNode.Of(process));
-            if (recordEntity is not null && !string.Equals(process.Entity, recordEntity, StringComparison.OrdinalIgnoreCase))
+            if (recordEntity is not null && process.Entity is null)
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.ActionProcessOverOtherEntity,
+                    $"The process '{process.Name}' has no subject, but the action starts it for a record of '{recordEntity}'.",
+                    page.File,
+                    $"{actionPath}/process",
+                    page.Id));
+            }
+            else if (recordEntity is not null && !string.Equals(process.Entity, recordEntity, StringComparison.OrdinalIgnoreCase))
             {
                 // The action starts the process for the record, so it must be its subject.
                 diagnostics.Add(new Diagnostic(

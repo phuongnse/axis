@@ -433,20 +433,37 @@ Value ranges follow what PostgreSQL accepts, so an invalid value fails at
 compile time rather than when the table is created; a value outside the range
 is `AXC0013`.
 
-| Type | `required` | `unique` | `maxLength` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` | `creator` | `sensitive` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `text` | yes | yes | 1..10485760 | | | | | yes | yes | yes | yes |
-| `integer` | yes | yes | | | | | | yes | | | yes |
-| `decimal` | yes | yes | | 1..1000 | 0..`precision`, only with `precision` | | | yes | | | yes |
-| `boolean` | yes | yes | | | | | | yes | | | yes |
-| `date` | yes | yes | | | | | | yes | | | yes |
-| `date-time` | yes | yes | | | | | | yes | | | yes |
-| `enum` | yes | yes | | | | | needed | yes | | | yes |
-| `reference` | yes | yes | | | | needed | | | | | yes |
-| `child-collection` | | | | | | needed | | | | | |
-| `money` | yes | yes | | 1..1000, default 18 | 0..`precision`, default from the currency | | | yes | | | yes |
+| Type | `required` | `unique` | `maxLength` | `minLength` | `min`, `max` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` | `creator` | `sensitive` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `text` | yes | yes | 1..10485760 | 1..`maxLength` | | | | | | yes | yes | yes | yes |
+| `integer` | yes | yes | | | yes | | | | | yes | | | yes |
+| `decimal` | yes | yes | | | yes | 1..1000 | 0..`precision`, only with `precision` | | | yes | | | yes |
+| `boolean` | yes | yes | | | | | | | | yes | | | yes |
+| `date` | yes | yes | | | yes | | | | | yes | | | yes |
+| `date-time` | yes | yes | | | yes | | | | | yes | | | yes |
+| `enum` | yes | yes | | | | | | | needed | yes | | | yes |
+| `reference` | yes | yes | | | | | | needed | | | | | yes |
+| `child-collection` | | | | | | | | needed | | | | | |
+| `money` | yes | yes | | | yes | 1..1000, default 18 | 0..`precision`, default from the currency | | | yes | | | yes |
 - `required` and `unique` default to `false`.
 - `maxLength` is capped at 10485760, the largest `varchar` length.
+- `min` and `max` are literals of the field's type, written as the record API
+  reads a value. An `integer` limit is a JSON integer in the signed 64-bit
+  range. A `decimal` or `money` limit is a JSON number that fits a .NET
+  `decimal`, at most 28 digits. A `date` limit is a string `yyyy-MM-dd`. A `date-time` limit is an
+  RFC 3339 string with an offset, compared as an instant in UTC. Either can be
+  left out. A limit of another JSON type, an invalid literal or `max` below
+  `min` is `AXC0013`, at `/fields/{i}/min` or `/fields/{i}/max`. `min` equal to
+  `max` is allowed.
+- `minLength` is 1 or more, and at most `maxLength` when that is set, else
+  `AXC0013` at `/fields/{i}/minLength`.
+- `min`, `max` and `minLength` cannot be combined with `expression`, `sequence`
+  or `creator`, because the server sets the value and a request never carries
+  it. Each is `AXC0013` at the property.
+- The server checks the limits when it reads a request, and the database has no
+  `CHECK` constraint for them. So tightening a limit needs no migration, and a
+  stored row outside the new limit keeps its values and still reads back. See
+  [request bodies and values](record-api.md#request-bodies-and-values).
 - `values` is a non-empty list of distinct strings; the JSON Schema checks
   this (`AXC0004`).
 - `target` names an entity in the same application, ignoring letter case.
@@ -463,8 +480,9 @@ is `AXC0013`.
   `currencyField` that is not a `text` or `enum` field of the entity is
   `AXC0243`, at `/fields/{i}` when the currency is missing and at
   `/fields/{i}/currency` or `/fields/{i}/currencyField` otherwise. `currency`
-  or `currencyField` on another type is `AXC0013`. A data source measure still
-  refuses `money`, see [data sources](data-sources.md#aggregates).
+  or `currencyField` on another type is `AXC0013`. A data source measure may
+  `sum`, `min` or `max` a money field, and must then group by its
+  `currencyField` (`AXC0248`), see [data sources](data-sources.md#aggregates).
 - `child-collection` owns the rows of the entity that `target` names. It
   allows no other type-specific property. It has no `required`, because a
   missing collection means no rows, and no `unique`. Setting either, even to
@@ -521,10 +539,6 @@ new check is a new compile diagnostic.
   [create, update and delete](record-api.md#create-update-and-delete). That is
   still planned, so a default is not applied yet. `file` and `references` are
   refused when those types arrive.
-- **`min` and `max`.** On `integer`, `decimal`, `money`, `date` and
-  `date-time` fields, a literal of the field's type, with `min` at most `max`.
-  **`minLength`** on `text`, at most `maxLength`. A value outside is a `400`
-  at the field's pointer. There is no `CHECK` constraint.
 - **`searchable`.** On a `text` field. `search` reads every searchable field,
   and the display field is always searchable. See
   [paging and sorting](record-api.md#paging-and-sorting).
@@ -540,14 +554,14 @@ new check is a new compile diagnostic.
   ignoring letter case. They are the index columns, in order. An empty list,
   a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
 - **Field types.** An index holds a field that has a column. A
-  `child-collection` field is `AXC0246`. `references` and `file` fields join
+  `child-collection` field is `AXC0251`. `references` and `file` fields join
   it when they are built.
 - **Compile diagnostics.** Each is reported in the entity file:
-  - `AXC0244`: an index lists the same fields in the same order as an earlier
+  - `AXC0249`: an index lists the same fields in the same order as an earlier
     one, at `/indexes/{j}/fields`.
-  - `AXC0245`: a name in `fields` is no field of the entity, at
+  - `AXC0250`: a name in `fields` is no field of the entity, at
     `/indexes/{j}/fields/{k}`.
-  - `AXC0246`: a field of a type an index cannot hold, at the same path.
+  - `AXC0251`: a field of a type an index cannot hold, at the same path.
 - **Every reference.** Every `reference` field and every child table's
   `owner_id` is indexed without a declaration.
 
@@ -669,20 +683,20 @@ validation calls the rules of its own module, see [modules](modules-and-template
   owner record, as
   [the record API](record-api.md#child-rows-computed-fields-and-validations)
   describes.
-- **M2 limits on a child entity.** These are limits of M2, not permanent
-  rules. Real line items often point to a product, so
-  [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md)
-  lifts part of the last one _(planned for M15)_. A child entity:
+- **Limits on a child entity.** A child entity:
   - is owned by exactly one `child-collection` field (`AXC0039`);
   - is never the `target` of a `reference` (`AXC0040`);
   - is never the `entity` of a data source (`AXC0064`) or of a process
     (`AXC0068`);
   - has no record routes of its own;
-  - has no `reference` or `child-collection` fields (`AXC0041`). From M15 it
-    may have `reference` fields, and `AXC0041` refuses only a
-    `child-collection` field _(planned for M15)_. A reference from a child
-    row gets a foreign key and an index, and its labels follow the rows, see
+  - has no `child-collection` fields (`AXC0041`). It may have `reference`
+    fields, as real line items point to a product, see
+    [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md). A
+    reference from a child row gets a foreign key, and its labels follow the
+    rows, see
     [child rows](record-api.md#child-rows-computed-fields-and-validations).
+    Its index comes with the platform indexes on every reference column
+    _(planned for M15)_.
 
 ## Form conditions and steps
 

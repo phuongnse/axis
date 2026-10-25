@@ -19,7 +19,7 @@ public sealed class ChartCompilerTests
         { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1, "displayField": "number",
           "fields": [ { "name": "number", "type": "text", "required": true }, { "name": "status", "type": "text" },
                       { "name": "quantity", "type": "integer" }, { "name": "total", "type": "decimal" },
-                      { "name": "placedOn", "type": "date" } ] }
+                      { "name": "fee", "type": "money", "currency": "VND" }, { "name": "placedOn", "type": "date" } ] }
         """;
 
     private const string OrdersFile = "pages/orders.json";
@@ -176,6 +176,7 @@ public sealed class ChartCompilerTests
     [InlineData("quantitySum")]
     [InlineData("maxQuantity")]
     [InlineData("minTotal")]
+    [InlineData("maxFee")]
     public void Chart_naming_a_count_a_sum_or_a_min_or_max_of_a_number_compiles(string measure)
     {
         using var folder = Folder(Chart(measures: Measure(measure)));
@@ -426,9 +427,10 @@ public sealed class ChartCompilerTests
             .With("data-sources/order-stats.json", """
                 { "id": "77777777-7777-4777-8777-777777777775", "kind": "dataSource", "name": "OrderStats", "formatVersion": 1, "entity": "Order",
                   "fields": [ { "name": "status", "path": "status" }, { "name": "number", "path": "number" }, { "name": "quantity", "path": "quantity" },
-                              { "name": "total", "path": "total" }, { "name": "placedOn", "path": "placedOn" } ],
+                              { "name": "total", "path": "total" }, { "name": "fee", "path": "fee" }, { "name": "placedOn", "path": "placedOn" } ],
                   "aggregate": { "groupBy": ["status"], "measures": [
                     { "name": "orders", "function": "count" },
+                    { "name": "maxFee", "function": "max", "field": "fee" },
                     { "name": "quantitySum", "function": "sum", "field": "quantity" },
                     { "name": "maxQuantity", "function": "max", "field": "quantity" },
                     { "name": "minTotal", "function": "min", "field": "total" },

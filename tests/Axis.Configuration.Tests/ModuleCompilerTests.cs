@@ -421,7 +421,7 @@ public sealed class ModuleCompilerTests
 
         Assert.Empty(result.Diagnostics);
         var process = Assert.Single(result.Model!.Processes);
-        Assert.Equal(DepartmentName, process.Entity.Name);
+        Assert.Equal(DepartmentName, process.Entity!.Name);
         var raise = Assert.IsType<RaiseEventStepModel>(process.Steps[0]);
         Assert.Equal("departments/DepartmentRenamed", raise.Event);
     }

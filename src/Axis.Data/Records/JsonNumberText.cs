@@ -77,6 +77,48 @@ internal static class JsonNumberText
         return number.Negative && !number.IsZero ? $"-{text}" : text;
     }
 
+    /// <summary>
+    /// Compares two numbers exactly, with no rounding: by sign, treating <c>-0</c> as zero, then by
+    /// the number of integer digits, then digit by digit. Call it only for numbers whose digit
+    /// counts were checked against a limit, because it renders them.
+    /// </summary>
+    public static int Compare(JsonNumber left, JsonNumber right)
+    {
+        var leftSign = left.IsZero ? 0 : left.Negative ? -1 : 1;
+        var rightSign = right.IsZero ? 0 : right.Negative ? -1 : 1;
+        if (leftSign != rightSign)
+        {
+            return leftSign.CompareTo(rightSign);
+        }
+
+        if (leftSign == 0)
+        {
+            return 0;
+        }
+
+        var magnitude = CompareMagnitude(left, right);
+        return leftSign < 0 ? -magnitude : magnitude;
+    }
+
+    private static int CompareMagnitude(JsonNumber left, JsonNumber right)
+    {
+        if (left.IntegerDigits != right.IntegerDigits)
+        {
+            return left.IntegerDigits.CompareTo(right.IntegerDigits);
+        }
+
+        var (leftInteger, leftFraction) = Split(left);
+        var (rightInteger, rightFraction) = Split(right);
+        var integer = string.CompareOrdinal(leftInteger, rightInteger);
+        if (integer != 0)
+        {
+            return integer;
+        }
+
+        var width = Math.Max(leftFraction.Length, rightFraction.Length);
+        return string.CompareOrdinal(leftFraction.PadRight(width, '0'), rightFraction.PadRight(width, '0'));
+    }
+
     /// <summary>Renders the integer part with its sign. Call it only for a number with no fraction digits.</summary>
     public static string RenderInteger(JsonNumber number)
     {

@@ -3,7 +3,7 @@ namespace Axis.Server.Authentication;
 /// <summary>
 /// Another system that calls the record API with a bearer token from its tenant's identity provider, as a service
 /// account under the same policies as a user. A route opts in with <see cref="ServiceAccountRoute"/>. On such a route a
-/// request with a bearer token is a service account request: the token is judged against <c>Oidc:ServiceAudience</c>,
+/// request with a bearer or DPoP token is a service account request: the token is judged against <c>Oidc:ServiceAudience</c>,
 /// the session cookie is never read or renewed, and no CSRF header is needed. Every other route ignores the token.
 /// </summary>
 internal static class ServiceAccount
@@ -17,11 +17,20 @@ internal static class ServiceAccount
 
     /// <summary>
     /// Whether the request is a service account request: its route carries <see cref="ServiceAccountRoute"/> and it
-    /// has an <c>Authorization: Bearer</c> header, in any letter case.
+    /// has an <c>Authorization: Bearer</c> or <c>Authorization: DPoP</c> header, in any letter case. A tenant under
+    /// <c>fapi2</c> takes only the second.
     /// </summary>
-    public static bool Applies(HttpContext context) =>
-        context.GetEndpoint()?.Metadata.GetMetadata<ServiceAccountRoute>() is not null
-        && context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
+    public static bool Applies(HttpContext context)
+    {
+        if (context.GetEndpoint()?.Metadata.GetMetadata<ServiceAccountRoute>() is null)
+        {
+            return false;
+        }
+
+        var authorization = context.Request.Headers.Authorization.ToString();
+        return authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            || authorization.StartsWith("DPoP ", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 /// <summary>

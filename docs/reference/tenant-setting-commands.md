@@ -6,8 +6,10 @@ keys and passwords, and the platform audit records they write. The other command
 sections marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The design follows [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md). The
-`platform.audit_records` table and `PlatformAuditRecords.WriteAsync` are built. The rest of this
-page is _(planned for M16)_.
+`platform.audit_records` table, `PlatformAuditRecords.WriteAsync` and the records of the commands
+that already exist are built, see [platform audit records](#platform-audit-records). The database
+password rotation, [`tenant rotate-passwords`](#database-passwords), is built. The other setting
+commands on this page, and the key rotation, are _(planned for M16)_.
 
 ## Common rules
 
@@ -51,7 +53,7 @@ page is _(planned for M16)_.
 | `--authority <url>`            | The authority of the tenant's identity provider                                               |
 | `--client-id <id>`             | The OIDC client id                                                                            |
 | `--client-secret`              | Replaces the client secret, from `AXIS_OIDC_CLIENT_SECRET` or standard input                  |
-| `--claim <name>=<claim>`       | A claim name: `UserId`, `DisplayName` or `Roles`                                              |
+| `--claim <name>=<claim>`       | A claim name: `UserId`, `DisplayName`, `Roles`, `Email` or `Locale`                              |
 | `--endpoint-audience <value>`  | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it |
 | `--service-audience <value>`   | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it |
 | `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](security.md#fapi-20-profile)                      |
@@ -75,9 +77,26 @@ page is _(planned for M16)_.
 ## Database passwords
 
 `tenant rotate-passwords <id>` sets new generated passwords for the tenant's runtime and schema
-database roles, with `ALTER ROLE`, and stores them encrypted, in one step per role.
+database roles, `axis_<id>_runtime` and `axis_<id>_schema`, with `ALTER ROLE`, and stores them
+encrypted, in one step per role. It prints one line per role, `<id> runtime-password ok` and
+`<id> schema-password ok`, or `failed` with the message of the database. It never prints a password.
 
-- **Admin connection.** It needs `Admin:ConnectionString`, as `tenant create` does.
+- **Admin connection.** It needs `Admin:ConnectionString`, as `tenant create` does, and checks the
+  admin role the same way: it needs `CREATEROLE` and must not be a superuser. On PostgreSQL 16 and
+  later a `CREATEROLE` role changes the password of only the roles it administers, so the role of
+  `Admin:ConnectionString` must be the one that created the tenant's roles.
+- **Order and steps.** The runtime role goes first, then the schema role. A step saves the new
+  encrypted password and raises the tenant `version` in a transaction of the platform database, runs
+  `ALTER ROLE`, and commits only when `ALTER ROLE` succeeded. A step that fails leaves the stored
+  password of its role as it was, the command stops and exits with code 1, and running it again
+  completes the rotation. A role that was rotated before the failure keeps its new password.
+- **Which tenants.** An `active` or `suspended` tenant is rotated. A tenant that is still
+  `provisioning` exits with code 2, as `migrate` does, because its roles may not exist yet.
+- **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, the tenant is unknown or
+  still provisioning, `Admin:ConnectionString` is missing, or the admin role is unsuitable. No audit
+  record is written.
+- **The log of the database server.** `ALTER ROLE ... PASSWORD` cannot take a parameter. A server
+  that logs DDL statements logs the new password, as it does for `CREATE ROLE` in `tenant create`.
 - **During the change.** The server and the worker keep their open pooled connections. A new
   connection opened before their next refresh may fail once with the old password. The next refresh
   gives them the new one.
@@ -106,11 +125,23 @@ keys. It can be rotated without signing anyone out.
 
 - **Table.** `platform.audit_records` is append-only. The database rejects every update, delete and
   truncate with SQLSTATE `23001`, as it does for the audit table of a tenant database. The table is
-  built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record. No command
-  calls it yet, so the commands that write records are _(planned for M16)_.
-- **What writes it.** Every `Axis.Admin` command that changes the directory, a tenant database, a key
-  or a password. `tenant backup` writes one too, because an archive holds a tenant's data.
-  `tenant list` and `version` write none.
+  built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record.
+- **What writes it.** Every `Axis.Admin` command that acts on a tenant: `tenant create`,
+  `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant backup`, `tenant restore`,
+  `migrate` and `activate` are built. `tenant backup` writes one because an archive holds a tenant's data. The other setting
+  commands on this page and `platform rekey` are _(planned for M16)_. `tenant list`, `version` and
+  `publisher` write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is
+  marked as writing one record per tenant or none. A command without a mark fails a test.
+- **When.** One record per tenant, when tenant work starts: after the checks of the command and
+  before its first change for that tenant. A usage error, a missing setting, an unknown tenant or a
+  host that another tenant holds writes none, because nothing started. A record means the command
+  started work for the tenant, not that the work succeeded. The `changed` names of these commands
+  are empty, because the command already says what changed. `tenant rotate-passwords` is the
+  exception: its record names both roles, `axis_<id>_runtime` and `axis_<id>_schema`, and never a
+  password.
+- **A record that cannot be written.** That tenant stops with an `audit` step, and nothing changes
+  for it. The line is `<tenant> audit failed: <message>`, and the command exits `1`. The other
+  tenants of `migrate` and `activate` go on. A record that is written prints no line.
 - **A record.** The time, the command, the tenant id, the operating system user and the machine that
   ran it, and the names of what changed, such as a binding name or a setting name. It never holds a
   secret value.

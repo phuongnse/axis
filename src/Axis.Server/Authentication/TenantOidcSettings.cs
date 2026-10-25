@@ -36,7 +36,7 @@ internal sealed class TenantOidcSettings
     /// </summary>
     public string? ServiceAudience { get; set; }
 
-    /// <summary>The names of the claims that give the user id, the display name and the roles.</summary>
+    /// <summary>The names of the claims that give the user id, the display name, the roles, the email and the locale.</summary>
     public TenantOidcClaims Claims { get; set; } = new();
 
     /// <summary>Reads the Oidc settings of one tenant and checks them.</summary>
@@ -65,6 +65,8 @@ internal sealed class TenantOidcSettings
                 UserId = source.UserIdClaim ?? "",
                 DisplayName = source.DisplayNameClaim ?? "",
                 Roles = source.RolesClaim ?? "",
+                Email = source.EmailClaim ?? "",
+                Locale = source.LocaleClaim ?? "",
             },
         };
         if (string.IsNullOrWhiteSpace(oidc.Authority))
@@ -134,6 +136,8 @@ internal sealed class TenantOidcClaims
     private string _userId = "sub";
     private string _displayName = "name";
     private string _roles = "roles";
+    private string _email = "email";
+    private string _locale = "locale";
 
     public string UserId
     {
@@ -151,5 +155,17 @@ internal sealed class TenantOidcClaims
     {
         get => _roles;
         set => _roles = string.IsNullOrWhiteSpace(value) ? "roles" : value;
+    }
+
+    public string Email
+    {
+        get => _email;
+        set => _email = string.IsNullOrWhiteSpace(value) ? "email" : value;
+    }
+
+    public string Locale
+    {
+        get => _locale;
+        set => _locale = string.IsNullOrWhiteSpace(value) ? "locale" : value;
     }
 }

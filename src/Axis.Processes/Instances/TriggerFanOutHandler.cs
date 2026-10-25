@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
+using Axis.Core.Telemetry;
 using Axis.Data.Audit;
 using Axis.Data.DataSources;
 using Axis.Data.Records;
@@ -27,9 +28,14 @@ namespace Axis.Processes.Instances;
 /// A data error in the data source's filter ends the occurrence with a warning. When the data
 /// source's filter or a group field reads a computed field that is being recomputed, the batch starts
 /// nothing, writes no receipt and keeps the cursor. It logs a warning and makes the item due again one
-/// lease later. The sort is not checked, because the batch reads by record id.
+/// lease later. The sort is not checked, because the batch reads by record id. Any other failure
+/// rolls the batch back. A transaction of its own then counts it in <c>axis.delivery_failures</c>
+/// under <c>trigger.fanOut</c> and <c>{triggerId}/{occurrence}</c>, storing only the exception type and
+/// SQLSTATE, and makes the item due again after the backoff with its cursor kept. At the limit of
+/// <see cref="DeliverySettings.Attempts"/> failures it writes an <c>open</c> dead letter with the
+/// occurrence and deletes the item. The count belongs to the occurrence, so a failure in any batch adds to it.
 /// </summary>
-internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILogger<TriggerFanOutHandler> logger) : IExternalWorkItemHandler
+internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, DeliverySettings settings, ILogger<TriggerFanOutHandler> logger) : IDeliveryWorkItemHandler
 {
     private const int PageSize = 100;
 
@@ -50,68 +56,43 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
         var skips = new List<(Guid SubjectId, string Reason)>();
         var outcome = WorkItemOutcome.Completed;
         TriggerModel trigger;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        try
         {
-            if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
+            await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
             {
-                await transaction.RollbackAsync(cancellationToken);
-                LogLostClaim(item.Id, triggerId, occurrence);
-                return WorkItemOutcome.LostClaim;
-            }
-
-            var context = new WorkItemContext(item, connection, transaction);
-            var stored = await models.GetAsync(context, releaseId, cancellationToken);
-            trigger = stored.Triggers.First(candidate => candidate.Id == triggerId);
-            var dataSource = stored.DataSources.First(candidate => candidate.Id == trigger.DataSource!.Id);
-
-            // The start lock comes before the active release is read and before any entity table, so a
-            // migrating activation cannot deadlock with this batch, and the release is the one the starts pin.
-            await StartLock.TakeSharedAsync(transaction, stored.Manifest.Id, cancellationToken);
-            var active = await models.FindActiveAsync(context, stored.Manifest.Id, cancellationToken);
-            var process = active?.Model.Processes.FirstOrDefault(candidate => candidate.Id == trigger.Process.Id);
-            if (active is not { } current || process is null)
-            {
-                LogNothingToStart(trigger.Name, occurrence, trigger.Process.Name);
-            }
-            else
-            {
-                var parameters = dataSource.Parameters
-                    .Select(parameter => new DataSourceParameterValue(parameter, trigger.Parameters!.GetValueOrDefault(parameter.Name)))
-                    .ToList();
-
-                // The filter or a group field on a field that is being recomputed would select records by a stale stored value.
-                var pending = await DataSourcePendingFields.ReadAsync(connection, transaction, stored, dataSource, sort: null, cancellationToken);
-                if (pending.Count > 0)
+                if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
                 {
-                    LogPending(trigger.Name, occurrence);
-                    if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, item.Lease, cancellationToken))
-                    {
-                        await transaction.RollbackAsync(cancellationToken);
-                        LogLostClaim(item.Id, triggerId, occurrence);
-                        return WorkItemOutcome.LostClaim;
-                    }
-
-                    outcome = WorkItemOutcome.Rescheduled;
+                    await transaction.RollbackAsync(cancellationToken);
+                    LogLostClaim(item.Id, triggerId, occurrence);
+                    return WorkItemOutcome.LostClaim;
                 }
-                else if (await ListIdsAsync(connection, transaction, stored, dataSource, parameters, item.Cursor, cancellationToken) is not { } ids)
+
+                var context = new WorkItemContext(item, connection, transaction);
+                var stored = await models.GetAsync(context, releaseId, cancellationToken);
+                trigger = stored.Triggers.First(candidate => candidate.Id == triggerId);
+                var dataSource = stored.DataSources.First(candidate => candidate.Id == trigger.DataSource!.Id);
+
+                // The start lock comes before the active release is read and before any entity table, so a
+                // migrating activation cannot deadlock with this batch, and the release is the one the starts pin.
+                await StartLock.TakeSharedAsync(transaction, stored.Manifest.Id, cancellationToken);
+                var active = await models.FindActiveAsync(context, stored.Manifest.Id, cancellationToken);
+                var process = active?.Model.Processes.FirstOrDefault(candidate => candidate.Id == trigger.Process.Id);
+                if (active is not { } current || process is null)
                 {
-                    LogDataError(trigger.Name, occurrence);
+                    LogNothingToStart(trigger.Name, occurrence, trigger.Process.Name);
                 }
                 else
                 {
-                    var entity = current.Model.FindEntity(process.Entity.Id)
-                        ?? throw new InvalidOperationException($"The release has no entity '{process.Entity.Name}'.");
-                    foreach (var id in ids)
-                    {
-                        if (await StartAsync(item, transaction, current.Model, current.ReleaseId, trigger, process, entity, occurrence, id, cancellationToken) is { } skipped)
-                        {
-                            skips.Add((id, skipped));
-                        }
-                    }
+                    var parameters = dataSource.Parameters
+                        .Select(parameter => new DataSourceParameterValue(parameter, trigger.Parameters!.GetValueOrDefault(parameter.Name)))
+                        .ToList();
 
-                    if (ids.Count == PageSize)
+                    // The filter or a group field on a field that is being recomputed would select records by a stale stored value.
+                    var pending = await DataSourcePendingFields.ReadAsync(connection, transaction, stored, dataSource, sort: null, cancellationToken);
+                    if (pending.Count > 0)
                     {
-                        if (!await WorkItemQueue.AdvanceCursorAsync(connection, transaction, item, ids[^1], cancellationToken))
+                        LogPending(trigger.Name, occurrence);
+                        if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, item.Lease, cancellationToken))
                         {
                             await transaction.RollbackAsync(cancellationToken);
                             LogLostClaim(item.Id, triggerId, occurrence);
@@ -120,17 +101,53 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
 
                         outcome = WorkItemOutcome.Rescheduled;
                     }
+                    else if (await ListIdsAsync(connection, transaction, stored, dataSource, parameters, item.Cursor, cancellationToken) is not { } ids)
+                    {
+                        LogDataError(trigger.Name, occurrence);
+                    }
+                    else
+                    {
+                        // The compiler refuses a trigger that names a process without a subject.
+                        var subjectReference = process.Entity
+                            ?? throw new InvalidOperationException($"The process '{process.Name}' has no subject, so a trigger cannot start it.");
+                        var entity = current.Model.FindEntity(subjectReference.Id)
+                            ?? throw new InvalidOperationException($"The release has no entity '{subjectReference.Name}'.");
+                        foreach (var id in ids)
+                        {
+                            if (await StartAsync(item, transaction, current.Model, current.ReleaseId, trigger, process, entity, occurrence, id, cancellationToken) is { } skipped)
+                            {
+                                skips.Add((id, skipped));
+                            }
+                        }
+
+                        if (ids.Count == PageSize)
+                        {
+                            if (!await WorkItemQueue.AdvanceCursorAsync(connection, transaction, item, ids[^1], cancellationToken))
+                            {
+                                await transaction.RollbackAsync(cancellationToken);
+                                LogLostClaim(item.Id, triggerId, occurrence);
+                                return WorkItemOutcome.LostClaim;
+                            }
+
+                            outcome = WorkItemOutcome.Rescheduled;
+                        }
+                    }
                 }
-            }
 
-            if (outcome == WorkItemOutcome.Completed && !await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                LogLostClaim(item.Id, triggerId, occurrence);
-                return WorkItemOutcome.LostClaim;
-            }
+                if (outcome == WorkItemOutcome.Completed && !await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    LogLostClaim(item.Id, triggerId, occurrence);
+                    return WorkItemOutcome.LostClaim;
+                }
 
-            await transaction.CommitAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            // The failed transaction is disposed, so it has rolled back and the connection is free.
+            return await CountFailureAsync(item, connection, triggerId, releaseId, occurrenceAt, occurrence, exception, cancellationToken);
         }
 
         foreach (var (subjectId, reason) in skips)
@@ -139,6 +156,65 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
         }
 
         return outcome;
+    }
+
+    /// <summary>
+    /// Counts a failed batch for the trigger and the occurrence in a transaction of its own, after
+    /// the batch has rolled back. Below the limit it makes the item due again after the backoff and
+    /// keeps its cursor. At the limit it writes an <c>open</c> dead letter and deletes the item.
+    /// </summary>
+    private async Task<WorkItemOutcome> CountFailureAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        Guid triggerId,
+        Guid releaseId,
+        DateTimeOffset occurrenceAt,
+        string occurrence,
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        // Only the type and SQLSTATE are kept: the message of the exception can quote a record value.
+        var error = DeliveryFailures.ErrorText(exception);
+        var target = $"{triggerId:D}/{occurrence}";
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            LogLostClaim(item.Id, triggerId, occurrence);
+            return WorkItemOutcome.LostClaim;
+        }
+
+        var attempts = await DeliveryFailures.CountAsync(transaction, DeliveryFailures.TriggerFanOutKind, target, error, cancellationToken);
+        if (attempts >= settings.Attempts)
+        {
+            var stored = await models.GetAsync(new WorkItemContext(item, connection, transaction), releaseId, cancellationToken);
+            var trigger = stored.Triggers.First(candidate => candidate.Id == triggerId);
+            var deadLetterId = await DeliveryFailures.InsertFanOutDeadLetterAsync(
+                transaction, stored.Manifest.Id, trigger.Process.Id, triggerId, occurrenceAt, attempts, error, cancellationToken);
+            if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id, triggerId, occurrence);
+                return WorkItemOutcome.LostClaim;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            AxisMetrics.RecordDeadLetter(item.TenantId, DeliveryFailures.TriggerFanOutKind);
+            LogDeadLettered(triggerId, occurrence, attempts, deadLetterId, DeliveryFailures.TriggerFanOutKind);
+            return WorkItemOutcome.Completed;
+        }
+
+        var delay = DeliveryFailures.Backoff(attempts);
+        if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            LogLostClaim(item.Id, triggerId, occurrence);
+            return WorkItemOutcome.LostClaim;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        LogFanOutFailed(triggerId, occurrence, error, attempts, settings.Attempts, delay);
+        return WorkItemOutcome.Rescheduled;
     }
 
     /// <summary>
@@ -243,6 +319,12 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, ILo
 
     [LoggerMessage(LogLevel.Warning, "Trigger {Trigger} started nothing for occurrence {OccurrenceAt}: the data source reads a field that is being recomputed, so the occurrence runs again after the lease.")]
     private partial void LogPending(string trigger, string occurrenceAt);
+
+    [LoggerMessage(LogLevel.Warning, "Fan-out of trigger {TriggerId} for occurrence {OccurrenceAt} failed with {Error}, failure {Attempts} of {Limit}. It is due again in {Delay}.")]
+    private partial void LogFanOutFailed(Guid triggerId, string occurrenceAt, string error, int attempts, int limit, TimeSpan delay);
+
+    [LoggerMessage(LogLevel.Warning, "Fan-out of trigger {TriggerId} for occurrence {OccurrenceAt} failed {Attempts} times and became dead letter {DeadLetterId} of kind {Kind}.")]
+    private partial void LogDeadLettered(Guid triggerId, string occurrenceAt, int attempts, Guid deadLetterId, string kind);
 
     [LoggerMessage(LogLevel.Warning, "Fan-out work item {ItemId} for trigger {TriggerId} and occurrence {OccurrenceAt} was claimed by another worker, so its writes were rolled back.")]
     private partial void LogLostClaim(Guid itemId, Guid triggerId, string occurrenceAt);

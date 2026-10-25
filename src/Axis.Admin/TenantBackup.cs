@@ -42,6 +42,7 @@ internal sealed class TenantBackup : IAsyncDisposable
 
     private readonly BackupSettings _settings;
     private readonly BackupPlan _plan;
+    private readonly TenantAudit _audit;
     private readonly TextWriter _output;
     private readonly CancellationToken _cancellationToken;
     private readonly string _id;
@@ -51,10 +52,11 @@ internal sealed class TenantBackup : IAsyncDisposable
     private List<ManifestPackage> _packages = [];
     private List<ManifestModule> _modules = [];
 
-    public TenantBackup(BackupSettings settings, BackupPlan plan, TextWriter output, CancellationToken cancellationToken)
+    public TenantBackup(BackupSettings settings, BackupPlan plan, TenantAudit audit, TextWriter output, CancellationToken cancellationToken)
     {
         _settings = settings;
         _plan = plan;
+        _audit = audit;
         _output = output;
         _cancellationToken = cancellationToken;
         _id = plan.Row.Id;
@@ -143,6 +145,11 @@ internal sealed class TenantBackup : IAsyncDisposable
     {
         try
         {
+            if (!await _audit.WriteAsync(_id, _output, _cancellationToken))
+            {
+                return 1;
+            }
+
             return await Step("dump", DumpAsync) && await Step("archive", ArchiveAsync) ? 0 : 1;
         }
         finally
@@ -372,6 +379,8 @@ internal sealed class TenantBackup : IAsyncDisposable
             row.ClaimUserId,
             row.ClaimDisplayName,
             row.ClaimRoles,
+            row.ClaimEmail,
+            row.ClaimLocale,
             row.EndpointAudience,
             row.ServiceAudience,
             [.. _plan.Bindings
@@ -457,6 +466,8 @@ internal sealed record ManifestDirectory(
     string? ClaimUserId,
     string? ClaimDisplayName,
     string? ClaimRoles,
+    string? ClaimEmail,
+    string? ClaimLocale,
     string? EndpointAudience,
     string? ServiceAudience,
     IReadOnlyList<ManifestBinding> Bindings);

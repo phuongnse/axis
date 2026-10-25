@@ -37,16 +37,22 @@
       "type": "createRecord",
       "entity": "Ticket",
       "as": "anna",
-      "save": "reopened",
+      "save": "submitted",
       "values": {
         "title": "Laptop will not start",
         "description": "It shows a black screen.",
-        "status": "reopened"
+        "status": "draft"
       }
     },
     {
+      "type": "startProcess",
+      "process": "TicketHandling",
+      "record": "submitted",
+      "as": "anna"
+    },
+    {
       "type": "deleteRecord",
-      "record": "reopened",
+      "record": "submitted",
       "as": "anna",
       "expect": "denied"
     }

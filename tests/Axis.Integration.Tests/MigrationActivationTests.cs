@@ -75,6 +75,39 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
     }
 
     [Fact]
+    public async Task A_release_that_tightens_a_range_needs_no_migration_and_keeps_the_stored_values_outside_it()
+    {
+        using var folder = Application().With("entities/order.json", Order(NumberField, PriorityField, NoteField));
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        var low = Guid.NewGuid();
+        var high = Guid.NewGuid();
+        await InsertAsync(_orderId, ("id", low), ("f_number", "PO-1"), ("f_priority", 1L), ("f_note", "ab"));
+        await InsertAsync(_orderId, ("id", high), ("f_number", "PO-2"), ("f_priority", 50L), ("f_note", null));
+        folder.With(
+            "entities/order.json",
+            Order(
+                NumberField,
+                """{ "name": "priority", "type": "integer", "min": 10, "max": 20 }""",
+                """{ "name": "note", "type": "text", "minLength": 5 }"""));
+        var compiled = await CompileAsync(folder);
+        Assert.NotNull(compiled.Model);
+
+        var result = await ActivateAsync(compiled);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(await ReadAppliedMigrationsAsync());
+        Assert.True(compiled.Model.TryGetEntity("Order", out var entity));
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        var first = await RecordQueries.GetAsync(connection, compiled.Model, entity, low, CancellationToken);
+        Assert.Equal((1L, "ab"), (first?.Values["priority"]?.GetValue<long>(), first?.Values["note"]?.GetValue<string>()));
+        var second = await RecordQueries.GetAsync(connection, compiled.Model, entity, high, CancellationToken);
+        Assert.Equal(50L, second?.Values["priority"]?.GetValue<long>());
+        Assert.Equal(["0"], await ReadScalarsAsync(
+            $"SELECT count(*)::text FROM pg_constraint WHERE conrelid = '{EntityNaming.QualifiedTable(EntityNaming.Table(_orderId))}'::regclass AND contype = 'c'"));
+    }
+
+    [Fact]
     public async Task A_pending_drop_field_drops_the_column_and_a_pending_drop_entity_drops_the_table_its_child_table_and_their_records()
     {
         using var folder = Application()

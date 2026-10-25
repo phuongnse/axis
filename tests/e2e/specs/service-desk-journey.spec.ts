@@ -8,7 +8,7 @@ import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { createResource } from '../studio-resources'
+import { createResource, openFormTab } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -42,7 +42,7 @@ interface SampleScenario {
 const scenarios = [
   ['TicketIsClosed', 'scenarios/ticket-is-closed.json'],
   ['TicketIsRejected', 'scenarios/ticket-is-rejected.json'],
-  ['ReopenedTicketIsResubmitted', 'scenarios/reopened-ticket-is-resubmitted.json'],
+  ['ReopenedTicketReturnsToTheAgent', 'scenarios/reopened-ticket-returns-to-the-agent.json'],
   ['AgentCannotActOnAnotherAgentsTicket', 'scenarios/agent-cannot-act-on-another-agents-ticket.json'],
   ['LeadCannotActForTheRequester', 'scenarios/lead-cannot-act-for-the-requester.json'],
   ['RequesterCannotReachAnotherTicket', 'scenarios/requester-cannot-reach-another-ticket.json'],
@@ -56,6 +56,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   async function createPage(page: Page, name: string) {
     await createResource(page, 'page', name)
+    await openFormTab(page)
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   }
 
@@ -63,6 +64,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   // panel as `scope`, so that only the panel's field matches.
   async function openPage(page: Page, name: string) {
     await page.getByTestId('studio-group-page').getByRole('button', { name, exact: true }).click()
+    await openFormTab(page)
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   }
 
@@ -81,7 +83,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await pickOption(page.getByTestId(testId).getByRole('combobox', { name, exact: true }), option)
   }
 
-  async function save(page: Page, answers: [field: string, choice: string][] = []) {
+  async function save(page: Page, answers: [field: string, choice: string, expression?: string][] = []) {
     // A save with a migration posts one changes call, and a save without one patches the resource.
     const answer = page.waitForResponse(
       (response) => {
@@ -95,8 +97,11 @@ test.describe('the author builds the service desk with Studio only', () => {
       { timeout: 60_000 },
     )
     await page.getByRole('button', { name: 'Save', exact: true }).click()
-    for (const [field, choice] of answers) {
+    for (const [field, choice, expression] of answers) {
       await expect(page.getByTestId('studio-migration-field')).toHaveText(field)
+      if (expression !== undefined) {
+        await page.getByRole('textbox', { name: 'Convert expression', exact: true }).fill(expression)
+      }
       await page.getByRole('button', { name: choice, exact: true }).click()
     }
     await expect(page.getByTestId('studio-saved')).toBeVisible()
@@ -453,6 +458,24 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(migrations).toHaveCount(0)
   })
 
+  test('the author removes the reopened status and converts the stored tickets to draft', async ({ page }) => {
+    // Studio names the migration after the UTC time of the save, so a fixed clock gives the committed file name.
+    await page.clock.setFixedTime(new Date('2026-10-25T12:00:00Z'))
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    await page.getByTestId('studio-group-entity').getByRole('button', { name: 'Ticket', exact: true }).click()
+    await expectForm(page)
+    const values = page.getByTestId('studio-field-/fields/7/values')
+    await expect(values.getByText('reopened', { exact: true })).toBeVisible()
+    // Backspace in the empty tags input removes the last tag, which is reopened.
+    await values.getByRole('combobox').press('Backspace')
+    await expect(values.getByText('reopened', { exact: true })).toHaveCount(0)
+    await save(page, [['status', 'Add convert', "'draft'"]])
+    await expectForm(page)
+    await expect(page.getByTestId('studio-group-migration').getByRole('button')).toHaveCount(1)
+  })
+
   test('the author builds the ticket lists and the open ticket counts as data sources', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
@@ -519,7 +542,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     const en = await texts('en')
     const form = await sample<SampleForm>('forms/ticket-edit.json')
     await createResource(page, 'form', 'TicketEdit')
-    await expectForm(page)
+    await openFormTab(page)
     // The Design pane has no editor for the entity, so it is picked on the Form tab.
     await pick(page, 'studio-field-/entity', form.entity)
     await openDesign(page)
@@ -602,7 +625,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     ]) {
       const form = await sample<SampleForm>(file)
       await createResource(page, 'form', name)
-      await expectForm(page)
+      await openFormTab(page)
       await pick(page, 'studio-field-/entity', form.entity)
       for (const [sectionIndex, section] of form.sections.entries()) {
         if (sectionIndex > 0) {
@@ -656,7 +679,6 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['confirm', 'task'],
       ['markClosed', 'operation'],
       ['markRejected', 'operation'],
-      ['markReopened', 'operation'],
       ['done', 'end'],
     ]
     // Every name exists before any transition is picked, because the pickers offer only named steps.
@@ -742,17 +764,16 @@ test.describe('the author builds the service desk with Studio only', () => {
       dueIn: 'P3D',
       outcomes: [
         { name: 'confirm', label: 'task.confirm', next: 'markClosed' },
-        { name: 'reopen', label: 'task.reopen', next: 'markReopened' },
+        { name: 'reopen', label: 'task.reopen', next: 'markAssigned' },
       ],
     })
     await operation(6, [['status', "'closed'"]], 'done')
     await operation(7, [['status', "'rejected'"]], 'done')
-    await operation(8, [['status', "'reopened'"]], 'done')
 
     await pick(page, 'studio-field-/start', 'submit')
     const condition = page.getByTestId('studio-field-/startCondition/expression')
     await expect(condition.locator('.cm-editor')).toBeVisible()
-    await condition.getByRole('textbox').fill("status in ('draft', 'reopened')")
+    await condition.getByRole('textbox').fill("status == 'draft'")
     await writeLabel(page, 'studio-field-/startCondition/message', 'ticket.cannotSubmit', en['ticket.cannotSubmit'])
     await save(page)
     await expectForm(page)
@@ -870,7 +891,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     // The sample has no Home page, and nothing points to it now.
     const home = page.getByTestId('studio-group-page').getByRole('button', { name: 'Home', exact: true })
     await home.click()
-    await expectForm(page)
+    await openFormTab(page)
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
     await confirmDialog(page, 'Delete')
     await expect(page.getByTestId("studio-group-page").getByRole("button", { name: /Home/i })).toHaveCount(0)
@@ -993,7 +1014,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       { actions: ['read'], filter: 'requester == currentUser()' },
       {
         actions: ['create', 'update'],
-        filter: "requester == currentUser() and status in ('draft', 'reopened')",
+        filter: "requester == currentUser() and status == 'draft'",
         fields: ['title', 'description', 'category', 'priority', 'status'],
       },
       { actions: ['delete'], filter: "requester == currentUser() and status == 'draft'" },
@@ -1120,7 +1141,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
     await page.getByRole('textbox', { name: 'Description', exact: true }).fill('It shows a black screen.')
     await page.getByRole('button', { name: 'Next', exact: true }).click()
-    // The requester's create grant only allows the statuses draft and reopened.
+    // The requester's create grant only allows the status draft.
     await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'draft')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytickets$/)
