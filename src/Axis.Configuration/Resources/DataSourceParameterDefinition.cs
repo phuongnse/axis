@@ -16,5 +16,7 @@ public sealed record DataSourceParameterDefinition
 
     public IReadOnlyList<string>? Values { get; init; }
 
+    public IReadOnlyDictionary<string, TextReference>? ValueLabels { get; init; }
+
     public string? Target { get; init; }
 }

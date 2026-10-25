@@ -6,7 +6,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The development realm in samples/keycloak issues tokens for the purchase request users, and for
-/// the purchasing system that calls the sample's endpoints.
+/// the purchasing system that calls the sample's endpoints and the reporting system that calls the record API.
 /// </summary>
 public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
@@ -84,6 +84,31 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
         Assert.Contains("axis-endpoints", Audiences(claims));
         Assert.Equal(JsonValueKind.Array, claims.GetProperty("roles").ValueKind);
         Assert.Equal(["purchasing-system"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
+    }
+
+    [Fact]
+    public async Task Issues_the_reporting_system_a_client_credentials_token_for_the_record_api()
+    {
+        using var client = new HttpClient();
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = KeycloakFixture.ReportingClientId,
+            ["client_secret"] = KeycloakFixture.ReportingClientSecret,
+        });
+        using var response = await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.True(response.StatusCode == HttpStatusCode.OK, body);
+
+        using var tokens = JsonDocument.Parse(body);
+        using var payload = DecodePayload(tokens.RootElement.GetProperty("access_token").GetString()!);
+        var claims = payload.RootElement;
+        Assert.Equal("reporting-system", claims.GetProperty("sub").GetString());
+        Assert.Equal("reporting-system", claims.GetProperty("azp").GetString());
+        Assert.Contains("axis-services", Audiences(claims));
+        Assert.DoesNotContain("axis-endpoints", Audiences(claims));
+        Assert.Equal(JsonValueKind.Array, claims.GetProperty("roles").ValueKind);
+        Assert.Equal(["reporting-system"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
     }
 
     // The E2E journeys use this token to call an endpoint as a realm user without the

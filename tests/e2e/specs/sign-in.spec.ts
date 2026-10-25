@@ -51,3 +51,30 @@ test('after signing out from the header menu, the current user endpoint answers 
   expect((await page.request.get('/api/me')).status()).toBe(401)
   await expect(signIn).toBeVisible()
 })
+
+test('a person who cancels at the Keycloak login page lands on the home page with a message and can sign in again', async ({
+  page,
+  baseURL,
+}) => {
+  const banner = page.getByRole('banner')
+  const signIn = banner.getByRole('button', { name: 'Sign in', exact: true })
+  await page.goto('/')
+  await signIn.click()
+  await page.locator('#username').waitFor()
+  const state = new URL(page.url()).searchParams.get('state')
+  // The realm's login form has no cancel button. This is the answer Keycloak sends when a person cancels.
+  await page.goto(`/api/auth/callback?error=access_denied&state=${encodeURIComponent(state!)}`)
+
+  await expect(page).toHaveURL(`${baseURL}/?signIn=failed`)
+  await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not complete.' })).toBeVisible()
+  await expect(signIn).toBeVisible()
+
+  await signIn.click()
+  await page.locator('#username').fill('anna')
+  await page.locator('#password').fill('axis')
+  await page.locator('#kc-login').click()
+
+  await expect(page).toHaveURL(`${baseURL}/`)
+  await expect(banner.getByRole('button', { name: 'Anna Employee', exact: true })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not complete.' })).toHaveCount(0)
+})

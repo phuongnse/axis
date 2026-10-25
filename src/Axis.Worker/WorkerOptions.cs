@@ -13,4 +13,7 @@ public sealed class WorkerOptions
 
     /// <summary>How often the worker reads each tenant database for the due work item and pending computed field gauges.</summary>
     public TimeSpan MetricsInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>The failures of one delivery that make it a dead letter. It must be at least 1.</summary>
+    public int DeliveryAttempts { get; set; } = 5;
 }

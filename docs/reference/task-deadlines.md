@@ -7,7 +7,9 @@ routes that claim, release and reassign a task. The task step is in
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-Everything in this file is _(planned for M14)_. The design follows
+Escalations, the deadline, overdue tasks and reassign are _(planned for M14)_.
+[Claim and release](#claim-and-release) and the `claimed_by` and `claimed_at`
+columns are built, except release by a `reassign` grant. The design follows
 [D71](../decisions/d71-task-deadlines-escalation-claim-and-reassign.md).
 
 ## Escalations and deadline
@@ -85,12 +87,24 @@ POST /api/apps/{app}/tasks/{id}/release
 - **Claim.** A user who holds the task's role may claim an open role task.
   The task stores `claimed_by` and `claimed_at`. Then only the claimer may
   complete it, and it leaves the lists of the other role holders.
-- **Release.** The claimer, or a user with the `reassign` grant on the
-  process, may release a claim. The task goes back to every holder of the role.
-- **Errors.** A task assigned to a user, or already claimed, is a `409` with a
-  fixed title. A user who may not act on the task gets the `403` of the task
-  API. An unknown task is a `404`.
-- **Audit.** `task.claimed` and `task.released`, with the task and the actor.
+- **Release.** The claimer may release a claim. A user with the `reassign`
+  grant on the process may too _(planned for M14)_. The task goes back to every
+  holder of the role.
+- **Response.** Both routes answer `200` with the task in the shape of a
+  single read of the [task API](task-api.md).
+- **Errors.** The checks run in the task API's order: `401`, `404`, `403`, then
+  `409`. A user who may not act on the task gets the `403` of the task API, and
+  so does a role holder who releases another holder's claim. An unknown task is
+  a `404`. A task that is no longer open is the task API's `409`. Three more
+  cases are a `409` with a fixed title:
+  - Claiming a task assigned to a user: "Only a task assigned to a role can be
+    claimed."
+  - Claiming a task that is already claimed: "This task is already claimed."
+  - Releasing a task that is not claimed: "This task is not claimed."
+- **Reading.** Other role holders may still read a claimed task and ask for its
+  form state. Only completing it, and listing it, is limited to the claimer.
+- **Audit.** `task.claimed` and `task.released`, with the actor, the task id,
+  the subject record and the instance.
 - The list and read add `"claimedBy"`, the claimer's user id, or `null`.
 
 ## Reassign
@@ -122,7 +136,8 @@ Content-Type: application/json
 
 ## Tables
 
-`axis.process_tasks` adds these columns:
+`axis.process_tasks` adds these columns. `claimed_by` and `claimed_at` are
+built, and the others are _(planned for M14)_:
 
 | Column | Type | Meaning |
 | --- | --- | --- |

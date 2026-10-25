@@ -33,9 +33,11 @@ event ([D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-a
 A schedule trigger may start a process without a subject, and a delete starts
 one through a delete trigger
 ([D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md)).
-Deliveries that keep failing stop after a limit and become dead letters
-([D72](../decisions/d72-a-delivery-limit-and-dead-letters.md)). See
-[Scheduled jobs](#scheduled-jobs), [Delete triggers](#delete-triggers) and
+See [Scheduled jobs](#scheduled-jobs) and [Delete triggers](#delete-triggers).
+
+Deliveries to `async` triggers that keep failing back off, stop after a limit and
+become dead letters ([D72](../decisions/d72-a-delivery-limit-and-dead-letters.md)).
+_(Planned for M14)_ Fan-out and email deliveries follow. See
 [Dead letters](#dead-letters).
 
 ## Raise event step
@@ -230,10 +232,17 @@ next worker claims the item after its lease expires and runs it once. The
 receipts of the triggers that committed make it skip them, even when the
 instance they started has already ended.
 
-A transaction that fails for another reason leaves the item claimed until its
-lease expires, and the delivery is then tried again. There is no limit on
-these retries yet. _(Planned for M14)_ A limit, a backoff and dead letters
-replace this, see [Dead letters](#dead-letters).
+A failure while the worker starts one trigger's process does not stop the item.
+A separate transaction counts it for that trigger and the event, the other
+triggers of the occurrence are still delivered in the same pass, and the item is
+then due again after a backoff instead of after its lease. After
+`Worker:DeliveryAttempts` failures the trigger gets a dead letter and a
+`deadLettered` receipt, and delivery carries on without it. See
+[Dead letters](#dead-letters).
+
+A transaction that fails for another reason, the first read or the last
+completion, leaves the item claimed until its lease expires, and the delivery is
+then tried again. These failures are not counted.
 
 **Waking waiting instances** _(planned for M14)_. After the triggers, the
 item delivers the occurrence to each instance that waits in a `waitEvent` step
@@ -394,9 +403,11 @@ process without a subject when a record is deleted:
 
 ## Dead letters
 
-_(Planned for M14.)_ Deliveries that keep failing stop after a limit and are
-kept as dead letters, see
-[D72](../decisions/d72-a-delivery-limit-and-dead-letters.md).
+Deliveries that keep failing stop after a limit and are kept as dead letters, see
+[D72](../decisions/d72-a-delivery-limit-and-dead-letters.md). The counting, the
+backoff, the limit, the two tables, the log and the metric are built for the start
+of an `async` trigger from `event.deliver`. _(Planned for M14)_ The fan-out and
+email kinds, the waiting-instance target and the routes below are not built yet.
 
 **What counts.** Three kinds of work item deliver something, and each
 failure is counted for its own target:
@@ -420,6 +431,24 @@ the counting transaction writes a dead letter instead. For `event.deliver` it
 also writes the receipt with the outcome `deadLettered`, so delivery carries on
 with the other targets. A fan-out item and an email are set aside.
 
+For an `async` trigger, the failure is counted in `axis.delivery_failures` under
+the kind `event.deliver` and the target `{triggerId}/{eventId}`. When more than
+one trigger fails in the same pass, the item is due again after the shortest
+backoff among them. The count stays after a later success or a dead letter, and
+only a redeliver clears it. The scenario runner of
+[test scenarios](test-scenarios.md) makes the item due at once, so a delivery
+that keeps failing runs 5 times there and is quietly dead-lettered.
+
+**The counter.** `axis.delivery_failures` holds one row per target:
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `kind` | `text` | The work item kind. Part of the primary key |
+| `target` | `text` | The target as a text key, so each kind builds its own. Part of the primary key |
+| `attempts` | `integer` | The failures counted |
+| `last_error` | `text` | The fixed text of the last failure |
+| `updated_at` | `timestamptz` | The start of the transaction of the last failure, `now()` |
+
 **The table.** `axis.dead_letters` holds one row per dead letter:
 
 | Column | Type | Meaning |
@@ -431,7 +460,7 @@ with the other targets. A fan-out item and an email are set aside.
 | `event_id`, `trigger_id`, `process_instance_id`, `email_id` | `uuid`, null | What failed, as the kind needs |
 | `occurrence_at` | `timestamptz`, null | The schedule occurrence, for a fan-out |
 | `attempts` | `integer` | The failures counted |
-| `last_error` | `text` | A fixed text. It holds no value, body, address or exception message |
+| `last_error` | `text` | A fixed text. It holds no value, body, address or exception message. For a database error it is the exception type with its SQLSTATE, as `Npgsql.PostgresException with SQLSTATE P0001`, and for another error just the exception type |
 | `state` | `text` | `open`, `redelivered` or `discarded` |
 | `reason` | `text`, null | The operator's reason |
 | `settled_by` | `text`, null | The user who redelivered or discarded it |

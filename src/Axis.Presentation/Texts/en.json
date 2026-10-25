@@ -22,6 +22,7 @@
   "shell.home.sites.empty": "No application is active.",
   "shell.home.sites.loadFailed": "The sites could not be loaded.",
   "shell.home.sites.signIn": "Sign in to see the sites.",
+  "shell.home.signInFailed": "Sign-in did not complete. Try again.",
   "shell.notFound.title": "Page not found",
   "shell.notFound.message": "There is nothing at this address.",
   "shell.notFound.home": "Go to the home page",
