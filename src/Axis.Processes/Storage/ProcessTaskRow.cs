@@ -52,5 +52,11 @@ public sealed class ProcessTaskRow
     /// <summary>When the task's deadline passed and the task expired, or <see langword="null"/> when it did not expire.</summary>
     public DateTimeOffset? ExpiredAt { get; init; }
 
+    /// <summary>The role holder who claimed the task, or <see langword="null"/> while no one holds the claim.</summary>
+    public string? ClaimedBy { get; init; }
+
+    /// <summary>When the current claim was made, or <see langword="null"/> while no one holds the claim.</summary>
+    public DateTimeOffset? ClaimedAt { get; init; }
+
     public DateTimeOffset CreatedAt { get; init; }
 }

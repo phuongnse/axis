@@ -25,6 +25,10 @@ public static class AuditActions
 
     public const string TaskCompleted = "task.completed";
 
+    public const string TaskClaimed = "task.claimed";
+
+    public const string TaskReleased = "task.released";
+
     public const string TaskExpired = "task.expired";
 
     public const string ConnectorCallStaged = "connector.callStaged";

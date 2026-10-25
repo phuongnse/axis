@@ -142,7 +142,7 @@ public sealed class ProcessCompilerTests
                 (DiagnosticCodes.UnknownStep, "/steps/0/otherwise", "The step 'missing' was not found. No step of this process has that name."),
                 (DiagnosticCodes.StepWithoutEnd, "/steps/1", "The step 'loopA' has no path to an 'end' step."),
                 (DiagnosticCodes.StepWithoutEnd, "/steps/2", "The step 'loopB' has no path to an 'end' step."),
-                (DiagnosticCodes.ProcessStepCycle, "/steps/2/branches/0/next", "Steps 'loopA' → 'loopB' → 'loopA' form a cycle. A process may not loop."),
+                (DiagnosticCodes.ProcessStepCycle, "/steps/2/branches/0/next", "Steps 'loopA' → 'loopB' → 'loopA' form a cycle with no waiting step, so the process would run for ever."),
                 (DiagnosticCodes.UnreachableStep, "/steps/3", "The step 'orphan' cannot be reached from the start step 'check'."),
                 (DiagnosticCodes.DuplicateStepName, "/steps/4/name", "The step name 'CHECK' is already used by step 'check' at '/steps/0'."),
             ],
@@ -164,6 +164,46 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
+    public void A_cycle_through_a_task_compiles()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "review", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "user": "'u1'" }, "form": "OrderReview",
+                "outcomes": [
+                  { "name": "again", "label": { "textKey": "task.reject" }, "next": "prepare" },
+                  { "name": "accept", "label": { "textKey": "task.approve" }, "next": "done" }
+                ] },
+              { "name": "prepare", "type": "operation", "operation": "updateRecord", "set": { "status": "'Reopened'" }, "next": "review" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_cycle_of_decision_and_operation_steps_is_still_a_cycle()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "amount > 0", "next": "prepare" }], "otherwise": "done" },
+              { "name": "prepare", "type": "operation", "operation": "updateRecord", "set": { "status": "'Reopened'" }, "next": "check" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ProcessStepCycle, "/steps/1/next", "Steps 'check' → 'prepare' → 'check' form a cycle with no waiting step, so the process would run for ever."),
+            (diagnostic.Code, diagnostic.Path, diagnostic.Message));
+    }
+
+    [Fact]
     public void A_step_that_loops_to_itself_is_a_cycle_at_that_transition()
     {
         using var folder = Folder(Process("Order", """
@@ -178,7 +218,7 @@ public sealed class ProcessCompilerTests
         // The step can still reach the end through 'otherwise', so the cycle is its only problem.
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(
-            (DiagnosticCodes.ProcessStepCycle, "/steps/0/branches/0/next", "Steps 'check' → 'check' form a cycle. A process may not loop."),
+            (DiagnosticCodes.ProcessStepCycle, "/steps/0/branches/0/next", "Steps 'check' → 'check' form a cycle with no waiting step, so the process would run for ever."),
             (diagnostic.Code, diagnostic.Path, diagnostic.Message));
     }
 
@@ -255,6 +295,41 @@ public sealed class ProcessCompilerTests
         var path = inStartCondition ? "/startCondition/expression" : "/steps/0/branches/0/when";
         Assert.Equal((code, "processes/order-review.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Contains(messagePart, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_condition_compares_the_id_of_the_subject_with_a_reference_to_it()
+    {
+        using var folder = Folder(Process("Customer", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "id == referredBy", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_path_cannot_start_at_the_id_of_the_subject()
+    {
+        using var folder = Folder(Process("Customer", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "id.name == 'x'", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.TypeMismatch, "processes/order-review.json", "/steps/0/branches/0/when"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Null(result.Model);
     }
 
@@ -1042,7 +1117,6 @@ public sealed class ProcessCompilerTests
                 (DiagnosticCodes.UnknownStep, "/steps/0/outcomes/1/next"),
                 (DiagnosticCodes.UnreachableStep, "/steps/1"),
                 (DiagnosticCodes.StepWithoutEnd, "/steps/1"),
-                (DiagnosticCodes.ProcessStepCycle, "/steps/1/outcomes/0/next"),
             ],
             result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
         Assert.Null(result.Model);

@@ -255,6 +255,24 @@ public sealed class TaskApiFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Claims and runs the next due <c>process.step</c> item of <paramref name="tenant"/>, so no staged
+    /// connector call is sent. Returns <see langword="false"/> when there is none.
+    /// </summary>
+    public async Task<bool> RunNextStepAsync(string tenant, CancellationToken cancellationToken)
+    {
+        var runner = (_services ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
+        await using var connection = await DataSource(tenant).OpenConnectionAsync(cancellationToken);
+        var item = await WorkItemQueue.ClaimAsync(connection, tenant, [ProcessStarts.StepWorkItemKind], _lease, cancellationToken);
+        if (item is null)
+        {
+            return false;
+        }
+
+        await runner.ExecuteAsync(item, cancellationToken);
+        return true;
+    }
+
+    /// <summary>
     /// Inserts a <c>pending</c> connector call of the step <paramref name="step"/> of the instance
     /// <paramref name="instanceId"/> in <paramref name="tenant"/>, to <c>Purchasing</c>
     /// <c>createOrder</c> on the tenant's first release, with the stored input
@@ -265,8 +283,8 @@ public sealed class TaskApiFixture : IAsyncLifetime
         var id = Guid.CreateVersion7();
         await using var command = DataSource(tenant).CreateCommand(
             """
-            INSERT INTO axis.connector_calls (id, process_instance_id, step, release_id, connector, operation, state, attempts, input)
-            VALUES (@id, @instance, @step, @release, 'Purchasing', 'createOrder', 'pending', 0, @input::jsonb)
+            INSERT INTO axis.connector_calls (id, process_instance_id, step, staged_revision, release_id, connector, operation, state, attempts, input)
+            VALUES (@id, @instance, @step, 1, @release, 'Purchasing', 'createOrder', 'pending', 0, @input::jsonb)
             """);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("instance", instanceId);
@@ -324,7 +342,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
     public async Task<long> AdminCountAsync(string tenant, string sql) =>
         (long)(await PostgreSqlServer.AdminScalarAsync(_tenants[tenant].ConnectionString, sql, TestContext.Current.CancellationToken))!;
 
-    /// <summary>Runs the single-value <paramref name="sql"/> with <paramref name="parameters"/> in <paramref name="tenant"/> and returns its value.</summary>
+    /// <summary>Runs <paramref name="sql"/> in <paramref name="tenant"/> with <paramref name="parameters"/> and returns its first value, or null.</summary>
     public async Task<object?> ScalarAsync(string tenant, string sql, params (string Name, object Value)[] parameters)
     {
         await using var command = DataSource(tenant).CreateCommand(sql);

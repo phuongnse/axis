@@ -6,7 +6,7 @@ namespace Axis.Processes.Storage;
 /// <summary>
 /// The processes module's tables in a tenant database: the process instances, the history of
 /// their steps, their human tasks, their staged connector calls, the attempts and lookups of those calls and of package calls, the events they raised, the receipts of starts and of
-/// endpoint calls that carried an <c>Idempotency-Key</c>, the receipts of trigger starts, the state of schedule triggers, and the work that workers claim and run. The caller supplies the connection to the tenant database.
+/// endpoint calls that carried an <c>Idempotency-Key</c>, the receipts of trigger starts, the counted failures of deliveries and their dead letters, the state of schedule triggers, and the work that workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
 {
@@ -37,6 +37,10 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public DbSet<EndpointReceiptRow> EndpointReceipts => Set<EndpointReceiptRow>();
 
     public DbSet<TriggerStartRow> TriggerStarts => Set<TriggerStartRow>();
+
+    public DbSet<DeliveryFailureRow> DeliveryFailures => Set<DeliveryFailureRow>();
+
+    public DbSet<DeadLetterRow> DeadLetters => Set<DeadLetterRow>();
 
     public DbSet<TriggerScheduleRow> TriggerSchedules => Set<TriggerScheduleRow>();
 
@@ -125,6 +129,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             task.Property(t => t.CompletedBy).HasColumnName("completed_by");
             task.Property(t => t.CompletedAt).HasColumnName("completed_at");
             task.Property(t => t.ExpiredAt).HasColumnName("expired_at");
+            task.Property(t => t.ClaimedBy).HasColumnName("claimed_by");
+            task.Property(t => t.ClaimedAt).HasColumnName("claimed_at");
             task.Property(t => t.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             task.HasIndex(t => t.ProcessInstanceId).HasDatabaseName("ix_process_tasks_process_instance_id");
 
@@ -145,6 +151,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.Id).HasColumnName("id").ValueGeneratedNever();
             call.Property(c => c.ProcessInstanceId).HasColumnName("process_instance_id");
             call.Property(c => c.Step).HasColumnName("step");
+            call.Property(c => c.StagedRevision).HasColumnName("staged_revision");
             call.Property(c => c.ReleaseId).HasColumnName("release_id");
             call.Property(c => c.Connector).HasColumnName("connector");
             call.Property(c => c.Operation).HasColumnName("operation");
@@ -157,10 +164,10 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             call.Property(c => c.SettledAt).HasColumnName("settled_at");
 
-            // A step stages at most one call.
-            call.HasIndex(c => new { c.ProcessInstanceId, c.Step })
+            // A step stages at most one call per pass.
+            call.HasIndex(c => new { c.ProcessInstanceId, c.Step, c.StagedRevision })
                 .IsUnique()
-                .HasDatabaseName("ux_connector_calls_process_instance_id_step");
+                .HasDatabaseName("ux_connector_calls_process_instance_id_step_staged_revision");
             call.HasOne<ProcessInstanceRow>()
                 .WithMany()
                 .HasForeignKey(c => c.ProcessInstanceId)
@@ -175,6 +182,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.Id).HasColumnName("id").ValueGeneratedNever();
             call.Property(c => c.ProcessInstanceId).HasColumnName("process_instance_id");
             call.Property(c => c.Step).HasColumnName("step");
+            call.Property(c => c.StagedRevision).HasColumnName("staged_revision");
             call.Property(c => c.ReleaseId).HasColumnName("release_id");
             call.Property(c => c.Package).HasColumnName("package");
             call.Property(c => c.Version).HasColumnName("version");
@@ -191,10 +199,10 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             call.Property(c => c.SettledAt).HasColumnName("settled_at");
 
-            // A step stages at most one call.
-            call.HasIndex(c => new { c.ProcessInstanceId, c.Step })
+            // A step stages at most one call per pass.
+            call.HasIndex(c => new { c.ProcessInstanceId, c.Step, c.StagedRevision })
                 .IsUnique()
-                .HasDatabaseName("ux_package_calls_process_instance_id_step");
+                .HasDatabaseName("ux_package_calls_process_instance_id_step_staged_revision");
             call.HasOne<ProcessInstanceRow>()
                 .WithMany()
                 .HasForeignKey(c => c.ProcessInstanceId)
@@ -285,6 +293,43 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             start.Property(s => s.Outcome).HasColumnName("outcome");
             start.Property(s => s.ProcessInstanceId).HasColumnName("process_instance_id");
             start.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<DeliveryFailureRow>(failure =>
+        {
+            failure.ToTable("delivery_failures");
+            failure.HasKey(f => new { f.Kind, f.Target }).HasName("pk_delivery_failures");
+            failure.Property(f => f.Kind).HasColumnName("kind");
+            failure.Property(f => f.Target).HasColumnName("target");
+            failure.Property(f => f.Attempts).HasColumnName("attempts");
+            failure.Property(f => f.LastError).HasColumnName("last_error");
+            failure.Property(f => f.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<DeadLetterRow>(letter =>
+        {
+            letter.ToTable("dead_letters");
+            letter.HasKey(l => l.Id).HasName("pk_dead_letters");
+            letter.Property(l => l.Id).HasColumnName("id").ValueGeneratedNever();
+            letter.Property(l => l.Kind).HasColumnName("kind");
+            letter.Property(l => l.ApplicationId).HasColumnName("application_id");
+            letter.Property(l => l.ProcessId).HasColumnName("process_id");
+            letter.Property(l => l.EventId).HasColumnName("event_id");
+            letter.Property(l => l.TriggerId).HasColumnName("trigger_id");
+            letter.Property(l => l.ProcessInstanceId).HasColumnName("process_instance_id");
+            letter.Property(l => l.EmailId).HasColumnName("email_id");
+            letter.Property(l => l.OccurrenceAt).HasColumnName("occurrence_at");
+            letter.Property(l => l.Attempts).HasColumnName("attempts");
+            letter.Property(l => l.LastError).HasColumnName("last_error");
+            letter.Property(l => l.State).HasColumnName("state");
+            letter.Property(l => l.Reason).HasColumnName("reason");
+            letter.Property(l => l.SettledBy).HasColumnName("settled_by");
+            letter.Property(l => l.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            letter.Property(l => l.SettledAt).HasColumnName("settled_at");
+
+            // The inspector lists a process's dead letters by state.
+            letter.HasIndex(l => new { l.ApplicationId, l.ProcessId, l.State })
+                .HasDatabaseName("ix_dead_letters_application_id_process_id_state");
         });
 
         modelBuilder.Entity<TriggerScheduleRow>(schedule =>

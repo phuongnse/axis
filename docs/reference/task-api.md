@@ -17,8 +17,8 @@ when the task's assignee is a role and the user holds it. The user's roles
 are the roles kept in their session. A role counts only when the active
 release declares it, so a task assigned to a role the active release no
 longer declares can be listed, read or completed by nobody. This is checked on every request, at
-the moment of action. Policies add to this check and never replace it. _(Planned for M14)_ A
-claimed role task may be completed only by its claimer, see
+the moment of action. Policies add to this check and never replace it. A
+claimed role task is listed and may be completed only by its claimer, see
 [Claim and release](task-deadlines.md#claim-and-release).
 
 **Policies on tasks.** These follow
@@ -62,6 +62,7 @@ by `createdAt`, then by `id`.
         "id": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
         "label": "PR-2026-00042"
       },
+      "claimedBy": null,
       "dueAt": "2026-10-13T02:05:00Z",
       "createdAt": "2026-10-10T02:05:00.123456Z"
     }
@@ -78,6 +79,8 @@ by `createdAt`, then by `id`.
 - `subject.label` is the value of the display field from the task's release.
   It is `null` when the active release's policies do not
   let the user read that field.
+- `claimedBy` is the user id of the holder who claimed the role task, or
+  `null`. A claimed task is listed for its claimer only.
 - `dueAt` is `null` when the step has no `dueIn`.
 
 **Read one task.** `GET /api/apps/{app}/tasks/{id}` returns one task in any
@@ -93,6 +96,7 @@ state:
   "labelKey": "purchaseRequest.managerApproval",
   "state": "open",
   "assignee": { "user": "maria", "role": null },
+  "claimedBy": null,
   "subject": {
     "entity": "PurchaseRequest",
     "id": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
@@ -130,6 +134,8 @@ state:
   release's policies decide whether the user
   may read it. Otherwise the label is `null`.
 - `assignee` has the user id or the role name, and the other is `null`.
+- `claimedBy` is the user id of the holder who claimed the role task, or
+  `null`. Other holders can still read a claimed task.
 - `form` is the step's form in the task's release, so a task pinned to an
   earlier release keeps its own layout. It has the shape of a form widget's
   `form` metadata, plus `entity` in the shape of a widget's `entity`
@@ -227,7 +233,7 @@ is a `403` before any of these checks.
   }
   ```
 - **`403`.** The user is not the assignee and does not hold the assignee
-  role, or the active release no longer declares that role. This applies to reading one task, asking for its form state and completing it.
+  role, or the active release no longer declares that role. It is also the answer when a role holder completes a role task that another holder claimed. This applies to reading one task, asking for its form state and completing it.
 
   ```json
   {

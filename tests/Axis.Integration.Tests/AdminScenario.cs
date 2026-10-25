@@ -200,6 +200,15 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         await context.SaveChangesAsync(CancellationToken);
     }
 
+    /// <summary>Sets the service audience of a tenant in the directory, which no command sets.</summary>
+    public async Task SetServiceAudienceAsync(string id, string audience)
+    {
+        await using var context = NewContext();
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+        row.ServiceAudience = audience;
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
     public async Task<long> CountEntriesAsync()
     {
         await using var context = NewContext();

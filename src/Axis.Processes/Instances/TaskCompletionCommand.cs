@@ -19,7 +19,7 @@ public enum TaskCompletionOutcome
     /// <summary>The task does not exist, or belongs to another application.</summary>
     NotFound,
 
-    /// <summary>The task is assigned to someone else.</summary>
+    /// <summary>The task is assigned to someone else, or a role task is claimed by another holder.</summary>
     Denied,
 
     /// <summary>The task is not open.</summary>
@@ -60,6 +60,7 @@ public sealed record TaskCompletionResult(
 /// update, from the active release, in the same transaction. A task shows its form and step as the
 /// release its instance is pinned to declares them, and a completion uses that release too.
 /// The assignee check is the only gate: no entity grant is needed and no record filter applies.
+/// Only the claimer may complete a claimed role task.
 /// A role assignee counts only when the active release declares the role.
 /// The command never commits or rolls back. A result other than <see cref="TaskCompletionOutcome.Completed"/>
 /// may have written partly, so the caller rolls back.
@@ -96,7 +97,7 @@ public static class TaskCompletionCommand
             return new TaskCompletionResult(TaskCompletionOutcome.NotFound);
         }
 
-        if (!TaskQueries.MayAct(task, actor.Id, actor.Roles))
+        if (!TaskQueries.MayComplete(task, actor.Id, actor.Roles))
         {
             return new TaskCompletionResult(TaskCompletionOutcome.Denied);
         }

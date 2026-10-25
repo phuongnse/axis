@@ -94,6 +94,7 @@ src/
                           used by Axis.Scenarios and, later, by the publisher
   Axis.Scenarios/         console host over Axis.Scenarios.Runner that runs an application's test scenarios
   Axis.Admin/             console host for tenant provisioning, migrations, activation, backup and restore
+  Axis.Administration/    library behind the Axis.Admin commands: the platform audit records so far
   Axis.PackageHost/       package runner host that runs extension package operations out of process (planned for M17)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
@@ -130,7 +131,7 @@ checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
-`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
+`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Administration` (the library behind the `Axis.Admin` commands), `Axis.Worker`, the test projects, the sample extension package
 `PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
 
 ## Module rules
@@ -377,8 +378,9 @@ bindings work. Status rules and publishing are built too.
   entry stores no sign-in settings. The catalog copies the main tenant's at each
   refresh.
 - **Sign-in.** A preview tenant uses its main tenant's authority, client id,
-  client secret and claim names. It does not use `Oidc:EndpointAudience`, so it
-  accepts no machine-caller token. The operator registers the preview host's
+  client secret and claim names. It uses neither `Oidc:EndpointAudience` nor
+  `Oidc:ServiceAudience`, so it accepts no machine-caller or service account
+  token. The operator registers the preview host's
   redirect address at the identity provider.
 - **Bindings.** A preview tenant's bindings are its own and empty by default.
   A missing binding is a warning at activation there, not an error, see
@@ -435,19 +437,22 @@ bindings work. Status rules and publishing are built too.
   - See [Sign-in and the session](reference/security.md#sign-in-and-the-session).
   - Other systems call inbound endpoints with a bearer token instead of the
     session. See [Machine callers](reference/security.md#machine-callers).
+  - Service accounts call the record API with a bearer token (D86). See
+    [service accounts](reference/security.md#service-accounts).
   - _(Planned for M16.)_ The session state moves to the tenant database, so
-    sign-out revokes it at once (D84). Service accounts call the record API,
-    data source rows and the process API with a bearer token (D86). A tenant
+    sign-out revokes it at once (D84). Service accounts also call data source
+    rows and the process API (D86). A tenant
     can turn on the FAPI 2.0 profile (D83). See
     [service accounts](reference/security.md#service-accounts) and
     [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
-- **Hardening (D82, D84, D85).** _(Planned for M16.)_
-  - The server sets security headers on every response and rate limits the
-    routes a caller can repeat. See
-    [security headers and rate limits](reference/headers-and-rate-limits.md).
-  - Axis is verified against ASVS 5.0 Level 2, tracked in
+- **Hardening (D82, D84, D85).**
+  - The server rate limits the routes a caller can repeat. See
+    [rate limits](reference/headers-and-rate-limits.md#rate-limits).
+  - _(Planned for M16.)_ The server sets security headers on every response.
+    See [security headers](reference/headers-and-rate-limits.md#security-headers).
+  - _(Planned for M16.)_ Axis is verified against ASVS 5.0 Level 2, tracked in
     [ASVS](reference/asvs.md).
-  - Performance objectives and the weekly load test are in
+  - _(Planned for M16.)_ Performance objectives and the weekly load test are in
     [performance](reference/performance.md).
 - **Authorization (D12, D24).**
   - The record API, the data source endpoint and the process start endpoint
@@ -560,7 +565,9 @@ is not part of this design.
   `server.port`, `network.peer.address` and `dns.question.name` never reach an
   exporter. The Axis metrics are in
   [worker metrics](reference/process-execution.md#worker-metrics). The server's tenant
-  database gauge is in [health checks](#health-checks).
+  database gauge is in [health checks](#health-checks), and its counter of
+  refused requests, `axis.rate_limits.refused`, is in
+  [rate limits](reference/headers-and-rate-limits.md#rate-limits).
 
 ### Axis spans
 

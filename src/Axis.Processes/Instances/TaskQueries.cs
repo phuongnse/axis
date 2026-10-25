@@ -6,22 +6,24 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Reads the human tasks of process instances over a connection to a tenant database, and decides
-/// who may act on one. A user may act on a task assigned to their id, or to a role they hold. Ids
-/// and role names match exactly, including letter case.
+/// who may act on one. A user may act on a task assigned to their id, or to a role they hold. A role
+/// task that a holder claimed is listed and completed only by its claimer. Ids and role names match
+/// exactly, including letter case.
 /// </summary>
 public static class TaskQueries
 {
     private const string Columns =
         """
         id, process_instance_id, process_id, release_id, application_id, step, subject_entity_id, subject_id,
-        assignee_kind, assignee, form_id, due_at, state, outcome, completed_by, completed_at, created_at, expired_at
+        assignee_kind, assignee, form_id, due_at, state, outcome, completed_by, completed_at, created_at, expired_at, claimed_by, claimed_at
         """;
 
     private const string MayActWhere =
         $"""
         application_id = @application AND state = '{ProcessTasks.Open}'
           AND ((assignee_kind = '{ProcessTasks.UserAssignee}' AND assignee = @user)
-            OR (assignee_kind = '{ProcessTasks.RoleAssignee}' AND assignee = ANY(@roles)))
+            OR (assignee_kind = '{ProcessTasks.RoleAssignee}' AND assignee = ANY(@roles)
+                AND (claimed_by IS NULL OR claimed_by = @user)))
         """;
 
     /// <summary>Counts the open tasks of an application that a user may act on.</summary>
@@ -147,6 +149,18 @@ public static class TaskQueries
         };
     }
 
+    /// <summary>
+    /// Whether <paramref name="userId"/> may complete <paramref name="task"/>: they may act on it
+    /// and no one else holds its claim.
+    /// </summary>
+    public static bool MayComplete(ProcessTaskRow task, string userId, IReadOnlyCollection<string> roles)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+
+        return MayAct(task, userId, roles)
+            && (task.ClaimedBy is null || string.Equals(task.ClaimedBy, userId, StringComparison.Ordinal));
+    }
+
     internal static void AddMayActParameters(NpgsqlCommand command, Guid applicationId, string userId, IReadOnlyCollection<string> roles)
     {
         command.Parameters.AddWithValue("application", applicationId);
@@ -175,6 +189,8 @@ public static class TaskQueries
             CompletedAt = reader.IsDBNull(15) ? null : reader.GetFieldValue<DateTimeOffset>(15),
             CreatedAt = reader.GetFieldValue<DateTimeOffset>(16),
             ExpiredAt = reader.IsDBNull(17) ? null : reader.GetFieldValue<DateTimeOffset>(17),
+            ClaimedBy = reader.IsDBNull(18) ? null : reader.GetString(18),
+            ClaimedAt = reader.IsDBNull(19) ? null : reader.GetFieldValue<DateTimeOffset>(19),
         };
 }
 

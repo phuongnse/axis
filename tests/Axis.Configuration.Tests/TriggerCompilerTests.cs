@@ -191,6 +191,19 @@ public sealed class TriggerCompilerTests
     }
 
     [Fact]
+    public void A_data_change_condition_sees_the_id_of_the_record()
+    {
+        using var folder = Folder().With("triggers/review.json", DataChangeTrigger("Note", "NoteReview", """, "on": ["create"], "when": "id is not null" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var when = Assert.Single(result.Model!.Triggers).When;
+        Assert.NotNull(when);
+        Assert.Equal(ExpressionType.Boolean, when.Check.Type);
+    }
+
+    [Fact]
     public void A_data_change_condition_that_is_not_a_boolean_is_a_diagnostic_at_when()
     {
         using var folder = Folder().With("triggers/review.json", DataChangeTrigger("Note", "NoteReview", """, "on": ["create"], "when": "priority" """));
