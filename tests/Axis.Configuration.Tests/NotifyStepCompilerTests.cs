@@ -238,6 +238,18 @@ public sealed class NotifyStepCompilerTests
     }
 
     [Fact]
+    public void A_second_text_file_for_a_locale_is_a_duplicate_locale_and_does_not_crash_the_compile()
+    {
+        using var folder = Folder()
+            .With("texts/en-copy.json", TextFile("55555555-5555-4555-8555-555555555e03", "TextsEnCopy", "EN", "Ticket {number}", "Resolution: {resolution}"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.DuplicateLocale, diagnostic.Code);
+    }
+
+    [Fact]
     public void A_missing_text_key_is_reported_at_the_key_and_skips_the_placeholder_check()
     {
         using var folder = Folder(subjectKey: "notice.missing");

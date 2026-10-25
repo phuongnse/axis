@@ -875,9 +875,9 @@ internal static class ProcessChecker
         Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
         Action<string, string, string> report)
     {
-        var subjects = textValues(message.Subject.TextKey).ToDictionary(text => text.Locale, text => text.Value, StringComparer.Ordinal);
-        var bodies = textValues(message.Body.TextKey).ToDictionary(text => text.Locale, text => text.Value, StringComparer.Ordinal);
-        foreach (var locale in subjects.Keys.Where(bodies.ContainsKey).Order(StringComparer.Ordinal))
+        var subjects = textValues(message.Subject.TextKey).DistinctBy(text => text.Locale, StringComparer.OrdinalIgnoreCase).ToDictionary(text => text.Locale, text => text.Value, StringComparer.OrdinalIgnoreCase);
+        var bodies = textValues(message.Body.TextKey).DistinctBy(text => text.Locale, StringComparer.OrdinalIgnoreCase).ToDictionary(text => text.Locale, text => text.Value, StringComparer.OrdinalIgnoreCase);
+        foreach (var locale in subjects.Keys.Where(bodies.ContainsKey).Order(StringComparer.OrdinalIgnoreCase))
         {
             var used = new HashSet<string>(StringComparer.Ordinal);
             var valid = true;
