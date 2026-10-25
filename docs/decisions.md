@@ -92,3 +92,9 @@ files agree, title and status included.
 | [D79](decisions/d79-import-and-export-under-policies.md) | Import and export under policies | **Agreed** |
 | [D80](decisions/d80-search-more-aggregates-and-query-timeouts.md) | Search, more aggregates and query timeouts | **Agreed** |
 | [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md) | Asset management as the fourth sample application | **Agreed** |
+| [D82](decisions/d82-performance-slos-and-load-tests.md) | Performance SLOs and load tests | **Agreed** |
+| [D83](decisions/d83-the-fapi-20-profile-per-tenant.md) | The FAPI 2.0 profile per tenant | **Agreed** |
+| [D84](decisions/d84-asvs-level-2-and-a-server-side-session.md) | ASVS Level 2 and a server-side session | **Agreed** |
+| [D85](decisions/d85-rate-limits-and-security-headers.md) | Rate limits and security headers | **Agreed** |
+| [D86](decisions/d86-service-accounts-for-the-record-and-process-apis.md) | Service accounts for the record and process APIs | **Agreed** |
+| [D87](decisions/d87-tenant-setting-commands-and-key-rotation.md) | Tenant setting commands and key rotation | **Agreed** |

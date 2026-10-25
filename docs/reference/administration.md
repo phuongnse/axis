@@ -7,7 +7,9 @@ activate releases, and back up and restore tenants. It follows
 and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant list`, `tenant backup`,
-`tenant restore`, `migrate`, `activate`, `publisher` and `version`. A tenant can also come from the `Tenants`
+`tenant restore`, `migrate`, `activate`, `publisher` and `version`. The commands that change a tenant
+after it is created and rotate keys are in [tenant setting commands](tenant-setting-commands.md)
+_(planned for M16)_. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
 [startup activation](host-settings.md#startup-activation).
 
@@ -430,6 +432,8 @@ option or a missing setting.
 2. Run [`tenant resume <id>`](#tenant-resume).
 
 No command sets a binding yet, see [Not built yet](#not-built-yet).
+`tenant oidc set --client-secret` and `tenant binding set` do step 1
+_(planned for M16)_, see [tenant setting commands](tenant-setting-commands.md).
 
 **Restoring over an existing tenant.** There is no in-place overwrite.
 
@@ -857,14 +861,23 @@ admin host carries the same version in its OCI label, see
 
 - Deleting a tenant.
 - An HTTP API for provisioning.
-- Rotating the generated database passwords.
+- Rotating the generated database passwords. `tenant rotate-passwords` is
+  _(planned for M16)_, see
+  [database passwords](tenant-setting-commands.md#database-passwords).
 - Moving a tenant to another database server.
 - Commands that set a tenant's deployment bindings, claim names or endpoint
-  audience. D43 does not say how they are written. `tenant create` sets none
-  of them, so they stay empty until a later issue decides. The one exception
-  is `--binding` on a `tenant create --preview-of`.
+  audience. `tenant create` sets none of them, so they stay empty. The one
+  exception is `--binding` on a `tenant create --preview-of`. `tenant binding`
+  and `tenant oidc set` are _(planned for M16)_, see
+  [tenant setting commands](tenant-setting-commands.md) and
+  [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md).
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation.
 - Overwriting a tenant in place with a restore.
 - A command that moves a host from one tenant to another. Restoring over an
-  existing tenant ends with this step.
+  existing tenant ends with this step. `tenant host move` is
+  _(planned for M16)_, see [hosts](tenant-setting-commands.md#hosts).
+- Rotating the installation key, and a platform audit record of each command.
+  Both are _(planned for M16)_, see
+  [installation key](tenant-setting-commands.md#installation-key) and
+  [platform audit records](tenant-setting-commands.md#platform-audit-records).

@@ -429,6 +429,20 @@ bindings work. Status rules and publishing are built too.
   - See [Sign-in and the session](reference/security.md#sign-in-and-the-session).
   - Other systems call inbound endpoints with a bearer token instead of the
     session. See [Machine callers](reference/security.md#machine-callers).
+  - _(Planned for M16.)_ The session state moves to the tenant database, so
+    sign-out revokes it at once (D84). Service accounts call the record API,
+    data source rows and the process API with a bearer token (D86). A tenant
+    can turn on the FAPI 2.0 profile (D83). See
+    [service accounts](reference/security.md#service-accounts) and
+    [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
+- **Hardening (D82, D84, D85).** _(Planned for M16.)_
+  - The server sets security headers on every response and rate limits the
+    routes a caller can repeat. See
+    [security headers and rate limits](reference/headers-and-rate-limits.md).
+  - Axis is verified against ASVS 5.0 Level 2, tracked in
+    [ASVS](reference/asvs.md).
+  - Performance objectives and the weekly load test are in
+    [performance](reference/performance.md).
 - **Authorization (D12, D24).**
   - The record API, the data source endpoint and the process start endpoint
     call the policy module with the entity, data source or process and the

@@ -1,7 +1,7 @@
 # Authentication and authorization
 
-Detailed reference for sign-in and the session, machine callers, authorization and the
-development users. The summary is in
+Detailed reference for sign-in and the session, machine callers, service accounts, the FAPI 2.0
+profile, authorization and the development users. The summary is in
 [architecture.md](../architecture.md#authentication-and-authorization).
 The conventions of [architecture.md](../architecture.md) apply: sections marked
 _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
@@ -16,7 +16,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   server is the confidential client: it exchanges the code for tokens, reads
   the claims from the ID token and keeps no token after that (D9). The
   identity provider returns the code in the query string. Pushed
-  authorization requests stay off until FAPI 2.0 work (D9).
+  authorization requests stay off until FAPI 2.0 work (D9). Under a tenant's
+  `fapi2` profile they are required _(planned for M16)_, see
+  [FAPI 2.0 profile](#fapi-20-profile).
   - The server registers one OIDC client per tenant. All of them share the
     callback path, and each one ignores a callback that arrives on another
     tenant's host.
@@ -71,7 +73,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - `GET /api/auth/callback` is where the identity provider returns. It
     creates the session and redirects to `returnUrl`. A callback that fails
     creates no session. For now it answers a `500` problem details response,
-    for example when the person cancels at the identity provider.
+    for example when the person cancels at the identity provider. A failed
+    callback is to redirect to the shell's sign-in page instead, which says
+    that sign-in did not complete and shows no reason _(planned for M16)_. See
+    [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
   - `POST /api/auth/sign-out` ends the session and returns `200` with
     `{ "signOutUrl" }`. The SPA then sends the browser to that URL, and the
     identity provider returns it to `/`. The SPA calls sign-out with `fetch`
@@ -85,7 +90,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   [D50](../decisions/d50-sign-in-audit-records-and-security-scanning-in-ci.md).
   - The callback writes `session.signedIn` when it creates a session. It writes
     `session.signInRefused`, with a reason code, when it refuses. A refused
-    callback still answers the `500` above.
+    callback still answers the `500` above, until the redirect of M16.
   - `POST /api/auth/sign-out` writes `session.signedOut` only when a session
     existed.
   - An expired session writes nothing. A host that resolves to no tenant writes
@@ -101,6 +106,25 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - It ends 8 hours after sign-in, or after 1 hour without requests,
     whichever comes first. Every request with a session renews the cookie,
     so the hour counts from the last request.
+  - _(Planned for M16.)_ The session moves to the server, see
+    [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md):
+    - The session state is a row of `axis.sessions` in the tenant database:
+      a hash of the session id, the user id, the display name, the roles,
+      the time of sign-in and the time of the last request. The table never
+      holds the session id itself, or a token.
+    - The cookie holds only a random session id of at least 128 bits. It
+      holds no claim.
+    - Sign-in always creates a new session id. Sign-out deletes the row, so a
+      copied cookie stops working at once, on every replica.
+    - A request reads the row and updates the time of the last request. A
+      row past one of the two lifetimes counts as no session, and is deleted.
+    - The worker removes expired rows.
+    - `tenant restore` empties the table, so no session comes back with an
+      archive.
+    - The cookie is named `__Host-Axis.Session`, with `Path=/` and no
+      domain, so the browser refuses it on plain http or from a subdomain.
+      In `Development` and `Testing` over plain http it keeps the name
+      `Axis.Session`.
   - In `Development` and `Testing`, which run over plain http, the session
     cookie and the OIDC helper cookies are Secure only on https requests.
   - Behind a named proxy, the callback and sign-out addresses and the cookie's
@@ -118,7 +142,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   cookie taken to another tenant's host signs nobody in there.
 - **Roles.** The roles come from the roles claim at sign-in and are kept in
   the session. A role change at the identity provider applies at the next
-  sign-in.
+  sign-in. Under the server-side session of M16 they are kept in the session
+  row, and the rule does not change.
 - **Current user.** `GET /api/me` keeps its shape,
   `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean
   `studio`, true when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set, and the user holds
@@ -277,13 +302,18 @@ systems.
   data source endpoint or the task API. The request's default
   authentication is the bearer token on paths under
   `/api/apps/{app}/endpoints/`, and the session everywhere else.
+  [Service accounts](#service-accounts) also send bearer tokens to the record
+  API, data source rows and the process API _(planned for M16)_. The task API
+  stays closed to bearer tokens.
 - **Clock.** The expiry is checked against the server's clock service, with
   the usual 5 minutes of clock skew, so tests can replace the clock.
 - **No session.** On endpoint routes the session cookie is ignored and not
   renewed, so the CSRF header does not apply. A browser cannot attach a bearer token on its
   own, so a cross-site page cannot call an endpoint for a signed-in user.
 - **Not bound to the sender.** A leaked token works until it expires.
-  Sender-constrained tokens (DPoP) stay a later FAPI 2.0 step under D9.
+  Sender-constrained tokens (DPoP) stay a later FAPI 2.0 step under D9. Under
+  a tenant's `fapi2` profile only DPoP-bound tokens are accepted
+  _(planned for M16)_, see [FAPI 2.0 profile](#fapi-20-profile).
 - **Keycloak.** The development realm gets what the purchase request sample
   needs:
   - a confidential client `purchasing-system` with a service account, for
@@ -302,6 +332,103 @@ systems.
   development only. `appsettings.Development.json` and the E2E server set
   `Oidc:EndpointAudience`. The Compose settings do not, so endpoint calls
   under Compose are a `401`.
+
+## Service accounts
+
+_(Planned for M16.)_ It follows
+[D86](../decisions/d86-service-accounts-for-the-record-and-process-apis.md).
+A service account lets another system read and write records, read data
+source rows, and start and inspect processes, under the same policies as a
+user. It replaces the point of D27 that accepts bearer tokens only on endpoint
+routes.
+
+- **What it is.** A client of the tenant's identity provider that gets
+  access tokens through the client credentials grant. Axis issues no API key.
+  The identity provider gives it roles in the roles claim, as it does for
+  people.
+- **Tenant setting.** The expected audience is a new tenant setting,
+  `Oidc:ServiceAudience`, separate from `Oidc:EndpointAudience`. In the
+  development tenant its value is `axis-services`. A tenant without it accepts
+  no service account token. Under `Tenancy:Source=directory` the setting is in
+  the tenant directory and `tenant oidc set` changes it, see
+  [tenant setting commands](tenant-setting-commands.md).
+- **Routes.** A service account may call:
+  - every route of the [record API](record-api.md), record history included;
+  - `GET /api/apps/{app}/data-sources/{dataSource}/rows`;
+  - `POST /api/apps/{app}/processes/{process}/instances`;
+  - the instance list and one instance of
+    [process inspection](process-inspection.md);
+  - the operator commands retry, cancel and resolve.
+- **Not reached.** The task API, the form state endpoint, site and page
+  metadata, `GET /api/me`, Studio and the authoring API. A task asks a person
+  to decide, so a service account never completes one. A bearer token on these
+  routes is ignored, as today, and the request needs a session.
+- **Choosing the scheme.** On the routes above, a request with an
+  `Authorization: Bearer` header is a service account request. It never falls
+  back to the session cookie, and does not renew it. A request without the
+  header uses the session.
+- **CSRF.** A service account request needs no `X-Axis-Csrf` header. A
+  browser cannot add an `Authorization` header to a cross-site request
+  without a CORS preflight, which Axis does not allow.
+- **Token checks.** The same as for [machine callers](#machine-callers):
+  the signature, the issuer, the expiry, and an audience that holds
+  `Oidc:ServiceAudience`. Any failure is a `401` with
+  `WWW-Authenticate: Bearer`. Under the `fapi2` profile the token must also
+  be DPoP-bound.
+- **Order of checks.** The tenant, the token (`401`), the path (`404`), then
+  the grant (`403`), as for a session. The checks that follow are those of
+  each route.
+- **Authorization.** The roles come from the configured roles claim. Policies
+  apply unchanged, with their record filters and fields. A service account
+  with no grant for the action gets a `403`.
+- **Actor.** The caller id comes from the configured user id claim, `sub` by
+  default. It is the audit actor and the creator of a new record. The display
+  name falls back to the client id, `azp`.
+- **Rate limits.** Service account requests count in the bearer partition,
+  by tenant and caller id, see
+  [rate limits](headers-and-rate-limits.md#rate-limits).
+- **Keycloak.** The development realm gets a confidential client
+  `reporting-system` with a service account, a role in the roles claim and an
+  audience mapper that adds `axis-services`. Tests use it for allowed and
+  denied calls.
+
+## FAPI 2.0 profile
+
+_(Planned for M16.)_ It follows
+[D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant can turn
+on the FAPI 2.0 Security Profile for sign-in and for machine callers.
+
+- **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
+  `standard` when unset. Any other value stops the server's start, naming the
+  tenant. A preview tenant takes its main tenant's profile.
+- **Sign-in under `fapi2`.**
+  - The server sends the authorization request through pushed authorization
+    requests (PAR). A provider that does not offer PAR fails the tenant's
+    sign-in, and the server logs why.
+  - PKCE with `S256`, as under `standard`.
+  - The client authenticates at the token endpoint with `private_key_jwt`.
+    The tenant has no client secret.
+  - The server checks the `iss` parameter of the authorization response
+    against the tenant's `Authority` (RFC 9207).
+  - The token request carries a DPoP proof.
+- **Machine callers under `fapi2`.** Inbound endpoints and service accounts
+  accept only access tokens bound to a DPoP key. The request carries a DPoP
+  proof, and its `htu` is checked against the forwarded scheme and host of
+  [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md). Mutual
+  TLS is not offered, because the TLS proxy ends the client's TLS connection.
+- **The client key.** A tenant under `fapi2` has a private key for
+  `private_key_jwt`. Under `configuration` it comes from the environment,
+  such as `Tenants__default__Oidc__ClientKey`, as a PEM. Under `directory` it
+  is stored encrypted in the tenant directory, with the field name
+  `oidc_client_key`, see [platform database](storage.md#platform-database).
+  A tenant under `fapi2` without a key stops the server's start.
+- **Rotation.** The tenant can hold a second key while the identity provider
+  changes over, see [tenant setting commands](tenant-setting-commands.md).
+- **Verification.** The OpenID Foundation's conformance suite runs by hand
+  against the development realm under `fapi2`. Its result is recorded in
+  [ASVS](asvs.md). Axis seeks no certification.
+- **Keycloak.** The development realm gets a second client, set up for FAPI
+  2.0 with a client policy, so tests cover both profiles.
 
 ## Authorization
 

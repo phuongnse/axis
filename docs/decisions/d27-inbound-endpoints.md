@@ -46,6 +46,9 @@ responses and its errors. The owner confirmed these points on issue #312 on
 - **No cookie session:** endpoints ignore the session cookie, so the CSRF
   header does not apply to them. Bearer tokens are accepted only on endpoint
   routes, and ignored everywhere else.
+  - [D86](d86-service-accounts-for-the-record-and-process-apis.md) replaces
+    the last sentence: service accounts also send bearer tokens to the record
+    API, data source rows and the process API.
 - **Roles:** the caller's roles come from the token's roles claim, matched
   as for users.
 - **Keycloak:** the development realm gets a confidential client

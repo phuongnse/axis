@@ -184,7 +184,9 @@ and creates no tables. See
   transaction after the migrations, and revokes any wider right the role had
   there. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
   It does not yet check whether the role is a superuser, owns the schema or
-  inherits rights through membership.
+  inherits rights through membership. The planned `platform.audit_records`
+  table is the one exception: the role gets no `SELECT` on it
+  _(planned for M16)_.
 - **One write grant.** The same role also gets `INSERT` on
   `platform.data_protection_keys`, and on no other table. Key rotation happens
   while the server runs, so the server must add keys. It never updates or
@@ -192,7 +194,9 @@ and creates no tables. See
   does not decrypt stops the start. The error names `Platform:SecretKey`. A
   replica with another `Platform:SecretKey` fails this way. Changing the key on
   an installation that holds key rows means deleting the rows by hand, which
-  signs everyone out. The Studio write lock is a PostgreSQL advisory lock. It needs
+  signs everyone out, until the key rotation of M16 replaces this step
+  _(planned for M16)_, see
+  [installation key](tenant-setting-commands.md#installation-key). The Studio write lock is a PostgreSQL advisory lock. It needs
   no grant, see [authoring API](authoring.md#versions).
 - **The writer.** `Axis.Admin` writes the directory over
   `ConnectionStrings:PlatformSchema`, see
@@ -203,10 +207,11 @@ The tables:
 
 | Table                                               | Columns                                                                                                                                                                                                                                                                                                                     |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants` |
+| `platform.tenants`                                  | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants`. The service audience, the sign-in profile and the encrypted client keys are _(planned for M16)_ |
 | `platform.tenant_hosts`                             | The tenant id and the host. The host is unique on `lower(host)` across all tenants                                                                                                                                                                                                                                          |
 | `platform.tenant_bindings`                          | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                         |
 | `platform.data_protection_keys`                     | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. Rows are only inserted, never updated or deleted. Every server replica reads them                                                                                                                                                                   |
+| `platform.audit_records`                            | _(Planned for M16.)_ The time, the `Axis.Admin` command, the tenant id, the operating system user and machine, and the names of what changed. Append-only. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records)                                                    |
 
 The tenant `version` grows on every change to the tenant, its hosts or its
 bindings.
@@ -221,7 +226,10 @@ a tenant only when this value is the one the host was built for, see
   else:
   - the runtime and schema database passwords, in `platform.tenants`;
   - the OIDC client secret, in `platform.tenants`;
-  - the value of a `secret` binding, in `platform.tenant_bindings`.
+  - the value of a `secret` binding, in `platform.tenant_bindings`;
+  - the client keys of a tenant under the `fapi2` sign-in profile, in
+    `platform.tenants`, with the field name `oidc_client_key` and the key id
+    _(planned for M16)_, see [FAPI 2.0 profile](security.md#fapi-20-profile).
 - **Encrypted format.** An encrypted value is a `bytea` that holds a 12-byte
   nonce, the ciphertext and a 16-byte tag. The cipher is AES-256-GCM with the
   installation key `Platform:SecretKey`, see
@@ -239,7 +247,10 @@ a tenant only when this value is the one the host was built for, see
   `SecretValue` does today. No API, log, problem details or backup manifest
   holds a decrypted value.
 - **No key rotation.** Axis has none. After a leaked key, every stored secret
-  must be set again by hand.
+  must be set again by hand. Rotating the installation key with
+  `Platform:PreviousSecretKey` and `platform rekey` is _(planned for M16)_,
+  see [installation key](tenant-setting-commands.md#installation-key) and
+  [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md).
 
 ## Database roles
 
