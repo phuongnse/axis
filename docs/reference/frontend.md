@@ -127,13 +127,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
               "name": "name", "type": "text", "labelKey": null,
               "required": true, "unique": false, "computed": false, "sequence": false,
               "creator": false, "maxLength": 100, "minLength": null,
-              "precision": null, "scale": null, "min": null, "max": null, "values": null, "target": null, "fields": null
+              "precision": null, "scale": null, "currency": null, "currencyField": null, "min": null, "max": null, "values": null, "target": null, "fields": null
             },
             {
               "name": "department", "type": "reference", "labelKey": "item.department",
               "required": false, "unique": false, "computed": false, "sequence": false,
               "creator": false, "maxLength": null, "minLength": null, "precision": null,
-              "scale": null, "min": null, "max": null, "values": null, "target": {
+              "scale": null, "currency": null, "currencyField": null, "min": null, "max": null, "values": null, "target": {
                 "entity": "Department",
                 "displayField": "name",
                 "recordsPath": "/api/apps/RecordsApp/entities/Department/records"
@@ -254,14 +254,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     field, the path of its record API in `recordsPath`, and its fields in
     declaration order. A `child-collection` field is listed too. Tables show
     no column for it, and forms show its rows.
-  - Each field has its name, its `type` as written in entity files (such as
-    `date-time`), its label key, `required`, `unique`, `computed`, `sequence` and `creator`,
-    `maxLength` and `minLength` for text, `min` and `max` for integer, decimal, date and
-    date-time, `precision` and `scale` for decimal, `values` for enum, `target` for
-    reference, and `fields` for child collection. `min` and `max` are strings in the
-    entity file's literal form, such as `"0.5"` or `"2026-01-01"`. A property the field's
-    type does not have, or a label the file leaves out, is `null`; it is
-    never left out.
+  - Each field has its name, its `type` as written in entity files (such as `date-time`), its label
+    key, `required`, `unique`, `computed`, `sequence` and `creator`, `maxLength` and `minLength` for
+    text, `min` and `max` for integer, decimal, date and date-time, `precision` and `scale` for
+    decimal and money, `currency` (the fixed code) or `currencyField` (the field holding the code)
+    for money, `values` for enum, `target` for reference, and `fields` for child collection. `min`
+    and `max` are strings in the entity file's literal form, such as `"0.5"` or `"2026-01-01"`. A
+    property the field's type does not have, or a label it leaves out, is `null`, never left out.
   - `computed` is `true` for a [computed field](resource-files.md#entity-logic).
     The server sets its value on every write, so the form shows it read-only
     and never sends it.
@@ -539,9 +538,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     | `date-time` | date and time to the second in the UI locale and the browser's time zone. The fraction is dropped |
     | `date` | the date in the UI locale, without a time-zone shift |
     | `integer`, `decimal` | exactly as the API wrote them, right-aligned |
+    | `money` | the amount with its currency in the UI locale, such as `$1,250.50` in `en` and `1.250.000 ₫` in `vi`, right-aligned. It shows the field's `scale` in decimal places, or more when the API wrote more, so it never rounds. The currency is `currency`, or the value of `currencyField` in the same row, or of `currencyColumn` in a data source row. Without a code of three letters it shows the number as the API wrote it |
     | `boolean` | a localized yes or no |
     | `reference` | the label from `labels` |
-    | `text`, `enum` | the value. An enum with `valueLabels` shows the label, money shows its currency, and a file its name as a download link _(planned for M15, [D76](../decisions/d76-file-money-and-enum-label-field-types.md))_ |
+    | `text`, `enum` | the value. An enum with `valueLabels` shows the label, and a file its name as a download link _(planned for M15, [D76](../decisions/d76-file-money-and-enum-label-field-types.md))_ |
     | `null` | an empty cell |
 
   - **Number source text.** The SPA parses record responses with the source
@@ -727,6 +727,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     | --- | --- |
     | `text` | a text input limited to `maxLength`. With `minLength` it also has the `minlength` attribute and shows the character count against the limits, such as `0 / 3–10`, or `0 / ≥3` with no `maxLength` |
     | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is. With `min` or `max` its placeholder shows the range, such as `1 – 10`, `≥ 1` or `≤ 10`, and a typed number outside the range is marked invalid. It is never blocked, because the server decides |
+    | `money` | the input of a decimal with the currency code beside the box. The code is `currency`, or the current value of `currencyField` in the form, or in the row of a child collection. Without a code of three letters nothing is shown beside the box. It sends the typed text as a plain JSON number |
     | `boolean` | a checkbox |
     | `date` | a date picker. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
     | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
@@ -782,11 +783,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `null` and every child collection empty, so an untouched field stays out of a create and the server
     decides what is required. An edit also sends the `version` it read. An
     emptied text or number input is sent as `null`.
-  - **Number text.** The body is written by hand, so an integer or decimal
-    goes out as the typed text and no digit is lost. Text that is not a JSON
-    number, such as `1,5`, goes out as a JSON string, and the server rejects
-    it on its field. The form never turns number text into a JavaScript
-    number.
+  - **Number text.** The body is written by hand, so an integer, decimal or money
+    amount goes out as the typed text and no digit is lost. Text that is not a JSON number,
+    such as `1,5`, goes out as a JSON string, and the server rejects it on its field. The form
+    never turns number text into a JavaScript number.
   - **Errors.** A `400` or `409` problem is mapped by its JSON Pointer keys. A
     key `/values/<field>` for a field of the form shows its messages under
     that field. Every other key, such as `""`, `/values` or `/version`, shows

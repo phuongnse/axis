@@ -580,7 +580,8 @@ data sources.
     [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
 - **Schema.** The data source's schema reaches the SPA in page metadata, in
   the widget's `dataSource` object. There is no separate schema endpoint. A
-  money measure has the type `money`. It also has `currency`, the fixed
-  currency code, or `currencyColumn`, the name of the group column that holds
-  the code. Both are left out of the JSON when they do not apply. Projected
-  and group columns of type `money` carry no currency yet.
+  money column or measure has the type `money`. It also has `currency`, the
+  fixed currency code, or `currencyColumn`, the name of the column that holds
+  the code. A measure's `currencyColumn` is a group column. A projected or
+  group column's is the sibling column that reads the currency field on the
+  same record. Both are left out of the JSON when they do not apply.

@@ -348,8 +348,8 @@ public sealed record DataSourceParameterMetadata(
 /// currency code in each grouped row. Both are left out of the JSON when null.
 /// </summary>
 /// <param name="Name">The projected name: the column's key in a row.</param>
-/// <param name="Currency">The fixed currency code of a money measure.</param>
-/// <param name="CurrencyColumn">The name of the group column that holds the currency code of a money measure.</param>
+/// <param name="Currency">The fixed currency code of a money column or measure.</param>
+/// <param name="CurrencyColumn">The name of the column that holds the currency code of a money column or measure.</param>
 public sealed record DataSourceColumnMetadata(
     string Name,
     string Type,
@@ -362,8 +362,9 @@ public sealed record DataSourceColumnMetadata(
 /// <summary>
 /// One field. Properties the field's type does not have are null: <see cref="MaxLength"/> and
 /// <see cref="MinLength"/> are for text, <see cref="Min"/> and <see cref="Max"/> for integer,
-/// decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal, <see cref="Values"/> for enum,
-/// <see cref="Target"/> for reference and <see cref="Fields"/> for child collection.
+/// decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal and money, <see cref="Currency"/> and
+/// <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum, <see cref="Target"/> for reference and
+/// <see cref="Fields"/> for child collection.
 /// </summary>
 /// <param name="Type">The type name as written in entity files, such as <c>date-time</c>.</param>
 /// <param name="Computed">Whether the server computes the value. A client shows it and never sends it.</param>
@@ -371,6 +372,8 @@ public sealed record DataSourceColumnMetadata(
 /// <param name="Creator">Whether the server sets the field to the creating user's id. A client shows it and never sends it.</param>
 /// <param name="Min">The lowest accepted value as the literal was written, such as <c>10</c>, <c>0.5</c> or <c>2026-01-01</c>, or null when there is none.</param>
 /// <param name="Max">The highest accepted value, written as <paramref name="Min"/> is, or null when there is none.</param>
+/// <param name="Currency">The fixed currency code of a money field, or null when the field has none.</param>
+/// <param name="CurrencyField">The name of the field that holds the currency code of a money field, or null when the field has none.</param>
 /// <param name="Fields">The child entity's fields in declaration order, for a child collection.</param>
 public sealed record FieldMetadata(
     string Name,
@@ -384,6 +387,8 @@ public sealed record FieldMetadata(
     int? MaxLength,
     int? Precision,
     int? Scale,
+    string? Currency,
+    string? CurrencyField,
     string? Min,
     string? Max,
     int? MinLength,

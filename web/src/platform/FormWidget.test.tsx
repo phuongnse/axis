@@ -114,6 +114,18 @@ const computedWidget: EntityWidgetMetadata = {
   },
 }
 
+// A note whose amount is money in the currency its currency field holds.
+const moneyWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [
+      { ...field('currency', 'enum', 'note.currency'), values: ['VND', 'USD'] },
+      { ...field('amount', 'money', 'note.amount'), precision: 18, scale: 2, currencyField: 'currency' },
+    ],
+  },
+}
+
 // A note whose number a sequence hands out on create.
 const sequenceWidget: EntityWidgetMetadata = {
   ...noteWidget,
@@ -224,6 +236,10 @@ function computedJson(version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","priority":2,"amount":1.50,"total":3.00,"lines":[{"description":"Pens","code":"PENS"}]},"labels":{}}`
 }
 
+function moneyJson(version: number) {
+  return `{"id":"${noteId}","version":${version},"values":{"currency":"USD","amount":1.50},"labels":{}}`
+}
+
 function linesJson(version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","lines":[{"description":"Pens","quantity":2},{"description":"Ink","quantity":1}]},"labels":{}}`
 }
@@ -261,6 +277,7 @@ const texts = {
   'note.code': 'Code',
   'note.priority': 'Priority',
   'note.amount': 'Amount',
+  'note.currency': 'Currency',
   'note.done': 'Done',
   'note.dueOn': 'Due on',
   'note.dueAt': 'Due at',
@@ -814,6 +831,34 @@ describe('FormWidget', () => {
       method: 'PATCH',
       body: '{"version":1,"values":{"priority":3,"lines":[{"description":"Pens!"}]}}',
     })
+  })
+
+  it('shows the currency beside a money input and sends the typed amount as a plain number', async () => {
+    const requests = stubFetch({ status: 200, body: moneyJson(1) }, { status: 200, body: moneyJson(2) })
+    renderForm(noteId, moneyWidget)
+
+    const amount = await screen.findByLabelText('Amount')
+    expect(amount).toHaveValue('1.50')
+    expect(within(amount.closest('.ant-space-compact') as HTMLElement).getByText('USD')).toBeInTheDocument()
+
+    await userEvent.clear(amount)
+    await userEvent.type(amount, '1250.50')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1]).toEqual({
+      url: `${recordsPath}/${noteId}`,
+      method: 'PATCH',
+      body: '{"version":1,"values":{"amount":1250.50}}',
+    })
+  })
+
+  it('shows no currency beside a money input whose currency field is empty', async () => {
+    stubFetch({ status: 200, body: moneyJson(1).replace('"USD"', 'null') })
+    renderForm(noteId, moneyWidget)
+
+    const amount = await screen.findByLabelText('Amount')
+    expect(amount.closest('.ant-space-compact')).toBeNull()
   })
 
   it('leaves computed fields out of a create body', async () => {
