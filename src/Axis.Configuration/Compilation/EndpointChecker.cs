@@ -289,6 +289,16 @@ internal static class EndpointChecker
                 continue;
             }
 
+            // A set of records has no storage yet, so there is nothing for a mapping to write.
+            if (FieldTypes.Parse(field.Type) == FieldType.References)
+            {
+                report(
+                    DiagnosticCodes.ReadOnlyEndpointValueField,
+                    $"The field '{field.Name}' is a references field. An endpoint cannot map a set of records yet.",
+                    path);
+                continue;
+            }
+
             if (!inputValid)
             {
                 continue;

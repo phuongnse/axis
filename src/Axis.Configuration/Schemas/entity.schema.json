@@ -57,7 +57,7 @@
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "type": {
-          "enum": ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference", "child-collection"]
+          "enum": ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference", "references", "child-collection"]
         },
         "label": { "$ref": "#/$defs/textReference" },
         "required": { "type": "boolean" },

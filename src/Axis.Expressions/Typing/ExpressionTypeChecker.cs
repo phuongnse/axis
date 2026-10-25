@@ -9,9 +9,9 @@ namespace Axis.Expressions.Typing;
 /// Finds the type of a parsed expression, following the typing rules in
 /// docs/reference/expressions.md, and checks it against the type the use needs. It covers
 /// literals, bare field names, every operator, every function in
-/// <see cref="ExpressionFunctions"/>, aggregates over the child collections in the scope and calls
+/// <see cref="ExpressionFunctions"/>, aggregates over the child collections and references fields in the scope and calls
 /// to the named rules in the scope. A collection is accepted only as the first argument of an
-/// aggregate, and the aggregate's item expression sees only the child row's fields. A path through
+/// aggregate, and the aggregate's item expression sees only the child row's or target record's fields. A path through
 /// reference fields resolves only in a scope that resolves paths, and is an unknown name in any
 /// other scope. The text of a <c>date</c> or <c>dateTime</c> literal must be a valid date or
 /// date-time under <see cref="DateLiterals"/>. A stored value, such as a computed field, cannot call
@@ -285,8 +285,8 @@ public static class ExpressionTypeChecker
     }
 
     /// <summary>
-    /// An aggregate: its first argument names a child collection in the scope, and its item
-    /// expression, when there is one, is checked over the child row's fields alone. A decimal
+    /// An aggregate: its first argument names a child collection or a references field in the scope,
+    /// and its item expression, when there is one, is checked over the child row's fields alone. A decimal
     /// result is recorded, so that the interpreter returns an integer sum or the 0 of an empty list
     /// as a decimal.
     /// </summary>
@@ -297,7 +297,7 @@ public static class ExpressionTypeChecker
             var found = Infer(call.Arguments[0], context);
             throw Fail(
                 ExpressionDiagnosticCodes.TypeMismatch,
-                $"Function '{name}' needs a child collection for argument 1, found {found}",
+                $"Function '{name}' needs a child collection or a references field for argument 1, found {found}",
                 call.Offset);
         }
 

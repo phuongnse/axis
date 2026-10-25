@@ -299,6 +299,28 @@ public sealed class RecordInputParserTests
     }
 
     [Fact]
+    public void A_references_field_is_an_unknown_property_until_records_can_store_sets()
+    {
+        var entity = Entity(
+            Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a02"),
+            "Request",
+            "entities/request.json",
+            Field("title", FieldType.Text, required: true),
+            Field("software", FieldType.References, target: _target));
+
+        var result = RecordInputParser.Parse(
+            Encoding.UTF8.GetBytes("""{ "values": { "title": "Hi", "software": [] } }"""),
+            entity,
+            Application(entity, _target),
+            RecordOperation.Create);
+
+        Assert.Null(result.Input);
+        Assert.NotNull(result.Errors);
+        Assert.Equal(["/values/software"], result.Errors.Keys);
+        Assert.Equal(["Unknown property."], result.Errors["/values/software"]);
+    }
+
+    [Fact]
     public void Valid_rows_hold_every_child_field_in_declaration_order()
     {
         var result = Parse(

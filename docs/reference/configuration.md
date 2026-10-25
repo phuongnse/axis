@@ -74,8 +74,9 @@ flowchart LR
      entity, owned by that field. The owner is the first such field in path
      order of the entity files, then in field order. A later field with the
      same target is `AXC0039` at its `/fields/{i}/target`, naming the owner.
-     A `reference` whose target is a child entity is `AXC0040` at
-     `/fields/{i}/target`. A `reference` or `child-collection` field on a
+     A `reference` or `references` whose target is a child entity is
+     `AXC0040` at `/fields/{i}/target`. A `reference`, `references` or
+     `child-collection` field on a
      child entity is `AXC0041` at its `/fields/{i}/type`, so an entity whose
      child collection names itself is `AXC0041`. See
      [Entity logic](resource-files.md#entity-logic) for why these limits exist.

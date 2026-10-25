@@ -112,16 +112,18 @@ Every expression has a type, found at compile time.
 | `reference` | `reference` | A record of the target entity. |
 | `money` _(planned for M15)_ | `decimal` | The amount. The currency is not part of the value. |
 | `file` _(planned for M15)_ | `file` | Only `is null` and `is not null` accept it. |
-| `references` _(planned for M15)_ | `list<Entity>` | The set of target records. Only aggregates accept it. |
+| `references` | `list<Entity>` | The set of target records. Only aggregates accept it. |
 
 Two more types exist only inside expressions:
 
 - **`null`.** The type of the literal `null`. It fits any type.
-- **`list<Entity>`.** The type of a child collection field, and from M15 of a
-  `references` field _(planned for M15)_. Only [aggregates](#aggregates)
-  accept it, as their first argument. Anywhere else it is a type diagnostic.
-  Over a `references` field, names in the item expression are the target's
-  fields, with paths through its references.
+- **`list<Entity>`.** The type of a child collection field and of a
+  `references` field. Only [aggregates](#aggregates) accept it, as their first
+  argument. Anywhere else it is a type diagnostic. Over a `references` field,
+  names in the item expression are the target's own fields, computed ones
+  included. Paths through its references in the item expression are planned
+  _(planned for M15)_, because they need record reads that come with its
+  storage.
 
 Rules:
 
@@ -304,7 +306,9 @@ Paths in validations and computed fields are not built. There a path is
 - **Child collection.** A child collection field gives a `list<Entity>`,
   which only aggregates accept. Inside an aggregate's item expression, names
   are the child row's fields, computed ones included, and nothing else: no
-  field of the owner, no collection and no rule.
+  field of the owner, no collection and no rule. A `references` field gives a
+  `list<Target>` the same way, with the target's fields in the item
+  expression.
 - **Rule call.** A named rule is called like a function, such as
   `isLargeRequest(total)`. Arguments are checked against the rule's typed
   parameters: an integer fits a decimal parameter, and `null` fits any
@@ -332,17 +336,18 @@ Paths in validations and computed fields are not built. There a path is
 - **Scope in a computed field.** The expression sees the entity's own fields
   that are not computed and its child collections through aggregates, and no
   reference path. Another computed field, itself included, is an unknown
-  name. Inside an item expression, names are the child row's fields,
-  computed ones included, and no rules. It cannot call `now()`, which is
-  `AXC0086`.
+  name, and so is a `references` field. Inside an item expression, names are
+  the child row's fields, computed ones included, and no rules. It cannot call
+  `now()`, which is `AXC0086`.
 - **Scope in a validation.** The expression sees the entity's fields,
-  computed ones included, its child collections through aggregates, and the
-  named rules at its top level.
+  computed ones included, its child collections and `references` fields
+  through aggregates, and the named rules at its top level.
 - **Scope in a data source filter.** A filter sees the entity's fields and the
   data source parameters as plain names, and paths through reference fields.
   It can call the named rules, with fields, paths, parameters and literals as
-  arguments. Its child collections type-check in aggregates, but no
-  aggregate is in the [SQL subset](#sql-subset), so one is `AXC0053`.
+  arguments. Its child collections and `references` fields type-check in
+  aggregates, but no aggregate is in the [SQL subset](#sql-subset), so one is
+  `AXC0053`.
 - **Scope in a policy filter.** A
   [policy](roles-and-policies.md) filter sees the entity's
   fields, paths through reference fields of up to 3 hops, the named rules and
@@ -462,10 +467,12 @@ filter uses it to compare a record with the user, such as
 
 ### Aggregates
 
-An aggregate works on a child collection. The first argument names the
-collection. The second argument is an item expression, evaluated once per
-row. Inside it, names refer only to the child row's fields, computed ones
-included. Computed fields and validations can use aggregates.
+An aggregate works on a child collection or a `references` field. The first
+argument names the field. The second argument is an item expression,
+evaluated once per row. Inside it, names refer only to the child row's or the
+target record's fields, computed ones included. Computed fields can use
+aggregates over child collections. Validations and process conditions can use
+them over child collections and `references` fields.
 
 | Function | Result | Empty list |
 | --- | --- | --- |
@@ -740,9 +747,10 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   arguments or `if` branches that do not fit each other, and a `date` or
   `dateTime` call without a text literal argument or with a text that is
   not a valid date or date-time. It also includes a child
-  collection used anywhere but as the first argument of an aggregate, such as
-  `lineItems == null`, reported at the name, an aggregate whose first
-  argument is not a child collection, such as `sum(title, amount)`, and an
+  collection or `references` field used anywhere but as the first argument of
+  an aggregate, such as `lineItems == null` or `software == null`, reported at
+  the name, an aggregate whose first argument is not a child collection or a
+  `references` field, such as `sum(title, amount)`, and an
   item of a type the aggregate does not accept. It also covers a `.` after a
   field that is not a reference, after a data source parameter, or after
   anything that is not a field path, at the `.`. The message names the

@@ -1045,6 +1045,7 @@ internal static class ProcessChecker
         field.Expression is not null ? "is computed"
         : field.Sequence is not null ? "is numbered by a sequence"
         : FieldTypes.Parse(field.Type) == FieldType.ChildCollection ? "is a child collection"
+        : FieldTypes.Parse(field.Type) == FieldType.References ? "is a references field"
         : null;
 
     /// <summary>

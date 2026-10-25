@@ -756,12 +756,17 @@ public static class ApplicationCompiler
 
             // A child entity's rows are read and written only through its owner, so they point nowhere else.
             var type = FieldTypes.Parse(field.Type);
-            if (childOwner is not null && type is FieldType.Reference or FieldType.ChildCollection)
+            if (childOwner is not null && type is FieldType.Reference or FieldType.References or FieldType.ChildCollection)
             {
-                var kind = type == FieldType.Reference ? "a reference" : "a child collection";
+                var kind = type switch
+                {
+                    FieldType.Reference => "a reference",
+                    FieldType.References => "a references field",
+                    _ => "a child collection",
+                };
                 Report(
                     DiagnosticCodes.ChildEntityWithReference,
-                    $"The field '{field.Name}' is {kind}, but '{entity.Name}' is a child entity owned by '{childOwner}'. A child entity has no reference or child collection fields.",
+                    $"The field '{field.Name}' is {kind}, but '{entity.Name}' is a child entity owned by '{childOwner}'. A child entity has no reference, references or child collection fields.",
                     $"{path}/type");
             }
         }
@@ -809,15 +814,15 @@ public static class ApplicationCompiler
             return;
         }
 
-        var scope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: findEntity);
+        var scope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: findEntity, references: false);
         for (var index = 0; index < entity.Fields.Count; index++)
         {
             var field = entity.Fields[index];
 
-            // A reference or child collection is reported by CheckField, and so is an enum without values.
+            // A reference, references field or child collection is reported by CheckField, and so is an enum without values.
             var type = FieldTypes.Parse(field.Type);
             if (field.Expression is null
-                || type is FieldType.Reference or FieldType.ChildCollection
+                || type is FieldType.Reference or FieldType.References or FieldType.ChildCollection
                 || (type == FieldType.Enum && field.Values is null))
             {
                 continue;
@@ -980,12 +985,12 @@ public static class ApplicationCompiler
     internal static FieldDefinition? FindField(EntityResource entity, string name) =>
         entity.Fields.FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Adds the <c>field target</c> edge of a reference or child collection field whose target entity resolves.</summary>
+    /// <summary>Adds the <c>field target</c> edge of a reference, references or child collection field whose target entity resolves.</summary>
     internal static void AddFieldTarget(
         Resource owner, FieldDefinition field, string path, Func<string, EntityResource?> findEntity, ReferenceIndexBuilder references)
     {
         if (field.Target is { } target
-            && FieldTypes.Parse(field.Type) is FieldType.Reference or FieldType.ChildCollection
+            && FieldTypes.Parse(field.Type) is FieldType.Reference or FieldType.References or FieldType.ChildCollection
             && findEntity(target) is { } targetEntity)
         {
             references.Add(owner, $"{path}/target", ReferenceRelations.FieldTarget, ResourceNode.Of(targetEntity));
@@ -1020,6 +1025,12 @@ public static class ApplicationCompiler
             {
                 report(DiagnosticCodes.InvalidConstraint, "'sensitive' does not apply to child-collection fields.", $"{path}/sensitive");
             }
+        }
+
+        // A references field has no column, and it is not a single value to make unique.
+        if (type == FieldType.References && field.Unique is not null)
+        {
+            report(DiagnosticCodes.InvalidConstraint, "'unique' does not apply to references fields.", $"{path}/unique");
         }
 
         // Reports a type-specific property on a field of another type. Returns whether it fits.
@@ -1081,18 +1092,19 @@ public static class ApplicationCompiler
 
         if (field.Target is { } target)
         {
-            if (Fits("target", "reference and child-collection", FieldType.Reference, FieldType.ChildCollection))
+            if (Fits("target", "reference, references and child-collection", FieldType.Reference, FieldType.References, FieldType.ChildCollection))
             {
                 if (findEntity(target) is { } targetEntity)
                 {
                     // A child collection's target is checked against the other owners by FindChildOwners.
-                    if (type == FieldType.Reference)
+                    if (type is FieldType.Reference or FieldType.References)
                     {
+                        var kind = type == FieldType.Reference ? "referenced" : "the target of a references field";
                         if (ownersByChildName.TryGetValue(targetEntity.Name, out var owner))
                         {
                             report(
                                 DiagnosticCodes.ReferenceToChildEntity,
-                                $"The target entity '{targetEntity.Name}' is a child entity owned by '{owner}'. A child entity cannot be referenced.",
+                                $"The target entity '{targetEntity.Name}' is a child entity owned by '{owner}'. A child entity cannot be {kind}.",
                                 $"{path}/target");
                         }
                         else if (targetEntity.DisplayField is null)
@@ -1120,6 +1132,10 @@ public static class ApplicationCompiler
         else if (type == FieldType.Reference)
         {
             report(DiagnosticCodes.MissingTypeProperty, "A reference field must name its target entity in 'target'.", path);
+        }
+        else if (type == FieldType.References)
+        {
+            report(DiagnosticCodes.MissingTypeProperty, "A references field must name its target entity in 'target'.", path);
         }
         else if (type == FieldType.ChildCollection)
         {
@@ -1275,7 +1291,7 @@ public static class ApplicationCompiler
                     target => references.Add(dataSource, $"/fields/{index}/path", ReferenceRelations.FieldPath, ResourceNode.Of(target)),
                     out var hops);
 
-                // A path that does not resolve, or ends at a child collection, has no column. It is
+                // A path that does not resolve, or ends at a child collection or a references field, has no column. It is
                 // stored as an invalid path for the sort check.
                 var field = pathProblem is null && hops.Count > 0 ? hops[^1] : null;
                 if (!fieldsByName.TryAdd(projected.Name, field))
@@ -1523,9 +1539,9 @@ public static class ApplicationCompiler
     /// Resolves a projected <c>path</c> from the entity <paramref name="root"/>, ignoring letter
     /// case. Every name before the last is a reference field, the path takes at most
     /// <see cref="ExpressionLimits.MaxHops"/> hops, and the last name is a field that is not a child
-    /// collection. Returns the problem's message, or null when the path resolves or reaches an
-    /// entity that was not loaded, which is reported at that entity's own file. When the path
-    /// resolves, <paramref name="hops"/> holds one field per name. It is empty when an entity was
+    /// collection or a references field. Returns the problem's message, or null when the path
+    /// resolves or reaches an entity that was not loaded, which is reported at that entity's own
+    /// file. When the path resolves, <paramref name="hops"/> holds one field per name. It is empty when an entity was
     /// not loaded. Each reference field of the path whose target resolves, the last name included,
     /// is passed to <paramref name="reach"/>, even when the path fails further on.
     /// </summary>
@@ -1560,6 +1576,11 @@ public static class ApplicationCompiler
                 if (type == FieldType.ChildCollection)
                 {
                     return $"The path '{path}' names the child collection '{field.Name}'. A data source cannot project a child collection.";
+                }
+
+                if (type == FieldType.References)
+                {
+                    return $"The path '{path}' names the references field '{field.Name}'. A data source cannot project a references field.";
                 }
 
                 if (type == FieldType.Reference && field.Target is not null && findEntity(field.Target) is { } lastTarget)
@@ -1598,7 +1619,7 @@ public static class ApplicationCompiler
     {
         // The child models are not built yet, so both scopes come from the definitions.
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
-        var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: FindEntity);
+        var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: FindEntity, references: false);
         var fields = entity.Fields.Select(field => BuildField(field, inputScope, entitiesByName, sequencesByName)).ToList();
         var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: FindEntity, modules: modules);
         return new EntityModel
@@ -1637,7 +1658,7 @@ public static class ApplicationCompiler
             Scale = field.Scale,
             Values = field.Values,
             Target = target is null ? null : new EntityReference(target.Id, target.Name),
-            TargetDisplayField = type == FieldType.Reference && target?.DisplayField is { } displayField ? FindField(target, displayField)?.Name : null,
+            TargetDisplayField = type is FieldType.Reference or FieldType.References && target?.DisplayField is { } displayField ? FindField(target, displayField)?.Name : null,
             Computed = field.Expression is null
                 ? null
                 : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),

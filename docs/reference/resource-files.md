@@ -455,7 +455,7 @@ is `AXC0013`.
   `false`, is `AXC0013`.
 - `expression` makes the field a computed field. `required` on a computed
   field is `AXC0013` at `/fields/{i}/required`, and an `expression` on a
-  `reference` or `child-collection` field is `AXC0013` at
+  `reference`, `references` or `child-collection` field is `AXC0013` at
   `/fields/{i}/expression`. See [Entity logic](#entity-logic).
 - `sequence` names a [sequence](#sequences), ignoring letter case. It cannot
   be combined with `required: true` or `expression`, and a child entity's
@@ -488,7 +488,16 @@ new check is a new compile diagnostic.
   It takes the properties of `decimal`, and its expression type is `decimal`.
 - **`references`.** A set of records of `target`, at most 1,000. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. Its
-  expression type is `list<Target>`.
+  expression type is `list<Target>`. The compile side is built. `unique` and
+  `expression` are `AXC0013`, `default` is refused by the entity schema
+  (`AXC0004`) and a missing `target` is `AXC0014`. A `target` that is a child
+  entity is `AXC0040`, and one without a `displayField` is `AXC0030`. A
+  `references` field on a child entity is `AXC0041`. It has no column, so a
+  data source cannot project it (`AXC0043`), an endpoint cannot map it
+  (`AXC0121`) and a process `updateRecord` cannot set it. Its storage and the
+  record API are still planned, so until they land the record API leaves the
+  field out of record values and a body that sets it is a `400` unknown
+  property.
 - **`valueLabels`.** On an `enum` field, a map from every value to a
   `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
   "priority.low" } }`. It covers every value, and its keys join `AXC0028`.
@@ -634,13 +643,14 @@ validation calls the rules of its own module, see [modules](modules-and-template
   [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md)
   lifts part of the last one _(planned for M15)_. A child entity:
   - is owned by exactly one `child-collection` field (`AXC0039`);
-  - is never the `target` of a `reference` (`AXC0040`);
+  - is never the `target` of a `reference` or `references` field (`AXC0040`);
   - is never the `entity` of a data source (`AXC0064`) or of a process
     (`AXC0068`);
   - has no record routes of its own;
-  - has no `reference` or `child-collection` fields (`AXC0041`). From M15 it
-    may have `reference` fields, and `AXC0041` refuses only a
-    `child-collection` field _(planned for M15)_. A reference from a child
+  - has no `reference`, `references` or `child-collection` fields
+    (`AXC0041`). From M15 it may have `reference` fields, and `AXC0041`
+    refuses only a `references` or `child-collection` field _(planned for
+    M15)_. A reference from a child
     row gets a foreign key and an index, and its labels follow the rows, see
     [child rows](record-api.md#child-rows-computed-fields-and-validations).
 
