@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Axis.Admin/Axis.Admin.csproj" />
+    <Project Path="src/Axis.Administration/Axis.Administration.csproj" />
     <Project Path="src/Axis.Configuration/Axis.Configuration.csproj" />
     <Project Path="src/Axis.Core/Axis.Core.csproj" />
     <Project Path="src/Axis.Data/Axis.Data.csproj" />

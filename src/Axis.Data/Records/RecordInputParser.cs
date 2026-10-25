@@ -385,7 +385,7 @@ public static partial class RecordInputParser
         {
             FieldType.Text => ReadText(element, field, out value),
             FieldType.Integer => ReadInteger(element, field, out value),
-            FieldType.Decimal => ReadDecimal(element, field, out value),
+            FieldType.Decimal or FieldType.Money => ReadDecimal(element, field, out value),
             FieldType.Boolean => ReadBoolean(element, out value),
             FieldType.Date => ReadDate(element, field, out value),
             FieldType.DateTime => ReadDateTime(element, field, out value),

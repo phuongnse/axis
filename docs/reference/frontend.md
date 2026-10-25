@@ -382,7 +382,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   | Address | Shows |
   | --- | --- |
-  | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in |
+  | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in. The shell's sign-in page is `/?signIn=failed`, where the server sends the browser after a refused sign-in. It shows the same prompt and, above the page, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/` without the marker shows no message |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on |
   | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
@@ -957,9 +957,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   [sign-in and the session](security.md#sign-in-and-the-session).
   The header also reads `studio` from it, and shows the [Studio](studio.md)
   link beside the button when it is `true`.
-  - With nobody signed in, it is a **Sign in** button. It sends the browser
-    to `/api/auth/sign-in` with the current path and query string as
-    `returnUrl`, so the person comes back to the same page.
+  - With nobody signed in, it is a **Sign in** button. It sends the browser to
+    `/api/auth/sign-in` with the current path and query string as `returnUrl`, so
+    the person comes back there, but to `/` from the sign-in page `/?signIn=failed`.
   - With someone signed in, it shows their display name. Its menu holds
     **Sign out**, which ends the session and then sends the browser to the
     identity provider's sign-out page.

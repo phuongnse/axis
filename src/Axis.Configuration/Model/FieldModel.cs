@@ -5,10 +5,10 @@ namespace Axis.Configuration.Model;
 /// <summary>
 /// A compiled field. Type-specific properties are set only for the type they belong to:
 /// <see cref="MaxLength"/> and <see cref="MinLength"/> for text, <see cref="Min"/> and
-/// <see cref="Max"/> for integer, decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal,
-/// <see cref="Values"/> for enum, <see cref="Target"/> for reference and child collection,
+/// <see cref="Max"/> for integer, decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal and
+/// money, <see cref="Currency"/> and <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum, <see cref="Target"/> for reference and child collection,
 /// <see cref="TargetDisplayField"/> for reference, and <see cref="Sequence"/> and
-/// <see cref="Creator"/> for text, and <see cref="Default"/> for text, integer, decimal, boolean,
+/// <see cref="Creator"/> for text, and <see cref="Default"/> for text, integer, decimal, money, boolean,
 /// date, date-time and enum.
 /// </summary>
 public sealed record FieldModel
@@ -39,6 +39,12 @@ public sealed record FieldModel
     public int? Precision { get; init; }
 
     public int? Scale { get; init; }
+
+    /// <summary>The ISO 4217 code of the fixed currency, set only for money fields that declare one.</summary>
+    public string? Currency { get; init; }
+
+    /// <summary>The declared name of the field that holds the currency, set only for money fields that declare one.</summary>
+    public string? CurrencyField { get; init; }
 
     public IReadOnlyList<string>? Values { get; init; }
 

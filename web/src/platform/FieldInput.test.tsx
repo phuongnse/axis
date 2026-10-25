@@ -2,6 +2,9 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { FieldInput } from './FieldInput'
 import type { FieldMetadata, FieldType } from './site'
+import { TextProvider } from './TextProvider'
+
+const catalogs = [{ texts: {}, fallbackTexts: {} }]
 
 function field(type: FieldType, limits: Partial<FieldMetadata>): FieldMetadata {
   return {
@@ -27,7 +30,11 @@ function field(type: FieldType, limits: Partial<FieldMetadata>): FieldMetadata {
 }
 
 function show(metadata: FieldMetadata, value: string | null) {
-  render(<FieldInput field={metadata} value={value} onChange={() => undefined} ariaLabel="limited" />)
+  render(
+    <TextProvider catalogs={catalogs} development={false}>
+      <FieldInput field={metadata} value={value} onChange={() => undefined} ariaLabel="limited" />
+    </TextProvider>,
+  )
   return screen.getByRole('textbox', { name: 'limited' })
 }
 

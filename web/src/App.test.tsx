@@ -2,6 +2,8 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
+import platformEnglish from '../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../src/Axis.Presentation/Texts/vi.json'
 import { App } from './App'
 import { assignLocation } from './platform/navigation'
 import type {
@@ -44,6 +46,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.home.sites.empty': 'No application is active.',
     'shell.home.sites.loadFailed': 'The sites could not be loaded.',
     'shell.home.sites.signIn': 'Sign in to see the sites.',
+    'shell.home.signInFailed': 'Sign-in did not complete. Try again.',
     'shell.notFound.title': 'Page not found',
     'shell.notFound.message': 'There is nothing at this address.',
     'shell.notFound.home': 'Go to the home page',
@@ -505,9 +508,27 @@ describe('App', () => {
     renderApp()
 
     expect(await screen.findByTestId('sites-sign-in')).toHaveTextContent('Sign in to see the sites.')
+    expect(screen.queryByTestId('sign-in-failed')).not.toBeInTheDocument()
     expect(screen.getByText('Sites')).toBeInTheDocument()
     expect(screen.queryByTestId('sites-error')).not.toBeInTheDocument()
     expect(assignLocation).not.toHaveBeenCalled()
+  })
+
+  it('shows a sign-in-did-not-complete alert above the sign-in prompt when the address has the marker', async () => {
+    stubServer({ sitesStatus: 401 })
+
+    renderApp('/?signIn=failed')
+
+    const alert = await screen.findByTestId('sign-in-failed')
+    expect(alert).toHaveTextContent('Sign-in did not complete. Try again.')
+    expect(alert).toHaveAttribute('role', 'alert')
+    expect(await screen.findByTestId('sites-sign-in')).toBeInTheDocument()
+  })
+
+  it('has the sign-in-did-not-complete text in every platform locale', () => {
+    for (const texts of [platformEnglish, platformVietnamese]) {
+      expect(texts).toHaveProperty(['shell.home.signInFailed'])
+    }
   })
 
   it('shows site titles in the current locale', async () => {

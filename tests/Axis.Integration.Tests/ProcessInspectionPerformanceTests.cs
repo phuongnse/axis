@@ -218,8 +218,8 @@ public sealed class ProcessInspectionData : IAsyncLifetime
             INSERT INTO axis.process_step_history (id, process_instance_id, step, revision, input, started_at, finished_at)
             SELECT gen_random_uuid(), @detail, 'step-' || s, s, jsonb_build_object(), now() + s * interval '1 second', now() + s * interval '1 second'
             FROM generate_series(1, {HistoryRows}) AS s;
-            INSERT INTO axis.connector_calls (id, process_instance_id, step, release_id, connector, operation, state, attempts)
-            SELECT gen_random_uuid(), @detail, 'call-' || s, @release, 'Ledger', 'post', 'succeeded', {AttemptRows / 2}
+            INSERT INTO axis.connector_calls (id, process_instance_id, step, staged_revision, release_id, connector, operation, state, attempts)
+            SELECT gen_random_uuid(), @detail, 'call-' || s, 1, @release, 'Ledger', 'post', 'succeeded', {AttemptRows / 2}
             FROM generate_series(1, 2) AS s;
             INSERT INTO axis.process_call_attempts (id, call_kind, call_id, kind, number, started_at, finished_at, outcome)
             SELECT gen_random_uuid(), 'connector', c.id, '{CallAttempts.Attempt}', a, now() + a * interval '1 second', now() + a * interval '1 second', 'succeeded'

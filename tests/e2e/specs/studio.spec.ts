@@ -7,6 +7,7 @@ import { startServer } from '../activate'
 import { openSelect, pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
+import { openFormTab } from '../studio-resources'
 
 // A server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -171,6 +172,7 @@ test.describe('Studio on a copy of its own', () => {
 
     try {
       await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${pageResource.id}`)
+      await openFormTab(page)
       await pickOption(
         page.getByTestId('studio-field-/widgets/0/dataSource').getByRole('combobox'),
         'PurchaseRequestList',
@@ -499,6 +501,7 @@ test.describe('Studio on a copy of its own', () => {
 
     try {
       await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+      await openFormTab(page)
       await expect(page.getByRole('textbox', { name: 'Text key', exact: true })).toHaveValue('pages.labelTextsE2e.title')
       await page.getByRole('textbox', { name: 'en', exact: true }).fill('Label texts')
       await page.getByRole('textbox', { name: 'vi', exact: true }).fill('Văn bản nhãn')
