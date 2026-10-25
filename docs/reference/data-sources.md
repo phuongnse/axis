@@ -185,10 +185,6 @@ These are _(planned for M15)_. See
   field, as the [record API](record-api.md#paging-and-sorting) matches.
 - **Export.** A data source can be exported to CSV or a spreadsheet, see
   [import and export](import-export.md#export).
-- **Timeout.** The rows query and its count run under `Data:QueryTimeout`. A
-  timeout is a `503` with the record API's title, and a count that times out
-  gives `totalCount: null`. See
-  [data settings](host-settings.md#data-settings).
 
 ## Compile checks
 
@@ -358,7 +354,8 @@ change the query:
 
 A response is `{ "items": [ ... ], "page": 1, "pageSize": 20, "totalCount": 42 }`.
 `page` and `pageSize` are the values used, and `totalCount` counts every row
-that passes the filter.
+that passes the filter. It is `null` when only the count runs past
+`Data:QueryTimeout`, and then the items are still there.
 
 Each item is `{ "id", "values", "labels" }`:
 
@@ -468,6 +465,13 @@ after the query and before the database.
   `or`, so the whole query fails closed. The server logs the policy and grant
   index of each of the user's read filters on the root entity, never a
   record value.
+- **`503` for a query timeout.** The rows query runs past
+  `Data:QueryTimeout` and PostgreSQL cancels it. The title is the record API's:
+  "The query took too long. Try again or narrow it." The server logs the data
+  source name and the duration, never a value, and counts it in
+  `axis.queries.timeouts`. A count alone that runs past the limit is no error:
+  the answer is `200` with `totalCount: null`. See
+  [data settings](host-settings.md#data-settings).
 - **`500`.** An unexpected error is caught by the exception handler. The
   response has no exception type, message or stack trace.
 

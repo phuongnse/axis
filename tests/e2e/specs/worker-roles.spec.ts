@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../test";
 
 test("the worker process holds the runtime role and no schema credentials", async () => {
   const pidFile = process.env.AXIS_E2E_WORKER_PID_FILE;

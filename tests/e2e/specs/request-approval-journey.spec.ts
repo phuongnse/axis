@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '../test'
+import type { Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { expectChosen, pickOption } from '../select'
 import { journeyURL } from '../server-settings'

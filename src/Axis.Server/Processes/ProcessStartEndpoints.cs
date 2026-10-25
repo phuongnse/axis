@@ -105,6 +105,14 @@ internal static class ProcessStartEndpoints
             return Grants.Forbidden();
         }
 
+        // The start of a process without a subject comes later. The grant check above comes first.
+        if (model.Entity is not { } subjectEntity)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "The process has no subject. It cannot be started through this endpoint yet.");
+        }
+
         if (!JsonRequest.IsJson(request))
         {
             return JsonRequest.UnsupportedMediaType();
@@ -120,9 +128,9 @@ internal static class ProcessStartEndpoints
             return IdempotencyKeyProblem();
         }
 
-        if (!application.TryGetEntity(model.Entity.Name, out var entity))
+        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
         {
-            throw new InvalidOperationException($"The subject entity '{model.Entity.Name}' of process '{model.Name}' is not in the model.");
+            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
         }
 
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;

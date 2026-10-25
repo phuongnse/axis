@@ -121,9 +121,15 @@ internal static class ProcessInspectionEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        if (!application.TryGetEntity(model.Entity.Name, out var entity))
+        // No instance of a process without a subject can exist yet.
+        if (model.Entity is not { } subjectEntity)
         {
-            throw new InvalidOperationException($"The subject entity '{model.Entity.Name}' of process '{model.Name}' is not in the model.");
+            return Results.Ok(new ProcessInstanceListResponse([], pageNumber, size, 0));
+        }
+
+        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
         }
 
         // An instance whose record the user may not read does not exist for them.
@@ -206,9 +212,15 @@ internal static class ProcessInspectionEndpoints
             return InstanceNotFound();
         }
 
-        if (!application.TryGetEntity(model.Entity.Name, out var entity))
+        // No instance of a process without a subject can exist yet.
+        if (model.Entity is not { } subjectEntity)
         {
-            throw new InvalidOperationException($"The subject entity '{model.Entity.Name}' of process '{model.Name}' is not in the model.");
+            return InstanceNotFound();
+        }
+
+        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
         }
 
         // An instance whose record the user may not read does not exist for them.

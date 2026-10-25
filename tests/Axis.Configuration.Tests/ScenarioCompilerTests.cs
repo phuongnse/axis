@@ -96,6 +96,32 @@ public sealed class ScenarioCompilerTests
             result.Diagnostics.Select(diagnostic => diagnostic.Code).Distinct().Order().ToArray());
     }
 
+    [Fact]
+    public void A_scenario_step_that_names_a_process_without_a_subject_is_AXC0184_at_its_process()
+    {
+        using var folder = SampleCopy()
+            .With("processes/nightly-job.json", """
+                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "NightlyJob", "formatVersion": 1,
+                  "parameters": [{ "name": "days", "type": "integer" }],
+                  "start": "done", "steps": [{ "name": "done", "type": "end" }] }
+                """)
+            .With(ScenarioFile, Scenario("""
+                "users": { "anna": ["employee"] },
+                "steps": [
+                  { "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "save": "request", "values": { "title": "Laptops" } },
+                  { "type": "startProcess", "process": "NightlyJob", "record": "request", "as": "anna" },
+                  { "type": "expectInstance", "process": "NightlyJob", "record": "request", "state": "running" }
+                ]
+                """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Equal(
+            [("AXC0184", "/steps/1/process"), ("AXC0184", "/steps/2/process")],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Contains("has no subject", result.Diagnostics[0].Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("""{ "type": "teleport", "record": "request" }""")]
     [InlineData("""{ "type": "createRecord", "entity": "Department", "as": "anna", "save": "dept", "values": {}, "expect": "denied" }""")]

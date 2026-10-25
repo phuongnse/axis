@@ -135,7 +135,7 @@ public sealed class ProcessStartFixture : IAsyncLifetime
     public async Task<Guid> InsertInstanceAsync(Guid subject)
     {
         Assert.True(Model.TryGetProcess("Submit", out var process));
-        Assert.True(Model.TryGetEntity(process.Entity.Name, out var entity));
+        Assert.True(Model.TryGetEntity(process.Entity!.Name, out var entity));
         var id = Guid.CreateVersion7();
         await using var command = DataSource.CreateCommand(
             """
