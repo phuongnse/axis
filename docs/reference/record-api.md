@@ -204,7 +204,9 @@ HTTP also call. The record API maps its outcome to the responses below.
   This adds to the content type rule and the SameSite session cookie. See
   [D23](../decisions/d23-sign-in-through-oidc-and-the-bff-session.md).
   `POST /api/apps/{app}/endpoints/{name}` is exempt from the header and
-  takes no session. See [Inbound endpoints](inbound-endpoints.md).
+  takes no session. See [Inbound endpoints](inbound-endpoints.md). A
+  [service account](security.md#service-accounts) request, which carries a
+  bearer token, is exempt too, and takes no session _(planned for M16)_.
 - **One transaction.** A create or update writes the record and the rows of
   its child collections in one transaction. When any write fails, nothing is
   written, neither the owner nor any row. A delete also runs in a

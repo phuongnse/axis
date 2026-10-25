@@ -46,6 +46,8 @@ The owner confirmed these points on issue #707 on 2026-10-19.
 - **Not in M10:** an audit of `403` refusals, an audit of session expiry, and
   the ASVS level. The first two stay in logs and metrics. The ASVS level stays
   in M16.
+  - [D84](d84-asvs-level-2-and-a-server-side-session.md) sets the level:
+    ASVS 5.0, Level 2.
 
 _Why:_ signing in is the first step of every attack on a shared server, and
 today it leaves no trace. A refused sign-in is rare and worth a record, and an

@@ -29,6 +29,8 @@ removed. Everything in this decision is in place. See
   provider.
 - **Session:** one HttpOnly, Secure, SameSite=Lax cookie.
   - It holds the user id, the display name, the roles and the tenant id.
+    - [D84](d84-asvs-level-2-and-a-server-side-session.md) replaces this
+      line: the session moves to the server and the cookie holds only its id.
   - It holds no tokens, and no token reaches the browser.
   - It ends after 8 hours, or after 1 hour without requests.
   - The cookie is protected with a key ring shared by every replica, and

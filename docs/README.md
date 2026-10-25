@@ -46,13 +46,17 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Detail, chart and KPI widgets](reference/detail-chart-kpi-widgets.md) | The SPA widgets that show one record, a chart and a KPI tile                          |
 | [Storage](reference/storage.md)                                        | Physical names, column types, database roles, schema planning, audit, release history |
 | [Migrations](reference/migrations.md)                                  | `migration` resources and recomputing stored computed fields                          |
-| [Security](reference/security.md)                                      | Sign-in and the session, machine callers, authorization, development users            |
+| [Security](reference/security.md)                                      | Sign-in and the session, machine callers, service accounts, the FAPI 2.0 profile, authorization, development users |
+| [Security headers and rate limits](reference/headers-and-rate-limits.md) | The headers the server sets on every response, and the rate limits per partition      |
+| [ASVS](reference/asvs.md)                                              | The ASVS 5.0 Level 2 tracking: each requirement, its status and its evidence          |
+| [Performance](reference/performance.md)                                | The service level objectives, the reference environment and the load test             |
 | [Frontend](reference/frontend.md)                                      | The SPA, sites, pages and widgets                                                     |
 | [Studio](reference/studio.md)                                          | The Studio page: editors, designers, publishing, tests                                |
 | [Form designer](reference/form-designer.md)                            | The Design tab of the form editor: canvas, field palette, layout outline, moves       |
 | [Authoring API](reference/authoring.md)                                | The API that Studio uses to read, write and publish application folders               |
-| [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, admin and telemetry settings      |
+| [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, admin, rate limit and telemetry settings |
 | [Administration](reference/administration.md)                          | The `Axis.Admin` commands: tenants, backup, restore, migrate, activate, publisher     |
+| [Tenant setting commands](reference/tenant-setting-commands.md)        | The `Axis.Admin` commands that change bindings, sign-in settings and hosts, rotate keys and passwords, and the platform audit records |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
 
 ## Working on Axis

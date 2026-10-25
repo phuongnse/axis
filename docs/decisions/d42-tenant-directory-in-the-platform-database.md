@@ -62,6 +62,8 @@ The owner confirmed these points on issue #639 on 2026-10-18.
     today.
   - Rotating the installation key is out of scope. After a leaked key,
     every stored secret must be set again by hand.
+    - [D87](d87-tenant-setting-commands-and-key-rotation.md) replaces this
+      point: the installation key can be rotated.
 - **Changes without restart:**
   - Both hosts read the directory again every `Tenancy:RefreshInterval`, 30
     seconds by default.
