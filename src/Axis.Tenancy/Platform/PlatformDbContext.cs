@@ -29,9 +29,14 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
         modelBuilder.Entity<TenantRow>(tenant =>
         {
-            tenant.ToTable("tenants", table => table.HasCheckConstraint(
-                "ck_tenants_status",
-                "status IN ('provisioning', 'active', 'suspended')"));
+            tenant.ToTable("tenants", table =>
+            {
+                table.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended')");
+                table.HasCheckConstraint("ck_tenants_oidc_profile", "oidc_profile IN ('standard', 'fapi2')");
+                table.HasCheckConstraint("ck_tenants_oidc_client_key", "(oidc_client_key IS NULL) = (oidc_client_key_id IS NULL)");
+                table.HasCheckConstraint("ck_tenants_oidc_previous_client_key", "(oidc_previous_client_key IS NULL) = (oidc_previous_client_key_id IS NULL)");
+                table.HasCheckConstraint("ck_tenants_oidc_previous_needs_current", "oidc_previous_client_key IS NULL OR oidc_client_key IS NOT NULL");
+            });
             tenant.HasKey(t => t.Id).HasName("pk_tenants");
             tenant.Property(t => t.Id).HasColumnName("id").ValueGeneratedNever();
             tenant.Property(t => t.Status).HasColumnName("status");
@@ -46,6 +51,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.OidcAuthority).HasColumnName("oidc_authority");
             tenant.Property(t => t.OidcClientId).HasColumnName("oidc_client_id");
             tenant.Property(t => t.OidcClientSecret).HasColumnName("oidc_client_secret").HasColumnType("bytea");
+            tenant.Property(t => t.OidcProfile).HasColumnName("oidc_profile").HasDefaultValue(TenantSignInProfiles.Standard);
+            tenant.Property(t => t.OidcClientKeyId).HasColumnName("oidc_client_key_id");
+            tenant.Property(t => t.OidcClientKey).HasColumnName("oidc_client_key").HasColumnType("bytea");
+            tenant.Property(t => t.OidcPreviousClientKeyId).HasColumnName("oidc_previous_client_key_id");
+            tenant.Property(t => t.OidcPreviousClientKey).HasColumnName("oidc_previous_client_key").HasColumnType("bytea");
             tenant.Property(t => t.ClaimUserId).HasColumnName("claim_user_id");
             tenant.Property(t => t.ClaimDisplayName).HasColumnName("claim_display_name");
             tenant.Property(t => t.ClaimRoles).HasColumnName("claim_roles");
