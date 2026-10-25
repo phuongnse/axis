@@ -83,6 +83,9 @@ operation step. The owner confirmed these points on issue #313 on
   - Packages are trusted code that the operator installs and reviews.
   - Out-of-process isolation comes with multi-tenant hosting
     ([D7](d7-custom-code-lives-in-extension-packages.md)).
+  - [D90](d90-extension-packages-run-out-of-process.md) replaces this point
+    and the loading point above: from M17, packages run in package runners
+    outside the worker, and in-process loading stays only for Development.
 - **Sample package:** `samples/packages/` holds one package with a pure
   operation and no capabilities. The purchase request sample uses it. The
   sample package is `payment-references`, whose operation computes an ISO 11649

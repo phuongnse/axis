@@ -1,8 +1,8 @@
 # Host settings
 
 Detailed reference for the settings of the server and of `Axis.Admin`: startup activation,
-Studio, tenancy and preview tenants, data settings, forwarded headers, the admin settings, rate limits
-and telemetry export.
+Studio, the operator console, tenancy and preview tenants, data settings, forwarded headers, the admin
+settings, rate limits and telemetry export.
 The worker's own settings are in [worker settings](process-execution.md#worker-settings).
 The conventions of [architecture.md](../architecture.md) apply: sections marked
 _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
@@ -187,6 +187,19 @@ and a JSON view, and shows the diagnostics.
   preview tenant, or null when the user cannot use Studio or the tenant has none.
   It also answers `studioTest`, true when `studio` is true and
   `Studio:Tests` is true.
+
+## Console settings
+
+_(planned for M17)_ One server setting controls the
+[operator console](operator-console.md), as
+[D93](../decisions/d93-an-operator-web-console.md) agrees.
+
+- **`Console:OperatorRole`.** A roles claim value, such as `platform-operator`. The
+  environment variable is `Console__OperatorRole`. Only a signed-in user whose
+  roles claim holds the value may use the console. It has no default, and with
+  no value nobody may. The Development settings set it to `platform-operator`, apart from the `operator` role of the purchase request sample.
+  Application policies play no part. `GET /api/me` answers `console: true` for
+  a user who holds it.
 
 ## Tenancy settings
 

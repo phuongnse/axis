@@ -443,7 +443,8 @@ on its own, and none implies another. The subject record must also be readable
 by the user, by the same rule as a start. A subject record the user may not
 read makes the instance an unknown instance, `404`, so the user cannot tell the
 two apart. Every request is also checked on the server, whatever the widget
-shows.
+shows. _(planned for M17)_ In the [operator console](operator-console.md), the
+operator role stands in for these grants.
 
 ### Retry
 

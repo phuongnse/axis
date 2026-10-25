@@ -98,3 +98,10 @@ files agree, title and status included.
 | [D85](decisions/d85-rate-limits-and-security-headers.md) | Rate limits and security headers | **Agreed** |
 | [D86](decisions/d86-service-accounts-for-the-record-and-process-apis.md) | Service accounts for the record and process APIs | **Agreed** |
 | [D87](decisions/d87-tenant-setting-commands-and-key-rotation.md) | Tenant setting commands and key rotation | **Agreed** |
+| [D88](decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md) | Custom widgets in the designer palette and a published SDK | **Agreed** |
+| [D89](decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md) | Modules that hold processes, pages and policies and depend on other modules | **Agreed** |
+| [D90](decisions/d90-extension-packages-run-out-of-process.md) | Extension packages run out of process | **Agreed** |
+| [D91](decisions/d91-connector-oauth2-and-structured-payloads.md) | Connector OAuth2 and structured payloads | **Agreed** |
+| [D92](decisions/d92-outbound-webhooks.md) | Outbound webhooks | **Agreed** |
+| [D93](decisions/d93-an-operator-web-console.md) | An operator web console | **Agreed** |
+| [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md) | Purchase requests prove the extensibility milestone | **Agreed** |

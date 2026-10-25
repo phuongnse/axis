@@ -63,10 +63,12 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   digits and `-`, starting with a letter), a SemVer `version`, a `label` and an
   optional `packages`. `packages` has the same shape as in `application.json`,
   see [Extension packages](extension-packages.md#declaring-packages-in-an-application). A module has no dependencies
-  on other modules.
+  on other modules. _(planned for M17)_ It gets `roles` and `modules`, see
+  [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
   `form`, `event`, `text` and `seed`. Processes, pages, roles and policies are
-  not allowed.
+  not allowed. _(planned for M17)_ `process`, `page` and `policy` are allowed
+  too. Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
   read them. The scenario runner gets a `--modules` option for the folder.
@@ -185,6 +187,77 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 | `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
 | `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
+
+### Processes, pages, policies and dependencies
+
+_(planned for M17)_ A module can ship a working feature with its screens and
+permissions, and build on other modules, as
+[D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
+agrees. It replaces the two limits above: the kinds a module may hold, and no
+dependencies.
+
+```json
+{
+  "kind": "module",
+  "id": "department-budgets",
+  "version": "1.0.0",
+  "label": "Department budgets",
+  "roles": [{ "name": "approver", "label": { "textKey": "department-budgets.roles.approver" } }],
+  "modules": [{ "id": "departments", "version": "^1.1.0", "roles": { "manager": "approver" } }]
+}
+```
+
+`department-budgets` is the sample module that the purchase request sample
+declares, as
+[D94](../decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
+agrees. An application that declares it maps the slot to one of its own roles:
+
+```json
+"modules": [
+  { "id": "departments", "version": "^1.1.0", "roles": { "manager": "Manager" } },
+  { "id": "department-budgets", "version": "^1.0.0", "roles": { "approver": "Manager" } }
+]
+```
+
+- **Kinds.** A module may also hold `process`, `page` and `policy`. It still
+  holds no `role`, `site`, `connector`, `endpoint`, `trigger` or `webhook`.
+- **Role slots.** `roles` in `module.json` lists the module's role slots, each
+  with a `name` and a `label`. Module policies and the assignees of module
+  tasks name a slot. Naming anything else is a new diagnostic.
+- **Mapping slots.** Each `modules` entry of an application has `roles`, which
+  maps every slot of that module to a role the application declares. A slot
+  left unmapped, or mapped to an undeclared role, is a new diagnostic. After
+  the mapping, a user who holds the role holds the slot.
+- **Module policies.** A module policy grants only on resources of its own
+  module.
+- **Pages.** A module page is named `<module id>/<name>`. Its widgets name
+  resources of its own module. A module holds no site, so the application's
+  site navigation lists a module page by that name, such as
+  `{ "page": "departments/Departments" }`.
+- **Processes.** A module process works on an entity of its own module. Its
+  steps name resources of its own module, and call operations of the module's
+  `packages`. It has no `callConnector` step. The application starts it from
+  a trigger, a `startProcess` action or a sub-process step, by the name
+  `<module id>/<name>`. It is pinned with the rest of the release.
+- **Dependencies.** `module.json` gets `modules`, with the shape of an
+  application's `modules` entries. A module names resources and calls rules
+  only of the modules it declares, as `<module id>/<name>` and
+  `<module id>:<rule>(…)`. Its entry for a module it depends on maps that
+  module's slots to its own slots.
+- **Resolving the graph.** The application resolves every module it declares
+  and every module they declare, flat. Each module id gets one version: the
+  highest installed version that meets every range that asks for it. No such
+  version is a new diagnostic that names every module that asks. A cycle
+  between modules is a new diagnostic.
+- **One copy each.** Each module gets one copy per application, with ids
+  derived from the application. A module that two others depend on is copied
+  once.
+- **What the application names.** The application names resources only of the
+  modules it declares itself, not of the modules they depend on.
+- **Studio.** Studio shows a module's processes, pages and policies read-only,
+  as it shows module entities, and never edits a module.
+- **Upgrades.** A module upgrade must still be additive for its entities
+  (`AXC0213`). Adding a process, page or policy is additive.
 
 ## Application templates
 

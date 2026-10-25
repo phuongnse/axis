@@ -26,6 +26,10 @@ confirmed these points on issue #571 on 2026-10-18.
     they would need application roles and sites to be known inside the module.
     Any other kind in a module is a diagnostic.
   - A module does not depend on other modules.
+  - [D89](d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
+    replaces these two points in M17: a module may hold processes, pages and
+    policies, uses role slots instead of roles, and may depend on other
+    modules.
 - **Installation and pinning:**
   - Modules are installed per installation under
     `Modules:Path/<id>/<version>/`, as packages are. The server, the worker and

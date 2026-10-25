@@ -1,7 +1,7 @@
 # Connectors, events and endpoints
 
 Detailed reference for the resources that connect an application to other systems: connectors
-and deployment bindings, events and triggers, and inbound endpoints. How a process calls a
+and deployment bindings, events and triggers, inbound endpoints and outbound webhooks. How a process calls a
 connector is in [process-execution.md](process-execution.md#connector-calls), how it raises an
 event is in [process-events.md](process-events.md), and how a caller calls an endpoint is in
 [inbound-endpoints.md](inbound-endpoints.md).
@@ -31,6 +31,8 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
 - **No binding resource.** No resource kind declares bindings. A connector
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
+  _(planned for M17)_ An `oauth2` auth's `tokenUrl` needs a `url` binding, and
+  a [webhook](#webhook-resource) names a `url` and a `secret` binding.
   A package operation names them in the `capabilities` of its manifest:
   `urls` need `url` bindings and `secrets` need `secret` bindings.
 - **Where values live.** Under `Tenancy:Source=configuration`, each tenant holds its values in
@@ -158,7 +160,8 @@ The purchase request sample holds the purchasing system connector in
   - `none`, the same as no `auth`;
   - `bearer`, with `token`, a `secret` binding sent as
     `Authorization: Bearer <value>`;
-  - `header`, with `name`, the header name, and `value`, a `secret` binding.
+  - `header`, with `name`, the header name, and `value`, a `secret` binding;
+  - `oauth2` _(planned for M17)_, see [OAuth2 auth](#oauth2-auth).
 - `timeout` is an ISO 8601 duration. It defaults to `PT30S` and is at most
   `PT2M`.
 - `idempotency` names the request header that carries the idempotency key.
@@ -166,13 +169,17 @@ The purchase request sample holds the purchasing system connector in
 - `operations` lists the named operations.
   - `method` is `GET`, `POST`, `PUT`, `PATCH` or `DELETE`.
   - `path` is a path template. `{idempotencyKey}` is the only placeholder.
-    Other placeholders come later.
+    Other placeholders come later. _(planned for M17)_ A `{name}` placeholder
+    names a `path` input, see [Structured payloads](#structured-payloads).
   - `input` fields are sent as a JSON body. A `GET` sends no body, so a `GET`
-    with `input` fields is a schema error.
+    with `input` fields is a schema error. _(planned for M17)_ An input's `in`
+    may send it in the path, the query or a header instead, and a `GET` may
+    have those.
   - `output` fields are read from the JSON response.
   - Input and output field types are the
     [rule parameter types](resource-files.md#resource-file-shape): `text`, `integer`,
-    `decimal`, `boolean`, `date` and `date-time`.
+    `decimal`, `boolean`, `date` and `date-time`. _(planned for M17)_ Inputs
+    may also be `object` and `list`.
 - `lookup` is optional and set per operation. It names another operation of
   the same connector that finds an earlier call by its idempotency key.
   - The lookup is a `GET` whose `path` holds `{idempotencyKey}`.
@@ -191,6 +198,89 @@ writes after the purchase order is created, so the form shows it read-only too.
 Development,
 Docker Compose, `scripts/dev.sh` and the E2E run point them at the
 [purchasing system stub](../architecture.md#purchasing-system-stub).
+
+### OAuth2 auth
+
+_(planned for M17)_ A connector can get its access token from an OAuth2
+authorization server through the client credentials grant, as
+[D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
+
+```json
+"auth": {
+  "type": "oauth2",
+  "tokenUrl": { "binding": "WarehouseTokenUrl" },
+  "clientId": { "binding": "WarehouseClientId" },
+  "clientSecret": { "binding": "WarehouseClientSecret" },
+  "scope": "orders.write"
+}
+```
+
+- `tokenUrl` is a `url` binding. `clientId` and `clientSecret` are `secret`
+  bindings. `scope` and `audience` are optional strings.
+- The worker requests a token with `grant_type=client_credentials`, sending
+  the client id and secret with HTTP Basic authentication, and sends the token
+  as `Authorization: Bearer <token>`.
+- The token stays in the worker's memory, for each tenant and connector, until
+  a minute before its `expires_in`. It is never stored, logged or shown, and
+  each worker replica gets its own.
+- A `401` from the system drops the token. The worker gets a new one and sends
+  the request once more in the same attempt, with the same idempotency key. A
+  second `401` fails the attempt as any `4xx` does.
+- A failed token request, for any reason, is a retryable attempt, and the
+  operation is not sent. History records the token endpoint's status code,
+  never its body.
+- The token URL follows the connector rules: `https` outside Development, and
+  no redirects.
+- `clientAuth: "privateKeyJwt"`, with the private key in a `secret` binding,
+  comes after M16 and reuses the signing code of M16's FAPI 2.0 profile.
+  Changing the binding rotates the key without a new release.
+- Grants that act for a user, such as the authorization code grant, are not
+  offered.
+
+### Structured payloads
+
+_(planned for M17)_ Inputs can go outside the body and nest, and outputs can
+come from deep in the response, as
+[D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
+Bodies stay JSON.
+
+```json
+{
+  "name": "createShipment",
+  "method": "POST",
+  "path": "/warehouses/{warehouse}/shipments",
+  "input": [
+    { "name": "warehouse", "type": "text", "in": "path", "required": true },
+    { "name": "dryRun", "type": "boolean", "in": "query" },
+    {
+      "name": "lines",
+      "type": "list",
+      "fields": [
+        { "name": "sku", "type": "text", "required": true },
+        { "name": "quantity", "type": "integer", "required": true }
+      ]
+    }
+  ],
+  "output": [{ "name": "trackingNumber", "type": "text", "source": "/shipment/tracking/number" }]
+}
+```
+
+- **`in`.** `body`, the default, `path`, `query` or `header`. A `header`
+  input's name is the header name. Only scalar inputs may go outside the body.
+- **Path placeholders.** Each `{name}` in `path` names a `path` input, and each
+  `path` input appears in `path`. A `path` input is `required`. Its value is
+  escaped as one path segment.
+- **`GET`.** A `GET` may have `path`, `query` and `header` inputs, but no
+  `body` input.
+- **`object` and `list`.** An `object` input has nested `fields`. A `list`
+  input's items are objects with `fields`. Nesting goes four levels deep at
+  most. The step maps them as in
+  [Step shape](process-execution.md#step-shape).
+- **`source`.** An output field may name a JSON Pointer into the response
+  body. Without it, the output is read from the top-level property of its
+  name. Outputs stay scalar, because they write subject fields.
+- **Later.** Writing a list from the response into a child collection, and
+  bodies that are not JSON.
 
 ## Events and triggers
 
@@ -561,3 +651,85 @@ The compiler reports these as compile errors, all in one pass. The
   breaking it is `AXC0004`.
 - `wait` is a valid ISO 8601 duration, more than zero and at most `PT30S`:
   `AXC0124`. So `PT0S` is `AXC0124`.
+
+## Outbound webhooks
+
+_(planned for M17)_ A webhook tells another system that an event happened, as
+[D92](../decisions/d92-outbound-webhooks.md) agrees. The author configures it
+in the application, so it is part of the release. There is no API through
+which another system subscribes itself.
+
+### Webhook resource
+
+A webhook that tells a chat system when a note is closed, in
+`webhooks/note-closed-chat.json`:
+
+```json
+{
+  "id": "5b0f3c1e-8a52-4d0e-9a57-0c1f7e2d6b44",
+  "kind": "webhook",
+  "name": "NoteClosedChat",
+  "formatVersion": 1,
+  "event": "NoteClosed",
+  "url": { "binding": "ChatWebhookUrl" },
+  "secret": { "binding": "ChatWebhookSecret" },
+  "timeout": "PT10S"
+}
+```
+
+- `event` names an event of the application, or `<module id>/<name>` of a
+  module the application declares. Only events raise webhooks. A record change
+  raises one when a process raises an event for it.
+- `url` is a `url` binding and `secret` is a `secret` binding, checked at
+  activation as a connector's are. On a
+  [preview tenant](host-settings.md#preview-tenants) a missing binding is a
+  warning, and the delivery fails at run time.
+- `timeout` is an ISO 8601 duration. It defaults to `PT10S` and is at most
+  `PT30S`.
+- An unknown event, a missing binding name and a timeout out of range are each
+  a new diagnostic.
+- An event that has a webhook may not carry a value read from a field marked
+  `sensitive`. A [raise event step](process-events.md#raise-event-step) that
+  maps one into its payload is a new diagnostic.
+- A module holds no webhook.
+
+### Webhook delivery
+
+- **Staged with the event.** Raising the event stages one delivery for each
+  webhook of the event, in the same transaction. The worker sends it later,
+  outside any transaction.
+- **Body.** A `POST` with a JSON body:
+
+  ```json
+  {
+    "type": "NoteClosed",
+    "id": "0d6f…",
+    "timestamp": "2026-11-02T09:15:00Z",
+    "data": { "entity": "Note", "subjectId": "8c1e…", "fields": { "priority": 2, "amount": 120.5 } }
+  }
+  ```
+
+  `id` is the event occurrence id. `fields` holds the event's payload fields.
+- **Headers.** The Standard Webhooks headers:
+  - `webhook-id`, built from the occurrence id and the webhook id, the same on
+    every attempt, so a receiver can drop duplicates;
+  - `webhook-timestamp`, the attempt's time in Unix seconds;
+  - `webhook-signature`, `v1,` and the base64 HMAC-SHA256 of
+    `<webhook-id>.<webhook-timestamp>.<body>` with the secret.
+- **Two secrets.** The `secret` binding may hold two secrets, separated by a
+  space. Each request then carries both signatures, separated by a space, so a
+  receiver can move to the new secret before the old one is removed.
+- **Outcomes.** A `2xx` delivers. Anything else, a timeout or a network error
+  is retried with backoff, up to the event delivery limit that M14 adds, and
+  then becomes a dead letter that an operator redelivers or discards.
+- **Rules of a connector call.** `https` only outside Development, and no
+  redirects: a `3xx` fails the attempt.
+- **At least once.** A delivery can arrive more than once, and deliveries
+  arrive in no fixed order.
+- **Audit.** Each delivered request writes an audit record
+  `webhook.delivered`, with actor `system`, the webhook, the event occurrence
+  and the status code. No body is stored after delivery, and none appears in
+  history, audit records or logs.
+- **Seen in the console.** The
+  [operator console](operator-console.md#views) lists recent deliveries and
+  dead letters.

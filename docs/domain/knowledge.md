@@ -242,8 +242,9 @@ and upgrades all break at those points.
   - file upload
   - read-only summaries
 - **Custom widgets later.** Custom widgets come later as packaged React
-  components (D8). Each one is reviewed as a sign of a missing standard
-  capability.
+  components (D8), planned for M17
+  ([D88](../decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md)).
+  Each one is reviewed as a sign of a missing standard capability.
 - **Display is formatting only.** The UI formats a value for the locale and
   never changes it. What the API returned is what is shown and what is sent
   back.
