@@ -1,10 +1,14 @@
 using System.Net;
+using Axis.Administration;
 using Axis.Server.Tenancy;
 using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
@@ -15,6 +19,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
 {
     private const string PermissionDenied = "42501";
     private const string UniqueViolation = "23505";
+    private const string RestrictViolation = "23001";
 
     [Theory]
     [InlineData(true)]
@@ -27,7 +32,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             platform,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'platform' ORDER BY table_name");
 
-        Assert.Equal(["__platform_migrations", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenants"], tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenants"], tables);
     }
 
     [Theory]
@@ -65,6 +70,73 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
                 WHERE n.nspname = 'platform' AND c.relkind IN ('r', 'p') AND c.relname <> 'data_protection_keys'
                 AND has_table_privilege('{readerRole}', c.oid, 'INSERT,UPDATE,DELETE,TRUNCATE')
                 """));
+    }
+
+    [Fact]
+    public async Task Platform_audit_records_cannot_be_updated_deleted_or_truncated_even_by_the_owner()
+    {
+        var platform = await StartServerAsync(directory: true);
+        await ExecuteAsync(
+            platform,
+            $"INSERT INTO platform.audit_records (id, occurred_at, command, os_user, machine, changed) VALUES ('{Guid.NewGuid()}', now(), 'tenant binding set', 'u', 'm', ARRAY['x'])");
+
+        await AssertSqlStateAsync(platform, "UPDATE platform.audit_records SET command = 'x'", RestrictViolation);
+        await AssertSqlStateAsync(platform, "DELETE FROM platform.audit_records", RestrictViolation);
+        await AssertSqlStateAsync(platform, "TRUNCATE platform.audit_records", RestrictViolation);
+        Assert.Equal(1L, await ScalarAsync(platform, "SELECT count(*) FROM platform.audit_records"));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_platform_reader_role_cannot_read_platform_audit_records(bool directory)
+    {
+        var platform = await StartServerAsync(directory);
+
+        await AssertSqlStateAsync(
+            PostgreSqlServer.RuntimeConnectionString(platform),
+            "SELECT count(*) FROM platform.audit_records",
+            PermissionDenied);
+    }
+
+    [Fact]
+    public async Task The_audit_migration_revokes_the_rights_that_default_privileges_gave_the_reader()
+    {
+        var platform = await database.CreateDatabaseAsync("platform", TestContext.Current.CancellationToken);
+        var readerRole = new NpgsqlConnectionStringBuilder(PostgreSqlServer.RuntimeConnectionString(platform)).Username!;
+        await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options);
+        await context.GetService<IMigrator>().MigrateAsync("20261020024803_AddDataProtectionKeys", TestContext.Current.CancellationToken);
+        // What the grant step set on an installation from before the audit table: SELECT on every new table.
+        await ExecuteAsync(platform, $"ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT SELECT ON TABLES TO \"{readerRole}\"");
+
+        await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            false,
+            await ScalarAsync(
+                platform,
+                $"SELECT has_table_privilege('{readerRole}', 'platform.audit_records', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')"));
+    }
+
+    [Fact]
+    public async Task Writing_a_platform_audit_record_stores_the_command_tenant_user_machine_and_changed_names()
+    {
+        var platform = await StartServerAsync(directory: true);
+        await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options);
+
+        await PlatformAuditRecords.WriteAsync(context, "tenant binding set", "one", ["PurchasingUrl"], TestContext.Current.CancellationToken);
+
+        await using var connection = new NpgsqlConnection(platform);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand("SELECT command, tenant_id, os_user, machine, changed FROM platform.audit_records", connection);
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        Assert.True(await reader.ReadAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("tenant binding set", reader.GetString(0));
+        Assert.Equal("one", reader.GetString(1));
+        Assert.Equal(Environment.UserName, reader.GetString(2));
+        Assert.Equal(Environment.MachineName, reader.GetString(3));
+        Assert.Equal(["PurchasingUrl"], reader.GetFieldValue<string[]>(4));
+        Assert.False(await reader.ReadAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -134,7 +206,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             }));
         using var client = factory.CreateClient();
 
-        Assert.Equal(["__platform_migrations", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenants"], probe.Tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenants"], probe.Tables);
     }
 
     private async Task<string> StartServerAsync(bool directory)
