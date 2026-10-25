@@ -4,8 +4,8 @@ Status: **Agreed**
 
 An author tries an application on a **preview tenant** before publishing it to
 the real tenant. A preview tenant belongs to one main tenant and keeps its own
-data, database roles, hosts and bindings. It was built in M10, with one exception:
-refusing to restore a preview tenant's archive is planned for M16. See [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
+data, database roles, hosts and bindings. It was built in M10, and
+[tenant restore](../reference/administration.md#tenant-restore) refuses a preview tenant's archive. See [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
 for M10, [preview tenants](../architecture.md#preview-tenants) for how the hosts
 treat one, [preview](../reference/authoring.md#preview) for the route,
 [tenant create](../reference/administration.md#tenant-create) for the command and

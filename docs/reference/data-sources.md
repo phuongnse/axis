@@ -101,8 +101,8 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 - **`parameters`.** Typed inputs of the filter. A parameter has a `name`, a
   `type` and `required`, which defaults to `false`. The types are the scalar
   field types plus `enum` and `reference`. An `enum` needs `values`, and a
-  `reference` needs `target`. They are checked by the same rules as entity
-  fields, see
+  `reference` needs `target`. An `enum` may also take `valueLabels`. They are
+  checked by the same rules as entity fields, see
   [Entity field types and constraints](resource-files.md#entity-field-types-and-constraints).
 - **Parameter `label`.** Optional, with the `{ "textKey" }` shape of a field
   label. A table shows it on the parameter's filter input.
@@ -219,6 +219,9 @@ see the Data sources bullet of the Resolve step in
   does not take, `AXC0014` for an `enum` without `values` or a `reference`
   without `target`, `AXC0012` for an unknown target, `AXC0040` for a child
   entity target and `AXC0030` for a target without a display field.
+- A parameter's `valueLabels` follow the entity field rules: a missing or
+  unknown value is `AXC0242` and a text key that no locale has is `AXC0028`,
+  at `/parameters/{i}/valueLabels/...`.
 - A parameter label's text key is in some locale (`AXC0028`), as for field
   labels. See the Labels bullet of the Resolve step in
   [configuration.md](configuration.md).
@@ -253,7 +256,7 @@ see the Data sources bullet of the Resolve step in
   does not end at a `reference`, or a measure, instead of a projected field
   (`AXC0045`).
 - `sort` and a `groupBy` entry cannot name a projected `file` field
-  _(planned for M15)_ (`AXC0244`, at `/sort` or `/aggregate/groupBy/{i}`).
+  _(planned for M15)_ (`AXC0245`, at `/sort` or `/aggregate/groupBy/{i}`).
 
 ## Endpoint
 

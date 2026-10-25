@@ -33,6 +33,8 @@ public sealed record FieldDefinition
 
     public IReadOnlyList<string>? Values { get; init; }
 
+    public IReadOnlyDictionary<string, TextReference>? ValueLabels { get; init; }
+
     /// <summary>The expression of a computed field, or null for a field that clients write.</summary>
     public string? Expression { get; init; }
 
@@ -41,6 +43,9 @@ public sealed record FieldDefinition
 
     /// <summary>Whether the server sets the field to the id of the user who creates the record, or null when not declared.</summary>
     public bool? Creator { get; init; }
+
+    /// <summary>The expression that gives the field its value on create when the body leaves it out, or null when it has none.</summary>
+    public string? Default { get; init; }
 
     /// <summary>Whether the field's value is kept out of process inspection, or null when not declared.</summary>
     public bool? Sensitive { get; init; }

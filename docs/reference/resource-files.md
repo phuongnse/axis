@@ -257,7 +257,7 @@ A `seed` holds records with fixed ids for one entity:
 - `values` has the shape of the `values` of a record API create body (see
   [Request bodies and values](record-api.md#request-bodies-and-values)).
   A seed cannot set a `file` field, in a record or in a child row
-  _(planned for M15)_ (`AXC0244`).
+  _(planned for M15)_ (`AXC0245`).
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
@@ -483,9 +483,9 @@ new check is a new compile diagnostic.
 - **`file`.** One file, with optional `maxSize` and `accept`. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. See
   [file fields](file-fields.md). The compiler reports a `maxSize` below 1 or
-  above the file size limit (`AXC0242`), an `accept` entry that is not
-  `type/subtype` or `type/*` (`AXC0243`), and `unique` on the field
-  (`AXC0244`). `maxSize` or `accept` on another type, and `expression` on a
+  above the file size limit (`AXC0243`), an `accept` entry that is not
+  `type/subtype` or `type/*` (`AXC0244`), and `unique` on the field
+  (`AXC0245`). `maxSize` or `accept` on another type, and `expression` on a
   `file`, are `AXC0013`. In an expression a file allows only `is null` and
   `is not null`.
 - **`money`.** An amount, with `precision` (default 18) and `scale`, and
@@ -498,13 +498,24 @@ new check is a new compile diagnostic.
   expression type is `list<Target>`.
 - **`valueLabels`.** On an `enum` field, a map from every value to a
   `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
-  "priority.low" } }`. It covers every value, and its keys join `AXC0028`.
+  "priority.low" } }`. It covers every value, and its keys join `AXC0028`. An
+  enum parameter of a data source takes it too. A value that has no label, or a
+  label for a value that `values` does not have, is `AXC0242`, at
+  `/fields/{i}/valueLabels` or `/fields/{i}/valueLabels/{value}`. Values are
+  compared exactly, by letter case too. On a field of another type it is
+  `AXC0013`. The compile checks are built. Showing the labels on pages is
+  planned for M15.
 - **`default`.** An expression with no record in scope: literals, rule calls
   and `now()`. Its type must fit the field. It is not allowed with
   `expression`, `sequence` or `creator`, or on `reference`, `file`,
-  `references` and `child-collection` fields. The record command applies it
-  on create when the body leaves the field out, see
-  [create, update and delete](record-api.md#create-update-and-delete).
+  `references` and `child-collection` fields. The compiler checks it now. A
+  forbidden combination is `AXC0013` at `/fields/{i}/default`, and an
+  expression problem reports its own code at the same path. The compiled field
+  carries the checked default. The record command will apply it on create when
+  the body leaves the field out, see
+  [create, update and delete](record-api.md#create-update-and-delete). That is
+  still planned, so a default is not applied yet. `file` and `references` are
+  refused when those types arrive.
 - **`min` and `max`.** On `integer`, `decimal`, `money`, `date` and
   `date-time` fields, a literal of the field's type, with `min` at most `max`.
   **`minLength`** on `text`, at most `maxLength`. A value outside is a `400`

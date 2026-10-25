@@ -7,7 +7,8 @@ namespace Axis.Configuration.Model;
 /// <see cref="MaxLength"/> for text, <see cref="Precision"/> and <see cref="Scale"/> for decimal,
 /// <see cref="Values"/> for enum, <see cref="Target"/> for reference and child collection,
 /// <see cref="TargetDisplayField"/> for reference, <see cref="MaxSize"/> and <see cref="Accept"/>
-/// for file, and <see cref="Sequence"/> and <see cref="Creator"/> for text.
+/// for file, <see cref="Sequence"/> and <see cref="Creator"/> for text, and <see cref="Default"/>
+/// for text, integer, decimal, boolean, date, date-time and enum.
 /// </summary>
 public sealed record FieldModel
 {
@@ -35,6 +36,9 @@ public sealed record FieldModel
 
     public IReadOnlyList<string>? Values { get; init; }
 
+    /// <summary>The text key of each enum value, or null when the field declares no labels.</summary>
+    public IReadOnlyDictionary<string, TextReference>? ValueLabels { get; init; }
+
     public EntityReference? Target { get; init; }
 
     /// <summary>The declared name of the target entity's display field, set only for reference fields.</summary>
@@ -54,6 +58,9 @@ public sealed record FieldModel
     /// Clients cannot set it.
     /// </summary>
     public bool Creator { get; init; }
+
+    /// <summary>The checked default, applied on create when the body leaves the field out, or null.</summary>
+    public ExpressionModel? Default { get; init; }
 
     /// <summary>
     /// Whether the field's value never appears in process inspection. The record API ignores it, and

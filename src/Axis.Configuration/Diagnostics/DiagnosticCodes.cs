@@ -230,7 +230,8 @@ public static class DiagnosticCodes
     public const string InvalidDetailRecord = "AXC0239";
     public const string ChartDataSourceNotGrouped = "AXC0240";
     public const string InvalidChartMeasure = "AXC0241";
-    public const string InvalidFileMaxSize = "AXC0242";
-    public const string InvalidFileAccept = "AXC0243";
-    public const string FileFieldNotAllowed = "AXC0244";
+    public const string InvalidValueLabels = "AXC0242";
+    public const string InvalidFileMaxSize = "AXC0243";
+    public const string InvalidFileAccept = "AXC0244";
+    public const string FileFieldNotAllowed = "AXC0245";
 }

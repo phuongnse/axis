@@ -102,6 +102,7 @@ export function serverEnv(baseURL: string): Record<string, string> {
     Tenants__default__Oidc__ClientSecret: 'axis-development-secret',
     // Endpoint calls need a token for this audience, as in appsettings.Development.json.
     Tenants__default__Oidc__EndpointAudience: 'axis-endpoints',
+    Tenants__default__Oidc__ServiceAudience: 'axis-services',
     // The purchase request sample activates only with its purchasing system bindings. The stub
     // ignores the token. The worker gets the same bindings from scripts/e2e.sh.
     Tenants__default__Bindings__PurchasingSystemUrl__Kind: 'url',
@@ -149,6 +150,7 @@ export function journeyServerEnv(): Record<string, string> {
     Tenants__journey__Oidc__ClientId: 'axis',
     Tenants__journey__Oidc__ClientSecret: 'axis-development-secret',
     Tenants__journey__Oidc__EndpointAudience: 'axis-endpoints',
+    Tenants__journey__Oidc__ServiceAudience: 'axis-services',
     Extensions__Path: extensionsPath,
     Modules__Path: modulesPath,
     Templates__Path: templatesPath,
