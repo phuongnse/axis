@@ -333,7 +333,9 @@ flowchart LR
      `/entity`, and its conditions are not checked. A name whose entity file
      was not loaded because of its own errors is not reported again. An
      `entity` that is a child entity is `AXC0068` at `/entity`, naming the
-     owner. Step names are unique ignoring letter case: a later step with a
+     owner. A process has `entity` or `parameters`, not both and not neither
+     (`AXC0242`). Without an `entity` it is checked over its `parameters`, see
+     [Compile checks](processes.md#compile-checks). Step names are unique ignoring letter case: a later step with a
      name already used is `AXC0069` at `/steps/{i}/name`, naming the first
      step. `start`, each branch `next`, each `otherwise`, each operation
      `next` and each task outcome `next` must name a step, ignoring letter

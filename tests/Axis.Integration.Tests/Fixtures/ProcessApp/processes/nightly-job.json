@@ -1,0 +1,12 @@
+{
+  "id": "2f6b9c0e-4d1a-4e57-8b3c-5a7d9e1f3b24",
+  "kind": "process",
+  "name": "NightlyJob",
+  "formatVersion": 1,
+  "parameters": [{ "name": "days", "type": "integer" }],
+  "start": "check",
+  "steps": [
+    { "name": "check", "type": "decision", "branches": [{ "when": "days > 30", "next": "done" }], "otherwise": "done" },
+    { "name": "done", "type": "end" }
+  ]
+}

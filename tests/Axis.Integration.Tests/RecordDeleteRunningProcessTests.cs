@@ -75,7 +75,7 @@ public sealed class RecordDeleteRunningProcessTests(ProcessStartFixture fixture)
     {
         var subject = await fixture.InsertRequestAsync(status: null);
         Assert.True(fixture.Model.TryGetProcess("Submit", out var process));
-        Assert.True(fixture.Model.TryGetEntity(process.Entity.Name, out var entity));
+        Assert.True(fixture.Model.TryGetEntity(process.Entity!.Name, out var entity));
         using var client = fixture.CreateClient().SignedInAs("olga");
 
         // A start in its uncommitted transaction: the start lock, the subject's row lock and the instance.

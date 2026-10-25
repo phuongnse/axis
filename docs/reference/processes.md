@@ -206,6 +206,11 @@ a payment reference from the sample extension package, see
 ```
 
 - `entity` names the subject entity. Each instance runs for one record of it.
+  It is optional. A process without it declares `parameters` instead, a list
+  of `{ "name", "type" }` with the scalar types of rule parameters: `text`,
+  `integer`, `decimal`, `boolean`, `date` and `date-time`. It has no subject
+  record. See [Processes without a
+  subject](process-flow.md#processes-without-a-subject).
 - `startCondition` is optional. Its `expression` is a boolean expression over
   the subject record. A start is allowed only when it is true. A `false`, a
   `null` or a run-time error fails the start. Its `message` is a label, shown
@@ -280,6 +285,15 @@ reported in one pass. See
 
 - `entity` names a loaded entity (`AXC0067`) that is not a child entity
   (`AXC0068`).
+- A process has `entity` or `parameters`, not both and not neither
+  (`AXC0242`). Parameter names are unique, ignoring letter case (`AXC0243`).
+  A process without a subject has no `task`, `updateRecord` or `raiseEvent`
+  step and no `output` on a connector or package step (`AXC0244`). Its start
+  condition and each `when` see its parameters and the named rules, and no
+  field, path or `id`. A trigger that names such a process is `AXC0245`. The
+  start endpoint answers `400` for it until starting these processes is built,
+  see [Processes without a
+  subject](process-flow.md#processes-without-a-subject).
 - Step names are unique within the process, ignoring letter case
   (`AXC0069`).
 - `start`, every branch `next`, `otherwise`, the `next` of an operation and

@@ -12,7 +12,8 @@ namespace Axis.Configuration.Compilation;
 /// is a collection an aggregate can name. Its item scope holds the child's fields, computed ones
 /// included, with no rules and no collections. The named <c>rules</c> are callable only where they
 /// are given, which for now is the top level of a validation, a data source filter, a process
-/// condition and a policy filter. A policy filter uses a data source scope with no parameters. An
+/// condition and a policy filter. A process without a subject has a scope of its parameters and the
+/// named rules only. A policy filter uses a data source scope with no parameters. An
 /// endpoint's mapping scope holds only the endpoint's input fields, typed as parameters. An event
 /// trigger's <c>when</c> scope holds only the event's scalar payload fields. A migration value's scope holds only the record's own fields. A
 /// data source scope adds the data source's parameters after the fields, has the named
@@ -145,6 +146,21 @@ public static class ExpressionScopes
             ReferenceFieldsOf(findEntity),
             modules);
     }
+
+    /// <summary>
+    /// The scope of a process without a subject: its parameters by name and the named
+    /// <paramref name="rules"/>. The scope has no collections, no <c>id</c> and resolves no paths.
+    /// </summary>
+    internal static ExpressionScope ForProcessParameters(
+        IEnumerable<ProcessParameterDefinition> parameters,
+        IEnumerable<ExpressionRule> rules,
+        IEnumerable<string>? modules = null) =>
+        Build(
+            parameters.Select(parameter => (parameter.Name, (ExpressionType?)TypeOf(parameter.Type))),
+            rules,
+            collections: null,
+            referenceFields: null,
+            modules);
 
     /// <summary>
     /// The scope of an endpoint's mapping expression: the input fields only, typed as data source

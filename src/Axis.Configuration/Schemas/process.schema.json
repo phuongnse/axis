@@ -3,13 +3,17 @@
   "title": "Axis process",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "kind", "name", "formatVersion", "entity", "start", "steps"],
+  "required": ["id", "kind", "name", "formatVersion", "start", "steps"],
   "properties": {
     "id": { "$ref": "#/$defs/id" },
     "kind": { "const": "process" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
     "entity": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "entity" },
+    "parameters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/parameter" }
+    },
     "startCondition": { "$ref": "#/$defs/startCondition" },
     "start": { "$ref": "#/$defs/name" },
     "steps": {
@@ -33,6 +37,18 @@
       "type": "string",
       "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$",
       "maxLength": 121
+    },
+    "type": {
+      "enum": ["text", "integer", "decimal", "boolean", "date", "date-time"]
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "type": { "$ref": "#/$defs/type" }
+      }
     },
     "stepOperation": {
       "type": "string",
