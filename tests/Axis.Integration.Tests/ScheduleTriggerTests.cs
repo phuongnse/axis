@@ -183,9 +183,9 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         var record = await tenant.InsertRequestAsync(2000m, 1);
         var stored = await MoveBackThreeHoursAsync(tenant);
 
-        await ScheduleTriggerFixture.RunUntilIdleAsync("e", fixture.NewWorker(), CancellationToken);
+        var (before, after) = await RunUntilIdleBetweenAsync("e", tenant, fixture.NewWorker());
 
-        await AssertOnlyTheLatestHourlyOccurrenceRanAsync(tenant, record, stored);
+        await AssertOnlyTheLatestHourlyOccurrenceRanAsync(tenant, record, stored, before, after);
     }
 
     [Fact]
@@ -244,9 +244,9 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         Assert.Equal(stored, item.DueAt);
         Assert.Null(state.LastOccurrenceAt);
 
-        await ScheduleTriggerFixture.RunUntilIdleAsync("g", fixture.NewWorker(), CancellationToken);
+        var (before, after) = await RunUntilIdleBetweenAsync("g", tenant, fixture.NewWorker());
 
-        await AssertOnlyTheLatestHourlyOccurrenceRanAsync(tenant, record, stored);
+        await AssertOnlyTheLatestHourlyOccurrenceRanAsync(tenant, record, stored, before, after);
     }
 
     [Fact]
@@ -525,25 +525,44 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     private static async Task<DateTimeOffset> MoveBackThreeHoursAsync(ProcessStepFixture tenant)
     {
         await AwayFromTheEndOfTheHourAsync(tenant);
-        await tenant.ScalarAsync("UPDATE axis.trigger_schedules SET next_occurrence_at = date_trunc('hour', now()) - interval '2 hours'");
-        await tenant.ScalarAsync(
-            "UPDATE axis.process_work_items SET due_at = date_trunc('hour', now()) - interval '2 hours' WHERE kind = @kind",
-            ("kind", ProcessStarts.TriggerScheduleWorkItemKind));
+        var stored = new DateTimeOffset((DateTime)(await tenant.ScalarAsync("SELECT date_trunc('hour', now()) - interval '2 hours'"))!);
+        await DueAtAsync(tenant, stored);
         return Assert.Single(await tenant.TriggerSchedulesAsync()).NextOccurrenceAt;
     }
+
+    /// <summary>Runs the worker until it is idle and returns the database time just before and just after the run.</summary>
+    private static async Task<(DateTimeOffset Before, DateTimeOffset After)> RunUntilIdleBetweenAsync(string tenantId, ProcessStepFixture tenant, WorkItemRunner worker)
+    {
+        var before = await DatabaseNowAsync(tenant);
+        await ScheduleTriggerFixture.RunUntilIdleAsync(tenantId, worker, CancellationToken);
+        return (before, await DatabaseNowAsync(tenant));
+    }
+
+    private static async Task<DateTimeOffset> DatabaseNowAsync(ProcessStepFixture tenant) =>
+        new((DateTime)(await tenant.ScalarAsync("SELECT now()"))!);
+
+    private static DateTimeOffset HourStart(DateTimeOffset time) =>
+        new(time.UtcDateTime.Year, time.UtcDateTime.Month, time.UtcDateTime.Day, time.UtcDateTime.Hour, 0, 0, TimeSpan.Zero);
 
     /// <summary>
     /// Checks that the worker skipped the occurrences missed since <paramref name="stored"/> and ran
     /// the latest one once for <paramref name="record"/>, and that the next occurrence is an hour later.
-    /// The test waits away from the end of the hour first, so no further occurrence falls due before the checks.
+    /// The latest occurrence is compared with the hour starts of the database times read just before
+    /// (<paramref name="before"/>) and just after (<paramref name="after"/>) the worker ran, so the check
+    /// does not depend on when the hour turns.
     /// </summary>
-    private static async Task AssertOnlyTheLatestHourlyOccurrenceRanAsync(ProcessStepFixture tenant, Guid record, DateTimeOffset stored)
+    private static async Task AssertOnlyTheLatestHourlyOccurrenceRanAsync(
+        ProcessStepFixture tenant,
+        Guid record,
+        DateTimeOffset stored,
+        DateTimeOffset before,
+        DateTimeOffset after)
     {
         var state = Assert.Single(await tenant.TriggerSchedulesAsync());
         var item = Assert.Single(await tenant.ScheduleItemsAsync());
         var latest = state.LastOccurrenceAt ?? throw new InvalidOperationException("No occurrence ran.");
         Assert.True(latest >= stored.AddHours(2));
-        Assert.True((bool)(await tenant.ScalarAsync("SELECT @latest <= now() AND now() - @latest < interval '1 hour'", ("latest", latest)))!);
+        Assert.InRange(latest, HourStart(before), HourStart(after));
         Assert.Equal(latest.AddHours(1), state.NextOccurrenceAt);
         Assert.Equal(state.NextOccurrenceAt, item.DueAt);
 
