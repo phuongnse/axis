@@ -112,7 +112,8 @@ Dn refers to [decisions.md](../decisions.md).
     that the entity marks `required` has no `visibleWhen` box. A computed,
     sequence or creator field shows `readOnly` on and locked. A field also has
     a Remove field button below its conditions, described in the field palette
-    bullet. A section shows its title and `visibleWhen`. A step shows its title.
+    bullet. A section shows its name, title and `visibleWhen`. A step shows its
+    title.
     _Partly built:_ a click, Enter or Space selects a field or a section. A
     click on a step selects it and shows its sections. The selected element has
     `aria-current` and an outline in the primary colour. The panel asks the
@@ -121,7 +122,10 @@ Dn refers to [decisions.md](../decisions.md).
     panel reads the entity flags from the canvas's latest answer, so it shows
     nothing about a field until the form is drawn. A required field that
     already has a `visibleWhen` shows no box for it. Remove it in the Form or
-    JSON tab.
+    JSON tab. The section Name box applies on Enter or when it loses focus. It
+    renames the step entries that list the section in the same edit, so one
+    undo reverses it. It refuses an empty name and another section's name,
+    ignoring letter case, and a message under the box says why.
   - **Used on.** A list of the pages and process steps that use the form. It is
     the Used by list filtered to the `widget form` and `task form` relations,
     loads with the resource, and can be stale like the `usedBy` counts. An

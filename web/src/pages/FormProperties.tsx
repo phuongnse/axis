@@ -1,5 +1,6 @@
 import { Button, Checkbox, Flex, Input, Select, Typography } from 'antd'
-import { lazy, Suspense, useContext } from 'react'
+import { lazy, Suspense, useContext, useState } from 'react'
+import { renameSection } from '../platform/formLayout'
 import { getAt } from '../platform/jsonPatch'
 import type { FieldMetadata } from '../platform/site'
 import { StudioNamesContext } from '../platform/studioNames'
@@ -27,10 +28,10 @@ function isContent(value: unknown): value is Content {
 
 /**
  * The properties of the element that is selected on the form canvas, found by its JSON Pointer in the draft. A field
- * has `readOnly`, its three conditions and a Remove field button, a section its title, `visibleWhen` and, on a form with
- * steps, a Move to step picker, and a step its title. A field the entity marks required has no `visibleWhen` (AXC0226).
- * A computed, sequence or creator field is always read-only. A selection that finds no object in the draft shows a
- * hint, so no edit goes to a stale pointer.
+ * has `readOnly`, its three conditions and a Remove field button, a section its name, title, `visibleWhen` and, on a
+ * form with steps, a Move to step picker, and a step its title. A field the entity marks required has no
+ * `visibleWhen` (AXC0226). A computed, sequence or creator field is always read-only. A selection that finds no object
+ * in the draft shows a hint, so no edit goes to a stale pointer.
  */
 export function FormProperties({
   draft,
@@ -193,6 +194,13 @@ function SectionProperties({
   )
   return (
     <Flex vertical gap="small" data-testid="studio-design-section">
+      <SectionNameBox
+        key={`${pointer}:${typeof section.name === 'string' ? section.name : ''}`}
+        draft={draft}
+        pointer={pointer}
+        section={section}
+        onChange={onChange}
+      />
       <TitleEditor pointer={pointer} element={section} onChange={onChange} />
       {steps.length > 0 && name !== '' && (
         <div>
@@ -222,6 +230,61 @@ function SectionProperties({
       )}
       <ConditionBox draft={draft} pointer={pointer} element={section} condition="visibleWhen" onChange={onChange} />
     </Flex>
+  )
+}
+
+/**
+ * The name of a section. A rename applies on Enter and when the box loses focus, and renames the step entries in the
+ * same edit. A refused name stays in the box with its message. The key resets the box on a new selection or an undo.
+ */
+function SectionNameBox({
+  draft,
+  pointer,
+  section,
+  onChange,
+}: {
+  draft: Content
+  pointer: string
+  section: Content
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const [text, setText] = useState(typeof section.name === 'string' ? section.name : '')
+  const [refused, setRefused] = useState<'empty' | 'taken' | null>(null)
+  const commit = () => {
+    const result = renameSection(draft, Number(pointer.slice('/sections/'.length)), text)
+    if (result === undefined) {
+      setRefused(null)
+      return
+    }
+    if ('refused' in result) {
+      setRefused(result.refused)
+      return
+    }
+    setRefused(null)
+    onChange('/sections', result.sections)
+    if (result.steps !== undefined) {
+      onChange('/steps', result.steps)
+    }
+  }
+  return (
+    <div>
+      <div>{t('shell.studio.design.name')}</div>
+      <Input
+        aria-label={t('shell.studio.design.name')}
+        data-testid="studio-design-section-name"
+        status={refused === null ? undefined : 'error'}
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onPressEnter={commit}
+        onBlur={commit}
+      />
+      {refused !== null && (
+        <Typography.Text type="danger">
+          {t(refused === 'taken' ? 'shell.studio.design.nameTaken' : 'shell.studio.design.nameEmpty')}
+        </Typography.Text>
+      )}
+    </div>
   )
 }
 

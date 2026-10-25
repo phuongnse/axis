@@ -538,6 +538,32 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     });
   });
 
+  test("an author renames the ticket edit form's problem section, and the first step follows", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketEditId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    await page
+      .locator('[data-testid="studio-outline-section"][data-path="/sections/0"]')
+      .locator("> span")
+      .first()
+      .click();
+    const name = page.getByTestId("studio-design-section-name");
+    await name.fill("issue");
+    await name.press("Enter");
+
+    await page.getByRole("tab", { name: "JSON", exact: true }).click();
+    const json = page.getByRole("textbox", { name: "JSON", exact: true });
+    const draft = JSON.parse(await json.inputValue());
+    expect(draft.sections[0].name).toBe("issue");
+    expect(draft.steps[0].sections).toEqual(["issue"]);
+  });
+
   test("an author moves the triage form's status field to the second section with the keyboard, and the live region says where it landed", async ({
     page,
   }) => {
