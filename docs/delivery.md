@@ -1,321 +1,168 @@
 # Delivery workflow
 
-Axis is built through NexKit. NexKit runs one issue per agent session. Its
-autopilot moves each issue of the current milestone on by itself, from plan to
-merge. People can still post the four comment commands at any time:
-`/nexkit plan` and `/nexkit go` on an issue, and `/nexkit fix` and
-`/nexkit review` on its pull request.
+Axis is built through NexKit. NexKit runs one issue per agent session, and its
+autopilot moves issues on by itself, from plan to merge. How NexKit works, what
+each setting does, and what a person does where NexKit stops are in NexKit's
+own docs and skills, at the version that `.github/workflows/nexkit.yml` pins:
+[how it works][nexkit-how], [configuration][nexkit-config],
+[troubleshooting][nexkit-troubleshooting], and the [`request`][nexkit-request]
+and [`drive`][nexkit-drive] skills. This file holds only what is Axis's own:
+who decides what, the settings Axis chooses and why, its rules for issues and
+milestones, design changes, the docs, and writing on GitHub. It puts
+[D13](decisions/d13-delivery-workflow.md) into practice. Values that NexKit or
+the repository settings own, such as protected paths, required checks and the
+profiles' models, are not copied here. Look them up where they live.
 
-Three roles take part:
+## Who does what
 
-- **The owner** decides what only the owner can: **Proposed** design points,
-  questions that have no recommended answer, whether NexKit merges its own
-  pull requests, and when a milestone closes. NexKit mentions the owner when a
-  run needs a person.
-- **The local agent session** works for the owner. It writes issues and their
-  order, watches the work, reviews plans and merged pull requests, and steps
-  in where autopilot stops and a person is needed. It also publishes the
-  Design System artifact in Claude from the repository, as
-  [Design changes](#design-changes) describes. How it does each of these,
-  with the commands and checklists, is in its runbooks, the
-  [`axis-nexkit` skill](../.claude/skills/axis-nexkit/SKILL.md) and, for the
-  design system, the [`axis-design` skill](../.claude/skills/axis-design/SKILL.md).
+- **The owner** decides **Proposed** design points, questions that nothing in
+  the plan, the issue or the docs settles, whether NexKit merges its own pull
+  requests, and when a milestone closes. The owner merges hand-made pull
+  requests, with an admin bypass of the rules on `main` once the CI workflow
+  passes. NexKit mentions the owner when a run needs a person; the owner's
+  login is in NexKit's `notify` setting.
+- **The local agent session** works for the owner when the owner asks. It
+  writes issues and their order, breaks milestones down, proposes changes to
+  the NexKit settings as hand-made pull requests, and publishes the Design
+  System artifact in Claude from the repository, as
+  [Design changes](#design-changes) describes. Its runbooks are the
+  [`axis-nexkit` skill](../.claude/skills/axis-nexkit/SKILL.md) and the
+  [`axis-design` skill](../.claude/skills/axis-design/SKILL.md). It does not
+  review plans or merged pull requests: NexKit's review stage does.
+- **The hourly driver** is a Claude Code routine that follows NexKit's
+  [`drive` skill][nexkit-drive] with the
+  [`axis-nexkit-routine` skill](../.claude/skills/axis-nexkit-routine/SKILL.md).
+  It acts for the owner where NexKit stops for a person: the owner has
+  confirmed in advance every option that NexKit, the plan, the issue or the
+  docs recommend or support. It pushes the hand merges NexKit cannot push,
+  makes the hand-made changes that a plan puts in paths NexKit may not change
+  and opens their pull requests. It never approves or merges, and it hands the
+  owner only what the owner alone can decide.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit
   pipeline. They read [AGENTS.md](../AGENTS.md). They do not read or write
   Claude Design.
 
-The rules here put [D13](decisions/d13-delivery-workflow.md) into
-practice. Values that NexKit or the repository settings own, such as protected
-paths, required checks, the automatic fix limit and the profiles with their
-models, are not copied here. Look them up where they live.
-
 ## Decisions
 
-- **Autopilot moves the issues of the current milestone on.** With NexKit's
-  [`autopilot` setting][nexkit-autopilot] on, NexKit plans each ready issue of
-  the earliest open milestone, oldest first, and starts `/nexkit go` on a plan
-  that has no questions and is not too large. It splits a plan that is too
-  large into sub-issues and re-plans an issue that collaborators commented on
-  after its latest plan. It never starts the next milestone by itself: when
-  every issue of the milestone is closed, it waits until the owner closes the
-  milestone. Issues outside that milestone, or opened by someone without write
-  access, are never touched.
-- **Issues run in parallel unless one needs another.** An issue is ready when
-  no issue that blocks it, by GitHub's *blocked by* relationship, is open.
-  Autopilot reads no text such as "Depends on #12", and the order of
-  sub-issues does not count. So the creator of an issue marks it *blocked by*
-  another open issue when, and only when, one of these holds:
-  - Its acceptance criteria check behaviour that the other issue delivers, for
-    example each step of a journey and the step before it.
-  - It needs something new that the other issue adds: code, an API, a schema,
-    a test helper, or a lint rule that its checks will meet. When two open
-    issues need the same new thing, one builds it and the other waits for it,
-    so it is built once.
-  - It is the milestone's docs sweep, which waits for every other issue of the
-    milestone.
+These are the settings Axis chooses in `.nexkit/config.json` and on GitHub,
+with the reasons. What each one does is in NexKit's
+[configuration][nexkit-config].
 
-  Touching the same files, or a tidier order, is no reason to wait: NexKit
-  resolves conflicts with `main` by itself. Nor is adding a new case of
-  something that another issue covers in every case, such as a new kind of
-  edit while the other makes every edit undoable: that issue's test finds
-  every case, so whichever of the two merges last fails its checks until it
-  covers the new one. The reason: a mark that is not needed only slows the
-  milestone, while a missing one makes two issues build the same thing
-  without any conflict to show it. Each mark has its own line in the issue
-  text, `Depends on #N: <what this issue uses from #N>`. A reader can check
-  every mark against its line, and the local agent adds a mark that its line
-  names but GitHub lacks. A mark that no such line explains is not made. The
-  docs sweep's marks, and those autopilot makes when it splits a plan, need
-  no line. There is no limit on how many issues run at once: autopilot's
-  `max_parallel` is left unset.
-- **Autopilot answers a question that has a recommended option.** Plans, and
-  rounds that stop as `blocked`, give each question its options and the one
-  NexKit recommends. With `answer` set to `recommended`, autopilot answers when
-  every question has a recommendation, even one that rests on a **Proposed**
-  decision, and nobody is mentioned. The owner sees the answers on the issue
-  and can change one with a comment, before `/nexkit go`, or with
-  `/nexkit fix` on the pull request. Autopilot answers only once in a row:
-  when the plan or round its answers started asks again, and no person has
-  commented since, the issue waits for a person.
-- **People stay in charge.** A person's command, a plan's question without a
-  recommendation, a question asked again after autopilot answered it, a failed
-  run, a second time-out and a refused merge all stop autopilot on that issue
-  until a person acts. Other issues go on, and an issue that waits for a person
-  does not hold up the others. A run that stops on a transient error, such as
-  an overloaded API or a lost connection, before it published anything, runs
-  once more by itself; a second such stop waits for a person.
-- **NexKit merges a pull request once it passes, while `merge.auto` is on.**
-  With NexKit's [`merge.auto` setting][nexkit-auto-merge] on, NexKit
-  squash-merges a pull request as soon as every check passes and the AI review
-  approves. Then it closes the issue the pull request implements. The review
-  marks each acceptance criterion met, unmet or unverifiable. An unmet
-  criterion counts as changes requested. An approved pull request with an
-  unverifiable criterion, one that the diff, its tests and the check results
-  show neither way, never merges by itself: the owner confirms the criteria
-  that the review comment lists, then merges. A merge that GitHub refuses
-  because `main` moved meanwhile is tried again, one refused because the pull
-  request branch moved gets a new review on that branch, and one that waits
-  for required checks happens on a later sweep once they pass. The owner
-  turns the setting off to decide each merge again, and then only the owner
-  merges. The switch is in `.nexkit/`, so changing it is a hand-made pull
-  request.
-- **NexKit mentions the owner when a person is needed.** The owner's login is
-  in NexKit's [`notify` setting][nexkit-config]. NexKit mentions it when a run
-  ends in a state that needs a person: a plan with a question that has no
-  recommended option, a blocked round with such a question, a question asked
-  again after autopilot answered it, a failed run, a second time-out, no
-  automatic fix rounds left, checks that fail again after a fix round blamed a
-  cause outside the code, a refused automatic merge, an approved pull
-  request with an unverifiable criterion, a CI failure on `main`, or the last
-  issue of the milestone closed. It mentions the owner once for each issue
-  that waits. Every other
-  run needs nobody, and a plan that autopilot answers or splits mentions
-  nobody either.
-- **NexKit resolves conflicts with `main` by itself.** With
-  `conflicts.auto_resolve` on, each time `main` moves NexKit starts a fix round
-  for every open NexKit pull request that now conflicts with it. A conflict
-  that needs a choice ends the round as `blocked`, with a question.
-- **NexKit pauses at the Claude usage limit and resumes after it resets.** A
-  Claude stage first moves to the second Claude subscription. NexKit pauses
-  only when both are at their limit. The
-  run's comment shows the reset time. No person repeats the command.
-- **A parent issue closes when its last part does.** With
-  `close_parent_issues` on, NexKit closes a parent issue once every sub-issue
-  is closed and at least one was completed.
+- **Autopilot is on, on the earliest open milestone.** NexKit's
+  [`autopilot`][nexkit-autopilot] setting is on with the milestone scope, so
+  no person posts `/nexkit plan` or `/nexkit go`, and the next milestone waits
+  until the owner closes the current one.
+- **Autopilot answers with the recommended option,** with `answer` set to
+  `recommended`, even when the recommendation rests on a **Proposed**
+  decision. The owner sees the answers on the issue and can change one with a
+  comment before `/nexkit go`, or with `/nexkit fix` on the pull request.
+- **Issues run in parallel unless one needs another.** Marks follow the rules
+  of NexKit's [`request` skill][nexkit-request]. The milestone's docs sweep is
+  marked *blocked by* every other issue of the milestone, with no reason line
+  for each. There is no limit on how many issues run at once: `max_parallel`
+  is left unset.
+- **NexKit merges a pull request once it passes,** with
+  [`merge.auto`][nexkit-auto-merge] on, because the AI review and the checks
+  are the gate Axis relies on. The owner turns the setting off to decide each
+  merge again, and then only the owner merges. The switch is in `.nexkit/`, so
+  changing it is a hand-made pull request.
+- **NexKit resolves conflicts with `main` by itself,** with
+  `conflicts.auto_resolve` on.
+- **A second Claude subscription takes over at the usage limit.** NexKit
+  pauses only when both are at their limit.
+- **A parent issue closes when its last part does,** with
+  `close_parent_issues` on.
 - **The rules on `main` let NexKit merge.** They require NexKit's own checks
   and no approval from a person. They do not require the CI workflow, which
   runs on pushes to `main` and to hand-made branches but not on NexKit's
   branches. NexKit's checks run the same scripts there.
-- **CI runs on `main` after every merge.** A merge by NexKit starts no `push`
-  workflow, so NexKit starts the CI and CodeQL workflows on `main` itself,
-  through its `merge.after_workflows` setting. Two pull requests that pass on their own
-  can still break `main` together. When one of those workflows fails on `main`,
-  autopilot runs its failed jobs once more. When they fail again, it opens a
-  `bug` issue in the milestone with the failed jobs and the run link, mentions
-  the owner, and plans it before every other issue. A run that passes only when
-  its failed jobs run again, and an older failed run that a newer run overtook,
-  are recorded too, planned right after those, so a failure that passed on a
-  second attempt is not lost. Each failure gets a `bug` issue of its own, named
-  in plain words by the failing test from the job's error annotation and its
-  file, or by the job and its first failed step; the same failure later adds a
-  comment to its open issue.
-- **Every merge to `main` gets a CI result.** A run on `main` always finishes.
-  A newer merge replaces only a run that is still waiting to start, so the next
-  run tests both merges. On any other branch a newer push stops the older run.
-  CI runs the lint and unit tests, the integration tests and the E2E tests as
-  three parallel jobs, so a run takes as long as its slowest job.
-- **Each check has room to grow within its time limit.** The limits are in
-  NexKit's [`checks` setting][nexkit-config]. When a check takes more than half
-  its limit, a hand-made pull request raises the limit or makes the suite
-  faster, before rounds start to stop on it.
+- **There is no push token.** NexKit pushes with the Actions token, so it
+  cannot push a merge that brings changes to `.github/workflows/`. The hourly
+  driver merges those by hand.
+- **CI runs on `main` after every merge.** NexKit starts the CI and CodeQL
+  workflows on `main` through its `merge.after_workflows` setting, because a
+  merge by NexKit starts no `push` workflow. A run on `main` always finishes:
+  a newer merge replaces only a run that is still waiting to start, so the
+  next run tests both merges. On any other branch a newer push stops the older
+  run. CI runs the lint and unit tests, the integration tests and the E2E
+  tests as three parallel jobs, so a run takes as long as its slowest job.
 - **The slow checks run in full only in NexKit's checks.** The integration and
-  E2E checks are marked `slow`, so an agent runs only the tests in them that
-  cover its change or that failed, and leaves the full suites to the checks
-  after its round. The test, integration and E2E checks name their `results`:
-  `artifacts/test-results`, and for E2E also `artifacts/logs` and the
-  Playwright traces in `tests/e2e/test-results`. When such a check fails, the
-  next fix round gets those files.
-- **A round gets the evidence of the CI runs its issue names.** Agents hold no
-  GitHub token, so before an implement or fix round NexKit downloads, for each
-  failed run that the issue records, or that its description or a person's
-  comment links, the end of each failed job's log, its annotations and the CI
-  workflow's `test-results-e2e`, `test-results-integration` and
-  `test-results-unit` artifacts, which hold the
-  Playwright traces and `error-context.md` files. The names are in NexKit's
-  [`evidence` setting][nexkit-evidence]. So a `bug` issue about a flaky run is
-  answered from that run's own traces, and a person never has to attach them.
-  The artifacts expire 14 days after their run.
+  E2E checks are marked `slow`. The test, integration and E2E checks name
+  their `results`: `artifacts/test-results`, and for E2E also `artifacts/logs`
+  and the Playwright traces in `tests/e2e/test-results`. NexKit's
+  [`evidence`][nexkit-evidence] setting names the CI workflow's
+  `test-results-e2e`, `test-results-integration` and `test-results-unit`
+  artifacts, which hold the Playwright traces and `error-context.md` files.
 - **NexKit's checks skip suites that a change cannot affect.** A check round
   takes about 25 minutes, of which the integration tests take about 7 and
   Playwright about 10. So under NexKit's `NEXKIT_BASE_SHA`, a suite that no
   changed file can affect is skipped, and any doubt runs it. The integration
   performance tests, whose class names end in `PerformanceTests`, never run
   there, because they depend on the runner's load. CI on `main` sets no base
-  and runs every suite, so a slowdown shows after the merge and autopilot opens
-  a bug issue for it. Which suite skips when is in
-  [test runs and reports](development.md#test-runs-and-reports).
-
-- **NexKit restores the dependency caches that CI on `main` saves.** Before
-  `scripts/setup.sh`, NexKit's implement, fix and check runs restore the
-  NuGet, npm and Playwright browser caches, so setup installs only what
-  changed. NexKit never saves a cache, because those runs execute code the
-  agent wrote. The CI workflow saves them on `main`, under the keys NexKit
-  looks for. The entries are in NexKit's [`cache` setting][nexkit-caches],
-  and the CI workflow has one `actions/cache` step for each, with the same
-  paths and key files in the same order. A change to what setup downloads
-  updates both in the same hand-made pull request. A missed cache never fails
-  a run; setup then installs from scratch.
+  and runs every suite, so a slowdown shows after the merge. Which suite skips
+  when is in [test runs and reports](development.md#test-runs-and-reports).
+- **NexKit restores the dependency caches that CI on `main` saves:** NuGet,
+  npm and the Playwright browsers. The entries are in NexKit's
+  [`cache`][nexkit-caches] setting, and the CI workflow has one
+  `actions/cache` step for each, with the same paths and key files in the
+  same order. A change to what setup downloads updates both in the same
+  hand-made pull request.
 - **Everything goes through NexKit, except changes in paths NexKit may not
-  change.** Those paths are set by NexKit's
-  [`protected_paths` setting][nexkit-config].
-  Such changes are hand-made pull requests on any branch name, for example a
+  change.** Those paths are set by NexKit's `protected_paths` setting. Such
+  changes are hand-made pull requests on any branch name, for example a
   NexKit version bump. Hand-made pull requests are only for those paths, so a
   design change is never one; see [Design changes](#design-changes). The owner
-  opens them from their own account. NexKit's
-  checks do not run on them, so the owner merges them with an admin bypass of
-  the rules on `main`, after the CI workflow passes.
+  or the hourly driver opens them, and the owner merges them.
 
 ## Profiles
 
-Each issue runs on one NexKit profile. The profile sets the models for the
-plan, implement, fix and review rounds of that issue. When `/nexkit plan`
-starts, NexKit's triage step reads the issue and chooses the profile. The
-profiles, their `when` texts and their models are in NexKit's
-[`profiles` setting][nexkit-profiles]. This section holds the rules behind
-them.
+Each issue runs on one NexKit profile, which triage chooses when
+`/nexkit plan` starts. The profiles, their `when` texts and their models are
+in NexKit's [`profiles`][nexkit-profiles] setting, and how to write profiles is
+in NexKit's configuration doc. These are Axis's choices.
 
-- **Profiles go by risk and novelty: `standard` and `hard`.** The more a
+- **Two profiles, `standard` and `hard`, by risk and novelty.** The more a
   mistake would cost, or the less the platform has done such work before, the
-  stronger the profile. `hard` is the default, so an issue whose triage fails
-  runs on it.
-- **`standard` is a narrow description and `hard` is the rest.** `standard`
-  names only work that repeats what the platform already does. Anything it
-  does not name goes to `hard`, so the concepts and kinds of work that a new
-  milestone brings land on the stronger profile with no change to the `when`
-  texts. The cost is that more issues run on the stronger, dearer models.
-- **Plan and review are at least as strong as implement.** The plan is the
-  contract and the review is the last check before the owner. In every
-  profile, review runs on a different model from implement.
-- **Triage runs on a strong model.** It is one call that reads only the
-  issue, so it costs little, and a wrong choice does not fail: the issue just
-  runs on the wrong profile.
-- **A `when` text says what a mistake would cost, not where the code is.** It
-  may name concepts from [concepts.md](domain/concepts.md) as examples, but
-  never files, classes, doc sections or milestones, which go stale. When
-  unsure, triage chooses the stronger profile.
-- **Triage sees only the issue and its discussion.** It does not open links.
-  So an issue names the concepts it touches in its own text, even when it
-  links to the docs that describe them.
-- **A comment changes the profile.** Comment
-  `/nexkit plan Use the <profile> profile`. A request written in the issue
-  text does not count. A re-plan keeps the profile unless someone asks for
-  another one.
+  stronger the profile. `hard` is the default profile, so an issue whose
+  triage fails runs on it. The cost is that more issues run on the stronger,
+  dearer models.
+- **`standard` names only work that repeats what the platform already does,**
+  and `hard` is the rest. So the concepts and kinds of work that a new
+  milestone brings land on `hard` with no change to the `when` texts. A `when`
+  text may name concepts from [concepts.md](domain/concepts.md) as examples.
+- **Plan and review are at least as strong as implement,** and review runs on
+  a different model from implement in every profile. Triage runs on a strong
+  model, because it is one call that reads only the issue, so it costs little,
+  and a wrong choice does not fail: the issue just runs on the wrong profile.
+  When unsure, triage chooses the stronger profile.
 - **Profile changes are hand-made pull requests,** because `.nexkit/` is a
   path NexKit may not change.
 
 ## The life of an issue
 
-1. **Write the issue.** One issue is one behaviour, aiming for 2–5 acceptance
-   criteria that a test or command can check. More than five is a signal to
-   check whether the issue holds more than one behaviour. If it does, split it.
-   If every criterion checks the same behaviour, more are fine. A plan is not
-   revised only to cut the number of criteria. The issue links to the doc
-   sections it implements, is in the current milestone, and names the concepts
-   it touches in its own text, so triage can choose the [profile](#profiles).
-   It gets at least one label, and every repository label whose description
-   on GitHub fits its content. There is no fixed list, because the owner adds
-   and removes labels. The owner or the local agent opens it, because
-   autopilot takes only issues opened by someone with write access, and marks
-   it *blocked by* every issue it must wait for, by the rules under
-   [Decisions](#decisions), with a `Depends on` line for each. Before that, it
-   checks the issue against every other open issue of the milestone by those
-   rules. An issue that covers something in every case, such as every edit
-   or every widget, has a criterion with a test that finds every case from
-   the code itself, not from a fixed list, and fails on one that is not
-   covered. So a case added later, in any milestone, cannot be left out
-   unnoticed. It may link a Design artifact as a picture, while the docs stay
-   the source of behaviour.
-2. **Plan.** Autopilot starts `/nexkit plan` once the issue is ready. NexKit's
-   plan agent posts a plan as a comment. A person may comment `/nexkit plan`
-   to start it sooner or with a note.
-3. **Questions and splits.** When every question of the plan has a
-   recommended option, autopilot answers with those options and plans again.
-   Otherwise NexKit mentions the owner, who answers in a comment on the
-   issue, and the next sweep plans again. When the plan reports `too_large`,
-   autopilot creates the parts the plan suggests as sub-issues, with the
-   issue's milestone and labels, marks each part *blocked by* the earlier
-   parts it needs, and closes an open NexKit pull request of the issue as
-   superseded, keeping its branch. NexKit closes the parent when all parts are
-   done. A part is written like any issue: its title names the behaviour that
-   part delivers and does not reuse the parent's title, whole or as a
-   `<parent>: <part>` prefix, because the sub-issue link already shows the
-   parent.
-4. **Review the plan.** The local agent reads each plan as it is posted and
-   checks it against the docs, [decisions.md](decisions.md) and the profiles.
-   Every change agreed after a plan, from the review or from the owner,
-   however small, is commented on the issue, and the next sweep plans again
-   before it starts `/nexkit go`. Once `/nexkit go` has started, the change
-   goes to the pull request as `/nexkit fix <change>`. No follow-up issues.
-   The reason: the plan is the contract. It holds the acceptance criteria the
-   pull request is checked against, and it is the record a later reader looks
-   at. A change that lives only in a comment is missing from both.
-5. **Implement.** Autopilot starts `/nexkit go` on the latest plan once it has
-   no open question, is not too large and no comment came after it. NexKit
-   implements that plan and opens a pull request. When the round finds that no
-   change is needed, for example because a commit on `main` already fixed the
-   failure, it opens no pull request and the issue closes as completed with
-   the finding: at once when the issue or its plan says to stop in that case,
-   otherwise through autopilot's recommended answer. When an implement or fix
-   round runs out of time, autopilot plans once more with a note to split the
-   issue, and the plan says why the round did not finish. A cause that was not
-   found makes the first part a diagnosis. A part inherits its parent's
-   time-outs, so a second time-out anywhere below waits for a person, and parts
-   go at most three levels deep.
-6. **Pull request.** Every round runs NexKit's checks and the AI review on the
-   new commit. Merging needs both to pass. A pull request runs one round at a
-   time: while the `/nexkit go` run that opened it still checks, reviews and
-   merges it, a conflict round waits for it, and a person's command or
-   *Request changes* review gets a reply to post it again once that run ends.
-7. **Fix.** NexKit starts fix rounds by itself for a conflict with `main`,
-   which it merges and never rebases, and for failing checks or a review that
-   requests changes, up to the automatic fix limit in its configuration. A
-   conflict that needs a choice stops the round as `blocked`, with a
-   question. A fix round reads the result files of the checks that failed and
-   what earlier fix rounds tried. When a check fails the same way before and
-   after a fix round, the next automatic round is a diagnosis: it names the
-   cause with evidence before it changes code, or stops as `blocked` with what
-   it found. A fix round that changes nothing because the cause lies outside
-   the code, such as a package registry that failed, runs the checks and the
-   review once more on the same commit; when they fail again, it waits for a
-   person. Beyond that, a person comments `/nexkit fix <instructions>`.
-8. **Merge.** NexKit squash-merges, starts CI on `main` and closes the issue.
-   With `merge.auto` off, or when the review left a criterion unverifiable,
-   the owner squash-merges instead, and GitHub closes the issue.
-9. **Exceptions.** Changes whose purpose is to edit paths NexKit may not change
-   are hand-made pull requests, as described under Decisions. A conflict in
-   those paths, or a merge that brings workflow changes, is one that NexKit
-   cannot push: the local agent merges `main` into the NexKit branch by hand,
-   and asks the owner before it pushes.
+An issue then follows NexKit's life of an issue: plan, questions and splits,
+implement, pull request, fix and merge, as NexKit's
+[how it works][nexkit-how] describes. Changing a plan after it is posted
+follows NexKit's rules too. Axis adds these rules for writing it.
+
+- **One behaviour.** One issue is one behaviour, aiming for 2–5 acceptance
+  criteria that a test or command can check, as
+  [D13](decisions/d13-delivery-workflow.md) says.
+- **Docs and concepts.** The issue links to the doc sections it implements, is
+  in the current milestone, and names the concepts it touches in its own text,
+  in the terms of [concepts.md](domain/concepts.md), so triage can choose the
+  [profile](#profiles).
+- **Labels.** It gets at least one label, and every repository label whose
+  description on GitHub fits its content. There is no fixed list, because the
+  owner adds and removes labels.
+- **Who opens it.** The owner or the local agent opens it, because autopilot
+  takes only issues opened by someone with write access. It marks the issue
+  *blocked by* what it must wait for, by the rules under
+  [Decisions](#decisions).
+- **Design.** It may link a Design artifact as a picture, while the docs stay
+  the source of behaviour.
+- **Exceptions.** Changes whose purpose is to edit paths NexKit may not change
+  are hand-made pull requests, as described under Decisions.
 
 ## The life of a milestone
 
@@ -323,8 +170,7 @@ them.
    agent breaks the next one into issues, as the
    [roadmap](roadmap.md#how-work-is-planned) describes, and checks the
    [profiles](#profiles) against the new milestone's concepts and the models
-   now available. Profile fixes are hand-made pull requests. Autopilot does not
-   touch the next milestone's issues while an earlier milestone is open.
+   now available. Profile fixes are hand-made pull requests.
 2. **Deliver the issues.** Each one follows the life of an issue above.
    Autopilot runs every ready issue of the milestone at once.
 3. **Docs sweep.** Before the owner closes the milestone, one issue in it
@@ -343,7 +189,7 @@ them.
      statements still hold.
 4. **Close.** When the last issue of the milestone closes, NexKit mentions
    the owner once. The owner closes the milestone on GitHub once the docs
-   sweep is merged, and the next sweep takes the next milestone.
+   sweep is merged.
 
 ## Design changes
 
@@ -468,7 +314,11 @@ issues, pull requests and sub-issues.
   user. This covers doc text that describes behaviour, and titles too. User names appear only in test
   code, test scenarios, the realm file and the [development users table](reference/security.md#development-users).
 
+[nexkit-how]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
+[nexkit-troubleshooting]: https://github.com/phuongnse/nexkit/blob/main/docs/troubleshooting.md
+[nexkit-request]: https://github.com/phuongnse/nexkit/blob/main/skills/request/SKILL.md
+[nexkit-drive]: https://github.com/phuongnse/nexkit/blob/main/skills/drive/SKILL.md
 [nexkit-profiles]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#profiles
 [nexkit-auto-merge]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#automatic-merge
 [nexkit-caches]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#caches

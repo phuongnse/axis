@@ -58,3 +58,18 @@ jobs:
       - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           category: /language:${{ matrix.language }}
+
+  # NexKit autopilot looks at this run as soon as it ends: a run that NexKit started with
+  # the Actions token sends no workflow_run event, but it may dispatch NexKit's sweep.
+  nexkit-sweep:
+    needs: [analyze]
+    if: always() && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - run: >-
+          gh workflow run nexkit.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
+          -f command=autopilot -f number=autopilot -f note="after run $GITHUB_RUN_ID"
+        env:
+          GH_TOKEN: ${{ github.token }}

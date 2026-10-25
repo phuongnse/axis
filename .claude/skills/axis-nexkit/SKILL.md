@@ -1,24 +1,19 @@
 ---
 name: axis-nexkit
-description: Runbook for the local agent session that works NexKit for the Axis owner (writing issues and their order, reading plans, stepping in where autopilot stops, triaging pull requests). Use when the owner asks to plan, implement, check, fix or split work through NexKit, or asks about the state of a NexKit issue or pull request. Not for agents running inside the NexKit pipeline.
+description: Runbook for the owner's local agent session that works NexKit for Axis when the owner asks (writing issues and their order, breaking a milestone down, proposing NexKit setting changes, upgrading NexKit, looking at a stopped issue). Use when the owner asks to plan, file, split or check work through NexKit, or asks about the state of a NexKit issue or pull request. Not for the hourly driver routine, which uses axis-nexkit-routine, and not for agents running inside the NexKit pipeline.
 ---
 
-# Driving NexKit for Axis
+# Working NexKit for Axis
 
-The rules, the roles and the life of an issue are in
-[docs/delivery.md](../../../docs/delivery.md). Read the sections your task
-touches. This runbook says how to apply them: where values live, the commands,
-the checklists and what to do when something fails. It does not repeat the
-rules, so follow its links.
+Axis's rules are in [docs/delivery.md](../../../docs/delivery.md). How NexKit
+works, and what a person does around it, are in NexKit's own docs and skills
+at the ref Axis pins. This runbook says only how to apply Axis's rules: where
+the values live, how to write Axis's issues and milestones, and how to upgrade
+NexKit for Axis. It does not repeat either, so follow its links.
 
-Autopilot plans and starts the issues of the current milestone, answers
-questions that have a recommended option, and splits plans that are too large.
-Your part is what it cannot do: write each issue and mark what it must wait
-for, read each plan and comment changes, and act where it stops and a person is
-needed. You may post any command, but never `/nexkit plan` or `/nexkit go` on
-an issue whose autopilot state is `start` or `active`. Ask the owner first when
-a choice rests on a **Proposed** decision or only the owner can answer it.
-Never approve, merge or close a pull request yourself.
+Autopilot and the hourly driver keep the work moving. Act when the owner asks.
+Ask the owner first when a choice rests on a **Proposed** decision or only the
+owner can answer it. Never approve, merge or close a pull request yourself.
 
 ## Where the values live
 
@@ -32,25 +27,24 @@ change with a NexKit release or a settings change.
   grep -E 'nexkit_(repository|ref):' .github/workflows/nexkit.yml
   ```
 
-- **NexKit's own docs** (how it works, configuration, troubleshooting): list
-  them at that ref, then read the one you need.
+- **NexKit's docs and skills at that ref:** clone NexKit at the pinned ref and
+  read `docs/` and `skills/` there. Use its `status` skill to see what runs,
+  what waits and why, and its `request` skill for the rules of marks between
+  issues.
 
   ```bash
-  gh api "repos/<nexkit_repository>/contents/docs?ref=<nexkit_ref>" --jq '.[].path'
-  gh api "repos/<nexkit_repository>/contents/<path>?ref=<nexkit_ref>" \
-    -H 'Accept: application/vnd.github.raw'
+  REPO=$(grep -oE 'nexkit_repository: \S+' .github/workflows/nexkit.yml | cut -d' ' -f2)
+  REF=$(grep -oE 'nexkit_ref: \S+' .github/workflows/nexkit.yml | cut -d' ' -f2)
+  KIT="${TMPDIR:-/tmp}/nexkit-$REF"
+  [ -d "$KIT" ] || git clone -q --depth 1 --branch "$REF" "https://github.com/$REPO" "$KIT"
   ```
 
-- **Settings:** `.nexkit/config.json`. A key that is `null` or missing takes
-  NexKit's default, from its configuration doc at the pinned ref. A profile's
-  stage settings override `stages`, which override the top-level `model` and
-  `effort`. The `cache` entries must match the `actions/cache` steps in
-  `.github/workflows/ci.yml`.
+- **Settings:** `.nexkit/config.json`. A key that is missing takes NexKit's
+  default, from its configuration doc at the pinned ref.
 
   ```bash
-  jq '{protected_paths, fix, merge, conflicts, usage_limit, close_parent_issues, autopilot, notify}' .nexkit/config.json
-  jq '{default_profile, triage: .stages.triage, profiles}' .nexkit/config.json
-  jq '.cache' .nexkit/config.json
+  python3 -c "import json; c = json.load(open('.nexkit/config.json')); print(json.dumps({k: c.get(k) for k in ('fix', 'merge', 'conflicts', 'usage_limit', 'close_parent_issues', 'autopilot', 'notify')}, indent=1))"
+  python3 -c "import json; c = json.load(open('.nexkit/config.json')); print(json.dumps({k: c.get(k) for k in ('default_profile', 'profiles', 'cache')}, indent=1))"
   ```
 
 - **Required checks on `main`:** the active rules for the branch.
@@ -60,191 +54,56 @@ change with a NexKit release or a settings change.
     --jq '.[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context'
   ```
 
-- **NexKit's branch prefix:** the `startsWith(github.event.pull_request.head.ref, '…')`
-  condition in the job `if:` block of `.github/workflows/nexkit.yml`.
-- **The pull request for an issue:** the link in NexKit's run comment on the
-  issue.
-
-## Commands
-
-Start every session with NexKit's local `status` command, at the pinned ref,
-and use it to watch the work. It lists each open issue and pull request with
-its state and last round, the recent merges with their CI runs on `main`, what
-the next autopilot sweep does with each issue and why, and a last section with
-only what needs a person. `--json` gives the same as JSON.
-
-```bash
-REPO=$(grep -oE 'nexkit_repository: \S+' .github/workflows/nexkit.yml | cut -d' ' -f2)
-REF=$(grep -oE 'nexkit_ref: \S+' .github/workflows/nexkit.yml | cut -d' ' -f2)
-KIT="${TMPDIR:-/tmp}/nexkit-$REF"
-[ -d "$KIT" ] || git clone -q --depth 1 --branch "$REF" "https://github.com/$REPO" "$KIT"
-python3 "$KIT/bin/nexkit" status
-```
-
-Post a command, read the latest plan (the newest NexKit comment, with its
-profile, models and why triage chose it), or start a sweep yourself, for
-example after changing what blocks what. A profile change must be a comment;
-a request in the issue text does not count.
-
-```bash
-gh issue comment <N> --body "/nexkit plan"
-gh issue comment <N> --body "/nexkit plan Use the hard profile"
-gh pr comment <N> --body "/nexkit fix <instructions>"
-gh issue view <N> --comments
-gh workflow run nexkit.yml -f command=autopilot -f number=autopilot
-```
-
-Mark an issue *blocked by* another, and make an issue a sub-issue of a parent.
-Autopilot reads no "Depends on" text, and the order of sub-issues does not
-count. Both endpoints take the database `id`, not the number. If one returns
-404, upgrade `gh`.
-
-```bash
-BLOCKER_ID=$(gh api repos/{owner}/{repo}/issues/<blocking> --jq .id)
-gh api -X POST repos/{owner}/{repo}/issues/<blocked>/dependencies/blocked_by -F issue_id="$BLOCKER_ID"
-gh api repos/{owner}/{repo}/issues/<blocked>/dependencies/blocked_by --jq '.[].number'
-
-CHILD_ID=$(gh api repos/{owner}/{repo}/issues/<child> --jq .id)
-gh api -X POST repos/{owner}/{repo}/issues/<parent>/sub_issues -F sub_issue_id="$CHILD_ID"
-```
-
-Split an issue by hand only when autopilot cannot, for example when the plan
-reports `too_large` without suggesting parts. Write each part as a new issue
-with the parent's milestone and labels, titled as
-[step 3 of the life of an issue](../../../docs/delivery.md#the-life-of-an-issue)
-says, for example `Connector call steps pass compile checks`, not
-`Call connector step: compile checks and model`. Then add the parts to the
-parent and mark each *blocked by* the parts it needs, as step 4 below says.
-
 ## Writing an issue
 
-The rules are in step 1 of
-[the life of an issue](../../../docs/delivery.md#the-life-of-an-issue) and in
-[writing on GitHub](../../../docs/delivery.md#writing-on-github).
+The rules are in
+[the life of an issue](../../../docs/delivery.md#the-life-of-an-issue), in
+[writing on GitHub](../../../docs/delivery.md#writing-on-github), and, for
+marks between issues, in NexKit's `request` skill.
 
 1. Read the doc sections the issue implements. Write the behaviour, by role,
    with 2–5 acceptance criteria, and name the concepts it touches in the
-   terms of [concepts.md](../../../docs/domain/concepts.md). Triage reads only
-   the issue and its discussion, not the links.
+   terms of [concepts.md](../../../docs/domain/concepts.md).
 2. Read the labels with `gh label list` and pick every one whose description
    fits.
 3. Create it in the current milestone:
    `gh issue create --title "<behaviour>" --milestone "<milestone>" --label "<a>,<b>" --body-file <file>`.
-4. Check it against the milestone's open issues by [the rules](../../../docs/delivery.md#decisions).
-   For each it waits for, add `Depends on #N: <what it uses from #N>` and mark
-   it *blocked by* #N before the next sweep, or autopilot plans it at once.
-
-## Reviewing a plan
-
-Check:
-
-- The issue is one behaviour. More than five criteria: split only if it holds
-  more than one behaviour, never re-plan only to cut the number.
-- The profile fits the `when` texts. If not, re-plan with
-  `/nexkit plan Use the <profile> profile`. If a `when` text caused the wrong
-  choice, propose a fix to the owner as a hand-made pull request.
-- Every doc link resolves, and no **Proposed** decision in
-  [decisions.md](../../../docs/decisions.md) is treated as **Agreed**.
-- The plan names roles, not development users, and puts the decisions and
-  risks the owner must judge in their own short sections.
-- A `too_large` plan suggests parts titled by their own behaviour, each naming
-  the earlier parts it needs.
-- After a re-plan, its *Since the last plan* section lists every change that
-  was asked for, and nothing else changed without a reason.
-
-Comment every change, however small, on the issue before `/nexkit go`. Once
-`/nexkit go` has started, post it as `/nexkit fix <change>` on the pull
-request instead. A re-plan keeps what no newer comment changes, so:
-
-- State only the changes. Choices accepted as they are need no comment.
-- One short line per change, with the exact values, names and rules. No
-  reasons or prose, and nothing the issue or the docs already say: link
-  instead. For example:
-  `Change: limits 2,000 chars / depth 32 / 500 nodes; == null-safe; trim not in SQL.`
-- Use `/nexkit plan from scratch` only when the plan has gone wrong, and
-  comment every choice to keep before you post it.
+4. Mark what it waits for, as NexKit's `request` skill says, before the next
+   sweep, or autopilot plans it at once. When the milestone's docs sweep is
+   open, mark it *blocked by* the new issue too.
 
 ## Breaking down a milestone
 
-Before the owner closes the current milestone:
+When the owner asks:
 
-- Create the next milestone's issues and their *blocked by* marks. Autopilot
-  takes them at the first sweep after the close.
-- Check each risky concept that the **From** column of
+- Create the next milestone's issues as in [Writing an issue](#writing-an-issue).
+- Check that each risky concept the **From** column of
   [concepts.md](../../../docs/domain/concepts.md) lists for the new milestone
   falls under `hard` by its consequence, and that work the platform has not
   done before, such as a new kind of editor, widget or library, is not
   described by the `standard` text.
-- Compare the profiles' results in the ending milestone: the share of issues
-  whose rounds stopped on an error, ran out of time or failed checks. When
-  `standard` fails more often than `hard`, narrow the `standard` text.
-- Check whether newer models make a profile's models out of date.
+- Compare the profiles' results in the ending milestone and check their
+  models against the models now available, as NexKit's configuration doc says
+  for writing profiles.
 - Propose any change to the owner as a hand-made pull request.
-
-## Reviewing a pull request
-
-While `merge.auto` is on, NexKit has merged by the time you look: review the
-merged pull request and raise problems with the owner. While it is off, NexKit
-mentions the owner when a pull request is ready. An approved pull request
-whose review marked a criterion ❔ unverifiable does not merge by itself, even
-with `merge.auto` on: check each listed criterion against the diff and the
-check results, and tell the owner which ones hold before they merge.
-
-- The behaviour change matches the issue and the approved plan.
-- When agreed behaviour changes, the docs change in the same pull request.
-- Tests cover the change, including denied access where it applies.
-- The required checks on `main` are green.
-- No edits in paths NexKit may not change, unless the pull request is
-  hand-made.
-- A change to what `scripts/setup.sh` downloads, such as a new toolchain or a
-  lock file in a new place, needs matching `cache` entries and CI cache steps.
-  Those are in paths NexKit may not change, so tell the owner and propose that
-  hand-made pull request.
 
 ## Upgrading NexKit
 
-An upgrade is one hand-made pull request. Read the release notes and the
-changelog of every release after the pinned ref, not only the latest.
+An upgrade is one hand-made pull request. Follow NexKit's upgrade steps in its
+configuration doc, then:
 
-1. Pin both the `uses:` ref and `nexkit_ref` in the workflow file to the new
-   tag.
-2. Compare the key tables and sections of NexKit's configuration doc at the old
-   and new refs. Set every new key, or new value of a key, that Axis has a
-   value for, such as the names of its own CI artifacts or workflows. A key
-   left at its default is named in the pull request with the reason.
-3. Check that the workflow file grants every permission the release asks for.
-4. Change `docs/delivery.md` and this runbook wherever the release changes
-   what NexKit does by itself, when it waits for a person, or what you do
-   then.
-5. Say in the pull request what changes, what the release brings that needs
+1. Name every key left at its default in the pull request, with the reason.
+2. Change `docs/delivery.md`, this runbook and the
+   [`axis-nexkit-routine`](../axis-nexkit-routine/SKILL.md) skill wherever the
+   release changes a setting Axis chooses or a choice NexKit leaves to Axis.
+3. Say in the pull request what changes, what the release brings that needs
    nothing here, and what the owner does: merge with the admin bypass, and any
    secret or setting only the owner can add.
 
-## When something fails
+## When something stops
 
-NexKit handles by itself what the
-[decisions](../../../docs/delivery.md#decisions) and the
-[life of an issue](../../../docs/delivery.md#the-life-of-an-issue) say it
-does, so do nothing until it mentions the owner. Its troubleshooting doc at
-the pinned ref has the mechanics.
-
-| Failure | What you do |
-| --- | --- |
-| Publish fails after `/nexkit go` | Read the run log. If the base branch was force-pushed, the same `/nexkit go` fixes it. Otherwise diagnose first, and ask the owner before posting `/nexkit go` again. |
-| A plan or a `blocked` round has a question with no recommended option, or asks again after autopilot answered it | Ask the owner when the choice is theirs. Answer a plan's question in a comment on the issue, so the next sweep plans again, and a round's question with `/nexkit fix <decision>`. |
-| A run stopped twice on a transient error | The comment shows both errors. Read them; when the cause has passed, repeat the command, otherwise tell the owner. |
-| No automatic fix rounds left, for failing checks or requested changes | Read the failing check's log or the review, ask the owner, then post `/nexkit fix <instructions>`. |
-| A fix round ended as `recheck_failed` | The checks failed again after the agent named a cause outside the code. Check that service or registry; when it works again, comment `/nexkit review`, and when the failure comes from the code after all, ask the owner, then post `/nexkit fix <instructions>`. |
-| NexKit replied that the `/nexkit go` run that opened the pull request still runs | Your command or *Request changes* review did not run. Post it again once that run has ended. |
-| A round closed an issue as `no_change` | The run's comment holds the finding and its evidence. Check it; when it is wrong, reopen the issue, comment what still needs changing and tell the owner. |
-| `conflicts.max_rounds` conflict rounds ran | Comment `/nexkit fix` yourself. |
-| A conflict in a path NexKit may not change, or a merge that brings workflow changes (`needs_merge`) | Merge `origin/main` into the pull request branch by hand, in a separate worktree. Run `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`. Ask the owner before pushing, then comment `/nexkit review`. |
-| An implement or fix round ran out of time twice, in the issue or in one of its parts | Autopilot has already planned once with a note to split, and parts inherit that time-out. Read the plan, the run logs and the result files in the round's `nexkit-checks` artifact. When the cause is not known, find it first; then split the issue by hand or comment a smaller plan. |
-| A diagnosis round stopped as `blocked` | It found no cause in the evidence. Read what it found, the result files and the CI evidence the round downloaded (its *Collect issue context* log lists it), ask the owner when the choice is theirs, then answer with `/nexkit fix <instructions>`. |
-| The plan comment says triage failed | The plan ran on the previous plan's profile or on `default_profile`. If that is wrong for the issue, re-plan with `/nexkit plan Use the <profile> profile`. |
-| A round stops because its plan names a profile that is no longer configured | Re-plan with `/nexkit plan`, then repeat the command that stopped. Ask the owner first when that command is `/nexkit go`. |
-| A run paused at the usage limit stops again with an unknown reset time | Repeat the command. |
-| Every run misses a dependency cache | Compare the `cache` entries with the CI cache steps, and check that CI on `main` succeeds, because `actions/cache` saves only after a successful job. |
-| The review job errored | NexKit has already run it once more. The round's comment says why. Comment `/nexkit review` to retry, unless it names an authentication error: then tell the owner, because a retry stops the same way. |
-| NexKit's automatic merge was refused (`merge_refused`) for a reason other than a conflict | The round's comment says why, usually a rule on `main`. NexKit has mentioned the owner; tell them what you found. |
-| Autopilot leaves an issue alone | `nexkit status` gives the reason. A command that has not run after six hours starts once more, then waits for a person, so post the command yourself. An issue opened without write access is never taken; open it again from the owner's account. |
+The hourly driver handles NexKit's stops, as NexKit's `drive` skill and
+troubleshooting doc say. When the owner asks you to look at one, read
+`nexkit status` and that doc at the pinned ref. A hand merge follows
+[the routine's steps](../axis-nexkit-routine/SKILL.md#hand-merges); ask the
+owner before you push it.
