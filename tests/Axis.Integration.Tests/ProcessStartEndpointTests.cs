@@ -8,6 +8,7 @@ namespace Axis.Integration.Tests;
 public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : IClassFixture<ProcessStartFixture>
 {
     private const string Instances = "/api/apps/ProcessApp/processes/Submit/instances";
+    private const string NightlyJobInstances = "/api/apps/ProcessApp/processes/NightlyJob/instances";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -250,6 +251,32 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
     }
 
     [Fact]
+    public async Task A_start_of_a_process_without_a_subject_is_a_400_for_a_user_with_the_start_grant_and_stores_nothing()
+    {
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+
+        using var response = await StartAsync(Guid.NewGuid(), key: Guid.NewGuid().ToString(), client: anna, path: NightlyJobInstances);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        Assert.Equal(
+            "The process has no subject. It cannot be started through this endpoint yet.",
+            problem.RootElement.GetProperty("title").GetString());
+        await AssertNothingStoredForNightlyJobAsync();
+    }
+
+    [Fact]
+    public async Task A_start_of_a_process_without_a_subject_is_a_403_for_a_user_without_the_start_grant_and_stores_nothing()
+    {
+        using var olga = fixture.CreateClient().SignedInAs("olga");
+
+        using var response = await StartAsync(Guid.NewGuid(), key: Guid.NewGuid().ToString(), client: olga, path: NightlyJobInstances);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        Assert.Equal("You have no grant for this action.", problem.RootElement.GetProperty("title").GetString());
+        await AssertNothingStoredForNightlyJobAsync();
+    }
+
+    [Fact]
     public async Task A_start_on_a_record_outside_the_users_read_filters_is_the_400_of_an_unknown_record_and_stores_nothing()
     {
         // Anna reads only the requests whose title starts with "Request".
@@ -337,6 +364,17 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
 
     private Task<long> CountReceiptsAsync(Guid subject) =>
         fixture.CountAsync("SELECT count(*) FROM axis.process_start_receipts WHERE subject_id = @subject", ("subject", subject));
+
+    private async Task AssertNothingStoredForNightlyJobAsync()
+    {
+        Assert.True(fixture.Model.TryGetProcess("NightlyJob", out var process));
+        Assert.Equal(
+            0L,
+            await fixture.CountAsync("SELECT count(*) FROM axis.process_instances WHERE process_id = @process", ("process", process.Id)));
+        Assert.Equal(
+            0L,
+            await fixture.CountAsync("SELECT count(*) FROM axis.process_start_receipts WHERE process_id = @process", ("process", process.Id)));
+    }
 
     private async Task AssertNothingStoredAsync(Guid subject)
     {
