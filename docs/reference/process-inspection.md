@@ -400,10 +400,14 @@ grant, a required reason and one transaction. The
 [instance detail](#instance-detail) lists the commands the user may take. The
 [process inspector widget](process-inspector-widget.md) shows Cancel, Retry and Resolve.
 
-_(Planned for M14)_ Two more commands, **redeliver** and **discard**, act on a
-dead letter, see [Dead letters](process-events.md#dead-letters). Cancel also
-cancels an instance's running sub-processes, and an instance without a subject
-needs only the grant, see [process flow](process-flow.md).
+Two more commands, **redeliver** and **discard**, act on a dead letter of the
+process with the same `retry` grant, a required reason and an audit record, see
+[Dead letters](process-events.md#routes). The widget's buttons for them are
+_(planned for M14)_.
+
+_(Planned for M14)_ Cancel also cancels an instance's running sub-processes, and
+an instance without a subject needs only the grant, see
+[process flow](process-flow.md).
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances/{id}/retry

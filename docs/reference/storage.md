@@ -675,6 +675,13 @@ schema of the tenant database.
     - They never hold a token, a cookie or the user agent.
     - A session that expires writes nothing. A sign-out with no session writes
       nothing.
+  - **Dead letter actions.** A redeliver or a discard of a
+    [dead letter](process-events.md#routes) writes `deadLetter.redelivered` or
+    `deadLetter.discarded`, with the user as `actor`. The `application_id` is
+    set, and `entity_id`, `record_id` and `process_instance_id` are null,
+    because a dead letter has no subject record. The `details` are
+    `{ "deadLetterId", "kind", "triggerId", "eventId", "occurrenceAt", "reason" }`,
+    with null for the ids that the kind lacks.
 
   - An index on `(entity_id, record_id, occurred_at desc, id desc)` serves
     the [record history](record-api.md#audit-records-and-history).
