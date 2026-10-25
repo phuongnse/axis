@@ -150,6 +150,27 @@ public sealed class TaskClaimTests(TaskApiFixture fixture) : IClassFixture<TaskA
     }
 
     [Fact]
+    public async Task A_grant_holder_without_the_role_releases_another_users_claim()
+    {
+        var (task, _, instance) = await CreateTaskAsync(TenantA, "RoleApprove");
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        using var fiona = fixture.CreateClient().SignedInAs("fiona");
+        using var ines = fixture.CreateClient().SignedInAs("ines");
+        using var claim = await PostAsync(maria, task, "claim", TenantA);
+        Assert.Equal(HttpStatusCode.OK, claim.StatusCode);
+
+        using var release = await PostAsync(ines, task, "release", TenantA);
+
+        Assert.Equal(HttpStatusCode.OK, release.StatusCode);
+        using var released = await ReadJsonAsync(release);
+        Assert.Equal(JsonValueKind.Null, released.RootElement.GetProperty("claimedBy").ValueKind);
+        var (actor, actorName, _) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskReleased));
+        Assert.Equal(("ines", "Ines Inspector"), (actor, actorName));
+        using var completed = await PostAsync(fiona, task, "complete", TenantA, """{ "outcome": "approve" }""");
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+    }
+
+    [Fact]
     public async Task Both_routes_need_a_signed_in_user()
     {
         var (task, _, _) = await CreateTaskAsync(TenantA, "RoleApprove");

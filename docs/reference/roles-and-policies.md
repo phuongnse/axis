@@ -151,9 +151,8 @@ outcomes. Operators inspect the approvals and change nothing:
   `entity`, `dataSource`, `process` or `endpoint`, and one or more `actions`:
   - an `entity` takes `read`, `create`, `update` and `delete`;
   - a `dataSource` takes `read`;
-  - a `process` takes `start`, `inspect`, `cancel`, `retry` and `resolve`,
-    and `reassign` _(planned for M14)_, see
-    [Reassign](task-deadlines.md#reassign);
+  - a `process` takes `start`, `inspect`, `cancel`, `retry`, `resolve` and
+    `reassign`, see [Reassign](task-deadlines.md#reassign);
   - an `endpoint` takes `invoke`.
   - From M15 _(planned for M15)_, an `entity` also takes `export` and
     `import`, and a `dataSource` takes `export`. `export` reaches only what
@@ -259,7 +258,7 @@ Compile checks, each a compile error:
 
 The schema checks the shape of each property: `roles` and `grants` are
 non-empty lists, each action is one of `read`, `create`, `update`, `delete`,
-`start`, `invoke`, `inspect`, `cancel`, `retry` and `resolve`, and a grant has no other properties. A problem there is
+`start`, `invoke`, `inspect`, `cancel`, `retry`, `resolve` and `reassign`, and a grant has no other properties. A problem there is
 `AXC0004`.
 
 ## Record creator

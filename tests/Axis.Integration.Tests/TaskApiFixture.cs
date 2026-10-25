@@ -4,6 +4,7 @@ using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Naming;
+using Axis.Data.Profiles;
 using Axis.Data.Schema;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
@@ -127,6 +128,13 @@ public sealed class TaskApiFixture : IAsyncLifetime
         }
 
         await _database.DisposeAsync();
+    }
+
+    /// <summary>Gives <paramref name="userId"/> a user profile in <paramref name="tenant"/>, as a first sign-in does.</summary>
+    public async Task InsertProfileAsync(string tenant, string userId, string displayName)
+    {
+        await using var connection = await DataSource(tenant).OpenConnectionAsync();
+        await UserProfiles.UpsertAsync(connection, userId, displayName, null, null);
     }
 
     /// <summary>Inserts a department of <paramref name="tenant"/> with a new name and <paramref name="manager"/>, and returns its id.</summary>
