@@ -9,6 +9,9 @@ export type RecordValue = string | boolean | null
 /** One row of a child collection: its child fields' values. */
 export type RecordRow = Record<string, RecordValue>
 
+/** The labels of the reference fields of one child row, by field name. */
+export type RowLabels = Record<string, string>
+
 /** A value of a record field. A child collection holds its rows in order. */
 export type FieldValue = RecordValue | RecordRow[]
 
@@ -17,7 +20,8 @@ export interface RecordItem {
   id: string
   version: number
   values: Record<string, FieldValue>
-  labels: Record<string, string>
+  /** A reference field's label, and for a child collection with references the labels of each row, in row order. */
+  labels: Record<string, string | RowLabels[]>
 }
 
 /** One page of records of the record API. */

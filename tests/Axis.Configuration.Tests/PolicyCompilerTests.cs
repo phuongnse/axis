@@ -182,7 +182,7 @@ public sealed class PolicyCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.ActionWithoutRequiredGrant, PolicyFile, path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
-        Assert.Equal("AXC0244", diagnostic.Code);
+        Assert.Equal("AXC0248", diagnostic.Code);
         Assert.Null(result.Model);
     }
 

@@ -16,10 +16,10 @@ policy matrix, which are built.
   takes `export`. See [roles and policies](roles-and-policies.md).
 - `export` reaches only what the user's `read` grants reach: the same record
   filters and the same field lists. A grant with `export` and no `read` on the
-  same target in the same policy is `AXC0244`. The policy evaluator allows an
+  same target in the same policy is `AXC0248`. The policy evaluator allows an
   export only when the user also holds `read`.
 - `import` needs `create`, and a grant with `import` and no `create` on the
-  same entity in the same policy is `AXC0244`. An import with a `key` needs
+  same entity in the same policy is `AXC0248`. An import with a `key` needs
   `update` as well, and each row is checked against those grants as a record
   API write would be _(planned for M15)_.
 

@@ -7,7 +7,7 @@ import { useCanvasActions } from './canvasActions'
 import { formatValue } from './formatValue'
 import { navigateTarget, type NavigateOpen } from './navigateAction'
 import { newIdempotencyKey, startProcess } from './processes'
-import { fetchRecord, type RecordItem, type RecordRow, type RecordValue } from './records'
+import { fetchRecord, type RecordItem, type RecordRow, type RecordValue, type RowLabels } from './records'
 import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
 import { sectionsOf } from './useRecordForm'
@@ -25,6 +25,10 @@ interface DetailWidgetProps {
 type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
 
 const noRows: RecordRow[] = []
+const noLabels: RowLabels[] = []
+
+/** The labels of a child collection's rows, which are an array only for a collection with references. */
+const rowLabelsOf = (label: string | RowLabels[] | undefined) => (Array.isArray(label) ? label : noLabels)
 
 /**
  * Shows one record of the widget's entity, read-only. A widget that names a form shows the form's
@@ -196,6 +200,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
                       readOnly
                       field={field}
                       rows={Array.isArray(value) ? value : noRows}
+                      labels={rowLabelsOf(record.labels[field.name])}
                       onChange={() => {}}
                       errors={{}}
                       locale={locale}
