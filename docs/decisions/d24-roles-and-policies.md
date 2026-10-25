@@ -23,6 +23,8 @@ may not read. Everything below is in place. See
   - an `entity`, with `read`, `create`, `update` and `delete`;
   - a `dataSource`, with `read`;
   - a `process`, with `start`.
+    [D71](d71-task-deadlines-escalation-claim-and-reassign.md) adds
+    `reassign` in M14.
 - **Record filter:** an entity grant may have a `filter`, a boolean
   expression over the record. It may use reference paths, rules and
   `currentUser()`.

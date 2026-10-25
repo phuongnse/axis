@@ -54,6 +54,11 @@ sends it, see [Staging and the call](#staging-and-the-call). A package
 operation step stages its call, and a `package.call` item runs it, see
 [Staging a package call](#staging-a-package-call). A `raiseEvent`
 operation step stores its event, see [Raise event step](process-events.md#raise-event-step).
+_(Planned for M14)_ The worker also runs `timer`, `waitEvent` and `subProcess`
+steps and the `createRecord` and `notify` operations, with the work item kinds
+`process.timer`, `process.resume`, `task.escalate`, `task.deadline` and
+`notification.email`, see [process flow](process-flow.md),
+[task deadlines](task-deadlines.md) and [notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
 one transaction:
 
@@ -662,6 +667,7 @@ that tenant's work again once `migrate` has brought the tenant to its version.
 | `Worker:LeaseDuration` | `00:00:30` | How long a claim lasts before another worker can claim the item. |
 | `Worker:PollInterval` | `00:00:01` | How long the worker waits before it polls again when it found no work. |
 | `Worker:MetricsInterval` | `00:00:30` | How often the worker reads each tenant database for the [due work item and pending computed field gauges](#worker-metrics). It must be positive. |
+| `Worker:DeliveryAttempts` | `5` | _(Planned for M14.)_ Failures of a delivery before it becomes a [dead letter](process-events.md#dead-letters). It must be at least 1. |
 | `Health:Urls` | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else. |
 
 As environment variables they are `Worker__LeaseDuration`,

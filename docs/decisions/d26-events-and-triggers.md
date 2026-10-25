@@ -15,6 +15,9 @@ step and how each trigger starts a process.
   starts a process for one record of the process's subject entity.
   - Starting an operation without a process comes later.
   - So do processes without a subject.
+  - [D70](d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md)
+    replaces this line in M14: a process may have no subject, and a schedule
+    or a delete starts it with parameters.
 - **Event resource:** an `event` has a name, the `entity` it is about and
   typed payload `fields`, of scalar types only.
   - An occurrence of the event names one record of that entity.
@@ -49,6 +52,9 @@ step and how each trigger starts a process.
     and a connector output.
   - **Delete waits:** `delete` comes later, because a deleted record cannot
     be a subject.
+    [D70](d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md)
+    replaces this line: in M14 a delete trigger starts a process without a
+    subject.
 - **Starts that cannot happen:**
   - When the process already runs for the record, the trigger skips the
     start. This is no error, and it is the guard against loops.

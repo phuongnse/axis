@@ -151,7 +151,9 @@ outcomes. Operators inspect the approvals and change nothing:
   `entity`, `dataSource`, `process` or `endpoint`, and one or more `actions`:
   - an `entity` takes `read`, `create`, `update` and `delete`;
   - a `dataSource` takes `read`;
-  - a `process` takes `start`, `inspect`, `cancel`, `retry` and `resolve`;
+  - a `process` takes `start`, `inspect`, `cancel`, `retry` and `resolve`,
+    and `reassign` _(planned for M14)_, see
+    [Reassign](task-deadlines.md#reassign);
   - an `endpoint` takes `invoke`.
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees

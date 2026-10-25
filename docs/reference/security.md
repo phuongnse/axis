@@ -24,7 +24,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   has an `Oidc` block. `Claims` names the claims that give the user id, the
   display name and the roles. Each claim name is optional, and the defaults
   are `sub`, `name` and `roles`. The optional `EndpointAudience` is for
-  [machine callers](#machine-callers).
+  [machine callers](#machine-callers). _(Planned for M14)_ `Claims` also names
+  `Email` and `Locale`, by default `email` and `locale`, which each sign-in
+  writes to the user's profile, see
+  [User profiles](notifications.md#user-profiles).
 
   ```json
   "default": {

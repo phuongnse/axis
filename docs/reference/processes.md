@@ -2,9 +2,16 @@
 
 Detailed reference for processes: the resource shape, the steps, the compile
 checks, the start endpoint, the instance and task states, releases and running
-work, and the tables. The rest of the process reference is in four files:
+work, and the tables. The rest of the process reference is in these files:
 
 - [task-api.md](task-api.md): the task API.
+- [process-flow.md](process-flow.md): timer, wait for event and sub-process
+  steps, loops, the `createRecord` operation and processes without a subject
+  _(planned for M14)_.
+- [task-deadlines.md](task-deadlines.md): task escalations, deadlines, claim
+  and reassign _(planned for M14)_.
+- [notifications.md](notifications.md): the `notify` operation and in-app and
+  email notifications _(planned for M14)_.
 - [process-execution.md](process-execution.md): execution, connector calls,
   package operations and the worker settings.
 - [process-events.md](process-events.md): raised events, triggers and
@@ -213,6 +220,9 @@ a payment reference from the sample extension package, see
 ## Steps
 
 M3 has four step types. Wait for event, timer and sub-process come later.
+_(Planned for M14)_ `timer`, `waitEvent` and `subProcess` steps, and the
+`createRecord` and `notify` operations, see [process flow](process-flow.md)
+and [notifications](notifications.md#notify-operation).
 
 - **`decision`.** `branches` is an ordered list. Each branch has a `when`
   expression and a `next` step. The branches are evaluated in order, and the
@@ -225,7 +235,8 @@ M3 has four step types. Wait for event, timer and sub-process come later.
   - `assignee` has exactly one of `{ "user": "<expression>" }` and
     `{ "role": "<role name>" }`. A `user` expression gives `text`, a user id,
     such as `department.manager`. A `role` names a role the user must hold.
-    Queues come later.
+    Queues come later. _(Planned for M14)_ A user who holds the role may
+    claim the task, see [Claim and release](task-deadlines.md#claim-and-release).
   - `form` names a [form resource](frontend.md) whose entity is the subject
     entity. The task page shows it over the subject record.
   - `dueIn` is optional. It is a positive ISO 8601 duration in whole
@@ -233,7 +244,9 @@ M3 has four step types. Wait for event, timer and sub-process come later.
     of hours, minutes and seconds, such as `P3D`, `PT4H` or `P1DT12H`. Years
     and months are `AXC0084` until calendar durations come with the
     [time zone rule](../decisions/d22-current-time-and-time-zones.md), because they have no fixed length. The task's due date is the time the task is created plus `dueIn`. It is
-    shown only. Escalation needs timers, so it comes later.
+    shown only. Escalation needs timers, so it comes later. _(Planned for
+    M14)_ `escalations` and a `deadline`, see
+    [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
     the task is completed with it.
@@ -275,6 +288,9 @@ reported in one pass. See
 - Every step is reachable from `start` (`AXC0071`).
 - Every step has a path to an `end` step (`AXC0072`).
 - The steps form no cycle (`AXC0073`). See [Limits in M3](#limits-in-m3).
+  _(Planned for M14)_ A cycle that passes through a `task`, `timer` or
+  `waitEvent` step is allowed, and `AXC0073` reports only a cycle with no
+  waiting step, see [Loops](process-flow.md#loops).
 - A decision has at least one branch (`AXC0004`).
 - Each `when` and the `startCondition` expression give a boolean. They see
   the subject entity's fields, computed ones included, its child collections
@@ -457,7 +473,7 @@ caller, and its details add the endpoint's name.
 | State | Meaning |
 | --- | --- |
 | `running` | The instance has work that is ready or claimed by a worker. |
-| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations). |
+| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations). _(Planned for M14)_ It also waits for a timer, an event or a sub-process, see [process flow](process-flow.md). |
 | `completed` | The instance reached an `end` step. |
 | `failed` | A step failed. The error is in the history. |
 | `cancelled` | An operator cancelled the instance while it was `running` or `waiting`. It is an end state. See [Cancel](process-inspection.md#cancel). |
@@ -476,7 +492,9 @@ record. An operator can cancel a `running` or `waiting` instance, see
 | `cancelled` | An operator cancelled the task's instance. The task has no decision and leaves every inbox. See [Cancel](process-inspection.md#cancel). |
 
 A task has no other state. Its due date is only shown, so there is no overdue
-state.
+state. _(Planned for M14)_ A deadline makes a task `expired`, and the task API
+reports an open task past its due date as overdue, see
+[Task states](task-deadlines.md#task-states).
 
 ## Releases and running work
 
@@ -588,6 +606,9 @@ database, with history in `axis.__processes_migrations` (see
   A partial unique index on
   application, process and subject record, where the state is `running` or
   `waiting`, enforces one start per submission.
+  _(Planned for M14)_ The index treats a null subject as one value, and the
+  table gains `parameters`, `parent_instance_id` and `parent_step`, see
+  [process flow](process-flow.md).
   Three more indexes serve the inspector's instance list: one by application,
   process and start time, newest first, one by application, process, state and
   start time, and one by subject record.
@@ -673,7 +694,9 @@ database, with history in `axis.__processes_migrations` (see
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
 - `axis.connector_calls`: one row per staged connector
   call, see [Connector calls](process-execution.md#connector-calls). A unique index on
-  (`process_instance_id`, `step`) lets a step stage only one call. Times use
+  (`process_instance_id`, `step`) lets a step stage only one call. _(Planned for
+  M14)_ The index adds `staged_revision`, one call per pass of a
+  [loop](process-flow.md#loops). Times use
   the database clock. There is no column for a request or response body.
   Each call attempt row stores the `trace_id` of its attempt, see
   [Telemetry](../architecture.md#telemetry).
@@ -719,7 +742,9 @@ database, with history in `axis.__processes_migrations` (see
   | `trace_id` | `text`, null | The 32-hex trace id of the run that made the attempt or lookup. Null when no span was current, and for rows that existed before the column |
 - `axis.package_calls`: one row per staged package call, see
   [Package operations](process-execution.md#package-operations). A unique index on
-  (`process_instance_id`, `step`) lets a step stage only one call. Times use
+  (`process_instance_id`, `step`) lets a step stage only one call. _(Planned for
+  M14)_ The index adds `staged_revision`, one call per pass of a
+  [loop](process-flow.md#loops). Times use
   the database clock. There is no column for an output.
   Each call attempt row stores the `trace_id` of its attempt, see
   [Telemetry](../architecture.md#telemetry).
@@ -789,6 +814,10 @@ database, with history in `axis.__processes_migrations` (see
 
 - **No cycles.** A process may not contain a cycle. A loop with no task step
   would run for ever. A returned request starts a new instance, so M3 needs
-  no loops.
+  no loops. _(Planned for M14)_ Loops through a waiting step are allowed, see
+  [Loops](process-flow.md#loops).
 - **No user check.** The user id that a `user` assignee gives is not checked
-  against any list of users. A wrong id creates a task that nobody sees.
+  against any list of users. A wrong id creates a task that nobody sees. A
+  reassign in M14 checks its target against the
+  [user profiles](notifications.md#user-profiles), but the `user` expression
+  stays unchecked.
