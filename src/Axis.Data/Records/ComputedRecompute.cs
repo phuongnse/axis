@@ -358,7 +358,7 @@ internal static class ComputedRecompute
     {
         var columns = RecordQueries.Columns(child);
         var selected = new[] { EntityNaming.Quote(EntityNaming.IdColumn) }.Concat(columns.Select(field =>
-            EntityNaming.Quote(EntityNaming.Column(field.Name)) + (field.Type == FieldType.Decimal ? "::text" : "")));
+            EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : "")));
         await using var command = new NpgsqlCommand(
             $"SELECT {string.Join(", ", selected)} FROM {RecordQueries.Table(child)} WHERE {EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner ORDER BY {EntityNaming.Quote(EntityNaming.PositionColumn)}",
             connection,

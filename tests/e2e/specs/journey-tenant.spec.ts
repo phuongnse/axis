@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../test'
 import { csrfHeaders } from '../csrf'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { journeyApplications, journeyURL } from '../server-settings'

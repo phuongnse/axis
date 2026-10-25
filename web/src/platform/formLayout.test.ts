@@ -9,6 +9,8 @@ import {
   moveSection,
   outline,
   paletteFields,
+  removeSection,
+  removeStep,
   renameSection,
   sectionMovePlace,
 } from './formLayout'
@@ -376,5 +378,74 @@ describe('renameSection', () => {
   it('does nothing for the same name or a missing section', () => {
     expect(renameSection(stepped, 0, 'a')).toBeUndefined()
     expect(renameSection(stepped, 5, 'z')).toBeUndefined()
+  })
+})
+
+describe('removeSection', () => {
+  const stepped = {
+    sections: [
+      { name: 'Problem', fields: [{ field: 'title' }] },
+      { name: 'details', fields: [{ field: 'status' }] },
+    ],
+    steps: [
+      { title: { textKey: 'one' }, sections: ['Problem'] },
+      { title: { textKey: 'two' }, sections: ['details', 'problem'] },
+    ],
+  }
+
+  it('takes the section out of sections and of every step that lists it, ignoring letter case', () => {
+    const result = removeSection(stepped, 0)
+
+    expect(result?.sections).toEqual([stepped.sections[1]])
+    expect(result?.steps).toEqual([
+      { title: { textKey: 'one' }, sections: [] },
+      { title: { textKey: 'two' }, sections: ['details'] },
+    ])
+    expect(result?.step).toBe(0)
+  })
+
+  it('keeps the steps that do not list the section as they are', () => {
+    const result = removeSection(stepped, 1)
+
+    expect(result?.steps?.[0]).toBe(stepped.steps[0])
+    expect(result?.step).toBe(1)
+  })
+
+  it('leaves the steps alone for a section no step lists, and returns no steps without them', () => {
+    const unlisted = { sections: [{ name: 'other', fields: [] }], steps: [{ title: { textKey: 'one' }, sections: [] }] }
+
+    expect(removeSection(unlisted, 0)).toEqual({ sections: [], steps: unlisted.steps, step: undefined })
+    expect(removeSection({ sections: [{ name: 'a', fields: [] }] }, 0)).toEqual({
+      sections: [],
+      steps: undefined,
+      step: undefined,
+    })
+  })
+
+  it('finds nothing for a missing section', () => {
+    expect(removeSection(stepped, 2)).toBeUndefined()
+  })
+})
+
+describe('removeStep', () => {
+  const draftWithSteps = {
+    sections: [{ name: 'a', fields: [] }],
+    steps: [
+      { title: { textKey: 'one' }, sections: ['a'] },
+      { title: { textKey: 'two' }, sections: [] },
+    ],
+  }
+
+  it('takes the step out and leaves sections alone', () => {
+    expect(removeStep(draftWithSteps, 0)).toEqual({ steps: [{ title: { textKey: 'two' }, sections: [] }] })
+  })
+
+  it('returns no steps when the last step goes', () => {
+    expect(removeStep({ ...draftWithSteps, steps: [draftWithSteps.steps[0]] }, 0)).toEqual({ steps: undefined })
+  })
+
+  it('finds nothing for a missing step or a draft without steps', () => {
+    expect(removeStep(draftWithSteps, 2)).toBeUndefined()
+    expect(removeStep({ sections: [] }, 0)).toBeUndefined()
   })
 })

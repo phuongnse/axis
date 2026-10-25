@@ -4,7 +4,8 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts
-/// and their deployment bindings, and the data protection keys of the server. The caller supplies the connection to the platform database.
+/// and their deployment bindings, the data protection keys of the server and the append-only platform audit records.
+/// The caller supplies the connection to the platform database.
 /// </summary>
 public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> options) : DbContext(options)
 {
@@ -20,6 +21,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
 
+    public DbSet<PlatformAuditRecordRow> AuditRecords => Set<PlatformAuditRecordRow>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
 
@@ -29,9 +32,14 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
         modelBuilder.Entity<TenantRow>(tenant =>
         {
-            tenant.ToTable("tenants", table => table.HasCheckConstraint(
-                "ck_tenants_status",
-                "status IN ('provisioning', 'active', 'suspended')"));
+            tenant.ToTable("tenants", table =>
+            {
+                table.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended')");
+                table.HasCheckConstraint("ck_tenants_oidc_profile", "oidc_profile IN ('standard', 'fapi2')");
+                table.HasCheckConstraint("ck_tenants_oidc_client_key", "(oidc_client_key IS NULL) = (oidc_client_key_id IS NULL)");
+                table.HasCheckConstraint("ck_tenants_oidc_previous_client_key", "(oidc_previous_client_key IS NULL) = (oidc_previous_client_key_id IS NULL)");
+                table.HasCheckConstraint("ck_tenants_oidc_previous_needs_current", "oidc_previous_client_key IS NULL OR oidc_client_key IS NOT NULL");
+            });
             tenant.HasKey(t => t.Id).HasName("pk_tenants");
             tenant.Property(t => t.Id).HasColumnName("id").ValueGeneratedNever();
             tenant.Property(t => t.Status).HasColumnName("status");
@@ -46,6 +54,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.OidcAuthority).HasColumnName("oidc_authority");
             tenant.Property(t => t.OidcClientId).HasColumnName("oidc_client_id");
             tenant.Property(t => t.OidcClientSecret).HasColumnName("oidc_client_secret").HasColumnType("bytea");
+            tenant.Property(t => t.OidcProfile).HasColumnName("oidc_profile").HasDefaultValue(TenantSignInProfiles.Standard);
+            tenant.Property(t => t.OidcClientKeyId).HasColumnName("oidc_client_key_id");
+            tenant.Property(t => t.OidcClientKey).HasColumnName("oidc_client_key").HasColumnType("bytea");
+            tenant.Property(t => t.OidcPreviousClientKeyId).HasColumnName("oidc_previous_client_key_id");
+            tenant.Property(t => t.OidcPreviousClientKey).HasColumnName("oidc_previous_client_key").HasColumnType("bytea");
             tenant.Property(t => t.ClaimUserId).HasColumnName("claim_user_id");
             tenant.Property(t => t.ClaimDisplayName).HasColumnName("claim_display_name");
             tenant.Property(t => t.ClaimRoles).HasColumnName("claim_roles");
@@ -100,6 +113,19 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             key.Property(k => k.FriendlyName).HasColumnName("friendly_name");
             key.HasIndex(k => k.FriendlyName).IsUnique().HasDatabaseName("ix_data_protection_keys_friendly_name");
             key.Property(k => k.Xml).HasColumnName("xml").HasColumnType("bytea");
+        });
+
+        modelBuilder.Entity<PlatformAuditRecordRow>(record =>
+        {
+            record.ToTable("audit_records");
+            record.HasKey(r => r.Id).HasName("pk_audit_records");
+            record.Property(r => r.Id).HasColumnName("id").ValueGeneratedNever();
+            record.Property(r => r.OccurredAt).HasColumnName("occurred_at");
+            record.Property(r => r.Command).HasColumnName("command");
+            record.Property(r => r.TenantId).HasColumnName("tenant_id");
+            record.Property(r => r.OsUser).HasColumnName("os_user");
+            record.Property(r => r.Machine).HasColumnName("machine");
+            record.Property(r => r.Changed).HasColumnName("changed").HasColumnType("text[]");
         });
     }
 }

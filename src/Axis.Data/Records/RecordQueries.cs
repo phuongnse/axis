@@ -16,6 +16,8 @@ public static class RecordQueries
 {
     private const string DateFormat = "yyyy-MM-dd";
 
+    private const string CountSavepoint = "count";
+
     // PostgreSQL stores microseconds, so six fraction digits show every stored value exactly.
     private const string DateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'";
 
@@ -32,9 +34,14 @@ public static class RecordQueries
     /// match it, in both the page and the count. Returns <see langword="null"/> when the database
     /// rejects the condition for these records with a data exception (SQLSTATE class 22), such as
     /// an integer overflow. Any other database error is thrown.
+    /// When <paramref name="transaction"/>, the transaction of <paramref name="connection"/>, is given,
+    /// the count runs under a savepoint. A count that the database cancels at the statement timeout
+    /// (SQLSTATE 57014) then leaves <see cref="RecordPage.TotalCount"/> null, and the page is still
+    /// read. Without a transaction that error is thrown.
     /// </summary>
     public static async Task<RecordPage?> ListAsync(
         NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
         EntityModel entity,
         int page,
         int pageSize,
@@ -52,9 +59,15 @@ public static class RecordQueries
         var statement = ListStatement(entity, sort, filtered, condition);
         try
         {
-            long totalCount;
-            await using (var count = new NpgsqlCommand(statement.CountSql, connection))
+            long? totalCount = null;
+            if (transaction is not null)
             {
+                await transaction.SaveAsync(CountSavepoint, cancellationToken);
+            }
+
+            try
+            {
+                await using var count = new NpgsqlCommand(statement.CountSql, connection);
                 if (filtered)
                 {
                     count.Parameters.Add(SearchParameter(search!));
@@ -62,6 +75,16 @@ public static class RecordQueries
 
                 condition?.AddTo(count);
                 totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
+                if (transaction is not null)
+                {
+                    await transaction.ReleaseAsync(CountSavepoint, cancellationToken);
+                }
+            }
+            catch (PostgresException exception) when (transaction is not null && exception.SqlState == PostgresErrorCodes.QueryCanceled)
+            {
+                // The count alone ran too long, so the page still answers without a total.
+                await transaction.RollbackAsync(CountSavepoint, cancellationToken);
+                await transaction.ReleaseAsync(CountSavepoint, cancellationToken);
             }
 
             await using var command = new NpgsqlCommand(statement.PageSql, connection);
@@ -252,7 +275,7 @@ public static class RecordQueries
             ?? throw new InvalidOperationException("The application has no entity for the child collection.");
         var columns = Columns(child);
         var selected = columns.Select(field =>
-            EntityNaming.Quote(EntityNaming.Column(field.Name)) + (field.Type == FieldType.Decimal ? "::text" : ""));
+            EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : ""));
         await using var command = new NpgsqlCommand(
             $"SELECT {string.Join(", ", selected)} FROM {Table(child)} WHERE {EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner ORDER BY {EntityNaming.Quote(EntityNaming.PositionColumn)}",
             connection);
@@ -288,7 +311,7 @@ public static class RecordQueries
             row + EntityNaming.Quote(EntityNaming.IdColumn),
             row + EntityNaming.Quote(EntityNaming.VersionColumn),
             .. Columns(entity).Select(field =>
-                row + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (field.Type == FieldType.Decimal ? "::text" : "")),
+                row + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : "")),
             .. References(entity).Select((field, index) =>
                 $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"),
         ]);
@@ -351,7 +374,7 @@ public static class RecordQueries
             FieldType.Text or FieldType.Enum => JsonValue.Create(reader.GetString(ordinal)),
             FieldType.Integer => JsonValue.Create(reader.GetInt64(ordinal)),
             // The number text is written as is, so trailing zeros and every digit are kept.
-            FieldType.Decimal => (JsonValue)JsonNode.Parse(reader.GetString(ordinal))!,
+            FieldType.Decimal or FieldType.Money => (JsonValue)JsonNode.Parse(reader.GetString(ordinal))!,
             FieldType.Boolean => JsonValue.Create(reader.GetBoolean(ordinal)),
             FieldType.Date => JsonValue.Create(reader.GetFieldValue<DateOnly>(ordinal).ToString(DateFormat, CultureInfo.InvariantCulture)),
             // Npgsql reads timestamp with time zone as a UTC DateTime.

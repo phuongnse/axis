@@ -19,6 +19,7 @@ public static class ColumnTypes
             FieldType.Text => field.MaxLength is { } maxLength ? $"{VaryingPrefix}{maxLength})" : Text,
             FieldType.Integer => "bigint",
             FieldType.Decimal => field.Precision is { } precision ? $"numeric({precision},{field.Scale ?? 0})" : "numeric",
+            FieldType.Money => $"numeric({field.Precision},{field.Scale})",
             FieldType.Boolean => "boolean",
             FieldType.Date => "date",
             FieldType.DateTime => "timestamp with time zone",

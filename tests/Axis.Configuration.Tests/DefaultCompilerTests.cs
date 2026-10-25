@@ -112,6 +112,7 @@ public sealed class DefaultCompilerTests
             FieldType.Text => ("""{ "name": "extra", "type": "text", "default": "'x'" }""", true),
             FieldType.Integer => ("""{ "name": "extra", "type": "integer", "default": "1" }""", true),
             FieldType.Decimal => ("""{ "name": "extra", "type": "decimal", "default": "1.5" }""", true),
+            FieldType.Money => ("""{ "name": "extra", "type": "money", "currency": "VND", "default": "1500" }""", true),
             FieldType.Boolean => ("""{ "name": "extra", "type": "boolean", "default": "true" }""", true),
             FieldType.Date => ("""{ "name": "extra", "type": "date", "default": "date('2026-01-01')" }""", true),
             FieldType.DateTime => ("""{ "name": "extra", "type": "date-time", "default": "now()" }""", true),

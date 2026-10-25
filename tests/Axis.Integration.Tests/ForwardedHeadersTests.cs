@@ -10,7 +10,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Sign-in behind a proxy that ends TLS. The proxy at 10.0.0.5 is listed, so its forwarded scheme and host
 /// decide the tenant and the redirect address that goes to Keycloak. Tenant a is served at localhost and tenant
-/// b at b.example.test.
+/// b at b.example.test. The same forwarded scheme decides <c>Strict-Transport-Security</c>, and only the listed
+/// proxy can turn it on.
 /// </summary>
 public sealed class ForwardedHeadersTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
@@ -50,6 +51,22 @@ public sealed class ForwardedHeadersTests(KeycloakFixture keycloak) : IAsyncLife
         Assert.All(cookies, cookie => Assert.Contains("secure", cookie!, StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task A_listed_proxy_that_forwards_https_gets_strict_transport_security()
+    {
+        var context = await GetMeAsync("10.0.0.5", forwardedHost: HostB);
+
+        Assert.Equal("max-age=31536000", context.Response.Headers.StrictTransportSecurity.ToString());
+    }
+
+    [Fact]
+    public async Task An_unlisted_address_that_forwards_https_gets_no_strict_transport_security()
+    {
+        var context = await GetMeAsync("10.0.0.9", host: HostB);
+
+        Assert.False(context.Response.Headers.ContainsKey("Strict-Transport-Security"));
+    }
+
     public async ValueTask InitializeAsync()
     {
         var authority = (await keycloak.StartAsync()).ToString();
@@ -77,6 +94,22 @@ public sealed class ForwardedHeadersTests(KeycloakFixture keycloak) : IAsyncLife
             await _factory.DisposeAsync();
         }
     }
+
+    private Task<HttpContext> GetMeAsync(string remoteAddress, string host = "server.internal", string? forwardedHost = null) =>
+        Factory.Server.SendAsync(
+            request =>
+            {
+                request.Request.Method = HttpMethods.Get;
+                request.Request.Path = "/api/me";
+                request.Request.Host = new HostString(host);
+                request.Connection.RemoteIpAddress = IPAddress.Parse(remoteAddress);
+                request.Request.Headers["X-Forwarded-Proto"] = "https";
+                if (forwardedHost is not null)
+                {
+                    request.Request.Headers["X-Forwarded-Host"] = forwardedHost;
+                }
+            },
+            CancellationToken);
 
     private static void UseKeycloak(IWebHostBuilder builder, string tenant, string authority)
     {

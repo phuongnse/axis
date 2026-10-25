@@ -20,6 +20,9 @@
     "folder-comparison.ts",
     "hang-guard.ts",
     "hang-guard.test.ts",
+    "policy-violations.ts",
+    "policy-violations.test.ts",
+    "test.ts",
     "folder-comparison.test.ts",
     "specs"
   ]
