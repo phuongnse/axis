@@ -492,13 +492,24 @@ new check is a new compile diagnostic.
   expression type is `list<Target>`.
 - **`valueLabels`.** On an `enum` field, a map from every value to a
   `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
-  "priority.low" } }`. It covers every value, and its keys join `AXC0028`.
+  "priority.low" } }`. It covers every value, and its keys join `AXC0028`. An
+  enum parameter of a data source takes it too. A value that has no label, or a
+  label for a value that `values` does not have, is `AXC0242`, at
+  `/fields/{i}/valueLabels` or `/fields/{i}/valueLabels/{value}`. Values are
+  compared exactly, by letter case too. On a field of another type it is
+  `AXC0013`. The compile checks are built. Showing the labels on pages is
+  planned for M15.
 - **`default`.** An expression with no record in scope: literals, rule calls
   and `now()`. Its type must fit the field. It is not allowed with
   `expression`, `sequence` or `creator`, or on `reference`, `file`,
-  `references` and `child-collection` fields. The record command applies it
-  on create when the body leaves the field out, see
-  [create, update and delete](record-api.md#create-update-and-delete).
+  `references` and `child-collection` fields. The compiler checks it now. A
+  forbidden combination is `AXC0013` at `/fields/{i}/default`, and an
+  expression problem reports its own code at the same path. The compiled field
+  carries the checked default. The record command will apply it on create when
+  the body leaves the field out, see
+  [create, update and delete](record-api.md#create-update-and-delete). That is
+  still planned, so a default is not applied yet. `file` and `references` are
+  refused when those types arrive.
 - **`min` and `max`.** On `integer`, `decimal`, `money`, `date` and
   `date-time` fields, a literal of the field's type, with `min` at most `max`.
   **`minLength`** on `text`, at most `maxLength`. A value outside is a `400`
@@ -518,14 +529,14 @@ new check is a new compile diagnostic.
   ignoring letter case. They are the index columns, in order. An empty list,
   a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
 - **Field types.** An index holds a field that has a column. A
-  `child-collection` field is `AXC0244`. `references` and `file` fields join
+  `child-collection` field is `AXC0245`. `references` and `file` fields join
   it when they are built.
 - **Compile diagnostics.** Each is reported in the entity file:
-  - `AXC0242`: an index lists the same fields in the same order as an earlier
+  - `AXC0243`: an index lists the same fields in the same order as an earlier
     one, at `/indexes/{j}/fields`.
-  - `AXC0243`: a name in `fields` is no field of the entity, at
+  - `AXC0244`: a name in `fields` is no field of the entity, at
     `/indexes/{j}/fields/{k}`.
-  - `AXC0244`: a field of a type an index cannot hold, at the same path.
+  - `AXC0245`: a field of a type an index cannot hold, at the same path.
 - **Every reference.** Every `reference` field and every child table's
   `owner_id` is indexed without a declaration.
 

@@ -79,6 +79,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("settled_at");
 
+                    b.Property<long>("StagedRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staged_revision");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasColumnType("text")
@@ -92,11 +96,122 @@ namespace Axis.Processes.Storage.Migrations
                     b.HasKey("Id")
                         .HasName("pk_connector_calls");
 
-                    b.HasIndex("ProcessInstanceId", "Step")
+                    b.HasIndex("ProcessInstanceId", "Step", "StagedRevision")
                         .IsUnique()
-                        .HasDatabaseName("ux_connector_calls_process_instance_id_step");
+                        .HasDatabaseName("ux_connector_calls_process_instance_id_step_staged_revision");
 
                     b.ToTable("connector_calls", "axis");
+                });
+
+            modelBuilder.Entity("Axis.Processes.Storage.DeadLetterRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid?>("EmailId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("email_id");
+
+                    b.Property<Guid?>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("LastError")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("OccurrenceAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurrence_at");
+
+                    b.Property<Guid>("ProcessId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_id");
+
+                    b.Property<Guid?>("ProcessInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_instance_id");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<string>("SettledBy")
+                        .HasColumnType("text")
+                        .HasColumnName("settled_by");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<Guid?>("TriggerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trigger_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dead_letters");
+
+                    b.HasIndex("ApplicationId", "ProcessId", "State")
+                        .HasDatabaseName("ix_dead_letters_application_id_process_id_state");
+
+                    b.ToTable("dead_letters", "axis");
+                });
+
+            modelBuilder.Entity("Axis.Processes.Storage.DeliveryFailureRow", b =>
+                {
+                    b.Property<string>("Kind")
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Target")
+                        .HasColumnType("text")
+                        .HasColumnName("target");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("LastError")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Kind", "Target")
+                        .HasName("pk_delivery_failures");
+
+                    b.ToTable("delivery_failures", "axis");
                 });
 
             modelBuilder.Entity("Axis.Processes.Storage.EndpointReceiptRow", b =>
@@ -257,6 +372,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("settled_at");
 
+                    b.Property<long>("StagedRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staged_revision");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasColumnType("text")
@@ -275,9 +394,9 @@ namespace Axis.Processes.Storage.Migrations
                     b.HasKey("Id")
                         .HasName("pk_package_calls");
 
-                    b.HasIndex("ProcessInstanceId", "Step")
+                    b.HasIndex("ProcessInstanceId", "Step", "StagedRevision")
                         .IsUnique()
-                        .HasDatabaseName("ux_package_calls_process_instance_id_step");
+                        .HasDatabaseName("ux_package_calls_process_instance_id_step_staged_revision");
 
                     b.ToTable("package_calls", "axis");
                 });
@@ -532,6 +651,14 @@ namespace Axis.Processes.Storage.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("assignee_kind");
+
+                    b.Property<DateTimeOffset?>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at");
+
+                    b.Property<string>("ClaimedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("claimed_by");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")

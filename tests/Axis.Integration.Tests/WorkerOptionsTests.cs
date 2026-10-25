@@ -29,6 +29,24 @@ public sealed class WorkerOptionsTests
     }
 
     [Fact]
+    public void A_delivery_attempts_setting_below_one_stops_the_worker_at_startup_naming_the_setting()
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Worker:DeliveryAttempts"] = "0",
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains("Worker:DeliveryAttempts", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Under_directory_without_a_secret_key_the_worker_stops_at_startup_naming_the_setting()
     {
         var builder = WorkerBuilder(source: "directory", secretKey: null);
