@@ -17,6 +17,7 @@ internal static class TestOidc
             builder.UseSetting($"Tenants:{tenantId}:Oidc:Authority", "https://127.0.0.1:1/realms/axis");
             builder.UseSetting($"Tenants:{tenantId}:Oidc:ClientId", "axis");
             builder.UseSetting($"Tenants:{tenantId}:Oidc:ClientSecret", "test");
+            builder.UseSetting($"Tenants:{tenantId}:Oidc:ServiceAudience", "axis-services");
         }
 
         return builder;

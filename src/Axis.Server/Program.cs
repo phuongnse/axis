@@ -22,6 +22,7 @@ using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
@@ -40,6 +41,13 @@ if (string.IsNullOrWhiteSpace(platformConnectionString))
 // Read before any database work, so a bad value stops the start.
 var forwardedHeaders = ForwardedHeadersSettings.Load(builder.Configuration);
 builder.Services.PostConfigure<ForwardedHeadersOptions>(forwardedHeaders.Apply);
+
+// Read before any database work too, so a bad value stops the start.
+var rateLimits = RateLimitSettings.Load(builder.Configuration);
+builder.Services.AddSingleton(rateLimits);
+builder.Services.AddSingleton<RateLimitRefusals>();
+builder.Services.AddRateLimiter(_ => { });
+builder.Services.AddOptions<RateLimiterOptions>().Configure<RateLimitSettings, RateLimitRefusals>(RateLimits.Configure);
 
 // Both sources need the schema connection, a reader role and the key, so a missing setting stops the start
 // before any database work.
@@ -164,8 +172,9 @@ var sessionCookiePolicy = plainHttpAllowed ? CookieSecurePolicy.SameAsRequest : 
 builder.Services.TryAddSingleton(TimeProvider.System);
 
 // Record writes, process starts, tasks and GET /api/me read the session. It is the default
-// everywhere except endpoint paths, so a request that carries a session renews it. On endpoint
-// paths the default is the caller's bearer token, so a session cookie there is never read or renewed.
+// everywhere except endpoint paths and record routes with a bearer token, so a request that carries a
+// session renews it. On endpoint paths the default is the caller's bearer token, and on a record route
+// that has one it is the service account's, so a session cookie there is never read or renewed.
 builder.Services.AddAuthentication(EndpointCaller.RequestScheme)
     .AddSession(sessionCookiePolicy)
     .AddTenantSignIn(oidcTenants, sessionCookiePolicy, allowHttp: plainHttpAllowed)
@@ -212,26 +221,39 @@ app.UseTenantResolution();
 
 // Before the session, so a refused write does no work and renews no cookie.
 app.UseCsrfHeader();
+
+// The OIDC handler answers the callback inside authentication, so a limiter after it never sees the callback. The
+// callback is counted here, and only here.
+app.UseWhen(RateLimits.IsCallback, branch => branch.UseRateLimiter());
 app.UseAuthentication();
+
+// After authentication, so the caller is known and a refused request still gets its 401 or 403 first.
+app.UseWhen(context => !RateLimits.IsCallback(context), branch => branch.UseRateLimiter());
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.MapHealthEndpoints();
-app.MapPresentationEndpoints();
-app.MapSiteEndpoints();
-app.MapRecordEndpoints();
-app.MapFormStateEndpoints();
-app.MapProcessEndpoints();
-app.MapProcessInspectionEndpoints();
-app.MapProcessOperatorEndpoints();
-app.MapTaskEndpoints();
-app.MapDataSourceEndpoints();
-app.MapInboundEndpoints();
-app.MapUserEndpoints();
-app.MapStudioEndpoints();
-app.MapAuthEndpoints();
 
-app.MapFallbackToFile("index.html");
+// Open routes have no limit. Every other route has one, and a route that sets its own partition overrides its group's.
+var open = app.MapGroup(string.Empty).WithoutRateLimit();
+open.MapHealthEndpoints();
+open.MapPresentationEndpoints();
+
+var sessions = app.MapGroup(string.Empty).WithRateLimit(Partition.Session);
+sessions.MapSiteEndpoints();
+sessions.MapRecordEndpoints();
+sessions.MapFormStateEndpoints();
+sessions.MapProcessEndpoints();
+sessions.MapProcessInspectionEndpoints();
+sessions.MapProcessOperatorEndpoints();
+sessions.MapTaskEndpoints();
+sessions.MapDataSourceEndpoints();
+sessions.MapUserEndpoints();
+sessions.MapStudioEndpoints();
+sessions.MapAuthEndpoints();
+
+app.MapGroup(string.Empty).WithBearerRateLimit().MapInboundEndpoints();
+
+app.MapFallbackToFile("index.html").WithoutRateLimit();
 
 app.Run();
 

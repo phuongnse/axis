@@ -461,7 +461,7 @@ is `AXC0013`.
   and its expression type is `decimal`. A field with neither property, with
   both, with a code that is not an ISO 4217 code with minor units, or with a
   `currencyField` that is not a `text` or `enum` field of the entity is
-  `AXC0242`, at `/fields/{i}` when the currency is missing and at
+  `AXC0243`, at `/fields/{i}` when the currency is missing and at
   `/fields/{i}/currency` or `/fields/{i}/currencyField` otherwise. `currency`
   or `currencyField` on another type is `AXC0013`. A data source measure still
   refuses `money`, see [data sources](data-sources.md#aggregates).
@@ -502,13 +502,24 @@ new check is a new compile diagnostic.
   expression type is `list<Target>`.
 - **`valueLabels`.** On an `enum` field, a map from every value to a
   `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
-  "priority.low" } }`. It covers every value, and its keys join `AXC0028`.
+  "priority.low" } }`. It covers every value, and its keys join `AXC0028`. An
+  enum parameter of a data source takes it too. A value that has no label, or a
+  label for a value that `values` does not have, is `AXC0242`, at
+  `/fields/{i}/valueLabels` or `/fields/{i}/valueLabels/{value}`. Values are
+  compared exactly, by letter case too. On a field of another type it is
+  `AXC0013`. The compile checks are built. Showing the labels on pages is
+  planned for M15.
 - **`default`.** An expression with no record in scope: literals, rule calls
   and `now()`. Its type must fit the field. It is not allowed with
   `expression`, `sequence` or `creator`, or on `reference`, `file`,
-  `references` and `child-collection` fields. The record command applies it
-  on create when the body leaves the field out, see
-  [create, update and delete](record-api.md#create-update-and-delete).
+  `references` and `child-collection` fields. The compiler checks it now. A
+  forbidden combination is `AXC0013` at `/fields/{i}/default`, and an
+  expression problem reports its own code at the same path. The compiled field
+  carries the checked default. The record command will apply it on create when
+  the body leaves the field out, see
+  [create, update and delete](record-api.md#create-update-and-delete). That is
+  still planned, so a default is not applied yet. `file` and `references` are
+  refused when those types arrive.
 - **`min` and `max`.** On `integer`, `decimal`, `money`, `date` and
   `date-time` fields, a literal of the field's type, with `min` at most `max`.
   **`minLength`** on `text`, at most `maxLength`. A value outside is a `400`

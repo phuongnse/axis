@@ -110,6 +110,10 @@
           "uniqueItems": true,
           "items": { "type": "string" }
         },
+        "valueLabels": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/textReference" }
+        },
         "target": { "type": "string", "x-axis-reference": "entity" }
       }
     }
