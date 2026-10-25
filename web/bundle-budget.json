@@ -2,5 +2,6 @@
   "mainBaselineBytes": 537019,
   "allowedGrowthBytes": 51200,
   "chartChunk": "ChartDrawing-",
-  "designChunk": "StudioPageDesign-"
+  "designChunk": "StudioPageDesign-",
+  "dragChunk": "DragAndDrop-"
 }

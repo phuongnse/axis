@@ -79,11 +79,11 @@ The owner confirmed these points on issue #1140 on 2026-10-24.
     A save keeps it, so an undo after a save changes the draft and the next
     save writes it.
 - **Library:** drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
-  `@dnd-kit/utilities` (MIT) in Studio's lazy chunk. The core package, which
-  brings `@dnd-kit/accessibility` and `@dnd-kit/utilities` with it, measures
-  12.7 KB gzipped in the lazy chunk `StudioPageDesign`, which holds the canvas,
-  the palette and the library and loads when the Design tab opens.
-  `@dnd-kit/sortable` comes with the moves of existing widgets. The pre-1.0 `@dnd-kit/react` is not used. The library has a keyboard
+  `@dnd-kit/utilities` (MIT) in Studio's lazy chunk. The four `@dnd-kit` packages,
+  with `@dnd-kit/accessibility` among them, measure 15.4 KB gzipped together in the lazy
+  chunk `assets/DragAndDrop-*.js`, which both designers share. The lazy chunk
+  `StudioPageDesign` holds the canvas and the palette. Both chunks load when the
+  Design tab opens. `@dnd-kit/sortable` comes with the moves of existing widgets. The pre-1.0 `@dnd-kit/react` is not used. The library has a keyboard
   sensor and screen reader announcements. Native HTML drag and drop has no
   keyboard or touch support. Pragmatic drag and drop leaves keyboard support to
   the application.

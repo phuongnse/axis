@@ -19,6 +19,15 @@ export default defineConfig({
     // The server hosts the built SPA from its web root.
     outDir: '../src/Axis.Server/wwwroot',
     emptyOutDir: true,
+    rolldownOptions: {
+      output: {
+        // Both designers share the drag and drop library. It loads with the first Design tab, never with the main bundle.
+        codeSplitting: {
+          includeDependenciesRecursively: false,
+          groups: [{ name: 'DragAndDrop', test: /[\\/]node_modules[\\/]@dnd-kit[\\/]/ }],
+        },
+      },
+    },
   },
   server: {
     proxy: {
