@@ -49,14 +49,36 @@ public sealed class CronScheduleTests
     }
 
     [Fact]
-    public void An_hourly_schedule_in_berlin_skips_the_second_pass_of_the_repeated_hour_and_one_in_utc_does_not()
+    public void An_hourly_schedule_in_berlin_skips_the_second_pass_of_the_repeated_hour()
     {
         var schedule = Parse("0 * * * *");
-        var instant = Utc("2026-10-25T00:00:00Z");
+        var instant = Utc("2026-10-24T23:30:00Z");
 
-        // 02:00 CEST is 00:00Z, and 02:00 CET (01:00Z) is the repeated time.
-        Assert.Equal(Utc("2026-10-25T02:00:00Z"), schedule.NextAfter(instant, _berlin));
-        Assert.Equal(Utc("2026-10-25T01:00:00Z"), schedule.NextAfter(instant, TimeZoneInfo.Utc));
+        var occurrences = new List<DateTimeOffset>();
+        for (var count = 0; count < 2; count++)
+        {
+            instant = schedule.NextAfter(instant, _berlin);
+            occurrences.Add(instant);
+        }
+
+        // 01:00Z is the second 02:00 local, which runs once by D26.
+        Assert.Equal([Utc("2026-10-25T00:00:00Z"), Utc("2026-10-25T02:00:00Z")], occurrences);
+    }
+
+    [Fact]
+    public void An_hourly_schedule_in_utc_runs_every_hour_through_the_autumn_clock_change()
+    {
+        var schedule = Parse("0 * * * *");
+        var instant = Utc("2026-10-24T23:30:00Z");
+
+        var occurrences = new List<DateTimeOffset>();
+        for (var count = 0; count < 3; count++)
+        {
+            instant = schedule.NextAfter(instant, TimeZoneInfo.Utc);
+            occurrences.Add(instant);
+        }
+
+        Assert.Equal([Utc("2026-10-25T00:00:00Z"), Utc("2026-10-25T01:00:00Z"), Utc("2026-10-25T02:00:00Z")], occurrences);
     }
 
     [Fact]

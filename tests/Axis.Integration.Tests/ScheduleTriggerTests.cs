@@ -168,6 +168,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     public async Task Missed_hourly_occurrences_run_only_the_latest_once_and_the_next_is_due_an_hour_later()
     {
         var tenant = fixture.Tenant("e");
+        await AssertHourlyInUtcAsync(tenant);
         var record = await tenant.InsertRequestAsync(2000m, 1);
         var stored = await MoveBackThreeHoursAsync(tenant);
 
@@ -219,10 +220,12 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     public async Task Activating_the_same_release_again_keeps_a_missed_next_occurrence_and_the_worker_runs_only_the_latest()
     {
         var tenant = fixture.Tenant("g");
+        await AssertHourlyInUtcAsync(tenant);
         var record = await tenant.InsertRequestAsync(2000m, 1);
         var stored = await MoveBackThreeHoursAsync(tenant);
 
         await tenant.ActivateAsync(fixture.HourlyFolder, []);
+        await AssertHourlyInUtcAsync(tenant);
 
         var state = Assert.Single(await tenant.TriggerSchedulesAsync());
         var item = Assert.Single(await tenant.ScheduleItemsAsync());
@@ -306,18 +309,32 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         await AwayFromTheEndOfTheHourAsync(tenant);
         await DueAtAsync(tenant, _occurrence);
 
-        var (releaseId, _) = await tenant.ActivateAsync(fixture.HourlyFolder, []);
+        var (releaseId, _) = await tenant.ActivateAsync(
+            fixture.HourlyFolder,
+            [],
+            activatedAt: DateTimeOffset.Parse("2026-03-04T10:20:30.123456Z", CultureInfo.InvariantCulture));
 
+        var expected = DateTimeOffset.Parse("2026-03-04T11:00:00Z", CultureInfo.InvariantCulture);
         var state = Assert.Single(await tenant.TriggerSchedulesAsync());
         var item = Assert.Single(await tenant.ScheduleItemsAsync());
         Assert.Equal(releaseId, state.ReleaseId);
-        Assert.Equal(state.NextOccurrenceAt, item.DueAt);
-        Assert.Equal(
-            (true, true, true),
-            (
-                (bool)(await tenant.ScalarAsync("SELECT next_occurrence_at > now() FROM axis.trigger_schedules"))!,
-                (bool)(await tenant.ScalarAsync("SELECT next_occurrence_at <= now() + interval '1 hour' FROM axis.trigger_schedules"))!,
-                (bool)(await tenant.ScalarAsync("SELECT date_trunc('hour', next_occurrence_at) = next_occurrence_at FROM axis.trigger_schedules"))!));
+        Assert.Equal(expected, state.NextOccurrenceAt);
+        Assert.Equal(expected, item.DueAt);
+
+        // Each activation changes the schedule, so each one recomputes the next occurrence.
+        // Activating exactly on the hour gives the following hour, not the same instant.
+        await tenant.ActivateAsync(fixture.Folder, [], activatedAt: DateTimeOffset.Parse("2026-03-04T10:20:30Z", CultureInfo.InvariantCulture));
+        var (hourlyReleaseId, _) = await tenant.ActivateAsync(
+            fixture.HourlyFolder,
+            [],
+            activatedAt: DateTimeOffset.Parse("2026-03-04T12:00:00Z", CultureInfo.InvariantCulture));
+
+        var onTheHour = DateTimeOffset.Parse("2026-03-04T13:00:00Z", CultureInfo.InvariantCulture);
+        state = Assert.Single(await tenant.TriggerSchedulesAsync());
+        item = Assert.Single(await tenant.ScheduleItemsAsync());
+        Assert.Equal(hourlyReleaseId, state.ReleaseId);
+        Assert.Equal(onTheHour, state.NextOccurrenceAt);
+        Assert.Equal(onTheHour, item.DueAt);
     }
 
     /// <summary>Waits for the next hour when less than a minute of the current one is left, so that no hourly occurrence falls due while the test runs.</summary>
@@ -329,6 +346,13 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
             await Task.Delay(left + TimeSpan.FromSeconds(1), CancellationToken);
         }
     }
+
+    /// <summary>
+    /// Checks that the trigger is hourly in UTC. The hourly tests rely on even hour steps, which
+    /// Berlin breaks at the autumn clock change.
+    /// </summary>
+    private static async Task AssertHourlyInUtcAsync(ProcessStepFixture tenant) =>
+        Assert.Equal("0 * * * * UTC", await tenant.ScalarAsync("SELECT schedule || ' ' || time_zone FROM axis.trigger_schedules"));
 
     /// <summary>
     /// Moves the stored next occurrence and the schedule item three hours back, to the start of the
