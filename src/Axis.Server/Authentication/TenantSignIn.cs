@@ -18,6 +18,12 @@ internal static class TenantSignIn
 {
     public const string CallbackPath = "/api/auth/callback";
 
+    /// <summary>
+    /// Where the browser goes when the callback fails: the shell's sign-in page. The address holds no reason,
+    /// as the reason is only in the audit record.
+    /// </summary>
+    public const string FailedPath = "/?signIn=failed";
+
     public const string SchemePrefix = "oidc-";
 
     /// <summary>The request item that <c>OnTokenValidated</c> sets when it rejects the ID token.</summary>
@@ -145,19 +151,20 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 reason: null,
                 context.HttpContext.RequestAborted);
         };
-        // The response stays the handler's 500. The record is best effort, as the callback has already failed.
+        // The browser goes to the shell's sign-in page. The record is best effort, as the callback has already failed.
         options.Events.OnRemoteFailure = async context =>
         {
             var httpContext = context.HttpContext;
             try
             {
                 var query = httpContext.Request.Query;
-                var stateRead = context.Properties is not null;
+                var tokenRejected = httpContext.Items.ContainsKey(TenantSignIn.TokenRejectedItem);
+                // A rejected token comes after the state was read, but the failure it leaves carries no properties.
+                var stateRead = context.Properties is not null || tokenRejected;
                 var otherTenantReadsState = !stateRead
                     && query["state"].ToString() is { Length: > 0 } state
                     && OtherTenantReadsState(httpContext, tenantId, state);
                 var providerError = !string.IsNullOrEmpty(query["error"].ToString());
-                var tokenRejected = httpContext.Items.ContainsKey(TenantSignIn.TokenRejectedItem);
                 var reason = SignInRefusals.Classify(stateRead, otherTenantReadsState, providerError, context.Failure, tokenRejected);
                 await SessionAudit.AppendAsync(
                     httpContext,
@@ -171,6 +178,9 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             {
                 LogRefusalNotRecorded(httpContext.RequestServices.GetRequiredService<ILogger<TenantSignInOptions>>(), exception);
             }
+
+            context.Response.Redirect(TenantSignIn.FailedPath);
+            context.HandleResponse();
         };
     }
 

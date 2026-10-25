@@ -36,6 +36,8 @@ public static class RuntimeRoleGrants
         "process_start_receipts",
         "trigger_schedules",
         "trigger_starts",
+        "delivery_failures",
+        "dead_letters",
         "audit_records",
         "sequence_counters",
         "computed_field_errors",
