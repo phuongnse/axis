@@ -66,6 +66,26 @@ public sealed class WidgetActionCompilerTests
     }
 
     [Fact]
+    public void Action_naming_a_process_without_a_subject_is_reported_at_its_process()
+    {
+        using var folder = Folder("Order")
+            .With("processes/nightly-job.json", """
+                { "id": "99999999-9999-4999-8999-999999999992", "kind": "process", "name": "NightlyJob", "formatVersion": 1,
+                  "parameters": [{ "name": "days", "type": "integer" }],
+                  "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
+                """)
+            .With(PageFile, FormPage(Action("NightlyJob")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ActionProcessOverOtherEntity, PageFile, "/widgets/0/actions/0/process"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("has no subject", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Action_naming_a_process_over_another_entity_is_reported_at_its_process()
     {
         using var folder = Folder("Customer")

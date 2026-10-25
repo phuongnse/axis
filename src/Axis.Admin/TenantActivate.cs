@@ -22,6 +22,7 @@ internal sealed class TenantActivate(
     PackageCatalog packages,
     ModuleCatalog modules,
     int inlineRecomputeLimit,
+    TenantAudit audit,
     TextWriter output,
     TextWriter error,
     CancellationToken cancellationToken)
@@ -47,6 +48,11 @@ internal sealed class TenantActivate(
 
     private async Task<bool> ActivateTenantAsync(TenantRow row)
     {
+        if (!await audit.WriteAsync(row.Id, output, cancellationToken))
+        {
+            return false;
+        }
+
         await using var steps = new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, cancellationToken);
         var run = await new TenantReleaseActivation(inlineRecomputeLimit, output, error, cancellationToken).RunAsync(
             row.Id,

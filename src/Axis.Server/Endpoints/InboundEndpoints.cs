@@ -435,7 +435,7 @@ internal static class InboundEndpoints
 
     private static IResult Unauthorized(HttpRequest request)
     {
-        request.HttpContext.Response.Headers.WWWAuthenticate = "Bearer";
+        BearerChallenge.Write(request.HttpContext);
         return Results.Problem(
             statusCode: StatusCodes.Status401Unauthorized,
             title: "A valid bearer token is needed to call this endpoint.");

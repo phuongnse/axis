@@ -75,9 +75,10 @@ flowchart LR
      order of the entity files, then in field order. A later field with the
      same target is `AXC0039` at its `/fields/{i}/target`, naming the owner.
      A `reference` whose target is a child entity is `AXC0040` at
-     `/fields/{i}/target`. A `reference` or `child-collection` field on a
+     `/fields/{i}/target`. A `child-collection` field on a
      child entity is `AXC0041` at its `/fields/{i}/type`, so an entity whose
-     child collection names itself is `AXC0041`. See
+     child collection names itself is `AXC0041`. A `reference` field on a
+     child entity is allowed. See
      [Entity logic](resource-files.md#entity-logic) for why these limits exist.
    - **Sites and pages.** A site belongs to one application. Its `path` is
      lower-case letters, digits and hyphens, starting with a letter. A path
@@ -306,7 +307,7 @@ flowchart LR
      money field, and `min` and `max` also take a date or a date-time. A measure
      field whose path is already `AXC0043` is not reported again. A `sum`, `min`
      or `max` over a money field with a `currencyField`, without a group field
-     that reaches that currency field on the same record, is `AXC0244` at
+     that reaches that currency field on the same record, is `AXC0248` at
      `/aggregate/measures/{i}/field`. When the data source is grouped, the
      `sort` must exactly match a group field that is not a `reference`, or a
      measure, otherwise it is `AXC0045`. A parameter name that is
@@ -337,11 +338,13 @@ flowchart LR
      `/entity`, and its conditions are not checked. A name whose entity file
      was not loaded because of its own errors is not reported again. An
      `entity` that is a child entity is `AXC0068` at `/entity`, naming the
-     owner. Step names are unique ignoring letter case: a later step with a
+     owner. A process has `entity` or `parameters`, not both and not neither
+     (`AXC0244`). Without an `entity` it is checked over its `parameters`, see
+     [Compile checks](processes.md#compile-checks). Step names are unique ignoring letter case: a later step with a
      name already used is `AXC0069` at `/steps/{i}/name`, naming the first
      step. `start`, each branch `next`, each `otherwise`, each operation
-     `next` and each task outcome `next` must name a step, ignoring letter
-     case, otherwise it is `AXC0070` at that property. A
+     `next`, each task outcome `next` and each task `deadline` `next` must name a
+     step, ignoring letter case, otherwise it is `AXC0070` at that property. A
      transition goes to the first step with its name. A step that cannot be
      reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
      when `start` is unknown. A step with no path to an `end` step is
@@ -351,7 +354,7 @@ flowchart LR
      transitions out of a `task` step are not followed, so a loop through a
      task is allowed. The steps are walked in
      file order, with the branches, then `otherwise`, then `next`, then the
-     outcomes. A step whose name is
+     outcomes, then the deadline's `next`. A step whose name is
      already `AXC0069` is left out of `AXC0071`, `AXC0072` and `AXC0073`. The
      `startCondition` expression and each decision `when` are parsed and
      type-checked as a boolean over the entity's fields, computed ones
@@ -424,7 +427,8 @@ flowchart LR
      reported again. A form over another entity than the process's is
      `AXC0083` at `/steps/{i}/form`. It is not checked when either entity is
      unknown. A `dueIn` that is not a positive whole-number duration is
-     `AXC0084` at `/steps/{i}/dueIn`. A later outcome with a name already
+     `AXC0084` at `/steps/{i}/dueIn`, and so is a `deadline` `after`, at
+     `/steps/{i}/deadline/after`. A later outcome with a name already
      used in the step, ignoring letter case, is `AXC0085` at
      `/steps/{i}/outcomes/{j}/name`. The task `label` and each outcome
      `label` join the `AXC0028` check. A decision with no branches, an

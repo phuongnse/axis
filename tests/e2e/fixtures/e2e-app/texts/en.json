@@ -50,6 +50,7 @@
     "note.lines": "Lines",
     "noteLine.description": "Description",
     "noteLine.quantity": "Quantity",
+    "noteLine.category": "Category",
     "noteSections.main": "Main",
     "noteSections.details": "Details",
     "noteWizard.main": "Note",

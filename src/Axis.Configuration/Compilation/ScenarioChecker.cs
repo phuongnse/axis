@@ -247,6 +247,15 @@ internal static class ScenarioChecker
 
             references.Add(scenario, $"{path}/process", ReferenceRelations.ScenarioProcess, ResourceNode.Of(process));
 
+            if (process.Entity is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownScenarioProcess,
+                    $"The process '{process.Name}' has no subject. A scenario starts a process for a record of its own entity.",
+                    $"{path}/process");
+                return;
+            }
+
             // A process over an unknown entity has a diagnostic of its own.
             if (entity is not null && findEntity(process.Entity) is { } processEntity && !ReferenceEquals(processEntity, entity))
             {
@@ -277,7 +286,7 @@ internal static class ScenarioChecker
 
         var taskName = step.Step!;
         var tasks = processes
-            .Where(process => ReferenceEquals(findEntity(process.Entity), entity))
+            .Where(process => process.Entity is { } subjectName && ReferenceEquals(findEntity(subjectName), entity))
             .SelectMany(process => process.Steps)
             .Where(candidate => candidate.Type == ProcessStepDefinition.TaskStep && Same(candidate.Name, taskName))
             .ToList();

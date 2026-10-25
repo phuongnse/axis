@@ -146,7 +146,7 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   the money field's `currencyField` on the same record, through the same
   reference fields. A root `currency` field does not cover `order.amount`,
   whose currency is `order.currency`. Without it the compile fails with
-  `AXC0244`. A `count` and a money field with a fixed `currency` need no
+  `AXC0248`. A `count` and a money field with a fixed `currency` need no
   currency group. A grouped row keeps the currency with each amount: the
   currency code is in the group column, and the total is summed in
   PostgreSQL `numeric`, so no digit is lost.
@@ -260,7 +260,7 @@ see the Data sources bullet of the Resolve step in
   is not reported again.
 - A `sum`, `min` or `max` over a money field with a `currencyField` needs a
   group field that reaches that currency field on the same record. Otherwise
-  it is `AXC0244` at `/aggregate/measures/{i}/field`. A `count`, a money field
+  it is `AXC0248` at `/aggregate/measures/{i}/field`. A `count`, a money field
   with a fixed `currency`, and a money field whose `currencyField` is
   already `AXC0243` are not reported.
 - When the data source is grouped, `sort` names a group field whose path

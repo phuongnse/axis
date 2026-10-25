@@ -122,9 +122,15 @@ internal static class ProcessOperatorEndpoints
             return InstanceNotFound();
         }
 
-        if (!application.TryGetEntity(model.Entity.Name, out var entity))
+        // No instance of a process without a subject can exist yet.
+        if (model.Entity is not { } subjectEntity)
         {
-            throw new InvalidOperationException($"The subject entity '{model.Entity.Name}' of process '{model.Name}' is not in the model.");
+            return InstanceNotFound();
+        }
+
+        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
         }
 
         var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
@@ -238,9 +244,15 @@ internal static class ProcessOperatorEndpoints
             return InstanceNotFound();
         }
 
-        if (!application.TryGetEntity(model.Entity.Name, out var entity))
+        // No instance of a process without a subject can exist yet.
+        if (model.Entity is not { } subjectEntity)
         {
-            throw new InvalidOperationException($"The subject entity '{model.Entity.Name}' of process '{model.Name}' is not in the model.");
+            return InstanceNotFound();
+        }
+
+        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
         }
 
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
@@ -374,9 +386,15 @@ internal static class ProcessOperatorEndpoints
             return CallNotFound();
         }
 
-        if (!application.TryGetEntity(model.Entity.Name, out var entity))
+        // No instance of a process without a subject can exist yet.
+        if (model.Entity is not { } subjectEntity)
         {
-            throw new InvalidOperationException($"The subject entity '{model.Entity.Name}' of process '{model.Name}' is not in the model.");
+            return InstanceNotFound();
+        }
+
+        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
         }
 
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
