@@ -1,6 +1,7 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { Card, Segmented, Typography } from 'antd'
 import {
+  memo,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -47,9 +48,13 @@ const phoneWidth = 375
 const frameSelector = '[data-testid="studio-canvas-widget"]'
 const actionSelector = '[data-action]'
 
+// A leaf redraws only when the answer gives it a new widget, not on a draft edit or a drag.
+const CanvasLeaf = memo(PageLeaf)
+
 /**
  * Draws the unsaved draft of a page with the site's own widgets. It posts the draft to the draft page metadata
- * route 300 ms after the last edit and redraws from the answer. While it is mounted, the widgets' `/api/apps/`
+ * route 300 ms after the last edit and redraws from the answer. A widget redraws only from a new answer, not on each
+ * edit or on a drag over the same target. While it is mounted, the widgets' `/api/apps/`
  * calls get placeholder data in the browser and none goes to the server. A click or a submit on the canvas does
  * nothing. A widget that does not compile draws as a placeholder with its diagnostics. A widget that a diagnostic
  * names is marked. The width switch draws the page at phone width, 375 px, with the phone layout. A click selects the
@@ -211,7 +216,7 @@ export function StudioPageCanvas({
                 <WidgetTree
                   widgets={page.widgets}
                   renderLeaf={(widget) => (
-                    <PageLeaf
+                    <CanvasLeaf
                       widget={widget}
                       sitePath={application}
                       pageName={page.name}
