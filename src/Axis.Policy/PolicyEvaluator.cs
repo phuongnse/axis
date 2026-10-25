@@ -94,6 +94,45 @@ public static class PolicyEvaluator
             && Access(application, held, entity, PolicyAction.Read).Granted;
     }
 
+    /// <summary>
+    /// Whether <paramref name="roles"/> grant <c>export</c> on <paramref name="entity"/>. That takes
+    /// an <c>export</c> grant and a <c>read</c> grant on the entity, which may come from different
+    /// roles, because an export reaches only what <c>read</c> reaches.
+    /// </summary>
+    public static bool AllowsExport(ApplicationModel application, IEnumerable<string> roles, EntityModel entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        var held = roles.ToList();
+        return Grants(application, held).Any(grant => grant.Entity?.Id == entity.Id && grant.Actions.Contains(PolicyAction.Export))
+            && Access(application, held, entity, PolicyAction.Read).Granted;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="roles"/> grant <c>export</c> on <paramref name="dataSource"/>. That
+    /// takes an <c>export</c> grant on the data source and everything <see cref="AllowsRead"/>
+    /// needs, because an export reaches only what <c>read</c> reaches.
+    /// </summary>
+    public static bool AllowsExport(ApplicationModel application, IEnumerable<string> roles, DataSourceModel dataSource)
+    {
+        ArgumentNullException.ThrowIfNull(dataSource);
+        var held = roles.ToList();
+        return Grants(application, held).Any(grant => grant.DataSource?.Id == dataSource.Id && grant.Actions.Contains(PolicyAction.Export))
+            && AllowsRead(application, held, dataSource);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="roles"/> grant <c>import</c> on <paramref name="entity"/>. That takes
+    /// an <c>import</c> grant and a <c>create</c> grant on the entity, which may come from different
+    /// roles, because an import writes through <c>create</c>.
+    /// </summary>
+    public static bool AllowsImport(ApplicationModel application, IEnumerable<string> roles, EntityModel entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        var held = roles.ToList();
+        return Grants(application, held).Any(grant => grant.Entity?.Id == entity.Id && grant.Actions.Contains(PolicyAction.Import))
+            && Access(application, held, entity, PolicyAction.Create).Granted;
+    }
+
     /// <summary>Whether <paramref name="roles"/> grant <c>start</c> on <paramref name="process"/>.</summary>
     public static bool AllowsStart(ApplicationModel application, IEnumerable<string> roles, ProcessModel process)
     {

@@ -374,8 +374,8 @@ agrees it. The answer is:
   the other kinds. A column is identified by `kind` and `name`, not by `id`.
 - **`actions`.** On a target, they are the actions it accepts, in the order
   [roles and policies](roles-and-policies.md) lists them. An
-  entity takes `read`, `create`, `update` and `delete`. A data source takes
-  `read`. A process takes `start`, `inspect`, `cancel`, `retry` and `resolve`.
+  entity takes `read`, `create`, `update`, `delete`, `export` and `import`.
+  A data source takes `read` and `export`. A process takes `start`, `inspect`, `cancel`, `retry` and `resolve`.
   An endpoint takes `invoke`.
 - **Rows and cells.** Each declared role is one row, in the order of the
   `roles` resources. Each row has one cell per column, in column order, empty
@@ -384,6 +384,10 @@ agrees it. The answer is:
   [combining grants](security.md#combining-grants). An action that the
   column does not accept is left out. The grant still lists its actions as
   written.
+- **`export` and `import`.** An entity cell has `export` only when it also has
+  `read`, and `import` only when it also has `create`. A data source cell has
+  `export` only when it also has `read`, so it is dropped with `read` when the
+  role cannot read the root entity. This is what the policy evaluator decides.
 - **Data source `read`.** A data source cell has `read` only when the role can
   also read the data source's root entity. When it has a `read` grant but not
   that entity read, `read` is left out and `missingEntityRead` names the root

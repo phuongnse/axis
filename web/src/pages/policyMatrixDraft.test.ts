@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { newGrant, newPolicy, ownGrantIndexes } from './policyMatrixDraft'
+import { grantActions, newGrant, newPolicy, ownGrantIndexes, targetActions } from './policyMatrixDraft'
 
 describe('ownGrantIndexes', () => {
   const grants = [
@@ -19,6 +19,31 @@ describe('ownGrantIndexes', () => {
 
   it('skips a grant that names more than one target', () => {
     expect(ownGrantIndexes(grants, { kind: 'process', name: 'Other' })).toEqual([])
+  })
+})
+
+describe('grantActions and targetActions', () => {
+  it("takes each kind's actions from the schema it is given", () => {
+    const schema = {
+      $defs: {
+        entityAction: { enum: ['wave', 'bow'] },
+        dataSourceAction: { enum: ['peek'] },
+        processAction: { enum: [] },
+      },
+    }
+
+    expect(grantActions(schema, 'entity')).toEqual(['wave', 'bow'])
+    expect(grantActions(schema, 'dataSource')).toEqual(['peek'])
+    expect(grantActions(schema, 'process')).toEqual([])
+    expect(grantActions(schema, 'endpoint')).toEqual([])
+    expect(grantActions({}, 'entity')).toEqual([])
+  })
+
+  it('reads policy.schema.json for the real lists', () => {
+    expect(targetActions('entity')).toEqual(['read', 'create', 'update', 'delete', 'export', 'import'])
+    expect(targetActions('dataSource')).toEqual(['read', 'export'])
+    expect(targetActions('process')).toEqual(['start', 'inspect', 'cancel', 'retry', 'resolve'])
+    expect(targetActions('endpoint')).toEqual(['invoke'])
   })
 })
 

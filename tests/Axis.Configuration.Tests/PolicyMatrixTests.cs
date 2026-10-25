@@ -58,6 +58,10 @@ public sealed class PolicyMatrixTests
                         PolicyEvaluator.Access(model, held, entity, action).Granted,
                         Cell(row, "entity", entity.Name).Actions.Contains(Name(action)));
                 }
+
+                var entityCell = Cell(row, "entity", entity.Name);
+                Assert.Equal(PolicyEvaluator.AllowsExport(model, held, entity), entityCell.Actions.Contains("export"));
+                Assert.Equal(PolicyEvaluator.AllowsImport(model, held, entity), entityCell.Actions.Contains("import"));
             }
 
             foreach (var dataSource in model.DataSources)
@@ -65,6 +69,9 @@ public sealed class PolicyMatrixTests
                 Assert.Equal(
                     PolicyEvaluator.AllowsRead(model, held, dataSource),
                     Cell(row, "dataSource", dataSource.Name).Actions.Contains("read"));
+                Assert.Equal(
+                    PolicyEvaluator.AllowsExport(model, held, dataSource),
+                    Cell(row, "dataSource", dataSource.Name).Actions.Contains("export"));
             }
 
             foreach (var process in model.Processes)
@@ -153,6 +160,51 @@ public sealed class PolicyMatrixTests
         var allowed = Cell(Role(matrix, "manager"), "dataSource", "RequestList");
         Assert.Equal(["read"], allowed.Actions);
         Assert.Null(allowed.MissingEntityRead);
+    }
+
+    [Fact]
+    public void An_export_or_import_shows_only_when_the_role_also_holds_read_or_create_and_a_data_source_export_needs_the_entity_read()
+    {
+        using var folder = Folder(
+            ("policies/employee.json", Policy("12", "EmployeeAccess", """["employee"]""", """
+                [
+                  { "dataSource": "RequestList", "actions": ["read", "export"] },
+                  { "entity": "Request", "actions": ["export", "import"] }
+                ]
+                """)),
+            ("policies/manager.json", Policy("13", "ManagerAccess", """["manager"]""", """
+                [
+                  { "dataSource": "RequestList", "actions": ["read", "export"] },
+                  { "entity": "Request", "actions": ["read", "export", "import"] }
+                ]
+                """)));
+
+        var matrix = ApplicationCompiler.Compile(folder.Path).PolicyMatrix;
+
+        // The employee cannot read the entity, so the data source shows neither read nor export,
+        // and the entity shows neither export nor import.
+        var employee = Role(matrix, "employee");
+        var blocked = Cell(employee, "dataSource", "RequestList");
+        Assert.Empty(blocked.Actions);
+        Assert.Equal("Request", blocked.MissingEntityRead);
+        Assert.Empty(Cell(employee, "entity", "Request").Actions);
+
+        // The manager holds read, so the export shows, but an import without create does not.
+        var manager = Role(matrix, "manager");
+        Assert.Equal(["read", "export"], Cell(manager, "dataSource", "RequestList").Actions);
+        Assert.Equal(["read", "export"], Cell(manager, "entity", "Request").Actions);
+    }
+
+    [Fact]
+    public void Each_kind_takes_the_actions_of_policy_schema_json_and_the_flat_list_is_their_union()
+    {
+        string[] kinds = ["entity", "dataSource", "process", "endpoint"];
+
+        Assert.Equal(["read", "create", "update", "delete", "export", "import"], PolicyActions.Of("entity"));
+        Assert.Equal(["read", "export"], PolicyActions.Of("dataSource"));
+        Assert.Equal(
+            PolicyActions.All.Order(StringComparer.Ordinal),
+            kinds.SelectMany(PolicyActions.Of).Distinct().Order(StringComparer.Ordinal));
     }
 
     [Fact]

@@ -426,11 +426,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
     `<Role>Access` that names other roles counts as shared too. Its row is
     read-only, with a message.
   - Only the actions a target takes can be chosen. An entity takes `read`,
-    `create`, `update` and `delete`. A data source takes `read`. A process
-    takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
-    takes `invoke`. Filter and fields are only on entity grants. An entity
-    also takes `export` and `import`, and a data source `export`
-    _(planned for M15)_.
+    `create`, `update`, `delete`, `export` and `import`. A data source takes
+    `read` and `export`. A process takes `start`, `inspect`, `cancel`,
+    `retry` and `resolve`. An endpoint takes `invoke`. Studio reads each list
+    from `policy.schema.json`. Filter and fields are only on entity grants.
   - The view reads the [policy matrix route](authoring.md#policy-matrix).
   - A Resources / Policy matrix switch sits under the application picker. The
     matrix view is kept in the address as `&view=policies`, so a reload or a

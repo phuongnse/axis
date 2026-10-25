@@ -137,13 +137,18 @@ public sealed class PolicyCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "entity": "Request", "actions": ["read", "start"] }""", "/grants/0/actions/1", "An entity grant cannot allow 'start'. It takes only 'read', 'create', 'update' and 'delete'.")]
-    [InlineData("""{ "dataSource": "RequestList", "actions": ["read", "update"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'update'. It takes only 'read'.")]
+    [InlineData("""{ "entity": "Request", "actions": ["read", "start"] }""", "/grants/0/actions/1", "An entity grant cannot allow 'start'. It takes only 'read', 'create', 'update', 'delete', 'export' and 'import'.")]
+    [InlineData("""{ "dataSource": "RequestList", "actions": ["read", "update"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'update'. It takes only 'read' and 'export'.")]
     [InlineData("""{ "process": "RequestReview", "actions": ["read"] }""", "/grants/0/actions/0", "A process grant cannot allow 'read'. It takes only 'start', 'inspect', 'cancel', 'retry' and 'resolve'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke", "read"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'read'. It takes only 'invoke'.")]
-    [InlineData("""{ "entity": "Request", "actions": ["inspect"] }""", "/grants/0/actions/0", "An entity grant cannot allow 'inspect'. It takes only 'read', 'create', 'update' and 'delete'.")]
+    [InlineData("""{ "entity": "Request", "actions": ["inspect"] }""", "/grants/0/actions/0", "An entity grant cannot allow 'inspect'. It takes only 'read', 'create', 'update', 'delete', 'export' and 'import'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["inspect"] }""", "/grants/0/actions/0", "An endpoint grant cannot allow 'inspect'. It takes only 'invoke'.")]
     [InlineData("""{ "process": "RequestReview", "actions": ["invoke"] }""", "/grants/0/actions/0", "A process grant cannot allow 'invoke'. It takes only 'start', 'inspect', 'cancel', 'retry' and 'resolve'.")]
+    [InlineData("""{ "dataSource": "RequestList", "actions": ["read", "import"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'import'. It takes only 'read' and 'export'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["start", "export"] }""", "/grants/0/actions/1", "A process grant cannot allow 'export'. It takes only 'start', 'inspect', 'cancel', 'retry' and 'resolve'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["import"] }""", "/grants/0/actions/0", "A process grant cannot allow 'import'. It takes only 'start', 'inspect', 'cancel', 'retry' and 'resolve'.")]
+    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["export"] }""", "/grants/0/actions/0", "An endpoint grant cannot allow 'export'. It takes only 'invoke'.")]
+    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke", "import"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'import'. It takes only 'invoke'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "filter": "true" }""", "/grants/0/filter", "An endpoint grant has no 'filter'. Only an entity grant limits rows.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "fields": ["owner"] }""", "/grants/0/fields", "An endpoint grant has no 'fields'. Only an entity grant limits fields.")]
     [InlineData("""{ "process": "RequestReview", "endpoint": "SubmitRequest", "actions": ["start"] }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 2.")]
@@ -160,6 +165,59 @@ public sealed class PolicyCompilerTests
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.InvalidGrant, PolicyFile, path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
         Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""[{ "entity": "Request", "actions": ["export"] }]""", "/grants/0/actions/0", "An 'export' on the entity 'Request' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
+    [InlineData("""[{ "entity": "Request", "actions": ["create", "export", "import"] }]""", "/grants/0/actions/1", "An 'export' on the entity 'Request' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
+    [InlineData("""[{ "dataSource": "RequestList", "actions": ["export"] }]""", "/grants/0/actions/0", "An 'export' on the data source 'RequestList' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
+    [InlineData("""[{ "entity": "Request", "actions": ["read", "import"] }]""", "/grants/0/actions/1", "An 'import' on the entity 'Request' needs a 'create' grant on it in the same policy. An import writes through 'create'.")]
+    [InlineData("""[{ "entity": "Request", "actions": ["read"] }, { "entity": "Request", "actions": ["import"] }, { "dataSource": "RequestList", "actions": ["read"] }]""", "/grants/1/actions/0", "An 'import' on the entity 'Request' needs a 'create' grant on it in the same policy. An import writes through 'create'.")]
+    [InlineData("""[{ "entity": "Request", "actions": ["read"] }, { "dataSource": "RequestList", "actions": ["export"] }]""", "/grants/1/actions/0", "An 'export' on the data source 'RequestList' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
+    public void An_export_without_read_or_an_import_without_create_is_reported_at_the_action(string grants, string path, string message)
+    {
+        using var folder = Folder(Policy("""["employee"]""", grants));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.ActionWithoutRequiredGrant, PolicyFile, path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+        Assert.Equal("AXC0242", diagnostic.Code);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_export_or_import_with_its_companion_action_on_the_same_target_compiles()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """
+            [
+              { "entity": "Request", "actions": ["read", "create", "export", "import"] },
+              { "dataSource": "RequestList", "actions": ["read"] },
+              { "dataSource": "requestlist", "actions": ["export"] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var grants = Assert.Single(result.Model!.Policies).Grants;
+        Assert.Equal([PolicyAction.Read, PolicyAction.Create, PolicyAction.Export, PolicyAction.Import], grants[0].Actions);
+        Assert.Equal([PolicyAction.Export], grants[2].Actions);
+    }
+
+    [Fact]
+    public void A_companion_action_is_matched_to_its_target_ignoring_letter_case()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """
+            [
+              { "entity": "request", "actions": ["read"] },
+              { "entity": "REQUEST", "actions": ["export"] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
     }
 
     [Fact]
@@ -400,6 +458,53 @@ public sealed class PolicyCompilerTests
         Assert.Empty(PolicyEvaluator.Fields(model, ["employee"], request, PolicyAction.Delete)!);
         Assert.Empty(PolicyEvaluator.Fields(model, ["manager"], request, PolicyAction.Read)!);
         Assert.Null(PolicyEvaluator.Fields(everyField, ["employee"], unlimitedRequest, PolicyAction.Read));
+    }
+
+    [Fact]
+    public void Export_and_import_need_their_grant_and_read_or_create_and_may_come_from_different_roles()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """[{ "entity": "Request", "actions": ["read"] }]"""));
+        var compiled = Compile(folder);
+        Assert.True(compiled.TryGetEntity("Request", out var request));
+        Assert.True(compiled.TryGetDataSource("RequestList", out var requestList));
+        var requestReference = new EntityReference(request.Id, request.Name);
+        var requestListReference = new DataSourceReference(requestList.Id, requestList.Name);
+
+        // The compiler refuses an export without read in one policy, so the model is built by hand to
+        // show that the evaluator still combines the roles' grants.
+        PolicyModel Hand(string name, string role, params GrantModel[] grants) =>
+            new() { Id = Guid.NewGuid(), Name = name, File = $"policies/{name}.json", Roles = [role], Grants = grants };
+        GrantModel EntityGrant(params PolicyAction[] actions) => new(requestReference, null, null, null, actions, null, null);
+        GrantModel DataSourceGrant(params PolicyAction[] actions) => new(null, requestListReference, null, null, actions, null, null);
+        var model = compiled with
+        {
+            Policies =
+            [
+                Hand("EmployeeAccess", "employee", EntityGrant(PolicyAction.Export, PolicyAction.Import), DataSourceGrant(PolicyAction.Export)),
+                Hand("ManagerAccess", "manager", EntityGrant(PolicyAction.Read, PolicyAction.Create), DataSourceGrant(PolicyAction.Read)),
+            ],
+        };
+
+        Assert.True(PolicyEvaluator.AllowsExport(model, ["employee", "manager"], request));
+        Assert.True(PolicyEvaluator.Access(model, ["employee", "manager"], request, PolicyAction.Read).Granted);
+        Assert.True(PolicyEvaluator.AllowsImport(model, ["employee", "manager"], request));
+        Assert.True(PolicyEvaluator.AllowsExport(model, ["employee", "manager"], requestList));
+
+        // Export and import alone reach nothing: they need read and create.
+        Assert.False(PolicyEvaluator.AllowsExport(model, ["employee"], request));
+        Assert.False(PolicyEvaluator.AllowsImport(model, ["employee"], request));
+        Assert.False(PolicyEvaluator.AllowsExport(model, ["employee"], requestList));
+
+        // Read and create alone are not an export or an import.
+        Assert.False(PolicyEvaluator.AllowsExport(model, ["manager"], request));
+        Assert.False(PolicyEvaluator.AllowsImport(model, ["manager"], request));
+        Assert.False(PolicyEvaluator.AllowsExport(model, ["manager"], requestList));
+
+        // A user without a role of any grant, or with a role the application does not declare, is denied.
+        Assert.False(PolicyEvaluator.AllowsExport(model, [], request));
+        Assert.False(PolicyEvaluator.AllowsExport(model, ["nobody"], request));
+        Assert.False(PolicyEvaluator.AllowsExport(model, ["Employee", "Manager"], requestList));
+        Assert.False(PolicyEvaluator.AllowsImport(model, ["nobody"], request));
     }
 
     [Fact]

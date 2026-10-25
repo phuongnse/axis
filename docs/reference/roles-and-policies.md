@@ -149,18 +149,19 @@ outcomes. Operators inspect the approvals and change nothing:
   of them gets every grant of the policy.
 - **Grants.** `grants` lists one or more grants. Each has exactly one target,
   `entity`, `dataSource`, `process` or `endpoint`, and one or more `actions`:
-  - an `entity` takes `read`, `create`, `update` and `delete`;
-  - a `dataSource` takes `read`;
+  - an `entity` takes `read`, `create`, `update`, `delete`, `export` and
+    `import`;
+  - a `dataSource` takes `read` and `export`;
   - a `process` takes `start`, `inspect`, `cancel`, `retry` and `resolve`,
     and `reassign` _(planned for M14)_, see
     [Reassign](task-deadlines.md#reassign);
   - an `endpoint` takes `invoke`.
-  - From M15 _(planned for M15)_, an `entity` also takes `export` and
-    `import`, and a `dataSource` takes `export`. `export` reaches only what
-    the user's `read` grants reach, and needs a `read` grant on the same
-    target, or the policy is a new compile diagnostic. `import` writes through
-    the user's `create` grants, and their `update` grants for an import with
-    a key. See [import and export](import-export.md#grants) and
+  - `export` reaches only what the user's `read` grants reach, and needs a
+    `read` grant on the same target in the same policy, or it is `AXC0242`.
+    `import` writes through the user's `create` grants, and needs a `create`
+    grant on the same entity in the same policy, or it is `AXC0242`. The
+    import checks `update` as well for an import with a key
+    _(planned for M15)_. See [import and export](import-export.md#grants) and
     [D79](../decisions/d79-import-and-export-under-policies.md).
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
@@ -245,6 +246,9 @@ Compile checks, each a compile error:
 - An action that the target's kind does not take, such as `start` on an
   entity or `read` on an endpoint, is `AXC0091`. So is `inspect` on anything
   but a process.
+- An `export` without a `read`, or an `import` without a `create`, on the
+  same target in the same policy, ignoring letter case, is `AXC0242` at the
+  action. An action the target's kind does not take is left to `AXC0091`.
 - A grant on a child entity is `AXC0093`. Child rows are read and written
   through their owner's grants.
 - A `filter` or `fields` on a `dataSource`, `process` or `endpoint` grant is
@@ -259,8 +263,12 @@ Compile checks, each a compile error:
 
 The schema checks the shape of each property: `roles` and `grants` are
 non-empty lists, each action is one of `read`, `create`, `update`, `delete`,
-`start`, `invoke`, `inspect`, `cancel`, `retry` and `resolve`, and a grant has no other properties. A problem there is
-`AXC0004`.
+`export`, `import`, `start`, `invoke`, `inspect`, `cancel`, `retry` and `resolve`, and a grant has no other properties. A problem there is
+`AXC0004`. The schema also lists the actions each target kind takes, as
+`entityAction`, `dataSourceAction`, `processAction` and `endpointAction`. The
+compiler, the policy matrix and Studio read those lists, so each lives in one
+place. The compiler, not the schema, refuses an action the target's kind does
+not take.
 
 ## Record creator
 

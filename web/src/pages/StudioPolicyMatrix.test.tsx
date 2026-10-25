@@ -252,7 +252,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
         within(group)
           .getAllByRole('checkbox')
           .map((box) => (box as HTMLInputElement).value),
-      ).toEqual(['read', 'create', 'update', 'delete'])
+      ).toEqual(['read', 'create', 'update', 'delete', 'export', 'import'])
       expect(within(group).queryByRole('checkbox', { name: 'start' })).not.toBeInTheDocument()
     }
 

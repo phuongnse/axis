@@ -14,11 +14,14 @@ internal static class PolicyMatrixBuilder
     private const string ProcessKind = "process";
     private const string EndpointKind = "endpoint";
     private const string ReadAction = "read";
+    private const string CreateAction = "create";
+    private const string ExportAction = "export";
+    private const string ImportAction = "import";
 
-    private static readonly string[] _entityActions = ["read", "create", "update", "delete"];
-    private static readonly string[] _dataSourceActions = [ReadAction];
-    private static readonly string[] _processActions = ["start", "inspect", "cancel", "retry", "resolve"];
-    private static readonly string[] _endpointActions = ["invoke"];
+    private static readonly IReadOnlyList<string> _entityActions = PolicyActions.Of(EntityKind);
+    private static readonly IReadOnlyList<string> _dataSourceActions = PolicyActions.Of(DataSourceKind);
+    private static readonly IReadOnlyList<string> _processActions = PolicyActions.Of(ProcessKind);
+    private static readonly IReadOnlyList<string> _endpointActions = PolicyActions.Of(EndpointKind);
 
     public static PolicyMatrix Build(
         IReadOnlyList<RoleResource> roles,
@@ -66,7 +69,7 @@ internal static class PolicyMatrixBuilder
     private static IEnumerable<PolicyMatrixTarget> Targets<T>(
         IEnumerable<T> resources,
         string kind,
-        string[] actions,
+        IReadOnlyList<string> actions,
         Func<T, string?> entityOf)
         where T : Resource
     {
@@ -149,6 +152,24 @@ internal static class PolicyMatrixBuilder
                 Actions = [.. cells[column].Actions.Where(action => action != ReadAction)],
                 MissingEntityRead = entityName,
             };
+        }
+
+        // An export reaches only what read reaches and an import writes through create, as the evaluator decides.
+        for (var column = 0; column < targets.Count; column++)
+        {
+            var actions = cells[column].Actions;
+            var dropped = targets[column].Kind switch
+            {
+                EntityKind => actions.Where(action =>
+                    (action == ExportAction && !actions.Contains(ReadAction)) || (action == ImportAction && !actions.Contains(CreateAction))),
+                DataSourceKind => actions.Where(action => action == ExportAction && !actions.Contains(ReadAction)),
+                _ => [],
+            };
+            var kept = actions.Except(dropped.ToList()).ToList();
+            if (kept.Count != actions.Count)
+            {
+                cells[column] = cells[column] with { Actions = kept };
+            }
         }
 
         return new PolicyMatrixRole(
