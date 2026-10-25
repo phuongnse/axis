@@ -1,6 +1,8 @@
 using System.Diagnostics.Metrics;
 using Axis.Core.Telemetry;
 using Axis.Server.Health;
+using Axis.Server.Http;
+using Axis.Server.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Axis.Server.Tests;
@@ -22,7 +24,9 @@ public sealed class AxisMetricsTests
         ["axis.computed.pending_fields"] = ["axis.tenant", "axis.application"],
         ["axis.tenant.database.available"] = ["axis.tenant"],
         ["axis.queries.timeouts"] = ["axis.tenant", "axis.application"],
+        ["axis.rate_limits.refused"] = ["axis.partition"],
         ["axis.calls.attempts"] = ["axis.tenant", "axis.application", "axis.connector", "axis.package", "axis.operation", "axis.outcome"],
+        ["axis.dead_letters.created"] = ["axis.tenant", "axis.work_item.kind"],
     };
 
     [Fact]
@@ -45,6 +49,7 @@ public sealed class AxisMetricsTests
         using var gauges = new AxisGauges();
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         var tenantDatabases = new TenantDatabaseGauge(services.GetRequiredService<IMeterFactory>());
+        var rateLimitRefusals = new RateLimitRefusals(services.GetRequiredService<IMeterFactory>());
 
         void Record<T>(Instrument instrument, T measurement, ReadOnlySpan<KeyValuePair<string, object?>> tags, object? state)
             where T : struct
@@ -70,9 +75,11 @@ public sealed class AxisMetricsTests
         AxisMetrics.RecordCallAttempt("default", null, AxisTelemetry.PackageTag, "PaymentReferences", "reserve", "retryable");
         AxisMetrics.RecordQueryTimeout("default", "PurchaseRequests");
         AxisMetrics.RecordQueryTimeout("default", null);
+        AxisMetrics.RecordDeadLetter("default", "event.deliver");
 
         gauges.Publish("default", [new WorkItemGauge("process.step", 3, 12.5)], [new PendingFieldsGauge("PurchaseRequests", 2)]);
         tenantDatabases.Record("default", true);
+        rateLimitRefusals.Record(Partition.Session);
         listener.RecordObservableInstruments();
 
         Assert.Equal([.. _allowed.Keys.Order(StringComparer.Ordinal)], [.. published.Order(StringComparer.Ordinal)]);

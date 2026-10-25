@@ -60,6 +60,59 @@ public static class ProcessTasks
     }
 
     /// <summary>
+    /// Sets <paramref name="userId"/> as the claimer of the <c>open</c> task <paramref name="id"/>
+    /// at the transaction's time. Returns <see langword="false"/> when the task is missing, no
+    /// longer open or already claimed. Lock the task first with <see cref="TaskQueries.LockAsync"/>.
+    /// </summary>
+    public static async Task<bool> TryClaimAsync(
+        NpgsqlTransaction transaction,
+        Guid id,
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(userId);
+
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.process_tasks
+            SET claimed_by = @user, claimed_at = now()
+            WHERE id = @id AND state = @open AND claimed_by IS NULL
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("user", userId);
+        command.Parameters.AddWithValue("open", Open);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>
+    /// Clears the claim of the <c>open</c> task <paramref name="id"/>. Returns <see langword="false"/>
+    /// when the task is missing, no longer open or not claimed. Lock the task first with
+    /// <see cref="TaskQueries.LockAsync"/>.
+    /// </summary>
+    public static async Task<bool> TryReleaseAsync(
+        NpgsqlTransaction transaction,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.process_tasks
+            SET claimed_by = NULL, claimed_at = NULL
+            WHERE id = @id AND state = @open AND claimed_by IS NOT NULL
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("open", Open);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>
     /// Sets the <c>open</c> task <paramref name="id"/> <c>completed</c> with <paramref name="outcome"/>,
     /// by <paramref name="userId"/>, at the transaction's time. Returns <see langword="false"/> when
     /// the task is missing or no longer open. Lock the task first with <see cref="TaskQueries.LockAsync"/>,

@@ -31,11 +31,17 @@ public static class AxisMetrics
     /// <summary>The attempts of connector calls and package operations. Lookups are not attempts.</summary>
     public const string CallAttempts = "axis.calls.attempts";
 
+    /// <summary>The dead letters that workers wrote, by tenant and work item kind.</summary>
+    public const string DeadLettersCreated = "axis.dead_letters.created";
+
     /// <summary>Whether each tenant database answered the last readiness probe of the server, 1 or 0, by tenant.</summary>
     public const string TenantDatabaseAvailable = "axis.tenant.database.available";
 
     /// <summary>The interactive reads that ran past the query timeout, by tenant and application.</summary>
     public const string QueryTimeouts = "axis.queries.timeouts";
+
+    /// <summary>The requests that a rate limit refused, by partition.</summary>
+    public const string RateLimitRefusals = "axis.rate_limits.refused";
 
     /// <summary>
     /// The attribute keys that the HTTP client and DNS metrics keep. Any other key, such as
@@ -79,6 +85,11 @@ public static class AxisMetrics
         "{query}",
         "Interactive reads that ran past the query timeout.");
 
+    private static readonly Counter<long> _createdDeadLetters = Meter.CreateCounter<long>(
+        DeadLettersCreated,
+        "{dead_letter}",
+        "Dead letters that workers wrote.");
+
     /// <summary>Records one run of a work item. <paramref name="outcome"/> is <c>completed</c>, <c>failed</c> or <c>fenced</c>.</summary>
     public static void RecordWorkItem(string tenant, string kind, string outcome, TimeSpan duration) =>
         _workItemDurations.Record(
@@ -94,6 +105,13 @@ public static class AxisMetrics
         Add(ref tags, AxisTelemetry.ApplicationTag, application);
         _queryTimeouts.Add(1, tags);
     }
+
+    /// <summary>Counts a dead letter of the work item kind <paramref name="kind"/>.</summary>
+    public static void RecordDeadLetter(string tenant, string kind) =>
+        _createdDeadLetters.Add(
+            1,
+            new KeyValuePair<string, object?>(AxisTelemetry.TenantTag, tenant),
+            new KeyValuePair<string, object?>(AxisTelemetry.WorkItemKindTag, kind));
 
     /// <summary>
     /// Counts a process instance that ended in <paramref name="state"/>, <c>completed</c> or <c>failed</c>.

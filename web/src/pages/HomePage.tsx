@@ -1,6 +1,6 @@
 import { Alert, Badge, Card, Empty, Flex, Spin } from 'antd'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { PageLayout } from '../platform/PageLayout'
 import { useServerStatus, type ServerStatus } from '../platform/serverStatus'
 import { fetchSites, type SiteListItem } from '../platform/site'
@@ -66,9 +66,14 @@ function SiteList() {
 export function HomePage() {
   const t = useText()
   const serverStatus = useServerStatus()
+  const [searchParams] = useSearchParams()
+  const signInFailed = searchParams.get('signIn') === 'failed'
 
   return (
     <PageLayout title={t('shell.home.title')}>
+      {signInFailed && (
+        <Alert data-testid="sign-in-failed" role="alert" type="warning" showIcon title={t('shell.home.signInFailed')} />
+      )}
       <Card title={t('shell.serverStatus.title')}>
         <Badge
           data-testid="server-status"

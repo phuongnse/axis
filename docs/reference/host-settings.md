@@ -292,7 +292,7 @@ the operator sets it with
   does. Its database is never the main tenant's.
 - **Sign-in.** A preview tenant has no `Oidc` block. It copies its main
   tenant's `Authority`, `ClientId`, `ClientSecret` and `Claims`. It does not copy
-  `EndpointAudience`, so the preview accepts no machine-caller token. A
+  `EndpointAudience` or `ServiceAudience`, so the preview accepts no machine-caller or service account token. A
   preview tenant with its own `Oidc` block stops the start.
 - **Bindings.** The bindings are empty unless the tenant sets some. A preview
   never takes its main tenant's bindings, so it never calls a real system by
@@ -403,11 +403,26 @@ As an environment variable it is `Admin__ConnectionString`.
 
 ## Rate limit settings
 
-_(Planned for M16.)_ The server reads `RateLimits:SignIn`,
-`RateLimits:Session`, `RateLimits:Bearer` and `RateLimits:Publishing`, each a
-number of requests per minute for one replica. See
-[rate limits](headers-and-rate-limits.md#rate-limits) and
+The server reads four settings, each a number of requests per minute for one
+replica. See [rate limits](headers-and-rate-limits.md#rate-limits) and
 [D85](../decisions/d85-rate-limits-and-security-headers.md).
+
+| Setting                 | Default | Meaning                                                              |
+| ----------------------- | ------- | -------------------------------------------------------------------- |
+| `RateLimits:SignIn`     | 300     | Sign-in and its callback, by client address                          |
+| `RateLimits:Session`    | 1200    | Every other route that takes a session, by tenant and user           |
+| `RateLimits:Bearer`     | 1200    | Requests with a bearer token, by tenant and caller id                |
+| `RateLimits:Publishing` | 60      | Studio validate, publish, preview, rollback and test, by tenant and user |
+
+- **Environment variables.** `RateLimits__SignIn`, `RateLimits__Session`,
+  `RateLimits__Bearer` and `RateLimits__Publishing`.
+- **Per replica.** Each replica counts on its own, so the limit an installation
+  sees is the number of replicas times the setting.
+- **Bad values.** A value of zero or less, or one that is not a whole number,
+  stops the server's start and names the setting.
+- **Defaults.** They are proposals. The weekly load test of
+  [D82](../decisions/d82-performance-slos-and-load-tests.md) never reaches
+  them, and it can tune them.
 
 ## Telemetry export
 

@@ -49,5 +49,11 @@ public sealed class ProcessTaskRow
 
     public DateTimeOffset? CompletedAt { get; init; }
 
+    /// <summary>The role holder who claimed the task, or <see langword="null"/> while no one holds the claim.</summary>
+    public string? ClaimedBy { get; init; }
+
+    /// <summary>When the current claim was made, or <see langword="null"/> while no one holds the claim.</summary>
+    public DateTimeOffset? ClaimedAt { get; init; }
+
     public DateTimeOffset CreatedAt { get; init; }
 }

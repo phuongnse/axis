@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
+using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Tenancy;
@@ -40,11 +41,11 @@ internal static class StudioPublishEndpoints
 
     public static void MapStudioPublishEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/api/studio/apps/{application}/validate", ValidateAsync);
-        endpoints.MapPost("/api/studio/apps/{application}/publish", PublishAsync);
-        endpoints.MapPost("/api/studio/apps/{application}/preview", PreviewAsync);
-        endpoints.MapPost("/api/studio/apps/{application}/test", TestAsync);
-        endpoints.MapPost("/api/studio/apps/{application}/releases/{id}/rollback", RollbackAsync);
+        endpoints.MapPost("/api/studio/apps/{application}/validate", ValidateAsync).WithRateLimit(Partition.Publishing);
+        endpoints.MapPost("/api/studio/apps/{application}/publish", PublishAsync).WithRateLimit(Partition.Publishing);
+        endpoints.MapPost("/api/studio/apps/{application}/preview", PreviewAsync).WithRateLimit(Partition.Publishing);
+        endpoints.MapPost("/api/studio/apps/{application}/test", TestAsync).WithRateLimit(Partition.Publishing);
+        endpoints.MapPost("/api/studio/apps/{application}/releases/{id}/rollback", RollbackAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapGet("/api/studio/apps/{application}/requests/{id}", GetRequestAsync);
     }
 

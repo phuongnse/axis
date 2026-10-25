@@ -1,0 +1,11 @@
+{
+  "id": "a7c3d1e4-5b2f-4e86-9a1d-3c8f6b2e4d08",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.employee": "Employee",
+    "role.reportingSystem": "Reporting system"
+  }
+}
