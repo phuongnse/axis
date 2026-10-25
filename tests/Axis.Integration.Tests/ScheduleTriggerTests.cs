@@ -306,7 +306,6 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     public async Task Activating_a_release_with_a_changed_schedule_computes_the_next_occurrence_from_the_activation_time()
     {
         var tenant = fixture.Tenant("h");
-        await AwayFromTheEndOfTheHourAsync(tenant);
         await DueAtAsync(tenant, _occurrence);
 
         var (releaseId, _) = await tenant.ActivateAsync(
