@@ -14,8 +14,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// A service account's bearer token reaches only the routes marked with <see cref="ServiceAccountRoute"/>, the record
-/// routes, and the endpoint routes, which take their own token. The test reads every <c>/api</c> route from the
+/// A service account's bearer token reaches only the routes marked with <see cref="ServiceAccountRoute"/>, the record,
+/// data source rows, process start and process inspection routes, and the endpoint routes, which take their own token. The test reads every <c>/api</c> route from the
 /// server's endpoint data source, so a new route that accepts the token by mistake fails it. The database is
 /// unreachable, so a request that reaches it fails the test.
 /// </summary>
@@ -43,7 +43,7 @@ public sealed class ServiceAccountRouteTests(KeycloakFixture keycloak) : IAsyncL
     private WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("The test host is not started.");
 
     [Fact]
-    public void The_routes_that_carry_the_marker_are_exactly_the_record_routes()
+    public void The_routes_that_carry_the_marker_are_exactly_the_service_account_routes()
     {
         var marked = Routes().Where(route => route.Endpoint.Metadata.GetMetadata<ServiceAccountRoute>() is not null)
             .Select(route => route.Name)
@@ -60,13 +60,21 @@ public sealed class ServiceAccountRouteTests(KeycloakFixture keycloak) : IAsyncL
                 $"PATCH {pattern}/{{id}}",
                 $"DELETE {pattern}/{{id}}",
             })
+            .Concat(
+            [
+                "GET /api/apps/{app}/data-sources/{dataSource}/rows",
+                "GET /api/apps/{app}/data-sources/{module}/{dataSource}/rows",
+                "POST /api/apps/{app}/processes/{process}/instances",
+                "GET /api/apps/{app}/processes/{process}/instances",
+                "GET /api/apps/{app}/processes/{process}/instances/{id}",
+            ])
             .Order(StringComparer.Ordinal);
 
         Assert.Equal(string.Join('\n', expected), string.Join('\n', marked));
     }
 
     [Fact]
-    public async Task A_service_token_without_a_session_is_a_401_on_every_route_outside_the_record_and_endpoint_routes()
+    public async Task A_service_token_without_a_session_is_a_401_on_every_route_outside_the_service_account_and_endpoint_routes()
     {
         var token = await RequestTokenAsync();
         var others = Routes()

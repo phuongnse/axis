@@ -11,8 +11,8 @@ namespace Axis.Server.Authentication;
 /// Another system that calls an inbound endpoint with a bearer token from its tenant's identity
 /// provider, through the client credentials grant. The server checks the token's signature, issuer,
 /// audience and expiry against the tenant resolved from the host, with one JWT bearer scheme per
-/// tenant. It accepts a token only on endpoint paths, and there it reads no session cookie. The record API takes a
-/// bearer token too, through <see cref="ServiceAccount"/>.
+/// tenant. It accepts a token only on endpoint paths, and there it reads no session cookie. The routes of the record API, the data source rows, process start and
+/// process inspection take a bearer token too, through <see cref="ServiceAccount"/>.
 /// </summary>
 internal static class EndpointCaller
 {
@@ -21,7 +21,7 @@ internal static class EndpointCaller
 
     /// <summary>
     /// The default scheme of every request: the bearer token on endpoint paths, the service account's bearer token on a
-    /// record route that has one, and the <see cref="Session"/> everywhere else.
+    /// service account route, and the <see cref="Session"/> everywhere else.
     /// </summary>
     public const string RequestScheme = "Axis.Request";
 

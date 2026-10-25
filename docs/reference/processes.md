@@ -405,9 +405,13 @@ The `201` has no `Location` header. Reading an instance needs an `inspect`
 grant, which the user who started it may not hold. See the
 [instance detail](process-inspection.md#instance-detail).
 
-A start needs a session, a `start` grant on the process and read access to
-the subject record, as [Authorization](security.md#authorization)
-describes.
+A start needs a session, or a bearer token of a
+[service account](security.md#service-accounts), a `start` grant on the process
+and read access to the subject record, as
+[Authorization](security.md#authorization) describes. A request with a bearer
+token needs no CSRF header, and its caller id is the actor of the
+`process.started` audit record. A bad token is a `401` with
+`WWW-Authenticate: Bearer`.
 
 - **Subject the user may not read.** A subject record the user may not read
   does not exist for them. That is a record outside every filter of their
@@ -417,14 +421,14 @@ describes.
 
 A request is checked in this order, and the first failure is the response:
 
-1. The session, `401`.
+1. The session or the bearer token, `401`.
 2. The application and the process, `404`.
 3. The `start` grant on the process, `403`.
 4. The content type, `415`.
 5. The body, `400`.
 6. The `Idempotency-Key` header, `400`.
 
-A start without the CSRF header is a `403` before any of these checks. Read
+A start by a session without the CSRF header is a `403` before any of these checks. Read
 access to the subject record is checked in the transaction, when the record
 is read.
 
