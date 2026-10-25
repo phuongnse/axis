@@ -108,6 +108,10 @@ export interface DataSourceColumn {
   /** The text key of each enum value's label, by value, or missing or `null` when the enum has no labels. */
   valueLabelKeys?: Record<string, string> | null
   target: ReferenceTarget | null
+  /** The fixed currency code of a money measure, or missing or `null` otherwise. */
+  currency?: string | null
+  /** The name of the group column that holds the currency code of a money measure, or missing or `null` otherwise. */
+  currencyColumn?: string | null
 }
 
 /**

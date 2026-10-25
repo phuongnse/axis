@@ -463,8 +463,9 @@ is `AXC0013`.
   `currencyField` that is not a `text` or `enum` field of the entity is
   `AXC0243`, at `/fields/{i}` when the currency is missing and at
   `/fields/{i}/currency` or `/fields/{i}/currencyField` otherwise. `currency`
-  or `currencyField` on another type is `AXC0013`. A data source measure still
-  refuses `money`, see [data sources](data-sources.md#aggregates).
+  or `currencyField` on another type is `AXC0013`. A data source measure may
+  `sum`, `min` or `max` a money field, and must then group by its
+  `currencyField` (`AXC0248`), see [data sources](data-sources.md#aggregates).
 - `child-collection` owns the rows of the entity that `target` names. It
   allows no other type-specific property. It has no `required`, because a
   missing collection means no rows, and no `unique`. Setting either, even to
