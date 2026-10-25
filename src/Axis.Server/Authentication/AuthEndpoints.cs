@@ -11,7 +11,8 @@ namespace Axis.Server.Authentication;
 /// Sign-in and sign-out through the tenant's identity provider. <c>GET /api/auth/sign-in</c>
 /// redirects there. The identity provider returns to <c>GET /api/auth/callback</c>, which the
 /// tenant's OIDC handler serves: it creates the <see cref="Session"/> and redirects to the
-/// <c>returnUrl</c>. A callback that fails creates no session.
+/// <c>returnUrl</c>. A callback that fails creates no session and redirects to
+/// <see cref="TenantSignIn.FailedPath"/>.
 /// <c>POST /api/auth/sign-out</c> ends the session and answers the identity provider's sign-out
 /// address, for the SPA to send the browser to.
 /// </summary>

@@ -72,10 +72,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     response. A missing `returnUrl` means `/`.
   - `GET /api/auth/callback` is where the identity provider returns. It
     creates the session and redirects to `returnUrl`. A callback that fails
-    creates no session. For now it answers a `500` problem details response,
-    for example when the person cancels at the identity provider. A failed
-    callback is to redirect to the shell's sign-in page instead, which says
-    that sign-in did not complete and shows no reason _(planned for M16)_. See
+    creates no session and redirects to the shell's sign-in page, `/?signIn=failed`,
+    for example when the person cancels at the identity provider. The page says
+    that sign-in did not complete and shows no reason, and the address holds
+    none. See the [home page](frontend.md) and
     [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
   - `POST /api/auth/sign-out` ends the session and returns `200` with
     `{ "signOutUrl" }`. The SPA then sends the browser to that URL, and the
@@ -90,7 +90,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   [D50](../decisions/d50-sign-in-audit-records-and-security-scanning-in-ci.md).
   - The callback writes `session.signedIn` when it creates a session. It writes
     `session.signInRefused`, with a reason code, when it refuses. A refused
-    callback still answers the `500` above, until the redirect of M16.
+    callback still redirects to the sign-in page.
   - `POST /api/auth/sign-out` writes `session.signedOut` only when a session
     existed.
   - An expired session writes nothing. A host that resolves to no tenant writes
