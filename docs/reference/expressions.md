@@ -110,7 +110,7 @@ Every expression has a type, found at compile time.
 | `date-time` | `date-time` | A UTC instant, to the microsecond. |
 | `enum` | `enum` | One value of one field's `values`. |
 | `reference` | `reference` | A record of the target entity. |
-| `money` _(planned for M15)_ | `decimal` | The amount. The currency is not part of the value. |
+| `money` | `decimal` | The amount. The currency is not part of the value. |
 | `file` _(planned for M15)_ | `file` | Only `is null` and `is not null` accept it. |
 | `references` _(planned for M15)_ | `list<Entity>` | The set of target records. Only aggregates accept it. |
 

@@ -456,9 +456,11 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Reports each transition that closes a cycle, at that transition, naming the steps in the
-    /// cycle. The steps are walked depth-first in file order, each step's transitions in order: the
-    /// branches, then <c>otherwise</c>, then <c>next</c>, then the outcomes. A step with two transitions to the same step is reported once.
+    /// Reports each transition that closes a cycle with no waiting step, at that transition, naming
+    /// the steps in the cycle. A <c>task</c> step waits for a person, so its transitions are not
+    /// followed and a loop through one is allowed. The steps are walked depth-first in file order,
+    /// each step's transitions in order: the branches, then <c>otherwise</c>, then <c>next</c>, then
+    /// the outcomes. A step with two transitions to the same step is reported once.
     /// </summary>
     private static void CheckCycles(
         IReadOnlyList<ProcessStepDefinition> steps, List<Transition>[] transitions, bool[] duplicate, Action<string, string, string> report)
@@ -472,7 +474,7 @@ internal static class ProcessChecker
         {
             onPath[index] = true;
             path.Add(index);
-            foreach (var transition in transitions[index])
+            foreach (var transition in steps[index].Type == ProcessStepDefinition.TaskStep ? [] : (IEnumerable<Transition>)transitions[index])
             {
                 if (transition.Target is not { } target)
                 {
@@ -485,7 +487,7 @@ internal static class ProcessChecker
                     {
                         var members = path.Skip(path.IndexOf(target)).Append(target);
                         var names = string.Join(" → ", members.Select(member => $"'{steps[member].Name}'"));
-                        report(DiagnosticCodes.ProcessStepCycle, $"Steps {names} form a cycle. A process may not loop.", transition.Path);
+                        report(DiagnosticCodes.ProcessStepCycle, $"Steps {names} form a cycle with no waiting step, so the process would run for ever.", transition.Path);
                     }
                 }
                 else if (!done[target])

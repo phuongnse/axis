@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { expect, test, type APIRequest, type APIRequestContext } from '@playwright/test'
+import { expect, test } from '../test'
+import type { APIRequest, APIRequestContext } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { sessionFile, useSession } from '../sessions'
 

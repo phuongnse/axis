@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiFetch, setApiGuard } from './api'
+import { apiFetch, setApiGuard, startSignIn } from './api'
 import { fetchCurrentUser } from './currentUser'
 import { assignLocation } from './navigation'
 
@@ -15,6 +15,24 @@ function stubFetch(status = 204) {
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }
+
+describe('startSignIn', () => {
+  it('returns to / from the sign-in page after a refused sign-in', () => {
+    history.pushState(null, '', '/?signIn=failed')
+
+    startSignIn()
+
+    expect(assignLocation).toHaveBeenCalledWith('/api/auth/sign-in?returnUrl=%2F')
+  })
+
+  it('keeps another path that has a signIn query parameter', () => {
+    history.pushState(null, '', '/e2e/notes?signIn=failed')
+
+    startSignIn()
+
+    expect(assignLocation).toHaveBeenCalledWith('/api/auth/sign-in?returnUrl=%2Fe2e%2Fnotes%3FsignIn%3Dfailed')
+  })
+})
 
 describe('apiFetch', () => {
   it.each(['POST', 'PUT', 'PATCH', 'DELETE', 'post'])(

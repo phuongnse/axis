@@ -94,6 +94,7 @@ src/
                           used by Axis.Scenarios and, later, by the publisher
   Axis.Scenarios/         console host over Axis.Scenarios.Runner that runs an application's test scenarios
   Axis.Admin/             console host for tenant provisioning, migrations, activation, backup and restore
+  Axis.Administration/    library behind the Axis.Admin commands: the platform audit records so far
   Axis.PackageHost/       package runner host that runs extension package operations out of process (planned for M17)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
@@ -130,7 +131,7 @@ checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
-`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
+`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Administration` (the library behind the `Axis.Admin` commands), `Axis.Worker`, the test projects, the sample extension package
 `PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
 
 ## Module rules
@@ -445,10 +446,9 @@ bindings work. Status rules and publishing are built too.
     [service accounts](reference/security.md#service-accounts) and
     [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
 - **Hardening (D82, D84, D85).**
-  - The server rate limits the routes a caller can repeat. See
+  - The server sets security headers on every response and rate limits the routes a caller can
+    repeat. See [security headers](reference/headers-and-rate-limits.md#security-headers) and
     [rate limits](reference/headers-and-rate-limits.md#rate-limits).
-  - _(Planned for M16.)_ The server sets security headers on every response.
-    See [security headers](reference/headers-and-rate-limits.md#security-headers).
   - _(Planned for M16.)_ Axis is verified against ASVS 5.0 Level 2, tracked in
     [ASVS](reference/asvs.md).
   - _(Planned for M16.)_ Performance objectives and the weekly load test are in
@@ -603,6 +603,11 @@ can go from a reported `traceId` to its logs with no collector.
 - **Failed work items.** A failed work item logs its kind, its id and the
   exception type only. The exception message and its inner exceptions can quote
   a record value, so the log leaves them out.
+- **Query timeouts.** An interactive read that runs past `Data:QueryTimeout`
+  logs a warning with the entity, data source or page name as the route spells
+  it and how long the read ran, never a value or the query string. The counter
+  `axis.queries.timeouts` counts each one by tenant and application, see
+  [Errors](reference/record-api.md#errors).
 - **Skipped trigger starts.** A trigger that skips a start because its `when`
   or start condition hit a run-time error logs the error kind, never the
   error message.
@@ -863,6 +868,11 @@ A step that once hung the browser until the test timeout can run through `guardS
 text to the test. The text holds the page URL, the console output, the page errors and the failed
 requests since the step began, the load of the machine and its busiest processes.
 `editInStudio` in `purchase-request-release.spec.ts` uses it with a limit of 60 seconds.
+
+Every spec imports `test` and `expect` from `tests/e2e/test.ts`. Its `test` has an automatic fixture that
+listens for `securitypolicyviolation` on every page of the test, including pages in browser contexts that the
+spec opens itself, and fails the test that caused a violation. `tests/e2e/policy-violations.test.ts` checks the
+listener and fails when a spec imports `test` from `@playwright/test` instead.
 
 The E2E run also starts the worker against the same database, with a 5 second
 lease. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart

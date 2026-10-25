@@ -342,8 +342,10 @@ flowchart LR
      reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
      when `start` is unknown. A step with no path to an `end` step is
      `AXC0072` at `/steps/{i}`. A step with a transition to an unknown step
-     is not also `AXC0072`. A transition that closes a cycle is `AXC0073` at
-     that transition, naming the steps in the cycle. The steps are walked in
+     is not also `AXC0072`. A transition that closes a cycle with no waiting
+     step is `AXC0073` at that transition, naming the steps in the cycle. The
+     transitions out of a `task` step are not followed, so a loop through a
+     task is allowed. The steps are walked in
      file order, with the branches, then `otherwise`, then `next`, then the
      outcomes. A step whose name is
      already `AXC0069` is left out of `AXC0071`, `AXC0072` and `AXC0073`. The

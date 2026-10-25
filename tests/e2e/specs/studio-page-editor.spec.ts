@@ -1,12 +1,13 @@
 import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "../test";
+import type { Page } from "@playwright/test";
 import { startServer } from "../activate";
 import { pickOption } from "../select";
 import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
-import { createResource } from "../studio-resources";
+import { createResource, openFormTab } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -39,6 +40,7 @@ test.describe("Studio builds pages in the page editor", () => {
 
   async function createPage(page: Page, name: string) {
     await createResource(page, "page", name);
+    await openFormTab(page);
     // The editor of the page that was open stays on screen until the new page replaces it, so wait for the name.
     await expect(
       page
@@ -104,6 +106,7 @@ test.describe("Studio builds pages in the page editor", () => {
     await createPage(page, "ReviewList");
     // The names load again, so the new form page is offered below.
     await page.reload();
+    await openFormTab(page);
     await expect(
       page
         .getByTestId("studio-page-editor")
