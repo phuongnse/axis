@@ -291,7 +291,8 @@ the operator sets it with
   `ConnectionString`, `SchemaConnectionString` and `Bindings`, as any tenant
   does. Its database is never the main tenant's.
 - **Sign-in.** A preview tenant has no `Oidc` block. It copies its main
-  tenant's `Authority`, `ClientId`, `ClientSecret` and `Claims`. It does not copy
+  tenant's `Authority`, `ClientId`, `ClientSecret`, `Profile`, `ClientKey`,
+  `ClientKeyId` and `Claims`. It does not copy
   `EndpointAudience` or `ServiceAudience`, so the preview accepts no machine-caller or service account token. A
   preview tenant with its own `Oidc` block stops the start.
 - **Bindings.** The bindings are empty unless the tenant sets some. A preview
