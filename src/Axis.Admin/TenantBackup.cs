@@ -365,6 +365,7 @@ internal sealed class TenantBackup : IAsyncDisposable
         var row = _plan.Row;
         var directory = new ManifestDirectory(
             row.Status,
+            row.PreviewOf,
             [.. _plan.Hosts.Order(StringComparer.Ordinal)],
             row.OidcAuthority,
             row.OidcClientId,
@@ -448,6 +449,7 @@ internal sealed record BackupManifest(
 
 internal sealed record ManifestDirectory(
     string Status,
+    string? PreviewOf,
     IReadOnlyList<string> Hosts,
     string OidcAuthority,
     string OidcClientId,
