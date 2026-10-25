@@ -1,7 +1,7 @@
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../test";
 import { startServer } from "../activate";
 import { dragTo } from "../design-drag";
 import { pickOption } from "../select";

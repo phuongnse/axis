@@ -4,8 +4,8 @@ Detailed reference for the security headers the server sets on every response, a
 on the routes a caller can repeat. The conventions of [architecture.md](../architecture.md) apply:
 sections marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-The design follows [D85](../decisions/d85-rate-limits-and-security-headers.md). All of this page is
-_(planned for M16)_.
+The design follows [D85](../decisions/d85-rate-limits-and-security-headers.md). The security headers
+are built. The rate limits are _(planned for M16)_.
 
 ## Security headers
 
@@ -19,7 +19,7 @@ and the Helm chart, and behind any proxy.
 | `X-Content-Type-Options`    | `nosniff`                                                                                                                                                                                                 | Every response                                |
 | `Referrer-Policy`           | `strict-origin-when-cross-origin`                                                                                                                                                                         | Every response                                |
 | `Cross-Origin-Opener-Policy` | `same-origin`                                                                                                                                                                                            | Every response                                |
-| `Permissions-Policy`        | Turns off camera, microphone, geolocation, payment and USB                                                                                                                                                | Every response                                |
+| `Permissions-Policy`        | `camera=(), microphone=(), geolocation=(), payment=(), usb=()`                                                                                                                                            | Every response                                |
 | `Cache-Control`             | `no-store`                                                                                                                                                                                                | Every response under `/api`                   |
 
 - **Scripts stay strict.** The SPA has no inline script and calls no `eval`. Scripts come only from
@@ -32,16 +32,26 @@ and the Helm chart, and behind any proxy.
   [forwarded headers](host-settings.md#forwarded-headers) rules of
   [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md). The server never sends the
   header in `Development`, so a developer's browser does not remember it for `localhost`.
-- **Static files.** The SPA's hashed files keep their long cache lifetime. `no-store` applies only
-  under `/api`.
+- **Static files.** The SPA's hashed files under `/assets/` get
+  `Cache-Control: public, max-age=31536000, immutable`. `index.html` and the other files keep the
+  revalidation by ETag. `no-store` applies only under `/api`, and replaces any `Cache-Control` an
+  endpoint there sets.
+- **Every answer.** The headers are written when the response starts, so error answers, `401`,
+  `403` and the tenant `404` carry them too.
+- **Under `scripts/dev.sh`.** Vite serves the SPA page on port 5173 without the policy, so only the
+  API answers it proxies carry the headers. A violation then shows up only in the E2E run, Docker
+  Compose or the Helm chart.
 - **Later routes.** A file download keeps to this policy and adds `Content-Disposition: attachment`.
   A custom widget bundle is served from the server's own origin and calls no `eval`.
-- **Tests.** An integration test checks the headers on the SPA page, a static file and an API
-  response, and that HSTS is missing on plain http.
+- **Tests.** Integration tests check the headers on the SPA page, a static file, an API response, a
+  `401` and the `404` for an unknown host. They check that HSTS is missing on plain http and in
+  `Development`, and that HSTS follows the forwarded scheme only from a named proxy. The Playwright
+  run uses the shared `test` of `tests/e2e/test.ts`, which fails any test whose pages report a
+  Content Security Policy violation.
 
 ## Rate limits
 
-The server uses the ASP.NET Core rate limiter.
+_(Planned for M16.)_ The server uses the ASP.NET Core rate limiter.
 
 - **Per replica.** Each replica counts on its own, in memory. A shared count would need a store
   that the stack does not have, or a database round trip on each request. So the limit an

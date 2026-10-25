@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '../test'
+import type { Page } from '@playwright/test'
 
 // The platform home page stays open while nobody is signed in. Every application page needs a
 // session and would start sign-in on its own, before the header's button is clicked.

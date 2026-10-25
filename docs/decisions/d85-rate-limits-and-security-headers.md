@@ -3,7 +3,7 @@
 Status: **Agreed**
 
 M16 adds security headers to every response and rate limits to the routes a
-caller can repeat. All of it is _(planned for M16)_. See
+caller can repeat. The rate limits are _(planned for M16)_. See
 [security headers and rate limits](../reference/headers-and-rate-limits.md)
 for the detail. The owner agreed these points on 2026-10-25.
 

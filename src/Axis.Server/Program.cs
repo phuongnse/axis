@@ -196,7 +196,11 @@ builder.Services.AddSingleton<ITextResourceProvider, EmbeddedTextResourceProvide
 
 var app = builder.Build();
 
-// Outermost, so an unexpected error on any path is a 500 problem without exception text.
+// First, so every answer carries the security headers. They are written when the response starts, after the
+// forwarded headers have set the scheme and after any error answer is written.
+app.UseSecurityHeaders(strictTransportSecurity: !app.Environment.IsDevelopment());
+
+// Outermost after the security headers, so an unexpected error on any path is a 500 problem without exception text.
 app.UseExceptionHandler();
 
 // Before tenant resolution, so the forwarded host picks the tenant. The built-in middleware skips the proxy check
@@ -215,7 +219,19 @@ app.UseCsrfHeader();
 app.UseAuthentication();
 
 app.UseDefaultFiles();
-app.UseStaticFiles();
+
+// Vite writes the hashed files under /assets/, so they never change under their name. index.html and the other
+// files keep revalidating by ETag.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        if (context.Context.Request.Path.StartsWithSegments("/assets"))
+        {
+            context.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        }
+    },
+});
 app.MapHealthEndpoints();
 app.MapPresentationEndpoints();
 app.MapSiteEndpoints();

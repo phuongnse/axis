@@ -1,4 +1,5 @@
-import { expect, test, type Locator } from '@playwright/test'
+import { expect, test } from '../test'
+import type { Locator } from '@playwright/test'
 import { useSession } from '../sessions'
 
 test('the home page loads and reports a ready server', async ({ page }) => {
