@@ -85,7 +85,13 @@ public sealed record DataSourceFieldModel(string Name, IReadOnlyList<FieldModel>
 /// name. When it is not given, it is null in the filter.
 /// </summary>
 public sealed record DataSourceParameterModel(
-    string Name, FieldType Type, bool Required, TextReference? Label, IReadOnlyList<string>? Values, EntityReference? Target);
+    string Name,
+    FieldType Type,
+    bool Required,
+    TextReference? Label,
+    IReadOnlyList<string>? Values,
+    EntityReference? Target,
+    IReadOnlyDictionary<string, TextReference>? ValueLabels = null);
 
 /// <summary>
 /// The default order of a data source: a projected field name, or a group field or measure name when

@@ -10,10 +10,10 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// The server signs people in only through each tenant's identity provider, and checks machine
-/// callers' bearer tokens only against it. It registers the session cookie scheme, one OpenID Connect
-/// scheme and one JWT bearer scheme per tenant, and the two policy schemes that choose between them,
-/// and nothing else. The default scheme picks the bearer token on endpoint paths and the session
-/// everywhere else.
+/// callers' and service accounts' bearer tokens only against it. It registers the session cookie scheme,
+/// one OpenID Connect scheme and two JWT bearer schemes per tenant, and the three policy schemes that
+/// choose between them, and nothing else. The default scheme picks the bearer token on endpoint paths,
+/// the service account's token on a record route with a bearer token, and the session everywhere else.
 /// </summary>
 public sealed class AuthenticationSchemeTests
 {
@@ -52,6 +52,11 @@ public sealed class AuthenticationSchemeTests
             },
             scheme =>
             {
+                Assert.Equal("Axis.ServiceAccount", scheme.Name);
+                Assert.Equal(typeof(PolicySchemeHandler), scheme.HandlerType);
+            },
+            scheme =>
+            {
                 Assert.Equal("Axis.Session", scheme.Name);
                 Assert.Equal(typeof(CookieAuthenticationHandler), scheme.HandlerType);
             },
@@ -64,6 +69,11 @@ public sealed class AuthenticationSchemeTests
             {
                 Assert.Equal("oidc-default", scheme.Name);
                 Assert.Equal(typeof(OpenIdConnectHandler), scheme.HandlerType);
+            },
+            scheme =>
+            {
+                Assert.Equal("service-default", scheme.Name);
+                Assert.Equal(typeof(JwtBearerHandler), scheme.HandlerType);
             });
         Assert.Equal("Axis.Request", (await provider.GetDefaultAuthenticateSchemeAsync())?.Name);
     }

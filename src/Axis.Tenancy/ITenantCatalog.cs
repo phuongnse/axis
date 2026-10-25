@@ -49,6 +49,7 @@ public sealed record TenantOidc(
     string? ClientId,
     SecretValue? ClientSecret,
     string? EndpointAudience,
+    string? ServiceAudience,
     string? UserIdClaim,
     string? DisplayNameClaim,
     string? RolesClaim);

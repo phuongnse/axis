@@ -39,6 +39,7 @@ public static class AxisTelemetry
     public const string OperationTag = "axis.operation";
     public const string WorkItemKindTag = "axis.work_item.kind";
     public const string OutcomeTag = "axis.outcome";
+    public const string PartitionTag = "axis.partition";
 
     /// <summary>The standard tag that names the type of the exception that failed a span. Its message is never recorded.</summary>
     public const string ErrorTypeTag = "error.type";

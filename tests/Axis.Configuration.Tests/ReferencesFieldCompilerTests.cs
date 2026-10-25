@@ -21,7 +21,7 @@ public sealed class ReferencesFieldCompilerTests
     {
         { """{ "name": "software", "type": "references", "target": "Software", "unique": true }""", DiagnosticCodes.InvalidConstraint, "/fields/0/unique", "'unique' does not apply to references fields." },
         { """{ "name": "software", "type": "references", "target": "Software", "expression": "1" }""", DiagnosticCodes.InvalidConstraint, "/fields/0/expression", "'expression' applies only to" },
-        { """{ "name": "software", "type": "references", "target": "Software", "default": [] }""", DiagnosticCodes.SchemaViolation, "/fields/0/default", "default" },
+        { """{ "name": "software", "type": "references", "target": "Software", "default": "1" }""", DiagnosticCodes.InvalidConstraint, "/fields/0/default", "'default' applies only to" },
         { """{ "name": "software", "type": "references" }""", DiagnosticCodes.MissingTypeProperty, "/fields/0", "A references field must name its target entity in 'target'." },
         { """{ "name": "software", "type": "references", "target": "Line" }""", DiagnosticCodes.ReferenceToChildEntity, "/fields/0/target", "A child entity cannot be the target of a references field." },
         { """{ "name": "software", "type": "references", "target": "Plain" }""", DiagnosticCodes.ReferenceTargetWithoutDisplayField, "/fields/0/target", "'displayField'" },

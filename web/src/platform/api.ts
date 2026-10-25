@@ -28,9 +28,16 @@ export function signInUrl(returnUrl: string): string {
   return `/api/auth/sign-in?returnUrl=${encodeURIComponent(returnUrl)}`
 }
 
-/** Sends the browser to sign in, and back to the current page with its query string after. */
+/** The shell's sign-in page, where the server sends the browser after a refused sign-in. */
+export const signInFailedPath = '/?signIn=failed'
+
+/**
+ * Sends the browser to sign in, and back to the current page with its query string after. On the
+ * sign-in page after a refused sign-in the return address is `/`, so a retry does not land on the message.
+ */
 export function startSignIn(): void {
-  assignLocation(signInUrl(window.location.pathname + window.location.search))
+  const current = window.location.pathname + window.location.search
+  assignLocation(signInUrl(current === signInFailedPath ? '/' : current))
 }
 
 /**
