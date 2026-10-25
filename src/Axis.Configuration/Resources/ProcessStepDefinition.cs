@@ -17,6 +17,9 @@ public sealed record ProcessStepDefinition
 
     public const string End = "end";
 
+    /// <summary>The <c>timer</c> step type: the process waits for a fixed time (<see cref="Wait"/>) or until a date-time (<see cref="Until"/>), then goes on at <see cref="Next"/>.</summary>
+    public const string Timer = "timer";
+
     /// <summary>The built-in operation that sets fields of the subject record.</summary>
     public const string UpdateRecord = "updateRecord";
 
@@ -28,7 +31,7 @@ public sealed record ProcessStepDefinition
 
     public required string Name { get; init; }
 
-    /// <summary>The step type: <c>decision</c>, <c>task</c>, <c>operation</c> or <c>end</c>.</summary>
+    /// <summary>The step type: <c>decision</c>, <c>task</c>, <c>operation</c>, <c>end</c> or <c>timer</c>.</summary>
     public required string Type { get; init; }
 
     /// <summary>The ordered branches of a decision, or null for any other step.</summary>
@@ -73,7 +76,7 @@ public sealed record ProcessStepDefinition
     /// </summary>
     public IReadOnlyDictionary<string, string>? Fields { get; init; }
 
-    /// <summary>The step an operation step leads to, or null for any other step.</summary>
+    /// <summary>The step an operation step or a timer leads to, or null for any other step.</summary>
     public string? Next { get; init; }
 
     /// <summary>The label of a task, shown in the task inbox and on the task page, or null for any other step.</summary>
@@ -90,6 +93,18 @@ public sealed record ProcessStepDefinition
     /// due date or for any other step.
     /// </summary>
     public string? DueIn { get; init; }
+
+    /// <summary>
+    /// The ISO 8601 duration a <c>timer</c> step waits, or null when it waits until a time or for any
+    /// other step. Exactly one of <see cref="Wait"/> and <see cref="Until"/> is set on a timer.
+    /// </summary>
+    public string? Wait { get; init; }
+
+    /// <summary>
+    /// The expression of type <c>date-time</c> that gives the time a <c>timer</c> step waits until, or
+    /// null when it waits for a duration or for any other step.
+    /// </summary>
+    public string? Until { get; init; }
 
     /// <summary>The outcomes a task is completed with, in file order, or null for any other step.</summary>
     public IReadOnlyList<TaskOutcomeDefinition>? Outcomes { get; init; }

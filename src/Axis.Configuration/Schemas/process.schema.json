@@ -61,7 +61,7 @@
       "required": ["name", "type"],
       "properties": {
         "name": { "$ref": "#/$defs/name" },
-        "type": { "enum": ["decision", "task", "operation", "end"] },
+        "type": { "enum": ["decision", "task", "operation", "end", "timer"] },
         "branches": {
           "type": "array",
           "minItems": 1,
@@ -113,6 +113,8 @@
         "assignee": { "$ref": "#/$defs/assignee" },
         "form": { "$ref": "#/$defs/name", "x-axis-reference": "form" },
         "dueIn": { "type": "string", "minLength": 1 },
+        "wait": { "type": "string", "minLength": 1 },
+        "until": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "outcomes": {
           "type": "array",
           "minItems": 1,
@@ -138,7 +140,9 @@
               "assignee": false,
               "form": false,
               "dueIn": false,
-              "outcomes": false
+              "outcomes": false,
+              "wait": false,
+              "until": false
             }
           }
         },
@@ -157,7 +161,9 @@
               "retry": false,
               "event": false,
               "fields": false,
-              "next": false
+              "next": false,
+              "wait": false,
+              "until": false
             }
           }
         },
@@ -172,7 +178,9 @@
               "assignee": false,
               "form": false,
               "dueIn": false,
-              "outcomes": false
+              "outcomes": false,
+              "wait": false,
+              "until": false
             }
           }
         },
@@ -191,6 +199,31 @@
               "event": false,
               "fields": false,
               "next": false,
+              "label": false,
+              "assignee": false,
+              "form": false,
+              "dueIn": false,
+              "outcomes": false,
+              "wait": false,
+              "until": false
+            }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "timer" } } },
+          "then": {
+            "required": ["next"],
+            "properties": {
+              "branches": false,
+              "otherwise": false,
+              "operation": false,
+              "set": false,
+              "connector": false,
+              "input": false,
+              "output": false,
+              "retry": false,
+              "event": false,
+              "fields": false,
               "label": false,
               "assignee": false,
               "form": false,

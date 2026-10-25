@@ -56,6 +56,12 @@ public sealed class WorkItemRow
     /// <summary>The entity a <c>computed.backfill</c> item recomputes, or <see langword="null"/> for other work.</summary>
     public Guid? EntityId { get; init; }
 
+    /// <summary>
+    /// The revision of the process instance that the step which queued a <c>process.timer</c> item left,
+    /// or <see langword="null"/> for other work. The item resumes the instance only while it waits at this revision.
+    /// </summary>
+    public long? Revision { get; init; }
+
     /// <summary>The trace id of the span that queued the item, or <see langword="null"/> when no span was current.</summary>
     public string? TraceId { get; init; }
 

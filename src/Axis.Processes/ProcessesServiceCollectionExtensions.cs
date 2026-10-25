@@ -25,6 +25,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<WorkItemRunner>();
         services.AddSingleton<ReleaseModelCache>();
         services.AddSingleton<IWorkItemHandler, ProcessStepHandler>();
+        services.AddSingleton<IWorkItemHandler, ProcessTimerHandler>();
         services.AddSingleton(new ConnectorCallSettings(allowHttpConnectorUrls));
         services.AddSingleton(new DeliverySettings(deliveryAttempts));
         services.AddSingleton<ConnectorClient>();

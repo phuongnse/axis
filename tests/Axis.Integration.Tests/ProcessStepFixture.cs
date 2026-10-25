@@ -203,6 +203,15 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         await command.ExecuteNonQueryAsync();
     }
 
+    /// <summary>Sets the <c>submittedAt</c> of the request <paramref name="id"/> by SQL, without a version change or an audit record.</summary>
+    public async Task SetSubmittedAtAsync(Guid id, DateTimeOffset submittedAt)
+    {
+        await using var command = DataSource.CreateCommand($"UPDATE {RequestTable} SET {Column("submittedAt")} = @at WHERE {Column("id")} = @id");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("at", submittedAt);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
     /// <summary>Inserts a department with a new name and <paramref name="manager"/>, and returns its id.</summary>
     public async Task<Guid> InsertDepartmentAsync(string? manager)
     {

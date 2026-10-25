@@ -448,6 +448,7 @@ internal static class ProcessInspectionEndpoints
             CallConnectorStepModel call => Operation(call.Name, call.Next),
             PackageOperationStepModel package => Operation(package.Name, package.Next),
             RaiseEventStepModel raise => Operation(raise.Name, raise.Next),
+            TimerStepModel timer => new(timer.Name, "timer", null, [new ProcessGraphTransition(timer.Next, null)]),
             EndStepModel end => new(end.Name, "end", null, []),
             _ => throw new InvalidOperationException($"Unexpected step type {step.GetType().Name}."),
         };

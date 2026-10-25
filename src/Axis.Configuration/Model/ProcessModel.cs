@@ -81,6 +81,13 @@ public sealed record TaskAssigneeModel(ExpressionModel? User, string? Role);
 public sealed record TaskOutcomeModel(string Name, TextReference Label, string Next);
 
 /// <summary>
+/// A timer: the process waits for <see cref="Wait"/> from the time the step runs, or until the time
+/// <see cref="Until"/> gives, then goes on at <see cref="Next"/>. Exactly one of <see cref="Wait"/>
+/// and <see cref="Until"/> is set.
+/// </summary>
+public sealed record TimerStepModel(string Name, TimeSpan? Wait, ExpressionModel? Until, string Next) : ProcessStepModel(Name);
+
+/// <summary>
 /// An <c>updateRecord</c> operation step: it sets each field in
 /// <see cref="Set"/> on the subject record through the record update rules, then moves to
 /// <see cref="Next"/>.

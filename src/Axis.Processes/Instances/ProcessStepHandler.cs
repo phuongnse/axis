@@ -23,7 +23,9 @@ namespace Axis.Processes.Instances;
 /// instance <c>waiting</c>, with no next work item. A <c>callConnector</c> step leaves it
 /// <c>waiting</c> too, and queues the <c>connector.call</c> item of its call, so no request is sent
 /// inside the transaction. A package operation step does the same with a <c>package.call</c> item,
-/// so no operation runs inside the transaction. An <c>updateRecord</c> step starts the data change
+/// so no operation runs inside the transaction. A <c>timer</c> step leaves the instance <c>waiting</c>
+/// too and queues a <c>process.timer</c> item due at the time the timer waits for, with the revision the
+/// step left, and writes no audit record while it waits. An <c>updateRecord</c> step starts the data change
 /// triggers of the update after its <c>record.updated</c> audit. A <c>sync</c> trigger and a data
 /// change trigger come from the application's active release, and
 /// its start runs as <c>system</c>, pinned to that release. A skipped <c>sync</c> start is logged
@@ -178,7 +180,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         string? decision;
         JsonObject output;
         JsonObject details;
-        string action;
+        string? action;
+        DateTimeOffset? timerDueAt = null;
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
         NewTask? task = null;
         NewConnectorCall? call = null;
@@ -363,6 +366,29 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 };
                 action = AuditActions.OperationStaged;
                 break;
+            case TimerStepModel timerStep:
+                if (!process.TryGetStep(timerStep.Next, out _))
+                {
+                    throw Failure($"The process '{process.Name}' has no step '{timerStep.Next}'.", instance, input);
+                }
+
+                var due = timerStep.Wait is { } wait
+                    ? instance.Now + wait
+                    : await UntilAsync(context, model, entity, record, timerStep, instance, input, cancellationToken);
+                timerDueAt = due;
+                state = ProcessStarts.Waiting;
+                nextStep = step.Name;
+                decision = null;
+                output = new JsonObject
+                {
+                    ["state"] = ProcessStarts.Waiting,
+                    ["dueAt"] = due.UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture),
+                };
+
+                // Waiting for a time is not an audit action. The resume writes the step's completion.
+                details = new JsonObject();
+                action = null;
+                break;
             default:
                 throw Failure($"The engine cannot run the step '{step.Name}' of type '{step.GetType().Name}'.", instance, input);
         }
@@ -479,10 +505,14 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 cancellationToken);
         }
 
-        await AuditRecords.AppendAsync(
-            context.Transaction,
-            new AuditEntry(AuditActors.System, action, instance.ApplicationId, instance.SubjectEntityId, instance.SubjectId, instance.Id, details),
-            cancellationToken);
+        if (action is not null)
+        {
+            await AuditRecords.AppendAsync(
+                context.Transaction,
+                new AuditEntry(AuditActors.System, action, instance.ApplicationId, instance.SubjectEntityId, instance.SubjectId, instance.Id, details),
+                cancellationToken);
+        }
+
         if (state == ProcessStarts.Running)
         {
             await WorkItemQueue.EnqueueAsync(
@@ -493,6 +523,20 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 DateTimeOffset.UtcNow,
                 cancellationToken,
                 processInstanceId: instance.Id);
+        }
+
+        if (timerDueAt is { } timerDue)
+        {
+            // The item resumes the instance only while it waits at the revision this step left.
+            await WorkItemQueue.EnqueueAsync(
+                context.Connection,
+                context.Transaction,
+                context.Item.TenantId,
+                ProcessStarts.TimerWorkItemKind,
+                timerDue,
+                cancellationToken,
+                processInstanceId: instance.Id,
+                revision: instance.Revision + 1);
         }
 
         if (call is not null)
@@ -578,6 +622,31 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         }
 
         return (Otherwise, step.Otherwise);
+    }
+
+    /// <summary>
+    /// Evaluates the <c>until</c> of a timer step. A time in the past is due at once. An <c>until</c>
+    /// that fails at run time, or gives null, fails the step.
+    /// </summary>
+    private static async Task<DateTimeOffset> UntilAsync(
+        WorkItemContext context,
+        ApplicationModel model,
+        EntityModel entity,
+        Record record,
+        TimerStepModel step,
+        LoadedInstance instance,
+        JsonObject input,
+        CancellationToken cancellationToken)
+    {
+        var result = await RecordExpressions.EvaluateAsync(context.Connection, model, entity, record, step.Until!, instance.Now, cancellationToken);
+        if (result.Error is { } error)
+        {
+            throw ExpressionFailure("until", step, error, instance, input);
+        }
+
+        return result.Value is DateTimeOffset time
+            ? time
+            : throw Failure($"The until of the timer step '{step.Name}' gave no time.", instance, input);
     }
 
     /// <summary>

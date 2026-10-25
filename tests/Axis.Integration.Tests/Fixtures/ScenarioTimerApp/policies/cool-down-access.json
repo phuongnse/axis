@@ -1,0 +1,13 @@
+{
+  "id": "f7c2b9d4-1a35-4e68-b0d3-6a8e4c1f9b52",
+  "kind": "policy",
+  "name": "CoolDownAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [
+    {
+      "process": "CoolDown",
+      "actions": ["start"]
+    }
+  ]
+}

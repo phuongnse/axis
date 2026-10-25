@@ -100,13 +100,13 @@ in any state. The body has these parts:
   `endedAt`, as in the list. `process` is the process name.
 - `graph` is the graph of the release the instance is pinned to:
   `{ "start", "steps": [ { "name", "type", "labelKey", "transitions" } ] }`.
-  - `type` is the step type: `decision`, `task`, `operation` or `end`.
+  - `type` is the step type: `decision`, `task`, `operation`, `timer` or `end`.
   - `labelKey` is the step's label text key, or `null` when it has none.
   - `transitions` is a list of `{ "next", "on" }`, one for each step the step
     can lead to. `on` is always text or `null`. It is the zero-based index of
     a decision branch as text, such as `"0"`, as in the history's `decision`,
     then `"otherwise"` for the fallback branch, the name of a task outcome, or
-    `null` for an operation's `next`. An `end` step has none.
+    `null` for the `next` of an operation or a timer. An `end` step has none.
   - A `callConnector`, package and `raiseEvent` step have type `operation`.
   - `labelKey` is set only for a `task` step.
 - `path` is the history rows of the instance, ordered by `finished_at`, then
