@@ -196,6 +196,8 @@
   "shell.studio.design.addSection": "Thêm phần",
   "shell.studio.design.addStep": "Thêm bước",
   "shell.studio.design.added": "Đã thêm",
+  "shell.studio.design.removed": "Đã xóa",
+  "shell.studio.design.removeField": "Xóa trường",
   "shell.studio.design.dropFieldHere": "Thả một trường vào đây",
   "shell.studio.design.moveToStep": "Chuyển sang bước",
   "shell.studio.palette": "Bảng widget",

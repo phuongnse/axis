@@ -9,6 +9,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { TextProvider } from '../platform/TextProvider'
 import { FormPalette } from './FormPalette'
+import { FormProperties } from './FormProperties'
 
 function nameField(name: string, type: string) {
   return { name, type, target: null, values: null }
@@ -42,7 +43,7 @@ const initial: Record<string, unknown> = {
 
 let latest: Record<string, unknown> = initial
 
-function Harness({ start = null }: { start?: string | null }) {
+function Harness({ start = null, withProperties = false }: { start?: string | null; withProperties?: boolean }) {
   const [draft, setDraft] = useState(initial)
   const [selected, setSelected] = useState<string | null>(start)
   const [announcement, setAnnouncement] = useState('')
@@ -51,6 +52,8 @@ function Harness({ start = null }: { start?: string | null }) {
   })
   // As the form designer has it: only the pointer drags, so Enter and Space reach the button.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+  const onChange = (pointer: string, value: unknown) =>
+    setDraft((current) => setAt(current, pointer, value) as typeof current)
   return (
     <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
       <StudioNamesContext.Provider value={names}>
@@ -61,8 +64,18 @@ function Harness({ start = null }: { start?: string | null }) {
             announcement={announcement}
             onAnnounce={setAnnouncement}
             onSelect={setSelected}
-            onChange={(pointer, value) => setDraft((current) => setAt(current, pointer, value) as typeof current)}
+            onChange={onChange}
           />
+          {withProperties && (
+            <FormProperties
+              draft={draft}
+              selected={selected}
+              entityFields={[]}
+              onSelect={setSelected}
+              onAnnounce={setAnnouncement}
+              onChange={onChange}
+            />
+          )}
         </DndContext>
       </StudioNamesContext.Provider>
     </TextProvider>
@@ -123,6 +136,16 @@ describe('FormPalette', () => {
 
     await userEvent.click(screen.getByTestId('studio-form-palette-notes'))
     expect((latest.sections as { fields: unknown[] }[])[2].fields).toEqual([{ field: 'notes' }])
+  })
+
+  it('lists a field again once the property panel removes it from its section', async () => {
+    render(<Harness start="/sections/1/fields/0" withProperties />)
+    expect(paletteButtons()).not.toContain('Status')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove field' }))
+
+    expect(paletteButtons()).toContain('Status')
+    expect(screen.getByTestId('studio-form-palette-announcement')).toHaveTextContent('Removed status · details')
   })
 
   it('adds the first step with every section, then an empty one', async () => {
