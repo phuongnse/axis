@@ -314,6 +314,7 @@ A tenant in any status except `provisioning` can be backed up, also a
 | Field | Meaning |
 | --- | --- |
 | `status` | The status at backup, `active` or `suspended`. |
+| `previewOf` | The id of the main tenant for a [preview tenant](../architecture.md#preview-tenants), or `null` for a main tenant. |
 | `hosts` | The tenant's hosts, in ordinal order. |
 | `oidcAuthority` | The OIDC authority. |
 | `oidcClientId` | The OIDC client id. |
@@ -364,9 +365,11 @@ what is missing:
   one of its migrations.
 - The tenant id exists in the directory as `active` or `suspended`.
 - A host belongs to another tenant, ignoring letter case.
-- *(Planned for M16.)* The archive is of a preview tenant. Preview data is
+- The archive is of a preview tenant. Preview data is
   disposable, so the operator creates the preview again with
-  [`tenant create --preview-of`](#tenant-create).
+  [`tenant create --preview-of`](#tenant-create). An archive written before
+  `previewOf` existed is recognised as a preview by its empty OIDC authority and
+  client id.
 - A package version with `required` set to `true` is not installed under
   `Extensions:Path`. The message lists every missing version, not only the first.
 - `AXIS_OIDC_CLIENT_SECRET` is missing.

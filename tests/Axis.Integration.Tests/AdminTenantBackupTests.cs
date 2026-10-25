@@ -65,6 +65,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
 
         var directory = root.GetProperty("directory");
         Assert.Equal("active", directory.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.Null, directory.GetProperty("previewOf").ValueKind);
         Assert.Equal([AdminBackupFixture.Host], directory.GetProperty("hosts").EnumerateArray().Select(host => host.GetString()));
         Assert.Equal(AdminScenario.Authority, directory.GetProperty("oidcAuthority").GetString());
         Assert.Equal("axis", directory.GetProperty("oidcClientId").GetString());
@@ -76,6 +77,24 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         Assert.DoesNotContain("database", archive.Manifest, StringComparison.OrdinalIgnoreCase);
 
         await fixture.Scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Backup_of_a_preview_tenant_records_its_main_tenant_in_the_manifest()
+    {
+        var scenario = fixture.Scenario;
+        var mainId = scenario.NewTenantId();
+        var previewId = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(mainId, $"{mainId}.example.test")).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(AdminScenario.PreviewArgs(previewId, mainId, $"{previewId}.example.test"), withClientSecret: false)).Exit);
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+
+        var result = await scenario.RunAsync(["tenant", "backup", previewId, "--out", file], path: fixture.Tools.PathSetting);
+
+        Assert.Equal(0, result.Exit);
+        using var manifest = JsonDocument.Parse(ReadArchive(file, folder.Path).Manifest);
+        Assert.Equal(mainId, manifest.RootElement.GetProperty("directory").GetProperty("previewOf").GetString());
     }
 
     [Fact]
