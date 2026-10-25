@@ -47,7 +47,7 @@ internal sealed class ScenarioWork : IDisposable
         [
             new ConnectorCallHandler(models, bindings, _client, settings, loggerFactory.CreateLogger<ConnectorCallHandler>()),
             new PackageCallHandler(models, packages, bindings, settings, _transport, loggerFactory.CreateLogger<PackageCallHandler>(), stubs.CreateOperation),
-            new EventDeliveryHandler(models, loggerFactory.CreateLogger<EventDeliveryHandler>()),
+            new EventDeliveryHandler(models, new DeliverySettings(5), loggerFactory.CreateLogger<EventDeliveryHandler>()),
         ];
         _runner = CreateRunner(handler, externalHandlers, loggerFactory);
         _timeRunner = CreateRunner(
