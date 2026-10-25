@@ -6,6 +6,8 @@ Status: **Agreed**
 - **Milestones:** milestones are vertical slices.
 - **Issue planning:** issues are created only for the current milestone
   (rolling wave).
+  - [D68](d68-issues-of-several-milestones-run-at-once.md) replaces this line:
+    issues of several milestones run at once.
 - **Issue size:** each issue is one behaviour, aiming for 2–5 acceptance
   criteria that a test or command can check. More than five is a signal to
   check whether the issue holds more than one behaviour. If it does, split it.
