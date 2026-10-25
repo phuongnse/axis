@@ -111,6 +111,22 @@ configuration in `samples/apps/purchase-requests/`. It is not platform code.
 - A new release is published while an older request is still waiting; that
   request finishes on its original version.
 
+### Extensibility
+
+_(planned for M17)_ Purchase requests prove the extensibility milestone, as
+[D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
+agrees.
+
+1. The application declares the `department-budgets` module, which depends on
+   the `departments` module, and maps its approver slot to the manager role.
+2. The author drags a packaged "budget usage" widget onto a purchase request
+   page in Studio.
+3. An approved request reaches the purchasing system through a connector that
+   signs in with client credentials and sends the line items as a list.
+4. The payment reference package runs out of process.
+5. A signed webhook announces the approval. When the receiver fails, the
+   platform operator redelivers the dead letter from the console.
+
 ## Second application: leave requests
 
 A second, smaller application is the second proving sample, of the same

@@ -85,3 +85,4 @@ files agree, title and status included.
 | [D91](decisions/d91-connector-oauth2-and-structured-payloads.md) | Connector OAuth2 and structured payloads | **Agreed** |
 | [D92](decisions/d92-outbound-webhooks.md) | Outbound webhooks | **Agreed** |
 | [D93](decisions/d93-an-operator-web-console.md) | An operator web console | **Agreed** |
+| [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md) | Purchase requests prove the extensibility milestone | **Agreed** |

@@ -48,6 +48,8 @@ The owner confirmed these points on issue #702 on 2026-10-19.
   - From M11 on, each milestone extends a sample of a different shape: a
     service desk, with SLAs, rework loops and notifications, then asset
     management, with dashboards, many-to-many, files and import.
+    [D94](d94-purchase-requests-prove-the-extensibility-milestone.md) makes
+    M17 the exception: it extends the purchase request sample.
   - These samples need no platform code.
 - **How it is planned:**
   - Rolling wave stays as it is. M10 was broken into issues first. A later

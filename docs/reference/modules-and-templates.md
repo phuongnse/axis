@@ -207,7 +207,10 @@ dependencies.
 }
 ```
 
-An application that declares it maps the slot to one of its own roles:
+`department-budgets` is the sample module that the purchase request sample
+declares, as
+[D94](../decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
+agrees. An application that declares it maps the slot to one of its own roles:
 
 ```json
 "modules": [
