@@ -3,6 +3,8 @@
 # The tools go into versioned folders under the home cache, so a version change
 # downloads again and the lint step needs no network.
 
+source scripts/lib/retry.sh
+
 HELM_VERSION=v3.22.1
 KUBECONFORM_VERSION=v0.8.0
 KUBERNETES_VERSION=1.33.0
@@ -51,8 +53,8 @@ install_tools() {
   if [ ! -x "$helm" ]; then
     local archive="helm-$HELM_VERSION-$os-$arch.tar.gz" sum
     mkdir "$work/helm"
-    curl -fsSL --retry 3 -o "$work/$archive" "https://get.helm.sh/$archive"
-    sum="$(curl -fsSL --retry 3 "https://get.helm.sh/$archive.sha256sum" | cut -d' ' -f1)"
+    retry 3 curl -fsSL --retry 3 -o "$work/$archive" "https://get.helm.sh/$archive"
+    sum="$(retry 3 curl -fsSL --retry 3 "https://get.helm.sh/$archive.sha256sum" | cut -d' ' -f1)"
     verify_sha256 "$work/$archive" "$sum"
     tar -xzf "$work/$archive" -C "$work/helm" --strip-components=1 "$os-$arch/helm"
     mv "$work/helm" "$tools_dir/helm-$HELM_VERSION"
@@ -61,9 +63,9 @@ install_tools() {
   if [ ! -x "$kubeconform" ]; then
     local archive="kubeconform-$os-$arch.tar.gz" sum
     mkdir "$work/kubeconform"
-    curl -fsSL --retry 3 -o "$work/$archive" \
+    retry 3 curl -fsSL --retry 3 -o "$work/$archive" \
       "https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION/$archive"
-    sum="$(curl -fsSL --retry 3 "https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION/CHECKSUMS" |
+    sum="$(retry 3 curl -fsSL --retry 3 "https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION/CHECKSUMS" |
       awk -v name="$archive" '$2 == name { print $1 }')"
     verify_sha256 "$work/$archive" "$sum"
     tar -xzf "$work/$archive" -C "$work/kubeconform" kubeconform
@@ -74,7 +76,7 @@ install_tools() {
     local file
     mkdir "$work/schemas"
     for file in "${KUBERNETES_SCHEMA_FILES[@]}"; do
-      curl -fsSL --retry 3 -o "$work/schemas/$file.json" \
+      retry 3 curl -fsSL --retry 3 -o "$work/schemas/$file.json" \
         "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/$KUBERNETES_SCHEMAS_COMMIT/v$KUBERNETES_VERSION-standalone-strict/$file.json"
     done
     mv "$work/schemas" "$kubernetes_schemas"

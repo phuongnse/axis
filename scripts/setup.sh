@@ -3,14 +3,15 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/tools.sh
+source scripts/lib/retry.sh
 
-dotnet restore Axis.slnx
-dotnet tool restore
-npm ci --prefix web
-npm ci --prefix tests/e2e
+retry 3 dotnet restore Axis.slnx
+retry 3 dotnet tool restore
+retry 3 npm ci --prefix web
+retry 3 npm ci --prefix tests/e2e
 if [[ "${CI:-}" == "true" ]]; then
-  npx --prefix tests/e2e playwright install --with-deps chromium
+  retry 3 npx --prefix tests/e2e playwright install --with-deps chromium
 else
-  npx --prefix tests/e2e playwright install chromium
+  retry 3 npx --prefix tests/e2e playwright install chromium
 fi
 install_tools
