@@ -20,3 +20,13 @@ export async function createResource(page: Page, kind: string, value: string, sh
     page.getByTestId(`studio-group-${kind}`).getByRole('button', { name: shownAs, exact: true }),
   ).toHaveAttribute('aria-current', 'true')
 }
+
+/**
+ * Selects the Form tab of the open resource and waits until it is selected. Under D65 and D66 a page or a form opens on
+ * its Design tab, so a spec that uses the fields of its Form tab selects Form first. It does no harm when Form is selected.
+ */
+export async function openFormTab(page: Page) {
+  const tab = page.getByRole('tab', { name: 'Form', exact: true })
+  await tab.click()
+  await expect(tab).toHaveAttribute('aria-selected', 'true')
+}
