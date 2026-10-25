@@ -38,7 +38,7 @@
     "ticket.status": "Status",
     "ticket.resolution": "Resolution",
     "ticket.submit": "Submit",
-    "ticket.cannotSubmit": "Only a draft or reopened ticket can be submitted.",
+    "ticket.cannotSubmit": "Only a draft ticket can be submitted.",
     "ticket.triage": "Triage ticket",
     "ticket.resolve": "Resolve ticket",
     "ticket.confirm": "Confirm resolution",

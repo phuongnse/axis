@@ -58,6 +58,14 @@ internal static class TriggerChecker
                     "/process");
             }
 
+            if (process is { Entity: null })
+            {
+                Report(
+                    DiagnosticCodes.TriggerProcessWithoutSubject,
+                    $"The process '{process.Name}' has no subject, so a trigger cannot start it. A trigger starts the process for a record.",
+                    "/process");
+            }
+
             if (trigger.Type == "dataChange")
             {
                 CheckDataChange(trigger, process, findEntity, unloadedEntityNames, rules, modules, references, Report);
@@ -92,7 +100,8 @@ internal static class TriggerChecker
             // An unknown entity has a diagnostic of its own on the event or the process.
             if (process is not null
                 && findEntity(@event.Entity) is { } eventEntity
-                && findEntity(process.Entity) is { } subject
+                && process.Entity is { } subjectName
+                && findEntity(subjectName) is { } subject
                 && !ReferenceEquals(eventEntity, subject))
             {
                 Report(
@@ -151,7 +160,8 @@ internal static class TriggerChecker
 
         // An unknown entity has a diagnostic of its own on the process.
         if (process is not null
-            && findEntity(process.Entity) is { } subject
+            && process.Entity is { } subjectName
+            && findEntity(subjectName) is { } subject
             && !ReferenceEquals(entity, subject))
         {
             report(
@@ -264,7 +274,8 @@ internal static class TriggerChecker
         // An unknown entity has a diagnostic of its own on the data source or the process.
         if (process is not null
             && findEntity(dataSource.Entity) is { } rowEntity
-            && findEntity(process.Entity) is { } subject
+            && process.Entity is { } subjectName
+            && findEntity(subjectName) is { } subject
             && !ReferenceEquals(rowEntity, subject))
         {
             report(

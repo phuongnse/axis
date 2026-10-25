@@ -652,20 +652,20 @@ validation calls the rules of its own module, see [modules](modules-and-template
   owner record, as
   [the record API](record-api.md#child-rows-computed-fields-and-validations)
   describes.
-- **M2 limits on a child entity.** These are limits of M2, not permanent
-  rules. Real line items often point to a product, so
-  [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md)
-  lifts part of the last one _(planned for M15)_. A child entity:
+- **Limits on a child entity.** A child entity:
   - is owned by exactly one `child-collection` field (`AXC0039`);
   - is never the `target` of a `reference` (`AXC0040`);
   - is never the `entity` of a data source (`AXC0064`) or of a process
     (`AXC0068`);
   - has no record routes of its own;
-  - has no `reference` or `child-collection` fields (`AXC0041`). From M15 it
-    may have `reference` fields, and `AXC0041` refuses only a
-    `child-collection` field _(planned for M15)_. A reference from a child
-    row gets a foreign key and an index, and its labels follow the rows, see
+  - has no `child-collection` fields (`AXC0041`). It may have `reference`
+    fields, as real line items point to a product, see
+    [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md). A
+    reference from a child row gets a foreign key, and its labels follow the
+    rows, see
     [child rows](record-api.md#child-rows-computed-fields-and-validations).
+    Its index comes with the platform indexes on every reference column
+    _(planned for M15)_.
 
 ## Form conditions and steps
 
@@ -878,7 +878,7 @@ The `application` manifest may name the application's time zone, see [D75](../de
 - `timeZone` is optional. It is an IANA time zone id. Without it, the time
   zone is `UTC`, so an application that names none behaves as before. An id
   is known when .NET finds it as an IANA id written with its exact letter
-  case, as for a schedule trigger. An unknown id is `AXC0244` at
+  case, as for a schedule trigger. An unknown id is `AXC0248` at
   `/timeZone`. Studio's application form offers `timeZone`.
 - It is part of the release. A change applies to work that runs on the new
   release.

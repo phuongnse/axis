@@ -18,6 +18,7 @@ internal sealed class TenantCreate : IAsyncDisposable
 
     private readonly CreateSettings _settings;
     private readonly TenantCreateRequest _request;
+    private readonly TenantAudit _audit;
     private readonly TextWriter _output;
     private readonly CancellationToken _cancellationToken;
     private readonly string _id;
@@ -31,10 +32,11 @@ internal sealed class TenantCreate : IAsyncDisposable
     private TenantProvisioning? _provisioning;
     private TenantDatabaseSteps? _steps;
 
-    public TenantCreate(CreateSettings settings, TenantCreateRequest request, TextWriter output, CancellationToken cancellationToken)
+    public TenantCreate(CreateSettings settings, TenantCreateRequest request, TenantAudit audit, TextWriter output, CancellationToken cancellationToken)
     {
         _settings = settings;
         _request = request;
+        _audit = audit;
         _output = output;
         _cancellationToken = cancellationToken;
         _id = request.Id;
@@ -117,6 +119,11 @@ internal sealed class TenantCreate : IAsyncDisposable
             {
                 Failed("entry", "a host belongs to another tenant");
                 return 2;
+            }
+
+            if (!await _audit.WriteAsync(_id, _output, _cancellationToken))
+            {
+                return 1;
             }
 
             await using var transaction = await _platform.Database.BeginTransactionAsync(_cancellationToken);

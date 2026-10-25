@@ -100,6 +100,170 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
+    public void A_process_without_a_subject_compiles_a_decision_over_a_parameter_and_a_rule_call()
+    {
+        using var folder = Folder(SubjectlessProcess("""[{ "name": "limit", "type": "decimal" }]""", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "NeedsReview(limit)", "next": "big" }], "otherwise": "small" },
+              { "name": "big", "type": "end" },
+              { "name": "small", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var process = Assert.Single(result.Model.Processes);
+        Assert.Null(process.Entity);
+        Assert.Equal([new ProcessParameterModel("limit", FieldType.Decimal)], process.Parameters);
+        var check = Assert.IsType<DecisionStepModel>(process.Steps[0]);
+        Assert.Equal("NeedsReview(limit)", Assert.Single(check.Branches).When.Expression);
+    }
+
+    [Fact]
+    public void A_process_without_a_subject_checks_connector_inputs_over_its_parameters()
+    {
+        using var folder = Folder(
+            SubjectlessProcess("""[{ "name": "reference", "type": "text" }, { "name": "limit", "type": "decimal" }]""", $$"""
+                [
+                  { "name": "call", "type": "operation", "operation": "callConnector", {{CallCreateOrder}}
+                    "input": { "reference": "reference", "amount": "limit * 2" }, "next": "done" },
+                  { "name": "done", "type": "end" }
+                ]
+                """, start: "call"),
+            Purchasing);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var call = Assert.IsType<CallConnectorStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal(["reference", "amount"], call.Input.Select(input => input.Input));
+        Assert.Empty(call.Output);
+    }
+
+    [Fact]
+    public void A_process_without_a_subject_sees_no_field_and_no_id()
+    {
+        using var folder = Folder(SubjectlessProcess("""[{ "name": "limit", "type": "decimal" }]""", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "amount > limit", "next": "big" }], "otherwise": "small" },
+              { "name": "big", "type": "end" },
+              { "name": "small", "type": "end" }
+            ]
+            """, startCondition: "id is not null"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [("/startCondition/expression", ExpressionDiagnosticCodes.UnknownName), ("/steps/0/branches/0/when", ExpressionDiagnosticCodes.UnknownName)],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Path, diagnostic.Code)));
+    }
+
+    [Fact]
+    public void A_process_with_both_an_entity_and_parameters_is_reported_at_the_parameters()
+    {
+        using var folder = Folder($$"""
+            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+              "entity": "Order", "parameters": [{ "name": "limit", "type": "decimal" }], "start": "check", "steps": {{ReviewSteps}} }
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidProcessSubject, "/parameters"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_process_with_neither_an_entity_nor_parameters_is_reported_once_at_the_root()
+    {
+        using var folder = Folder($$"""
+            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+              "start": "check", "steps": {{ReviewSteps}} }
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidProcessSubject, ""), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_process_parameter_name_repeated_ignoring_letter_case_is_reported_at_the_repeat()
+    {
+        using var folder = Folder(SubjectlessProcess(
+            """[{ "name": "DailyJob", "type": "text" }, { "name": "limit", "type": "decimal" }, { "name": "dailyjob", "type": "integer" }]""",
+            """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "limit > 0", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicateProcessParameter, "/parameters/2/name", "The parameter name 'dailyjob' is already used by parameter 'DailyJob' at '/parameters/0'."),
+            (diagnostic.Code, diagnostic.Path, diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_task_step_in_a_process_without_a_subject_is_reported_at_its_type_and_not_checked_further()
+    {
+        using var folder = Folder(SubjectlessProcess(
+            """[{ "name": "limit", "type": "decimal" }]""",
+            TaskSteps(assignee: """{ "user": "nope" }""", form: "Missing"),
+            start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.StepNeedsSubject, "/steps/0/type"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Theory]
+    [InlineData("updateRecord", """ "set": { "status": "'x'" }, """)]
+    [InlineData("raiseEvent", """ "event": "OrderPlaced", "fields": {}, """)]
+    public void An_update_or_raise_event_step_in_a_process_without_a_subject_is_reported_at_its_operation(string operation, string properties)
+    {
+        using var folder = Folder(SubjectlessProcess(
+            """[{ "name": "limit", "type": "decimal" }]""",
+            $$"""
+            [
+              { "name": "act", "type": "operation", "operation": "{{operation}}", {{properties}} "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """,
+            start: "act"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.StepNeedsSubject, "/steps/0/operation"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_connector_output_in_a_process_without_a_subject_is_reported_at_the_output()
+    {
+        using var folder = Folder(
+            SubjectlessProcess("""[{ "name": "reference", "type": "text" }]""", $$"""
+                [
+                  { "name": "call", "type": "operation", "operation": "callConnector", {{CallCreateOrder}}
+                    "input": { "reference": "reference", "amount": "1" }, "output": { "orderNumber": "number" }, "next": "done" },
+                  { "name": "done", "type": "end" }
+                ]
+                """, start: "call"),
+            Purchasing);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.StepNeedsSubject, "/steps/0/output"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
     public void Transitions_resolve_ignoring_letter_case_to_the_declared_step_name()
     {
         using var folder = Folder(Process("order", """
@@ -114,7 +278,7 @@ public sealed class ProcessCompilerTests
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
         var process = Assert.Single(result.Model.Processes);
-        Assert.Equal(("Order", "check"), (process.Entity.Name, process.Start));
+        Assert.Equal(("Order", "check"), (process.Entity!.Name, process.Start));
         var check = Assert.IsType<DecisionStepModel>(process.Steps[0]);
         Assert.Equal(("done", "done"), (check.Branches[0].Next, check.Otherwise));
     }
@@ -1167,6 +1331,18 @@ public sealed class ProcessCompilerTests
         return $$"""
             { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
               "entity": "{{entity}}", {{condition}} "start": "{{start}}", "steps": {{steps}} }
+            """;
+    }
+
+    /// <summary>The process <c>OrderReview</c> with no entity and the given <paramref name="parameters"/> array, with an optional start condition.</summary>
+    private static string SubjectlessProcess(string parameters, string steps, string start = "check", string? startCondition = null)
+    {
+        var condition = startCondition is null
+            ? ""
+            : $$""" "startCondition": { "expression": "{{startCondition}}", "message": { "textKey": "order.cannotStart" } }, """;
+        return $$"""
+            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+              "parameters": {{parameters}}, {{condition}} "start": "{{start}}", "steps": {{steps}} }
             """;
     }
 

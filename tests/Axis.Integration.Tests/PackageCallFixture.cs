@@ -314,7 +314,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
     {
         var model = Model;
         Assert.True(model.TryGetProcess(process, out var processModel));
-        Assert.True(model.TryGetEntity(processModel.Entity.Name, out var entity));
+        Assert.True(model.TryGetEntity(processModel.Entity!.Name, out var entity));
         await using var connection = await _tenant.DataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var result = await ProcessRetryCommand.RetryAsync(

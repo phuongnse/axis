@@ -75,9 +75,10 @@ flowchart LR
      order of the entity files, then in field order. A later field with the
      same target is `AXC0039` at its `/fields/{i}/target`, naming the owner.
      A `reference` whose target is a child entity is `AXC0040` at
-     `/fields/{i}/target`. A `reference` or `child-collection` field on a
+     `/fields/{i}/target`. A `child-collection` field on a
      child entity is `AXC0041` at its `/fields/{i}/type`, so an entity whose
-     child collection names itself is `AXC0041`. See
+     child collection names itself is `AXC0041`. A `reference` field on a
+     child entity is allowed. See
      [Entity logic](resource-files.md#entity-logic) for why these limits exist.
    - **Sites and pages.** A site belongs to one application. Its `path` is
      lower-case letters, digits and hyphens, starting with a letter. A path
@@ -333,7 +334,9 @@ flowchart LR
      `/entity`, and its conditions are not checked. A name whose entity file
      was not loaded because of its own errors is not reported again. An
      `entity` that is a child entity is `AXC0068` at `/entity`, naming the
-     owner. Step names are unique ignoring letter case: a later step with a
+     owner. A process has `entity` or `parameters`, not both and not neither
+     (`AXC0244`). Without an `entity` it is checked over its `parameters`, see
+     [Compile checks](processes.md#compile-checks). Step names are unique ignoring letter case: a later step with a
      name already used is `AXC0069` at `/steps/{i}/name`, naming the first
      step. `start`, each branch `next`, each `otherwise`, each operation
      `next` and each task outcome `next` must name a step, ignoring letter

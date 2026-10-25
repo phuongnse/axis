@@ -47,7 +47,7 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
 
-        if (await FindMissingReferencesAsync(connection, values, cancellationToken) is { } missing)
+        if (await FindMissingReferencesAsync(connection, values, rows, cancellationToken) is { } missing)
         {
             return missing;
         }
@@ -107,7 +107,7 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
 
-        if (await FindMissingReferencesAsync(connection, values, cancellationToken) is { } missing)
+        if (await FindMissingReferencesAsync(connection, values, rows, cancellationToken) is { } missing)
         {
             return missing;
         }
@@ -384,13 +384,13 @@ public static class RecordCommands
 
     /// <summary>
     /// Maps a violation in a row of a child collection like one of the owner, keyed by the row's
-    /// pointer, such as <c>/values/parts/1/</c>. A child has no reference field, so a foreign key
-    /// the row violates is not one the model declares for the row: a schema conflict.
+    /// pointer, such as <c>/values/parts/1/</c>. A foreign key of a reference field of the child is
+    /// a missing reference at that cell. Any other foreign key the row violates, such as the one to
+    /// its owner, is not one the model declares for the row: a schema conflict.
     /// </summary>
     private static RecordWriteResult? MapRowViolation(PostgresException exception, RecordRows collection, int position) =>
-        exception.SqlState == PostgresErrorCodes.ForeignKeyViolation
-            ? new RecordWriteResult(RecordWriteOutcome.SchemaConflict)
-            : MapViolation(exception, collection.Child, string.Create(CultureInfo.InvariantCulture, $"{ValuesPointer}{collection.Collection.Name}/{position}/"));
+        MapViolation(exception, collection.Child, string.Create(CultureInfo.InvariantCulture, $"{ValuesPointer}{collection.Collection.Name}/{position}/"))
+            ?? (exception.SqlState == PostgresErrorCodes.ForeignKeyViolation ? new RecordWriteResult(RecordWriteOutcome.SchemaConflict) : null);
 
     /// <summary>
     /// Maps a constraint violation to its result by the constraint names the model declares, with
@@ -423,24 +423,46 @@ public static class RecordCommands
         }
     }
 
-    /// <summary>Checks every non-null reference value; returns the errors for those that name no record.</summary>
+    /// <summary>
+    /// Checks every non-null reference value of the owner and of each row of <paramref name="rows"/>;
+    /// returns the errors for those that name no record, keyed by cell, such as
+    /// <c>/values/lines/0/product</c>.
+    /// </summary>
     private static async Task<RecordWriteResult?> FindMissingReferencesAsync(
         NpgsqlConnection connection,
         IReadOnlyList<RecordValue> values,
+        IReadOnlyList<RecordRows> rows,
         CancellationToken cancellationToken)
     {
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         foreach (var value in values)
         {
-            if (value is { Field.Type: FieldType.Reference, Value: Guid target }
-                && !await ExistsAsync(connection, EntityNaming.QualifiedTable(EntityNaming.Table(value.Field.Target!.Id)), target, cancellationToken))
+            if (await IsMissingReferenceAsync(connection, value, cancellationToken))
             {
                 errors[ValuesPointer + value.Field.Name] = [Messages.MissingReference];
             }
         }
 
+        foreach (var collection in rows)
+        {
+            for (var position = 0; position < collection.Rows.Count; position++)
+            {
+                foreach (var value in collection.Rows[position])
+                {
+                    if (await IsMissingReferenceAsync(connection, value, cancellationToken))
+                    {
+                        errors[string.Create(CultureInfo.InvariantCulture, $"{ValuesPointer}{collection.Collection.Name}/{position}/{value.Field.Name}")] = [Messages.MissingReference];
+                    }
+                }
+            }
+        }
+
         return errors.Count > 0 ? new RecordWriteResult(RecordWriteOutcome.MissingReference, Errors: errors) : null;
     }
+
+    private static async Task<bool> IsMissingReferenceAsync(NpgsqlConnection connection, RecordValue value, CancellationToken cancellationToken) =>
+        value is { Field.Type: FieldType.Reference, Value: Guid target }
+        && !await ExistsAsync(connection, EntityNaming.QualifiedTable(EntityNaming.Table(value.Field.Target!.Id)), target, cancellationToken);
 
     internal static async Task<bool> ExistsAsync(NpgsqlConnection connection, string table, Guid id, CancellationToken cancellationToken)
     {
