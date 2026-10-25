@@ -19,7 +19,7 @@ public sealed class TenantSettings
 
     /// <summary>
     /// The id of the main tenant when this is a preview tenant. A blank value counts as unset. A preview tenant signs
-    /// people in with its main tenant's settings, without <c>EndpointAudience</c>.
+    /// people in with its main tenant's settings, without <c>EndpointAudience</c> and <c>ServiceAudience</c>.
     /// </summary>
     public string? PreviewOf { get; set; }
 

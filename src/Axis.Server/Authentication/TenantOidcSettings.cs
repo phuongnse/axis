@@ -29,6 +29,13 @@ internal sealed class TenantOidcSettings
     /// </summary>
     public string? EndpointAudience { get; set; }
 
+    /// <summary>
+    /// The audience that a service account's bearer token must contain on the record API. It is separate from
+    /// <see cref="EndpointAudience"/>, so an endpoint token never reaches records. A blank value means the tenant
+    /// accepts no service account token, so every such request there is a <c>401</c>.
+    /// </summary>
+    public string? ServiceAudience { get; set; }
+
     /// <summary>The names of the claims that give the user id, the display name and the roles.</summary>
     public TenantOidcClaims Claims { get; set; } = new();
 
@@ -52,6 +59,7 @@ internal sealed class TenantOidcSettings
             Profile = source.Profile ?? TenantSignInProfiles.Standard,
             ClientKeys = source.ClientKeys ?? [],
             EndpointAudience = source.EndpointAudience,
+            ServiceAudience = source.ServiceAudience,
             Claims =
             {
                 UserId = source.UserIdClaim ?? "",
