@@ -36,6 +36,10 @@ public sealed class TenantRow
 
     public string? ClaimRoles { get; set; }
 
+    public string? ClaimEmail { get; set; }
+
+    public string? ClaimLocale { get; set; }
+
     public string? EndpointAudience { get; set; }
 
     /// <summary>

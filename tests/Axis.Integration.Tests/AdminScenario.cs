@@ -200,6 +200,16 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         await context.SaveChangesAsync(CancellationToken);
     }
 
+    /// <summary>Sets the email and locale claim names of a tenant in the directory, which no command sets.</summary>
+    public async Task SetEmailAndLocaleClaimsAsync(string id, string email, string locale)
+    {
+        await using var context = NewContext();
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+        row.ClaimEmail = email;
+        row.ClaimLocale = locale;
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
     public async Task<long> CountEntriesAsync()
     {
         await using var context = NewContext();

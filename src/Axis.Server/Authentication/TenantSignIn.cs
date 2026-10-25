@@ -1,5 +1,8 @@
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
+using Axis.Data.Profiles;
+using Axis.Server.Tenancy;
+using Axis.Server.Users;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -22,6 +25,9 @@ internal static class TenantSignIn
 
     /// <summary>The request item that <c>OnTokenValidated</c> sets when it rejects the ID token.</summary>
     public const string TokenRejectedItem = "axis:sign_in_token_rejected";
+
+    /// <summary>The request item that <c>OnTokenValidated</c> fills with the <see cref="ProfileClaims"/> for <c>OnTicketReceived</c>.</summary>
+    public const string ProfileClaimsItem = "axis:sign_in_profile";
 
     public static string SchemeName(string tenantId) => $"{SchemePrefix}{tenantId}";
 
@@ -54,6 +60,9 @@ internal static class TenantSignIn
     }
 }
 
+/// <summary>The email and locale of a signed-in user from the ID token. A claim the token lacks is <c>null</c>.</summary>
+internal sealed record ProfileClaims(string? Email, string? Locale);
+
 /// <summary>Builds the options of a tenant's OIDC client from its settings, each time the options are created.</summary>
 internal sealed partial class TenantSignInOptions(TenantSignInSettings settings, CookieSecurePolicy securePolicy, bool allowHttp)
     : IConfigureNamedOptions<OpenIdConnectOptions>
@@ -82,6 +91,12 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
         // the SameSite=Lax correlation and nonce cookies.
         options.ResponseMode = OpenIdConnectResponseMode.Query;
         options.UsePkce = true;
+        // Providers other than Keycloak put the email in the ID token only when this scope is requested.
+        if (!options.Scope.Contains("email"))
+        {
+            options.Scope.Add("email");
+        }
+
         // D9 leaves pushed authorization requests (PAR) to a later FAPI 2.0 milestone, so the
         // authorization request, PKCE included, goes in the redirect.
         options.PushedAuthorizationBehavior = PushedAuthorizationBehavior.Disable;
@@ -122,6 +137,10 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
 
             var displayName = principal.FindFirst(tenant.Claims.DisplayName)?.Value;
             var roles = principal.FindAll(tenant.Claims.Roles).Select(claim => claim.Value);
+            // The email and locale are not session claims. They go to OnTicketReceived in a request item.
+            context.HttpContext.Items[TenantSignIn.ProfileClaimsItem] = new ProfileClaims(
+                Blank(principal.FindFirst(tenant.Claims.Email)?.Value),
+                Blank(principal.FindFirst(tenant.Claims.Locale)?.Value));
             context.Principal = Session.CreatePrincipal(
                 tenantId,
                 userId,
@@ -141,6 +160,7 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 user.DisplayName,
                 reason: null,
                 context.HttpContext.RequestAborted);
+            await SaveProfileAsync(context.HttpContext, user);
         };
         // The response stays the handler's 500. The record is best effort, as the callback has already failed.
         options.Events.OnRemoteFailure = async context =>
@@ -171,6 +191,30 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
         };
     }
 
+    // A profile that cannot be written never refuses the sign-in. The log holds no email or locale.
+    private static async Task SaveProfileAsync(HttpContext httpContext, CurrentUserResponse user)
+    {
+        try
+        {
+            var claims = httpContext.Items[TenantSignIn.ProfileClaimsItem] as ProfileClaims;
+            var connection = await httpContext.RequestServices.GetRequiredService<TenantDatabase>()
+                .GetConnectionAsync(httpContext.RequestAborted);
+            await UserProfiles.UpsertAsync(
+                connection,
+                user.Id,
+                user.DisplayName,
+                claims?.Email,
+                claims?.Locale,
+                httpContext.RequestAborted);
+        }
+        catch (Exception exception)
+        {
+            LogProfileNotWritten(httpContext.RequestServices.GetRequiredService<ILogger<TenantSignInOptions>>(), exception);
+        }
+    }
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
     // Each tenant's client protects its state with its own key purpose, so only a sign-in that
     // another tenant started can pass this check.
     private bool OtherTenantReadsState(HttpContext httpContext, string tenantId, string state)
@@ -198,6 +242,9 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
 
         return false;
     }
+
+    [LoggerMessage(LogLevel.Warning, "The profile of the signed-in user could not be written.")]
+    private static partial void LogProfileNotWritten(ILogger logger, Exception exception);
 
     [LoggerMessage(LogLevel.Warning, "The refused sign-in callback could not be written to the audit records.")]
     private static partial void LogRefusalNotRecorded(ILogger logger, Exception exception);

@@ -320,8 +320,13 @@ A tenant in any status except `provisioning` can be backed up, also a
 | `claimUserId` | The claim name of the user id, or `null` for the default. |
 | `claimDisplayName` | The claim name of the display name, or `null` for the default. |
 | `claimRoles` | The claim name of the roles, or `null` for the default. |
+| `claimEmail` | The claim name of the email, or `null` for the default. |
+| `claimLocale` | The claim name of the locale, or `null` for the default. |
 | `endpointAudience` | The endpoint audience, or `null` for the default. |
 | `bindings` | The bindings, in ordinal order of the name. Each has `name`, `kind` and, for a `url` binding, `url`. |
+
+An archive written before `claimEmail` and `claimLocale` existed has neither, and a
+restore reads both as `null`.
 
 A `secret` binding holds only its name and kind. The database server, the
 database name, the role names and the `version` of the entry are not in the

@@ -123,7 +123,9 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 section["EndpointAudience"],
                 section["Claims:UserId"],
                 section["Claims:DisplayName"],
-                section["Claims:Roles"]);
+                section["Claims:Roles"],
+                section["Claims:Email"],
+                section["Claims:Locale"]);
 
     // A blank value counts as missing.
     private static SecretValue? Secret(string? value) =>

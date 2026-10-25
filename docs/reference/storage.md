@@ -59,6 +59,10 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.process_work_items` (the work that
     workers claim and run), with history in `axis.__processes_migrations`.
     See [processes](processes.md#tables).
+  - `Axis.Data` also owns `axis.user_profiles`, one row for each user who
+    signed in, with the display name, email, locale and the first and last
+    sign-in. Each sign-in upserts it through `UserProfiles.UpsertAsync`, see
+    [User profiles](notifications.md#user-profiles).
   - `Axis.Data` also owns `axis.audit_records`, with history in
     `axis.__data_migrations`. Other modules append and read audit records
     only through its contract. `AuditRecords.AppendAsync` takes the
@@ -300,7 +304,7 @@ What each database role may do:
 | Objects                                                                                                                                                                                                                                     | Schema database role                                             | Runtime database role                                             |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `entities` tables                                                                                                                                                                                                                           | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields` | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                     | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                         | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                          | Owns it. The publisher changes the status and the lease | `SELECT` and `INSERT` only. It never updates or deletes a request |

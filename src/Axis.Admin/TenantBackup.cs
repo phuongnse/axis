@@ -371,6 +371,8 @@ internal sealed class TenantBackup : IAsyncDisposable
             row.ClaimUserId,
             row.ClaimDisplayName,
             row.ClaimRoles,
+            row.ClaimEmail,
+            row.ClaimLocale,
             row.EndpointAudience,
             [.. _plan.Bindings
                 .OrderBy(binding => binding.Name, StringComparer.Ordinal)
@@ -454,6 +456,8 @@ internal sealed record ManifestDirectory(
     string? ClaimUserId,
     string? ClaimDisplayName,
     string? ClaimRoles,
+    string? ClaimEmail,
+    string? ClaimLocale,
     string? EndpointAudience,
     IReadOnlyList<ManifestBinding> Bindings);
 

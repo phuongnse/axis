@@ -51,7 +51,9 @@ public sealed record TenantOidc(
     string? EndpointAudience,
     string? UserIdClaim,
     string? DisplayNameClaim,
-    string? RolesClaim);
+    string? RolesClaim,
+    string? EmailClaim,
+    string? LocaleClaim);
 
 /// <summary>
 /// One deployment binding. A <c>url</c> binding has <see cref="Url"/>, as written, and a <c>secret</c> binding has

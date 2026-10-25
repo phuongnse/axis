@@ -233,7 +233,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     // A preview tenant is keyed by the settings of its main tenant, without the endpoint audience it never takes, so a
     // change to the main tenant's sign-in reaches the preview at the next refresh.
     private static string OidcKey(TenantRow signIn, bool preview) =>
-        string.Join('\n', signIn.OidcAuthority, signIn.OidcClientId, Convert.ToBase64String(signIn.OidcClientSecret), preview ? null : signIn.EndpointAudience, signIn.ClaimUserId, signIn.ClaimDisplayName, signIn.ClaimRoles);
+        string.Join('\n', signIn.OidcAuthority, signIn.OidcClientId, Convert.ToBase64String(signIn.OidcClientSecret), preview ? null : signIn.EndpointAudience, signIn.ClaimUserId, signIn.ClaimDisplayName, signIn.ClaimRoles, signIn.ClaimEmail, signIn.ClaimLocale);
 
     // A preview tenant signs people in with the sign-in settings of its main tenant, whatever the main tenant's status,
     // and decrypts the client secret under the main tenant's id. It never takes the main tenant's EndpointAudience, so it
@@ -276,7 +276,9 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             main is null ? Blank(signIn.EndpointAudience) : null,
             Blank(signIn.ClaimUserId),
             Blank(signIn.ClaimDisplayName),
-            Blank(signIn.ClaimRoles));
+            Blank(signIn.ClaimRoles),
+            Blank(signIn.ClaimEmail),
+            Blank(signIn.ClaimLocale));
 
         return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf);
     }

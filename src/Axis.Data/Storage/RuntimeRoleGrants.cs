@@ -37,6 +37,7 @@ public static class RuntimeRoleGrants
         "trigger_schedules",
         "trigger_starts",
         "audit_records",
+        "user_profiles",
         "sequence_counters",
         "computed_field_errors",
         "pending_computed_fields",

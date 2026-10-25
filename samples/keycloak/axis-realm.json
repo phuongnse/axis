@@ -1,6 +1,9 @@
 {
   "realm": "axis",
   "enabled": true,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en", "vi"],
+  "defaultLocale": "en",
   "roles": {
     "client": {
       "axis": [
@@ -145,6 +148,9 @@
       "emailVerified": true,
       "firstName": "Anna",
       "lastName": "Employee",
+      "attributes": {
+        "locale": ["vi"]
+      },
       "credentials": [
         {
           "type": "password",
