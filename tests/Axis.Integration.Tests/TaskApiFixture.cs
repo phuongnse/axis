@@ -255,6 +255,24 @@ public sealed class TaskApiFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Claims and runs the next due <c>process.step</c> item of <paramref name="tenant"/>, so no staged
+    /// connector call is sent. Returns <see langword="false"/> when there is none.
+    /// </summary>
+    public async Task<bool> RunNextStepAsync(string tenant, CancellationToken cancellationToken)
+    {
+        var runner = (_services ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
+        await using var connection = await DataSource(tenant).OpenConnectionAsync(cancellationToken);
+        var item = await WorkItemQueue.ClaimAsync(connection, tenant, [ProcessStarts.StepWorkItemKind], _lease, cancellationToken);
+        if (item is null)
+        {
+            return false;
+        }
+
+        await runner.ExecuteAsync(item, cancellationToken);
+        return true;
+    }
+
+    /// <summary>
     /// Inserts a <c>pending</c> connector call of the step <paramref name="step"/> of the instance
     /// <paramref name="instanceId"/> in <paramref name="tenant"/>, to <c>Purchasing</c>
     /// <c>createOrder</c> on the tenant's first release, with the stored input
@@ -265,8 +283,8 @@ public sealed class TaskApiFixture : IAsyncLifetime
         var id = Guid.CreateVersion7();
         await using var command = DataSource(tenant).CreateCommand(
             """
-            INSERT INTO axis.connector_calls (id, process_instance_id, step, release_id, connector, operation, state, attempts, input)
-            VALUES (@id, @instance, @step, @release, 'Purchasing', 'createOrder', 'pending', 0, @input::jsonb)
+            INSERT INTO axis.connector_calls (id, process_instance_id, step, staged_revision, release_id, connector, operation, state, attempts, input)
+            VALUES (@id, @instance, @step, 1, @release, 'Purchasing', 'createOrder', 'pending', 0, @input::jsonb)
             """);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("instance", instanceId);
@@ -300,6 +318,19 @@ public sealed class TaskApiFixture : IAsyncLifetime
         command.Parameters.Add(new NpgsqlParameter("status", NpgsqlDbType.Integer) { Value = (object?)httpStatus ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)error ?? DBNull.Value });
         await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>Runs <paramref name="sql"/> in <paramref name="tenant"/> with <paramref name="parameters"/> and returns its first value, or null.</summary>
+    public async Task<object?> ScalarAsync(string tenant, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var command = DataSource(tenant).CreateCommand(sql);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        var result = await command.ExecuteScalarAsync();
+        return result is DBNull ? null : result;
     }
 
     /// <summary>The id of the one task of the instance <paramref name="instanceId"/> in <paramref name="tenant"/>.</summary>

@@ -8,6 +8,7 @@ import { confirmDialog, waitForDialog } from '../dialogs'
 import { pickAction, pickOption } from '../select'
 import { e2eApp } from '../server-settings'
 import { useSession } from '../sessions'
+import { createResource, openFormTab } from '../studio-resources'
 
 // A second server starts in beforeAll, and the journey creates an application and publishes it.
 test.setTimeout(240_000)
@@ -108,19 +109,14 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
     await addAggregate(folder, 'request-totals', 'RequestTotals', [])
     await addAggregate(folder, 'requests-by-status', 'RequestsByStatus', ['status'])
 
-    await page.getByRole('button', { name: 'New resource', exact: true }).click()
-    const resource = await waitForDialog(page)
-    await pickOption(resource.getByRole('combobox', { name: 'Kind', exact: true }), 'page')
-    await resource.getByRole('textbox', { name: 'Name', exact: true }).fill('Dashboard')
-    await resource.getByRole('button', { name: 'Create', exact: true }).click()
-    // The dialog gives the focus back to the New resource button when its close animation ends, and the pick helpers
-    // press Enter, so they start only when it is gone.
-    await expect(resource).toBeHidden()
+    await createResource(page, 'page', 'Dashboard')
+    await openFormTab(page)
     const editor = page.getByTestId('studio-page-editor')
     await expect(editor.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Dashboard')
 
     // The names load again, so the new data sources are offered below.
     await page.reload()
+    await openFormTab(page)
     await expect(editor.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Dashboard')
 
     await writeTexts(page, 'studio-field-/title', `Dashboard ${stamp}`, `Bảng điều khiển ${stamp}`)

@@ -488,7 +488,7 @@ and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
 `mode` on a schedule trigger and the properties of other types are `AXC0004`.
 
 - The `process` exists and has a subject. A trigger that names a process
-  without a subject is `AXC0246`, whatever the trigger type, until a schedule
+  without a subject is `AXC0247`, whatever the trigger type, until a schedule
   trigger without a data source and a delete trigger are built.
 - The subject entity matches. The event's entity, the `entity`, or the data
   source's root entity is the process's subject entity.

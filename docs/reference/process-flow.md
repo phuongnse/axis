@@ -7,7 +7,8 @@ subject. The process resource and the first four step types are in
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-Everything in this file is _(planned for M14)_. The design follows
+Everything in this file is _(planned for M14)_, except [Loops](#loops) through
+a `task` and the calls in them, which are built. The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
@@ -124,17 +125,23 @@ A `subProcess` step starts another process and waits until it ends:
 ## Loops
 
 A process may loop back to an earlier step when every cycle passes through a
-waiting step: a `task`, a `timer` or a `waitEvent`. `AXC0073` reports only a
-cycle with no waiting step, which would run for ever. See
-[Compile checks](processes.md#compile-checks).
+waiting step. A `task` is built as a waiting step. _(Planned for M14)_ A
+`timer` and a `waitEvent` are waiting steps too. `AXC0073` reports only a
+cycle with no waiting step, which would run for ever. A cycle of `decision` and
+`operation` steps is reported, and so is a cycle through a call step with no
+task in it. See [Compile checks](processes.md#compile-checks).
 
 - Each pass writes its own history rows, told apart by `revision`.
 - **Calls in a loop.** A step stages one connector call or one package call
   per pass. The unique index of `axis.connector_calls` and
   `axis.package_calls` is on (`process_instance_id`, `step`,
   `staged_revision`), where `staged_revision` is the instance revision the
-  step ran at. Retry and resolve act on the latest call of the step.
-- **Service desk.** A reopened ticket loops back to the agent's resolve task.
+  step ran at. An operator retry stages the latest call of the step again,
+  under the same operation identity, and sets its `staged_revision` to the
+  revision the step runs at again. Resolve finds its call by id. The
+  inspector lists every pass's calls, oldest first.
+- **Service desk.** _(Planned for M14)_ A reopened ticket loops back to the
+  agent's resolve task.
 
 ## Create record operation
 
@@ -204,8 +211,8 @@ answer `404`.
 
 - `parameters` is a list of `{ "name", "type" }`. The types are the scalar
   types of rule parameters. Names are unique, ignoring letter case, and a
-  repeated name is `AXC0244`. A process has `entity` or `parameters`, not both
-  and not neither. Either mistake is `AXC0243`, reported at `/parameters` when
+  repeated name is `AXC0245`. A process has `entity` or `parameters`, not both
+  and not neither. Either mistake is `AXC0244`, reported at `/parameters` when
   there are both and at the root of the file when there is neither.
 - Expressions see the parameters by name, and the named rules. There is no
   record, so there is no `id` and no field path. The start condition, a
@@ -213,13 +220,13 @@ answer `404`.
   checked over this scope.
 - **Steps.** `decision`, `createRecord`, `callConnector`, package operations,
   `timer`, `subProcess`, `notify` and `end` are allowed. `updateRecord`,
-  `raiseEvent`, `task` and `waitEvent` need a subject and are `AXC0245`. So is
+  `raiseEvent`, `task` and `waitEvent` need a subject and are `AXC0246`. So is
   the `output` of a `callConnector` or package operation step, because it
   writes the subject. Only the step types that exist today are checked: `task`,
   `updateRecord`, `raiseEvent` and the outputs. The compiler reports no other
   problem in such a step.
 - **Triggers and other starts by name.** An event, data change or schedule
-  trigger that names a process without a subject is `AXC0246`. An endpoint, a
+  trigger that names a process without a subject is `AXC0247`. An endpoint, a
   page `startProcess` action and a scenario step that name one are reported
   with their usual codes for a process over another entity: `AXC0117`,
   `AXC0088` and `AXC0184`.

@@ -134,7 +134,7 @@ table. From M15 every reference column and declared index has one, see
 | `date-time` | A string in UTC with exactly six fraction digits and `Z`, such as `2026-10-06T02:00:00.123456Z`. PostgreSQL stores microseconds, so no precision is lost |
 | `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
 | `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](#child-rows-computed-fields-and-validations) |
-| `money` _(planned for M15)_ | A number written as for `decimal`. The currency is the field's, or the value of its `currencyField` |
+| `money` | A number written as for `decimal`. The currency is the field's, or the value of its `currencyField` |
 | `file` _(planned for M15)_ | An object `{ "id", "name", "mediaType", "size" }`. See [file fields](file-fields.md#field-and-value) |
 | `references` _(planned for M15)_ | An array of record ids, in the order they were written. Its labels are an array in the same order in `labels`. List responses leave it out, as for a child collection |
 
@@ -513,7 +513,7 @@ is not a `text`. A wrong JSON type or a value outside its bounds is an error at
 | `date-time` | An RFC 3339 string `yyyy-MM-ddTHH:mm:ss` with an optional fraction of 1 to 6 digits and `Z` or `±HH:mm`; `T` and `Z` may be lower case. A missing offset, an offset beyond ±14:00, a leap second (`:60`), more than 6 fraction digits (PostgreSQL stores microseconds) or an instant outside 0001..9999 in UTC is an error | `DateTimeOffset` converted to UTC with offset zero, the only offset Npgsql writes to `timestamp with time zone` |
 | `enum` | A string equal to one of `values`, compared ordinally | `string` |
 | `reference` | A string in the hyphenated 8-4-4-4-12 hex form, in either letter case; whether the record exists is checked when it is written | `Guid` |
-| `money` _(planned for M15)_ | A number, checked as for `decimal` with the field's `precision` and `scale` | `string`, as for `decimal` |
+| `money` | A number, checked as for `decimal` with the field's `precision` and `scale` | `string`, as for `decimal` |
 | `file` _(planned for M15)_ | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field, see [file fields](file-fields.md#upload) | `Guid` |
 | `references` _(planned for M15)_ | An array of distinct record ids, at most 1,000. The whole set replaces the stored one | `Guid[]` |
 
@@ -774,7 +774,7 @@ can be read as its history (D21).
   returns the audit records of one record.
   - It lists every audit record that names the record. That covers the
     record API's writes, and the [process start](processes.md#start-endpoint),
-    each step and each [task decision](task-api.md#completing-a-task) on it,
+    each step and each [task decision](task-api.md#completing-a-task), claim and release on it,
     including those whose actor is `system`.
   - The path follows the 404 rules of a single read. An unknown record, a
     deleted record, or an id from another tenant is a `404`.

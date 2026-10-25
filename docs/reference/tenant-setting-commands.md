@@ -5,7 +5,8 @@ keys and passwords, and the platform audit records they write. The other command
 [administration](administration.md). The conventions of [architecture.md](../architecture.md) apply:
 sections marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-The design follows [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md). All of this
+The design follows [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md). The
+`platform.audit_records` table and `PlatformAuditRecords.WriteAsync` are built. The rest of this
 page is _(planned for M16)_.
 
 ## Common rules
@@ -103,8 +104,10 @@ keys. It can be rotated without signing anyone out.
 
 ## Platform audit records
 
-- **Table.** `platform.audit_records` is append-only. The database rejects every update and delete,
-  as it does for the audit table of a tenant database.
+- **Table.** `platform.audit_records` is append-only. The database rejects every update, delete and
+  truncate with SQLSTATE `23001`, as it does for the audit table of a tenant database. The table is
+  built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record. No command
+  calls it yet, so the commands that write records are _(planned for M16)_.
 - **What writes it.** Every `Axis.Admin` command that changes the directory, a tenant database, a key
   or a password. `tenant backup` writes one too, because an archive holds a tenant's data.
   `tenant list` and `version` write none.

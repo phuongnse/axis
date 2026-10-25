@@ -1,0 +1,31 @@
+{
+  "id": "8bc5e628-abd9-4187-ada2-882f9f15e39d",
+  "kind": "process",
+  "name": "Rework",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "send",
+  "steps": [
+    {
+      "name": "send",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "Purchasing", "operation": "createOrder" },
+      "input": { "reference": "title", "amount": "amount", "note": "comment" },
+      "output": { "orderNumber": "comment" },
+      "next": "check"
+    },
+    {
+      "name": "check",
+      "type": "task",
+      "label": { "textKey": "request.approve" },
+      "assignee": { "role": "finance" },
+      "form": "RequestReview",
+      "outcomes": [
+        { "name": "again", "label": { "textKey": "task.reject" }, "next": "send" },
+        { "name": "accept", "label": { "textKey": "task.approve" }, "next": "done" }
+      ]
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Axis.Administration\Axis.Administration.csproj" />
     <ProjectReference Include="..\Axis.Configuration\Axis.Configuration.csproj" />
     <ProjectReference Include="..\Axis.Data\Axis.Data.csproj" />
     <ProjectReference Include="..\Axis.Processes\Axis.Processes.csproj" />

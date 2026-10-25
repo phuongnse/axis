@@ -94,6 +94,7 @@ src/
                           used by Axis.Scenarios and, later, by the publisher
   Axis.Scenarios/         console host over Axis.Scenarios.Runner that runs an application's test scenarios
   Axis.Admin/             console host for tenant provisioning, migrations, activation, backup and restore
+  Axis.Administration/    library behind the Axis.Admin commands: the platform audit records so far
   Axis.PackageHost/       package runner host that runs extension package operations out of process (planned for M17)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
@@ -130,7 +131,7 @@ checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
-`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Worker`, the test projects, the sample extension package
+`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Administration` (the library behind the `Axis.Admin` commands), `Axis.Worker`, the test projects, the sample extension package
 `PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
 
 ## Module rules

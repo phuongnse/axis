@@ -6,8 +6,8 @@ work, and the tables. The rest of the process reference is in these files:
 
 - [task-api.md](task-api.md): the task API.
 - [process-flow.md](process-flow.md): timer, wait for event and sub-process
-  steps, loops, the `createRecord` operation and processes without a subject
-  _(planned for M14)_.
+  steps, loops, the `createRecord` operation and processes without a subject.
+  Loops through a `task` are built, the rest is _(planned for M14)_.
 - [task-deadlines.md](task-deadlines.md): task escalations, deadlines, claim
   and reassign _(planned for M14)_.
 - [notifications.md](notifications.md): the `notify` operation and in-app and
@@ -286,11 +286,11 @@ reported in one pass. See
 - `entity` names a loaded entity (`AXC0067`) that is not a child entity
   (`AXC0068`).
 - A process has `entity` or `parameters`, not both and not neither
-  (`AXC0243`). Parameter names are unique, ignoring letter case (`AXC0244`).
+  (`AXC0244`). Parameter names are unique, ignoring letter case (`AXC0245`).
   A process without a subject has no `task`, `updateRecord` or `raiseEvent`
-  step and no `output` on a connector or package step (`AXC0245`). Its start
+  step and no `output` on a connector or package step (`AXC0246`). Its start
   condition and each `when` see its parameters and the named rules, and no
-  field, path or `id`. A trigger that names such a process is `AXC0246`. The
+  field, path or `id`. A trigger that names such a process is `AXC0247`. The
   start endpoint answers `400` for it until starting these processes is built,
   see [Processes without a
   subject](process-flow.md#processes-without-a-subject).
@@ -301,10 +301,11 @@ reported in one pass. See
   case (`AXC0070`).
 - Every step is reachable from `start` (`AXC0071`).
 - Every step has a path to an `end` step (`AXC0072`).
-- The steps form no cycle (`AXC0073`). See [Limits in M3](#limits-in-m3).
-  _(Planned for M14)_ A cycle that passes through a `task`, `timer` or
-  `waitEvent` step is allowed, and `AXC0073` reports only a cycle with no
-  waiting step, see [Loops](process-flow.md#loops).
+- The steps form no cycle that has no waiting step (`AXC0073`). A cycle that
+  passes through a `task` step is allowed, see [Loops](process-flow.md#loops).
+  A cycle of steps that never wait, such as `decision` and `operation` steps,
+  would run for ever and is reported. _(Planned for M14)_ A `timer` or
+  `waitEvent` step is a waiting step too.
 - A decision has at least one branch (`AXC0004`).
 - Each `when` and the `startCondition` expression give a boolean. They see
   the subject entity's fields, computed ones included, `id`, the subject
@@ -708,9 +709,8 @@ database, with history in `axis.__processes_migrations` (see
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
 - `axis.connector_calls`: one row per staged connector
   call, see [Connector calls](process-execution.md#connector-calls). A unique index on
-  (`process_instance_id`, `step`) lets a step stage only one call. _(Planned for
-  M14)_ The index adds `staged_revision`, one call per pass of a
-  [loop](process-flow.md#loops). Times use
+  (`process_instance_id`, `step`, `staged_revision`) lets a step stage one call
+  per pass of a [loop](process-flow.md#loops). Times use
   the database clock. There is no column for a request or response body.
   Each call attempt row stores the `trace_id` of its attempt, see
   [Telemetry](../architecture.md#telemetry).
@@ -720,6 +720,7 @@ database, with history in `axis.__processes_migrations` (see
   | `id` | `uuid` | A version 7 UUID, the call's operation identity. Every attempt and every lookup sends it as the idempotency key |
   | `process_instance_id` | `uuid` | The instance |
   | `step` | `text` | The declared name of the `callConnector` step |
+  | `staged_revision` | `bigint` | The instance revision the step ran at. A retry restage sets it to the new run's revision |
   | `release_id` | `uuid` | The release the instance is pinned to |
   | `connector` | `text` | The connector's name |
   | `operation` | `text` | The operation's name |
@@ -756,9 +757,8 @@ database, with history in `axis.__processes_migrations` (see
   | `trace_id` | `text`, null | The 32-hex trace id of the run that made the attempt or lookup. Null when no span was current, and for rows that existed before the column |
 - `axis.package_calls`: one row per staged package call, see
   [Package operations](process-execution.md#package-operations). A unique index on
-  (`process_instance_id`, `step`) lets a step stage only one call. _(Planned for
-  M14)_ The index adds `staged_revision`, one call per pass of a
-  [loop](process-flow.md#loops). Times use
+  (`process_instance_id`, `step`, `staged_revision`) lets a step stage one call
+  per pass of a [loop](process-flow.md#loops). Times use
   the database clock. There is no column for an output.
   Each call attempt row stores the `trace_id` of its attempt, see
   [Telemetry](../architecture.md#telemetry).
@@ -768,6 +768,7 @@ database, with history in `axis.__processes_migrations` (see
   | `id` | `uuid` | A version 7 UUID, the call's operation identity. It is the `OperationId` of the operation's context |
   | `process_instance_id` | `uuid` | The instance |
   | `step` | `text` | The declared name of the package operation step |
+  | `staged_revision` | `bigint` | The instance revision the step ran at. A retry restage sets it to the new run's revision |
   | `release_id` | `uuid` | The release the instance is pinned to |
   | `package` | `text` | The package id |
   | `version` | `text` | The package version the release pins |
@@ -820,16 +821,16 @@ database, with history in `axis.__processes_migrations` (see
   | `trigger_id` | `uuid` | The trigger |
   | `source` | `text` | The event id for an event trigger, or the occurrence time for a schedule trigger |
   | `subject_id` | `uuid` | The record |
-  | `outcome` | `text` | `started` or `skipped` |
+  | `outcome` | `text` | `started`, `skipped` or `deadLettered` |
   | `process_instance_id` | `uuid`, null | The instance it started. Null when skipped |
   | `created_at` | `timestamptz` | The start of the transaction, `now()` |
 
 ## Limits in M3
 
-- **No cycles.** A process may not contain a cycle. A loop with no task step
-  would run for ever. A returned request starts a new instance, so M3 needs
-  no loops. _(Planned for M14)_ Loops through a waiting step are allowed, see
-  [Loops](process-flow.md#loops).
+- **Loops only through a task.** A process may not contain a cycle that has no
+  `task` step, because it would run for ever. A cycle through a `task` step is
+  allowed, see [Loops](process-flow.md#loops). _(Planned for M14)_ A cycle
+  through a `timer` or `waitEvent` step is allowed too.
 - **No user check.** The user id that a `user` assignee gives is not checked
   against any list of users. A wrong id creates a task that nobody sees. A
   reassign in M14 checks its target against the

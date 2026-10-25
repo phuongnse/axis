@@ -330,6 +330,42 @@ export function renameSection(draft: Content, index: number, name: string): Sect
   }
 }
 
+/** Removes a section from `sections` and every step that lists it. `step` is the first step that listed it. */
+export function removeSection(
+  draft: Content,
+  index: number,
+): { sections: unknown[]; steps: unknown[] | undefined; step: number | undefined } | undefined {
+  const sections = Array.isArray(draft.sections) ? draft.sections : []
+  const section = sections[index]
+  if (!isContent(section)) {
+    return undefined
+  }
+  const wanted = typeof section.name === 'string' ? section.name.toLowerCase() : undefined
+  let step: number | undefined
+  const steps = Array.isArray(draft.steps)
+    ? draft.steps.map((item, position) => {
+        if (wanted === undefined || !listedBy(item).some((name) => sameName(name, wanted))) {
+          return item
+        }
+        if (step === undefined) {
+          step = position
+        }
+        return { ...(item as Content), sections: listedBy(item).filter((name) => !sameName(name, wanted)) }
+      })
+    : undefined
+  return { sections: sections.filter((_, position) => position !== index), steps, step }
+}
+
+/** Removes a step and leaves `sections` alone. `steps` is `undefined` when no step is left. */
+export function removeStep(draft: Content, index: number): { steps: unknown[] | undefined } | undefined {
+  const steps = stepsOf(draft)
+  if (steps === undefined || !isContent(steps[index])) {
+    return undefined
+  }
+  const remaining = steps.filter((_, position) => position !== index)
+  return { steps: remaining.length > 0 ? remaining : undefined }
+}
+
 /**
  * The layout of a draft: each step with the indexes of the sections it lists, in the order the step lists them, then
  * the sections that no step lists. A draft without steps has all its sections in one group with no step.
