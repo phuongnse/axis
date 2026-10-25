@@ -168,6 +168,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     public async Task Missed_hourly_occurrences_run_only_the_latest_once_and_the_next_is_due_an_hour_later()
     {
         var tenant = fixture.Tenant("e");
+        await AssertHourlyInUtcAsync(tenant);
         var record = await tenant.InsertRequestAsync(2000m, 1);
         var stored = await MoveBackThreeHoursAsync(tenant);
 
@@ -219,10 +220,12 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     public async Task Activating_the_same_release_again_keeps_a_missed_next_occurrence_and_the_worker_runs_only_the_latest()
     {
         var tenant = fixture.Tenant("g");
+        await AssertHourlyInUtcAsync(tenant);
         var record = await tenant.InsertRequestAsync(2000m, 1);
         var stored = await MoveBackThreeHoursAsync(tenant);
 
         await tenant.ActivateAsync(fixture.HourlyFolder, []);
+        await AssertHourlyInUtcAsync(tenant);
 
         var state = Assert.Single(await tenant.TriggerSchedulesAsync());
         var item = Assert.Single(await tenant.ScheduleItemsAsync());
@@ -318,6 +321,13 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
                 (bool)(await tenant.ScalarAsync("SELECT next_occurrence_at <= now() + interval '1 hour' FROM axis.trigger_schedules"))!,
                 (bool)(await tenant.ScalarAsync("SELECT date_trunc('hour', next_occurrence_at) = next_occurrence_at FROM axis.trigger_schedules"))!));
     }
+
+    /// <summary>
+    /// Checks that the trigger is hourly in UTC. The hourly tests rely on even hour steps, which
+    /// Berlin breaks at the autumn clock change.
+    /// </summary>
+    private static async Task AssertHourlyInUtcAsync(ProcessStepFixture tenant) =>
+        Assert.Equal("0 * * * * UTC", await tenant.ScalarAsync("SELECT schedule || ' ' || time_zone FROM axis.trigger_schedules"));
 
     /// <summary>
     /// Moves the stored next occurrence and the schedule item three hours back, to the start of the
