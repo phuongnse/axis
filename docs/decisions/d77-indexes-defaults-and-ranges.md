@@ -3,7 +3,9 @@
 Status: **Agreed**
 
 M15 adds indexes, default values and value ranges to entity fields. The owner
-agreed these points on 2026-10-25. All of it is _(planned for M15)_. See
+agreed these points on 2026-10-25. All of it is _(planned for M15)_, except that
+the ranges of `integer`, `decimal`, `date`, `date-time` and `text` fields are
+built, without the Studio designer. See
 [entity field types](../reference/resource-files.md#entity-field-types-and-constraints)
 and [schema planning](../reference/storage.md#schema-planning).
 

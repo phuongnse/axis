@@ -206,6 +206,11 @@ a payment reference from the sample extension package, see
 ```
 
 - `entity` names the subject entity. Each instance runs for one record of it.
+  It is optional. A process without it declares `parameters` instead, a list
+  of `{ "name", "type" }` with the scalar types of rule parameters: `text`,
+  `integer`, `decimal`, `boolean`, `date` and `date-time`. It has no subject
+  record. See [Processes without a
+  subject](process-flow.md#processes-without-a-subject).
 - `startCondition` is optional. Its `expression` is a boolean expression over
   the subject record. A start is allowed only when it is true. A `false`, a
   `null` or a run-time error fails the start. Its `message` is a label, shown
@@ -244,9 +249,13 @@ and [notifications](notifications.md#notify-operation).
     of hours, minutes and seconds, such as `P3D`, `PT4H` or `P1DT12H`. Years
     and months are `AXC0084` until calendar durations come with the
     [time zone rule](../decisions/d22-current-time-and-time-zones.md), because they have no fixed length. The task's due date is the time the task is created plus `dueIn`. It is
-    shown only. Escalation needs timers, so it comes later. _(Planned for
-    M14)_ `escalations` and a `deadline`, see
+    shown only.
+  - `deadline` is optional. It is `{ "after", "next" }`. `after` is a duration
+    by the rule of `dueIn`, counted from the task's creation. `next` names a
+    step. When the task is still `open` after that time, the task becomes
+    `expired` and the instance moves to `next`, see
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
+    _(Planned for M14)_ `escalations`, see the same section.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
     the task is completed with it.
@@ -280,6 +289,15 @@ reported in one pass. See
 
 - `entity` names a loaded entity (`AXC0067`) that is not a child entity
   (`AXC0068`).
+- A process has `entity` or `parameters`, not both and not neither
+  (`AXC0244`). Parameter names are unique, ignoring letter case (`AXC0245`).
+  A process without a subject has no `task`, `updateRecord` or `raiseEvent`
+  step and no `output` on a connector or package step (`AXC0246`). Its start
+  condition and each `when` see its parameters and the named rules, and no
+  field, path or `id`. A trigger that names such a process is `AXC0247`. The
+  start endpoint answers `400` for it until starting these processes is built,
+  see [Processes without a
+  subject](process-flow.md#processes-without-a-subject).
 - Step names are unique within the process, ignoring letter case
   (`AXC0069`).
 - `start`, every branch `next`, `otherwise`, the `next` of an operation and
@@ -491,11 +509,11 @@ record. An operator can cancel a `running` or `waiting` instance, see
 | `open` | The task waits for a decision. |
 | `completed` | The decision is recorded, and the instance moves on. |
 | `cancelled` | An operator cancelled the task's instance. The task has no decision and leaves every inbox. See [Cancel](process-inspection.md#cancel). |
+| `expired` | The task's `deadline` passed while it was `open`, and the instance moved to the deadline's `next` step. The task has no decision and leaves every inbox. It cannot be completed. See [Escalations and deadline](task-deadlines.md#escalations-and-deadline). |
 
 A task has no other state. Its due date is only shown, so there is no overdue
-state. _(Planned for M14)_ A deadline makes a task `expired`, and the task API
-reports an open task past its due date as overdue, see
-[Task states](task-deadlines.md#task-states).
+state. _(Planned for M14)_ The task API reports an open task past its due date
+as overdue, see [Task states](task-deadlines.md#task-states).
 
 ## Releases and running work
 
@@ -606,10 +624,12 @@ database, with history in `axis.__processes_migrations` (see
   and is null before. A retry clears it.
   A partial unique index on
   application, process and subject record, where the state is `running` or
-  `waiting`, enforces one start per submission.
-  _(Planned for M14)_ The index treats a null subject as one value, and the
-  table gains `parameters`, `parent_instance_id` and `parent_step`, see
-  [process flow](process-flow.md).
+  `waiting`, enforces one start per submission. The index treats a null subject
+  as one value (`NULLS NOT DISTINCT`), so a process without a subject has one
+  open instance. The subject columns are null for such an instance, and its
+  `parameters` `jsonb` column holds the values it started with, see
+  [process flow](process-flow.md#processes-without-a-subject).
+  _(Planned for M14)_ The table gains `parent_instance_id` and `parent_step`.
   Three more indexes serve the inspector's instance list: one by application,
   process and start time, newest first, one by application, process, state and
   start time, and one by subject record.
@@ -623,8 +643,8 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. `{ "command": "cancel" }` for an operator cancel. `{ "command": "retry" }` for an operator retry. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
-  | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "taskId", "next" }` for a task whose deadline expired it, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. `{ "command": "cancel" }` for an operator cancel. `{ "command": "retry" }` for an operator retry. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
+  | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion, and `deadline` for a task its deadline expired. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step. The exception type, or a fixed text that names the step, part, field pointer or message key. Never the exception message or a value, see [Step errors](process-inspection.md#step-errors-in-inspection) |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `finished_at` | `timestamptz` | When the row was written, `clock_timestamp()` |
@@ -652,7 +672,8 @@ database, with history in `axis.__processes_migrations` (see
   current. A run starts a new trace with a link to that span, see
   [Telemetry](../architecture.md#telemetry). A rescheduled item keeps them.
   Activation that queues a `trigger.schedule` item again replaces them.
-  Two more kinds come with [schedules](process-events.md#schedules), and a third with
+  Two more kinds come with [schedules](process-events.md#schedules), one with
+  [task deadlines](task-deadlines.md), and one with
   [computed fields](migrations.md#recomputing-computed-fields):
   - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
     also has the `trigger_id`, and its `due_at` is the next occurrence. A
@@ -661,6 +682,10 @@ database, with history in `axis.__processes_migrations` (see
     Its item also has the `trigger_id`, the `release_id` that was active at
     the occurrence and the `occurrence_at` time. Its `cursor` is the last
     record id it handled, and is null before its first batch.
+  - `task.deadline` expires one task at its deadline. Its item also has the
+    `task_id` of the task and the `process_instance_id` of its instance, and
+    its `due_at` is the task step's time plus the deadline's `after`. See
+    [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
   - `computed.backfill` recomputes the out-of-date rows of
     one entity. Its item also has the `entity_id`, and each claim runs one
     batch of up to 500 rows. See
@@ -688,10 +713,11 @@ database, with history in `axis.__processes_migrations` (see
   | `assignee` | `text` | The user id that the `user` expression gave, or the role name |
   | `form_id` | `uuid` | The id of the step's form |
   | `due_at` | `timestamptz`, null | `created_at` plus `dueIn`, or null when the step has no `dueIn` |
-  | `state` | `text` | `open`, `completed` or `cancelled` |
-  | `outcome` | `text`, null | The outcome the task was completed with. Null while it is `open`, and for a `cancelled` task |
-  | `completed_by` | `text`, null | The user who completed the task. Null while it is `open`, and for a `cancelled` task |
-  | `completed_at` | `timestamptz`, null | When the task was completed. Null while it is `open`, and for a `cancelled` task |
+  | `state` | `text` | `open`, `completed`, `cancelled` or `expired` |
+  | `outcome` | `text`, null | The outcome the task was completed with. Null while it is `open`, and for a `cancelled` or `expired` task |
+  | `completed_by` | `text`, null | The user who completed the task. Null while it is `open`, and for a `cancelled` or `expired` task |
+  | `completed_at` | `timestamptz`, null | When the task was completed. Null while it is `open`, and for a `cancelled` or `expired` task |
+  | `expired_at` | `timestamptz`, null | When the deadline expired the task. Null unless the task is `expired`. The task API does not return it |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
 - `axis.connector_calls`: one row per staged connector
   call, see [Connector calls](process-execution.md#connector-calls). A unique index on

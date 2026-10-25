@@ -120,9 +120,15 @@ internal static class ProcessInspectionEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        if (!application.TryGetEntity(model.Entity.Name, out var entity))
+        // No instance of a process without a subject can exist yet.
+        if (model.Entity is not { } subjectEntity)
         {
-            throw new InvalidOperationException($"The subject entity '{model.Entity.Name}' of process '{model.Name}' is not in the model.");
+            return Results.Ok(new ProcessInstanceListResponse([], pageNumber, size, 0));
+        }
+
+        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
         }
 
         // An instance whose record the user may not read does not exist for them.
@@ -155,10 +161,11 @@ internal static class ProcessInspectionEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
         }
 
+        // The list filters by the subject entity, so every instance has a subject.
         var items = result.Items
             .Select(instance => new ProcessInstanceListItem(
                 instance.Id,
-                instance.SubjectId,
+                instance.SubjectId!.Value,
                 instance.State,
                 instance.Step,
                 instance.ReleaseId,
@@ -205,9 +212,15 @@ internal static class ProcessInspectionEndpoints
             return InstanceNotFound();
         }
 
-        if (!application.TryGetEntity(model.Entity.Name, out var entity))
+        // No instance of a process without a subject can exist yet.
+        if (model.Entity is not { } subjectEntity)
         {
-            throw new InvalidOperationException($"The subject entity '{model.Entity.Name}' of process '{model.Name}' is not in the model.");
+            return InstanceNotFound();
+        }
+
+        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
         }
 
         // An instance whose record the user may not read does not exist for them.
@@ -229,8 +242,10 @@ internal static class ProcessInspectionEndpoints
             return InstanceNotFound();
         }
 
+        // FindAsync filters by the subject entity, so the instance has a subject.
+        var subjectId = row.SubjectId!.Value;
         if (read.Filters is { } filters
-            && await RecordCommand.MatchAsync(connection, null, application, entity, row.SubjectId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+            && await RecordCommand.MatchAsync(connection, null, application, entity, subjectId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
         {
             return InstanceNotFound();
         }
@@ -261,7 +276,7 @@ internal static class ProcessInspectionEndpoints
         return Results.Ok(new ProcessInstanceDetailResponse(
             row.Id,
             model.Name,
-            row.SubjectId,
+            subjectId,
             row.ReleaseId,
             row.State,
             row.Step,

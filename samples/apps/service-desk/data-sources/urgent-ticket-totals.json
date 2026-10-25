@@ -10,7 +10,7 @@
       "path": "status"
     }
   ],
-  "filter": "status in ('submitted', 'assigned', 'resolved', 'reopened') and priority == 'urgent'",
+  "filter": "status in ('submitted', 'assigned', 'resolved') and priority == 'urgent'",
   "aggregate": {
     "groupBy": [],
     "measures": [

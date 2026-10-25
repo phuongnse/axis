@@ -343,25 +343,34 @@ public sealed record DataSourceParameterMetadata(
 /// One column of a data source: a projected field or, for a grouped data source, a group field or a
 /// measure. A field column's type, label key, values and target are those of the field its path ends
 /// at. <see cref="Values"/> is set for enum and <see cref="Target"/> for reference. A measure column
-/// has the type of its result and no label key, values or target, so its header is its name.
+/// has the type of its result and no label key, values or target, so its header is its name. A
+/// money measure gives its fixed <see cref="Currency"/> or the <see cref="CurrencyColumn"/> that holds the
+/// currency code in each grouped row. Both are left out of the JSON when null.
 /// </summary>
 /// <param name="Name">The projected name: the column's key in a row.</param>
+/// <param name="Currency">The fixed currency code of a money measure.</param>
+/// <param name="CurrencyColumn">The name of the group column that holds the currency code of a money measure.</param>
 public sealed record DataSourceColumnMetadata(
     string Name,
     string Type,
     string? LabelKey,
     IReadOnlyList<string>? Values,
-    ReferenceTarget? Target);
+    ReferenceTarget? Target,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Currency = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CurrencyColumn = null);
 
 /// <summary>
-/// One field. Properties the field's type does not have are null: <see cref="MaxLength"/> is for
-/// text, <see cref="Precision"/> and <see cref="Scale"/> for decimal, <see cref="Values"/> for enum,
+/// One field. Properties the field's type does not have are null: <see cref="MaxLength"/> and
+/// <see cref="MinLength"/> are for text, <see cref="Min"/> and <see cref="Max"/> for integer,
+/// decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal, <see cref="Values"/> for enum,
 /// <see cref="Target"/> for reference and <see cref="Fields"/> for child collection.
 /// </summary>
 /// <param name="Type">The type name as written in entity files, such as <c>date-time</c>.</param>
 /// <param name="Computed">Whether the server computes the value. A client shows it and never sends it.</param>
 /// <param name="Sequence">Whether a sequence numbers the field on create. A client shows it and never sends it.</param>
 /// <param name="Creator">Whether the server sets the field to the creating user's id. A client shows it and never sends it.</param>
+/// <param name="Min">The lowest accepted value as the literal was written, such as <c>10</c>, <c>0.5</c> or <c>2026-01-01</c>, or null when there is none.</param>
+/// <param name="Max">The highest accepted value, written as <paramref name="Min"/> is, or null when there is none.</param>
 /// <param name="Fields">The child entity's fields in declaration order, for a child collection.</param>
 public sealed record FieldMetadata(
     string Name,
@@ -375,6 +384,9 @@ public sealed record FieldMetadata(
     int? MaxLength,
     int? Precision,
     int? Scale,
+    string? Min,
+    string? Max,
+    int? MinLength,
     IReadOnlyList<string>? Values,
     ReferenceTarget? Target,
     IReadOnlyList<FieldMetadata>? Fields);

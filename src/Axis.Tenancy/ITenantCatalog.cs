@@ -55,6 +55,8 @@ public sealed record TenantOidc(
     string? UserIdClaim,
     string? DisplayNameClaim,
     string? RolesClaim,
+    string? EmailClaim,
+    string? LocaleClaim,
     string? Profile = null,
     IReadOnlyList<TenantClientKey>? ClientKeys = null);
 
