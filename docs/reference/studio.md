@@ -804,7 +804,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
     values made from the field types, as the widget previews do with fixtures.
     Actions run nothing. The canvas asks
     [the draft page metadata route](authoring.md#draft-page-metadata) 300 ms
-    after the last edit and redraws from its answer. _Built:_ the canvas
+    after the last edit and redraws from its answer. From an edit until it
+    draws the answer to that draft, the canvas has `aria-busy`, which the tests
+    wait on before a drag. _Built:_ the canvas
     draws the page, with labels from the application's texts and no request to
     `/api/apps/`. It cancels every click and form submit, so a navigate action
     or a link leaves Studio where it is. A page parameter gets a placeholder

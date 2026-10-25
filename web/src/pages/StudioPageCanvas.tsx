@@ -37,8 +37,8 @@ import { PlatformContext } from './context'
 import { CanvasAlert } from './CanvasAlert'
 import { canvasTexts, cancel, debounceMs, diagnosticsAt } from './studioCanvas'
 
-/** The route's latest answer, or `'failed'`. `undefined` before the first. */
-type Answer = StudioPageMetadataAnswer | 'failed' | undefined
+/** The route's latest answer, or `'failed'`, with the draft it answers. */
+type Answered = { draft: Record<string, unknown>; answer: StudioPageMetadataAnswer | 'failed' }
 
 type CanvasWidth = 'desktop' | 'phone'
 
@@ -53,7 +53,8 @@ const CanvasLeaf = memo(PageLeaf)
 
 /**
  * Draws the unsaved draft of a page with the site's own widgets. It posts the draft to the draft page metadata
- * route 300 ms after the last edit and redraws from the answer. A widget redraws only from a new answer, not on each
+ * route 300 ms after the last edit and redraws from the answer. From an edit until it draws the answer to that draft,
+ * the canvas has `aria-busy`. A widget redraws only from a new answer, not on each
  * edit or on a drag over the same target. While it is mounted, the widgets' `/api/apps/`
  * calls get placeholder data in the browser and none goes to the server. A click or a submit on the canvas does
  * nothing. A widget that does not compile draws as a placeholder with its diagnostics. A widget that a diagnostic
@@ -94,9 +95,11 @@ export function StudioPageCanvas({
   const platformLocale = useContext(PlatformContext)?.current.locale
   const { pathname } = useLocation()
   const { generation, lost } = useStudioConnection()
-  const [answer, setAnswer] = useState<Answer>()
+  const [answered, setAnswered] = useState<Answered>()
   const [width, setWidth] = useState<CanvasWidth>('desktop')
   const phone = width === 'phone'
+  const answer = answered?.answer
+  const busy = answered?.draft !== draft
   const drawn = answer === undefined || answer === 'failed' ? undefined : answer
   const page = drawn?.page ?? null
   const diagnostics = drawn?.diagnostics ?? []
@@ -120,7 +123,11 @@ export function StudioPageCanvas({
     const controller = new AbortController()
     const timer = setTimeout(() => {
       fetchStudioPageMetadata(application, resourceId, draft, controller.signal).then(
-        (result) => setAnswer(result),
+        (result) => {
+          if (!controller.signal.aborted) {
+            setAnswered({ draft, answer: result })
+          }
+        },
         (error: unknown) => {
           if (controller.signal.aborted) {
             return
@@ -130,7 +137,7 @@ export function StudioPageCanvas({
             return
           }
           console.warn(`Drawing the page '${resourceId}' failed`, error)
-          setAnswer('failed')
+          setAnswered({ draft, answer: 'failed' })
         },
       )
     }, debounceMs)
@@ -203,7 +210,13 @@ export function StudioPageCanvas({
   return (
     <TextProvider catalogs={catalogs} development={outer.development}>
       <WidthSwitch value={width} onChange={setWidth} />
-      <div ref={canvas} data-testid="studio-page-canvas" onClickCapture={click} onSubmitCapture={cancel}>
+      <div
+        ref={canvas}
+        data-testid="studio-page-canvas"
+        aria-busy={busy ? 'true' : 'false'}
+        onClickCapture={click}
+        onSubmitCapture={cancel}
+      >
         <SelectedActionStyle />
         {drawn?.page === null && (
           <CanvasAlert testId="studio-canvas-cannot-draw" textKey="shell.studio.design.cannotDraw" />

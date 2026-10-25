@@ -119,7 +119,7 @@ function metadataOf(draft: Draft): PageMetadata {
 /** Serves the resource and answers each page-metadata post, recording the posted drafts. */
 function stub(
   saved: unknown,
-  answer: (draft: Draft) => Response = (draft) =>
+  answer: (draft: Draft) => Response | Promise<Response> = (draft) =>
     new Response(JSON.stringify({ page: metadataOf(draft), diagnostics: [] }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -150,6 +150,26 @@ function respond(page: PageMetadata | null, diagnostics: StudioDiagnostic[]) {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+/** Answers each post at once until `hold`, then holds each answer until `release` gives the oldest one. */
+function gatedAnswers() {
+  let holding = false
+  const held: (() => void)[] = []
+  return {
+    answer: (draft: Draft): Response | Promise<Response> => {
+      if (!holding) {
+        return respond(metadataOf(draft), [])
+      }
+      return new Promise<Response>((resolve) => {
+        held.push(() => resolve(respond(metadataOf(draft), [])))
+      })
+    },
+    hold: () => {
+      holding = true
+    },
+    release: () => held.shift()!(),
+  }
 }
 
 function diagnosticAt(path: string): StudioDiagnostic {
@@ -470,8 +490,11 @@ describe('the Design tab of a page', () => {
   })
 
   describe('redraws', () => {
-    async function openDesign(widgets: Record<string, unknown>[]) {
-      const stubbed = stub(content(widgets))
+    async function openDesign(
+      widgets: Record<string, unknown>[],
+      answer?: (draft: Draft) => Response | Promise<Response>,
+    ) {
+      const stubbed = stub(content(widgets), answer)
       renderEditor()
       await screen.findByTestId('studio-page-editor', {}, slow)
       await openTab('Design')
@@ -479,6 +502,54 @@ describe('the Design tab of a page', () => {
       await within(design).findByTestId('chart-widget', {}, slow)
       return { ...stubbed, design }
     }
+
+    it('is busy from an edit until it draws the answer to that draft', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      try {
+        const gate = gatedAnswers()
+        const { design, posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }], gate.answer)
+        const canvas = within(design).getByTestId('studio-page-canvas')
+        expect(canvas).toHaveAttribute('aria-busy', 'false')
+
+        gate.hold()
+        await userEvent.click(within(design).getByTestId('chart-widget'))
+        const before = posts.length
+        await chooseOption('pie', within(design).getByTestId('studio-field-/widgets/1/kind'))
+        await waitFor(() => expect(posts).toHaveLength(before + 1))
+        expect(canvas).toHaveAttribute('aria-busy', 'true')
+
+        gate.release()
+        await waitFor(() => expect(canvas).toHaveAttribute('aria-busy', 'false'))
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('stays busy when an answer for an earlier draft arrives after a newer edit', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      try {
+        const gate = gatedAnswers()
+        const { design, posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }], gate.answer)
+        const canvas = within(design).getByTestId('studio-page-canvas')
+
+        gate.hold()
+        await userEvent.click(within(design).getByTestId('chart-widget'))
+        const before = posts.length
+        await chooseOption('pie', within(design).getByTestId('studio-field-/widgets/1/kind'))
+        await waitFor(() => expect(posts).toHaveLength(before + 1))
+        await chooseOption('line', within(design).getByTestId('studio-field-/widgets/1/kind'))
+        await waitFor(() => expect(posts).toHaveLength(before + 2))
+
+        gate.release()
+        await act(() => vi.advanceTimersByTimeAsync(100))
+        expect(canvas).toHaveAttribute('aria-busy', 'true')
+
+        gate.release()
+        await waitFor(() => expect(canvas).toHaveAttribute('aria-busy', 'false'))
+      } finally {
+        vi.useRealTimers()
+      }
+    })
 
     it('posts one edit 300 ms after it and draws the chart once, from the answer', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true })
