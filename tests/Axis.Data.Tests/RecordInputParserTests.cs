@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Model;
 using Axis.Data.Records;
 using static Axis.Data.Tests.Models;
@@ -530,6 +531,43 @@ public sealed class RecordInputParserTests
         Assert.NotNull(result.Input);
         return Assert.Single(result.Input.Values, value => value.Field.Name == field).Value;
     }
+
+    [Fact]
+    public void A_required_field_with_a_default_may_be_left_out_of_the_owner_but_not_of_a_row()
+    {
+        var line = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e11"),
+            "DefaultedLine",
+            "entities/defaulted-line.json",
+            WithDefault(Field("kind", FieldType.Text, required: true)));
+        var owner = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e12"),
+            "Defaulted",
+            "entities/defaulted.json",
+            Field("title", FieldType.Text),
+            WithDefault(Field("kind", FieldType.Text, required: true)),
+            Field("lines", FieldType.ChildCollection, target: line));
+        var application = Application(owner, line);
+
+        var left = RecordInputParser.Parse(
+            Encoding.UTF8.GetBytes("""{ "values": { "title": "Hi", "lines": [{}] } }"""), owner, application, RecordOperation.Create);
+        var sentNull = RecordInputParser.Parse(
+            Encoding.UTF8.GetBytes("""{ "values": { "kind": null } }"""), owner, application, RecordOperation.Create);
+
+        Assert.Equal(["/values/lines/0/kind"], left.Errors!.Keys);
+        Assert.Equal(["Required."], left.Errors["/values/lines/0/kind"]);
+        Assert.Equal(["/values/kind"], sentNull.Errors!.Keys);
+        Assert.Equal(["Required."], sentNull.Errors["/values/kind"]);
+
+        var ownerOnly = RecordInputParser.Parse(
+            Encoding.UTF8.GetBytes("""{ "values": { "title": "Hi" } }"""), owner, application, RecordOperation.Create);
+
+        Assert.Null(ownerOnly.Errors);
+        Assert.Equal(["title"], ownerOnly.Input!.Values.Select(value => value.Field.Name));
+    }
+
+    private static FieldModel WithDefault(FieldModel field) =>
+        field with { Default = ExpressionModel.Compile("'x'", ExpressionScopes.ForEntity([]), ExpressionScopes.TypeOf(field)!) };
 
     private static RecordInputResult Parse(string json, RecordOperation operation) =>
         RecordInputParser.Parse(Encoding.UTF8.GetBytes(json), _entity, _application, operation);

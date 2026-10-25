@@ -13,8 +13,10 @@ namespace Axis.Data.Seeding;
 /// <see cref="RecordCommands.UpdateAsync"/>, so its version grows by one; an identical record is not
 /// written, undeclared fields keep their values, and no record is deleted. Only the owner's column
 /// values are compared, so a synced record whose only change is in its child rows is not written.
-/// Every write sets the record's computed fields, from the stored record and the declared values
-/// on an update. A value that cannot be computed rolls back every write.
+/// An inserted record gets the default of each field its seed leaves out, with <c>now()</c> the start
+/// time of the transaction, and an update applies none. Every write sets the record's computed fields,
+/// from the stored record and the declared values on an update. A default or a value that cannot be
+/// computed rolls back every write.
 /// Seed values follow the
 /// record API's rules: each record goes through <see cref="RecordInputParser"/> as a create body
 /// and is inserted by <see cref="RecordCommands.CreateAsync"/>. Every record is parsed before any
@@ -69,6 +71,9 @@ public static class SeedApplier
         }
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // A default's now() is the start time of the transaction.
+        var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         var inserted = 0;
         var updated = 0;
         foreach (var (seed, entity, index, id, input) in parsed)
@@ -102,7 +107,14 @@ public static class SeedApplier
                 }
                 else
                 {
-                    var computed = RecordComputer.ComputeCreate(model, entity, input.Values, input.Rows);
+                    var defaults = RecordDefaults.Apply(entity, input.Values, now);
+                    if (defaults.Errors is { } defaultErrors)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        return NotComputed(seed, index, defaultErrors);
+                    }
+
+                    var computed = RecordComputer.ComputeCreate(model, entity, defaults.Values, input.Rows);
                     if (computed.Errors is { } errors)
                     {
                         await transaction.RollbackAsync(cancellationToken);
@@ -119,7 +131,14 @@ public static class SeedApplier
                     continue;
                 }
 
-                var computed = RecordComputer.ComputeCreate(model, entity, input.Values, input.Rows);
+                var defaults = RecordDefaults.Apply(entity, input.Values, now);
+                if (defaults.Errors is { } defaultErrors)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return NotComputed(seed, index, defaultErrors);
+                }
+
+                var computed = RecordComputer.ComputeCreate(model, entity, defaults.Values, input.Rows);
                 if (computed.Errors is { } errors)
                 {
                     await transaction.RollbackAsync(cancellationToken);

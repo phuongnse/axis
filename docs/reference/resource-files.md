@@ -504,11 +504,14 @@ new check is a new compile diagnostic.
   `references` and `child-collection` fields. The compiler checks it now. A
   forbidden combination is `AXC0013` at `/fields/{i}/default`, and an
   expression problem reports its own code at the same path. The compiled field
-  carries the checked default. The record command will apply it on create when
-  the body leaves the field out, see
-  [create, update and delete](record-api.md#create-update-and-delete). That is
-  still planned, so a default is not applied yet. `file` and `references` are
-  refused when those types arrive.
+  carries the checked default. A create applies it when the body
+  leaves the field out, see
+  [create, update and delete](record-api.md#create-update-and-delete). That
+  holds for the record API, the record command, inbound endpoints and seed
+  records. A required field with a default may be left out of a create, and
+  `now()` is the start time of the write transaction. An update never applies
+  a default. A default on a field of a child entity does nothing for its rows
+  yet. `file` and `references` are refused when those types arrive.
 - **`min` and `max`.** On `integer`, `decimal`, `money`, `date` and
   `date-time` fields, a literal of the field's type, with `min` at most `max`.
   **`minLength`** on `text`, at most `maxLength`. A value outside is a `400`

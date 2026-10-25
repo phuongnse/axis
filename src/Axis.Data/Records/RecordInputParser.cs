@@ -215,7 +215,7 @@ public static partial class RecordInputParser
             // Required fields are checked only when values is an object, so a missing values is one error.
             if (operation == RecordOperation.Create && values is { } valuesElement)
             {
-                AddMissingRequired(valuesElement, valuesPointer, entity, errors);
+                AddMissingRequired(valuesElement, valuesPointer, entity, owner: true, errors);
             }
 
             if (errors.Count > 0)
@@ -352,7 +352,7 @@ public static partial class RecordInputParser
                 return false;
             }
 
-            AddMissingRequired(row, rowPointer, child, errors);
+            AddMissingRequired(row, rowPointer, child, owner: false, errors);
 
             // Every column is written, so a field the row leaves out is SQL NULL.
             parsedRows.Add([.. columns.Select(field => new RecordValue(field, parsed.GetValueOrDefault(field.Name)))]);
@@ -362,10 +362,15 @@ public static partial class RecordInputParser
         return true;
     }
 
-    /// <summary>Reports each required column field of <paramref name="entity"/> that <paramref name="values"/> leaves out.</summary>
-    private static void AddMissingRequired(JsonElement values, string pointer, EntityModel entity, SortedDictionary<string, string[]> errors)
+    /// <summary>
+    /// Reports each required column field of <paramref name="entity"/> that <paramref name="values"/> leaves out.
+    /// The owner's required field with a default may be left out, because a create fills it. A row has
+    /// no defaults, so it keeps every required field required.
+    /// </summary>
+    private static void AddMissingRequired(JsonElement values, string pointer, EntityModel entity, bool owner, SortedDictionary<string, string[]> errors)
     {
-        foreach (var field in RecordQueries.Columns(entity).Where(field => field.Required && !values.TryGetProperty(field.Name, out _)))
+        foreach (var field in RecordQueries.Columns(entity).Where(field =>
+            field.Required && !(owner && field.Default is not null) && !values.TryGetProperty(field.Name, out _)))
         {
             AddError(errors, Pointer(pointer, field.Name), Messages.Required);
         }

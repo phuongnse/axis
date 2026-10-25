@@ -9,6 +9,8 @@
     { "entity": "Department", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Order", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Ticket", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Reminder", "actions": ["read", "create", "update"] },
+    { "entity": "Gauge", "actions": ["read", "create", "update"] },
     { "dataSource": "ActiveItems", "actions": ["read"] },
     { "dataSource": "ItemTotalsByDepartment", "actions": ["read"] },
     { "dataSource": "ItemTotals", "actions": ["read"] },
