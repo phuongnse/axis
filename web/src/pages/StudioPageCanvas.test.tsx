@@ -33,9 +33,13 @@ vi.mock('@dnd-kit/core', async (importOriginal) => {
   }
 })
 
-// The chart library is not under test here.
+// The chart library is not under test here. The counter records each draw of a chart.
+const chartDraws = vi.hoisted(() => ({ count: 0 }))
 vi.mock('../platform/Chart', () => ({
-  Chart: (props: ChartProps) => <div role="img" aria-label={props.title} />,
+  Chart: (props: ChartProps) => {
+    chartDraws.count++
+    return <div role="img" aria-label={props.title} />
+  },
 }))
 
 const folder = '/api/studio/apps/Shop'
@@ -462,6 +466,42 @@ describe('the Design tab of a page', () => {
       const again = await screen.findByTestId('studio-page-design', {}, slow)
       await within(again).findByTestId('chart-widget', {}, slow)
       expect(frame(again, '/widgets/1')).toHaveAttribute('aria-current', 'true')
+    })
+  })
+
+  describe('redraws', () => {
+    async function openDesign(widgets: Record<string, unknown>[]) {
+      const stubbed = stub(content(widgets))
+      renderEditor()
+      await screen.findByTestId('studio-page-editor', {}, slow)
+      await openTab('Design')
+      const design = await screen.findByTestId('studio-page-design', {}, slow)
+      await within(design).findByTestId('chart-widget', {}, slow)
+      return { ...stubbed, design }
+    }
+
+    it('posts one edit 300 ms after it and draws the chart once, from the answer', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      try {
+        const { design, posts } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+        await userEvent.click(within(design).getByTestId('chart-widget'))
+        const before = posts.length
+        chartDraws.count = 0
+
+        await chooseOption('pie', within(design).getByTestId('studio-field-/widgets/1/kind'))
+        expect(posts).toHaveLength(before)
+        await act(() => vi.advanceTimersByTimeAsync(200))
+        expect(posts).toHaveLength(before)
+        await act(() => vi.advanceTimersByTimeAsync(100))
+        await waitFor(() => expect(posts).toHaveLength(before + 1))
+        expect(posts.at(-1)!.widgets[1]).toMatchObject({ type: 'chart', kind: 'pie' })
+
+        await waitFor(() => expect(chartDraws.count).toBe(1))
+        await act(() => vi.advanceTimersByTimeAsync(1000))
+        expect(chartDraws.count).toBe(1)
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 
@@ -979,18 +1019,23 @@ describe('the Design tab of a page', () => {
         .find((element) => element.getAttribute('data-path') === path)!
     }
 
+    /** The event of a drag of the widget at `from` over a target, with the pointer at `clientY` in a box 100 high. */
+    function dragEvent(from: string, data: { kind: 'widget' | 'list'; pointer: string }, clientY = 10) {
+      return {
+        active: { id: `move:${from}`, data: { current: { kind: 'move', pointer: from, label: 'x' } } },
+        over: { id: `${data.kind}:${data.pointer}`, data: { current: data }, rect: { top: 0, height: 100 } },
+        delta: { x: 0, y: 0 },
+        activatorEvent: new MouseEvent('pointerdown', { clientY }),
+      } as never
+    }
+
     /** Drags the widget at `from` over a target, as the library reports a drag: the pointer at `clientY` in a box 100 high. */
     function drag(
       from: string,
       data: { kind: 'widget' | 'list'; pointer: string },
       { clientY = 10, drop = true }: { clientY?: number; drop?: boolean } = {},
     ) {
-      const event = {
-        active: { id: `move:${from}`, data: { current: { kind: 'move', pointer: from, label: 'x' } } },
-        over: { id: `${data.kind}:${data.pointer}`, data: { current: data }, rect: { top: 0, height: 100 } },
-        delta: { x: 0, y: 0 },
-        activatorEvent: new MouseEvent('pointerdown', { clientY }),
-      } as never
+      const event = dragEvent(from, data, clientY)
       act(() => dnd.props!.onDragStart!(event))
       act(() => dnd.props!.onDragOver!(event))
       if (drop) {
@@ -1033,6 +1078,22 @@ describe('the Design tab of a page', () => {
       drag('/widgets/1', { kind: 'widget', pointer: '/widgets/0' }, { clientY: 10 })
 
       await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['chart', 'kpi']), slow)
+    })
+
+    it('draws the chart no more for repeated drag-over events on the same target', async () => {
+      await openDesign([{ type: 'kpi' }, { type: 'chart' }])
+      await screen.findByTestId('chart-widget', {}, slow)
+      const event = dragEvent('/widgets/0', { kind: 'widget', pointer: '/widgets/1' })
+      act(() => dnd.props!.onDragStart!(event))
+      act(() => dnd.props!.onDragOver!(event))
+
+      chartDraws.count = 0
+      for (let index = 0; index < 20; index++) {
+        act(() => dnd.props!.onDragOver!(event))
+      }
+      expect(chartDraws.count).toBe(0)
+
+      act(() => dnd.props!.onDragCancel!(event))
     })
 
     it('moves the selected widget with Alt+ArrowDown and Alt+ArrowUp, keeps it selected and focused, and says where it landed', async () => {

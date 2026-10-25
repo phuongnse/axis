@@ -135,7 +135,7 @@ export default function StudioPageDesign({
     const widgets = draft.widgets
     const place = target === undefined || !Array.isArray(widgets) ? undefined : movePlace(widgets, from, target)
     const refusal = place !== undefined && 'limit' in place ? t(paletteReasons[place.limit]) : undefined
-    setDragging((current) => current && { label: current.label, refusal })
+    setDragging((current) => (current && current.refusal !== refusal ? { label: current.label, refusal } : current))
     if (refusal !== undefined) {
       setAnnouncement(refusal)
     }

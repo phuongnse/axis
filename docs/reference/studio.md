@@ -810,6 +810,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     `/api/apps/`. It cancels every click and form submit, so a navigate action
     or a link leaves Studio where it is. A page parameter gets a placeholder
     value made from its type. A page the route cannot draw shows a short notice.
+    A widget redraws only from a new answer: an edit redraws it once, after the
+    post, and a drag over the same target redraws none.
   - **Placeholders and diagnostic marks.** A widget that does not compile draws
     as a placeholder with its type and a line for each of its diagnostics, with
     the code and the message. A widget is marked when a diagnostic of the page
