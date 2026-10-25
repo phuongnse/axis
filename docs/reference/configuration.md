@@ -57,8 +57,8 @@ flowchart LR
      [Modules](modules-and-templates.md#modules).
      Each release carries its own texts, so a newer release can remove a key
      that older running work still shows.
-   - **Labels.** The text key of the application label, an entity label or a
-     field label must be in some locale, otherwise it is `AXC0028` at that
+   - **Labels.** The text key of the application label, an entity label, a
+     field label or an enum value label (`valueLabels`) must be in some locale, otherwise it is `AXC0028` at that
      label's `/textKey`. This applies also when the application has no text
      resource. Unused keys are allowed.
    - **Display field.** An entity's `displayField` must name one of its own
@@ -871,7 +871,7 @@ to show where a resource is used and what it uses.
 
 - **Label paths.** A `label text` edge sits at the `/textKey` of each label the
   `AXC0028` check covers: the application label, entity and
-  field labels, the site title, navigation labels, page titles, action labels,
+  field labels, enum value labels, the site title, navigation labels, page titles, action labels,
   form section titles, role labels, data source parameter labels, task and
   outcome labels, the `startCondition` message and validation messages.
 - **Direct calls only.** A `rule call` edge goes from the expression that

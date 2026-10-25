@@ -491,7 +491,13 @@ new check is a new compile diagnostic.
   expression type is `list<Target>`.
 - **`valueLabels`.** On an `enum` field, a map from every value to a
   `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
-  "priority.low" } }`. It covers every value, and its keys join `AXC0028`.
+  "priority.low" } }`. It covers every value, and its keys join `AXC0028`. An
+  enum parameter of a data source takes it too. A value that has no label, or a
+  label for a value that `values` does not have, is `AXC0242`, at
+  `/fields/{i}/valueLabels` or `/fields/{i}/valueLabels/{value}`. Values are
+  compared exactly, by letter case too. On a field of another type it is
+  `AXC0013`. The compile checks are built. Showing the labels on pages is
+  planned for M15.
 - **`default`.** An expression with no record in scope: literals, rule calls
   and `now()`. Its type must fit the field. It is not allowed with
   `expression`, `sequence` or `creator`, or on `reference`, `file`,

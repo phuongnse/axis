@@ -72,6 +72,10 @@
           "uniqueItems": true,
           "items": { "type": "string" }
         },
+        "valueLabels": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/textReference" }
+        },
         "expression": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "sequence": { "type": "string", "x-axis-reference": "sequence" },
         "creator": { "type": "boolean" },
