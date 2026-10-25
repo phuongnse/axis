@@ -242,7 +242,7 @@ and [notifications](notifications.md#notify-operation).
     such as `department.manager`. A `role` names a role the user must hold.
     Queues come later. _(Planned for M14)_ A user who holds the role may
     claim the task, see [Claim and release](task-deadlines.md#claim-and-release).
-  - `form` names a [form resource](frontend.md) whose entity is the subject
+  - `form` names a [form resource](form-widget.md) whose entity is the subject
     entity. The task page shows it over the subject record.
   - `dueIn` is optional. It is a positive ISO 8601 duration in whole
     numbers: either weeks, such as `P2W`, or days with an optional time part

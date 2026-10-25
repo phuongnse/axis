@@ -243,7 +243,7 @@ flowchart LR
      `record` on a target that holds no form widget, or whose form is over
      another entity, is `AXC0235` at `/record`. A parse error or an unknown
      name keeps the expression's own code.
-   - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
+   - **Forms.** A [form](form-widget.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded
      because of its own errors is not reported again. Each section `field`

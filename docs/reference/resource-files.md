@@ -91,7 +91,7 @@ site, and its widgets are its content:
 
 - A page holds one or more widgets. A leaf widget `type` is `table`, `form`,
   `taskInbox`, `processInspector`, `kpi` or `detail`. A `form` names a `form` resource, which lays out the fields of
-  one entity in sections (see [frontend.md](frontend.md)), or an `entity`, as
+  one entity in sections (see [form-widget.md](form-widget.md)), or an `entity`, as
   shorthand for all its fields in one section. A `table` names an `entity`, as
   shorthand for all records of that entity, or a `dataSource`. A `kpi` names a
   `dataSource` with one total row, one of its `measure`s and a `label`, and
@@ -682,7 +682,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
 
 ## Form conditions and steps
 
-A `form` resource (see [frontend](frontend.md)) can show, require and lock
+A `form` resource (see [form widget](form-widget.md)) can show, require and lock
 fields depending on the record, and can split its sections into wizard steps
 ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 The schema, the compile checks, the compiled model, the page and task metadata and the

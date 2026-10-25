@@ -3,7 +3,7 @@
 Detailed reference for how the form widget follows the server's form states. The conventions of
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_ are not built yet,
 and Dn refers to [decisions.md](../decisions.md). The rest of the frontend, including the form
-widget, is in [frontend.md](frontend.md).
+widget, is in [form-widget.md](form-widget.md) and [frontend.md](frontend.md).
 
 - **Conditions and steps**. The widget asks the server which fields to
   show, require and lock, and which messages to show. It has no evaluator of
