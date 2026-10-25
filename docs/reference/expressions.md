@@ -369,10 +369,15 @@ Paths in validations and computed fields are not built. There a path is
   An `updateRecord` value sees the same scope, and is type-checked against
   its field's type. A task's `assignee.user` sees the same scope too, and is
   type-checked as `text`. Validations and computed fields keep their scope.
-  See [processes](processes.md#steps). _(Planned for M14)_ The scope adds
-  `id`, the subject record's id, typed as a reference to the subject entity,
-  as in a navigate action. A process without a subject sees its parameters
-  and the named rules instead. See [process flow](process-flow.md).
+  The scope also has `id`, the subject record's id, typed as a reference
+  parameter to the subject entity, as in a navigate action. So `id == manager`
+  compares with a reference field that points to the subject entity, and a
+  path cannot start at it: `id.name` is `AXC0047`. `id` comes first, so it
+  wins over a field named `id`. A data change trigger's `when` has the same
+  scope. See [processes](processes.md#steps). _(Planned for M14)_ A process
+  without a subject sees its parameters and the named rules instead. See
+  [process flow](process-flow.md) and
+  [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
 
 ## Functions
 

@@ -134,12 +134,14 @@ public static class ExpressionScopes
     }
 
     /// <summary>
-    /// The scope of a process condition: every field of the subject entity, computed ones
+    /// The scope of a process condition: <c>id</c> as a reference parameter to the subject entity,
+    /// so a path cannot start at it, then every field of the subject entity, computed ones
     /// included, its child collections, which only aggregates accept, and the named
-    /// <paramref name="rules"/>. A path through a reference field resolves to a field of the entity
-    /// <paramref name="findEntity"/> returns for the target's name.
+    /// <paramref name="rules"/>. A field named <c>id</c> is hidden by it. A path through a reference
+    /// field resolves to a field of the entity <paramref name="findEntity"/> returns for the target's name.
     /// </summary>
     internal static ExpressionScope ForProcess(
+        string subjectEntity,
         IEnumerable<FieldDefinition> fields,
         IEnumerable<ExpressionRule> rules,
         Func<string, EntityResource?> findEntity,
@@ -147,7 +149,10 @@ public static class ExpressionScopes
     {
         var all = fields.ToList();
         return Build(
-            all.Select(field => (field.Name, TypeOf(field))),
+            [
+                ("id", (ExpressionType?)ExpressionType.ReferenceParameter(subjectEntity)),
+                .. all.Select(field => (field.Name, TypeOf(field))),
+            ],
             rules,
             CollectionsOf(all, findEntity),
             ReferenceFieldsOf(findEntity),
