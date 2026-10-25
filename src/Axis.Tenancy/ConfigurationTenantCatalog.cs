@@ -126,6 +126,8 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 section["Claims:UserId"],
                 section["Claims:DisplayName"],
                 section["Claims:Roles"],
+                section["Claims:Email"],
+                section["Claims:Locale"],
                 Blank(section["Profile"]),
                 ClientKeys(section));
 

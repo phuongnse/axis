@@ -46,8 +46,9 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.tar");
-        Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
         var scenario = fixture.Scenario;
+        await scenario.SetEmailAndLocaleClaimsAsync(fixture.TenantId, "mail", "lang");
+        Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
         var original = await scenario.RowAsync(fixture.TenantId);
         var originalHosts = await scenario.HostsAsync(fixture.TenantId);
         var newId = scenario.NewTenantId();
@@ -64,6 +65,8 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.Equal([newHost], await scenario.HostsAsync(newId));
         Assert.Equal(original.OidcAuthority, row.OidcAuthority);
         Assert.Equal(original.OidcClientId, row.OidcClientId);
+        Assert.Equal("mail", row.ClaimEmail);
+        Assert.Equal("lang", row.ClaimLocale);
         Assert.NotEqual(original.DatabaseName, row.DatabaseName);
         Assert.Equal(0, await CountSecretBindingValuesAsync(newId));
         Assert.Equal(

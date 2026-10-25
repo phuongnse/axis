@@ -53,7 +53,7 @@ commands on this page, and the key rotation, are _(planned for M16)_.
 | `--authority <url>`            | The authority of the tenant's identity provider                                               |
 | `--client-id <id>`             | The OIDC client id                                                                            |
 | `--client-secret`              | Replaces the client secret, from `AXIS_OIDC_CLIENT_SECRET` or standard input                  |
-| `--claim <name>=<claim>`       | A claim name: `UserId`, `DisplayName` or `Roles`                                              |
+| `--claim <name>=<claim>`       | A claim name: `UserId`, `DisplayName`, `Roles`, `Email` or `Locale`                              |
 | `--endpoint-audience <value>`  | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it |
 | `--service-audience <value>`   | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it |
 | `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](security.md#fapi-20-profile)                      |
