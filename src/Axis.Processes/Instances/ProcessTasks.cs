@@ -10,8 +10,8 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Writes the human tasks of process instances over a connection to a tenant database, and names
-/// their states and assignee kinds. A completion closes the task and resumes its instance in the
-/// caller's transaction.
+/// their states and assignee kinds. A completion closes the task, deletes its deadline item and
+/// resumes its instance in the caller's transaction.
 /// </summary>
 public static class ProcessTasks
 {
@@ -23,6 +23,9 @@ public static class ProcessTasks
 
     /// <summary>The state of a task that an operator's cancel of its instance closed. It has no outcome.</summary>
     public const string Cancelled = "cancelled";
+
+    /// <summary>The state of a task whose deadline passed while it was open. It has no outcome.</summary>
+    public const string Expired = "expired";
 
     /// <summary>The assignee kind of a task assigned to one user id.</summary>
     public const string UserAssignee = "user";
@@ -90,6 +93,38 @@ public static class ProcessTasks
         command.Parameters.AddWithValue("completed", Completed);
         command.Parameters.AddWithValue("open", Open);
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>
+    /// Sets the <c>open</c> task <paramref name="id"/> <c>expired</c> at the transaction's time.
+    /// Returns <see langword="false"/> when the task is missing or no longer open. Lock the task
+    /// first with <see cref="TaskQueries.LockAsync"/>, so this only backs that check up.
+    /// </summary>
+    internal static async Task<bool> TryExpireAsync(NpgsqlTransaction transaction, Guid id, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+
+        await using var command = new NpgsqlCommand(
+            "UPDATE axis.process_tasks SET state = @expired, expired_at = now() WHERE id = @id AND state = @open",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("expired", Expired);
+        command.Parameters.AddWithValue("open", Open);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>Deletes the work items that wait on the task <paramref name="taskId"/>, which are its pending <c>task.deadline</c> items.</summary>
+    internal static async Task DeletePendingItemsAsync(NpgsqlTransaction transaction, Guid taskId, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM axis.process_work_items WHERE task_id = @task",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("task", taskId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>

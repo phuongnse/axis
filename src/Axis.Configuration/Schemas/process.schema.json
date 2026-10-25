@@ -117,6 +117,15 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/outcome" }
+        },
+        "deadline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["after", "next"],
+          "properties": {
+            "after": { "type": "string", "minLength": 1 },
+            "next": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "/name" } }
+          }
         }
       },
       "allOf": [
@@ -138,7 +147,8 @@
               "assignee": false,
               "form": false,
               "dueIn": false,
-              "outcomes": false
+              "outcomes": false,
+              "deadline": false
             }
           }
         },
@@ -172,7 +182,8 @@
               "assignee": false,
               "form": false,
               "dueIn": false,
-              "outcomes": false
+              "outcomes": false,
+              "deadline": false
             }
           }
         },
@@ -195,7 +206,8 @@
               "assignee": false,
               "form": false,
               "dueIn": false,
-              "outcomes": false
+              "outcomes": false,
+              "deadline": false
             }
           }
         },

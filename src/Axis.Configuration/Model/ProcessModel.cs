@@ -62,6 +62,7 @@ public sealed record DecisionBranchModel(ExpressionModel When, string Next);
 /// A human task: a person assigned through <see cref="Assignee"/> completes it on
 /// <see cref="Form"/>, shown over the subject record, with one of its <see cref="Outcomes"/>.
 /// <see cref="DueIn"/> is the time from the task's creation to its due date, or null when it has none.
+/// <see cref="Deadline"/> is when the task expires and where the process goes then, or null when it has none.
 /// </summary>
 public sealed record TaskStepModel(
     string Name,
@@ -69,7 +70,8 @@ public sealed record TaskStepModel(
     TaskAssigneeModel Assignee,
     FormReference Form,
     TimeSpan? DueIn,
-    IReadOnlyList<TaskOutcomeModel> Outcomes) : ProcessStepModel(Name);
+    IReadOnlyList<TaskOutcomeModel> Outcomes,
+    TaskDeadlineModel? Deadline) : ProcessStepModel(Name);
 
 /// <summary>
 /// The assignee of a task: exactly one of <see cref="User"/>, a <c>text</c> expression over the
@@ -79,6 +81,9 @@ public sealed record TaskAssigneeModel(ExpressionModel? User, string? Role);
 
 /// <summary>An outcome of a task: its name, its label and the declared name of the step it leads to.</summary>
 public sealed record TaskOutcomeModel(string Name, TextReference Label, string Next);
+
+/// <summary>The deadline of a task: the time from the task's creation until it expires, and the declared name of the step the process then moves to.</summary>
+public sealed record TaskDeadlineModel(TimeSpan After, string Next);
 
 /// <summary>
 /// An <c>updateRecord</c> operation step: it sets each field in

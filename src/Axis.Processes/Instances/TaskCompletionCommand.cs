@@ -205,6 +205,8 @@ public static class TaskCompletionCommand
             return new TaskCompletionResult(TaskCompletionOutcome.AlreadyCompleted);
         }
 
+        // The task is closed, so its deadline has nothing left to expire.
+        await ProcessTasks.DeletePendingItemsAsync(transaction, task.Id, cancellationToken);
         await ProcessTasks.ResumeAsync(
             transaction,
             task,

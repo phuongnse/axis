@@ -336,8 +336,8 @@ flowchart LR
      owner. Step names are unique ignoring letter case: a later step with a
      name already used is `AXC0069` at `/steps/{i}/name`, naming the first
      step. `start`, each branch `next`, each `otherwise`, each operation
-     `next` and each task outcome `next` must name a step, ignoring letter
-     case, otherwise it is `AXC0070` at that property. A
+     `next`, each task outcome `next` and each task `deadline` `next` must name a
+     step, ignoring letter case, otherwise it is `AXC0070` at that property. A
      transition goes to the first step with its name. A step that cannot be
      reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
      when `start` is unknown. A step with no path to an `end` step is
@@ -345,7 +345,7 @@ flowchart LR
      is not also `AXC0072`. A transition that closes a cycle is `AXC0073` at
      that transition, naming the steps in the cycle. The steps are walked in
      file order, with the branches, then `otherwise`, then `next`, then the
-     outcomes. A step whose name is
+     outcomes, then the deadline's `next`. A step whose name is
      already `AXC0069` is left out of `AXC0071`, `AXC0072` and `AXC0073`. The
      `startCondition` expression and each decision `when` are parsed and
      type-checked as a boolean over the entity's fields, computed ones
@@ -418,7 +418,8 @@ flowchart LR
      reported again. A form over another entity than the process's is
      `AXC0083` at `/steps/{i}/form`. It is not checked when either entity is
      unknown. A `dueIn` that is not a positive whole-number duration is
-     `AXC0084` at `/steps/{i}/dueIn`. A later outcome with a name already
+     `AXC0084` at `/steps/{i}/dueIn`, and so is a `deadline` `after`, at
+     `/steps/{i}/deadline/after`. A later outcome with a name already
      used in the step, ignoring letter case, is `AXC0085` at
      `/steps/{i}/outcomes/{j}/name`. The task `label` and each outcome
      `label` join the `AXC0028` check. A decision with no branches, an

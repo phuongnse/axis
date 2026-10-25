@@ -771,6 +771,12 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "form": "OrderReview" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "next": "done", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }] }""")]
     [InlineData("""{ "name": "submit", "type": "end", "dueIn": "P3D" }""")]
+    [InlineData("""{ "name": "submit", "type": "end", "deadline": { "after": "P1D", "next": "done" } }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "deadline": { "after": "P1D", "next": "done" } }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "after": "P1D" } }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "next": "done" } }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "after": "", "next": "done" } }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "after": "P1D", "next": "done", "escalate": true } }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "input": { "amount": "1" }, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "output": { "count": "amount" }, "next": "done" }""")]
@@ -830,6 +836,85 @@ public sealed class ProcessCompilerTests
         Assert.Equal(
             [("approve", new TextReference("task.approve"), "approved"), ("reject", new TextReference("task.reject"), "rejected")],
             review.Outcomes.Select(outcome => (outcome.Name, outcome.Label, outcome.Next)));
+    }
+
+    [Fact]
+    public void A_task_deadline_compiles_into_the_model_with_its_duration_and_next_step()
+    {
+        using var folder = Folder(Process("Order", TaskSteps(deadline: """{ "after": "P1DT12H", "next": "rejected" }"""), start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var review = Assert.IsType<TaskStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal(new TaskDeadlineModel(TimeSpan.FromHours(36), "rejected"), review.Deadline);
+    }
+
+    [Fact]
+    public void A_task_step_without_a_deadline_has_none_in_the_model()
+    {
+        using var folder = Folder(Process("Order", TaskSteps(), start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotNull(result.Model);
+        Assert.Null(Assert.IsType<TaskStepModel>(Assert.Single(result.Model.Processes).Steps[0]).Deadline);
+    }
+
+    [Theory]
+    [InlineData("P1M")]
+    [InlineData("P0D")]
+    [InlineData("soon")]
+    public void A_task_deadline_that_is_not_a_positive_fixed_duration_is_reported_at_its_after(string after)
+    {
+        using var folder = Folder(Process("Order", TaskSteps(deadline: $$"""{ "after": "{{after}}", "next": "rejected" }"""), start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidTaskDueIn, "processes/order-review.json", "/steps/0/deadline/after"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains($"'{after}'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("'deadline.after'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_task_deadline_next_that_names_no_step_is_reported_at_its_next()
+    {
+        using var folder = Folder(Process("Order", TaskSteps(deadline: """{ "after": "P1D", "next": "missing" }"""), start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownStep, "processes/order-review.json", "/steps/0/deadline/next"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_step_reached_only_through_a_deadline_is_reachable_and_a_deadline_cycle_is_reported()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "review", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview",
+                "outcomes": [{ "name": "approve", "label": { "textKey": "task.approve" }, "next": "done" }],
+                "deadline": { "after": "P1D", "next": "late" } },
+              { "name": "late", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview",
+                "outcomes": [{ "name": "approve", "label": { "textKey": "task.approve" }, "next": "done" }],
+                "deadline": { "after": "P1D", "next": "late" } },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.ProcessStepCycle, "/steps/1/deadline/next"), (diagnostic.Code, diagnostic.Path));
+        Assert.Null(result.Model);
     }
 
     [Fact]
@@ -1067,9 +1152,11 @@ public sealed class ProcessCompilerTests
         string assignee = """{ "user": "'u1'" }""",
         string form = "OrderReview",
         string? dueIn = "P3D",
-        string secondOutcome = "reject")
+        string secondOutcome = "reject",
+        string? deadline = null)
     {
-        var due = dueIn is null ? "" : $$""" "dueIn": "{{dueIn}}", """;
+        var due = (dueIn is null ? "" : $$""" "dueIn": "{{dueIn}}", """)
+            + (deadline is null ? "" : $$""" "deadline": {{deadline}}, """);
         return $$"""
             [
               { "name": "review", "type": "task", "label": { "textKey": "order.review" }, "assignee": {{assignee}}, "form": "{{form}}", {{due}}

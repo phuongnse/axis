@@ -302,6 +302,41 @@ public sealed class TaskApiFixture : IAsyncLifetime
         await command.ExecuteNonQueryAsync();
     }
 
+    /// <summary>Opens a superuser connection to the database of <paramref name="tenant"/>, which the caller disposes.</summary>
+    public async Task<NpgsqlConnection> OpenConnectionAsync(string tenant) => await DataSource(tenant).OpenConnectionAsync();
+
+    /// <summary>Runs <paramref name="sql"/> with <paramref name="parameters"/> in <paramref name="tenant"/> and returns the number of rows it changed.</summary>
+    public async Task<int> ExecuteAsync(string tenant, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var command = DataSource(tenant).CreateCommand(sql);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        return await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Runs the <c>SELECT count(*)</c> <paramref name="sql"/> on the database of <paramref name="tenant"/> as the
+    /// admin role, which is the only role that sees the sessions of other roles.
+    /// </summary>
+    public async Task<long> AdminCountAsync(string tenant, string sql) =>
+        (long)(await PostgreSqlServer.AdminScalarAsync(_tenants[tenant].ConnectionString, sql, TestContext.Current.CancellationToken))!;
+
+    /// <summary>Runs the single-value <paramref name="sql"/> with <paramref name="parameters"/> in <paramref name="tenant"/> and returns its value.</summary>
+    public async Task<object?> ScalarAsync(string tenant, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var command = DataSource(tenant).CreateCommand(sql);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        var result = await command.ExecuteScalarAsync();
+        return result is DBNull ? null : result;
+    }
+
     /// <summary>The id of the one task of the instance <paramref name="instanceId"/> in <paramref name="tenant"/>.</summary>
     public async Task<Guid> TaskIdAsync(string tenant, Guid instanceId)
     {

@@ -15,8 +15,9 @@ namespace Axis.Scenarios.Runner;
 /// ones, with the scenario's placeholder bindings, so an <c>async</c> event trigger starts its process
 /// here. The scenario's stubs take the place of the HTTP request of a connector call and of the
 /// package operation. A call that no stub answers fails the scenario before it runs. After an action,
-/// schedule triggers and fan-outs stay queued, so a schedule never fires on the real clock.
-/// <see cref="AdvanceAsync"/> runs them too, after the scenario's <c>now</c> moved. The items run over
+/// schedule triggers, fan-outs and task deadlines stay queued, so none of them fires on the real clock.
+/// <see cref="AdvanceAsync"/> runs them too, and the <c>task.deadline</c> items, after the scenario's <c>now</c> moved,
+/// so a task expires only when the scenario's time reaches its deadline. The items run over
 /// the scenario's connection string, so they read the scenario's <c>now</c> too, and a due time is
 /// compared with it. Leases keep the database clock.
 /// </summary>
@@ -49,9 +50,9 @@ internal sealed class ScenarioWork : IDisposable
             new PackageCallHandler(models, packages, bindings, settings, _transport, loggerFactory.CreateLogger<PackageCallHandler>(), stubs.CreateOperation),
             new EventDeliveryHandler(models, loggerFactory.CreateLogger<EventDeliveryHandler>()),
         ];
-        _runner = CreateRunner(handler, externalHandlers, loggerFactory);
+        _runner = CreateRunner([handler], externalHandlers, loggerFactory);
         _timeRunner = CreateRunner(
-            handler,
+            [handler, new TaskDeadlineHandler(models, loggerFactory.CreateLogger<TaskDeadlineHandler>())],
             [
                 .. externalHandlers,
                 new TriggerScheduleHandler(models, loggerFactory.CreateLogger<TriggerScheduleHandler>()),
@@ -60,11 +61,11 @@ internal sealed class ScenarioWork : IDisposable
             loggerFactory);
     }
 
-    private WorkItemRunner CreateRunner(ProcessStepHandler handler, IExternalWorkItemHandler[] externalHandlers, ILoggerFactory loggerFactory) =>
+    private WorkItemRunner CreateRunner(IWorkItemHandler[] handlers, IExternalWorkItemHandler[] externalHandlers, ILoggerFactory loggerFactory) =>
         new(
             new ScenarioConnections(() => _connectionString),
             new TenantContextAccessor(),
-            [handler],
+            handlers,
             loggerFactory.CreateLogger<WorkItemRunner>(),
             externalHandlers)
         {

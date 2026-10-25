@@ -124,6 +124,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             task.Property(t => t.Outcome).HasColumnName("outcome");
             task.Property(t => t.CompletedBy).HasColumnName("completed_by");
             task.Property(t => t.CompletedAt).HasColumnName("completed_at");
+            task.Property(t => t.ExpiredAt).HasColumnName("expired_at");
             task.Property(t => t.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             task.HasIndex(t => t.ProcessInstanceId).HasDatabaseName("ix_process_tasks_process_instance_id");
 
@@ -313,6 +314,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.ClaimToken).HasColumnName("claim_token");
             item.Property(i => i.ProcessInstanceId).HasColumnName("process_instance_id");
             item.Property(i => i.ConnectorCallId).HasColumnName("connector_call_id");
+            item.Property(i => i.TaskId).HasColumnName("task_id");
             item.Property(i => i.PackageCallId).HasColumnName("package_call_id");
             item.Property(i => i.EventId).HasColumnName("event_id");
             item.Property(i => i.TriggerId).HasColumnName("trigger_id");
@@ -326,6 +328,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.HasIndex(i => i.ProcessInstanceId).HasDatabaseName("ix_process_work_items_process_instance_id");
             item.HasIndex(i => i.ConnectorCallId).HasDatabaseName("ix_process_work_items_connector_call_id");
             item.HasIndex(i => i.PackageCallId).HasDatabaseName("ix_process_work_items_package_call_id");
+            item.HasIndex(i => i.TaskId).HasDatabaseName("ix_process_work_items_task_id");
             item.HasIndex(i => i.EventId).HasDatabaseName("ix_process_work_items_event_id");
 
             // A schedule trigger has at most one item that waits for its next occurrence.
@@ -342,6 +345,11 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .WithMany()
                 .HasForeignKey(i => i.ConnectorCallId)
                 .HasConstraintName("fk_process_work_items_connector_calls_connector_call_id")
+                .OnDelete(DeleteBehavior.Restrict);
+            item.HasOne<ProcessTaskRow>()
+                .WithMany()
+                .HasForeignKey(i => i.TaskId)
+                .HasConstraintName("fk_process_work_items_process_tasks_task_id")
                 .OnDelete(DeleteBehavior.Restrict);
             item.HasOne<PackageCallRow>()
                 .WithMany()
