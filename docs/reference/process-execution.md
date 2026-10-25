@@ -213,6 +213,13 @@ After approval, the purchase request process creates a purchase order.
 - `input` maps operation inputs to expressions. Each key is an input of the
   operation. Each value is an expression over the subject record, with the
   same scope as a decision's `when`.
+  - _(planned for M17)_ An `object` input maps as `{ "fields": { … } }`, each
+    key a nested field. A `list` input maps from a child collection of the
+    subject as `{ "from": "<child collection>", "fields": { … } }`, and each
+    item expression is over the child row. Each nested field is checked as a
+    top-level input is. See
+    [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) and
+    [Connector resource](integration-resources.md#connector-resource).
 - `output` is optional. It maps operation outputs to subject fields. Each key
   is an output of the operation, and each value names a field of the subject
   record.
@@ -563,7 +570,10 @@ the operation in place of the HTTP request:
   operation's `timeout`.
 - **Run.** The worker loads the pinned package version, resolves the
   `url` and `secret` bindings the operation declares for the tenant, and runs
-  the operation with the stored input, outside any transaction. The context's
+  the operation with the stored input, outside any transaction. _(planned for
+  M17)_ Outside Development, the worker sends the attempt to a
+  [package runner](extension-packages.md#package-runners) instead of loading
+  the version itself, and kills the runner at the `timeout`. The context's
   `OperationId` is the operation identity, the same on every attempt. The
   context hands out only the declared bindings, see
   [Capabilities](extension-packages.md#capabilities). The

@@ -32,7 +32,12 @@ does not ship either one for production.
 
 There are three production images: `axis-server`, `axis-worker` and
 `axis-admin`. They hold no sample, no sample extension package, no sample
-module, no development realm and no credential.
+module, no development realm and no credential. _(planned for M17)_ A fourth
+image, `axis-package-host`, runs the
+[package runners](extension-packages.md#package-runners) in the
+`package-host` container beside the worker. Compose and the Helm chart give
+that container no tenant settings, a read-only root file system, CPU and
+memory limits, and a network that reaches only the worker.
 
 Build one from the repository root with
 `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`.

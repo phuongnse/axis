@@ -53,6 +53,11 @@ flowchart LR
   It runs the package operations that process steps call, see
   [extension packages](reference/extension-packages.md).
   It loads the same modules as the server.
+- **Axis.PackageHost** _(planned for M17)_ runs package operations in package
+  runners, outside the worker, in its own `package-host` container. The worker
+  sends each attempt to a runner, and no longer loads package code outside
+  Development. See [package runners](reference/extension-packages.md#package-runners)
+  and [D90](decisions/d90-extension-packages-run-out-of-process.md).
 - **Axis.Admin** is the console host that the platform
   operator runs. It creates tenants, migrates tenant databases, activates
   releases, and backs up and restores tenants. It is the only host that writes
@@ -87,6 +92,7 @@ src/
                           used by Axis.Scenarios and, later, by the publisher
   Axis.Scenarios/         console host over Axis.Scenarios.Runner that runs an application's test scenarios
   Axis.Admin/             console host for tenant provisioning, migrations, activation, backup and restore
+  Axis.PackageHost/       package runner host that runs extension package operations out of process (planned for M17)
   Axis.Core/              shared primitives: ids, results, clock, tenant context
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)

@@ -79,3 +79,9 @@ files agree, title and status included.
 | [D66](decisions/d66-a-visual-form-designer-for-form-resources.md) | A visual form designer for form resources | **Agreed** |
 | [D67](decisions/d67-live-widget-previews-in-the-design-system.md) | Live widget previews in the design system | **Agreed** |
 | [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) | Issues of several milestones run at once | **Agreed** |
+| [D88](decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md) | Custom widgets in the designer palette and a published SDK | **Agreed** |
+| [D89](decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md) | Modules that hold processes, pages and policies and depend on other modules | **Agreed** |
+| [D90](decisions/d90-extension-packages-run-out-of-process.md) | Extension packages run out of process | **Agreed** |
+| [D91](decisions/d91-connector-oauth2-and-structured-payloads.md) | Connector OAuth2 and structured payloads | **Agreed** |
+| [D92](decisions/d92-outbound-webhooks.md) | Outbound webhooks | **Agreed** |
+| [D93](decisions/d93-an-operator-web-console.md) | An operator web console | **Agreed** |

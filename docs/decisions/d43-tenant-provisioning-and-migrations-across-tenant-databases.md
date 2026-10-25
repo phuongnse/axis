@@ -101,7 +101,9 @@ The owner confirmed these points on issue #640 on 2026-10-19.
   generated database passwords and moving a tenant to another database server.
 
 _Why:_ a command-line tool keeps database admin rights out of every
-long-running host, and a web console for operators can come later. Tenants
+long-running host, and a web console for operators can come later.
+[D93](d93-an-operator-web-console.md) plans that console for M17, without
+provisioning. Tenants
 migrate on their own, so one broken tenant database no longer stops the
 others. The cost is that tenants can sit on different schema versions, so a
 host refuses a tenant whose version it does not expect. A version taken from

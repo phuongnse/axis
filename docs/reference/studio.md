@@ -933,5 +933,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Format.** The designer writes only the order of the widget tree and the
     properties the format has. It writes no pixels, and widths stay in twelfths.
 - **Form designer** _(built)_. It is in [the form designer](form-designer.md).
+- **Custom widgets in the palette** _(planned for M17)_. They are in
+  [custom widgets](custom-widgets.md#designer-palette).
 - **Texts.** Its texts, including those of the lists above, are the platform
   texts under `shell.studio.*`, in `en` and `vi`, like the other shell texts.
