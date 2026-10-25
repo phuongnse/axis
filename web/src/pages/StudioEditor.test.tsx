@@ -83,6 +83,10 @@ function renderEditor() {
 // The first lookup waits for the schema chunk and two fetches, which is slow while other test files run.
 const slow = { timeout: 5000 }
 
+async function openFormTab() {
+  await userEvent.click(await screen.findByRole('tab', { name: 'Form' }, slow))
+}
+
 // The schema is a chunk of its own. Loading it here keeps the first test from racing its first lookup.
 beforeAll(() =>
   Promise.all([
@@ -981,6 +985,7 @@ describe('StudioEditor for a label', () => {
     const fetchMock = stubPage(pageContent, () => json({ resources: [], diagnostics: [] }))
     const onTextsWritten = vi.fn()
     renderResource(pageItem, namesWithTexts, onTextsWritten)
+    await openFormTab()
 
     const key = await screen.findByRole('textbox', { name: 'Text key' }, slow)
     expect(key).toHaveValue('pages.myTasks.title')
@@ -1004,6 +1009,7 @@ describe('StudioEditor for a label', () => {
   it('takes an empty key as no key and suggests one', async () => {
     stubPage({ ...pageContent, title: { textKey: '' } }, () => json({ resources: [], diagnostics: [] }))
     renderResource(pageItem, namesWithTexts)
+    await openFormTab()
 
     expect(await screen.findByRole('textbox', { name: 'Text key' }, slow)).toHaveValue('pages.myTasks.title')
   })
@@ -1011,6 +1017,7 @@ describe('StudioEditor for a label', () => {
   it('shows how many other labels use the key of a saved label', async () => {
     stubPage({ ...pageContent, title: { textKey: 'pages.home.title' } }, () => json({ resources: [], diagnostics: [] }))
     renderResource(pageItem, namesWithTexts)
+    await openFormTab()
 
     expect(await screen.findByRole('textbox', { name: 'Text key' }, slow)).toHaveValue('pages.home.title')
     expect(screen.getByRole('textbox', { name: 'en' })).toHaveValue('Home')
@@ -1021,6 +1028,7 @@ describe('StudioEditor for a label', () => {
   it('shows the failure and leaves the draft unchanged when the write fails', async () => {
     const fetchMock = stubPage(pageContent, () => new Response(null, { status: 400 }))
     renderResource(pageItem, namesWithTexts)
+    await openFormTab()
 
     await userEvent.type(await screen.findByRole('textbox', { name: 'en' }, slow), 'My tasks')
     await userEvent.click(screen.getByRole('button', { name: 'Write texts' }))
@@ -1063,6 +1071,7 @@ describe('StudioEditor for a page', () => {
   it('opens the page editor with the widget list and the selected widget panel', async () => {
     stubResource(pageItem, tablePage)
     renderResource(pageItem, pageNames)
+    await openFormTab()
 
     expect(await screen.findByTestId('studio-page-editor', {}, slow)).toBeInTheDocument()
     expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('form · PurchaseRequest')
@@ -1073,6 +1082,7 @@ describe('StudioEditor for a page', () => {
     const content = { ...tablePage, widgets: [{ type: 'table', dataSource: 'PurchaseRequestList', 'x-note': 'keep' }] }
     const { fetchMock } = stubResource(pageItem, content)
     renderResource(pageItem, pageNames)
+    await openFormTab()
 
     const field = await screen.findByTestId('studio-field-/widgets/0/dataSource', {}, slow)
     await userEvent.click(within(field).getByRole('combobox'))
@@ -1090,6 +1100,7 @@ describe('StudioEditor for a page', () => {
     }
     const { fetchMock } = stubResource(pageItem, content)
     renderResource(pageItem, pageNames)
+    await openFormTab()
 
     const field = await screen.findByTestId('studio-field-/widgets/0/type', {}, slow)
     await userEvent.click(within(field).getByRole('combobox'))
@@ -1117,6 +1128,7 @@ describe('StudioEditor for a page', () => {
     it('starts with Undo and Redo off', async () => {
       stubResource(pageItem, pageContent)
       renderResource(pageItem, pageNames)
+      await openFormTab()
 
       await screen.findByTestId('studio-page-editor', {}, slow)
       expect(undoButton()).toBeDisabled()
@@ -1126,6 +1138,7 @@ describe('StudioEditor for a page', () => {
     it('undoes and redoes the typing in one box as one step', async () => {
       stubResource(pageItem, pageContent)
       renderResource(pageItem, pageNames)
+      await openFormTab()
 
       const name = await screen.findByRole('textbox', { name: 'Name' }, slow)
       await userEvent.type(name, 'abc')
@@ -1144,6 +1157,7 @@ describe('StudioEditor for a page', () => {
     it('makes the typing in a box after leaving it a new step', async () => {
       stubResource(pageItem, pageContent)
       renderResource(pageItem, pageNames)
+      await openFormTab()
 
       const name = await screen.findByRole('textbox', { name: 'Name' }, slow)
       await userEvent.type(name, 'a')
@@ -1157,6 +1171,7 @@ describe('StudioEditor for a page', () => {
     it('undoes and redoes a data source pick with the buttons and with the keys', async () => {
       stubResource(pageItem, tableAndInbox)
       renderResource(pageItem, pageNames)
+      await openFormTab()
 
       await userEvent.click(await screen.findByTestId('studio-widget-/widgets/1', {}, slow))
       await userEvent.click(within(screen.getByTestId('studio-field-/widgets/1/dataSource')).getByRole('combobox'))
@@ -1177,6 +1192,7 @@ describe('StudioEditor for a page', () => {
     it('undoes and redoes a move of a widget', async () => {
       stubResource(pageItem, tableAndInbox)
       renderResource(pageItem, pageNames)
+      await openFormTab()
 
       await screen.findByTestId('studio-widget-/widgets/1', {}, slow)
       await userEvent.click(
@@ -1198,6 +1214,7 @@ describe('StudioEditor for a page', () => {
     it('undoes and redoes an edit in the JSON view with the keys', async () => {
       stubResource(pageItem, pageContent)
       renderResource(pageItem, pageNames)
+      await openFormTab()
 
       await screen.findByTestId('studio-page-editor', {}, slow)
       await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
@@ -1219,6 +1236,7 @@ describe('StudioEditor for a page', () => {
     it('turns Save off again after undoing an invalid edit in the JSON view', async () => {
       stubResource(pageItem, pageContent)
       renderResource(pageItem, pageNames)
+      await openFormTab()
 
       await screen.findByTestId('studio-page-editor', {}, slow)
       await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
@@ -1234,6 +1252,7 @@ describe('StudioEditor for a page', () => {
     it('keeps the history after a save, and the next save sends the patch that reverts the edit', async () => {
       const { fetchMock } = stubResource(pageItem, pageContent)
       renderResource(pageItem, pageNames)
+      await openFormTab()
 
       const name = await screen.findByRole('textbox', { name: 'Name' }, slow)
       await userEvent.type(name, 'abc')
@@ -1259,6 +1278,7 @@ describe('StudioEditor for a page', () => {
         init?.method === 'PATCH' ? json({ title: 'Conflict.' }, 409) : base(input, init),
       )
       renderResource(pageItem, pageNames)
+      await openFormTab()
 
       const name = await screen.findByRole('textbox', { name: 'Name' }, slow)
       await userEvent.type(name, 'abc')
@@ -1277,6 +1297,7 @@ describe('StudioEditor for a page', () => {
     it('leaves the keys to the browser when the focus is outside the editor', async () => {
       stubResource(pageItem, pageContent)
       renderResource(pageItem, pageNames)
+      await openFormTab()
 
       const name = await screen.findByRole('textbox', { name: 'Name' }, slow)
       await userEvent.type(name, 'abc')
