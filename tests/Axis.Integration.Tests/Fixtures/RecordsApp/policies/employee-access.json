@@ -10,6 +10,8 @@
     { "entity": "Order", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Product", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Ticket", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Reminder", "actions": ["read", "create", "update"] },
+    { "entity": "Gauge", "actions": ["read", "create", "update"] },
     { "entity": "Reading", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Expense", "actions": ["read", "create", "update", "delete"] },
     { "dataSource": "ActiveItems", "actions": ["read"] },

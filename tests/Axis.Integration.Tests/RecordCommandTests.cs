@@ -1,4 +1,5 @@
 using System.Text;
+using Axis.Data.Audit;
 using Axis.Processes.Records;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
@@ -94,6 +95,31 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
         Assert.Null(result.Record);
         Assert.Equal(0, (await fixture.TableShapeAsync(TenantId, "Item")).RowCount);
         Assert.Equal(auditBefore, await fixture.AuditRecordCountAsync(TenantId));
+    }
+
+    [Fact]
+    public async Task Create_run_as_system_fills_the_fields_the_body_leaves_out_from_their_defaults()
+    {
+        await fixture.ResetAsync();
+        Assert.True(fixture.Model.TryGetEntity("Reminder", out var reminder));
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantId));
+        await connection.OpenAsync(CancellationToken);
+
+        var result = await RecordCommand.CreateAsync(
+            connection,
+            TenantId,
+            fixture.Model,
+            await ActiveReleaseIdAsync(connection),
+            reminder,
+            new RecordActor(AuditActors.System, "System", ["employee"]),
+            _ => Task.FromResult<byte[]?>(Encoding.UTF8.GetBytes("""{ "values": { "title": "Sys" } }""")),
+            null,
+            NullLoggerFactory.Instance,
+            CancellationToken);
+
+        Assert.Equal(RecordCommandOutcome.Written, result.Outcome);
+        Assert.Equal("open", result.Record!.Values["state"]!.GetValue<string>());
+        Assert.Equal(3, result.Record.Values["priority"]!.GetValue<long>());
     }
 
     private async Task<Guid> ActiveReleaseIdAsync(NpgsqlConnection connection)
