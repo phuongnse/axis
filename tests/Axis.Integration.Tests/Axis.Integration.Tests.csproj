@@ -40,6 +40,7 @@
     <Compile Include="..\Axis.Configuration.Tests\TestPackages.cs" Link="TestPackages.cs" />
     <Compile Include="..\Axis.Data.Tests\Models.cs" Link="Models.cs" />
     <Compile Include="..\Axis.Data.Tests\XlsxFiles.cs" Link="XlsxFiles.cs" />
+    <Compile Include="..\Axis.Server.Tests\CsvText.cs" Link="CsvText.cs" />
     <Compile Include="..\Axis.Server.Tests\DpopTestKey.cs" Link="DpopTestKey.cs" />
     <Compile Include="..\Axis.Server.Tests\InMemorySessionStore.cs" Link="InMemorySessionStore.cs" />
     <Compile Include="..\Axis.Server.Tests\TestAuthentication.cs" Link="TestAuthentication.cs" />

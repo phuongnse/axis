@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Data.Tests" />
     <InternalsVisibleTo Include="Axis.Integration.Tests" />
     <InternalsVisibleTo Include="Axis.Data.Tests" />
     <InternalsVisibleTo Include="Axis.Processes" />

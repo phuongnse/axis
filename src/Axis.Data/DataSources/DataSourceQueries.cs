@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Naming;
@@ -112,6 +113,44 @@ public static class DataSourceQueries
         {
             // Class 22 is a data exception: the filter could not be evaluated for some row.
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Streams up to <paramref name="limit"/> rows in the order, filter and condition of
+    /// <see cref="ListAsync"/>, one at a time, so a caller never holds them all. A grouped data source
+    /// streams its groups. It does not count. A database error is thrown as it is, including a data
+    /// exception (SQLSTATE class 22) that the filter or the condition raises for some row, which the
+    /// caller maps.
+    /// </summary>
+    public static async IAsyncEnumerable<DataSourceRow> ReadAllAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        DataSourceModel dataSource,
+        DataSourceSort? sort,
+        IReadOnlyList<DataSourceParameterValue> parameters,
+        RecordCondition? condition,
+        int limit,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(dataSource);
+        ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+
+        var statement = Statement(application, dataSource, sort, condition);
+        await using var command = new NpgsqlCommand(statement.PageSql, connection);
+        AddValues(command, statement.Values);
+        AddParameters(command, parameters);
+        condition?.AddTo(command);
+        command.Parameters.AddWithValue("limit", limit);
+        command.Parameters.AddWithValue("offset", 0L);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            yield return dataSource.Aggregate is { } grouped ? ReadGroupedRow(reader, grouped) : ReadRow(reader, dataSource);
         }
     }
 

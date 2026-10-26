@@ -72,6 +72,12 @@ describe('the palette', () => {
       input: {},
     })
     expect(newStep(entry('raiseEvent'), 'r')).toMatchObject({ event: '', fields: {} })
+    expect(newStep(entry('createRecord'), 'c')).toMatchObject({
+      operation: 'createRecord',
+      entity: '',
+      set: {},
+      next: '',
+    })
     expect(newStep(entry('package'), 'p')).toMatchObject({ operation: '', input: {}, next: '' })
     expect(newStep(entry('subProcess'), 's')).toEqual({ name: 's', type: 'subProcess', process: '', next: '' })
     expect(newStep(entry('end'), 'e')).toEqual({ name: 'e', type: 'end' })

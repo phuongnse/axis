@@ -58,6 +58,7 @@
     "role.fielded": "Fielded",
     "role.dsonly": "Data source only",
     "role.falseOnly": "False only",
-    "role.failing": "Failing"
+    "role.failing": "Failing",
+    "role.exporter": "Exporter"
   }
 }
