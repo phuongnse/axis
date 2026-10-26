@@ -65,11 +65,11 @@ and a `task.escalate` item runs one of its `escalations`, see
 A `subProcess` step starts its child and waits, and a `process.resume` item
 resumes the parent when the child completes, see
 [Sub-process step](process-flow.md#sub-process-step).
-_(Planned for M14)_ The worker also runs `waitEvent` steps and sends the staged
-emails of the `notify` operation, with the work item kind `notification.email`.
-A `notify` step already queues a `notification.email` item for each email, and it
-stays queued until then. See [process flow](process-flow.md),
-[task deadlines](task-deadlines.md) and [notifications](notifications.md).
+A `notify` step queues a `notification.email` item for each email, and that
+item sends it, see [email](notifications.md#email).
+_(Planned for M14)_ The worker also runs `waitEvent` steps. See
+[process flow](process-flow.md), [task deadlines](task-deadlines.md) and
+[notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
 one transaction:
 

@@ -3,6 +3,7 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Core.Telemetry;
 using Axis.Processes;
+using Axis.Processes.Instances;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -19,11 +20,13 @@ public static class WorkerServiceCollectionExtensions
     /// <c>Tenancy:RefreshInterval</c>. The dry run of an import fails a file with more data rows than
     /// <c>Data:ImportMaxRows</c>, which defaults to 10000. The worker deletes in-app notifications older than
     /// <c>Notifications:RetentionDays</c>, which defaults to 90. Only a worker
-    /// that runs in Development sends connector calls to an <c>http</c> base URL.
+    /// that runs in Development sends connector calls to an <c>http</c> base URL. The worker sends the emails that
+    /// <c>notify</c> steps staged over the SMTP server of the <c>Email</c> section, which a tenant's own <c>Email</c> block
+    /// replaces whole. With no <c>Email:Smtp:Host</c> it sends none.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant, worker or health configuration is invalid, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
-    /// <c>directory</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist.
+    /// <c>directory</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, or the <c>Email</c> section is invalid.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
@@ -91,7 +94,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton(catalog);
         services.AddExtensionPackages(configuration, environment);
         services.AddModules(configuration, environment);
-        services.AddProcesses(environment.IsDevelopment(), options.DeliveryAttempts, ImportMaxRows(configuration));
+        services.AddProcesses(environment.IsDevelopment(), options.DeliveryAttempts, ImportMaxRows(configuration), EmailDefaults.Load(configuration));
         services.AddSingleton(options);
         services.AddSingleton(new NotificationOptions { RetentionDays = RetentionDays(configuration) });
         services.AddSingleton(health);

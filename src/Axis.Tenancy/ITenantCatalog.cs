@@ -34,6 +34,7 @@ public interface ITenantCatalog
 /// <param name="Oidc">How the tenant signs people in, or <c>null</c> when the source has none. Only the server uses it.</param>
 /// <param name="Bindings">The tenant's deployment bindings keyed by name, matched ignoring letter case.</param>
 /// <param name="PreviewOf">The id of the main tenant when this is a preview tenant, otherwise <c>null</c>.</param>
+/// <param name="Email">The tenant's own mail settings, which replace the host's whole, or <c>null</c> when the tenant uses the host's. Only the <c>configuration</c> source has them.</param>
 public sealed record TenantEntry(
     string Id,
     IReadOnlyList<string> Hosts,
@@ -41,7 +42,8 @@ public sealed record TenantEntry(
     SecretValue? SchemaConnectionString,
     TenantOidc? Oidc,
     IReadOnlyDictionary<string, TenantBinding> Bindings,
-    string? PreviewOf = null);
+    string? PreviewOf = null,
+    EmailSettings? Email = null);
 
 /// <summary>How one tenant signs people in. A value the source leaves blank is <c>null</c>.</summary>
 /// <param name="Profile">The sign-in profile as the source wrote it, or <c>null</c> when unset, which counts as <c>standard</c>. See <see cref="TenantSignInProfiles"/>.</param>
