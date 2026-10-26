@@ -323,6 +323,56 @@ describe('ProcessInspectorWidget', () => {
     expect(requests.deadLetterRequests()[1].body).toBe('{"reason":"The trigger is back"}')
   })
 
+  it('goes back to the last page with rows when settling empties the current page', async () => {
+    const item = (id: string, kind: string) => ({
+      ...JSON.parse(deadLetterPage).items[0],
+      id,
+      kind,
+    })
+    const first = item(retryableId, 'event.deliver')
+    const second = item(settledId, 'trigger.fanOut')
+    let settled = false
+    const deadLetterGets: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string, init?: RequestInit) => {
+        if (!input.startsWith(deadLettersPath)) {
+          return new Response(instancePage)
+        }
+        if (init?.method === 'POST') {
+          settled = true
+          return new Response('{}')
+        }
+        deadLetterGets.push(input)
+        const onSecondPage = input.includes('page=2')
+        const items = settled ? (onSecondPage ? [] : [first]) : onSecondPage ? [second] : [first]
+        return new Response(
+          JSON.stringify({ items, page: onSecondPage ? 2 : 1, pageSize: 1, totalCount: settled ? 1 : 2 }),
+        )
+      }),
+    )
+    const user = userEvent.setup()
+
+    renderWidget()
+
+    await screen.findByRole('row', { name: /event\.deliver/ })
+    await user.click(screen.getByTitle('2'))
+    await user.click(await screen.findByTestId(`inspector-dead-letter-discard-${settledId}`))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Reason'), 'Not needed')
+    await user.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await screen.findByRole('row', { name: /event\.deliver/ })).toBeInTheDocument()
+    expect(screen.queryByText('No open dead letters.')).not.toBeInTheDocument()
+    expect(deadLetterGets).toEqual([
+      `${deadLettersPath}?state=open`,
+      `${deadLettersPath}?state=open&page=2`,
+      `${deadLettersPath}?state=open&page=2`,
+      `${deadLettersPath}?state=open`,
+    ])
+  })
+
   it("shows the server's problem title when a command is refused", async () => {
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
       if (init?.method === 'POST') {

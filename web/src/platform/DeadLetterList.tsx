@@ -57,9 +57,16 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
   useEffect(() => {
     const controller = new AbortController()
     fetchDeadLetters(deadLettersPath, query, controller.signal)
-      .then((result) =>
-        setLoad(result === forbidden ? { url: loadKey, failed: true } : { url: loadKey, page: result, failed: false }),
-      )
+      .then((result) => {
+        if (result === forbidden) {
+          setLoad({ url: loadKey, failed: true })
+          return
+        }
+        // A page past the end, such as after the last row of the last page is settled, becomes the
+        // last page once the total is known.
+        setPage((current) => Math.min(current, Math.max(1, Math.ceil(result.totalCount / result.pageSize))))
+        setLoad({ url: loadKey, page: result, failed: false })
+      })
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
           return
