@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -139,6 +139,7 @@ const texts = {
   'note.done': 'Done',
   'note.category': 'Category',
   'note.lines': 'Lines',
+  'note.software': 'Software',
   'noteLine.description': 'Description',
   'noteLine.quantity': 'Quantity',
   'noteSections.main': 'Main',
@@ -222,6 +223,37 @@ describe('DetailWidget', () => {
     expect(screen.getByLabelText('Description 1')).toHaveAttribute('readonly')
     expect(screen.getByLabelText('Quantity 1')).toHaveValue('2')
     expect(screen.queryByRole('button', { name: 'Add row' })).toBeNull()
+  })
+
+  it('shows the labels of a references field in order, and the id where a label is missing', async () => {
+    const widget: EntityWidgetMetadata = {
+      ...noteWidget,
+      entity: {
+        ...noteWidget.entity,
+        fields: [
+          field('title', 'text', 'note.title'),
+          {
+            ...field('software', 'references', 'note.software'),
+            target: {
+              entity: 'Software',
+              displayField: 'name',
+              recordsPath: '/api/apps/E2eApp/entities/Software/records',
+            },
+          },
+        ],
+      },
+    }
+    stubFetch({
+      status: 200,
+      body: `{"id":"${noteId}","version":1,"values":{"title":"Laptop","software":["id-word","id-excel","id-visio"]},"labels":{"software":["Word",null,"Visio"]}}`,
+    })
+
+    renderDetail(widget)
+
+    expect(await screen.findByText('Word')).toBeInTheDocument()
+    const tags = within(screen.getByTestId('detail-references-software')).getAllByText(/./)
+    expect(descriptionItem('Software')).toContainElement(tags[0])
+    expect(tags.map((tag) => tag.textContent)).toEqual(['Word', 'id-excel', 'Visio'])
   })
 
   it('shows the label of a reference in a child row instead of its id', async () => {

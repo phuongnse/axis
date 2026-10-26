@@ -9,6 +9,8 @@ public static class AuditActions
 
     public const string RecordDeleted = "record.deleted";
 
+    public const string RecordsImported = "records.imported";
+
     public const string RecordsExported = "records.exported";
 
     public const string ProcessStarted = "process.started";

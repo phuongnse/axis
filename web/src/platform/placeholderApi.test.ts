@@ -62,8 +62,20 @@ describe('placeholderApi', () => {
         status: 'submitted',
         category: '00000000-0000-4000-8000-000000000101',
         lines: [
-          { description: 'Sample description 1', count: '10' },
-          { description: 'Sample description 2', count: '20' },
+          {
+            description: 'Sample description 1',
+            quantity: '10',
+            unitPrice: '1250.50',
+            amount: '1250.50',
+            category: '00000000-0000-4000-8000-000000000101',
+          },
+          {
+            description: 'Sample description 2',
+            quantity: '20',
+            unitPrice: '2501.00',
+            amount: '2501.00',
+            category: '00000000-0000-4000-8000-000000000101',
+          },
         ],
       },
       labels: { category: 'Sample Category' },

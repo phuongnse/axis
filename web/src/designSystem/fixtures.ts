@@ -24,7 +24,7 @@ const requestsPath = `${apiPath}/entities/Request/records`
 const loadingPath = `${apiPath}/entities/LoadingRequest/records`
 const failingPath = `${apiPath}/entities/FailingRequest/records`
 const categoriesPath = `${apiPath}/entities/Category/records`
-const formStatePath = `${apiPath}/forms/RequestForm/state`
+const formStatePath = (form: string) => `${apiPath}/forms/${form}/state`
 const tasksPath = `${apiPath}/tasks`
 const instancesPath = `${apiPath}/processes/Approve/instances`
 const deadLettersPath = `${apiPath}/processes/Approve/dead-letters`
@@ -62,10 +62,10 @@ function field(name: string, type: FieldType, labelKey: string): FieldMetadata {
   }
 }
 
-/** A field type the design system previews: all but money. */
-export type PreviewFieldType = Exclude<FieldType, 'money'>
+/** A field type the design system previews: all but money and references. */
+export type PreviewFieldType = Exclude<FieldType, 'money' | 'references'>
 
-/** One field of each type but money, which the previews do not draw. The names are the labels' keys without their prefix. */
+/** One field of each type but money and references, which the previews do not draw. The names are the labels' keys without their prefix. */
 export const fields: Record<PreviewFieldType, FieldMetadata> = {
   text: { ...field('title', 'text', 'request.title'), maxLength: 200 },
   integer: field('quantity', 'integer', 'request.quantity'),
@@ -81,8 +81,14 @@ export const fields: Record<PreviewFieldType, FieldMetadata> = {
   'child-collection': {
     ...field('lines', 'child-collection', 'request.lines'),
     fields: [
-      { ...field('description', 'text', 'requestLine.description'), maxLength: 100 },
-      field('count', 'integer', 'requestLine.count'),
+      { ...field('description', 'text', 'requestLine.description'), maxLength: 200 },
+      field('quantity', 'integer', 'requestLine.quantity'),
+      { ...field('unitPrice', 'decimal', 'requestLine.unitPrice'), precision: 18, scale: 2 },
+      { ...field('amount', 'decimal', 'requestLine.amount'), precision: 18, scale: 2, computed: true },
+      {
+        ...field('category', 'reference', 'requestLine.category'),
+        target: { entity: 'Category', displayField: 'name', recordsPath: categoriesPath },
+      },
     ],
   },
 }
@@ -96,8 +102,8 @@ export const entity: EntityMetadata = {
 }
 
 /** The entity cut down to one field, so a preview shows only that field's input. */
-export function entityWithField(type: PreviewFieldType): EntityMetadata {
-  return { ...entity, fields: [fields[type]] }
+export function entityWithField(type: PreviewFieldType, required = false): EntityMetadata {
+  return { ...entity, fields: [{ ...fields[type], required }] }
 }
 
 const widgetBase: WidgetMetadata = {
@@ -221,6 +227,52 @@ export const formWidget: EntityWidgetMetadata = {
 
 /** A detail widget of a request: the form's sections, read-only, with the start button. */
 export const detailWidget: EntityWidgetMetadata = { ...formWidget, type: 'detail', detail: { record: 'request' } }
+
+/** The form with a name of its own, so its state and save answers are its own fixtures. */
+const namedForm = (name: string, steps: FormMetadata['steps'] = []): EntityWidgetMetadata => ({
+  ...formWidget,
+  form: { ...form, name, steps },
+})
+
+/** The form whose save the fixture answers with a validation problem, so its messages show. */
+export const invalidRequestForm = namedForm('InvalidRequestForm')
+/** The form whose state locks the amount, as a form condition does. */
+export const lockedRequestForm = namedForm('LockedRequestForm')
+/** The form with two wizard steps, the general section and the details section. */
+export const wizardRequestForm = namedForm('WizardRequestForm', [
+  { titleKey: 'request.section.general', sections: ['general'] },
+  { titleKey: 'request.section.details', sections: ['details'] },
+])
+
+const noStateAnswer = () => ({ sections: [], fields: {}, errors: {}, defaults: {} })
+
+/** The answers only the validation errors state uses: no state, and a save that fails on two fields. */
+export const invalidFormRoutes: Record<string, () => unknown> = {
+  [formStatePath('InvalidRequestForm')]: noStateAnswer,
+  [`${requestsPath}?form=InvalidRequestForm`]: () =>
+    new Response(
+      JSON.stringify({
+        title: 'Validation failed',
+        errors: { '/values/title': ['preview.error.title'], '/values/quantity': ['preview.error.field'] },
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } },
+    ),
+}
+
+/** The answers only the read-only state uses: the form state locks the amount. */
+export const lockedFormRoutes: Record<string, () => unknown> = {
+  [formStatePath('LockedRequestForm')]: () => ({
+    sections: [],
+    fields: { amount: { visible: true, required: false, readOnly: true } },
+    errors: {},
+    defaults: {},
+  }),
+}
+
+/** The answers only the wizard state uses: no state, as the steps are the only difference. */
+export const wizardFormRoutes: Record<string, () => unknown> = {
+  [formStatePath('WizardRequestForm')]: noStateAnswer,
+}
 
 /** The detail widget over a record whose values are all empty, so the Lines table has no rows. */
 export const blankDetailWidget: EntityWidgetMetadata = {
@@ -349,14 +401,24 @@ const savedRequest = (id: string, title: string, status: string): RecordItem => 
     status,
     category: categoryId,
     lines: [
-      { description: 'Standing desk', count: '2' },
-      { description: 'Desk lamp', count: '10' },
+      { description: 'Standing desk', quantity: '2', unitPrice: '850.00', amount: '1700.00', category: categoryId },
+      { description: 'Desk lamp', quantity: '10', unitPrice: '-5.00', amount: '-50.00', category: categoryId },
     ],
   },
-  labels: { category: 'Office furniture' },
+  labels: {
+    category: 'Office furniture',
+    lines: [{ category: 'Office furniture' }, { category: 'Office furniture' }],
+  },
 })
 
 export const savedRecord = savedRequest(requestId, 'Standing desks for the new office', 'submitted')
+
+/** The saved request with no line items, which the empty state of the child collection draws. */
+export const emptyLinesRecord: RecordItem = {
+  ...savedRecord,
+  values: { ...savedRecord.values, lines: [] },
+  labels: { category: 'Office furniture' },
+}
 
 const recordPage: RecordPage = {
   items: [
@@ -532,7 +594,6 @@ const requestTotalsPage: RecordPage = {
 export const siteTexts: Record<string, string> = {
   'request.label': 'Request',
   'request.title': 'Title',
-  'request.title.taken': 'Another request has this title.',
   'request.quantity': 'Quantity',
   'request.amount': 'Amount',
   'request.urgent': 'Urgent',
@@ -542,7 +603,10 @@ export const siteTexts: Record<string, string> = {
   'request.category': 'Category',
   'request.lines': 'Lines',
   'requestLine.description': 'Description',
-  'requestLine.count': 'Count',
+  'requestLine.quantity': 'Quantity',
+  'requestLine.unitPrice': 'Unit price',
+  'requestLine.amount': 'Amount',
+  'requestLine.category': 'Category',
   'request.section.general': 'General',
   'request.section.details': 'Details',
   'request.new': 'New request',
@@ -557,6 +621,9 @@ export const siteTexts: Record<string, string> = {
   'kpi.requests': 'Requests',
   'preview.requests': 'Requests',
   'preview.tasks': 'Tasks',
+  'preview.error.field': 'This value is not valid.',
+  'preview.error.title': 'Enter a title.',
+  'preview.error.unitPrice': 'Unit price cannot be negative.',
 }
 
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
@@ -570,12 +637,6 @@ export const routes: Record<string, () => unknown> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
   [`${requestsPath}/${requestId}/history`]: () => history,
-  [formStatePath]: () => ({
-    sections: [],
-    fields: {},
-    errors: { '/values/title': ['request.title.taken'] },
-    defaults: {},
-  }),
   [categoriesPath]: () => categoryPage,
   [tasksPath]: () => taskPage,
   [instancesPath]: () => instancePage,

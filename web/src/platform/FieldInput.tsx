@@ -159,6 +159,7 @@ export function FieldInput({ field, value, onChange, id, ariaLabel, style, curre
         />
       )
     case 'reference':
+    case 'references':
     case 'child-collection':
       // The form renders these itself, and a child entity has neither.
       return null

@@ -346,18 +346,30 @@ Run and the Test results list, the read-only view of a module entity, and the re
     `sequence`, `creator` and `sensitive`. The settings follow the
     [field types](resource-files.md#entity-field-types-and-constraints), so a
     setting a type does not take cannot be edited.
-  - _(Planned for M15.)_ The type picker adds `money`, `file` and
-    `references`, and a child entity's fields may be `reference`. The
-    settings column adds `currency` or `currencyField`, `maxSize`, `accept`,
-    `default` in the expression editor, `min`, `max`, `minLength`,
-    `searchable` and a label picker for each enum value. An Indexes list
-    under the fields adds, orders and removes the entity's `indexes`. See
+  - The type picker also offers `money`, `file` and `references`, and a child
+    entity's fields may be `reference`. A `references` field has the same
+    target picker as a `reference` field. The settings column adds, for a
+    `file`, `maxSize` in bytes and an `accept` list of media types. For a
+    `money` field it adds a choice between a fixed `currency` code and a
+    `currencyField`, picked from the entity's `enum` and `text` fields. The
+    field holds only the one that is chosen: Field writes an empty
+    `currencyField` and removes `currency`, and Fixed code removes
+    `currencyField`. A typed code is turned into upper case. For an `enum` it
+    adds a label picker for each value, which writes `valueLabels`. Removing a
+    value keeps its label, and Validate reports it (`AXC0242`). A test compares
+    the field types and properties of the designer with `entity.schema.json`,
+    so a property that a later issue adds cannot be left out by mistake. See
     [types and properties added in M15](resource-files.md#types-and-properties-added-in-m15).
+  - _(Planned for M15.)_ The settings column adds `default` in the expression
+    editor, `min`, `max`, `minLength` and `searchable`, which are edited in the
+    JSON tab until then. An Indexes list under the fields adds, orders and
+    removes the entity's `indexes`.
   - Changing a field's type drops the settings the new type does not take and
     keeps the rest. It does not add an empty `values` or `target`, and Validate
     reports the missing setting.
   - Clearing a field's label, the display field, `maxLength`, `precision`,
-    `scale`, `sequence`, `expression` or the last enum value removes the key.
+    `scale`, `maxSize`, `accept`, `sequence`, `expression`, the last enum value
+    or the last value label removes the key.
   - A computed field's `expression` and each validation's expression use the
     [expression editor](../decisions/d52-reference-pickers-label-texts-and-the-expression-editor.md).
     A validation also has a message key picker and a field picker, and can be

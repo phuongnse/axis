@@ -1,14 +1,15 @@
 namespace Axis.Data;
 
 /// <summary>
-/// One deployment binding of a tenant as activation sees it: its <see cref="Kind"/>, <c>url</c> or
-/// <c>secret</c>, and for a <c>url</c> binding its <see cref="Url"/>. A secret's value is never
+/// One deployment binding of a tenant as activation sees it: its <see cref="Kind"/>, <c>url</c>,
+/// <c>secret</c> or <c>storage</c>, and for a <c>url</c> binding its <see cref="Url"/>. A secret's value is never
 /// passed in.
 /// </summary>
 public sealed record ActivationBinding(string Kind, Uri? Url)
 {
     public const string UrlKind = "url";
     public const string SecretKind = "secret";
+    public const string StorageKind = "storage";
 }
 
 /// <summary>

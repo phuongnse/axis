@@ -128,6 +128,9 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// outcome is <see cref="RecordCommandOutcome.ReleaseChanged"/>, so the caller can run it again on the
 /// new release. A delete takes the record's row lock after the start lock. It is refused as a conflict when
 /// a running or waiting process instance has the record as its subject, checked after the record filters.
+/// A caller that owns the write transaction and has taken the start lock itself, such as the commit of an import,
+/// creates through <see cref="CreateInTransactionAsync"/>. It takes the same steps after the lock and never commits
+/// or rolls back.
 /// A create or update may name a form of the entity. The form is checked after the grant and the
 /// record checks and before the content type: a name that is no form of the entity is invalid.
 /// A body is checked in order: content type, then body, then a field that no grant for the action
@@ -176,7 +179,7 @@ public static class RecordCommand
         }
 
         var input = parse.Input!;
-        RecordWriteResult result;
+        RecordCommandResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             // The start lock comes first, before any entity table is touched in this transaction, so a
@@ -188,47 +191,114 @@ public static class RecordCommand
                 return new RecordCommandResult(RecordCommandOutcome.ReleaseChanged);
             }
 
-            // The defaults, the computed fields and the validations run in the write transaction, so their
-            // now() is its start time.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var sets = model.Validations.Count > 0 || formModel?.HasRequiredWhen == true
-                ? await RecordSets.ReadAsync(connection, application, model, null, input.Links, cancellationToken)
-                : RecordSets.Empty;
-            var prepared = PrepareCreate(application, model, actor, input, formModel, now, sets);
-            if (prepared.Errors is { } prepareErrors)
+            result = await WriteCreateAsync(connection, transaction, tenantId, application, releaseId, model, actor, access, input, formModel, now, loggerFactory, cancellationToken);
+            if (result.Outcome == RecordCommandOutcome.Written)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+            else
             {
                 await transaction.RollbackAsync(cancellationToken);
-                return Invalid(prepareErrors);
-            }
-
-            var computed = prepared.Computed!;
-            result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cancellationToken: cancellationToken);
-            var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
-            var outside = written is not null
-                && !await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken);
-            await CompleteAsync(
-                transaction,
-                written is not null && !outside
-                    ? RecordAudit(actor, AuditActions.RecordCreated, application, model, written.Id, written.Version)
-                    : null,
-                () => DataChangeTriggerStarts.StartAsync(
-                    transaction,
-                    tenantId,
-                    application,
-                    releaseId,
-                    model,
-                    DataChangeKinds.Create,
-                    written!,
-                    changedFields: null,
-                    loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
-                    cancellationToken),
-                cancellationToken);
-            if (outside)
-            {
-                return new RecordCommandResult(RecordCommandOutcome.OutsideFilters);
             }
         }
 
+        return result;
+    }
+
+    /// <summary>
+    /// Creates a record from <paramref name="body"/> inside <paramref name="transaction"/>, a transaction the caller
+    /// owns and that already holds the application's start lock for <paramref name="releaseId"/>, which the caller
+    /// has checked is the active release. It checks the actor's <c>create</c> grant (denied), then the body, then
+    /// does what a create does in its write transaction: the defaults, the computed fields, the validations,
+    /// storage, the record filters, the <c>record.created</c> audit record and the starts of the data change
+    /// triggers. It never commits or rolls back. When the outcome is not <see cref="RecordCommandOutcome.Written"/>
+    /// the transaction holds partial work, as a failed statement may leave it aborted, so the caller rolls back
+    /// to a savepoint it took before, or rolls the transaction back. <paramref name="now"/> is the start time of
+    /// the transaction.
+    /// </summary>
+    public static async Task<RecordCommandResult> CreateInTransactionAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel application,
+        Guid releaseId,
+        EntityModel model,
+        RecordActor actor,
+        ReadOnlyMemory<byte> body,
+        DateTimeOffset now,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
+
+        var access = PolicyEvaluator.Access(application, actor.Roles, model, PolicyAction.Create);
+        if (!access.Granted)
+        {
+            return new RecordCommandResult(RecordCommandOutcome.Denied);
+        }
+
+        var parse = ParseCreate(application, model, actor, body);
+        return parse.Failure
+            ?? await WriteCreateAsync(connection, transaction, tenantId, application, releaseId, model, actor, access, parse.Input!, form: null, now, loggerFactory, cancellationToken);
+    }
+
+    // The write steps of a create after the start lock, in the transaction of the caller, which commits or
+    // rolls back. The defaults, the computed fields and the validations run in the write transaction, so their
+    // now() is its start time, which is now.
+    private static async Task<RecordCommandResult> WriteCreateAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel application,
+        Guid releaseId,
+        EntityModel model,
+        RecordActor actor,
+        RecordAccess access,
+        RecordInput input,
+        FormModel? form,
+        DateTimeOffset now,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        var sets = model.Validations.Count > 0 || form?.HasRequiredWhen == true
+            ? await RecordSets.ReadAsync(connection, application, model, null, input.Links, cancellationToken)
+            : RecordSets.Empty;
+        var prepared = PrepareCreate(application, model, actor, input, form, now, sets);
+        if (prepared.Errors is { } prepareErrors)
+        {
+            return Invalid(prepareErrors);
+        }
+
+        var computed = prepared.Computed!;
+        var result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cancellationToken: cancellationToken);
+        if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
+        {
+            return WriteResult(result);
+        }
+
+        if (!await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken))
+        {
+            return new RecordCommandResult(RecordCommandOutcome.OutsideFilters);
+        }
+
+        await AuditRecords.AppendAsync(transaction, RecordAudit(actor, AuditActions.RecordCreated, application, model, written.Id, written.Version), cancellationToken);
+        await DataChangeTriggerStarts.StartAsync(
+            transaction,
+            tenantId,
+            application,
+            releaseId,
+            model,
+            DataChangeKinds.Create,
+            written,
+            changedFields: null,
+            loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+            cancellationToken);
         return WriteResult(result);
     }
 

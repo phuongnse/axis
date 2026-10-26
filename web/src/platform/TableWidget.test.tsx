@@ -172,6 +172,7 @@ const texts = {
   'note.dueAt': 'Due at',
   'note.category': 'Category',
   'note.lines': 'Lines',
+  'note.software': 'Software',
   'note.details': 'Details',
   'note.edit': 'Edit',
   'note.add': 'Add note',
@@ -652,6 +653,24 @@ describe('TableWidget', () => {
     await waitFor(() => expect(search()).toBe(''))
     expect(requests()).toEqual([recordsPath])
     expect(screen.queryByRole('columnheader', { name: 'Lines' })).not.toBeInTheDocument()
+  })
+
+  it('shows no column for a references field and ignores it as a sort', async () => {
+    const requests = stubRecords()
+    const software: FieldMetadata = {
+      ...field('software', 'references', 'note.software'),
+      target: { entity: 'Software', displayField: 'name', recordsPath: '/api/apps/E2eApp/entities/Software/records' },
+    }
+
+    renderWidget('?sort=software', {
+      ...noteWidget,
+      entity: { ...noteWidget.entity, fields: [...noteWidget.entity.fields, software] },
+    })
+
+    await screen.findByRole('row', { name: /Buy paper/ })
+    await waitFor(() => expect(search()).toBe(''))
+    expect(requests()).toEqual([recordsPath])
+    expect(screen.queryByRole('columnheader', { name: 'Software' })).not.toBeInTheDocument()
   })
 
   it('right-aligns numbers and shows them as the API wrote them', async () => {

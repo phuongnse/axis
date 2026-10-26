@@ -414,7 +414,7 @@ public static class ApplicationSites
             field.MinLength,
             field.Values,
             LabelKeys(field.Values, field.ValueLabels),
-            field.Type == FieldType.Reference
+            field.Type is FieldType.Reference or FieldType.References
                 ? new ReferenceTarget(field.Target!.Name, field.TargetDisplayField, RecordsPath(application, field.Target.Name))
                 : null,
             field.Type == FieldType.ChildCollection ? ChildFields(application, field) : null);

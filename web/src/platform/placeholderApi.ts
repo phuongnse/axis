@@ -44,6 +44,8 @@ function value(field: Typed, n: number): FieldValue {
       return field.values?.[(n - 1) % field.values.length] ?? null
     case 'reference':
       return referenceId
+    case 'references':
+      return [referenceId]
     case 'child-collection':
       return Array.from({ length: childRowCount }, (_, row) => values(field.fields ?? [], row + 1) as RecordRow)
   }
@@ -53,11 +55,14 @@ function values(fields: readonly Typed[], n: number): Record<string, FieldValue>
   return Object.fromEntries(fields.map((field) => [field.name, value(field, n)]))
 }
 
-function labels(fields: readonly Typed[]): Record<string, string> {
+function labels(fields: readonly Typed[]): Record<string, string | string[]> {
   return Object.fromEntries(
     fields
-      .filter((field) => field.type === 'reference')
-      .map((field) => [field.name, `Sample ${field.target?.entity ?? field.name}`]),
+      .filter((field) => field.type === 'reference' || field.type === 'references')
+      .map((field) => {
+        const label = `Sample ${field.target?.entity ?? field.name}`
+        return [field.name, field.type === 'references' ? [label] : label]
+      }),
   )
 }
 
