@@ -35,6 +35,9 @@ public static class ProcessStarts
     /// <summary>The kind of the work item that expires one open task at its step's deadline.</summary>
     public const string TaskDeadlineWorkItemKind = "task.deadline";
 
+    /// <summary>The kind of the work item that runs one escalation of an open task at its time.</summary>
+    public const string TaskEscalateWorkItemKind = "task.escalate";
+
     /// <summary>The kind of the work item that resumes a parent instance when its sub-process child completes.</summary>
     public const string ProcessResumeWorkItemKind = "process.resume";
 

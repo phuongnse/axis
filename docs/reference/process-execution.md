@@ -60,13 +60,14 @@ A `notify` operation step stores its in-app notification, see
 A `timer` step sets the instance `waiting`, and a `process.timer` item resumes
 it, see [Timer step](process-flow.md#timer-step).
 A `task.deadline` item expires the task of a task step that has a `deadline`,
-see [task deadlines](task-deadlines.md#escalations-and-deadline).
+and a `task.escalate` item runs one of its `escalations`, see
+[task deadlines](task-deadlines.md#escalations-and-deadline).
 A `subProcess` step starts its child and waits, and a `process.resume` item
 resumes the parent when the child completes, see
 [Sub-process step](process-flow.md#sub-process-step).
 _(Planned for M14)_ The worker also runs `waitEvent` steps and the email of the
-`notify` operation, with the work item kinds
-`task.escalate` and `notification.email`, see [process flow](process-flow.md),
+`notify` operation, with the work item kind
+`notification.email`, see [process flow](process-flow.md),
 [task deadlines](task-deadlines.md) and [notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
 one transaction:
@@ -141,9 +142,11 @@ one transaction:
    and its work item is deleted, so it never runs again.
 5. A task step then inserts its task into `axis.process_tasks` as `open`. Its
    `due_at` is the transaction time, `now()`, plus `dueIn`, or null without
-   `dueIn`. `dueIn` is added as a fixed length of time. A task step with a
-   `deadline` also queues one `task.deadline` work item for the task, due at
-   the transaction time plus the deadline's `after`. See
+   `dueIn`. `dueIn` is added as a fixed length of time. A task step with
+   `escalations` also queues one `task.escalate` work item for each, due at the
+   transaction time plus its `after`, and one with a `deadline` queues one
+   `task.deadline` work item after them, due at the transaction time plus the
+   deadline's `after`. See
    [task deadlines](task-deadlines.md#escalations-and-deadline).
 
    A `callConnector` step then inserts its call into `axis.connector_calls`

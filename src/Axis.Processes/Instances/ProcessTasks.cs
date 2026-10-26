@@ -10,7 +10,7 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Writes the human tasks of process instances over a connection to a tenant database, and names
-/// their states and assignee kinds. A completion closes the task, deletes its deadline item and
+/// their states and assignee kinds. A completion closes the task, deletes its escalation and deadline items and
 /// resumes its instance in the caller's transaction.
 /// </summary>
 public static class ProcessTasks
@@ -198,7 +198,7 @@ public static class ProcessTasks
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
-    /// <summary>Deletes the work items that wait on the task <paramref name="taskId"/>, which are its pending <c>task.deadline</c> items.</summary>
+    /// <summary>Deletes the work items that wait on the task <paramref name="taskId"/>, which are its pending <c>task.escalate</c> and <c>task.deadline</c> items.</summary>
     internal static async Task DeletePendingItemsAsync(NpgsqlTransaction transaction, Guid taskId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(transaction);
@@ -208,6 +208,23 @@ public static class ProcessTasks
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("task", taskId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes the pending <c>task.escalate</c> items of the task <paramref name="taskId"/>. An expiry
+    /// calls it from the deadline's own item, which it keeps, since the worker deletes that item last.
+    /// </summary>
+    internal static async Task DeletePendingEscalationsAsync(NpgsqlTransaction transaction, Guid taskId, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM axis.process_work_items WHERE task_id = @task AND kind = @kind",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("task", taskId);
+        command.Parameters.AddWithValue("kind", ProcessStarts.TaskEscalateWorkItemKind);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

@@ -31,6 +31,14 @@
         "after": "P1D",
         "next": "financeApproval"
       },
+      "escalations": [
+        {
+          "after": "PT6H",
+          "reassign": {
+            "role": "department-manager"
+          }
+        }
+      ],
       "outcomes": [
         {
           "name": "approve",

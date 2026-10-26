@@ -264,8 +264,8 @@ operation is built, see
     step. When the task is still `open` after that time, the task becomes
     `expired` and the instance moves to `next`, see
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
-    `escalations` is optional and checked in the same section. Running them is
-    _(planned for M14)_.
+    `escalations` is optional and checked in the same section. The engine runs
+    the `reassign` of an escalation. Sending its `notify` is _(planned for M14)_.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
     the task is completed with it.
@@ -780,6 +780,11 @@ database, with history in `axis.__processes_migrations` (see
   - `task.deadline` expires one task at its deadline. Its item also has the
     `task_id` of the task and the `process_instance_id` of its instance, and
     its `due_at` is the task step's time plus the deadline's `after`. See
+    [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
+  - `task.escalate` runs one escalation of one task. Its item also has the
+    `task_id` of the task, the `process_instance_id` of its instance and the
+    `escalation`, the escalation's index in file order. Its `due_at` is the task
+    step's time plus the escalation's `after`. See
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
   - `computed.backfill` recomputes the out-of-date rows of
     one entity. Its item also has the `entity_id`, and each claim runs one

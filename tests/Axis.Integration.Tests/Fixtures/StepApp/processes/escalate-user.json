@@ -1,0 +1,26 @@
+{
+  "id": "b74cbf89-3dbf-4fa4-acd2-fa5496c8985c",
+  "kind": "process",
+  "name": "EscalateUser",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "decide",
+  "steps": [
+    {
+      "name": "decide",
+      "type": "task",
+      "label": { "textKey": "request.decide" },
+      "assignee": { "role": "finance" },
+      "form": "RequestDecision",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "task.approve" }, "next": "approved" },
+        { "name": "reject", "label": { "textKey": "task.reject" }, "next": "rejected" }
+      ],
+      "deadline": { "after": "P1D", "next": "expired" },
+      "escalations": [{ "after": "PT1H", "reassign": { "user": "department.manager" } }]
+    },
+    { "name": "approved", "type": "end" },
+    { "name": "rejected", "type": "end" },
+    { "name": "expired", "type": "end" }
+  ]
+}

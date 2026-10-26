@@ -16,7 +16,8 @@ the `claimed_by` and `claimed_at` columns are built, and so are release by a
 [overdue](#task-states) rule and the [inbox and task page](#inbox-and-task-page)
 are built: the inbox marks, and Claim, Release and the Reassign dialog on the
 task page. The shape of `escalations` and its checks are built, and the compiler
-holds them in the model. Escalation runs are _(planned for M14)_.
+holds them in the model. The `task.escalate` work item and the runs of
+`reassign` are built. Sending an escalation's `notify` is _(planned for M14)_.
 
 ## Escalations and deadline
 
@@ -60,7 +61,7 @@ A task step may add `escalations` and a `deadline`:
   [`notify` operation](notifications.md#notify-operation), without `next`,
   reported under `.../notify`. The compiler keeps escalations in file order and
   does not require them to be in order of `after`. An escalation does not end the
-  task. Running escalations is _(planned for M14)_.
+  task. The engine runs `reassign`. Sending `notify` is _(planned for M14)_.
 - **Deadline.** `after` and `next`. `next` names a step of the process
   (`AXC0070` when it names none). It counts as a transition of the step graph,
   checked after the outcomes, so a step that only a deadline leads to is
@@ -68,13 +69,26 @@ A task step may add `escalations` and a `deadline`:
   otherwise `AXC0281` at that escalation's `/after`.
 - **Work items.** The task step's transaction queues one `task.deadline` item,
   with the task id and the instance id, due at the step's time plus the
-  deadline's `after`. _(Planned for M14)_ It also queues one `task.escalate`
-  item per escalation, with the task id and the escalation's index, due at the
-  step's time plus its `after`.
-- **Escalation runs** _(planned for M14)_. The item locks the task row. When the task is still
-  `open`, it applies `reassign` as a [reassign](#reassign) by `system`, and
-  stages `notify` as the operation does. The step history gets a row with
-  `{ "escalation": <index> }`.
+  deadline's `after`. It also queues one `task.escalate` item per escalation,
+  with the task id, the instance id and the escalation's index in file order,
+  due at the step's time plus its `after`. The escalation items are queued by
+  `after`, before the deadline item, so a [test scenario](test-scenarios.md)
+  that runs items in queue order passes them in order of time.
+- **Escalation runs.** The item locks the task row. When the task is still
+  `open`, it applies `reassign` as a [reassign](#reassign) by `system`: the task
+  goes to the target and a claim is cleared. The task stays `open`, and its
+  instance and its deadline do not change. The step history gets a row with
+  `{ "escalation": <index> }` and no decision. A `reassign` with a `user`
+  expression is evaluated over the subject record when the item runs, as a task
+  step evaluates its assignee. If it gives null, blank text or an error, the
+  task is left as it is, the handler logs a warning and the item is deleted,
+  because a late reassign must not fail an instance that waits correctly. A
+  `role` target is not checked against the active release, and a `user` target
+  is not checked against the user profiles, since the compiler checked the role
+  against the pinned release and a step's `assignee` is not checked against
+  profiles either. An escalation that only has `notify` leaves the task alone,
+  and writes no history row, until sending it is built _(planned for M14)_. If
+  the handler fails, it logs the error type and does not fail the instance.
 - **Deadline runs.** The item locks the task row. When the task is still
   `open`, the task becomes `expired` with `expired_at` set, the instance
   resumes at `next`, and the history row's `decision` is `deadline`. The audit
@@ -85,13 +99,15 @@ A task step may add `escalations` and a `deadline`:
   cancel closes the instance's open tasks in its own transaction, so an open
   task ends exactly one way. A task that is no longer `open` makes the item do
   nothing. Completing a task deletes its pending `task.deadline` item, and a
-  cancel deletes every work item of the instance. _(Planned for M14)_ Cancel,
-  an escalation and a reassign follow the same rule, and the deadline's expiry
-  deletes the pending `task.escalate` items.
+  cancel deletes every work item of the instance. An escalation follows the same
+  rule, as it locks the task row first, and so does a reassign. Completing a
+  task deletes its pending `task.escalate` items too, and the deadline's expiry
+  deletes them.
 - **Release.** The deadline comes from the task's pinned release. Role checks
   use the active release, as today.
-- **Test scenarios.** `advanceTime` runs due `task.deadline` items. A scenario
-  action never runs one early, see [Test scenarios](test-scenarios.md).
+- **Test scenarios.** `advanceTime` runs due `task.escalate` and `task.deadline`
+  items. A scenario action never runs one early, see
+  [Test scenarios](test-scenarios.md).
 
 ## Task states
 
@@ -180,8 +196,9 @@ Content-Type: application/json
 - **Audit.** `task.reassigned`, with the actor, the task id, the subject record
   and the instance. Its details are `{ "taskId", "from", "to", "reason" }`.
   `from` and `to` have the shape of `assignee`: `{ "role": name }` or
-  `{ "user": id }`. An escalation will write it with the actor `system`
-  _(planned for M14)_.
+  `{ "user": id }`. An escalation writes it with the actor `system`, no display
+  name, and the details `{ "taskId", "from", "to", "escalation" }`. They have the
+  escalation's index and no `reason`, because no person typed one.
 
 ## Tables
 
@@ -195,8 +212,9 @@ Content-Type: application/json
 
 Its `state` takes `expired` as well. `axis.process_work_items` adds a `task_id`
 column, a foreign key to the task, and the kind `task.deadline`, with `task_id`
-and `process_instance_id`. _(Planned for M14)_ It also adds the kind
-`task.escalate`, with `task_id` and `escalation`.
+and `process_instance_id`. It also adds a nullable integer column `escalation`
+and the kind `task.escalate`, with `task_id`, `process_instance_id` and
+`escalation`.
 
 ## Inbox and task page
 

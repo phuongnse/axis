@@ -558,6 +558,37 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
+    public async Task A_task_escalation_reassigns_the_task_after_advance_time_passes_it_and_the_deadline_comes_later()
+    {
+        using var folder = DeadlineApplication(Scenario("TaskEscalation", Purchasing, CreateRequest + StartApproval + """
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
+            { "type": "advanceTime", "by": "PT12H" },
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "role": "department-manager" } },
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "state": "open" },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "managerApproval" },
+            { "type": "advanceTime", "by": "P1D" },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "financeApproval" }
+            """, now: ScheduleNow));
+
+        var result = await RunAsync(folder, "TaskEscalation");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task A_task_escalation_does_not_run_after_an_action()
+    {
+        using var folder = DeadlineApplication(Scenario("EarlyEscalation", Purchasing, CreateRequest + StartApproval + """
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "role": "department-manager" } }
+            """, now: ScheduleNow));
+
+        var result = await RunAsync(folder, "EarlyEscalation");
+
+        Assert.False(result.Passed);
+        Assert.Contains("Step 3 (expectTask)", result.Failure);
+    }
+
+    [Fact]
     public async Task A_task_deadline_does_not_run_after_an_action_and_a_completed_task_never_expires()
     {
         using var early = DeadlineApplication(Scenario("EarlyDeadline", Purchasing, CreateRequest + StartApproval + """

@@ -236,6 +236,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
         NewTask? task = null;
         TaskDeadlineModel? taskDeadline = null;
+        IReadOnlyList<TaskEscalationModel> taskEscalations = [];
         NewConnectorCall? call = null;
         NewPackageCall? packageCall = null;
         var restagesCall = false;
@@ -315,6 +316,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     taskStep.Form.Id,
                     taskStep.DueIn is { } dueIn ? instance.Now + dueIn : null);
                 taskDeadline = taskStep.Deadline;
+                taskEscalations = taskStep.Escalations;
                 state = ProcessStarts.Waiting;
                 nextStep = step.Name;
                 decision = null;
@@ -563,6 +565,25 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         if (task is not null)
         {
             await ProcessTasks.InsertAsync(context.Transaction, task, cancellationToken);
+
+            // Escalations count from the step's time too. They are queued by their time, before the
+            // deadline, so a scenario that runs items in queue order passes them in the order of time.
+            foreach (var (escalation, index) in taskEscalations
+                .Select((escalation, index) => (escalation, index))
+                .OrderBy(pair => pair.escalation.After))
+            {
+                await WorkItemQueue.EnqueueAsync(
+                    context.Connection,
+                    context.Transaction,
+                    context.Item.TenantId,
+                    ProcessStarts.TaskEscalateWorkItemKind,
+                    instance.Now + escalation.After,
+                    cancellationToken,
+                    processInstanceId: instance.Id,
+                    taskId: task.Id,
+                    escalation: index);
+            }
+
             if (taskDeadline is not null)
             {
                 // The deadline counts from the step's time, as the due date does, so a scenario's clock decides it.
