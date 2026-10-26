@@ -668,8 +668,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
       label, assignee, form, `dueIn` or outcomes opens the Form tab at that
       field.
     - **Operation panel** _(built)_. An `operation` step shows an operation
-      choice, `updateRecord`, `callConnector`, `raiseEvent` or **Package
-      operation**, above its transition. Changing the operation removes only
+      choice, `updateRecord`, `callConnector`, `raiseEvent`, `createRecord` or
+      **Package operation**, above its transition. Changing the operation removes only
       the keys the new one forbids. It adds no empty key, so the compiler
       reports what is still missing. Every other key, including unknown keys,
       stays.
@@ -679,7 +679,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
         expression, `output` as rows of a typed connector output name and an
         entity field, and `retry`. `raiseEvent` shows the event as a picker
         and `fields` as rows of a payload field of that event and an
-        expression.
+        expression. `createRecord` shows the entity to create as a picker,
+        which lists every entity, child entities included, because the names
+        do not say which are child entities and the compiler reports one. It
+        shows `set` as rows of a field of that entity and an expression.
       - A package operation is typed in a text box as
         `<package>/<operation>`, because no route lists the installed
         operations. It shows `input`, `output` and `retry` as `callConnector`

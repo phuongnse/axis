@@ -30,11 +30,19 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Design tokens and previews.** The token file
   `web/src/platform/designTokens.ts` holds every colour, type, spacing and
   radius value of the theme, in Axis names. The colours are primary, success,
-  warning, danger, info, canvas, surface, text, textMuted, border, borderSubtle
-  and divider, each with a light and a dark value. Type has the body and code
-  fonts and the font size, spacing runs from xs to xl, and radius has the base
-  radius. The body font is IBM Plex Sans, a variable font for weights 100 to
-  700, and the code font is IBM Plex Mono at weight 400. The SPA ships the
+  warning, danger, info, primaryText, successText, warningText, dangerText,
+  infoText, canvas, surface, text, textMuted, border, borderSubtle, divider and
+  focusRing, each with a light and a dark value. The first five are seeds: they
+  colour fills, icons and tints. The `*Text` tokens colour text in that state
+  colour: state text, links, the selected tab, the active navigation entry and
+  form validation messages. `focusRing` colours the solid 2px keyboard focus of
+  every control. Every text colour reaches 4.5:1 and every border and focus
+  ring reaches 3:1 on surface and canvas, in both modes. The shadow group
+  holds `overlay`, the only shadow: dialogs, menus, pickers and popovers cast
+  it, and widgets, cards, sections and buttons cast none. Type has the body and
+  code fonts and the font size, spacing runs from xs to xl, and radius has the
+  base radius. The body font is IBM Plex Sans, a variable font for weights 100
+  to 700, and the code font is IBM Plex Mono at weight 400. The SPA ships the
   Google Fonts files from the Fontsource npm packages unchanged. Only the
   Latin, Latin Extended and Vietnamese subsets ship, each with a
   `unicode-range` in `web/src/fonts.css`, so a browser downloads only the
@@ -53,11 +61,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   fixture metadata, in light and dark mode. `scripts/design-system.sh` builds
   them into one classic script that sets `window.Axis` with a mount per preview.
   A mounted widget follows `data-theme` on the page's root element. For the
-  current mode it also reads the custom properties `--primary` to `--divider`
-  for the colours (named as above), `--spacing-xs` to `--spacing-xl`,
+  current mode it also reads the custom properties `--primary` to `--focusRing`
+  for the colours (named as above, so `--primaryText` to `--infoText` and
+  `--focusRing` too), `--shadowOverlay`, `--spacing-xs` to `--spacing-xl`,
   `--radius-base`, `--font-sans` and `--font-code` from that element, and
   redraws when one changes. A property the page leaves out, or sets to a value
-  the theme cannot use, keeps its token file value. Only the design-system
+  the theme cannot use, keeps its token file value. A shadow value is usable
+  when it is not empty and has no `;`, `{` or `}`. Only the design-system
   bundle reads them. See [Development](../development.md#widget-previews),
   [D67](../decisions/d67-live-widget-previews-in-the-design-system.md),
   [D57](../decisions/d57-a-design-system-published-from-the-repository.md) and

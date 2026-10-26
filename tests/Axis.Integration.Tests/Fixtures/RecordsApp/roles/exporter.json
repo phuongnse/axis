@@ -1,0 +1,9 @@
+{
+  "id": "6d0c7e4a-2b1f-4a53-9c58-1f3e2a7b9d10",
+  "kind": "role",
+  "name": "exporter",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.exporter"
+  }
+}

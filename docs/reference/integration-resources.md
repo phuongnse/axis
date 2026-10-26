@@ -296,7 +296,7 @@ loads, is checked and is part of the release. The worker delivers each raised ev
 `sync` event triggers in its own transaction, see
 [Raise event step](process-events.md#raise-event-step). Data change triggers start their
 processes in the transaction of a record API create or update, of an inbound endpoint's
-create, of a task form save, of an `updateRecord` step, of a connector output and of a package
+create, of a task form save, of an `updateRecord` step, of a `createRecord` step, of a connector output and of a package
 operation output, see [Starts from triggers](process-events.md#starts-from-triggers). A delete
 trigger starts its process in the transaction of a record API delete, see
 [Delete triggers](process-events.md#delete-triggers). The schedule
@@ -417,7 +417,7 @@ when its `amount` changes, and the amount is 1000 or more, in
   the same scope as a process's `when`.
 - It fires on every committed write through the record command: the record
   API, an inbound endpoint's create, a task form save, an `updateRecord` step,
-  a connector output and a package operation output.
+  a `createRecord` step, a connector output and a package operation output.
 
 **Schedule trigger.** It starts `NoteClose` every night at 02:00 in Ho Chi
 Minh City, for each note the `NoteRows` data source returns, in

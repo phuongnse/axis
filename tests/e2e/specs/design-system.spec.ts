@@ -34,6 +34,7 @@ const previews: Record<string, (page: Page) => Locator> = {
   columns: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
   tabs: (page) => page.getByRole('tab', { name: 'Requests', exact: true }),
   section: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
+  states: (page) => page.getByRole('alert').filter({ hasText: 'The records could not be loaded.' }),
   'field-text': (page) => page.getByLabel('Title', { exact: true }),
   'field-integer': (page) => page.getByLabel('Quantity', { exact: true }),
   'field-decimal': (page) => page.getByLabel('Amount', { exact: true }),
@@ -93,6 +94,12 @@ for (const [name, widget] of Object.entries(previews)) {
       const recording = await openHarness(page, `?preview=${name}&mode=${mode}`)
 
       await expect(widget(page)).toBeVisible()
+      if (name === 'states') {
+        // The loading state's request never finishes, so its table stays busy.
+        await expect(
+          page.getByRole('figure', { name: 'Loading', exact: true }).locator('[aria-busy="true"]').first(),
+        ).toBeVisible()
+      }
       await page.waitForLoadState('networkidle')
 
       if (name.startsWith('field-')) {
@@ -175,6 +182,23 @@ test("a mounted form uses the page's --primary and redraws when it changes", asy
   await expect.poll(background).toBe('rgb(235, 47, 150)')
   expect(recording.errors).toEqual([])
 })
+
+for (const mode of modes) {
+  test(`a form validation message follows the page's --dangerText in ${mode} mode`, async ({ page }) => {
+    const recording = await openHarness(page, `?preview=form&mode=${mode}`)
+    await expect(previews.form(page)).toBeVisible()
+    await page.evaluate(() => document.documentElement.style.setProperty('--dangerText', '#13c2c2'))
+
+    const title = page.getByLabel('Title', { exact: true })
+    await title.fill('Standing desks')
+    await title.press('Tab')
+
+    const message = page.getByText('Another request has this title.', { exact: true })
+    await expect(message).toBeVisible()
+    await expect.poll(() => message.evaluate((element) => getComputedStyle(element).color)).toBe('rgb(19, 194, 194)')
+    expect(recording.errors).toEqual([])
+  })
+}
 
 test('the bundle sets window.Axis with one mount for each preview', async ({ page }) => {
   const recording = await openHarness(page, '')

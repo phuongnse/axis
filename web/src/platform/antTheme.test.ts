@@ -6,35 +6,26 @@ import {
   designTokensFor,
   pageTokenProperties,
   radiusTokens,
+  shadowTokens,
   spacingTokens,
   typeTokens,
 } from './designTokens'
 
-// The theme config before the Axis token file. The mapping must give Ant Design the same design token. The
-// fonts are the intended change: IBM Plex Sans replaced Inter and IBM Plex Mono leads the code fonts.
-const previousToken = {
-  colorPrimary: '#2f54eb',
-  borderRadius: 6,
-  fontFamily: "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-  fontFamilyCode: "'IBM Plex Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace",
-}
-
 describe.each(['light', 'dark'] as const)('the Ant Design theme in %s mode', (mode) => {
-  const algorithm = mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm
-
-  it('gives the same design token as the previous theme config', () => {
-    expect(theme.getDesignToken(antThemeFor(mode))).toEqual(theme.getDesignToken({ algorithm, token: previousToken }))
-  })
-
   it('resolves the colours the components read through useDesignTokens', () => {
     const token = theme.getDesignToken(antThemeFor(mode))
     const { colour } = designTokensFor(mode)
     expect({
       primary: token.colorPrimary,
+      primaryText: token.colorPrimaryText,
       success: token.colorSuccess,
+      successText: token.colorSuccessText,
       warning: token.colorWarning,
+      warningText: token.colorWarningText,
       danger: token.colorError,
+      dangerText: token.colorErrorText,
       info: token.colorInfo,
+      infoText: token.colorInfoText,
       canvas: token.colorBgLayout,
       surface: token.colorBgContainer,
       text: token.colorText,
@@ -42,7 +33,55 @@ describe.each(['light', 'dark'] as const)('the Ant Design theme in %s mode', (mo
       border: token.colorBorder,
       borderSubtle: token.colorBorderSecondary,
       divider: token.colorSplit,
+      focusRing: token.controlOutline,
     }).toEqual(colour)
+  })
+})
+
+describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Design theme in %s mode', (mode) => {
+  const config = antThemeFor(mode)
+  const token = theme.getDesignToken(config)
+  const { colour, shadow } = designTokensFor(mode)
+
+  it('draws links and state text in the text tokens', () => {
+    expect(token.colorLink).toBe(colour.primaryText)
+    expect(token.colorLinkHover).toBe(colour.primaryText)
+    expect(token.colorLinkActive).toBe(colour.primaryText)
+    expect(token.colorSuccessText).toBe(colour.successText)
+    expect(token.colorWarningText).toBe(colour.warningText)
+    expect(token.colorErrorText).toBe(colour.dangerText)
+    expect(token.colorInfoText).toBe(colour.infoText)
+  })
+
+  it('draws validation messages, the selected tab and the selected menu entry in the text tokens', () => {
+    expect(config.components?.Form).toMatchObject({ colorError: colour.dangerText })
+    expect(config.components?.Tabs).toMatchObject({
+      itemSelectedColor: colour.primaryText,
+      itemHoverColor: colour.primaryText,
+      itemActiveColor: colour.primaryText,
+    })
+    expect(config.components?.Menu).toMatchObject({
+      itemSelectedColor: colour.primaryText,
+      horizontalItemSelectedColor: colour.primaryText,
+    })
+  })
+
+  it('draws keyboard focus as a solid 2px focusRing', () => {
+    expect(token.colorPrimaryBorder).toBe(colour.focusRing)
+    expect(token.controlOutline).toBe(colour.focusRing)
+    expect(token.lineWidthFocus).toBe(2)
+    expect(token.controlOutlineWidth).toBe(2)
+  })
+
+  it('casts the overlay shadow on overlays and no other shadow', () => {
+    expect(token.boxShadow).toBe(shadow.overlay)
+    expect(token.boxShadowSecondary).toBe(shadow.overlay)
+    expect(token.boxShadowTertiary).toBe('none')
+    expect(config.components?.Button).toMatchObject({
+      defaultShadow: 'none',
+      primaryShadow: 'none',
+      dangerShadow: 'none',
+    })
   })
 })
 
@@ -93,6 +132,7 @@ describe('the Ant Design theme with page values', () => {
       [pageTokenProperties.radius.base]: String(radiusTokens.base),
       [pageTokenProperties.type.fontFamily]: typeTokens.fontFamily,
       [pageTokenProperties.type.codeFontFamily]: typeTokens.codeFontFamily,
+      [pageTokenProperties.shadow.overlay]: shadowTokens.overlay[mode],
     }
 
     it("gives today's design token without values, with none and with the token file's own values", () => {
