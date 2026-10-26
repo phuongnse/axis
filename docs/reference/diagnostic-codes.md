@@ -96,9 +96,9 @@ sorted by file and then path.
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
 | `AXC0077` | A `form` widget's `form` names no loaded form. Reported at `/widgets/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
-| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector`, `raiseEvent`, `notify` or a package operation written `<package>/<operation>`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
-| `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
-| `AXC0080` | A key of an `updateRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. Reported at `/steps/{i}/set/{field}`. |
+| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector`, `raiseEvent`, `createRecord`, `notify` or a package operation written `<package>/<operation>`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
+| `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a key of a `createRecord` `set` names no field of its `entity`, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
+| `AXC0080` | A key of an `updateRecord` or `createRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. A `createRecord` `set` cannot name a creator field either, as the server sets it to `system`. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0081` | A process task step's `assignee` has both or neither of `user` and `role`. Reported at `/steps/{i}/assignee`. |
 | `AXC0082` | A process task step's `form` names no loaded form, ignoring letter case. Reported at `/steps/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
 | `AXC0083` | A process task step's `form` is over another entity than the process's subject entity. Reported at `/steps/{i}/form`, naming both entities. Not checked when either entity is unknown. |
@@ -258,6 +258,8 @@ sorted by file and then path.
 | `AXC0257` | A `file` field's `maxSize` is below 1 or above the file size limit the compile was given, 25 MB by default. Reported at `/fields/{i}/maxSize`. |
 | `AXC0258` | An entry of a `file` field's `accept` is not a media type `type/subtype` or `type/*`. `*/*` and parameters such as `;charset=` are refused. Reported at `/fields/{i}/accept/{j}`. |
 | `AXC0259` | A `file` field is used where none is allowed: `unique` on it, a data source `sort` or `groupBy` entry that names it, or a seed record that sets it. Reported at the property: `/fields/{i}/unique`, `/sort`, `/aggregate/groupBy/{i}` or `/records/{i}/values/{name}`, below a child row `/records/{i}/values/{collection}/{j}/{name}`. |
+| `AXC0260` | The `entity` of a `createRecord` step names no loaded entity. Reported at `/steps/{i}/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. See [Create record operation](process-flow.md#create-record-operation). |
+| `AXC0261` | The `entity` of a `createRecord` step is a child entity. A step creates a record of a root entity. Reported at `/steps/{i}/entity`, naming the owner. |
 | `AXC0265` | A policy grant has an `export` with no `read`, or an `import` with no `create`, on the same target in the same policy, ignoring letter case. Reported at `/grants/{i}/actions/{j}`. The message names the action, the target and the grant it needs. An action the target's kind does not take is `AXC0091` instead. |
 | `AXC0266` | A `notify` step has an empty `to`. Reported at `/steps/{i}/to`. |
 | `AXC0267` | A recipient of a `notify` step has none or more than one of `user`, `role` and `email`. Reported at `/steps/{i}/to/{j}`. |

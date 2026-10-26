@@ -46,8 +46,8 @@
 # either log never reports it ready. The setup step signs the author, the requester, the service desk lead and
 # the agent in on its host.
 # A Compose smoke test then builds the image and runs the stack on free ports. An images smoke test
-# then builds the production images axis-server, axis-worker and axis-admin and runs them read-only
-# against a throwaway PostgreSQL. An on-premises smoke test then installs deploy/compose/compose.yaml
+# then builds the production images axis-server, axis-worker and axis-admin, each up to three times
+# with a wait of 15 and 30 seconds, and runs them read-only against a throwaway PostgreSQL. An on-premises smoke test then installs deploy/compose/compose.yaml
 # from the production images as docs/reference/installation.md says, against a test PostgreSQL and Keycloak over
 # HTTPS. It creates two tenants, activates the leave request sample, checks each tenant's site and
 # sign-in, suspend and resume, and an unknown host. Each is skipped when $NEXKIT_BASE_SHA shows that

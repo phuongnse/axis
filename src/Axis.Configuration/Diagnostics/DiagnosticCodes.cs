@@ -83,6 +83,8 @@ public static class DiagnosticCodes
     public const string DeleteTriggerWithOtherKinds = "AXC0254";
     public const string DeleteTriggerWithFields = "AXC0255";
     public const string DeleteTriggerProcessWithSubject = "AXC0256";
+    public const string UnknownCreateRecordEntity = "AXC0260";
+    public const string CreateRecordOverChildEntity = "AXC0261";
     public const string UnknownOperation = "AXC0078";
     public const string UnknownSetField = "AXC0079";
     public const string ReadOnlySetField = "AXC0080";

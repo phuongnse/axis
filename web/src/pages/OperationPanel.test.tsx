@@ -27,6 +27,17 @@ const names: StudioNames = {
         values: null,
       })),
     },
+    {
+      id: '5',
+      name: 'ApprovalNote',
+      module: null,
+      fields: ['text', 'author'].map((name) => ({
+        name,
+        type: 'text',
+        target: null,
+        values: null,
+      })),
+    },
   ],
   dataSources: [],
   processes: [],
@@ -102,6 +113,15 @@ const process = {
       x: 1,
     },
     { name: 'done', type: 'end' },
+    {
+      name: 'note',
+      type: 'operation',
+      operation: 'createRecord',
+      entity: 'ApprovalNote',
+      set: { text: 'status' },
+      next: 'done',
+      x: 1,
+    },
   ],
 }
 
@@ -400,6 +420,71 @@ describe('A raiseEvent step', () => {
   })
 })
 
+describe('A createRecord step', () => {
+  it('shows the entity picker and the set rows of the picked entity', async () => {
+    const onChange = renderEditor()
+    await screen.findAllByTestId('studio-expression-type')
+
+    expect(within(screen.getByTestId('studio-field-/steps/5/entity')).getByText('ApprovalNote')).toBeVisible()
+    const row = within(screen.getByTestId('studio-field-/steps/5/set/text'))
+    expect(row.getByRole('combobox', { name: 'Field' })).toBeVisible()
+    expect(row.getByRole('textbox', { name: 'Expression' })).toBeVisible()
+
+    // The rows are keyed by the fields of the step's entity, not of the process's entity.
+    await userEvent.click(step(5).getByRole('combobox', { name: 'Add mapping Set' }))
+    expect(optionTexts()).toEqual(['author'])
+    await chooseOption('author')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/5/set/author', '')
+  })
+
+  it('writes the picked entity to the draft', async () => {
+    const onChange = renderEditor()
+
+    await userEvent.click(step(5).getByRole('combobox', { name: 'Entity to create' }))
+    await chooseOption('PurchaseRequest')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/5/entity', 'PurchaseRequest')
+  })
+
+  it('types the entity and its field names while the names are unknown', async () => {
+    const onChange = renderEditor(false)
+
+    await userEvent.type(step(5).getByRole('textbox', { name: 'Entity to create' }), 'X')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/5/entity', 'ApprovalNoteX')
+    const row = within(screen.getByTestId('studio-field-/steps/5/set/text'))
+    await userEvent.type(row.getByRole('textbox', { name: 'Expression' }), 'X')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/5/set/text', 'statusX')
+    await userEvent.type(row.getByRole('textbox', { name: 'Field' }), 'X')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/5/set', { textX: 'status' })
+  })
+
+  it('is picked from the operation list and keeps the keys it allows', async () => {
+    const onChange = renderEditor()
+
+    await userEvent.click(step(0).getByRole('combobox', { name: 'Operation' }))
+    await chooseOption('createRecord')
+
+    const [pointer, next] = onChange.mock.lastCall as [string, Record<string, unknown>]
+    expect(pointer).toBe('/steps/0')
+    expect(next).toEqual({
+      name: 'update',
+      type: 'operation',
+      operation: 'createRecord',
+      set: { status: "'submitted'", totalAmount: '1' },
+      next: 'done',
+      x: 1,
+    })
+  })
+
+  it('points to the JSON view for a key its operation forbids', () => {
+    renderEditor(true, {
+      ...process,
+      steps: [{ name: 'note', type: 'operation', operation: 'createRecord', entity: 'E', set: {}, event: 'E' }],
+    })
+
+    expect(within(screen.getByTestId('studio-field-/steps/0/event')).getByTestId('studio-json-only')).toBeVisible()
+  })
+})
+
 describe('A package operation step', () => {
   it('shows its name box, input, output and retry, and no connector', async () => {
     renderEditor()
@@ -449,11 +534,12 @@ describe('withOperation', () => {
     output: { a: 'b' },
     retry: { attempts: 2 },
     event: 'E',
+    entity: 'N',
     fields: { a: 'b' },
     next: 'done',
     x: 1,
   }
-  const operations = ['updateRecord', 'callConnector', 'raiseEvent', 'package/operation']
+  const operations = ['updateRecord', 'callConnector', 'raiseEvent', 'createRecord', 'package/operation']
 
   it.each(operations)('removes exactly the keys that %s forbids', (operation) => {
     const next = withOperation(full, operation)
@@ -468,10 +554,19 @@ describe('withOperation', () => {
   })
 
   it('removes the keys the schema forbids for each operation', () => {
-    expect(forbiddenOperationKeys('updateRecord')).toEqual(['connector', 'input', 'output', 'retry', 'event', 'fields'])
-    expect(forbiddenOperationKeys('callConnector')).toEqual(['set', 'event', 'fields'])
-    expect(forbiddenOperationKeys('raiseEvent')).toEqual(['set', 'connector', 'input', 'output', 'retry'])
-    expect(forbiddenOperationKeys('package/operation')).toEqual(['set', 'connector', 'event', 'fields'])
+    expect(forbiddenOperationKeys('updateRecord')).toEqual([
+      'connector',
+      'input',
+      'output',
+      'retry',
+      'event',
+      'entity',
+      'fields',
+    ])
+    expect(forbiddenOperationKeys('callConnector')).toEqual(['set', 'event', 'entity', 'fields'])
+    expect(forbiddenOperationKeys('raiseEvent')).toEqual(['set', 'connector', 'input', 'output', 'retry', 'entity'])
+    expect(forbiddenOperationKeys('createRecord')).toEqual(['connector', 'input', 'output', 'retry', 'event', 'fields'])
+    expect(forbiddenOperationKeys('package/operation')).toEqual(['set', 'connector', 'event', 'entity', 'fields'])
   })
 
   it('removes nothing for an operation the schema has no rule for and adds no key', () => {
