@@ -66,6 +66,18 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     The table never holds the session id or a token. The server reads, inserts,
     updates and deletes its rows, see
     [sign-in and the session](security.md#sign-in-and-the-session).
+  - `Axis.Data` also owns `axis.files` and `axis.file_contents`, with history
+    in `axis.__data_migrations`. A row of `axis.files` is the details of one
+    uploaded file of a [file field](file-fields.md#storage-and-clean-up): `id`
+    (the primary key), `application_id`, `entity_id`, `field_path` (the field
+    name, or `collection/field` for a field of a child entity),
+    `owner_record_id` (null until the file is attached), `name`, `media_type`,
+    `size`, `sha256` (`bytea`), `storage_kind` (`database`), `state`
+    (`pending`, `attached` or `deleted`), `uploaded_by` and `uploaded_at`. A
+    row of `axis.file_contents` is the bytes (`content`, `bytea`) of the file
+    with the same `file_id`, and is deleted with it. The server reads, inserts,
+    updates and deletes their rows. A file field's column in the `entities`
+    schema is a `uuid` with a foreign key to `axis.files (id)`.
   - `Axis.Data` also owns `axis.user_profiles`, one row for each user who
     signed in, with the display name, email, locale and the first and last
     sign-in. Each sign-in upserts it through `UserProfiles.UpsertAsync`, see
@@ -317,7 +329,7 @@ What each database role may do:
 | Objects                                                                                                                                                                                                                                                                                                       | Schema database role                                             | Runtime database role                                             |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `entities` tables                                                                                                                                                                                                                                                                                             | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions` | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `files`, `file_contents` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                                                                                       | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                                                                                           | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                                                                                            | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |

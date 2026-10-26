@@ -5,7 +5,8 @@ namespace Axis.Data.Storage;
 /// <summary>
 /// The data module's tables in a tenant database: what has been provisioned in the
 /// <c>entities</c> schema, the migrations applied to it, the counters of the sequences, the audit records, the user
-/// profiles, the computed fields whose expression failed for a record, and the signed-in sessions. The caller
+/// profiles, the computed fields whose expression failed for a record, the signed-in sessions, and the uploaded
+/// files with their bytes. The caller
 /// supplies the connection to the tenant database.
 /// </summary>
 public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbContext(options)
@@ -35,6 +36,10 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
     public DbSet<PendingComputedFieldRow> PendingComputedFields => Set<PendingComputedFieldRow>();
 
     public DbSet<SessionRow> Sessions => Set<SessionRow>();
+
+    public DbSet<FileRow> Files => Set<FileRow>();
+
+    public DbSet<FileContentRow> FileContents => Set<FileContentRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
@@ -156,6 +161,42 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             session.Property(s => s.Roles).HasColumnName("roles").HasColumnType("text[]");
             session.Property(s => s.SignedInAt).HasColumnName("signed_in_at");
             session.Property(s => s.LastRequestAt).HasColumnName("last_request_at");
+        });
+
+        modelBuilder.Entity<FileRow>(file =>
+        {
+            file.ToTable("files", table =>
+            {
+                table.HasCheckConstraint("ck_files_state", "state IN ('pending','attached','deleted')");
+                table.HasCheckConstraint("ck_files_storage_kind", "storage_kind = 'database'");
+            });
+            file.HasKey(f => f.Id).HasName("pk_files");
+            file.Property(f => f.Id).HasColumnName("id").ValueGeneratedNever();
+            file.Property(f => f.ApplicationId).HasColumnName("application_id");
+            file.Property(f => f.EntityId).HasColumnName("entity_id");
+            file.Property(f => f.FieldPath).HasColumnName("field_path");
+            file.Property(f => f.OwnerRecordId).HasColumnName("owner_record_id");
+            file.Property(f => f.Name).HasColumnName("name");
+            file.Property(f => f.MediaType).HasColumnName("media_type");
+            file.Property(f => f.Size).HasColumnName("size");
+            file.Property(f => f.Sha256).HasColumnName("sha256").HasColumnType("bytea");
+            file.Property(f => f.StorageKind).HasColumnName("storage_kind");
+            file.Property(f => f.State).HasColumnName("state");
+            file.Property(f => f.UploadedBy).HasColumnName("uploaded_by");
+            file.Property(f => f.UploadedAt).HasColumnName("uploaded_at");
+        });
+
+        modelBuilder.Entity<FileContentRow>(content =>
+        {
+            content.ToTable("file_contents");
+            content.HasKey(c => c.FileId).HasName("pk_file_contents");
+            content.Property(c => c.FileId).HasColumnName("file_id").ValueGeneratedNever();
+            content.Property(c => c.Content).HasColumnName("content").HasColumnType("bytea");
+            content.HasOne<FileRow>()
+                .WithOne()
+                .HasForeignKey<FileContentRow>(c => c.FileId)
+                .HasConstraintName("fk_file_contents_files_file_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

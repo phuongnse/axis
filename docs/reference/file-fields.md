@@ -7,7 +7,10 @@ The conventions of [architecture.md](../architecture.md) apply: sections
 marked _(planned for M15)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
-Everything on this page is _(planned for M15)_.
+Upload up to the `pending` state, and the storage of a file's details and bytes,
+are _(built)_. Attach, download, replace, remove, the sweep, audit and the SPA
+are _(planned for M15)_. Until attach is built, a record create or update cannot
+set a file field, and a file id in a body fails.
 
 ## Field and value
 
@@ -28,26 +31,54 @@ Everything on this page is _(planned for M15)_.
 
 ## Upload
 
+This is _(built)_.
+
 `POST /api/apps/{app}/entities/{entity}/fields/{field}/files` takes the bytes
 as `multipart/form-data` with one part, `file`, and answers `201` with
 `{ "id", "name", "mediaType", "size" }`. A field of a child entity is named by
-its path, such as `fields/attachments/file`.
+its collection and field, such as
+`/api/apps/{app}/entities/{entity}/fields/attachments/file/files`. An entity of
+a module has no upload route yet. A service account may upload, as it may
+write records.
 
+- **Order of checks.** The route checks in the order of the record routes:
+  sign-in (`401`), then the path (`404`), then the grant (`403`), then the
+  request content type (`415`), then the body. A user without a grant learns
+  nothing from the body checks. An unknown entity or field, and a field that is
+  not a `file` field, are `404`.
 - **Grant.** The user needs a `create` or `update` grant on the entity whose
-  field list covers the field, or a `403`.
+  field list covers the field, or a `403`. For a child field the list must
+  cover the owner's child collection field. Record filters are not read,
+  because an upload has no record yet. The attach step runs in a record write,
+  and that write applies the filters.
+- **Body.** The request must be `multipart/form-data` with a boundary, or it
+  is a `415`. A missing `file` part, an extra part, a part without a file name
+  and an empty file are `400` at `file`.
+- **Name.** The stored name is the last path segment of the part's file name,
+  without control characters, at most 255 characters.
+- **Media type.** The media type comes from the part's `Content-Type`, without
+  its parameters, such as `charset`. A part without one is stored as
+  `application/octet-stream`.
 - **Checks.** A file larger than the field's `maxSize`, or than
-  `Files:MaxSize`, is a `413`. A media type that `accept` does not allow is a
-  `415`. The media type comes from the part's header and is checked against
-  the file's first bytes for the common types, so a renamed executable is
-  refused.
+  `Files:MaxSize`, is a `413` as soon as the count passes the limit. A media
+  type that `accept` does not allow is a `415`. A file that starts like a
+  Windows, Linux or macOS executable is a `415` whatever type it declares. A
+  file declared as PDF, PNG, JPEG, GIF, WebP or ZIP must start as that type
+  does, or it is a `415`. Other types are checked only for an executable start.
 - **Pending.** The file is stored as `pending`, owned by the user, the entity
-  and the field. Nothing points to it yet.
-- **Attach.** A create or update that sends the id attaches the file in its
-  transaction. The file must be `pending`, uploaded by the same user, for the
+  and the field path (`receipt`, or `attachments/file` for a child field).
+  Nothing points to it yet. The response has no `Location` header, because the
+  download route does not exist yet.
+- **Memory.** The server holds one upload in memory, up to the limit, before
+  it writes the file to the database.
+- **Attach** _(planned for M15)_. A create or update that sends the id
+  attaches the file in its transaction. The file must be `pending`, uploaded by the same user, for the
   same entity and field. Any other id is a `400` at the field's pointer, with
   the same message whether the id is unknown or belongs to someone else.
 
 ## Download
+
+This is _(planned for M15)_.
 
 `GET /api/apps/{app}/files/{id}` answers the bytes.
 
@@ -64,27 +95,31 @@ its path, such as `fields/attachments/file`.
 
 ## Storage and clean-up
 
-- **Metadata.** The platform table `axis.files` in the tenant database holds
-  the id, application, entity, field path, owner record, name, media type,
+- **Metadata** _(built)_. The platform table `axis.files` in the tenant
+  database holds the id, application, entity, field path, owner record, name, media type,
   size, SHA-256, storage kind, state (`pending`, `attached` or `deleted`), and
   who uploaded it and when. The field's column is a `uuid` that points to it.
-- **Bytes.** A `storage` binding names where the bytes go, see
-  [deployment bindings](integration-resources.md#deployment-bindings). In
-  M15 its only value is `database`: the bytes live in `axis.file_contents` of
-  the tenant database. An application without `fileStorage` in its manifest
-  uses the tenant database too.
-- **Replace and remove.** A write that replaces or removes a file, a removed
-  child row and a deleted record mark the old file `deleted` in the write's
+- **Bytes** _(built)_. The bytes live in `axis.file_contents` of the tenant
+  database, under the id of the file's row. A `storage` binding that names
+  where the bytes go is _(planned for M15)_, see
+  [deployment bindings](integration-resources.md#deployment-bindings). In M15
+  its only value is `database`. An application without `fileStorage` in its
+  manifest uses the tenant database too.
+- **Replace and remove** _(planned for M15)_. A write that replaces or
+  removes a file, a removed child row and a deleted record mark the old file `deleted` in the write's
   transaction.
-- **Sweep.** A worker sweep purges `deleted` files and `pending` files older
-  than 24 hours. It is internal, so it needs no scheduled job.
+- **Sweep** _(planned for M15)_. A worker sweep purges `deleted` files and
+  `pending` files older than 24 hours. Until it is built, failed and abandoned
+  uploads stay in the tenant database. It is internal, so it needs no scheduled job.
 - **Backup.** Files in the tenant database are in the tenant's `pg_dump`, so
   [tenant backup](administration.md) archives hold them.
-- **Audit.** An audit record names the file field that changed, never the
+- **Audit** _(planned for M15)_. An audit record names the file field that changed, never the
   file's name or bytes. A `sensitive` file field also hides its name and id in
   step history and inspection.
 
 ## In the SPA
+
+This is _(planned for M15)_.
 
 - A form shows a file input: the current file's name as a download link, an
   upload button and, when the field is not required, a remove button. The

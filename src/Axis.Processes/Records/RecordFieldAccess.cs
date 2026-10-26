@@ -66,6 +66,30 @@ public sealed class RecordFieldAccess
         application.FindEntity(reference.Target!.Id) is { } target
         && CanRead(PolicyEvaluator.Fields(application, held, target, PolicyAction.Read), reference.TargetDisplayField!);
 
+    /// <summary>
+    /// Whether <paramref name="roles"/> hold a <c>create</c> or an <c>update</c> grant on <paramref name="model"/>
+    /// whose <c>fields</c> cover <paramref name="field"/>. Record filters are not read, because an upload has no record yet.
+    /// </summary>
+    public static bool CanWrite(ApplicationModel application, IEnumerable<string> roles, EntityModel model, string field)
+    {
+        var held = roles.ToList();
+        foreach (var action in new[] { PolicyAction.Create, PolicyAction.Update })
+        {
+            if (!PolicyEvaluator.Access(application, held, model, action).Granted)
+            {
+                continue;
+            }
+
+            var covered = PolicyEvaluator.Fields(application, held, model, action);
+            if (covered is null || covered.Contains(field))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>Whether the user may read the field named <paramref name="name"/>.</summary>
     public bool CanRead(string name) => CanRead(Readable, name);
 

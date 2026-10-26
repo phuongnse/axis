@@ -148,6 +148,95 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("computed_field_errors", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.FileContentRow", b =>
+                {
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("content");
+
+                    b.HasKey("FileId")
+                        .HasName("pk_file_contents");
+
+                    b.ToTable("file_contents", "axis");
+                });
+
+            modelBuilder.Entity("Axis.Data.Storage.FileRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("FieldPath")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("field_path");
+
+                    b.Property<string>("MediaType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("media_type");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("OwnerRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_record_id");
+
+                    b.Property<byte[]>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("sha256");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("StorageKind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("storage_kind");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("uploaded_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_files");
+
+                    b.ToTable("files", "axis", t =>
+                        {
+                            t.HasCheckConstraint("ck_files_state", "state IN ('pending','attached','deleted')");
+
+                            t.HasCheckConstraint("ck_files_storage_kind", "storage_kind = 'database'");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.PendingComputedFieldRow", b =>
                 {
                     b.Property<Guid>("EntityId")
@@ -317,6 +406,16 @@ namespace Axis.Data.Storage.Migrations
                         .HasName("pk_user_profiles");
 
                     b.ToTable("user_profiles", "axis");
+                });
+
+            modelBuilder.Entity("Axis.Data.Storage.FileContentRow", b =>
+                {
+                    b.HasOne("Axis.Data.Storage.FileRow", null)
+                        .WithOne()
+                        .HasForeignKey("Axis.Data.Storage.FileContentRow", "FileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_file_contents_files_file_id");
                 });
 
             modelBuilder.Entity("Axis.Data.Storage.ProvisionedEnumValueRow", b =>

@@ -319,7 +319,7 @@ the operator sets it with
 
 ## Data settings
 
-`Data:QueryTimeout` and `Data:ExportQueryTimeout` are built. The rest are
+`Data:QueryTimeout`, `Data:ExportQueryTimeout` and `Files:MaxSize` are built. The rest are
 _(planned for M15)_. The server reads them. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
@@ -331,7 +331,7 @@ _(planned for M15)_. The server reads them. See
 | `Data:ExportMaxRows` | `100000` | The most rows one export writes. |
 | `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. |
 | `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. |
-| `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. A field's `maxSize` cannot exceed it. |
+| `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. An upload is refused with `413` above the smaller of this and the field's `maxSize`. Publish checks a field's `maxSize` against the 25 MB default, not against this setting. |
 
 - **Per transaction.** Each timeout is set with `SET LOCAL`, so it never
   outlives its query's transaction and never reaches a pooled connection's
@@ -343,6 +343,8 @@ _(planned for M15)_. The server reads them. See
   task, process inspection and site list reads have no timeout.
 - **A bad value.** A value that is not a duration of at least one millisecond
   stops the start. A missing value takes its default.
+- **A bad file size.** A `Files:MaxSize` that is not a whole number of bytes,
+  at least 1, stops the start. A missing value takes the default.
 - **Writes.** Record writes, activation and the worker's own statements keep
   their current limits. M16 sets the final values against its SLOs.
 - **Environment.** As environment variables they are `Data__QueryTimeout`

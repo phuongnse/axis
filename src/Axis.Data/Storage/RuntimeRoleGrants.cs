@@ -44,6 +44,8 @@ public static class RuntimeRoleGrants
         "computed_field_errors",
         "pending_computed_fields",
         "sessions",
+        "files",
+        "file_contents",
     };
 
     /// <summary>

@@ -545,7 +545,7 @@ internal static class RecordEndpoints
     /// Finds the application and the entity in its active release, or the 404 that says which is
     /// missing. A child entity has no record routes: its rows are served through the owner record.
     /// </summary>
-    private static async Task<(ApplicationModel? Application, EntityModel? Entity, IResult? NotFound, Guid ReleaseId)> ResolveEntityAsync(
+    internal static async Task<(ApplicationModel? Application, EntityModel? Entity, IResult? NotFound, Guid ReleaseId)> ResolveEntityAsync(
         string app,
         string entity,
         ActiveApplicationResolver resolver,
