@@ -105,7 +105,7 @@ function SchemaNode({
   const names = useContext(StudioNamesContext)
   const check = useContext(ExpressionCheckContext)
   const label = useContext(LabelTextsContext)
-  const schema = resolveSchema(node, root)
+  const schema = textAlternative(resolveSchema(node, root), root, value)
   const reference = node['x-axis-reference'] ?? schema['x-axis-reference']
   const isObject = schema.type === 'object' && schema.properties !== undefined
   const isArray = schema.type === 'array' && schema.items !== undefined
@@ -404,6 +404,17 @@ function isLabelSchema(schema: JsonSchema): boolean {
 }
 
 /**
+ * The schema the form shows for a node. A node with alternatives whose value is text, or empty, is shown through
+ * its first text alternative. An object value keeps the alternatives, so it goes to the JSON view.
+ */
+function textAlternative(schema: JsonSchema, root: JsonSchema, value: unknown): JsonSchema {
+  if (schema.oneOf === undefined || (value !== undefined && typeof value !== 'string')) {
+    return schema
+  }
+  return schema.oneOf.map((option) => resolveSchema(option, root)).find((option) => option.type === 'string') ?? schema
+}
+
+/**
  * Whether the form can show a node. Alternatives, maps and nodes without a type go to the JSON view. A combination
  * of only conditionals is shown, because the form does not enforce its conditions.
  */
@@ -434,7 +445,8 @@ function isSupported(schema: JsonSchema): boolean {
 
 /** The value Add appends to an array: an empty value of the item's type, or its first enum value. */
 function defaultFor(node: JsonSchema, root: JsonSchema): unknown {
-  const schema = resolveSchema(node, root)
+  const resolved = resolveSchema(node, root)
+  const schema = resolved.oneOf?.[0] === undefined ? resolved : resolveSchema(resolved.oneOf[0], root)
   if (schema.enum !== undefined) {
     return schema.enum[0]
   }

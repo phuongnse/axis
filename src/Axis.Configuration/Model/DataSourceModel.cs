@@ -76,7 +76,8 @@ public sealed record DataSourceModel
 
 /// <summary>
 /// A projected field: its key in a row and the path of fields it reads, starting at a field of the
-/// root entity. Every field of the path before the last is a reference field.
+/// root entity. Every field of the path before the last is a reference field. A group field of a
+/// grouped data source may carry a <see cref="Bucket"/>.
 /// </summary>
 public sealed record DataSourceFieldModel(string Name, IReadOnlyList<FieldModel> Path)
 {
@@ -88,6 +89,28 @@ public sealed record DataSourceFieldModel(string Name, IReadOnlyList<FieldModel>
 
     /// <summary>The field the path ends at.</summary>
     public FieldModel Field => Path[^1];
+
+    /// <summary>The bucket a group field groups a date or date-time field into. Null reads the field's own value.</summary>
+    public DateBucket? Bucket { get; init; }
+
+    /// <summary>The type of the value the field gives in a row: a bucketed group is a date, any other field its own type.</summary>
+    public FieldType ValueType => Bucket is null ? Field.Type : FieldType.Date;
+}
+
+/// <summary>The span of dates a group field gathers into one group. The row holds the first date of the span.</summary>
+public enum DateBucket
+{
+    /// <summary>One day.</summary>
+    Day,
+
+    /// <summary>A week from Monday to Sunday.</summary>
+    Week,
+
+    /// <summary>A calendar month.</summary>
+    Month,
+
+    /// <summary>A calendar year.</summary>
+    Year,
 }
 
 /// <summary>

@@ -26,8 +26,14 @@ internal static class SchemaDiagnostics
             return true;
         }
 
+        var countBefore = diagnostics.Count;
         var reported = new HashSet<(string Path, string Message)>();
-        foreach (var node in results.Details ?? [])
+        var details = results.Details ?? [];
+        var validBranches = details
+            .Where(node => node.IsValid)
+            .Select(node => (Location: node.InstanceLocation.ToString(), Path: node.EvaluationPath.ToString()))
+            .ToList();
+        foreach (var node in details)
         {
             // An "if" that fails only chooses which branch applies, so its errors are not problems.
             if (node.IsValid || node.Errors is null || IsUnderIf(node.EvaluationPath.ToString()))
@@ -38,10 +44,54 @@ internal static class SchemaDiagnostics
             var path = node.InstanceLocation.ToString();
             foreach (var (keyword, error) in node.Errors)
             {
+                // A value of the wrong type for one alternative of a "oneOf" or "anyOf" is no problem while
+                // another alternative accepts it.
+                if (keyword == "type" && IsRejectedByOtherwiseValidAlternative(node, validBranches))
+                {
+                    continue;
+                }
+
                 var message = DescribeSchemaError(node, path, keyword, error);
                 if (reported.Add((path, message)))
                 {
                     diagnostics.Add(new Diagnostic(code, message, file, path, resourceId));
+                }
+            }
+        }
+
+        // A failed "not" has no error of its own. A file that is invalid must still report a problem.
+        if (diagnostics.Count == countBefore)
+        {
+            diagnostics.Add(new Diagnostic(code, "The file does not match its schema.", file, "", resourceId));
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="node"/> is an alternative of a <c>oneOf</c> or <c>anyOf</c> that its value fails,
+    /// while another alternative of the same keyword accepts that value.
+    /// </summary>
+    private static bool IsRejectedByOtherwiseValidAlternative(EvaluationResults node, List<(string Location, string Path)> validBranches)
+    {
+        var segments = node.EvaluationPath.ToString().Split('/');
+        var location = node.InstanceLocation.ToString();
+        for (var index = 1; index < segments.Length - 1; index++)
+        {
+            if (segments[index] is not ("oneOf" or "anyOf") || !int.TryParse(segments[index + 1], out var branch))
+            {
+                continue;
+            }
+
+            var prefix = string.Join('/', segments[..(index + 1)]) + "/";
+            foreach (var (validLocation, validPath) in validBranches)
+            {
+                if (validPath.StartsWith(prefix, StringComparison.Ordinal)
+                    && validPath[prefix.Length..].Split('/')[0] is var other
+                    && other != branch.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    && location == validLocation)
+                {
+                    return true;
                 }
             }
         }
