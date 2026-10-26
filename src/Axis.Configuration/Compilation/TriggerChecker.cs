@@ -14,7 +14,9 @@ namespace Axis.Configuration.Compilation;
 /// subject entity, and its <c>when</c> is a boolean that sees only the event's payload fields. A data
 /// change trigger names the process's subject entity, any <c>fields</c> are non-computed fields of it,
 /// and its <c>when</c> is a boolean over the watched record with the scope of a process condition.
-/// Every problem of a trigger is reported in one pass. A process, event or entity whose file did
+/// A delete trigger lists only <c>delete</c> in <c>on</c>, has no <c>fields</c> and names a process
+/// without a subject, and its parameters give each process parameter an expression over the deleted
+/// record. Every problem of a trigger is reported in one pass. A process, event or entity whose file did
 /// not load is not reported again, the entity match is not checked when either entity is unknown,
 /// and <c>when</c> is not checked without the event or the entity. A schedule trigger has a valid cron
 /// and a known IANA time zone, and names a loaded data source that is not grouped and is over the
@@ -61,7 +63,9 @@ internal static class TriggerChecker
             }
 
             // A scheduled job, a schedule trigger without a data source, starts a process without a subject.
-            if (process is { Entity: null } && !(trigger.Type == "schedule" && trigger.DataSource is null))
+            if (process is { Entity: null }
+                && !(trigger.Type == "schedule" && trigger.DataSource is null)
+                && !IsDelete(trigger))
             {
                 Report(
                     DiagnosticCodes.TriggerProcessWithoutSubject,
@@ -129,10 +133,15 @@ internal static class TriggerChecker
         }
     }
 
+    /// <summary>Whether the trigger is a data change trigger that lists <c>delete</c>.</summary>
+    private static bool IsDelete(TriggerResource trigger) =>
+        trigger.Type == "dataChange" && trigger.On!.Contains("delete");
+
     /// <summary>
     /// Checks a data change trigger. The schema requires its entity and <c>on</c>. An unknown
     /// entity, or one that is not the process's subject, stops the check of the trigger's fields
-    /// and condition.
+    /// and condition. A delete trigger is checked against a process without a subject instead, and
+    /// its parameters are checked with its condition.
     /// </summary>
     private static void CheckDataChange(
         TriggerResource trigger,
@@ -161,8 +170,37 @@ internal static class TriggerChecker
 
         references.Add(trigger, "/entity", ReferenceRelations.TriggerEntity, ResourceNode.Of(entity));
 
+        var isDelete = IsDelete(trigger);
+        if (isDelete)
+        {
+            if (trigger.On!.Any(kind => kind != "delete"))
+            {
+                report(
+                    DiagnosticCodes.DeleteTriggerWithOtherKinds,
+                    "A delete trigger lists only 'delete' in 'on'. A record that is deleted has no later state for a create or an update trigger to start a process for.",
+                    "/on");
+            }
+
+            if (trigger.Fields is not null)
+            {
+                report(
+                    DiagnosticCodes.DeleteTriggerWithFields,
+                    "A delete trigger has no 'fields'. A delete removes the whole record, so no field changes.",
+                    "/fields");
+            }
+
+            if (process is { Entity: not null })
+            {
+                report(
+                    DiagnosticCodes.DeleteTriggerProcessWithSubject,
+                    $"The process '{process.Name}' has a subject, so a delete trigger cannot start it. The record is gone, so name a process without a subject.",
+                    "/process");
+            }
+        }
+
         // An unknown entity has a diagnostic of its own on the process.
-        if (process is not null
+        if (!isDelete
+            && process is not null
             && process.Entity is { } subjectName
             && findEntity(subjectName) is { } subject
             && !ReferenceEquals(entity, subject))
@@ -173,7 +211,8 @@ internal static class TriggerChecker
                 "/entity");
         }
 
-        var fields = trigger.Fields ?? [];
+        // The per-field checks do not apply to a delete trigger, which has no fields.
+        var fields = isDelete ? [] : trigger.Fields ?? [];
         for (var index = 0; index < fields.Count; index++)
         {
             var field = FindField(entity, fields[index]);
@@ -219,6 +258,106 @@ internal static class TriggerChecker
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, "/when");
+            }
+        }
+
+        if (isDelete && process is { Entity: null })
+        {
+            CheckDeleteParameters(trigger, process, entity, rules, findEntity, modules, references, report);
+        }
+    }
+
+    /// <summary>
+    /// Checks the parameters of a delete trigger against the process's. Each value is an expression over
+    /// the deleted record, of the type of the parameter it gives. A process that is not loaded has a
+    /// diagnostic of its own.
+    /// </summary>
+    private static void CheckDeleteParameters(
+        TriggerResource trigger,
+        ProcessResource process,
+        EntityResource entity,
+        IEnumerable<ExpressionRule> rules,
+        Func<string, EntityResource?> findEntity,
+        IReadOnlySet<string> modules,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        var definitions = process.Parameters ?? [];
+        var given = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in trigger.Parameters ?? new Dictionary<string, JsonElement>())
+        {
+            var path = $"/parameters/{key}";
+            var definition = definitions.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+            if (definition is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownTriggerParameter,
+                    $"The parameter '{key}' was not found. The process '{process.Name}' has no parameter with that name.",
+                    path);
+                continue;
+            }
+
+            if (!given.TryAdd(definition.Name, key))
+            {
+                report(
+                    DiagnosticCodes.UnknownTriggerParameter,
+                    $"The parameter '{definition.Name}' is already given by '{given[definition.Name]}'.",
+                    path);
+                continue;
+            }
+
+            if (value.ValueKind != JsonValueKind.String)
+            {
+                report(
+                    DiagnosticCodes.InvalidTriggerParameterValue,
+                    $"The value for the parameter '{definition.Name}' is not an expression. Give a string that is an expression over the deleted record.",
+                    path);
+                continue;
+            }
+
+            var parsed = ExpressionParser.Parse(value.GetString()!);
+            ExpressionDiagnostic? problem;
+            ExpressionType? type = null;
+            if (parsed.Succeeded)
+            {
+                // A parameter whose type is unknown has a diagnostic of its own on the process.
+                if (!FieldTypes.TryParse(definition.Type, out var parameterType))
+                {
+                    continue;
+                }
+
+                var check = ExpressionTypeChecker.Check(
+                    parsed.Expression!,
+                    ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules),
+                    ExpressionScopes.TypeOf(parameterType));
+                if (check.Succeeded)
+                {
+                    references.AddRuleCalls(trigger, path, check);
+                }
+
+                problem = check.Diagnostic;
+                type = check.Type;
+            }
+            else
+            {
+                problem = parsed.Diagnostic;
+            }
+
+            references.RecordExpression(trigger, path, type, problem);
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, path);
+            }
+        }
+
+        foreach (var definition in definitions)
+        {
+            if (!given.ContainsKey(definition.Name))
+            {
+                report(
+                    DiagnosticCodes.MissingTriggerParameter,
+                    $"The parameter '{definition.Name}' is a parameter of the process '{process.Name}', but the trigger does not give it. Give an expression over the deleted record.",
+                    "/parameters");
             }
         }
     }
@@ -579,7 +718,26 @@ internal static class TriggerChecker
         var on = DataChangeKinds.None;
         foreach (var kind in trigger.On!)
         {
-            on |= kind == "create" ? DataChangeKinds.Create : DataChangeKinds.Update;
+            on |= kind switch
+            {
+                "create" => DataChangeKinds.Create,
+                "delete" => DataChangeKinds.Delete,
+                _ => DataChangeKinds.Update,
+            };
+        }
+
+        // A delete trigger gives each parameter of the process an expression over the deleted record.
+        Dictionary<string, ExpressionModel>? parameterExpressions = null;
+        if (on.HasFlag(DataChangeKinds.Delete))
+        {
+            var scope = ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules);
+            var given = trigger.Parameters ?? new Dictionary<string, JsonElement>();
+            parameterExpressions = new Dictionary<string, ExpressionModel>(StringComparer.Ordinal);
+            foreach (var parameter in process.Parameters ?? [])
+            {
+                var text = given.First(pair => string.Equals(pair.Key, parameter.Name, StringComparison.OrdinalIgnoreCase)).Value.GetString()!;
+                parameterExpressions.Add(parameter.Name, ExpressionModel.Compile(text, scope, ExpressionScopes.TypeOf(parameter.Type)));
+            }
         }
 
         return new TriggerModel
@@ -598,6 +756,7 @@ internal static class TriggerChecker
             When = trigger.When is { } when
                 ? ExpressionModel.Compile(when, ExpressionScopes.ForProcess(entity.Name, entity.Fields, rules, findEntity, modules), ExpressionType.Boolean)
                 : null,
+            ParameterExpressions = parameterExpressions,
         };
     }
 }

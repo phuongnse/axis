@@ -148,6 +148,42 @@ export type InstanceCommand = (typeof instanceCommands)[number]
 /** The outcome of an operator command, or the problem the server reported. */
 export type CommandResult = { ok: true } | { ok: false; problem: RecordProblem }
 
+/** The operator commands the dead letter list offers. */
+export const deadLetterCommands = ['redeliver', 'discard'] as const
+
+/** An operator command the dead letter list offers. */
+export type DeadLetterCommand = (typeof deadLetterCommands)[number]
+
+/**
+ * A dead letter in the list of a process's dead letters. The ids that its kind lacks are `null`.
+ * `commands` holds the operator commands the signed-in user may take on it now. The server decides.
+ */
+export interface DeadLetterItem {
+  id: string
+  kind: string
+  eventId: string | null
+  triggerId: string | null
+  processInstanceId: string | null
+  emailId: string | null
+  occurrenceAt: string | null
+  attempts: number
+  lastError: string
+  state: string
+  reason: string | null
+  settledBy: string | null
+  createdAt: string
+  settledAt: string | null
+  commands: string[]
+}
+
+/** One page of the dead letters of a process. */
+export interface DeadLetterPage {
+  items: DeadLetterItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
+
 /**
  * Whether retrying the instance needs a warning. It does when a call on the instance's current step
  * has failed, and that call is a package call whose operation is not `idempotent: true`. Such an
@@ -214,6 +250,18 @@ export async function fetchInstance(
   }
 }
 
+/** Reads a 400, 403, 404 or 409 answer as the problem, or returns `null` for any other status. */
+async function readProblem(response: Response): Promise<CommandResult | null> {
+  if (![400, 403, 404, 409].includes(response.status)) {
+    return null
+  }
+  const problem = JSON.parse(await response.text()) as Partial<RecordProblem>
+  return {
+    ok: false,
+    problem: { status: response.status, title: problem.title ?? '', errors: problem.errors ?? {} },
+  }
+}
+
 /**
  * Sends an operator command to an instance with the reason the audit keeps. A 400, 403, 404 or 409
  * comes back as the problem. A 401 starts sign-in and throws, as any other failure does.
@@ -232,15 +280,59 @@ export async function sendCommand(
   if (response.ok) {
     return { ok: true }
   }
-  if ([400, 403, 404, 409].includes(response.status)) {
-    const problem = JSON.parse(await response.text()) as Partial<RecordProblem>
-    return {
-      ok: false,
-      problem: { status: response.status, title: problem.title ?? '', errors: problem.errors ?? {} },
-    }
+  const problem = await readProblem(response)
+  if (problem) {
+    return problem
   }
   throw new Error(
     `Sending '${command}' to the instance '${id}' of '${instancesPath}' failed with status ${response.status}.`,
+  )
+}
+
+/**
+ * Loads one page of the dead letters of a process, newest first. `query` holds the dead letter API's
+ * `state`, `page` and `pageSize`. A 403 returns {@link forbidden}. A 401 starts sign-in and throws,
+ * as any other failure does.
+ */
+export async function fetchDeadLetters(
+  deadLettersPath: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<DeadLetterPage | typeof forbidden> {
+  const response = await apiFetch(`${deadLettersPath}${query ? `?${query}` : ''}`, { signal })
+  if (response.status === 403) {
+    return forbidden
+  }
+  if (!response.ok) {
+    throw new Error(`Loading the dead letters of '${deadLettersPath}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as DeadLetterPage
+}
+
+/**
+ * Sends an operator command to a dead letter with the reason the audit keeps. A 400, 403, 404 or 409
+ * comes back as the problem. A 401 starts sign-in and throws, as any other failure does.
+ */
+export async function sendDeadLetterCommand(
+  deadLettersPath: string,
+  id: string,
+  command: DeadLetterCommand,
+  reason: string,
+): Promise<CommandResult> {
+  const response = await apiFetch(`${deadLettersPath}/${id}/${command}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+  if (response.ok) {
+    return { ok: true }
+  }
+  const problem = await readProblem(response)
+  if (problem) {
+    return problem
+  }
+  throw new Error(
+    `Sending '${command}' to the dead letter '${id}' of '${deadLettersPath}' failed with status ${response.status}.`,
   )
 }
 
@@ -262,12 +354,9 @@ export async function resolveCall(
   if (response.ok) {
     return { ok: true }
   }
-  if ([400, 403, 404, 409].includes(response.status)) {
-    const problem = JSON.parse(await response.text()) as Partial<RecordProblem>
-    return {
-      ok: false,
-      problem: { status: response.status, title: problem.title ?? '', errors: problem.errors ?? {} },
-    }
+  const problem = await readProblem(response)
+  if (problem) {
+    return problem
   }
   throw new Error(
     `Resolving the call '${callId}' of the instance '${instanceId}' of '${instancesPath}' failed with status ${response.status}.`,

@@ -105,6 +105,24 @@ function withType(step: Content, type: string): Content {
   return next
 }
 
+/** The distinct, non-empty step names of a draft, for the pickers of every transition. */
+function stepNames(steps: unknown[]): string[] {
+  return [
+    ...new Set(
+      steps.flatMap((step) =>
+        isContent(step) && typeof step.name === 'string' && step.name !== '' ? [step.name] : [],
+      ),
+    ),
+  ]
+}
+
+/** The steps with the step at `index` swapped with its neighbour `offset` places away. */
+function moved(steps: unknown[], index: number, offset: number): unknown[] {
+  const next = [...steps]
+  ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
+  return next
+}
+
 /**
  * The editor of a process. It shows the process's name, entity and start condition with the generic form, the start
  * step, and the steps as cards in file order. A decision shows its branches and its `otherwise`, an end shows only
@@ -125,19 +143,7 @@ export function ProcessEditor({
 }) {
   const t = useText()
   const steps = Array.isArray(value.steps) ? value.steps : []
-  const names = [
-    ...new Set(
-      steps.flatMap((step) =>
-        isContent(step) && typeof step.name === 'string' && step.name !== '' ? [step.name] : [],
-      ),
-    ),
-  ]
-
-  function move(index: number, offset: number) {
-    const next = [...steps]
-    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
-    onChange('/steps', next)
-  }
+  const names = stepNames(steps)
 
   return (
     <Flex vertical gap="middle" data-testid="studio-process-editor">
@@ -162,7 +168,7 @@ export function ProcessEditor({
               entity={text(value.entity)}
               names={names}
               last={index === steps.length - 1}
-              onMove={(offset) => move(index, offset)}
+              onMove={(offset) => onChange('/steps', moved(steps, index, offset))}
               onRemove={() =>
                 onChange(
                   '/steps',
@@ -188,6 +194,47 @@ export function ProcessEditor({
         </Flex>
       </div>
     </Flex>
+  )
+}
+
+/**
+ * The card of one step of a process, as the Form tab shows it, for the Design tab's side panel. Move up and Move down
+ * select the step at its new place, and Remove clears the selection.
+ */
+export function ProcessStepPanel({
+  value,
+  index,
+  onChange,
+  onSelect,
+}: {
+  value: Content
+  index: number
+  onChange: ChangeHandler
+  onSelect: (index: number | null) => void
+}) {
+  const steps = Array.isArray(value.steps) ? value.steps : []
+  const step = steps[index]
+
+  return (
+    <Step
+      index={index}
+      step={isContent(step) ? step : {}}
+      entity={text(value.entity)}
+      names={stepNames(steps)}
+      last={index === steps.length - 1}
+      onMove={(offset) => {
+        onChange('/steps', moved(steps, index, offset))
+        onSelect(index + offset)
+      }}
+      onRemove={() => {
+        onChange(
+          '/steps',
+          steps.filter((_, position) => position !== index),
+        )
+        onSelect(null)
+      }}
+      onChange={onChange}
+    />
   )
 }
 

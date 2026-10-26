@@ -31,6 +31,7 @@ same cause, even after a worker crash.
 
 _(Planned for M14)_ Event delivery also wakes the instances that wait for an
 event ([D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)).
+
 A delete starts a process without a subject through a delete trigger
 ([D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md)).
 See [Delete triggers](#delete-triggers).
@@ -180,7 +181,7 @@ record.
 | --- | --- | --- |
 | Event, `async` | The `event.deliver` transaction, one for each occurrence and trigger | The trigger already handled the occurrence, the `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
-| Data change | The write's transaction: a record API create or update, an inbound endpoint's create, a task form save, an `updateRecord` step, a `createRecord` step, a connector output or a package operation output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
+| Data change | The write's transaction: a record API create or update, an inbound endpoint's create, a task form save, an `updateRecord` step, a `createRecord` step, a connector output or a package operation output. For a delete trigger, the transaction of a record API or Studio scenario delete, after `record.deleted` | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true. For a delete trigger: the `when` is not true or fails, a parameter fails or is `null`, the process already runs, or the `startCondition` is not true |
 | Schedule | The `trigger.fanOut` transaction of one batch, which holds the starts of up to 100 records. Without a data source, the one start of the occurrence | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true. Without a data source: the occurrence was already handled, the process is already running, or the `startCondition` is not true |
 
 A `when` or a `startCondition` is not true when it gives `false` or `null`,
@@ -393,7 +394,7 @@ once per occurrence, see
 
 ## Delete triggers
 
-_(Planned for M14.)_ A data change trigger with `"on": ["delete"]` starts a
+A data change trigger with `"on": ["delete"]` starts a
 process without a subject when a record is deleted:
 
 ```json
@@ -410,17 +411,36 @@ process without a subject when a record is deleted:
 }
 ```
 
-- `delete` is listed alone. With `create` or `update` it is a new diagnostic,
-  and so is a `fields` list.
-- The process must have no subject. `parameters` maps each process parameter
-  to an expression over the record as it was before the delete, with the scope
-  of a data change trigger's `when`. So does `when`.
-- It fires on every delete through the record command. The start commits in
-  the delete's transaction, after the `record.deleted` audit record. A run-time
-  error in `when` or a parameter skips the start, and the delete still
-  commits.
-- A record that a `running` or `waiting` instance names still cannot be
-  deleted: that `409` comes first, and no trigger runs.
+- `delete` is listed alone. With `create` or `update` it is `AXC0254`, and a
+  `fields` list is `AXC0255`.
+- The process must have no subject, otherwise it is `AXC0256`. `parameters`
+  maps each process parameter to an expression over the record as it was before
+  the delete, of the parameter's type, with the scope of a data change trigger's
+  `when`. So does `when`. An unknown or repeated key is `AXC0165`, a value that
+  is not a string is `AXC0166`, a parameter the trigger does not give is
+  `AXC0167`, and an expression of another type has the expression checker's own
+  code.
+- It fires on every delete through the record command: the record API and a
+  Studio test scenario. Activation, tenant clean-up and a raw SQL delete start
+  nothing. The start commits in the delete's transaction, after the
+  `record.deleted` audit record, as `system` and pinned to the active release.
+- The `when` and the parameters are worked out after the row lock and the
+  `409` check, and before the row is deleted, so they see the record whole,
+  with its child rows and pending computed fields.
+- A `when` that is not true, or that fails at run time, skips the start. So
+  does a parameter that fails at run time, is `null` or does not fit its type.
+  Each skip is logged at Information level with the trigger, the process and
+  the record id, and the delete still commits. A process without a subject runs
+  one instance at a time, so a delete while an instance of the process is still
+  open skips its start and logs it.
+- A delete that is refused starts nothing and logs nothing. This covers the
+  `409` for a record that a `running` or `waiting` instance names, which comes
+  first, the `409` for a referenced record, a denied delete and a delete
+  outside the filters.
+- A delete takes the application's start lock shared, as the first statement of
+  its transaction, and pins the active release, as a create and an update do. When
+  activation changed the release, the delete runs again on the new release, and
+  it answers `503` after three changes.
 
 ## Dead letters
 

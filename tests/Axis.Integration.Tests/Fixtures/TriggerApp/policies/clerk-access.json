@@ -4,5 +4,10 @@
   "name": "ClerkAccess",
   "formatVersion": 1,
   "roles": ["clerk"],
-  "grants": [{ "entity": "Ticket", "actions": ["read", "create", "update"] }]
+  "grants": [
+    { "entity": "Ticket", "actions": ["read", "create", "update"] },
+    { "entity": "Asset", "actions": ["read", "create"] },
+    { "entity": "Asset", "actions": ["delete"], "filter": "tag != 'locked'" },
+    { "entity": "AssetNote", "actions": ["read", "create"] }
+  ]
 }

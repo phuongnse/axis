@@ -23,6 +23,7 @@ const inspectorWidget: WidgetMetadata = {
   tasksPath: null,
   process: 'PurchaseRequestApproval',
   instancesPath,
+  deadLettersPath: '/api/apps/PurchasingApp/processes/PurchaseRequestApproval/dead-letters',
   actions: [],
   rowActions: [],
   toolbarActions: [],

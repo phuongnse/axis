@@ -8,8 +8,8 @@ subject. The process resource and the first four step types are in
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 Everything in this file is _(planned for M14)_, except [Loops](#loops) through
-a `task` and the calls in them, the compile checks of the
-[sub-process step](#sub-process-step), and the
+a `task` and the calls in them, the [sub-process step](#sub-process-step)
+apart from its failure handling and cancel rules, and the
 [create record operation](#create-record-operation), which are built. The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
@@ -98,10 +98,10 @@ A `subProcess` step starts another process and waits until it ends:
 { "name": "fulfil", "type": "subProcess", "process": "OrderFulfilment", "subject": "order", "next": "close" }
 ```
 
-- **Compile checks are built, the run is not.** The compiler checks and builds
-  the step, and the instance detail graph shows it as an `operation` step. An
-  instance that reaches it still fails with the engine's error for a step it
-  cannot run, until the engine part is built.
+- **Built, except Failure and Cancel.** The compiler checks and builds the
+  step, and the engine runs it: Start, Cannot start, End and the history
+  output below are built. The instance detail graph shows the step as an
+  `operation` step.
 - `process` names a process of the same application, ignoring letter case,
   otherwise it is `AXC0250` at `/steps/{i}/process`. A process may not reach
   itself through sub-process steps, directly or through others. Each step that
@@ -127,16 +127,21 @@ A `subProcess` step starts another process and waits until it ends:
   `system`, and sets the parent `waiting`. The child is pinned to the
   parent's release, not the active one. Its instance row holds
   `parent_instance_id` and `parent_step`. The `process.started` audit record
-  adds `"parentInstanceId"`.
-- **Cannot start.** A child that already runs for that record, or whose
-  `startCondition` is not true, fails the parent's step with a fixed error.
+  adds `"parentInstanceId"`. The parent's waiting step writes no audit record
+  of its own: the child's `process.started` record stands for it.
+- **Cannot start.** A child that already runs for that record, whose
+  `startCondition` is not true, or whose record is missing, fails the parent's
+  step with a fixed error that names the step and the child process, never a
+  value.
 - **End.** A child that completes queues a `process.resume` item for its
-  parent. The item resumes the parent at `next`, by the revision check.
-- **Failure.** A child that fails leaves the parent `waiting`. The inspector
-  shows the failed child under the parent, and an operator retries the child.
-  A cancelled child fails the parent's step.
-- **Cancel.** Cancelling the parent cancels its `running` and `waiting`
-  children, in the same transaction.
+  parent. The item resumes the parent at `next`, by the revision check, and
+  writes the `process.stepCompleted` audit record as `system`. An item for a
+  parent that is not waiting on that child is logged and discarded.
+- **Failure** _(planned for M14)_. A child that fails leaves the parent
+  `waiting`. The inspector shows the failed child under the parent, and an
+  operator retries the child. A cancelled child fails the parent's step.
+- **Cancel** _(planned for M14)_. Cancelling the parent cancels its `running`
+  and `waiting` children, in the same transaction.
 - History output: `{ "state": "waiting", "childInstanceId" }`, then
   `{ "next", "childInstanceId" }`.
 
@@ -177,7 +182,7 @@ A `createRecord` operation creates a record of another entity:
 ```
 
 - `entity` names a root entity of the application, not a child entity. An
-  unknown entity is `AXC0254` and a child entity is `AXC0255`, both reported at
+  unknown entity is `AXC0257` and a child entity is `AXC0258`, both reported at
   `/steps/{i}/entity`. Neither is reported when the entity's file failed to
   load.
 - `set` is required and has at least one field. It maps fields of that entity

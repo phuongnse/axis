@@ -253,7 +253,8 @@ export interface WidgetAccess {
  * widget shows all records of an entity, or the rows of a data source. `form` is set only on a form
  * widget that names a form, and `entity` is then the form's entity with every field. A task inbox has
  * neither an entity nor a data source, and lists the signed-in user's tasks from `tasksPath`. A process
- * inspector has neither, and lists the instances of its `process` from `instancesPath`.
+ * inspector has neither, and lists the instances of its `process` from `instancesPath` and its open dead
+ * letters from `deadLettersPath`.
  */
 export interface WidgetMetadata {
   type: 'table' | 'form' | 'taskInbox' | 'processInspector' | 'kpi' | 'chart' | 'detail'
@@ -268,6 +269,8 @@ export interface WidgetMetadata {
   process: string | null
   /** The inspection API's instance list path on a process inspector, and `null` on every other widget. */
   instancesPath: string | null
+  /** The dead letter list path on a process inspector, and `null` on every other widget. */
+  deadLettersPath: string | null
   /** The actions of a form or detail widget the user may take, and `[]` on every other widget. */
   actions: WidgetAction[]
   /** The `startProcess`, navigate and `delete` actions a table shows on each row, and `[]` on every other widget. */

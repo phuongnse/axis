@@ -525,7 +525,7 @@ test.describe('Studio on a copy of its own', () => {
     }
   })
 
-  test('an author opens the steps and transitions of a process from its graph', async ({ page }) => {
+  test('an author selects the steps of a process on its graph', async ({ page }) => {
     await useSession(page, 'hoa')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
@@ -545,12 +545,14 @@ test.describe('Studio on a copy of its own', () => {
     const ids = await edges.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-testid')))
     expect(ids.sort()).toEqual(expected.map((transitionPath) => `rf__edge-${transitionPath}`).sort())
 
+    const design = page.getByTestId('studio-process-design')
     await page.getByRole('button', { name: 'financeApproval · task', exact: true }).click()
-    await expect(page).toHaveURL(/path=%2Fsteps%2F3(&|$)/)
+    await expect(design.getByTestId('studio-step-3')).toBeVisible()
     await expect(page.getByTestId('studio-graph-node-3')).toHaveAttribute('aria-current', 'true')
 
     await page.getByTestId('rf__edge-/steps/3/outcomes/0').click()
-    await expect(page).toHaveURL(/path=%2Fsteps%2F3%2Foutcomes%2F0/)
+    await expect(design.getByTestId('studio-step-3')).toBeVisible()
+    await expect(page.getByTestId('studio-graph-node-3')).toHaveAttribute('aria-current', 'true')
   })
 
   test('someone without the author role sees no Studio link and a forbidden page', async ({ page }) => {

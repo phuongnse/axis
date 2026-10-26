@@ -80,8 +80,11 @@ public static class DiagnosticCodes
     public const string SubProcessCycle = "AXC0251";
     public const string InvalidSubProcessSubject = "AXC0252";
     public const string InvalidSubProcessParameters = "AXC0253";
-    public const string UnknownCreateRecordEntity = "AXC0254";
-    public const string CreateRecordOverChildEntity = "AXC0255";
+    public const string DeleteTriggerWithOtherKinds = "AXC0254";
+    public const string DeleteTriggerWithFields = "AXC0255";
+    public const string DeleteTriggerProcessWithSubject = "AXC0256";
+    public const string UnknownCreateRecordEntity = "AXC0257";
+    public const string CreateRecordOverChildEntity = "AXC0258";
     public const string UnknownOperation = "AXC0078";
     public const string UnknownSetField = "AXC0079";
     public const string ReadOnlySetField = "AXC0080";

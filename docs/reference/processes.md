@@ -224,14 +224,14 @@ a payment reference from the sample extension package, see
 
 ## Steps
 
-M3 has four step types. Wait for event, timer and sub-process come later.
-The compiler already checks and builds a `subProcess` step, but the engine
-does not run it yet, see [Sub-process step](process-flow.md#sub-process-step).
+M3 has four step types. Wait for event and timer come later. The engine runs
+a `subProcess` step, see [Sub-process step](process-flow.md#sub-process-step).
+Its failure handling and cancel rules are _(planned for M14)_, as are `timer`
+and `waitEvent` steps and the `notify` operation, see
+[process flow](process-flow.md) and
+[notifications](notifications.md#notify-operation).
 The `createRecord` operation is built, see
 [Create record operation](process-flow.md#create-record-operation).
-_(Planned for M14)_ `timer`, `waitEvent` and `subProcess` steps, and the
-`notify` operation, see [process flow](process-flow.md)
-and [notifications](notifications.md#notify-operation).
 
 - **`decision`.** `branches` is an ordered list. Each branch has a `when`
   expression and a `next` step. The branches are evaluated in order, and the
@@ -334,7 +334,7 @@ reported in one pass. See
   `when`. A problem is reported at `/steps/{i}/set/{field}` with its
   expression code, such as `AXC0048` for a value of the wrong type.
 - A `createRecord` step names a loaded root entity in `entity`. An unknown
-  entity is `AXC0254` and a child entity is `AXC0255`, both at
+  entity is `AXC0257` and a child entity is `AXC0258`, both at
   `/steps/{i}/entity`. Its `set` keys and values are checked against that
   entity as above, and a creator field is `AXC0080` too. See
   [Create record operation](process-flow.md#create-record-operation).
@@ -547,7 +547,7 @@ these:
 | State | Meaning |
 | --- | --- |
 | `running` | The instance has work that is ready or claimed by a worker. |
-| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations). _(Planned for M14)_ It also waits for a timer, an event or a sub-process, see [process flow](process-flow.md). |
+| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations), and for the child of a sub-process step, see [Sub-process step](process-flow.md#sub-process-step). _(Planned for M14)_ It also waits for a timer or an event, see [process flow](process-flow.md). |
 | `completed` | The instance reached an `end` step. |
 | `failed` | A step failed. The error is in the history. |
 | `cancelled` | An operator cancelled the instance while it was `running` or `waiting`. It is an end state. See [Cancel](process-inspection.md#cancel). |
@@ -595,7 +595,7 @@ for texts. **Both** means different parts use different releases.
 | Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
 | Instance list | Active | Roles and policies come from the active release. |
 | Instance detail | Both | The graph and the step names use the instance's release. So do the fields a call's mapping reads or writes. Roles and policies come from the active release, and so do the fields the user may read. The `sensitive` flag counts when the pinned release or the active release marks the field. See [Values and masking](process-inspection.md#values-and-masking). |
-| Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
+| Worker steps (`decision`, `task`, `operation`, `updateRecord`, `subProcess`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
 | Operator retry | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |
 | Operator resolve | Both | The output check and the record write use the pinned release. The `resolve` grant and data change triggers come from the active release. |
@@ -621,7 +621,7 @@ for texts. **Both** means different parts use different releases.
   with no pending migration never takes it. A server request that finds a
   different active release under the lock runs again on the new release. The
   process start endpoint, the [inbound endpoint](inbound-endpoints.md#responses),
-  task completion and record creates and updates answer `503` after three
+  task completion and record creates, updates and deletes answer `503` after three
   release changes. A record delete takes the lock shared too, and the subject's row lock decides between a
   start and a delete of the same record. Operator [retry](process-inspection.md#retry) takes it too, as the first
   statement of its transaction, and answers `503` after three release changes.
@@ -684,7 +684,9 @@ database, with history in `axis.__processes_migrations` (see
   open instance. The subject columns are null for such an instance, and its
   `parameters` `jsonb` column holds the values it started with, see
   [process flow](process-flow.md#processes-without-a-subject).
-  _(Planned for M14)_ The table gains `parent_instance_id` and `parent_step`.
+  An instance that a sub-process step started also holds the `parent_instance_id`
+  and the `parent_step` of its parent, and both are null for any other
+  instance. An index on `parent_instance_id` finds the children of a parent.
   Three more indexes serve the inspector's instance list: one by application,
   process and start time, newest first, one by application, process, state and
   start time, and one by subject record.
@@ -728,7 +730,8 @@ database, with history in `axis.__processes_migrations` (see
   current. A run starts a new trace with a link to that span, see
   [Telemetry](../architecture.md#telemetry). A rescheduled item keeps them.
   Activation that queues a `trigger.schedule` item again replaces them.
-  Two more kinds come with [schedules](process-events.md#schedules), one with
+  Three more kinds come with [schedules](process-events.md#schedules), one with
+  [sub-processes](process-flow.md#sub-process-step), one with
   [task deadlines](task-deadlines.md), and one with
   [computed fields](migrations.md#recomputing-computed-fields):
   - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
@@ -738,6 +741,10 @@ database, with history in `axis.__processes_migrations` (see
     Its item also has the `trigger_id`, the `release_id` that was active at
     the occurrence and the `occurrence_at` time. Its `cursor` is the last
     record id it handled, and is null before its first batch.
+  - `process.resume` resumes the parent of a completed child. Its item also
+    has the `process_instance_id` of the child, and the handler finds the
+    parent from the child's `parent_instance_id`. See
+    [Sub-process step](process-flow.md#sub-process-step).
   - `task.deadline` expires one task at its deadline. Its item also has the
     `task_id` of the task and the `process_instance_id` of its instance, and
     its `due_at` is the task step's time plus the deadline's `after`. See
