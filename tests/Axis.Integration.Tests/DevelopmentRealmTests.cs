@@ -24,6 +24,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
         { "khoa", "Khoa Agent", ["agent"] },
         { "linh", "Linh Service Desk Lead", ["service-desk-lead"] },
         { "minh", "Minh Approver", ["approver"] },
+        { "nam", "Nam Service Desk Lead", ["service-desk-lead"] },
     };
 
     public async ValueTask InitializeAsync() => _authority = await keycloak.StartAsync();
