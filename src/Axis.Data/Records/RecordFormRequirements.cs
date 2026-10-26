@@ -32,7 +32,8 @@ public static class RecordFormRequirements
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
         DateTimeOffset? now,
-        IReadOnlyCollection<string>? sent = null)
+        IReadOnlyCollection<string>? sent = null,
+        RecordSets? sets = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
@@ -47,7 +48,7 @@ public static class RecordFormRequirements
         }
 
         var record = RecordValidator.BuildRecord(entity, stored, values);
-        var rowsExact = RecordCollections.TryAdd(application, entity, stored, rows, record, errors);
+        var rowsExact = RecordCollections.TryAdd(application, entity, stored, rows, record, errors, sets);
 
         // A value that cannot be held exactly stops every condition, as it stops the validations.
         var inexact = record.Where(pair => !pair.Value.Exact).Select(pair => pair.Key).ToList();

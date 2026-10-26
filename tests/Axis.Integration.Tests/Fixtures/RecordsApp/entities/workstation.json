@@ -1,0 +1,16 @@
+{
+  "id": "c4a8e1d6-2f73-4b95-a0d8-7e5b3c91f204",
+  "kind": "entity",
+  "name": "Workstation",
+  "formatVersion": 1,
+  "displayField": "name",
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "seats", "type": "integer" },
+    { "name": "software", "type": "references", "target": "Product" }
+  ],
+  "validations": [
+    { "expression": "count(software) <= 2", "message": { "textKey": "workstation.tooMuchSoftware" }, "field": "software" },
+    { "expression": "seats == null or count(software) <= seats", "message": { "textKey": "workstation.tooFewSeats" }, "field": "seats" }
+  ]
+}
