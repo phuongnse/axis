@@ -70,7 +70,7 @@ public sealed record DecisionBranchModel(ExpressionModel When, string Next);
 /// <see cref="Form"/>, shown over the subject record, with one of its <see cref="Outcomes"/>.
 /// <see cref="DueIn"/> is the time from the task's creation to its due date, or null when it has none.
 /// <see cref="Deadline"/> is when the task expires and where the process goes then, or null when it has none.
-/// <see cref="Escalations"/> are what happens to the task before its deadline, in file order. The engine does not run them yet.
+/// <see cref="Escalations"/> are what happens to the task before its deadline, in file order. The engine runs the <c>reassign</c> of an escalation, and does not send its <c>notify</c> yet.
 /// </summary>
 public sealed record TaskStepModel(
     string Name,

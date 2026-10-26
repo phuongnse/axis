@@ -168,7 +168,7 @@ Every step has a `type`. These are the step kinds:
   scenario, including the work item runner's. Every later step reads it.
 - The runner then runs every due work item (`process.step`, `process.timer`,
   `process.resume`, `connector.call`, `package.call`, `event.deliver`,
-  `trigger.schedule`, `trigger.fanOut` and `task.deadline`) until none is due. A
+  `trigger.schedule`, `trigger.fanOut`, `task.escalate` and `task.deadline`) until none is due. A
   `process.timer` item is due when the scenario's time reaches its time, so a
   timer resumes its instance in the `advanceTime` that passes it.
   If more than 1,000 items run in one step, the scenario fails at that step.
@@ -184,7 +184,9 @@ Every step has a `type`. These are the step kinds:
   scenario's `now`. The task expires only in an `advanceTime` step that
   moves `now` to its deadline or past it. No action runs a deadline early. The
   instance then moves to the deadline's `next` step, which `expectInstance` can
-  check. See [task deadlines](task-deadlines.md#escalations-and-deadline).
+  check. An escalation's `reassign` counts from the same time and runs in the
+  `advanceTime` step that reaches its `after`, so `expectTask` sees the new
+  assignee before the deadline passes. See [task deadlines](task-deadlines.md#escalations-and-deadline).
 - `advanceTime` is not an action. It takes no `as` and no `expect`.
 - Time never goes back. No step sets an earlier time.
 

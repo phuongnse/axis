@@ -400,6 +400,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.ProcessInstanceId).HasColumnName("process_instance_id");
             item.Property(i => i.ConnectorCallId).HasColumnName("connector_call_id");
             item.Property(i => i.TaskId).HasColumnName("task_id");
+            item.Property(i => i.Escalation).HasColumnName("escalation");
             item.Property(i => i.PackageCallId).HasColumnName("package_call_id");
             item.Property(i => i.EventId).HasColumnName("event_id");
             item.Property(i => i.TriggerId).HasColumnName("trigger_id");

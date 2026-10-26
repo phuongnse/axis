@@ -32,6 +32,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<IWorkItemHandler, ProcessStepHandler>();
         services.AddSingleton<IWorkItemHandler, ProcessTimerHandler>();
         services.AddSingleton<IWorkItemHandler, ProcessResumeHandler>();
+        services.AddSingleton<IWorkItemHandler, TaskEscalationHandler>();
         services.AddSingleton<IWorkItemHandler, TaskDeadlineHandler>();
         services.AddSingleton(new ConnectorCallSettings(allowHttpConnectorUrls));
         services.AddSingleton(new DeliverySettings(deliveryAttempts));

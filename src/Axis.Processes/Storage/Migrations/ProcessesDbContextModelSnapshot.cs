@@ -931,6 +931,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("entity_id");
 
+                    b.Property<int?>("Escalation")
+                        .HasColumnType("integer")
+                        .HasColumnName("escalation");
+
                     b.Property<Guid?>("EventId")
                         .HasColumnType("uuid")
                         .HasColumnName("event_id");
