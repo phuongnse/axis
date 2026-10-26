@@ -323,8 +323,8 @@ reported in one pass. See
   or a package operation written `<package>/<operation>`, matched exactly as
   a step `type` is (`AXC0078` at `/steps/{i}/operation`).
 - A `notify` step's checks are listed under
-  [Notify operation](notifications.md#notify-operation) (`AXC0248` to
-  `AXC0255`). The step compiles, but a published process that reaches it
+  [Notify operation](notifications.md#notify-operation) (`AXC0257` to
+  `AXC0264`). The step compiles, but a published process that reaches it
   fails until the runtime part of D73 is built.
 - Each key of an `updateRecord` `set` names a field of the subject entity,
   ignoring letter case, that no earlier key of the step names (`AXC0079`).
@@ -633,10 +633,12 @@ database, with history in `axis.__processes_migrations` (see
   and is null before. A retry clears it.
   A partial unique index on
   application, process and subject record, where the state is `running` or
-  `waiting`, enforces one start per submission.
-  _(Planned for M14)_ The index treats a null subject as one value, and the
-  table gains `parameters`, `parent_instance_id` and `parent_step`, see
-  [process flow](process-flow.md).
+  `waiting`, enforces one start per submission. The index treats a null subject
+  as one value (`NULLS NOT DISTINCT`), so a process without a subject has one
+  open instance. The subject columns are null for such an instance, and its
+  `parameters` `jsonb` column holds the values it started with, see
+  [process flow](process-flow.md#processes-without-a-subject).
+  _(Planned for M14)_ The table gains `parent_instance_id` and `parent_step`.
   Three more indexes serve the inspector's instance list: one by application,
   process and start time, newest first, one by application, process, state and
   start time, and one by subject record.

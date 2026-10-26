@@ -5,8 +5,9 @@ notifications, user profiles and the mail settings. The conventions of
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-The compile checks of the notify operation and of placeholders are built. The
-rest of this file is _(planned for M14)_. The design follows
+The [user profiles](#user-profiles) section and the compile checks of the notify
+operation and of placeholders are built. Everything else in this file is
+_(planned for M14)_. The design follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
 [D75](../decisions/d75-the-application-time-zone.md). New compile problems are
@@ -31,10 +32,10 @@ listed as new diagnostics.
 }
 ```
 
-- `to` is a non-empty list (`AXC0248` at `/steps/{i}/to`). Each recipient has
-  exactly one of (`AXC0249` at `/steps/{i}/to/{j}`):
+- `to` is a non-empty list (`AXC0257` at `/steps/{i}/to`). Each recipient has
+  exactly one of (`AXC0258` at `/steps/{i}/to/{j}`):
   - `user`, an expression that gives a user id, as a task's `user` assignee;
-  - `role`, a declared role name, compared exactly (`AXC0250` at
+  - `role`, a declared role name, compared exactly (`AXC0259` at
     `/steps/{i}/to/{j}/role` for an unknown one). A role whose file failed to
     load is not reported again;
   - `email`, an expression that gives an address. It is for the `email`
@@ -42,10 +43,10 @@ listed as new diagnostics.
 - `user` and `email` are `text` expressions with the scope of a `when`. A
   problem is reported with its expression code at `/steps/{i}/to/{j}/user` or
   `/steps/{i}/to/{j}/email`.
-- `channels` is a non-empty list of `inApp` and `email` (`AXC0251` at
+- `channels` is a non-empty list of `inApp` and `email` (`AXC0260` at
   `/steps/{i}/channels`). A channel named twice is a schema violation
   (`AXC0004`).
-- A `role` recipient with the `email` channel is `AXC0252` at
+- A `role` recipient with the `email` channel is `AXC0261` at
   `/steps/{i}/to/{j}/role`. Axis has no directory to expand a role into
   addresses.
 - `message.subject` and `message.body` are text keys, checked as a label is at
@@ -71,11 +72,11 @@ A text value may hold named placeholders, such as
 
 - A name is ASCII letters and digits. `{{` and `}}` write a brace. A name and a
   `values` key match exactly, letter case included.
-- Each placeholder of a message's texts needs a key in `values` (`AXC0253`),
-  and each key of `values` must appear in the subject or the body (`AXC0254`),
+- Each placeholder of a message's texts needs a key in `values` (`AXC0262`),
+  and each key of `values` must appear in the subject or the body (`AXC0263`),
   in every locale that has both texts. Each mismatch is reported at
   `/steps/{i}/message`, naming the locale and the name.
-- A lone or invalid brace is `AXC0255` at `/steps/{i}/message`. A locale with
+- A lone or invalid brace is `AXC0264` at `/steps/{i}/message`. A locale with
   one is reported for that brace only.
 - _(Planned for M14)_ A value whose expression reads a field marked
   `sensitive`, directly or through a path, is a new diagnostic. A notification
@@ -138,7 +139,11 @@ sign-in and the last sign-in. A later sign-in updates it.
 
 - The email and locale come from the claims the tenant names in
   `Oidc:Claims:Email` and `Oidc:Claims:Locale`, by default `email` and
-  `locale`. A missing claim leaves the value null.
+  `locale`. A missing claim leaves the value null. Sign-in asks the identity
+  provider for the `email` scope, so providers other than Keycloak put the
+  email in the ID token.
+- A failure to write the profile does not refuse the sign-in. The server logs a
+  warning that does not include the email.
 - The profiles are not a directory. They serve email addresses, locales and the
   user picker of a [reassign](task-deadlines.md#reassign), and no other route
   lists them.

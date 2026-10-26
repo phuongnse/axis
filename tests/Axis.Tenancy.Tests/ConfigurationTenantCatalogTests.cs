@@ -151,6 +151,8 @@ public sealed class ConfigurationTenantCatalogTests
                 "Tenants:default:Oidc:ServiceAudience=axis-services",
                 "Tenants:default:Oidc:Claims:UserId=preferred_username",
                 "Tenants:default:Oidc:Claims:Roles=groups",
+                "Tenants:default:Oidc:Claims:Email=mail",
+                "Tenants:default:Oidc:Claims:Locale=lang",
                 "Tenants:default:Bindings:PurchasingSystemUrl:Kind=url",
                 "Tenants:default:Bindings:PurchasingSystemUrl:Value=https://purchasing.example.test",
                 "Tenants:default:Bindings:Token:Kind=secret",
@@ -166,6 +168,8 @@ public sealed class ConfigurationTenantCatalogTests
         Assert.Equal("preferred_username", oidc.UserIdClaim);
         Assert.Null(oidc.DisplayNameClaim);
         Assert.Equal("groups", oidc.RolesClaim);
+        Assert.Equal("mail", oidc.EmailClaim);
+        Assert.Equal("lang", oidc.LocaleClaim);
 
         // The url keeps its text: no trailing slash is added.
         Assert.Equal(new TenantBinding("url", "https://purchasing.example.test", null), entry.Bindings["purchasingsystemurl"]);
@@ -189,6 +193,8 @@ public sealed class ConfigurationTenantCatalogTests
                 "Tenants:main:Oidc:Claims:UserId=preferred_username",
                 "Tenants:main:Oidc:Claims:DisplayName=name",
                 "Tenants:main:Oidc:Claims:Roles=groups",
+                "Tenants:main:Oidc:Claims:Email=mail",
+                "Tenants:main:Oidc:Claims:Locale=lang",
                 "Tenants:main:Bindings:PurchasingSystemUrl:Kind=url",
                 "Tenants:main:Bindings:PurchasingSystemUrl:Value=https://purchasing.example.test",
                 "Tenants:main-preview:Bindings:Own:Kind=secret",
@@ -209,6 +215,8 @@ public sealed class ConfigurationTenantCatalogTests
         Assert.Equal("preferred_username", oidc.UserIdClaim);
         Assert.Equal("name", oidc.DisplayNameClaim);
         Assert.Equal("groups", oidc.RolesClaim);
+        Assert.Equal("mail", oidc.EmailClaim);
+        Assert.Equal("lang", oidc.LocaleClaim);
         Assert.Null(oidc.EndpointAudience);
         Assert.Null(oidc.ServiceAudience);
         Assert.Equal(["Own"], preview.Bindings.Keys);

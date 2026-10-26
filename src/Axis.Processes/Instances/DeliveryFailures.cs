@@ -13,6 +13,9 @@ internal static class DeliveryFailures
     /// <summary>The kind of an event delivery to one <c>async</c> trigger.</summary>
     internal const string EventDeliverKind = ProcessStarts.EventDeliverWorkItemKind;
 
+    /// <summary>The kind of a schedule trigger's fan-out of one occurrence.</summary>
+    internal const string TriggerFanOutKind = ProcessStarts.TriggerFanOutWorkItemKind;
+
     /// <summary>The state of a dead letter that waits for an operator.</summary>
     internal const string Open = "open";
 
@@ -95,6 +98,38 @@ internal static class DeliveryFailures
         command.Parameters.AddWithValue("process", processId);
         command.Parameters.AddWithValue("event", eventId);
         command.Parameters.AddWithValue("trigger", triggerId);
+        command.Parameters.AddWithValue("attempts", attempts);
+        command.Parameters.AddWithValue("error", error);
+        command.Parameters.AddWithValue("state", Open);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        return id;
+    }
+
+    /// <summary>Writes an <c>open</c> dead letter for the fan-out of one occurrence of a schedule trigger and returns its id.</summary>
+    internal static async Task<Guid> InsertFanOutDeadLetterAsync(
+        NpgsqlTransaction transaction,
+        Guid applicationId,
+        Guid processId,
+        Guid triggerId,
+        DateTimeOffset occurrenceAt,
+        int attempts,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        var id = Guid.CreateVersion7();
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO axis.dead_letters (id, kind, application_id, process_id, trigger_id, occurrence_at, attempts, last_error, state, created_at)
+            VALUES (@id, @kind, @application, @process, @trigger, @occurrence, @attempts, @error, @state, now())
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("kind", TriggerFanOutKind);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("process", processId);
+        command.Parameters.AddWithValue("trigger", triggerId);
+        command.Parameters.AddWithValue("occurrence", occurrenceAt);
         command.Parameters.AddWithValue("attempts", attempts);
         command.Parameters.AddWithValue("error", error);
         command.Parameters.AddWithValue("state", Open);

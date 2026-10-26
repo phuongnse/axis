@@ -524,8 +524,24 @@ is not a `text`. A wrong JSON type or a value outside its bounds is an error at
 | `file` _(planned for M15)_ | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field, see [file fields](file-fields.md#upload) | `Guid` |
 | `references` _(planned for M15)_ | An array of distinct record ids, at most 1,000. The whole set replaces the stored one | `Guid[]` |
 
-From M15 _(planned for M15)_, a value outside a field's `min`, `max` or
-`minLength` is an error at the field's pointer, as for `maxLength`.
+A value outside a field's limits is an error at the field's pointer, as for
+`maxLength`. A value equal to a limit is accepted, and a missing or `null`
+value is never checked against a limit.
+
+- `min` and `max` apply to `integer`, `decimal`, `money`, `date` and
+  `date-time` values. The messages are "Must be at least 1." and "Must be at most 10.",
+  with the limit as written in the entity file. A `decimal` or `money` is compared
+  exactly, with no rounding, so `0.49999999999999999999999999999999` is below
+  `0.5`. A `date-time` is compared as an instant in UTC, whatever offset the
+  value or the limit is written with.
+- `minLength` applies to `text` values and counts code points, as `maxLength`
+  does. The message is "Must be at least 3 characters.".
+- The check is part of the request parser, so the record API, processes, task
+  completion, form state, inbound endpoints and seeds all apply it. The limits
+  are not stored as a `CHECK` constraint, so a stored row outside a tightened
+  limit keeps its values and is read back unchanged.
+- An endpoint `input` field has no limits of its own. An endpoint that writes
+  a record is still checked by the entity field's limits.
 
 **Errors** are a dictionary from RFC 6901 JSON Pointer into the body to its
 messages, in ordinal key order, usable as is for a validation problem

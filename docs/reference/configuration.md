@@ -303,8 +303,12 @@ flowchart LR
      or a `sum`, `min` or `max` without one, is `AXC0063` at
      `/aggregate/measures/{i}`. A measure `field` that names no projected
      field, or whose type the function does not take, is `AXC0063` at
-     `/aggregate/measures/{i}/field`. A measure field whose path is already
-     `AXC0043` is not reported again. When the data source is grouped, the
+     `/aggregate/measures/{i}/field`. `sum` takes an integer, a decimal or a
+     money field, and `min` and `max` also take a date or a date-time. A measure
+     field whose path is already `AXC0043` is not reported again. A `sum`, `min`
+     or `max` over a money field with a `currencyField`, without a group field
+     that reaches that currency field on the same record, is `AXC0248` at
+     `/aggregate/measures/{i}/field`. When the data source is grouped, the
      `sort` must exactly match a group field that is not a `reference`, or a
      measure, otherwise it is `AXC0045`. A parameter name that is
      also a field of the entity, is `page`, `pageSize` or `sort`, or repeats
