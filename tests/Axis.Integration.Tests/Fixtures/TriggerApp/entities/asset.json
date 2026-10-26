@@ -1,0 +1,12 @@
+{
+  "id": "015e7bfb-edd5-4a4b-b3bf-c986702a3560",
+  "kind": "entity",
+  "name": "Asset",
+  "formatVersion": 1,
+  "displayField": "tag",
+  "fields": [
+    { "name": "tag", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "cost", "type": "decimal" },
+    { "name": "flagged", "type": "boolean" }
+  ]
+}

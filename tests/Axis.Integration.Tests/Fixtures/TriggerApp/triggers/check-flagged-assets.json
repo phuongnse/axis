@@ -1,0 +1,11 @@
+{
+  "id": "4b7926cc-4577-4e7e-b97d-912684feaaaf",
+  "kind": "trigger",
+  "name": "CheckFlaggedAssets",
+  "formatVersion": 1,
+  "type": "dataChange",
+  "entity": "Asset",
+  "on": ["create"],
+  "when": "flagged",
+  "process": "AssetCheck"
+}

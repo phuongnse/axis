@@ -1,0 +1,12 @@
+{
+  "id": "04fc294c-2013-42c3-b68b-96c24130c49a",
+  "kind": "trigger",
+  "name": "AssetDeleted",
+  "formatVersion": 1,
+  "type": "dataChange",
+  "entity": "Asset",
+  "on": ["delete"],
+  "when": "100 / cost > 0",
+  "process": "AssetRemoved",
+  "parameters": { "tag": "tag", "cost": "cost" }
+}
