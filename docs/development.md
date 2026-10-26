@@ -37,6 +37,11 @@ after the SPA build. It prints the four sizes and fails when the main bundle is 
 there is no chart chunk, page design chunk or drag and drop chunk or when any of them is among the
 main bundle files. Do not raise the budget to make the check pass: find what grew.
 
+`scripts/build.sh` then runs [`scripts/check-fonts.mjs`](../scripts/check-fonts.mjs) on the same
+output. It lists the font files in `assets/` and fails when a file is not IBM Plex Sans or IBM Plex
+Mono in the Latin, Latin Extended or Vietnamese subset, when one of the six combinations has no
+`.woff2` file, or when a license text is missing from `fonts/`.
+
 ## Test runs and reports
 
 The test, integration and E2E scripts run every suite even when one fails. The exceptions are

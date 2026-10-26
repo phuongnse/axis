@@ -28,8 +28,8 @@ export const colourTokens = {
 } as const satisfies Record<string, ColourValue>
 
 export const typeTokens = {
-  fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-  codeFontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace",
+  fontFamily: "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  codeFontFamily: "'IBM Plex Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace",
   fontSize: 14,
 }
 

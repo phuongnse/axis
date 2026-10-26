@@ -33,7 +33,17 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   warning, danger, info, canvas, surface, text, textMuted, border, borderSubtle
   and divider, each with a light and a dark value. Type has the body and code
   fonts and the font size, spacing runs from xs to xl, and radius has the base
-  radius. `web/src/platform/antTheme.ts` is the only file that maps them to Ant
+  radius. The body font is IBM Plex Sans, a variable font for weights 100 to
+  700, and the code font is IBM Plex Mono at weight 400. The SPA ships the
+  Google Fonts files from the Fontsource npm packages unchanged. Only the
+  Latin, Latin Extended and Vietnamese subsets ship, each with a
+  `unicode-range` in `web/src/fonts.css`, so a browser downloads only the
+  subsets a page uses. The fonts are under the SIL Open Font License 1.1. Its
+  texts ship at `/fonts/OFL-IBM-Plex-Sans.txt` and
+  `/fonts/OFL-IBM-Plex-Mono.txt`, from `web/public/fonts`. The font files are
+  part of the build output and load from the SPA's own origin (`font-src
+  'self'`), so an install with no internet shows them too. The design-system
+  bundle carries no fonts. `web/src/platform/antTheme.ts` is the only file that maps them to Ant
   Design tokens. A component that needs a theme value reads Axis tokens through
   `useDesignTokens`, never through Ant Design's `theme.useToken`. A Vitest test
   fails on a hard-coded colour, font family or radius in `web/src` outside those

@@ -10,11 +10,13 @@ import {
   typeTokens,
 } from './designTokens'
 
-// The theme config before the Axis token file. The mapping must give Ant Design the same design token.
+// The theme config before the Axis token file. The mapping must give Ant Design the same design token. The
+// fonts are the intended change: IBM Plex Sans replaced Inter and IBM Plex Mono leads the code fonts.
 const previousToken = {
   colorPrimary: '#2f54eb',
   borderRadius: 6,
-  fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  fontFamily: "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  fontFamilyCode: "'IBM Plex Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace",
 }
 
 describe.each(['light', 'dark'] as const)('the Ant Design theme in %s mode', (mode) => {

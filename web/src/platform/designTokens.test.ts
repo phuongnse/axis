@@ -58,6 +58,13 @@ describe('tokens with page values', () => {
     designTokensFor('light', { '--spacing-md': '99', '--radius-base': '99', '--font-sans': 'Georgia' })
     expect(spacingTokens.md).toBe(16)
     expect(radiusTokens.base).toBe(6)
-    expect(typeTokens.fontFamily).toContain('Inter')
+    expect(typeTokens.fontFamily).toContain('IBM Plex Sans')
+  })
+
+  it('names IBM Plex first and no longer names Inter', () => {
+    expect(typeTokens.fontFamily.startsWith("'IBM Plex Sans'")).toBe(true)
+    expect(typeTokens.codeFontFamily.startsWith("'IBM Plex Mono'")).toBe(true)
+    expect(typeTokens.fontFamily).not.toContain('Inter')
+    expect(typeTokens.codeFontFamily).not.toContain('Inter')
   })
 })
