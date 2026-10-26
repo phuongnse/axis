@@ -1850,21 +1850,39 @@ public static partial class ApplicationCompiler
             {
                 for (var index = 0; index < aggregate.GroupBy.Count; index++)
                 {
-                    var name = aggregate.GroupBy[index];
-                    groupFields.Add(name);
-                    if (!fieldsByName.ContainsKey(name))
+                    var group = aggregate.GroupBy[index];
+                    var name = group.Field;
+                    var at = $"/aggregate/groupBy/{index}";
+                    if (!groupFields.Add(name))
+                    {
+                        Report(
+                            DiagnosticCodes.UnknownDataSourceGroupField,
+                            $"The group field '{name}' is already grouped by an earlier entry. A field appears once in 'groupBy'.",
+                            at);
+                    }
+                    else if (!fieldsByName.ContainsKey(name))
                     {
                         Report(
                             DiagnosticCodes.UnknownDataSourceGroupField,
                             $"The group field '{name}' must name a projected field.",
-                            $"/aggregate/groupBy/{index}");
+                            group.Bucket is null ? at : at + "/field");
                     }
                     else if (fieldsByName[name] is { } groupField && FieldTypes.Parse(groupField.Type) == FieldType.File)
                     {
                         Report(
                             DiagnosticCodes.FileFieldNotAllowed,
                             $"The group field '{name}' is a file field. A data source cannot group by a file.",
-                            $"/aggregate/groupBy/{index}");
+                            at);
+                    }
+                    else if (group.Bucket is not null
+                        && fieldsByName[name] is { } bucketField
+                        && FieldTypes.Parse(bucketField.Type) is var bucketType
+                        && bucketType is not (FieldType.Date or FieldType.DateTime))
+                    {
+                        Report(
+                            DiagnosticCodes.UnknownDataSourceGroupField,
+                            $"The group field '{name}' is a {FieldTypes.Name(bucketType)} field. A bucket needs a date or date-time field.",
+                            at + "/bucket");
                     }
                 }
 
@@ -1884,7 +1902,7 @@ public static partial class ApplicationCompiler
                     {
                         Report(DiagnosticCodes.InvalidDataSourceMeasure, message, path + problemPath);
                     }
-                    else if (CheckMeasureCurrency(measure, aggregate.GroupBy, hopsByName, entity, findEntity) is { } currencyMessage)
+                    else if (CheckMeasureCurrency(measure, [.. aggregate.GroupBy.Select(group => group.Field)], hopsByName, entity, findEntity) is { } currencyMessage)
                     {
                         Report(DiagnosticCodes.UngroupedMoneyCurrency, currencyMessage, $"{path}/field");
                     }
@@ -2510,7 +2528,7 @@ public static partial class ApplicationCompiler
             return new ChartModel(
                 Enum.Parse<ChartKind>(widget.Kind!, ignoreCase: true),
                 widget.Title!,
-                aggregate.GroupBy[0],
+                aggregate.GroupBy[0].Field,
                 [.. measures.Select(measure => new ChartMeasureModel(
                     aggregate.Measures.First(candidate => string.Equals(candidate.Name, measure.Name, StringComparison.OrdinalIgnoreCase)).Name,
                     measure.Label))]);
@@ -2665,7 +2683,12 @@ public static partial class ApplicationCompiler
             Filter = dataSource.Filter is { } filter ? ExpressionModel.Compile(filter, filterScope, ExpressionType.Boolean) : null,
             Aggregate = dataSource.Aggregate is { } aggregate
                 ? new DataSourceAggregateModel(
-                    aggregate.GroupBy.Select(Projected).ToList(),
+                    aggregate.GroupBy
+                        .Select(group => Projected(group.Field) with
+                        {
+                            Bucket = group.Bucket is null ? null : Enum.Parse<DateBucket>(group.Bucket, ignoreCase: true),
+                        })
+                        .ToList(),
                     aggregate.Measures
                         .Select(measure => new DataSourceMeasureModel(
                             measure.Name,
