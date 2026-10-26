@@ -265,7 +265,7 @@ operation is built, see
     `expired` and the instance moves to `next`, see
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
     `escalations` is optional and checked in the same section. The engine runs
-    the `reassign` of an escalation. Sending its `notify` is _(planned for M14)_.
+    the `reassign` and the `notify` of an escalation. Its `email` channel is _(planned for M14)_.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
     the task is completed with it.

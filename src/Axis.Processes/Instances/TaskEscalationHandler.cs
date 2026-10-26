@@ -3,6 +3,7 @@ using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Data.Audit;
 using Axis.Data.Records;
+using Axis.Expressions.Evaluation;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Microsoft.Extensions.Logging;
@@ -13,12 +14,15 @@ namespace Axis.Processes.Instances;
 /// Runs the escalation a <c>task.escalate</c> work item names. The handler locks the task first,
 /// as a completion does, so a task that ends cannot also be escalated. A task that is still
 /// <c>open</c> is reassigned to the escalation's <c>reassign</c> target as <c>system</c>, which clears
-/// a claim. The audit record <c>task.reassigned</c> is appended with the escalation's index, and the
-/// task step gets a history row whose output is <c>{ "escalation": index }</c>. The task stays open
-/// and its instance is not changed. A task in any other state, or no task, is left alone and the
-/// item is deleted. So is a task whose <c>user</c> expression gives no user, with a warning, since a
-/// late reassign must not fail an instance that waits correctly. An escalation that only notifies
-/// leaves the task alone. A failure is logged and the instance is not failed.
+/// a claim. The audit record <c>task.reassigned</c> is appended with the escalation's index. The
+/// escalation's <c>notify</c> is evaluated as a <c>notify</c> step evaluates it and stored as an in-app
+/// notification, in the same transaction. The task step gets a history row whose output is
+/// <c>{ "escalation": index }</c>, with the <c>notificationId</c> when there is a notify. The task
+/// stays open and its instance is not changed. A task in any other state, or no task, is left alone and
+/// the item is deleted. A task whose <c>user</c> expression gives no user is left as it is, with a
+/// warning, since a late reassign must not fail an instance that waits correctly, but its notify still
+/// runs. A failure, such as a notify expression that fails, is logged, the whole escalation is rolled
+/// back and the instance is not failed.
 /// </summary>
 internal sealed partial class TaskEscalationHandler(ReleaseModelCache models, ILogger<TaskEscalationHandler> logger) : IWorkItemHandler
 {
@@ -49,52 +53,99 @@ internal sealed partial class TaskEscalationHandler(ReleaseModelCache models, IL
             return;
         }
 
-        if (step.Escalations[index].Reassign is not { } reassign)
+        var escalation = step.Escalations[index];
+        var evaluate = await SubjectEvaluatorAsync(context, release, task, cancellationToken);
+
+        NewNotification? notification = null;
+        if (escalation.Notify is { } notify)
         {
-            // Sending the notification is not built yet, so an escalation that only notifies does nothing.
-            return;
+            if (evaluate is null)
+            {
+                LogNoSubject(taskId, index);
+            }
+            else
+            {
+                notification = await ProcessNotifications.EvaluateAsync(
+                    notify,
+                    evaluate,
+                    task.ApplicationId,
+                    task.ReleaseId,
+                    (part, error) => new InvalidOperationException($"The {part} of escalation {index} of the step '{task.Step}' failed: {error.Kind}."),
+                    (value, name) => ProcessNotifications.TryToJson(value, out var json)
+                        ? json
+                        : throw new InvalidOperationException($"The {name} of escalation {index} of the step '{task.Step}' gave a value of type '{value!.GetType().Name}'."));
+            }
         }
 
-        string assigneeKind;
-        string assignee;
-        if (reassign.User is { } user)
+        string? assigneeKind = null;
+        string? assignee = null;
+        if (escalation.Reassign is { } reassign)
         {
-            if (await UserAsync(context, release, task, user, cancellationToken) is not { } id)
+            if (reassign.User is { } user)
             {
-                LogNoUser(taskId, index);
+                if (await UserAsync(evaluate, user) is { } id)
+                {
+                    (assigneeKind, assignee) = (ProcessTasks.UserAssignee, id);
+                }
+                else
+                {
+                    LogNoUser(taskId, index);
+                }
+            }
+            else
+            {
+                (assigneeKind, assignee) = (ProcessTasks.RoleAssignee, reassign.Role!);
+            }
+        }
+
+        var reassigned = false;
+        if (assigneeKind is not null && assignee is not null)
+        {
+            if (!await ProcessTasks.TryReassignAsync(context.Transaction, taskId, assigneeKind, assignee, cancellationToken))
+            {
+                LogNotOpen(taskId, null);
                 return;
             }
 
-            (assigneeKind, assignee) = (ProcessTasks.UserAssignee, id);
-        }
-        else
-        {
-            (assigneeKind, assignee) = (ProcessTasks.RoleAssignee, reassign.Role!);
+            reassigned = true;
         }
 
-        if (!await ProcessTasks.TryReassignAsync(context.Transaction, taskId, assigneeKind, assignee, cancellationToken))
+        if (!reassigned && notification is null)
         {
-            LogNotOpen(taskId, null);
             return;
         }
 
-        await AuditRecords.AppendAsync(
-            context.Transaction,
-            new AuditEntry(
-                AuditActors.System,
-                AuditActions.TaskReassigned,
-                task.ApplicationId,
-                task.SubjectEntityId,
-                task.SubjectId,
-                task.ProcessInstanceId,
-                new JsonObject
-                {
-                    ["taskId"] = task.Id,
-                    ["from"] = new JsonObject { [task.AssigneeKind] = task.Assignee },
-                    ["to"] = new JsonObject { [assigneeKind] = assignee },
-                    ["escalation"] = index,
-                }),
-            cancellationToken);
+        if (notification is not null && ProcessNotifications.ShouldStore(notification, escalation.Notify!.Channels))
+        {
+            await ProcessNotifications.InsertAsync(context.Transaction, notification, cancellationToken);
+        }
+
+        if (reassigned)
+        {
+            await AuditRecords.AppendAsync(
+                context.Transaction,
+                new AuditEntry(
+                    AuditActors.System,
+                    AuditActions.TaskReassigned,
+                    task.ApplicationId,
+                    task.SubjectEntityId,
+                    task.SubjectId,
+                    task.ProcessInstanceId,
+                    new JsonObject
+                    {
+                        ["taskId"] = task.Id,
+                        ["from"] = new JsonObject { [task.AssigneeKind] = task.Assignee },
+                        ["to"] = new JsonObject { [assigneeKind!] = assignee },
+                        ["escalation"] = index,
+                    }),
+                cancellationToken);
+        }
+
+        var output = new JsonObject { ["escalation"] = index };
+        if (notification is not null)
+        {
+            output["notificationId"] = notification.Id;
+        }
 
         // The instance keeps waiting on the step, so the row takes its current revision.
         var instance = await ProcessSteps.LoadAsync(context.Transaction, task.ProcessInstanceId, cancellationToken)
@@ -106,7 +157,7 @@ internal sealed partial class TaskEscalationHandler(ReleaseModelCache models, IL
                 task.Step,
                 instance.Revision,
                 new JsonObject { ["subjectId"] = task.SubjectId, ["subjectVersion"] = null },
-                new JsonObject { ["escalation"] = index },
+                output,
                 null,
                 null,
                 await RecordQueries.TransactionTimeAsync(context.Connection, cancellationToken)),
@@ -124,15 +175,14 @@ internal sealed partial class TaskEscalationHandler(ReleaseModelCache models, IL
     }
 
     /// <summary>
-    /// The user id a <c>reassign</c> expression gives over the subject record, as a task step evaluates
-    /// its assignee, or <see langword="null"/> when the record is missing or the expression fails or
-    /// gives no non-blank text.
+    /// A function that evaluates an expression over the task's subject record, as a task step evaluates
+    /// its expressions, or <see langword="null"/> when the record is missing. The record has its pending
+    /// computed fields computed by the active release, and the time is the transaction's.
     /// </summary>
-    private async Task<string?> UserAsync(
+    private async Task<Func<ExpressionModel, Task<ExpressionEvaluationResult>>?> SubjectEvaluatorAsync(
         WorkItemContext context,
         ApplicationModel release,
         ProcessTaskRow task,
-        ExpressionModel user,
         CancellationToken cancellationToken)
     {
         var entity = release.FindEntity(task.SubjectEntityId)
@@ -147,16 +197,19 @@ internal sealed partial class TaskEscalationHandler(ReleaseModelCache models, IL
         var subject = active is { } current
             ? await PendingComputedReads.ApplyAsync(context.Connection, context.Transaction, current.Model, entity, stored, cancellationToken, release)
             : stored;
-        var result = await RecordExpressions.EvaluateAsync(
-            context.Connection,
-            release,
-            entity,
-            subject,
-            user,
-            await RecordQueries.TransactionTimeAsync(context.Connection, cancellationToken),
-            cancellationToken);
-        return result is { Error: null, Value: string id } && !string.IsNullOrWhiteSpace(id) ? id : null;
+        var now = await RecordQueries.TransactionTimeAsync(context.Connection, cancellationToken);
+        return expression => RecordExpressions.EvaluateAsync(context.Connection, release, entity, subject, expression, now, cancellationToken);
     }
+
+    /// <summary>
+    /// The user id a <c>reassign</c> expression gives, or <see langword="null"/> when the record is
+    /// missing or the expression fails or gives no non-blank text.
+    /// </summary>
+    private static async Task<string?> UserAsync(Func<ExpressionModel, Task<ExpressionEvaluationResult>>? evaluate, ExpressionModel user) =>
+        evaluate is not null && await evaluate(user) is { Error: null, Value: string id } && !string.IsNullOrWhiteSpace(id) ? id : null;
+
+    [LoggerMessage(LogLevel.Warning, "The subject record of task {TaskId} is missing, so the notify of escalation {Index} was skipped.")]
+    private partial void LogNoSubject(Guid taskId, int index);
 
     [LoggerMessage(LogLevel.Warning, "Escalation work item {ItemId} names no task or escalation, so it was discarded.")]
     private partial void LogNoEscalation(Guid itemId);

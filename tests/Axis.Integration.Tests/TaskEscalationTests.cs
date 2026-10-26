@@ -149,6 +149,75 @@ public sealed class TaskEscalationTests(TaskApiFixture fixture) : IClassFixture<
     }
 
     [Fact]
+    public async Task A_notify_escalation_stores_the_role_notification_and_a_later_reassign_runs_as_system()
+    {
+        var (task, subject, instance) = await CreateTaskAsync("EscalateNotify", "maria");
+        var waiting = await fixture.SnapshotAsync(TenantA, instance);
+        Assert.Equal(
+            [("task.escalate", 0), ("task.escalate", 1), ("task.deadline", null)],
+            (await ItemsAsync(task)).OrderBy(item => item.Seq).Select(item => (item.Kind, item.Escalation)));
+        await MakeEscalationDueAsync(task, 0);
+
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        var notification = await NotificationAsync(subject);
+        Assert.Equal(("role", "reviewer", "request.notice.subject", "request.notice.body", "Tasks"), (notification.Kind, notification.Recipient, notification.Subject, notification.Body, notification.Page));
+        Assert.Equal(fixture.ReleaseId(TenantA), notification.Release);
+        Assert.True(JsonNode.DeepEquals(
+            JsonNode.Parse($$"""{ "title": "{{RequestTitle(subject)}}", "amount": null }"""),
+            JsonNode.Parse(notification.Values)));
+        Assert.Equal(("user", "maria"), await AssigneeAsync(task));
+        Assert.Equal(ProcessTasks.Open, await StateAsync(task));
+        Assert.Empty(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskReassigned));
+        var after = await fixture.SnapshotAsync(TenantA, instance);
+        Assert.Equal((ProcessStarts.Waiting, "decide", waiting.Revision), (after.State, after.Step, after.Revision));
+        var escalated = Assert.Single(await fixture.HistoryAsync(TenantA, instance), row => row.Output is not null && row.Output.Contains("escalation", StringComparison.Ordinal));
+        Assert.True(JsonNode.DeepEquals(
+            JsonNode.Parse($$"""{ "escalation": 0, "notificationId": "{{notification.Id:D}}" }"""),
+            JsonNode.Parse(escalated.Output!)));
+
+        await MakeEscalationDueAsync(task, 1);
+
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        Assert.Equal(("role", "finance"), await AssigneeAsync(task));
+        Assert.Equal(ProcessTasks.Open, await StateAsync(task));
+        var (actor, _, details) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskReassigned));
+        Assert.Equal(AuditActors.System, actor);
+        Assert.True(JsonNode.DeepEquals(
+            JsonNode.Parse($$"""{ "taskId": "{{task:D}}", "from": { "user": "maria" }, "to": { "role": "finance" }, "escalation": 1 }"""),
+            JsonNode.Parse(details)));
+        Assert.Equal(1L, (long)(await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notifications WHERE \"values\"->>'title' = @title", ("title", RequestTitle(subject))))!);
+        Assert.Equal(["task.deadline"], (await ItemsAsync(task)).Select(item => item.Kind));
+    }
+
+    [Fact]
+    public async Task A_notify_escalation_on_a_completed_task_stores_no_notification()
+    {
+        var (task, subject, instance) = await CreateTaskAsync("EscalateNotify", "maria");
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        using (var request = RecordApiFixture.Request(HttpMethod.Post, $"{Tasks}/{task:D}/complete", Host(TenantA), """{ "outcome": "approve" }"""))
+        using (var response = await maria.SendAsync(request, CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+        await fixture.ExecuteAsync(
+            TenantA,
+            "INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id, task_id, escalation) VALUES (gen_random_uuid(), @tenant, 'task.escalate', now() - interval '1 minute', @instance, @task, 0)",
+            ("tenant", TenantA),
+            ("instance", instance),
+            ("task", task));
+
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        Assert.Empty(await ItemsAsync(task));
+        Assert.Equal(ProcessTasks.Completed, await StateAsync(task));
+        Assert.Equal(0L, (long)(await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notifications WHERE \"values\"->>'title' = @title", ("title", RequestTitle(subject))))!);
+    }
+
+    [Fact]
     public async Task The_deadline_that_expires_the_task_deletes_its_pending_escalation_items()
     {
         var (task, _, instance) = await CreateTaskAsync("Escalate", "maria");
@@ -182,6 +251,27 @@ public sealed class TaskEscalationTests(TaskApiFixture fixture) : IClassFixture<
             "UPDATE axis.process_work_items SET due_at = now() - interval '1 minute' WHERE task_id = @id AND kind = @kind",
             ("id", task),
             ("kind", kind));
+
+    private Task<int> MakeEscalationDueAsync(Guid task, int index) =>
+        fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_work_items SET due_at = now() - interval '1 minute' WHERE task_id = @id AND kind = 'task.escalate' AND escalation = @index",
+            ("id", task),
+            ("index", index));
+
+    private async Task<(Guid Id, Guid Release, string Kind, string Recipient, string Subject, string Body, string Page, string Values)> NotificationAsync(Guid subject)
+    {
+        await using var connection = await fixture.OpenConnectionAsync(TenantA);
+        await using var command = new Npgsql.NpgsqlCommand(
+            "SELECT id, release_id, recipient_kind, recipient, subject_key, body_key, open_page, \"values\"::text FROM axis.notifications WHERE \"values\"->>'title' = @title",
+            connection);
+        command.Parameters.AddWithValue("title", RequestTitle(subject));
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        var row = (reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7));
+        Assert.False(await reader.ReadAsync(CancellationToken));
+        return row;
+    }
 
     private async Task<string> StateAsync(Guid task) =>
         (string)(await fixture.ScalarAsync(TenantA, "SELECT state FROM axis.process_tasks WHERE id = @id", ("id", task)))!;

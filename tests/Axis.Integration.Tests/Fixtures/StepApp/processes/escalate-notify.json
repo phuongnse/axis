@@ -1,0 +1,41 @@
+{
+  "id": "4f04e7a2-6a94-4145-b160-10b1fed8a17d",
+  "kind": "process",
+  "name": "EscalateNotify",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "decide",
+  "steps": [
+    {
+      "name": "decide",
+      "type": "task",
+      "label": { "textKey": "request.decide" },
+      "assignee": { "user": "department.manager" },
+      "form": "RequestDecision",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "task.approve" }, "next": "approved" },
+        { "name": "reject", "label": { "textKey": "task.reject" }, "next": "rejected" }
+      ],
+      "deadline": { "after": "P5D", "next": "expired" },
+      "escalations": [
+        {
+          "after": "P1D",
+          "notify": {
+            "to": [{ "role": "reviewer" }],
+            "channels": ["inApp"],
+            "message": {
+              "subject": { "textKey": "request.notice.subject" },
+              "body": { "textKey": "request.notice.body" },
+              "values": { "title": "title", "amount": "amount" }
+            },
+            "open": { "page": "Tasks" }
+          }
+        },
+        { "after": "P2D", "reassign": { "role": "finance" } }
+      ]
+    },
+    { "name": "approved", "type": "end" },
+    { "name": "rejected", "type": "end" },
+    { "name": "expired", "type": "end" }
+  ]
+}

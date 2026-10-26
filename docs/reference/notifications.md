@@ -6,8 +6,9 @@ notifications, user profiles and the mail settings. The conventions of
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The [user profiles](#user-profiles) section, the compile checks of the notify
-operation and of placeholders, the run of the notify step and the storage of
-in-app notifications, the routes that list them and mark them read, and their
+operation and of placeholders, the run of the notify step and of a task
+escalation's `notify`, and the storage of in-app notifications, the routes that
+list them and mark them read, and their
 retention are built, and so is the bell in the site shell. Email is
 _(planned for M14)_, as is everything else in this file that says so. The design follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
