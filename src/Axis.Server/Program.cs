@@ -262,6 +262,7 @@ sessions.MapFormStateEndpoints();
 sessions.MapProcessEndpoints();
 sessions.MapProcessInspectionEndpoints();
 sessions.MapProcessOperatorEndpoints();
+sessions.MapDeadLetterEndpoints();
 sessions.MapTaskEndpoints();
 sessions.MapDataSourceEndpoints();
 sessions.MapUserEndpoints();

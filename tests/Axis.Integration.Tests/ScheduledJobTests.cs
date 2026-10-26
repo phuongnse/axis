@@ -19,6 +19,8 @@ public sealed class ScheduledJobTests(ScheduleTriggerFixture fixture) : IClassFi
 
     private static readonly DateTimeOffset _secondTestStart = DateTimeOffset.Parse("2026-02-01T05:00:00Z");
 
+    private static readonly DateTimeOffset _thirdTestStart = DateTimeOffset.Parse("2026-03-01T05:00:00Z");
+
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -105,6 +107,56 @@ public sealed class ScheduledJobTests(ScheduleTriggerFixture fixture) : IClassFi
                 && entry.Contains(Source(second), StringComparison.Ordinal)
                 && entry.Contains("already running", StringComparison.Ordinal));
 
+        await ScheduleTriggerFixture.RunUntilIdleAsync("l", worker, CancellationToken);
+    }
+
+    [Fact]
+    public async Task Redelivering_the_dead_letter_of_a_scheduled_job_queues_the_fan_out_and_starts_the_process_once()
+    {
+        var tenant = fixture.Tenant("l");
+        var state = Assert.Single(await tenant.TriggerSchedulesAsync());
+        Assert.True(tenant.Model.TryGetProcess("Tally", out var process));
+        var worker = fixture.NewWorker();
+        var occurrence = _thirdTestStart;
+        var id = Guid.CreateVersion7();
+        var before = await InstanceCountAsync(tenant, process.Id);
+        await tenant.ScalarAsync(
+            """
+            INSERT INTO axis.dead_letters (id, kind, application_id, process_id, trigger_id, occurrence_at, attempts, last_error, state, created_at)
+            VALUES (@id, 'trigger.fanOut', @application, @process, @trigger, @occurrence, 5, 'System.InvalidOperationException', 'open', now())
+            """,
+            ("id", id),
+            ("application", tenant.Model.Manifest.Id),
+            ("process", process.Id),
+            ("trigger", state.TriggerId),
+            ("occurrence", occurrence));
+
+        DeadLetterResult result;
+        await using (var connection = await tenant.DataSource.OpenConnectionAsync(CancellationToken))
+        await using (var transaction = await connection.BeginTransactionAsync(CancellationToken))
+        {
+            result = await DeadLetterCommand.RedeliverAsync(
+                connection,
+                transaction,
+                tenant.Tenant,
+                tenant.Model,
+                state.ReleaseId,
+                process.Id,
+                id,
+                "maria",
+                "Maria",
+                "The job is fixed.",
+                CancellationToken);
+            await transaction.CommitAsync(CancellationToken);
+        }
+
+        Assert.Equal(DeadLetterOutcome.Settled, result.Outcome);
+        Assert.Equal("redelivered", (string?)await tenant.ScalarAsync("SELECT state FROM axis.dead_letters WHERE id = @id", ("id", id)));
+        await tenant.ScalarAsync("UPDATE axis.process_work_items SET due_at = now() - interval '1 minute' WHERE kind = @kind", ("kind", ProcessStarts.TriggerFanOutWorkItemKind));
+        await fixture.RunAsync("l", worker, 1, CancellationToken);
+
+        Assert.Equal(before + 1, await InstanceCountAsync(tenant, process.Id));
+        Assert.Equal("started", (await ReceiptAsync(tenant, state.TriggerId, occurrence)).Outcome);
         await ScheduleTriggerFixture.RunUntilIdleAsync("l", worker, CancellationToken);
     }
 
