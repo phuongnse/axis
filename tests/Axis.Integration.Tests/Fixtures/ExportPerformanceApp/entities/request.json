@@ -1,0 +1,37 @@
+{
+  "id": "095398aa-1b8d-47b1-ab5d-40467e2c7f6e",
+  "kind": "entity",
+  "name": "Request",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "required": true,
+      "maxLength": 100
+    },
+    {
+      "name": "amount",
+      "type": "integer"
+    },
+    {
+      "name": "department",
+      "type": "reference",
+      "target": "Department"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "values": [
+        "open",
+        "approved",
+        "rejected"
+      ]
+    },
+    {
+      "name": "createdOn",
+      "type": "date"
+    }
+  ]
+}
