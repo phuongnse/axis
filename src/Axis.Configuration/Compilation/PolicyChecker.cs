@@ -9,8 +9,11 @@ namespace Axis.Configuration.Compilation;
 /// Checks the policies of an application and builds the checked ones. Each role a policy names is
 /// a declared role, matched exactly. Each grant has exactly one target: an <c>entity</c>, a
 /// <c>dataSource</c>, a <c>process</c> or an <c>endpoint</c>. Its actions are ones that target
-/// takes: <c>read</c>, <c>create</c>, <c>update</c> and <c>delete</c> for an entity, <c>read</c> for
-/// a data source, <c>start</c>, <c>inspect</c>, <c>cancel</c>, <c>retry</c>, <c>resolve</c> and <c>reassign</c> for a process and <c>invoke</c> for an endpoint. Only an entity grant
+/// takes, as <c>policy.schema.json</c> lists them: <c>read</c>, <c>create</c>, <c>update</c>,
+/// <c>delete</c>, <c>export</c> and <c>import</c> for an entity, <c>read</c> and <c>export</c> for
+/// a data source, <c>start</c>, <c>inspect</c>, <c>cancel</c>, <c>retry</c>, <c>resolve</c> and <c>reassign</c> for a process and <c>invoke</c> for an endpoint. An
+/// <c>export</c> needs a <c>read</c> and an <c>import</c> needs a <c>create</c> on the same target
+/// in the same policy (<c>AXC0265</c>). Only an entity grant
 /// has a <c>filter</c> or <c>fields</c>. The target
 /// is loaded, ignoring letter case, and an entity target is not a child entity. Each of its
 /// <c>fields</c> is a field of the entity, ignoring letter case. Its <c>filter</c> parses,
@@ -23,10 +26,10 @@ namespace Axis.Configuration.Compilation;
 /// </summary>
 internal static class PolicyChecker
 {
-    private static readonly PolicyAction[] _entityActions = [PolicyAction.Read, PolicyAction.Create, PolicyAction.Update, PolicyAction.Delete];
-    private static readonly PolicyAction[] _dataSourceActions = [PolicyAction.Read];
-    private static readonly PolicyAction[] _processActions = [PolicyAction.Start, PolicyAction.Inspect, PolicyAction.Cancel, PolicyAction.Retry, PolicyAction.Resolve, PolicyAction.Reassign];
-    private static readonly PolicyAction[] _endpointActions = [PolicyAction.Invoke];
+    private static readonly PolicyAction[] _entityActions = [.. PolicyActions.Of("entity").Select(ParseAction)];
+    private static readonly PolicyAction[] _dataSourceActions = [.. PolicyActions.Of("dataSource").Select(ParseAction)];
+    private static readonly PolicyAction[] _processActions = [.. PolicyActions.Of("process").Select(ParseAction)];
+    private static readonly PolicyAction[] _endpointActions = [.. PolicyActions.Of("endpoint").Select(ParseAction)];
 
     /// <summary>
     /// Checks <paramref name="policies"/>, which come in path order. <paramref name="findRole"/>
@@ -91,6 +94,8 @@ internal static class PolicyChecker
                     modules,
                     Report);
             }
+
+            CheckCompanionActions(policy, Report);
         }
     }
 
@@ -155,6 +160,73 @@ internal static class PolicyChecker
             Roles = policy.Roles,
             Grants = policy.Grants.Select(BuildGrant).ToList(),
         };
+    }
+
+    /// <summary>
+    /// An <c>export</c> needs a <c>read</c>, and an <c>import</c> needs a <c>create</c>, on the same
+    /// target in the same policy. Targets match ignoring letter case. A grant without exactly one
+    /// target, and an action its target's kind does not take, are left to <c>AXC0091</c>.
+    /// </summary>
+    private static void CheckCompanionActions(PolicyResource policy, Action<string, string, string> report)
+    {
+        var held = new Dictionary<(string Kind, string Name), HashSet<string>>();
+        var grantTargets = new (string Kind, string Described, string Name)?[policy.Grants.Count];
+        for (var index = 0; index < policy.Grants.Count; index++)
+        {
+            var grant = policy.Grants[index];
+            if (new[] { grant.Entity, grant.DataSource, grant.Process, grant.Endpoint }.Count(target => target is not null) != 1)
+            {
+                continue;
+            }
+
+            (string Kind, string Described, string Name) target = grant switch
+            {
+                { Entity: { } entity } => ("entity", "entity", entity),
+                { DataSource: { } dataSource } => ("dataSource", "data source", dataSource),
+                { Process: { } process } => ("process", "process", process),
+                _ => ("endpoint", "endpoint", grant.Endpoint!),
+            };
+            grantTargets[index] = target;
+            var key = (target.Kind, target.Name.ToUpperInvariant());
+            if (!held.TryGetValue(key, out var actions))
+            {
+                held[key] = actions = new HashSet<string>(StringComparer.Ordinal);
+            }
+
+            actions.UnionWith(grant.Actions);
+        }
+
+        for (var index = 0; index < policy.Grants.Count; index++)
+        {
+            if (grantTargets[index] is not var (kind, described, name))
+            {
+                continue;
+            }
+
+            var actions = held[(kind, name.ToUpperInvariant())];
+            var takes = PolicyActions.Of(kind);
+            var grant = policy.Grants[index];
+            for (var actionIndex = 0; actionIndex < grant.Actions.Count; actionIndex++)
+            {
+                var action = grant.Actions[actionIndex];
+                var needs = action switch
+                {
+                    "export" => "read",
+                    "import" => "create",
+                    _ => null,
+                };
+                if (needs is null || !takes.Contains(action) || actions.Contains(needs))
+                {
+                    continue;
+                }
+
+                var why = action == "export" ? "An export reaches only what 'read' reaches." : "An import writes through 'create'.";
+                report(
+                    DiagnosticCodes.ActionWithoutRequiredGrant,
+                    $"An '{action}' on the {described} '{name}' needs a '{needs}' grant on it in the same policy. {why}",
+                    $"/grants/{index}/actions/{actionIndex}");
+            }
+        }
     }
 
     private static void CheckGrant(
@@ -322,6 +394,8 @@ internal static class PolicyChecker
             "create" => PolicyAction.Create,
             "update" => PolicyAction.Update,
             "delete" => PolicyAction.Delete,
+            "export" => PolicyAction.Export,
+            "import" => PolicyAction.Import,
             "start" => PolicyAction.Start,
             "invoke" => PolicyAction.Invoke,
             "inspect" => PolicyAction.Inspect,
@@ -329,7 +403,7 @@ internal static class PolicyChecker
             "retry" => PolicyAction.Retry,
             "resolve" => PolicyAction.Resolve,
             "reassign" => PolicyAction.Reassign,
-            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "The JSON Schema allows only read, create, update, delete, start, invoke, inspect, cancel, retry, resolve and reassign."),
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "The JSON Schema allows only read, create, update, delete, export, import, start, invoke, inspect, cancel, retry, resolve and reassign."),
         };
 
     private static string Name(PolicyAction action) => action.ToString().ToLowerInvariant();

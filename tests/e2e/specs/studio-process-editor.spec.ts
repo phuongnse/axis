@@ -4,6 +4,7 @@ import path from 'node:path'
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { startServer } from '../activate'
+import { dragTo } from '../design-drag'
 import { pickAction, pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
@@ -233,6 +234,54 @@ test.describe('Studio edits a process in the process editor', () => {
       await page.getByRole('button', { name: 'Undo', exact: true }).click()
       // The save marked steps by the saved file's numbers, so the restored node may carry another node's mark.
       await expect(page.getByTestId(`studio-graph-node-${removed}`)).toHaveAccessibleName(/^markReturned · operation/)
+    } finally {
+      await writeFile(target, original)
+    }
+  })
+
+  test('an author drags a type onto an edge, inserts another after it by keyboard and finds both wired in the saved file', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    const id = await processId(page)
+    const target = path.join(copy, file)
+    const original = await readFile(target, 'utf8')
+
+    try {
+      // The earlier journeys changed the copy, so the steps are found by name.
+      const content = JSON.parse(original) as { steps: { name: string }[] }
+      const indexOf = (name: string) => content.steps.findIndex((step) => step.name === name)
+      const rejected = indexOf('markRejected')
+      expect(rejected).toBeGreaterThan(0)
+      const announcement = page.getByTestId('studio-process-announcement')
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+
+      await expect(page.getByTestId(`rf__edge-/steps/${rejected}/next`)).toHaveAccessibleName(
+        'markRejected to done · next',
+      )
+      await dragTo(
+        page,
+        'studio-process-design',
+        page.getByTestId('studio-process-palette-updateRecord'),
+        page.getByTestId(`studio-process-edge-drop-/steps/${rejected}/next`),
+      )
+      await expect(announcement).toHaveText('Step updateRecord1 added after markRejected')
+
+      await page.getByTestId('studio-process-palette-raiseEvent').focus()
+      await page.keyboard.press('Enter')
+      await expect(announcement).toHaveText('Step raiseEvent1 added after updateRecord1')
+
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
+      await expect(page.getByTestId('studio-saved')).toBeVisible()
+      const saved = JSON.parse(await readFile(target, 'utf8')) as { steps: Record<string, unknown>[] }
+      const named = (name: string) => saved.steps.find((step) => step.name === name)
+      expect(named('markRejected')?.next).toBe('updateRecord1')
+      expect(named('updateRecord1')).toMatchObject({
+        type: 'operation',
+        operation: 'updateRecord',
+        next: 'raiseEvent1',
+      })
+      expect(named('raiseEvent1')).toMatchObject({ type: 'operation', operation: 'raiseEvent', next: 'done' })
     } finally {
       await writeFile(target, original)
     }

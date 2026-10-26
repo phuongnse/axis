@@ -248,6 +248,7 @@ public static class DiagnosticCodes
     public const string InvalidFileMaxSize = "AXC0257";
     public const string InvalidFileAccept = "AXC0258";
     public const string FileFieldNotAllowed = "AXC0259";
+    public const string ActionWithoutRequiredGrant = "AXC0265";
     public const string EmptyNotifyRecipients = "AXC0266";
     public const string InvalidNotifyRecipient = "AXC0267";
     public const string UnknownNotifyRole = "AXC0268";
