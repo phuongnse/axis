@@ -158,7 +158,7 @@ public static class FormStateEvaluator
         if (stored is null)
         {
             // A field with a parse error is not left out: the user sent something, so it gets no default.
-            var defaults = RecordDefaults.Apply(entity, input.Values, now);
+            var defaults = RecordDefaults.Apply(entity, input.Values, now, application.TimeZone);
             var given = input.Values.Select(value => value.Field.Name).ToHashSet(StringComparer.Ordinal);
             var sent = new HashSet<string>(given, StringComparer.Ordinal);
             sent.UnionWith(draft.Errors.Keys.Select(FieldOf).OfType<string>());

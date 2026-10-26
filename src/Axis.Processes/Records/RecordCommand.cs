@@ -191,7 +191,7 @@ public static class RecordCommand
             // now() is its start time. The defaults and the creator fields are set before the computed fields
             // and validations, so they see the record as it will be stored.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var defaults = RecordDefaults.Apply(model, input.Values, now);
+            var defaults = RecordDefaults.Apply(model, input.Values, now, application.TimeZone);
             if (defaults.Errors is { } defaultErrors)
             {
                 await transaction.RollbackAsync(cancellationToken);

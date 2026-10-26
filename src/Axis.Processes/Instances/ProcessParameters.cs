@@ -77,19 +77,20 @@ internal static class ProcessParameters
 
     /// <summary>
     /// Evaluates <paramref name="expression"/> over <paramref name="values"/>, with <paramref name="now"/> as
-    /// the time of <c>now()</c>. A parameter that holds a decimal that cannot be held exactly is a
+    /// the time of <c>now()</c> and <paramref name="timeZone"/> as the zone of <c>today()</c> and <c>toDate</c>. A parameter that holds a decimal that cannot be held exactly is a
     /// <see cref="ExpressionRuntimeErrorKind.DecimalOverflow"/> error, as it is for a record field.
     /// </summary>
-    public static ExpressionEvaluationResult Evaluate(ExpressionModel expression, ParameterValues values, DateTimeOffset now)
+    public static ExpressionEvaluationResult Evaluate(ExpressionModel expression, ParameterValues values, DateTimeOffset now, TimeZoneInfo timeZone)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(timeZone);
         return values.Inexact is { } name
             ? new ExpressionEvaluationResult(null, new ExpressionRuntimeError(
                 ExpressionRuntimeErrorKind.DecimalOverflow,
                 $"The stored value of the parameter '{name}' cannot be held exactly as a decimal at character 1.",
                 0))
-            : ExpressionInterpreter.Evaluate(expression.Syntax, expression.Check, values.Values, null, now);
+            : ExpressionInterpreter.Evaluate(expression.Syntax, expression.Check, values.Values, null, now, timeZone);
     }
 }
 
