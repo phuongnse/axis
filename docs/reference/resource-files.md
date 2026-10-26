@@ -913,7 +913,7 @@ The `application` manifest may name the application's time zone, see [D75](../de
 - `timeZone` is optional. It is an IANA time zone id. Without it, the time
   zone is `UTC`, so an application that names none behaves as before. An id
   is known when .NET finds it as an IANA id written with its exact letter
-  case, as for a schedule trigger. An unknown id is `AXC0266` at
+  case, as for a schedule trigger. An unknown id is `AXC0274` at
   `/timeZone`. Studio's application form offers `timeZone`.
 - It is part of the release. A change applies to work that runs on the new
   release.
