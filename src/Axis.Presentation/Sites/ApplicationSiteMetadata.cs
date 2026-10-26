@@ -12,7 +12,8 @@ public sealed record SiteListItem(string Path, string TitleKey, IReadOnlyDiction
 
 /// <summary>What the SPA needs to build an application site's shell: title, locales and navigation.</summary>
 /// <param name="TitleKey">Text key of the site title.</param>
-public sealed record ApplicationSite(string Path, string TitleKey, SiteLocales Locales, IReadOnlyList<SiteNavigationItem> Navigation);
+/// <param name="NotificationsPath">The address of the application's notification routes, which the shell's bell reads.</param>
+public sealed record ApplicationSite(string Path, string TitleKey, SiteLocales Locales, IReadOnlyList<SiteNavigationItem> Navigation, string NotificationsPath);
 
 /// <summary>One navigation entry of an application site: the page it opens and the text key of its label.</summary>
 public sealed record SiteNavigationItem(string Page, string LabelKey);

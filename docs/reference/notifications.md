@@ -8,8 +8,8 @@ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 The [user profiles](#user-profiles) section, the compile checks of the notify
 operation and of placeholders, the run of the notify step and the storage of
 in-app notifications, the routes that list them and mark them read, and their
-retention are built. The bell and email are _(planned for M14)_, as is
-everything else in this file that says so. The design follows
+retention are built, and so is the bell in the site shell. Email is
+_(planned for M14)_, as is everything else in this file that says so. The design follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
 [D75](../decisions/d75-the-application-time-zone.md). New compile problems are
@@ -135,8 +135,21 @@ A text value may hold named placeholders, such as
   whose `created_at` is older than that by its own clock, with their
   `axis.notification_reads` rows in one transaction, when the tenant becomes
   ready and then every 24 hours.
-- **Site shell.** A bell in the site header shows the unread count. It opens
-  the list. A row opens its page, if it has one, and marks it read.
+- **Site shell.** A bell in the header of an application site shows the
+  signed-in user's unread count for that application, and no count when
+  nothing is unread. The platform site has no bell. `GET /api/sites/{path}`
+  gives the address of the notification routes as `notificationsPath`.
+  - The bell is a button with the accessible name "Notifications, 2 unread", or
+    "Notifications" with no count. A polite live region announces a change of
+    the count.
+  - The bell opens a panel that lists the notifications newest first, 10 to a
+    page, each with its subject, body and time. Unread rows are marked. A Mark
+    all read button sits at the top.
+  - A row opens its page, if it has one, with its parameters and marks the
+    notification read. A row without a page only marks it read.
+  - The count reloads when the site loads, on every page navigation, when the
+    panel opens and after any mark read. There is no timer. A failure to read
+    the list hides the bell and never starts sign-in.
 
 ## Email
 
