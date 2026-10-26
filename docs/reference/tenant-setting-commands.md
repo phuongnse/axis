@@ -34,11 +34,14 @@ built, see [installation key](#installation-key). The
 ## Deployment bindings
 
 - `tenant binding list <id>` prints a table of each binding's name, kind and value, ordered by
-  name. A `url` binding shows its URL. A `secret` binding shows `(hidden)` when it has a value and
+  name. A `url` binding shows its URL and a `storage` binding shows its value, `database`. A `secret` binding shows `(hidden)` when it has a value and
   `(not set)` when it has none, never the value. It also lists a tenant that is still
   `provisioning`.
 - `tenant binding set <id> <name> --url <value>` adds or replaces a `url` binding. The value is an
   absolute `http` or `https` URL.
+- `tenant binding set <id> <name> --storage database` adds or replaces a `storage` binding. Its only
+  value is `database`. Any other value exits with code 2 and writes nothing, not even an audit
+  record.
 - `tenant binding set <id> <name> --secret` adds or replaces a `secret` binding. The value comes from
   `AXIS_BINDING_SECRET`, or from standard input when the variable is not set. The value is stored
   encrypted and never printed. An empty value exits with code 2. With the variable unset and a

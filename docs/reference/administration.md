@@ -341,7 +341,7 @@ A tenant in any status except `provisioning` can be backed up, also a
 | `claimLocale` | The claim name of the locale, or `null` for the default. |
 | `endpointAudience` | The endpoint audience, or `null` for the default. |
 | `serviceAudience` | The service audience, or `null` when the tenant accepts no service account token. An archive from before the field reads as `null`. |
-| `bindings` | The bindings, in ordinal order of the name. Each has `name`, `kind` and, for a `url` binding, `url`. |
+| `bindings` | The bindings, in ordinal order of the name. Each has `name`, `kind` and, for a `url` or `storage` binding, `url`. |
 
 An archive written before `claimEmail` and `claimLocale` existed has neither, and a
 restore reads both as `null`.
@@ -417,7 +417,9 @@ it keeps working without the module installed.
 1. `check`: read the archive and make every check above.
 2. `entry`: write the directory entry with status `provisioning`. It takes the
    new id and hosts, and everything else from `directory` in the manifest. A
-   `secret` binding is restored by name and kind, without a value.
+   `secret` binding is restored by name and kind, without a value. A `url` or `storage`
+   binding is restored with its value. The check refuses an archive whose `storage` binding has
+   a value other than `database`.
 3. `roles`: create `axis_<id>_schema` and `axis_<id>_runtime` with new random
    passwords, as `tenant create` does.
 4. `database`: create `axis_<id>`, owned by the schema role.
