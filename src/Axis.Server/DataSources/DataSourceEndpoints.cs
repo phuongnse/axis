@@ -1,15 +1,19 @@
 using System.Globalization;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Data.Audit;
 using Axis.Data.DataSources;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Records;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
+using Axis.Server.Exports;
 using Axis.Server.Http;
 using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Npgsql;
 
 namespace Axis.Server.DataSources;
 
@@ -48,6 +52,12 @@ internal static class DataSourceEndpoints
         {
             var rows = endpoints.MapGroup(pattern).WithMetadata(ServiceAccountRoute.Instance);
             rows.MapGet("", ListAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
+        }
+
+        // Only a signed-in user exports, so a service account never reaches it.
+        foreach (var pattern in new[] { "/api/apps/{app}/data-sources/{dataSource}/export", "/api/apps/{app}/data-sources/{module}/{dataSource}/export" })
+        {
+            endpoints.MapGet(pattern, ExportAsync).WithQueryTimeout(QueryTimeoutSettings.Export);
         }
     }
 
@@ -155,6 +165,152 @@ internal static class DataSourceEndpoints
 
         return Results.Ok(new DataSourceRowsResponse([.. result.Items.Select(fields.Visible)], pageNumber, size, result.TotalCount));
     }
+
+    // An export takes the query of the rows route without its paging. The grants, the filters and the
+    // field checks are the rows route's, and the export grant is checked in place of the read grant.
+    // The rows are written to a temporary file, so the file is complete before the audit record and
+    // before any byte is sent. A grouped data source writes its group fields, then its measures.
+    private static async Task<IResult> ExportAsync(
+        HttpContext context,
+        string app,
+        string dataSource,
+        string? sort,
+        string? format,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ExportSettings export,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(context) is not { } user)
+        {
+            return Grants.SignInRequired(context);
+        }
+
+        if (await resolver.ResolveAsync(app, cancellationToken) is not { } application)
+        {
+            return NotFound("No application is active under this name.");
+        }
+
+        if (!application.TryGetDataSource(DataSourceName(context, dataSource), out var model))
+        {
+            return NotFound("The application has no data source with this name.");
+        }
+
+        if (!PolicyEvaluator.AllowsExport(application, user.Roles, model)
+            || DataSourceFieldAccess.Read(application, user.Roles, model) is not { } fields)
+        {
+            return Grants.Forbidden();
+        }
+
+        // AllowsExport found the root entity, so it is in the model.
+        var root = application.FindEntity(model.Entity.Id)!;
+        var read = PolicyEvaluator.Access(application, user.Roles, root, PolicyAction.Read);
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application, root, pendingFilters, loggerFactory, cancellationToken))
+        {
+            return Grants.PendingFilter();
+        }
+
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var order = DataSourceSort.Default(model);
+        if (!string.IsNullOrEmpty(sort) && !DataSourceSort.TryParse(sort, model, out order))
+        {
+            errors["sort"] = ["Must be a projected field name that is not a reference, or a group field or measure name when the data source is grouped, optionally preceded by '-'."];
+        }
+
+        var parameters = DataSourceParameterReader.Read(context.Request.QueryString, model, errors);
+        ExportFile.TryParseFormat(format, errors, out var exportFormat);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        // A sort, a group field, a measure or a filter on a field that is being recomputed would decide from a stale stored value.
+        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, cancellationToken);
+        if (pending.Count > 0)
+        {
+            return Results.ValidationProblem(pending.ToDictionary(), statusCode: StatusCodes.Status409Conflict, title: "A field is being recomputed.");
+        }
+
+        var condition = read.Filters is { } filters
+            ? RecordFilters.Condition(application, root, [.. filters.Select(filter => filter.Expression)], user.Id)
+            : null;
+        var columns = ExportColumns(model);
+        string?[] Cells(DataSourceRow row)
+        {
+            var visible = fields.Visible(row);
+            return [.. columns.Select(column => ExportValues.Format(
+                column.Type,
+                visible.Values.GetValueOrDefault(column.Name),
+                visible.Labels.TryGetValue(column.Name, out var label) ? JsonValue.Create(label) : null))];
+        }
+
+        try
+        {
+            return await ExportFile.RunAsync(
+                context,
+                database,
+                connection,
+                exportFormat,
+                model.Name,
+                columns,
+                DataSourceQueries.ReadAllAsync(connection, application, model, order, parameters, condition, export.MaxRows + 1, cancellationToken),
+                Cells,
+                export.MaxRows,
+                (rows, truncated) => new AuditEntry(
+                    user.Id,
+                    AuditActions.RecordsExported,
+                    application.Manifest.Id,
+                    null,
+                    null,
+                    null,
+                    new JsonObject
+                    {
+                        ["dataSourceId"] = model.Id,
+                        ["format"] = exportFormat.Name(),
+                        ["rowCount"] = rows,
+                        ["truncated"] = truncated,
+                    },
+                    user.DisplayName),
+                cancellationToken);
+        }
+        catch (PostgresException exception) when (exception.SqlState.StartsWith("22", StringComparison.Ordinal))
+        {
+            // PostgreSQL cannot say which part of the WHERE clause failed, so every read filter is named.
+            if (read.Filters is not null)
+            {
+                var logger = loggerFactory.CreateLogger(typeof(DataSourceEndpoints).FullName!);
+                foreach (var filter in read.Filters)
+                {
+                    RecordFilterLog.DataSourceFailed(logger, filter.Policy, filter.Grant, model.Name);
+                }
+            }
+
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "The data source filter could not be evaluated for these rows.");
+        }
+    }
+
+    // The columns of a row in the order the row holds them. A count is an integer, a sum a decimal, and a
+    // minimum or maximum has the type of its field.
+    private static List<ExportColumn> ExportColumns(DataSourceModel model) =>
+        model.Aggregate is { } aggregate
+            ?
+            [
+                .. aggregate.GroupBy.Select(field => new ExportColumn(field.Name, field.Field.Type)),
+                .. aggregate.Measures.Select(measure => new ExportColumn(
+                    measure.Name,
+                    measure.Function switch
+                    {
+                        AggregateFunction.Count => FieldType.Integer,
+                        AggregateFunction.Sum => FieldType.Decimal,
+                        _ => measure.Field!.Field.Type,
+                    })),
+            ]
+            : [.. model.Fields.Select(field => new ExportColumn(field.Name, field.Field.Type))];
 
     // The route of a module data source has a module segment before the data source name.
     private static string DataSourceName(HttpContext context, string dataSource) =>

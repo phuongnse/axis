@@ -61,8 +61,8 @@ see [task deadlines](task-deadlines.md#escalations-and-deadline).
 A `subProcess` step starts its child and waits, and a `process.resume` item
 resumes the parent when the child completes, see
 [Sub-process step](process-flow.md#sub-process-step).
-_(Planned for M14)_ The worker also runs `timer` and `waitEvent` steps, the
-`createRecord` operation and the email of a `notify` operation, with the work item kinds
+_(Planned for M14)_ The worker also runs `timer` and `waitEvent` steps and the email of a
+`notify` operation, with the work item kinds
 `process.timer`, `task.escalate` and `notification.email`, see [process flow](process-flow.md),
 [task deadlines](task-deadlines.md) and [notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
@@ -75,8 +75,11 @@ one transaction:
 3. It reads the subject record and runs the step. An `updateRecord`
    operation first locks the subject record's row, so it reads the latest
    stored version, and a user's write of the same record waits until the
-   step's transaction ends. A `callConnector`, `raiseEvent` or `notify` step only
-   reads the record, so it takes no lock.
+   step's transaction ends. A `callConnector`, `raiseEvent`, `createRecord` or `notify`
+   step only reads the record, so it takes no lock on it. An `updateRecord`,
+   `raiseEvent` or `createRecord` step takes the application's start lock
+   shared first, since it can start an instance. A `createRecord` step in a
+   process without a subject takes it too.
    Every read of the subject record computes a
    [pending field](migrations.md#recomputing-computed-fields) with the active
    release and does not store the result. That covers decisions, `set`
@@ -101,6 +104,10 @@ one transaction:
    - A **package operation** step evaluates each `input` expression on the
      record. A required input that gives `null` fails the step. The instance
      becomes `waiting` on the step.
+   - A **`createRecord`** operation evaluates each `set` expression on the
+     record, or on the parameters of a process without a subject. A value that
+     fails at run time fails the step. The instance stays `running` on its
+     `next` step.
    - A **`raiseEvent`** operation evaluates each `fields` expression on the
      record. A payload field that gives `null` is stored as `null`. The
      instance stays `running` on its `next` step.
@@ -152,22 +159,36 @@ one transaction:
    field is refused. Computed fields are recomputed, validations run, and the
    record's version goes up by one. A refused write is an error, keyed and worded as in the
    [record API](record-api.md#child-rows-computed-fields-and-validations).
+
+   A `createRecord` operation then creates its record in the step's
+   transaction, as `system`, the way a record create does after its grant
+   check: it applies the defaults of the fields `set` leaves out, sets each
+   creator field to `system`, computes the computed fields, runs the
+   validations and gives each sequence field its number. A `null` for a
+   required field, and a required field with no value and no default, are
+   refused with `Required.`. A refused create is an error that fails the step
+   and leaves no record, no sequence number taken and no audit record. The
+   history output is `{ "next", "recordId" }`. See
+   [Create record operation](process-flow.md#create-record-operation).
 6. It writes the step's history row and its audit records, all with the actor
    `system`:
    - An `updateRecord` operation first writes `record.updated` for the
      subject record, with the instance id. Its details are
      `{ "version", "fields" }`, as the
      [record API](record-api.md#audit-records-and-history) writes them.
-   - A decision, an `updateRecord` operation, a `raiseEvent` operation and a
-     `notify` operation write `process.stepCompleted` with details `{ "step", "next" }`.
+   - A `createRecord` operation first writes `record.created` for the new
+     record, with the instance id. Its details are `{ "version" }`.
+   - A decision, an `updateRecord` operation, a `createRecord` operation, a
+     `raiseEvent` operation and a `notify` operation write `process.stepCompleted`
+     with details `{ "step", "next" }`.
    - A task step writes `task.created` with details `{ "step", "taskId" }`.
    - A `callConnector` step writes `connector.callStaged` with details
      `{ "step", "connector", "operation", "operationId" }`.
    - A package operation step writes `operation.staged` with details
      `{ "step", "package", "version", "operation", "operationId" }`.
    - An end step writes `process.completed` with details `{ "step" }`.
-7. A decision, an `updateRecord` operation, a `raiseEvent` operation and a
-   `notify` operation insert the work item of the next step. A task step inserts none, because
+7. A decision, an `updateRecord` operation, a `createRecord` operation, a
+   `raiseEvent` operation and a `notify` operation insert the work item of the next step. A task step inserts none, because
    the instance waits for the task. A `callConnector` step inserts a
    `connector.call` item for its call instead, and a package operation step
    inserts a `package.call` item.

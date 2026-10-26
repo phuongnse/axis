@@ -22,6 +22,10 @@ internal static class RecordInputMessages
 
     public const string FieldNames = "Must be an array of field names.";
 
+    public const string MustBeIdArray = "Must be an array of record ids.";
+
+    public const string DuplicateId = "Duplicate id.";
+
     public const string Text = "Must be a text value.";
 
     public const string NullCharacter = "Must not contain the null character.";
@@ -51,6 +55,9 @@ internal static class RecordInputMessages
     public const string Computed = "Cannot be set.";
 
     public const string NotComputable = "Could not be computed.";
+
+    public static string MaxIds(int maxIds) =>
+        string.Create(CultureInfo.InvariantCulture, $"Must hold at most {maxIds} ids.");
 
     public static string MaxLength(int maxLength) =>
         string.Create(CultureInfo.InvariantCulture, $"Must be at most {maxLength} characters.");

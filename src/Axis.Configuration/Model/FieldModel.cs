@@ -90,7 +90,7 @@ public sealed record FieldModel
     /// <summary>
     /// Whether the field is stored in a column of its entity's table. A child collection has no
     /// column: its rows live in the child entity's table. A references field has none either: its
-    /// links will live in a table of their own.
+    /// links live in a table of their own.
     /// </summary>
     public bool HasColumn => Type is not (FieldType.ChildCollection or FieldType.References);
 }

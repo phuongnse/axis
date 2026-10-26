@@ -530,6 +530,7 @@
   "shell.studio.process.output": "Output",
   "shell.studio.process.connectorOutput": "Connector output",
   "shell.studio.process.event": "Event",
+  "shell.studio.process.createEntity": "Entity to create",
   "shell.studio.process.eventFields": "Event fields",
   "shell.studio.process.eventField": "Event field",
   "shell.studio.process.retry": "Retry",

@@ -49,7 +49,7 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
     }
 
     [Fact]
-    public async Task Every_interactive_read_route_in_the_endpoint_map_runs_under_the_timeout()
+    public async Task Every_read_route_in_the_endpoint_map_runs_under_its_timeout()
     {
         await fixture.ResetAsync();
         var id = await InsertItemAsync(SecretName);
@@ -60,6 +60,17 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
             .ToList();
         Assert.NotEmpty(routes);
 
+        // An export route is a read route too. It runs under its own limit, and it needs a format.
+        var exports = routes.Where(IsExport).Select(route => route.RoutePattern.RawText).ToList();
+        Assert.Equal(
+            [
+                "/api/apps/{app}/data-sources/{dataSource}/export",
+                "/api/apps/{app}/data-sources/{module}/{dataSource}/export",
+                "/api/apps/{app}/entities/{entity}/records/export",
+                "/api/apps/{app}/entities/{module}/{entity}/records/export",
+            ],
+            exports.Order(StringComparer.Ordinal));
+
         // Each route resolves the application or the site first, so locking the release tables stalls every one of them.
         await using var host = CreateHost();
         using var client = host.CreateClient().SignedInAs("anna");
@@ -69,14 +80,15 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
             foreach (var route in routes)
             {
                 var pattern = route.RoutePattern;
-                Assert.Contains(route.Metadata.GetOrderedMetadata<QueryTimeoutMetadata>(), metadata => metadata.Setting == "Data:QueryTimeout");
+                var setting = IsExport(route) ? "Data:ExportQueryTimeout" : "Data:QueryTimeout";
+                Assert.Contains(route.Metadata.GetOrderedMetadata<QueryTimeoutMetadata>(), metadata => metadata.Setting == setting);
                 var path = pattern.RawText!;
                 foreach (var parameter in pattern.Parameters)
                 {
                     path = path.Replace($"{{{parameter.Name}}}", Fill(parameter.Name, id), StringComparison.Ordinal);
                 }
 
-                using var response = await GetAsync(client, path);
+                using var response = await GetAsync(client, IsExport(route) ? $"{path}?format=csv" : path);
 
                 Assert.True(response.StatusCode == HttpStatusCode.ServiceUnavailable, $"{pattern.RawText} answered {(int)response.StatusCode}.");
             }
@@ -166,6 +178,8 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
         "/api/sites/{path}/pages/",
     ];
 
+    private static bool IsExport(RouteEndpoint route) => route.RoutePattern.RawText!.EndsWith("/export", StringComparison.Ordinal);
+
     private static string Fill(string parameter, Guid id) => parameter switch
     {
         "app" => "RecordsApp",
@@ -188,6 +202,7 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
         fixture.Factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Data:QueryTimeout", "00:00:00.200");
+            builder.UseSetting("Data:ExportQueryTimeout", "00:00:00.200");
             builder.UseSetting(
                 "Tenants:a:ConnectionString",
                 PostgreSqlServer.RuntimeConnectionString(fixture.ConnectionString(TenantA)) + ";Maximum Pool Size=1;No Reset On Close=true");

@@ -255,7 +255,7 @@ public sealed class ComputedRecomputeActivationTests(DataDatabaseFixture databas
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync(CancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(CancellationToken);
-        var result = await RecordCommands.UpdateAsync(connection, model, order, releaseId, orderId, version, [new RecordValue(note, "changed")], sent, CancellationToken);
+        var result = await RecordCommands.UpdateAsync(connection, model, order, releaseId, orderId, version, [new RecordValue(note, "changed")], sent, cancellationToken: CancellationToken);
         await transaction.CommitAsync(CancellationToken);
         return result;
     }

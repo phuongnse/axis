@@ -507,7 +507,8 @@ is `AXC0013`.
 
 ### Types and properties added in M15
 
-These are _(planned for M15)_. They follow
+These are _(planned for M15)_, except [`indexes`](#indexes), which is built.
+They follow
 [D76](../decisions/d76-file-money-and-enum-label-field-types.md),
 [D77](../decisions/d77-indexes-defaults-and-ranges.md),
 [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md) and
@@ -530,10 +531,10 @@ new check is a new compile diagnostic.
   entity is `AXC0040`, and one without a `displayField` is `AXC0030`. A
   `references` field on a child entity is `AXC0041`. It has no column, so a
   data source cannot project it (`AXC0043`), an endpoint cannot map it
-  (`AXC0121`) and a process `updateRecord` cannot set it. Its storage and the
-  record API are still planned, so until they land the record API leaves the
-  field out of record values and a body that sets it is a `400` unknown
-  property.
+  (`AXC0121`) and a process `updateRecord` cannot set it. The record API
+  writes it as an array of record ids and reads it with its labels, see
+  [reading values](record-api.md#reading-values). Its links live in a junction
+  table, see [storage](storage.md#schema-planning).
 - **`valueLabels`.** On an `enum` field, a map from every value to a
   `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
   "priority.low" } }`. It covers every value, and its keys join `AXC0028`. An
@@ -562,11 +563,28 @@ new check is a new compile diagnostic.
 - **`searchable`.** On a `text` field. `search` reads every searchable field,
   and the display field is always searchable. See
   [paging and sorting](record-api.md#paging-and-sorting).
-- **`indexes`.** On the entity, a list of `{ "fields": [ ... ] }` with an
-  optional `"unique": true`. Each field is a root field that is not a
-  `child-collection`, `references` or `file`. Two indexes over the same
-  fields in the same order are a diagnostic. See
-  [schema planning](storage.md#schema-planning).
+
+### Indexes
+
+`indexes` is built. On the entity, it is a list of
+`{ "fields": [ ... ] }` with an optional `"unique": true`. See
+[D77](../decisions/d77-indexes-defaults-and-ranges.md) and
+[schema planning](storage.md#schema-planning).
+
+- **`fields`.** One to 32 distinct field names of the entity, matched
+  ignoring letter case. They are the index columns, in order. An empty list,
+  a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
+- **Field types.** An index holds a field that has a column. A
+  `child-collection`, `references` or `file` field is `AXC0276`. A `references`
+  field has no column, because a junction table holds its links.
+- **Compile diagnostics.** Each is reported in the entity file:
+  - `AXC0274`: an index lists the same fields in the same order as an earlier
+    one, at `/indexes/{j}/fields`.
+  - `AXC0275`: a name in `fields` is no field of the entity, at
+    `/indexes/{j}/fields/{k}`.
+  - `AXC0276`: a field of a type an index cannot hold, at the same path.
+- **Every reference.** Every `reference` field and every child table's
+  `owner_id` is indexed without a declaration.
 
 ## Entity logic
 

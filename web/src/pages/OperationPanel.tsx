@@ -19,7 +19,7 @@ function text(value: unknown): string {
 }
 
 /**
- * The panel of an `operation` step: the operation to run and its properties. An operation is one of the three built
+ * The panel of an `operation` step: the operation to run and its properties. An operation is one of the four built
  * in, or a package's operation that is typed as `<package>/<operation>`. A key the operation forbids is not shown,
  * and the step keeps it until the author removes it in the JSON view.
  */
@@ -98,6 +98,9 @@ export function OperationPanel({
         </>
       )}
       {operation === 'raiseEvent' && <EventChoice pointer={pointer} step={step} names={names} onChange={onChange} />}
+      {operation === 'createRecord' && (
+        <CreateEntityChoice pointer={pointer} step={step} names={names} onChange={onChange} />
+      )}
       {isPackage && <ConnectorMappings pointer={pointer} step={step} fields={fields} onChange={onChange} />}
     </>
   )
@@ -224,6 +227,59 @@ function EventChoice({
         value={step.fields}
         keyLabel={t('shell.studio.process.eventField')}
         keyOptions={payload}
+        target={{ kind: 'expression' }}
+        onChange={onChange}
+      />
+    </>
+  )
+}
+
+/** The entity a `createRecord` step creates a record of and its `set`, which is keyed by that entity's fields. */
+function CreateEntityChoice({
+  pointer,
+  step,
+  names,
+  onChange,
+}: {
+  pointer: string
+  step: Content
+  names: StudioNames | null
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const entityPointer = `${pointer}/entity`
+  const entity = text(step.entity)
+  const entityLabel = t('shell.studio.process.createEntity')
+  const fields = names?.entities
+    .find((item) => item.name.toLowerCase() === entity.toLowerCase())
+    ?.fields.map((field) => field.name)
+
+  return (
+    <>
+      <div data-testid={`studio-field-${entityPointer}`}>
+        <div>{entityLabel}</div>
+        {names === null ? (
+          <Input
+            aria-label={entityLabel}
+            value={entity}
+            onChange={(input) => onChange(entityPointer, input.target.value)}
+          />
+        ) : (
+          <ReferencePicker
+            name={entityLabel}
+            value={entity}
+            required
+            options={names.entities.map((item) => item.name)}
+            onChange={(next) => onChange(entityPointer, next ?? '')}
+          />
+        )}
+      </div>
+      <MappingRows
+        pointer={`${pointer}/set`}
+        title={t('shell.studio.process.set')}
+        value={step.set}
+        keyLabel={t('shell.studio.process.field')}
+        keyOptions={fields}
         target={{ kind: 'expression' }}
         onChange={onChange}
       />
