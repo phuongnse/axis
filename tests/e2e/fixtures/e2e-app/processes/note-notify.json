@@ -1,0 +1,25 @@
+{
+  "id": "fe60fe84-6101-40d8-b55c-aee689b0454c",
+  "kind": "process",
+  "name": "NoteNotify",
+  "formatVersion": 1,
+  "entity": "Note",
+  "start": "tell",
+  "steps": [
+    {
+      "name": "tell",
+      "type": "operation",
+      "operation": "notify",
+      "to": [{ "user": "createdBy" }],
+      "channels": ["inApp"],
+      "message": {
+        "subject": { "textKey": "noteNotify.subject" },
+        "body": { "textKey": "noteNotify.body" },
+        "values": { "title": "title" }
+      },
+      "open": { "page": "NoteDetail", "parameters": { "note": "id" } },
+      "next": "end"
+    },
+    { "name": "end", "type": "end" }
+  ]
+}

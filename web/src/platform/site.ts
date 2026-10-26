@@ -36,6 +36,8 @@ export interface ApplicationSite {
   titleKey: string
   locales: SiteLocales
   navigation: { page: string; labelKey: string }[]
+  /** The address of the application's notification routes. */
+  notificationsPath?: string | null
 }
 
 /** A field type as written in entity files. */

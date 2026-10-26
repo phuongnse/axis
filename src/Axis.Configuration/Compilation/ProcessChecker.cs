@@ -4,6 +4,7 @@ using Axis.Configuration.Packages;
 using Axis.Configuration.Resources;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Parsing;
+using Axis.Expressions.Syntax;
 using Axis.Expressions.Typing;
 
 namespace Axis.Configuration.Compilation;
@@ -198,7 +199,7 @@ internal static class ProcessChecker
 
             CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, findRole, unloadedRoleNames, references, Report);
 
-            CheckEscalations(process, scope, findRole, unloadedRoleNames, findPage, unloadedPageNames, textValues, references, Report, diagnostics);
+            CheckEscalations(process, entity, scope, findEntity, findRole, unloadedRoleNames, findPage, unloadedPageNames, textValues, references, Report, diagnostics);
 
             CheckTimers(process, scope, references, Report);
 
@@ -1169,8 +1170,25 @@ internal static class ProcessChecker
     /// problem, or null. When it type-checks, the rules it calls are added to <paramref name="references"/> at <paramref name="path"/>.
     /// </summary>
     private static ExpressionDiagnostic? CheckExpression(
-        Resource process, string expression, ExpressionScope scope, ExpressionType expected, string path, ReferenceIndexBuilder references)
+        Resource process, string expression, ExpressionScope scope, ExpressionType expected, string path, ReferenceIndexBuilder references) =>
+        CheckExpression(process, expression, scope, expected, path, references, out _, out _);
+
+    /// <summary>
+    /// Like the overload without outputs, and also gives the parsed expression and its check result
+    /// when the expression type-checks, and null for both otherwise.
+    /// </summary>
+    private static ExpressionDiagnostic? CheckExpression(
+        Resource process,
+        string expression,
+        ExpressionScope scope,
+        ExpressionType expected,
+        string path,
+        ReferenceIndexBuilder references,
+        out ExpressionNode? node,
+        out ExpressionCheckResult? result)
     {
+        node = null;
+        result = null;
         var parsed = ExpressionParser.Parse(expression);
         if (!parsed.Succeeded)
         {
@@ -1182,6 +1200,8 @@ internal static class ProcessChecker
         if (check.Succeeded)
         {
             references.AddRuleCalls(process, path, check);
+            node = parsed.Expression;
+            result = check;
         }
 
         references.RecordExpression(process, path, check.Type, check.Diagnostic);
@@ -1269,7 +1289,9 @@ internal static class ProcessChecker
                     step.Message!,
                     step.Open,
                     $"/steps/{index}",
+                    entity,
                     scope,
+                    findEntity,
                     findRole,
                     unloadedRoleNames,
                     findPage,
@@ -1412,7 +1434,9 @@ internal static class ProcessChecker
     /// <paramref name="scope"/>. <c>channels</c> has a channel. The subject and body each have a text key.
     /// Each <c>values</c> expression is checked over <paramref name="scope"/> for its syntax, names and
     /// rules, but not for a result type, because a value is formatted by its type. The page <c>open</c>
-    /// names is checked like the page of a navigate action. The expressions are not checked when the
+    /// names is checked like the page of a navigate action. A <c>values</c> expression that reads a
+    /// sensitive field, directly, through a reference path, in an aggregate or as an argument to a rule, is
+    /// reported at the value. The expressions are not checked when the
     /// subject entity is unknown. Last, for each locale that has both texts, each placeholder of the
     /// subject or body has a key in <c>values</c> and each key appears in a placeholder. A locale with a
     /// bad brace is reported for that brace only.
@@ -1424,7 +1448,9 @@ internal static class ProcessChecker
         NotifyMessageDefinition message,
         NotifyOpenDefinition? open,
         string path,
+        EntityResource? entity,
         ExpressionScope? scope,
+        Func<string, EntityResource?> findEntity,
         Func<string, RoleResource?> findRole,
         IReadOnlySet<string> unloadedRoleNames,
         Func<string, PageResource?> findPage,
@@ -1501,10 +1527,18 @@ internal static class ProcessChecker
             foreach (var (key, expression) in values)
             {
                 var valuePath = $"{path}/message/values/{key}";
-                var problem = CheckExpression(process, expression, scope, ExpressionType.Null, valuePath, references);
+                var problem = CheckExpression(process, expression, scope, ExpressionType.Null, valuePath, references, out var node, out var check);
                 if (problem is not null)
                 {
                     report(problem.Code, problem.Message, valuePath);
+                }
+                else if (entity is not null
+                    && SensitiveReads.Find(node!, check!, entity, scope, findEntity) is var (readEntity, readField))
+                {
+                    report(
+                        DiagnosticCodes.SensitiveNotifyValue,
+                        $"The value '{key}' reads the sensitive field '{readEntity}.{readField}'. A notification never carries a sensitive value.",
+                        valuePath);
                 }
             }
         }
@@ -2057,7 +2091,9 @@ internal static class ProcessChecker
     /// </summary>
     private static void CheckEscalations(
         ProcessResource process,
+        EntityResource? entity,
         ExpressionScope? scope,
+        Func<string, EntityResource?> findEntity,
         Func<string, RoleResource?> findRole,
         IReadOnlySet<string> unloadedRoleNames,
         Func<string, PageResource?> findPage,
@@ -2121,7 +2157,9 @@ internal static class ProcessChecker
                         notify.Message,
                         notify.Open,
                         $"{path}/notify",
+                        entity,
                         scope,
+                        findEntity,
                         findRole,
                         unloadedRoleNames,
                         findPage,

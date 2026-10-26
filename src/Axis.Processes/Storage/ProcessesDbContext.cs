@@ -276,6 +276,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             notification.Property(n => n.SubjectKey).HasColumnName("subject_key");
             notification.Property(n => n.BodyKey).HasColumnName("body_key");
             notification.Property(n => n.Values).HasColumnName("values").HasColumnType("jsonb");
+            notification.Property(n => n.ValueTypes).HasColumnName("value_types").HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb");
             notification.Property(n => n.OpenPage).HasColumnName("open_page");
             notification.Property(n => n.OpenParameters).HasColumnName("open_parameters").HasColumnType("jsonb");
             notification.Property(n => n.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
