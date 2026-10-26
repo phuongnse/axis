@@ -39,11 +39,12 @@ flowchart LR
 - **Axis.Worker** executes durable work. It serves health endpoints on its own
   address, see [health checks](#health-checks).
   It runs work items, and through them
-  the `decision`, `task`, `operation`, `end` and `timer` steps of process instances.
+  the `decision`, `task`, `operation`, `subProcess`, `end` and `timer` steps of process instances.
   Operation steps include `updateRecord`, `callConnector` calls with their
   retries and reconciliation, and package operations. `raiseEvent` steps raise
-  events. A `timer` step waits for a time and a `process.timer` item resumes it.
-  Wait for event and sub-process steps come later. _(Planned
+  events. Sub-process steps start a child and resume the parent when it
+  completes. A `timer` step waits for a time and a `process.timer` item resumes
+  it. Wait for event steps come later. _(Planned
   for M14)_ It runs them, task escalations and deadlines, and email sending,
   see [process flow](reference/process-flow.md). It
   delivers raised events to async event triggers, see

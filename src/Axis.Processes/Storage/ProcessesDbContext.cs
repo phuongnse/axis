@@ -67,6 +67,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.State).HasColumnName("state");
             instance.Property(i => i.Revision).HasColumnName("revision");
             instance.Property(i => i.Step).HasColumnName("step");
+            instance.Property(i => i.ParentInstanceId).HasColumnName("parent_instance_id");
+            instance.Property(i => i.ParentStep).HasColumnName("parent_step");
             instance.Property(i => i.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             instance.Property(i => i.EndedAt).HasColumnName("ended_at");
 
@@ -87,6 +89,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .IsDescending(false, false, false, true, true)
                 .HasDatabaseName("ix_process_instances_application_id_process_id_state_created_at");
             instance.HasIndex(i => i.SubjectId).HasDatabaseName("ix_process_instances_subject_id");
+            instance.HasIndex(i => i.ParentInstanceId).HasDatabaseName("ix_process_instances_parent_instance_id");
         });
 
         modelBuilder.Entity<ProcessStepHistoryRow>(history =>

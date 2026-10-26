@@ -80,6 +80,9 @@ public static class DiagnosticCodes
     public const string SubProcessCycle = "AXC0251";
     public const string InvalidSubProcessSubject = "AXC0252";
     public const string InvalidSubProcessParameters = "AXC0253";
+    public const string DeleteTriggerWithOtherKinds = "AXC0254";
+    public const string DeleteTriggerWithFields = "AXC0255";
+    public const string DeleteTriggerProcessWithSubject = "AXC0256";
     public const string UnknownOperation = "AXC0078";
     public const string UnknownSetField = "AXC0079";
     public const string ReadOnlySetField = "AXC0080";
@@ -242,5 +245,5 @@ public static class DiagnosticCodes
     public const string InvalidValueLabels = "AXC0242";
     public const string InvalidMoneyCurrency = "AXC0243";
     public const string UngroupedMoneyCurrency = "AXC0248";
-    public const string InvalidTimerStep = "AXC0254";
+    public const string InvalidTimerStep = "AXC0257";
 }

@@ -1,0 +1,11 @@
+{
+  "id": "de013287-d738-46a6-8492-b502ad7358a7",
+  "kind": "entity",
+  "name": "AssetNote",
+  "formatVersion": 1,
+  "displayField": "text",
+  "fields": [
+    { "name": "asset", "type": "reference", "target": "Asset" },
+    { "name": "text", "type": "text", "required": true, "maxLength": 200 }
+  ]
+}

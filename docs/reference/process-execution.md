@@ -49,7 +49,7 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 ### Running a step
 
-The worker runs the `decision`, `task`, `operation`, `end` and `timer` steps. A
+The worker runs the `decision`, `task`, `operation`, `subProcess`, `end` and `timer` steps. A
 `callConnector` operation step stages its call, and a `connector.call` item
 sends it, see [Staging and the call](#staging-and-the-call). A package
 operation step stages its call, and a `package.call` item runs it, see
@@ -59,10 +59,12 @@ A `timer` step sets the instance `waiting`, and a `process.timer` item resumes
 it, see [Timer step](process-flow.md#timer-step).
 A `task.deadline` item expires the task of a task step that has a `deadline`,
 see [task deadlines](task-deadlines.md#escalations-and-deadline).
-_(Planned for M14)_ The worker also runs `waitEvent` and `subProcess`
-steps and the `createRecord` and `notify` operations, with the work item kinds
-`process.resume`, `task.escalate` and
-`notification.email`, see [process flow](process-flow.md),
+A `subProcess` step starts its child and waits, and a `process.resume` item
+resumes the parent when the child completes, see
+[Sub-process step](process-flow.md#sub-process-step).
+_(Planned for M14)_ The worker also runs `waitEvent` steps and the
+`createRecord` and `notify` operations, with the work item kinds
+`task.escalate` and `notification.email`, see [process flow](process-flow.md),
 [task deadlines](task-deadlines.md) and [notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
 one transaction:

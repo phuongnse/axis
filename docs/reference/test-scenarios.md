@@ -167,10 +167,10 @@ Every step has a `type`. These are the step kinds:
 - It needs `now`. The runner sets the new time on every connection of the
   scenario, including the work item runner's. Every later step reads it.
 - The runner then runs every due work item (`process.step`, `process.timer`,
-  `connector.call`, `package.call`, `event.deliver`, `trigger.schedule`,
-  `trigger.fanOut` and `task.deadline`) until none is due. A `process.timer`
-  item is due when the scenario's time reaches its time, so a timer resumes its
-  instance in the `advanceTime` that passes it.
+  `process.resume`, `connector.call`, `package.call`, `event.deliver`,
+  `trigger.schedule`, `trigger.fanOut` and `task.deadline`) until none is due. A
+  `process.timer` item is due when the scenario's time reaches its time, so a
+  timer resumes its instance in the `advanceTime` that passes it.
   If more than 1,000 items run in one step, the scenario fails at that step.
 - A schedule that missed several occurrences runs only the latest one, once, as
   a worker does after an outage. See [schedules](process-events.md#schedules). To

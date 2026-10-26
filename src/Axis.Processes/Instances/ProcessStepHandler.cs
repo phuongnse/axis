@@ -30,9 +30,13 @@ namespace Axis.Processes.Instances;
 /// change trigger come from the application's active release, and
 /// its start runs as <c>system</c>, pinned to that release. A skipped <c>sync</c> start is logged
 /// and lets the step commit. A step that finds the instance at another revision than it loaded
-/// writes nothing. An operation step and a <c>raiseEvent</c> step take the application's start lock
-/// shared before they read an entity table, since they can start instances. A step that throws is rolled back, and the failure callback then records the
-/// error in the history and marks the instance <c>failed</c>.
+/// writes nothing. An operation step, a <c>raiseEvent</c> step and a <c>subProcess</c> step take the
+/// application's start lock shared before they read an entity table, since they can start instances.
+/// A <c>subProcess</c> step starts its child as <c>system</c> on the release the parent is pinned to,
+/// after the parent's move to <c>waiting</c>, and writes no audit record of its own: the child's
+/// <c>process.started</c> record names the parent. The end step of a child queues the
+/// <c>process.resume</c> item that moves the parent on. A step that throws is rolled back, and the
+/// failure callback then records the error in the history and marks the instance <c>failed</c>.
 /// </summary>
 internal sealed partial class ProcessStepHandler(ReleaseModelCache models, PackageCatalog packages, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
 {
@@ -159,10 +163,10 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 ?? throw Failure($"The release has no entity '{entityId}'.", instance, input);
             entity = subjectEntity;
 
-            if (step is OperationStepModel or RaiseEventStepModel)
+            if (step is OperationStepModel or RaiseEventStepModel or SubProcessStepModel)
             {
-                // These steps can start an instance: an operation through a data change trigger and a raised
-                // event through a sync trigger. The start lock comes before any entity table is read, so a
+                // These steps can start an instance: an operation through a data change trigger, a raised
+                // event through a sync trigger and a sub-process step its child. The start lock comes before any entity table is read, so a
                 // migrating activation cannot deadlock with the step, and the active release read later is
                 // read under it. The step keeps the release the instance is pinned to.
                 await StartLock.TakeSharedAsync(context.Transaction, instance.ApplicationId, cancellationToken);
@@ -190,6 +194,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         }
         else
         {
+            if (step is SubProcessStepModel)
+            {
+                // The step starts a child, so the start lock comes before anything else.
+                await StartLock.TakeSharedAsync(context.Transaction, instance.ApplicationId, cancellationToken);
+            }
+
             // The compiler rejects these steps in a process without a subject (AXC0246), so this only
             // guards against a broken release. It runs before any lock or record read.
             if (step is OperationStepModel or RaiseEventStepModel or TaskStepModel)
@@ -208,6 +218,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         JsonObject details;
         string? action;
         DateTimeOffset? timerDueAt = null;
+        PendingChild? child = null;
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
         NewTask? task = null;
         TaskDeadlineModel? taskDeadline = null;
@@ -411,6 +422,22 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 details = new JsonObject();
                 action = null;
                 break;
+            case SubProcessStepModel subStep:
+                if (!process.TryGetStep(subStep.Next, out _))
+                {
+                    throw Failure($"The process '{process.Name}' has no step '{subStep.Next}'.", instance, input);
+                }
+
+                child = await PrepareChildAsync(context, model, subStep, instance, record, evaluate, input, cancellationToken);
+                state = ProcessStarts.Waiting;
+                nextStep = step.Name;
+                decision = null;
+                output = new JsonObject { ["state"] = ProcessStarts.Waiting, ["childInstanceId"] = child.Id };
+                details = new JsonObject { ["step"] = step.Name, ["childInstanceId"] = child.Id };
+
+                // No audit record of its own: the child's process.started record names this instance.
+                action = null;
+                break;
             default:
                 throw Failure($"The engine cannot run the step '{step.Name}' of type '{step.GetType().Name}'.", instance, input);
         }
@@ -425,6 +452,13 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         if (state == ProcessStarts.Completed)
         {
             AxisMetrics.RecordInstanceEnded(context.Item.TenantId, model.Manifest.Name, process.Name, ProcessStarts.Completed);
+        }
+
+        // The child starts only once the instance is known to be current, so a stale step starts no
+        // stray child. A start that cannot happen throws, which rolls back the move to waiting too.
+        if (child is not null)
+        {
+            await StartChildAsync(context, model, instance, step.Name, child, input, cancellationToken);
         }
 
         // The record is written only once the instance is known to be current, so a stale step
@@ -548,6 +582,19 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 cancellationToken);
         }
 
+        if (state == ProcessStarts.Completed && instance.ParentInstanceId is not null)
+        {
+            // The parent waits on this child, so its resume item is queued with the end.
+            await WorkItemQueue.EnqueueAsync(
+                context.Connection,
+                context.Transaction,
+                context.Item.TenantId,
+                ProcessStarts.ProcessResumeWorkItemKind,
+                DateTimeOffset.UtcNow,
+                cancellationToken,
+                processInstanceId: instance.Id);
+        }
+
         if (state == ProcessStarts.Running)
         {
             await WorkItemQueue.EnqueueAsync(
@@ -598,6 +645,131 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 cancellationToken,
                 processInstanceId: instance.Id,
                 packageCallId: packageCall.Id);
+        }
+    }
+
+    /// <summary>
+    /// Works out what a <c>subProcess</c> step starts: the child process in the pinned release, the
+    /// record it runs for and the parameter values of a child without a subject. A child with a subject
+    /// runs for the record <c>subject</c> gives, or for the parent's own record when it is left out. A
+    /// record other than the parent's is locked and read as a trigger start reads it, with its pending
+    /// computed fields computed by the active release when the child has a start condition. A missing
+    /// record fails the step with a fixed text that names no value.
+    /// </summary>
+    private async Task<PendingChild> PrepareChildAsync(
+        WorkItemContext context,
+        ApplicationModel model,
+        SubProcessStepModel step,
+        LoadedInstance instance,
+        Record? parentRecord,
+        Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
+        JsonObject input,
+        CancellationToken cancellationToken)
+    {
+        var childProcess = model.Processes.FirstOrDefault(candidate => candidate.Id == step.ProcessId)
+            ?? throw Failure($"The release has no process '{step.Process}'.", instance, input);
+        var childId = Guid.CreateVersion7();
+        if (childProcess.Entity is not { } reference)
+        {
+            var parameters = new JsonObject();
+            foreach (var parameter in step.Parameters)
+            {
+                var result = await evaluate(parameter.Value);
+                if (result.Error is { } error)
+                {
+                    throw ExpressionFailure($"parameter '{parameter.Parameter}'", step, error, instance, input);
+                }
+
+                parameters[parameter.Parameter] = ToJson(result.Value, $"parameter '{parameter.Parameter}'", step, instance, input);
+            }
+
+            return new PendingChild(childId, childProcess, null, null, null, parameters);
+        }
+
+        var childEntity = model.FindEntity(reference.Id)
+            ?? throw Failure($"The release has no entity '{reference.Name}'.", instance, input);
+        if (step.Subject is null)
+        {
+            // The child runs for the parent's own record, which the step has already read.
+            if (instance.SubjectId is not { } ownId || instance.SubjectEntityId != childEntity.Id || parentRecord is null)
+            {
+                throw Failure($"The step '{step.Name}' needs a subject.", instance, input);
+            }
+
+            return new PendingChild(childId, childProcess, childEntity, ownId, parentRecord, null);
+        }
+
+        var given = await evaluate(step.Subject);
+        if (given.Error is { } subjectError)
+        {
+            throw ExpressionFailure("subject", step, subjectError, instance, input);
+        }
+
+        if (given.Value is not Guid givenId)
+        {
+            throw Failure($"The subject of the step '{step.Name}' gave no record of '{childEntity.Name}'.", instance, input);
+        }
+
+        var subjectId = givenId;
+        if (instance.SubjectId == subjectId && instance.SubjectEntityId == childEntity.Id && parentRecord is not null)
+        {
+            return new PendingChild(childId, childProcess, childEntity, subjectId, parentRecord, null);
+        }
+
+        // The lock makes the read below and the start condition see the latest version, as for a trigger start.
+        var noRecord = $"The step '{step.Name}' found no record of '{childEntity.Name}' to start the process '{childProcess.Name}' for.";
+        if (!await RecordCommands.LockAsync(context.Connection, childEntity, subjectId, cancellationToken)
+            || await RecordQueries.GetAsync(context.Connection, model, childEntity, subjectId, cancellationToken) is not { } stored)
+        {
+            throw Failure(noRecord, instance, input);
+        }
+
+        if (childProcess.StartCondition is not null
+            && await models.FindActiveAsync(context, instance.ApplicationId, cancellationToken) is { } active)
+        {
+            stored = await PendingComputedReads.ApplyAsync(context.Connection, context.Transaction, active.Model, childEntity, stored, cancellationToken, model);
+        }
+
+        return new PendingChild(childId, childProcess, childEntity, subjectId, stored, null);
+    }
+
+    /// <summary>
+    /// Starts the child of a <c>subProcess</c> step on the release the parent is pinned to. A child that
+    /// already runs for the record, or whose start condition is not true, fails the step with a fixed
+    /// text that names the step and the process, never a value.
+    /// </summary>
+    private static async Task StartChildAsync(
+        WorkItemContext context,
+        ApplicationModel model,
+        LoadedInstance instance,
+        string stepName,
+        PendingChild child,
+        JsonObject input,
+        CancellationToken cancellationToken)
+    {
+        var started = await ProcessStarter.StartChildAsync(
+            context.Connection,
+            context.Transaction,
+            context.Item.TenantId,
+            model,
+            instance.ReleaseId,
+            child.Process,
+            child.Entity,
+            child.SubjectId,
+            child.Subject,
+            child.Parameters,
+            child.Id,
+            instance.Id,
+            stepName,
+            cancellationToken);
+        if (started.Outcome == ProcessStartOutcome.AlreadyRunning)
+        {
+            throw Failure($"The step '{stepName}' cannot start the process '{child.Process.Name}': it already runs for the record.", instance, input);
+        }
+
+        if (started.Outcome == ProcessStartOutcome.ConditionFailed)
+        {
+            throw Failure($"The step '{stepName}' cannot start the process '{child.Process.Name}': its start condition is not true.", instance, input);
         }
     }
 
@@ -843,6 +1015,9 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
     private static ProcessStepException Failure(string message, LoadedInstance instance, JsonObject input, Exception? innerException = null) =>
         new(message, instance.Step, instance.Revision, instance.Now, input, innerException);
+
+    /// <summary>The child a <c>subProcess</c> step starts: its new instance id, its process, and its record or parameter values.</summary>
+    private sealed record PendingChild(Guid Id, ProcessModel Process, EntityModel? Entity, Guid? SubjectId, Record? Subject, JsonObject? Parameters);
 
     [LoggerMessage(LogLevel.Information, "Trigger {Trigger} skipped the start of process {Process} for record {SubjectId} of event {EventId}: {Reason}.")]
     private partial void LogSyncSkipped(string trigger, string process, Guid subjectId, Guid eventId, string reason);
