@@ -6,8 +6,8 @@ namespace Axis.Data.Records;
 /// <summary>
 /// The columns of an import file read against an entity: which field each header cell names, and how a row
 /// of cells becomes the body of a create. The header names the fields of the entity's table, matched ignoring
-/// letter case. A cell that names no such field, a field named twice, and a child collection are errors at
-/// <c>/columns/{n}</c>, with <c>n</c> counting the columns from 1. An empty cell leaves its field out of the
+/// letter case. A cell that names no such field, a field named twice, a child collection and a file field are errors
+/// at <c>/columns/{n}</c>, with <c>n</c> counting the columns from 1. An empty cell leaves its field out of the
 /// body, so its default applies or <c>Required.</c> is reported. A cell of an integer, decimal or money field
 /// that is written as a JSON number is a number, the cell <c>true</c> or <c>false</c>, in any letter case, of
 /// a boolean field is a boolean, and every other cell is text, so the record parser checks a row exactly as
@@ -51,6 +51,10 @@ internal sealed class RecordImportColumns
             {
                 errors[pointer] = ["Is a collection, which an import cannot set."];
             }
+            else if (field.Type == FieldType.File)
+            {
+                errors[pointer] = ["Is a file, which an import cannot set."];
+            }
             else if (!seen.Add(field.Name))
             {
                 errors[pointer] = ["Is named more than once."];
@@ -63,6 +67,9 @@ internal sealed class RecordImportColumns
 
         return errors.Count > 0 ? (null, errors) : (new RecordImportColumns(fields), null);
     }
+
+    /// <summary>The field of each column, in column order.</summary>
+    internal IReadOnlyList<FieldModel> Fields => _fields!;
 
     /// <summary>The body of a create, <c>{"values":{…}}</c> as UTF-8, for a row of <paramref name="cells"/>.</summary>
     public byte[] Body(IReadOnlyList<string> cells)

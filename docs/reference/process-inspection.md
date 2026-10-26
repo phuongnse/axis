@@ -108,6 +108,21 @@ in any state. The body has these parts:
 - `id`, `process`, `subjectId`, `releaseId`, `state`, `step`, `createdAt` and
   `endedAt`, as in the list. `process` is the process name. `subjectId` is
   `null` for an instance of a process without a subject.
+- `parent` is `{ "id", "process", "step" }` for an instance that a `subProcess`
+  step started, and `null` for any other instance. `step` is the name of the
+  `subProcess` step in the parent that started this instance. It is not the step
+  this instance is at.
+- `subProcesses` are the instances that this instance started, ordered by
+  `createdAt`, then by `id`. Each is
+  `{ "id", "process", "step", "state", "createdAt", "endedAt" }`. `step` is the
+  name of the `subProcess` step in this instance that started the child.
+  - A parent or child appears only when the user holds `inspect` on its process
+    in the active release. A parent the user may not inspect, or whose process
+    the active release no longer has, shows as `null`. Such a child is missing
+    from the list.
+  - Neither has a subject id, and the read filters of the subject record do
+    not apply. The `inspect` grant alone decides. The user may still get `404`
+    when they open a child whose subject record they may not read.
 - `graph` is the graph of the release the instance is pinned to:
   `{ "start", "steps": [ { "name", "type", "labelKey", "transitions" } ] }`.
   - `type` is the step type: `decision`, `task`, `operation`, `timer` or `end`.
@@ -185,6 +200,8 @@ in any state. The body has these parts:
   "step": "registerPurchase",
   "createdAt": "2026-10-10T02:05:00.123456Z",
   "endedAt": null,
+  "parent": null,
+  "subProcesses": [],
   "graph": {
     "start": "managerApproval",
     "steps": [
@@ -259,7 +276,7 @@ in any state. The body has these parts:
 
 The example shortens the lists. The graph, the path and the tasks are the
 same for every user who may inspect the instance. Only a call's `input`,
-`commands`, and each call's `resolvable` and `outputs` differ between users.
+`commands`, `parent` and `subProcesses`, and each call's `resolvable` and `outputs` differ between users.
 
 ### Values and masking
 

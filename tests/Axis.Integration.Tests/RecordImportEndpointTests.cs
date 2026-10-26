@@ -19,6 +19,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
 {
     private const string Items = "/api/apps/RecordsApp/entities/Item";
     private const string Tickets = "/api/apps/RecordsApp/entities/Ticket";
+    private const string Products = "/api/apps/RecordsApp/entities/Product/records";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -245,9 +246,21 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
     public async Task Committing_a_checked_import_creates_every_row_as_the_uploader_and_audits_the_import()
     {
         await ResetAsync();
+
+        // Audit records are never deleted, so an earlier commit leaves its records.imported record behind. Committing one here
+        // makes that leftover present on every run, whatever order the tests run in.
+        var earlier = await UploadAsync(fixture.Client, Tickets, "title,code\nLamp,l1\n");
+        await RunChecksAsync();
+        using var queued = await CommitAsync(fixture.Client, Tickets, earlier.Id);
+        Assert.Equal(HttpStatusCode.Accepted, queued.StatusCode);
+        Assert.Equal(1, await RunCommitsAsync());
+        await ResetAsync();
+
         var upload = await UploadAsync(fixture.Client, Tickets, "title,code\nPrinter,p1\nScanner,s1\nDesk,d1\n");
         await RunChecksAsync();
         var audits = await fixture.AuditRecordCountAsync(TenantA);
+        var imported = await ImportedAuditCountAsync();
+        var importedByAnna = await ImportedAuditCountAsync(ImportedByAnnaFilter);
 
         using var accepted = await CommitAsync(fixture.Client, Tickets, upload.Id);
 
@@ -268,13 +281,74 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
                 TenantA,
                 $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.created' AND actor = 'anna' AND actor_name = 'Anna Employee' AND record_id IN (SELECT id FROM {TicketTable})"))!);
         Assert.Equal(audits + 4, await fixture.AuditRecordCountAsync(TenantA));
-        Assert.Equal(1L, (long)(await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.audit_records WHERE action = 'records.imported'"))!);
-        Assert.Equal(
-            1L,
-            (long)(await fixture.ScalarAsync(
-                TenantA,
-                "SELECT count(*) FROM axis.audit_records WHERE action = 'records.imported' AND actor = 'anna' AND actor_name = 'Anna Employee' AND record_id IS NULL AND process_instance_id IS NULL AND entity_id IS NOT NULL AND details = '{\"created\": 3, \"updated\": 0}'::jsonb"))!);
+        Assert.Equal(imported + 1, await ImportedAuditCountAsync());
+        Assert.Equal(importedByAnna + 1, await ImportedAuditCountAsync(ImportedByAnnaFilter));
         Assert.Equal(0L, (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.process_work_items WHERE kind = '{RecordImports.CommitWorkItemKind}'"))!);
+    }
+
+    [Fact]
+    public async Task A_reference_cell_may_hold_the_targets_display_value_and_the_commit_links_the_records()
+    {
+        await ResetAsync();
+        var desk = await CreateProductAsync("Desk");
+        var lamp = await CreateProductAsync("Lamp");
+        var chair = await CreateProductAsync("Chair");
+        var upload = await UploadAsync(fixture.Client, Tickets, $"title,code,product\nA,a1,Desk\nB,b1,Lamp\nC,c1,{chair:D}\nD,d1,Desk\nE,e1,\n");
+        await RunChecksAsync();
+        Assert.Equal("checked", await StateAsync(upload.Id, Tickets));
+
+        using var accepted = await CommitAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        await RunCommitsAsync();
+
+        Assert.Equal("committed", await StateAsync(upload.Id, Tickets));
+        Assert.Equal(5L, await TicketCountAsync());
+        Assert.Equal(desk, await ProductOfAsync("a1"));
+        Assert.Equal(lamp, await ProductOfAsync("b1"));
+        Assert.Equal(chair, await ProductOfAsync("c1"));
+        Assert.Equal(desk, await ProductOfAsync("d1"));
+        Assert.Null(await ProductOfAsync("e1"));
+    }
+
+    [Fact]
+    public async Task A_display_value_that_matches_no_record_or_more_than_one_fails_the_dry_run_without_repeating_the_value()
+    {
+        await ResetAsync();
+        await CreateProductAsync("Chair");
+        await CreateProductAsync("Chair");
+        await CreateProductAsync("Desk");
+        var upload = await UploadAsync(fixture.Client, Tickets, "title,code,product\nA,a1,Chair\nB,b1,Nothing\nC,c1,Desk\nD,d1,desk\n");
+
+        await RunChecksAsync();
+
+        using var failed = await GetAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        var errors = failed.RootElement.GetProperty("errors");
+        Assert.Equal(
+            ["/rows/1/values/product", "/rows/2/values/product", "/rows/4/values/product"],
+            errors.EnumerateObject().Select(error => error.Name));
+        Assert.Equal("Matches more than one record by its display value.", errors.GetProperty("/rows/1/values/product")[0].GetString());
+        Assert.Equal("Matches no record by its display value.", errors.GetProperty("/rows/2/values/product")[0].GetString());
+        Assert.DoesNotContain("Chair", errors.GetRawText());
+        Assert.DoesNotContain("Nothing", errors.GetRawText());
+        Assert.Equal(0L, await TicketCountAsync());
+    }
+
+    [Fact]
+    public async Task A_display_value_is_not_looked_up_for_an_uploader_who_may_not_read_the_targets_display_field()
+    {
+        await ResetAsync();
+        await CreateProductAsync("Desk");
+        var upload = await UploadAsync(fixture.Client, Tickets, "title,code,product\nA,a1,Desk\n");
+        await fixture.ExecuteAsync(TenantA, "UPDATE axis.record_imports SET uploader_roles = '{filtered}'");
+
+        await RunChecksAsync();
+
+        using var failed = await GetAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        var error = Assert.Single(failed.RootElement.GetProperty("errors").EnumerateObject());
+        Assert.Equal("/rows/1/values/product", error.Name);
+        Assert.DoesNotContain("display value", error.Value[0].GetString());
     }
 
     [Fact]
@@ -463,8 +537,25 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         }
     }
 
+    private async Task<Guid> CreateProductAsync(string name)
+    {
+        using var response = await SendAsync(fixture.Client, HttpMethod.Post, Products, $$"""{ "values": { "name": "{{name}}" } }""", "application/json");
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var created = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return created.RootElement.GetProperty("id").GetGuid();
+    }
+
+    private async Task<Guid?> ProductOfAsync(string code) =>
+        await fixture.ScalarAsync(TenantA, $"SELECT f_product FROM {TicketTable} WHERE f_code = '{code}'") as Guid?;
+
     private async Task<long> TicketCountAsync(string? where = null) =>
         (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM {TicketTable}{(where is null ? "" : $" WHERE {where}")}"))!;
+
+    private const string ImportedByAnnaFilter =
+        "actor = 'anna' AND actor_name = 'Anna Employee' AND record_id IS NULL AND process_instance_id IS NULL AND entity_id IS NOT NULL AND details = '{\"created\": 3, \"updated\": 0}'::jsonb";
+
+    private async Task<long> ImportedAuditCountAsync(string? where = null) =>
+        (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.audit_records WHERE action = 'records.imported'{(where is null ? "" : $" AND {where}")}"))!;
 
     private async Task<long> ItemCountAsync() =>
         (await fixture.TableShapeAsync(TenantA, "Item")).RowCount;
