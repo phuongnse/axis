@@ -371,10 +371,9 @@ stay session-only until then.
   `axis-services`. A tenant without it accepts no service account token, and
   neither does a preview tenant, which takes neither audience from its main
   tenant. Under `Tenancy:Source=directory` the setting is the
-  `service_audience` column of `platform.tenants`. `tenant oidc set` will
-  change it _(planned for M16)_, see
-  [tenant setting commands](tenant-setting-commands.md). Until then an operator
-  sets the column by hand.
+  `service_audience` column of `platform.tenants`.
+  [`tenant oidc set --service-audience`](tenant-setting-commands.md#sign-in-settings)
+  changes it.
 - **Routes.** A service account may call:
   - every route of the [record API](record-api.md), record history included;
   - `GET /api/apps/{app}/data-sources/{dataSource}/rows`;

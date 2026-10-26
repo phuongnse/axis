@@ -187,7 +187,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         return await context.TenantBindings.AsNoTracking().CountAsync(binding => binding.TenantId == id, CancellationToken);
     }
 
-    /// <summary>Sets the endpoint audience of a tenant in the directory, which no command sets.</summary>
+    /// <summary>Sets the endpoint audience of a tenant in the directory, as the operator does without <c>tenant oidc set</c>.</summary>
     public async Task SetEndpointAudienceAsync(string id, string audience)
     {
         await using var context = NewContext();
@@ -196,7 +196,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         await context.SaveChangesAsync(CancellationToken);
     }
 
-    /// <summary>Sets the service audience of a tenant in the directory, which no command sets.</summary>
+    /// <summary>Sets the service audience of a tenant in the directory, as the operator does without <c>tenant oidc set</c>.</summary>
     public async Task SetServiceAudienceAsync(string id, string audience)
     {
         await using var context = NewContext();
@@ -205,7 +205,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         await context.SaveChangesAsync(CancellationToken);
     }
 
-    /// <summary>Sets the email and locale claim names of a tenant in the directory, which no command sets.</summary>
+    /// <summary>Sets the email and locale claim names of a tenant in the directory, as the operator does without <c>tenant oidc set</c>.</summary>
     public async Task SetEmailAndLocaleClaimsAsync(string id, string email, string locale)
     {
         await using var context = NewContext();
@@ -213,6 +213,24 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         row.ClaimEmail = email;
         row.ClaimLocale = locale;
         await context.SaveChangesAsync(CancellationToken);
+    }
+
+    /// <summary>Every platform audit record in the order it was written, with the whole row as text for the leak checks.</summary>
+    public async Task<List<(string Command, string? TenantId, string[] Changed, string Text)>> AuditRecordsAsync()
+    {
+        await using var connection = new NpgsqlConnection(Platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT command, tenant_id, changed, t::text FROM platform.audit_records t ORDER BY occurred_at, id",
+            connection);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var rows = new List<(string, string?, string[], string)>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetFieldValue<string[]>(2), reader.GetString(3)));
+        }
+
+        return rows;
     }
 
     public async Task<long> CountEntriesAsync()
@@ -240,7 +258,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 '|',
                 t.Id, t.Status, t.Version, t.DatabaseHost, t.DatabasePort, t.DatabaseName, t.RuntimeUser, t.SchemaUser,
                 Convert.ToHexString(t.RuntimePassword), Convert.ToHexString(t.SchemaPassword), t.OidcAuthority, t.OidcClientId,
-                Convert.ToHexString(t.OidcClientSecret), t.SchemaVersion, t.PreviewOf))
+                Convert.ToHexString(t.OidcClientSecret), t.OidcProfile, t.ClaimUserId, t.ClaimDisplayName, t.ClaimRoles, t.ClaimEmail, t.ClaimLocale,
+                t.EndpointAudience, t.ServiceAudience, t.OidcClientKeyId, t.OidcPreviousClientKeyId, t.SchemaVersion, t.PreviewOf))
             .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}"))
             .Concat(bindings.Select(binding => $"{binding.TenantId}|{binding.Name}|{binding.Kind}|{binding.Url}")));
     }
