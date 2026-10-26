@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Configuration.Model;
 using Axis.Server.Tests;
 using static Axis.Integration.Tests.RecordApiFixture;
 
@@ -251,29 +252,151 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
     }
 
     [Fact]
-    public async Task A_start_of_a_process_without_a_subject_is_a_400_for_a_user_with_the_start_grant_and_stores_nothing()
+    public async Task A_start_of_a_process_without_a_subject_returns_the_running_instance_and_stores_its_parameters()
     {
+        var process = NightlyJob();
+        await fixture.EndInstancesAsync(process.Id);
+        var activeRelease = await fixture.ActiveReleaseIdAsync();
         using var anna = fixture.CreateClient().SignedInAs("anna");
 
-        using var response = await StartAsync(Guid.NewGuid(), key: Guid.NewGuid().ToString(), client: anna, path: NightlyJobInstances);
+        using var response = await StartJobAsync("""{ "parameters": { "days": 31 } }""", client: anna);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        var root = body.RootElement;
+        Assert.Equal(
+            ["id", "process", "subjectId", "releaseId", "state"],
+            root.EnumerateObject().Select(property => property.Name));
+        var id = root.GetProperty("id").GetGuid();
+        Assert.Equal("NightlyJob", root.GetProperty("process").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("subjectId").ValueKind);
+        Assert.Equal(activeRelease, root.GetProperty("releaseId").GetGuid());
+        Assert.Equal("running", root.GetProperty("state").GetString());
+        Assert.Equal(1L, await fixture.CountAsync(
+            """
+            SELECT count(*) FROM axis.process_instances
+            WHERE id = @id AND process_id = @process AND subject_id IS NULL AND subject_entity_id IS NULL
+              AND release_id = @release AND state = 'running' AND revision = 1 AND parameters = '{"days": 31}'::jsonb
+            """,
+            ("id", id), ("process", process.Id), ("release", activeRelease)));
+        Assert.Equal(1L, await fixture.CountAsync(
+            "SELECT count(*) FROM axis.process_work_items WHERE process_instance_id = @id AND kind = 'process.step'",
+            ("id", id)));
+        Assert.Equal(1L, await fixture.CountAsync(
+            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND actor = 'anna' AND action = 'process.started'",
+            ("id", id)));
+    }
+
+    [Fact]
+    public async Task A_mistyped_parameter_of_a_process_without_a_subject_is_a_400_at_the_parameter_and_stores_nothing()
+    {
+        var process = NightlyJob();
+        var before = await CountNightlyJobRowsAsync(process);
+
+        using var response = await StartJobAsync("""{ "parameters": { "days": "x" } }""", key: Guid.NewGuid().ToString());
 
         using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        AssertErrors(problem, ("/parameters/days", "Must be a value of type 'integer'."));
+        Assert.Equal(before, await CountNightlyJobRowsAsync(process));
+    }
+
+    [Theory]
+    [InlineData("""{ "parameters": {} }""", "/parameters/days", "Is required.")]
+    [InlineData("""{ "parameters": { "days": 1, "other": 2 } }""", "/parameters/other", "Is not a parameter of the process.")]
+    [InlineData("""{ "parameters": { "Days": 1 } }""", "/parameters/Days", "Is not a parameter of the process.")]
+    [InlineData("""{ "parameters": { "days": null } }""", "/parameters/days", "Must not be null.")]
+    [InlineData("""{ "parameters": { "days": 1, "days": 2 } }""", "/parameters/days", "Must be given once.")]
+    [InlineData("""{ "parameters": { "days": 1.5 } }""", "/parameters/days", "Must be a value of type 'integer'.")]
+    public async Task A_missing_unknown_repeated_null_or_mistyped_parameter_is_a_400_at_the_parameter(string body, string errorKey, string message)
+    {
+        var process = NightlyJob();
+        var before = await CountNightlyJobRowsAsync(process);
+
+        using var response = await StartJobAsync(body);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        var errors = problem.RootElement.GetProperty("errors");
+        Assert.Equal([message], errors.GetProperty(errorKey).EnumerateArray().Select(error => error.GetString()));
+        Assert.Equal(before, await CountNightlyJobRowsAsync(process));
+    }
+
+    [Theory]
+    [InlineData("""{}""")]
+    [InlineData("""[]""")]
+    [InlineData("""{ "parameters": [] }""")]
+    [InlineData("""{ "parameters": 1 }""")]
+    [InlineData("""{ "parameters": { "days": 1 }, "other": 1 }""")]
+    [InlineData("""{ "days": 1 }""")]
+    [InlineData("""{ "parameters": { "days": 1 }""")]
+    public async Task A_body_that_is_not_one_parameters_object_is_a_400_at_parameters(string body)
+    {
+        var process = NightlyJob();
+        var before = await CountNightlyJobRowsAsync(process);
+
+        using var response = await StartJobAsync(body);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        AssertErrors(problem, ("/parameters", "Must be an object that holds one property, parameters, which is an object."));
+        Assert.Equal(before, await CountNightlyJobRowsAsync(process));
+    }
+
+    [Fact]
+    public async Task A_second_start_of_a_process_without_a_subject_while_one_runs_is_a_409_and_stores_no_second_instance()
+    {
+        var process = NightlyJob();
+        await fixture.EndInstancesAsync(process.Id);
+        using var first = await StartJobAsync("""{ "parameters": { "days": 1 } }""");
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        var before = await CountNightlyJobRowsAsync(process);
+
+        using var second = await StartJobAsync("""{ "parameters": { "days": 2 } }""", key: Guid.NewGuid().ToString());
+
+        using var problem = await ReadProblemAsync(second, HttpStatusCode.Conflict);
         Assert.Equal(
-            "The process has no subject. It cannot be started through this endpoint yet.",
+            "A running or waiting instance of this process already exists.",
             problem.RootElement.GetProperty("title").GetString());
-        await AssertNothingStoredForNightlyJobAsync();
+        Assert.Equal(before, await CountNightlyJobRowsAsync(process));
+        Assert.Equal(1L, await fixture.CountAsync(
+            "SELECT count(*) FROM axis.process_instances WHERE process_id = @process AND state IN ('running', 'waiting')",
+            ("process", process.Id)));
     }
 
     [Fact]
     public async Task A_start_of_a_process_without_a_subject_is_a_403_for_a_user_without_the_start_grant_and_stores_nothing()
     {
+        var process = NightlyJob();
+        var before = await CountNightlyJobRowsAsync(process);
         using var olga = fixture.CreateClient().SignedInAs("olga");
 
-        using var response = await StartAsync(Guid.NewGuid(), key: Guid.NewGuid().ToString(), client: olga, path: NightlyJobInstances);
+        using var response = await StartJobAsync("""{ "parameters": { "days": 31 } }""", key: Guid.NewGuid().ToString(), client: olga);
 
         using var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
         Assert.Equal("You have no grant for this action.", problem.RootElement.GetProperty("title").GetString());
-        await AssertNothingStoredForNightlyJobAsync();
+        Assert.Equal(before, await CountNightlyJobRowsAsync(process));
+    }
+
+    [Fact]
+    public async Task A_repeat_of_a_process_without_a_subject_with_the_same_parameters_returns_the_first_response_and_other_parameters_are_a_422()
+    {
+        var process = NightlyJob();
+        await fixture.EndInstancesAsync(process.Id);
+        var key = Guid.NewGuid().ToString();
+        using var first = await StartJobAsync("""{ "parameters": { "days": 31 } }""", key);
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        var firstBody = await first.Content.ReadAsStringAsync(CancellationToken);
+        var before = await CountNightlyJobRowsAsync(process);
+        Assert.Equal(1L, await fixture.CountAsync(
+            "SELECT count(*) FROM axis.process_start_receipts WHERE process_id = @process AND key = @key AND subject_id IS NULL",
+            ("process", process.Id), ("key", key)));
+
+        using var repeat = await StartJobAsync("""{ "parameters": { "days": 31 } }""", key);
+        using var other = await StartJobAsync("""{ "parameters": { "days": 32 } }""", key);
+
+        Assert.Equal(HttpStatusCode.Created, repeat.StatusCode);
+        Assert.Equal(firstBody, await repeat.Content.ReadAsStringAsync(CancellationToken));
+        using var problem = await ReadProblemAsync(other, HttpStatusCode.UnprocessableEntity);
+        Assert.Equal("This Idempotency-Key was used with different parameters.", problem.RootElement.GetProperty("title").GetString());
+        Assert.Equal(before, await CountNightlyJobRowsAsync(process));
     }
 
     [Fact]
@@ -344,6 +467,17 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         return await (client ?? fixture.Client).SendAsync(request, CancellationToken);
     }
 
+    private async Task<HttpResponseMessage> StartJobAsync(string body, string? key = null, HttpClient? client = null)
+    {
+        using var request = Request(HttpMethod.Post, NightlyJobInstances, ProcessStartFixture.Host, body);
+        if (key is not null)
+        {
+            request.Headers.TryAddWithoutValidation("Idempotency-Key", key);
+        }
+
+        return await (client ?? fixture.Client).SendAsync(request, CancellationToken);
+    }
+
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
 
@@ -365,15 +499,25 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
     private Task<long> CountReceiptsAsync(Guid subject) =>
         fixture.CountAsync("SELECT count(*) FROM axis.process_start_receipts WHERE subject_id = @subject", ("subject", subject));
 
-    private async Task AssertNothingStoredForNightlyJobAsync()
+    private ProcessModel NightlyJob()
     {
         Assert.True(fixture.Model.TryGetProcess("NightlyJob", out var process));
-        Assert.Equal(
-            0L,
-            await fixture.CountAsync("SELECT count(*) FROM axis.process_instances WHERE process_id = @process", ("process", process.Id)));
-        Assert.Equal(
-            0L,
+        return process;
+    }
+
+    // The instances and receipts of NightlyJob, so a test can tell that a refused start stored nothing.
+    private async Task<(long Instances, long Receipts)> CountNightlyJobRowsAsync(ProcessModel process) =>
+        (await fixture.CountAsync("SELECT count(*) FROM axis.process_instances WHERE process_id = @process", ("process", process.Id)),
             await fixture.CountAsync("SELECT count(*) FROM axis.process_start_receipts WHERE process_id = @process", ("process", process.Id)));
+
+    private static void AssertErrors(JsonDocument problem, params (string Pointer, string Message)[] expected)
+    {
+        var errors = problem.RootElement.GetProperty("errors");
+        Assert.Equal(expected.Select(error => error.Pointer), errors.EnumerateObject().Select(error => error.Name));
+        foreach (var (pointer, message) in expected)
+        {
+            Assert.Equal([message], errors.GetProperty(pointer).EnumerateArray().Select(error => error.GetString()));
+        }
     }
 
     private async Task AssertNothingStoredAsync(Guid subject)

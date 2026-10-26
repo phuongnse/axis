@@ -39,6 +39,6 @@ export async function fetchFormState(statePath: string, body: string, signal?: A
   if (response.status !== 200) {
     throw new Error(`Loading the form state from '${statePath}' failed with status ${response.status}.`)
   }
-  // The answer holds no field values, so plain numbers are safe.
+  // The client does not read `defaults` yet, so plain numbers are safe for what it reads.
   return JSON.parse(await response.text()) as FormStateAnswer
 }

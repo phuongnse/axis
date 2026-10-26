@@ -9,7 +9,7 @@ public enum TriggerType
     /// <summary>A record of the process's subject entity that was created or updated.</summary>
     DataChange,
 
-    /// <summary>A cron schedule, for each row of a data source.</summary>
+    /// <summary>A cron schedule, for each row of a data source, or for a scheduled job without a data source, once.</summary>
     Schedule,
 }
 
@@ -82,12 +82,12 @@ public sealed record TriggerModel
     /// <summary>The time zone in which <see cref="Schedule"/> is read. It is set for a schedule trigger only.</summary>
     public TimeZoneInfo? TimeZone { get; init; }
 
-    /// <summary>The data source whose rows a schedule trigger starts the process for. It is set for a schedule trigger only.</summary>
+    /// <summary>The data source whose rows a schedule trigger starts the process for. It is null for a scheduled job, which starts a process without a subject once, and for every other trigger.</summary>
     public DataSourceReference? DataSource { get; init; }
 
     /// <summary>
-    /// The values of the data source's parameters, by declared name, in the data source's declaration order. A
-    /// value is a <see cref="string"/> for text and enum, <see cref="long"/>, <see cref="decimal"/>,
+    /// The values of the data source's parameters, or of the process's parameters for a scheduled job, by declared
+    /// name, in the declaration order of the data source or the process. A value is a <see cref="string"/> for text and enum, <see cref="long"/>, <see cref="decimal"/>,
     /// <see cref="bool"/>, <see cref="DateOnly"/>, a <see cref="DateTimeOffset"/> in UTC or a <see cref="Guid"/> for
     /// reference, or null when an optional parameter is not given. It is set for a schedule trigger only.
     /// </summary>

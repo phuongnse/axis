@@ -47,6 +47,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Operator console](reference/operator-console.md)                      | The web page where the platform operator sees and fixes failed work in a tenant       |
 | [Process inspector widget](reference/process-inspector-widget.md)      | The SPA widget that lists and shows the instances of one process                      |
 | [Task inbox widget](reference/task-inbox-widget.md)                    | The SPA widget that lists the user's open tasks, and the task page                    |
+| [Form resource and form widget](reference/form-widget.md)              | The form resource and the SPA widget that creates and edits one record                |
 | [Form widget conditions and steps](reference/form-widget-conditions.md) | How the SPA form widget follows the form state endpoint, and its wizard steps          |
 | [Container widgets](reference/container-widgets.md)                    | How the SPA draws the columns, tabs and section widgets, and keeps the selected tab   |
 | [Detail, chart and KPI widgets](reference/detail-chart-kpi-widgets.md) | The SPA widgets that show one record, a chart and a KPI tile                          |

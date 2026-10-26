@@ -116,6 +116,37 @@ public static class ProcessTasks
     }
 
     /// <summary>
+    /// Hands the <c>open</c> task <paramref name="id"/> to <paramref name="assignee"/>, a user id or a role name
+    /// as <paramref name="assigneeKind"/> says, and clears its claim. Returns <see langword="false"/> when the task is
+    /// missing or no longer open. Lock the task first with <see cref="TaskQueries.LockAsync"/>.
+    /// </summary>
+    public static async Task<bool> TryReassignAsync(
+        NpgsqlTransaction transaction,
+        Guid id,
+        string assigneeKind,
+        string assignee,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(assigneeKind);
+        ArgumentNullException.ThrowIfNull(assignee);
+
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.process_tasks
+            SET assignee_kind = @kind, assignee = @assignee, claimed_by = NULL, claimed_at = NULL
+            WHERE id = @id AND state = @open
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("kind", assigneeKind);
+        command.Parameters.AddWithValue("assignee", assignee);
+        command.Parameters.AddWithValue("open", Open);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>
     /// Sets the <c>open</c> task <paramref name="id"/> <c>completed</c> with <paramref name="outcome"/>,
     /// by <paramref name="userId"/>, at the transaction's time. Returns <see langword="false"/> when
     /// the task is missing or no longer open. Lock the task first with <see cref="TaskQueries.LockAsync"/>,

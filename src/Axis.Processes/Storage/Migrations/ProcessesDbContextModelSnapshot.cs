@@ -571,7 +571,7 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("status_code");
 
-                    b.Property<Guid>("SubjectId")
+                    b.Property<Guid?>("SubjectId")
                         .HasColumnType("uuid")
                         .HasColumnName("subject_id");
 

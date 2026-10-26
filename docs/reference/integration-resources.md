@@ -452,12 +452,13 @@ Minh City, for each note the `NoteRows` data source returns, in
 - `dataSource` names a [data source](data-sources.md) that is not grouped.
   Its root entity is the process's subject entity. Each occurrence starts the
   process for every row it returns, in record id order. The data source's
-  `pageSize` and `sort` do not apply. _(Planned for M14)_ Without
-  `dataSource`, the trigger starts a process without a subject once per
-  occurrence, and `parameters` gives the process's parameters, see
+  `pageSize` and `sort` do not apply. Without `dataSource`, the trigger starts
+  a process without a subject once per occurrence, and `parameters` gives the
+  process's parameters, see
   [Scheduled jobs](process-events.md#scheduled-jobs).
 - `parameters` maps the data source's declared parameters to literal values.
-  It may be left out when there are none. A value uses the record API's JSON
+  Without `dataSource`, it maps the process's declared parameters, and `null`
+  is never allowed. It may be left out when there are none. A value uses the record API's JSON
   forms: a number for `integer` and `decimal`, `true` or `false` for
   `boolean`, and a string for the other types, which follow the
   [data source parameter](data-sources.md) forms. `null` means the parameter
@@ -478,7 +479,9 @@ committed write through the record command. The schedule trigger checks are buil
 `AXC0160`, an unknown `timeZone` is `AXC0161`, an unknown `dataSource` is
 `AXC0162`, a grouped one is `AXC0163`, one over another entity is `AXC0164`,
 an unknown or repeated `parameters` key is `AXC0165`, a wrongly typed value
-is `AXC0166` and a missing parameter is `AXC0167`. Schedule triggers compile
+is `AXC0166` and a missing parameter is `AXC0167`. Without a `dataSource`, the
+same three codes check the keys and values against the process's parameters,
+and a process with a subject is `AXC0249`. Schedule triggers compile
 and are part of the release, and the platform computes the next occurrence of
 a schedule in its time zone. On a daylight saving change a local time that
 does not exist runs at the next valid time, and a repeated local time runs
@@ -488,8 +491,9 @@ and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
 `mode` on a schedule trigger and the properties of other types are `AXC0004`.
 
 - The `process` exists and has a subject. A trigger that names a process
-  without a subject is `AXC0247`, whatever the trigger type, until a schedule
-  trigger without a data source and a delete trigger are built.
+  without a subject is `AXC0247`, whatever the trigger type, until a delete
+  trigger is built. The exception is a schedule trigger without a data source,
+  which must name a process without a subject, otherwise it is `AXC0249`.
 - The subject entity matches. The event's entity, the `entity`, or the data
   source's root entity is the process's subject entity.
 - The `event` exists.
@@ -501,9 +505,9 @@ and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
 - `mode` is `async` or `sync`.
 - `schedule` is a valid cron expression.
 - `timeZone` is a known IANA time zone id.
-- The `dataSource` exists and is not grouped.
-- Each `parameters` key names a declared parameter of the data source, with
-  a literal value of its type.
+- The `dataSource`, when given, exists and is not grouped.
+- Each `parameters` key names a declared parameter of the data source, or of
+  the process when there is no `dataSource`, with a literal value of its type.
 - Each `type` has only its own properties.
 
 ## Inbound endpoints

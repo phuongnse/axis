@@ -75,6 +75,7 @@ public static class DiagnosticCodes
     public const string DuplicateProcessParameter = "AXC0245";
     public const string StepNeedsSubject = "AXC0246";
     public const string TriggerProcessWithoutSubject = "AXC0247";
+    public const string ScheduleJobProcessWithSubject = "AXC0249";
     public const string UnknownOperation = "AXC0078";
     public const string UnknownSetField = "AXC0079";
     public const string ReadOnlySetField = "AXC0080";
@@ -237,5 +238,5 @@ public static class DiagnosticCodes
     public const string InvalidValueLabels = "AXC0242";
     public const string InvalidMoneyCurrency = "AXC0243";
     public const string UngroupedMoneyCurrency = "AXC0248";
-    public const string InvalidTimerStep = "AXC0249";
+    public const string InvalidTimerStep = "AXC0250";
 }

@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "roles": ["reporting-system"],
   "grants": [
-    { "entity": "Report", "actions": ["read", "create", "update", "delete"], "filter": "status != 'hidden'" }
+    { "entity": "Report", "actions": ["read", "create", "update", "delete"], "filter": "status != 'hidden'" },
+    { "dataSource": "ReportTitles", "actions": ["read"] },
+    { "process": "Review", "actions": ["start", "inspect"] }
   ]
 }

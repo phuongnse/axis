@@ -6,6 +6,8 @@
   "roles": ["employee"],
   "grants": [
     { "entity": "Report", "actions": ["read", "create", "update", "delete"] },
-    { "entity": "Restricted", "actions": ["read", "create", "update", "delete"] }
+    { "entity": "Restricted", "actions": ["read", "create", "update", "delete"] },
+    { "dataSource": "ReportStatuses", "actions": ["read"] },
+    { "process": "Escalate", "actions": ["start", "inspect"] }
   ]
 }
