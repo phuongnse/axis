@@ -125,3 +125,28 @@ describe('recordQuery', () => {
     )
   })
 })
+
+describe('search', () => {
+  it('is read, as typed and without trimming, only when the table is searchable', () => {
+    const params = new URLSearchParams('search=%20paper%20&search=other')
+
+    expect(parseTableQuery(params, fields, 20, [], true).search).toBe(' paper ')
+    expect(parseTableQuery(params, fields).search).toBeUndefined()
+    expect(parseTableQuery(new URLSearchParams('search='), fields, 20, [], true).search).toBeUndefined()
+  })
+
+  it('is written after the parameter values and before page, and removed when cleared', () => {
+    const query = { page: 2, pageSize: 20, sort: null, parameters: { minTotal: '5' }, search: 'paper' }
+
+    expect(writeTableQuery(new URLSearchParams('x=1&search=old'), query, 20, ['minTotal']).toString()).toBe(
+      'x=1&minTotal=5&search=paper&page=2',
+    )
+    expect(writeTableQuery(new URLSearchParams('search=old'), { page: 1, pageSize: 20, sort: null }).toString()).toBe(
+      '',
+    )
+  })
+
+  it('is sent in the request', () => {
+    expect(recordQuery({ page: 1, pageSize: 20, sort: null, search: 'a&b' })).toBe('search=a%26b')
+  })
+})

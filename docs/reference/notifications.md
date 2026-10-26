@@ -80,7 +80,7 @@ A text value may hold named placeholders, such as
   `/steps/{i}/message`, naming the locale and the name.
 - A lone or invalid brace is `AXC0273` at `/steps/{i}/message`. A locale with
   one is reported for that brace only.
-- A value whose expression reads a field marked `sensitive` is `AXC0280` at
+- A value whose expression reads a field marked `sensitive` is `AXC0282` at
   `/steps/{i}/message/values/{key}`, naming the field. It covers a field of the
   subject, a field reached through a path such as `assignee.salary`, one read
   inside an aggregate and one passed to a rule. A notification never carries a

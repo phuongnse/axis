@@ -135,7 +135,7 @@ site, and its widgets are its content:
   checked by the same rules as an entity field, so a bad type, missing
   `values` or `target`, or an unknown `target` gives `AXC0004`, `AXC0014`,
   `AXC0012`, `AXC0040` or `AXC0030`. A name that an earlier parameter already
-  uses, or that is `page`, `pageSize` or `sort`, ignoring letter case, is
+  uses, or that is `page`, `pageSize`, `sort` or `search`, ignoring letter case, is
   `AXC0231`. The compiled page lists its parameters in file order. A value
   lives in the URL query under the parameter name, and a table can bind it to a
   data source parameter. See

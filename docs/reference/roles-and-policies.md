@@ -341,5 +341,5 @@ user:
   pinned to or the active release marks it.
 - **Notifications.** A `values` expression of a `notify` step may not read a
   sensitive field, directly or through a path. It is
-  [`AXC0280`](notifications.md#placeholders), because a notification stores its
+  [`AXC0282`](notifications.md#placeholders), because a notification stores its
   values and shows them to every recipient.

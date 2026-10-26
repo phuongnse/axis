@@ -145,7 +145,7 @@ export interface DataSourceColumn {
 
 /**
  * The data source a table shows: the path of its rows endpoint, its root entity, its parameters,
- * its default page size and its columns in declaration order.
+ * its default page size, whether its rows route takes `search` and its columns in declaration order.
  */
 export interface DataSourceMetadata {
   name: string
@@ -153,6 +153,8 @@ export interface DataSourceMetadata {
   entity: string
   parameters: DataSourceParameter[]
   pageSize: number
+  /** Whether the rows route takes `search`. */
+  search: boolean
   columns: DataSourceColumn[]
 }
 

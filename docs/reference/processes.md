@@ -264,7 +264,8 @@ operation is built, see
     step. When the task is still `open` after that time, the task becomes
     `expired` and the instance moves to `next`, see
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
-    _(Planned for M14)_ `escalations`, see the same section.
+    `escalations` is optional and checked in the same section. Running them is
+    _(planned for M14)_.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
     the task is completed with it.

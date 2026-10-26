@@ -60,6 +60,43 @@ public sealed class ApplicationSitesTests
     }
 
     [Fact]
+    public void Data_source_metadata_says_whether_the_rows_route_takes_search()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
+        try
+        {
+            Write(root, "application.json", """{ "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }""");
+            Write(root, "entities/note.json", """
+                { "id": "55555555-5555-4555-8555-555555555504", "kind": "entity", "name": "Note", "formatVersion": 1, "displayField": "title",
+                  "fields": [ { "name": "title", "type": "text", "required": true } ] }
+                """);
+            Write(root, "data-sources/searchable-notes.json", """
+                { "id": "99999999-9999-4999-8999-999999999994", "kind": "dataSource", "name": "SearchableNotes", "formatVersion": 1, "entity": "Note",
+                  "fields": [ { "name": "title", "path": "title" } ], "search": true }
+                """);
+            Write(root, "data-sources/plain-notes.json", """
+                { "id": "99999999-9999-4999-8999-999999999995", "kind": "dataSource", "name": "PlainNotes", "formatVersion": 1, "entity": "Note",
+                  "fields": [ { "name": "title", "path": "title" } ] }
+                """);
+
+            var result = ApplicationCompiler.Compile(root);
+            Assert.Empty(result.Diagnostics);
+            Assert.NotNull(result.Model);
+
+            var searchable = ApplicationSites.DescribeDataSource(result.Model, "SearchableNotes");
+            var plain = ApplicationSites.DescribeDataSource(result.Model, "PlainNotes");
+
+            Assert.True(searchable.Search);
+            Assert.False(plain.Search);
+            Assert.Contains("\"search\":true", System.Text.Json.JsonSerializer.Serialize(searchable, System.Text.Json.JsonSerializerOptions.Web), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Money_measures_are_typed_money_and_name_their_fixed_currency_or_the_currency_group_column()
     {
         var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");

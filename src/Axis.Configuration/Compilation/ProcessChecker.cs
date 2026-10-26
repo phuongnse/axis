@@ -38,7 +38,8 @@ namespace Axis.Configuration.Compilation;
 /// transition. Its <c>deadline</c>'s <c>after</c> is a positive fixed duration too, and its <c>next</c> is a
 /// transition that comes after the outcomes. A timer step has exactly one of <c>wait</c>, a positive
 /// fixed duration, and <c>until</c>, a <c>date-time</c> expression over the same scope.
-/// A <c>notify</c> step is checked by <see cref="CheckNotify"/>.
+/// A <c>notify</c> step is checked by <see cref="CheckNotify"/>. A task's <c>escalations</c> are checked by
+/// <see cref="CheckEscalations"/>.
 /// Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
@@ -197,6 +198,8 @@ internal static class ProcessChecker
             CheckSubProcesses(process, entity, scope, findEntity, findProcess, unloadedProcessNames, references, Report);
 
             CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, findRole, unloadedRoleNames, references, Report);
+
+            CheckEscalations(process, entity, scope, findEntity, findRole, unloadedRoleNames, findPage, unloadedPageNames, textValues, references, Report, diagnostics);
 
             CheckTimers(process, scope, references, Report);
 
@@ -687,6 +690,68 @@ internal static class ProcessChecker
                 Resolve(step.Next!));
         }
 
+        // A checked assignee has exactly one of user and role.
+        TaskAssigneeModel BuildAssignee(TaskAssigneeDefinition assignee) =>
+            new(assignee.User is { } user ? ExpressionModel.Compile(user, scope, ExpressionType.Text) : null, assignee.Role);
+
+        // A checked notification has recipients that each have one kind, a loaded page when it opens one, and
+        // parameters that each name a parameter of that page once.
+        (List<NotifyRecipientModel> Recipients, List<NotifyValueModel> Values, NotifyOpenModel? Open) BuildNotification(
+            IReadOnlyList<NotifyRecipientDefinition> to,
+            NotifyMessageDefinition message,
+            NotifyOpenDefinition? definition)
+        {
+            NotifyOpenModel? open = null;
+            if (definition is not null)
+            {
+                var target = findPage(definition.Page)!;
+                var given = new Dictionary<string, string>(definition.Parameters ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+                open = new NotifyOpenModel(
+                    new PageReference(target.Id, target.Name),
+                    [
+                        .. target.Parameters
+                            .Where(parameter => given.ContainsKey(parameter.Name))
+                            .Select(parameter => new NotifyParameterModel(
+                                parameter.Name,
+                                ExpressionModel.Compile(given[parameter.Name], scope, NavigateChecker.ExpectedType(parameter)!))),
+                    ]);
+            }
+
+            return (
+                [
+                    .. to.Select(recipient => new NotifyRecipientModel(
+                        recipient.User is { } user ? ExpressionModel.Compile(user, scope, ExpressionType.Text) : null,
+                        recipient.Role,
+                        recipient.Email is { } email ? ExpressionModel.Compile(email, scope, ExpressionType.Text) : null)),
+                ],
+                [
+                    .. (message.Values ?? new Dictionary<string, string>())
+                        .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                        .Select(pair => new NotifyValueModel(pair.Key, ExpressionModel.Compile(pair.Value, scope, ExpressionType.Null))),
+                ],
+                open);
+        }
+
+        // A checked escalation has a valid after, and the assignee and notification it has are checked too.
+        TaskEscalationModel BuildEscalation(TaskEscalationDefinition escalation)
+        {
+            var after = IsoDuration.TryParse(escalation.After, out var parsed) ? parsed : default;
+            TaskEscalationNotifyModel? notify = null;
+            if (escalation.Notify is { } definition)
+            {
+                var (recipients, values, open) = BuildNotification(definition.To, definition.Message, definition.Open);
+                notify = new TaskEscalationNotifyModel(
+                    recipients,
+                    [.. definition.Channels],
+                    definition.Message.Subject,
+                    definition.Message.Body,
+                    values,
+                    open);
+            }
+
+            return new TaskEscalationModel(after, escalation.Reassign is { } reassign ? BuildAssignee(reassign) : null, notify);
+        }
+
         // A checked task has exactly one of user and role, a loaded form and a valid dueIn.
         TaskStepModel BuildTask(ProcessStepDefinition step)
         {
@@ -695,15 +760,14 @@ internal static class ProcessChecker
             return new TaskStepModel(
                 step.Name,
                 step.Label!,
-                new TaskAssigneeModel(
-                    step.Assignee!.User is { } user ? ExpressionModel.Compile(user, scope, ExpressionType.Text) : null,
-                    step.Assignee.Role),
+                BuildAssignee(step.Assignee!),
                 new FormReference(form.Id, form.Name),
                 dueIn,
                 step.Outcomes!.Select(outcome => new TaskOutcomeModel(outcome.Name, outcome.Label, Resolve(outcome.Next))).ToList(),
                 step.Deadline is { } deadline && IsoDuration.TryParse(deadline.After, out var after)
                     ? new TaskDeadlineModel(after, Resolve(deadline.Next))
-                    : null);
+                    : null,
+                [.. (step.Escalations ?? []).Select(BuildEscalation)]);
         }
 
         // A checked call names a loaded connector and operation, and each input, output and field once.
@@ -813,42 +877,17 @@ internal static class ProcessChecker
             return new CreateRecordStepModel(step.Name, new EntityReference(target.Id, target.Name), Assign(target, step.Set!), Resolve(step.Next!));
         }
 
-        // A checked notify step has recipients that each have one kind, a loaded page when it opens one, and
-        // parameters that each name a parameter of that page once.
+        // A checked notify step has a notification that is built like the one of an escalation.
         NotifyStepModel BuildNotify(ProcessStepDefinition step)
         {
-            NotifyOpenModel? open = null;
-            if (step.Open is { } definition)
-            {
-                var target = findPage(definition.Page)!;
-                var given = new Dictionary<string, string>(definition.Parameters ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
-                open = new NotifyOpenModel(
-                    new PageReference(target.Id, target.Name),
-                    [
-                        .. target.Parameters
-                            .Where(parameter => given.ContainsKey(parameter.Name))
-                            .Select(parameter => new NotifyParameterModel(
-                                parameter.Name,
-                                ExpressionModel.Compile(given[parameter.Name], scope, NavigateChecker.ExpectedType(parameter)!))),
-                    ]);
-            }
-
+            var (recipients, values, open) = BuildNotification(step.To!, step.Message!, step.Open);
             return new NotifyStepModel(
                 step.Name,
-                [
-                    .. step.To!.Select(recipient => new NotifyRecipientModel(
-                        recipient.User is { } user ? ExpressionModel.Compile(user, scope, ExpressionType.Text) : null,
-                        recipient.Role,
-                        recipient.Email is { } email ? ExpressionModel.Compile(email, scope, ExpressionType.Text) : null)),
-                ],
+                recipients,
                 [.. step.Channels!],
                 step.Message!.Subject,
                 step.Message.Body,
-                [
-                    .. (step.Message.Values ?? new Dictionary<string, string>())
-                        .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                        .Select(pair => new NotifyValueModel(pair.Key, ExpressionModel.Compile(pair.Value, scope, ExpressionType.Null))),
-                ],
+                values,
                 open,
                 Resolve(step.Next!));
         }
@@ -1244,7 +1283,23 @@ internal static class ProcessChecker
             if (string.Equals(step.Operation, ProcessStepDefinition.Notify, StringComparison.Ordinal))
             {
                 CheckNotify(
-                    process, step, index, entity, scope, findEntity, findRole, unloadedRoleNames, findPage, unloadedPageNames, textValues, references, report, diagnostics);
+                    process,
+                    step.To!,
+                    step.Channels!,
+                    step.Message!,
+                    step.Open,
+                    $"/steps/{index}",
+                    entity,
+                    scope,
+                    findEntity,
+                    findRole,
+                    unloadedRoleNames,
+                    findPage,
+                    unloadedPageNames,
+                    textValues,
+                    references,
+                    report,
+                    diagnostics);
                 continue;
             }
 
@@ -1371,7 +1426,8 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Checks a <c>notify</c> step. <c>to</c> has a recipient, and each recipient has exactly one of
+    /// Checks a <c>notify</c> step, or the <c>notify</c> of a task escalation, whose properties are
+    /// written under <paramref name="path"/>. <c>to</c> has a recipient, and each recipient has exactly one of
     /// <c>user</c>, <c>role</c> and <c>email</c>. A <c>role</c> is a declared role, compared exactly,
     /// unless its file was not loaded, and is not used with the <c>email</c> channel, because a role has
     /// no address. A <c>user</c> and an <c>email</c> are <c>text</c> expressions over
@@ -1387,8 +1443,11 @@ internal static class ProcessChecker
     /// </summary>
     private static void CheckNotify(
         ProcessResource process,
-        ProcessStepDefinition step,
-        int index,
+        IReadOnlyList<NotifyRecipientDefinition> recipients,
+        IReadOnlyList<string> channels,
+        NotifyMessageDefinition message,
+        NotifyOpenDefinition? open,
+        string path,
         EntityResource? entity,
         ExpressionScope? scope,
         Func<string, EntityResource?> findEntity,
@@ -1401,10 +1460,6 @@ internal static class ProcessChecker
         Action<string, string, string> report,
         List<Diagnostic> diagnostics)
     {
-        var path = $"/steps/{index}";
-        var recipients = step.To!;
-        var channels = step.Channels!;
-        var message = step.Message!;
         if (recipients.Count == 0)
         {
             report(DiagnosticCodes.EmptyNotifyRecipients, "A notify step needs at least one recipient in 'to'.", $"{path}/to");
@@ -1488,7 +1543,7 @@ internal static class ProcessChecker
             }
         }
 
-        if (step.Open is { } open)
+        if (open is not null)
         {
             NavigateChecker.CheckTarget(
                 open.Page, open.Parameters, $"{path}/open", scope, process, unloadedPageNames, findPage, references, diagnostics, "step");
@@ -1983,6 +2038,142 @@ internal static class ProcessChecker
     }
 
     /// <summary>
+    /// Checks who a task is assigned to, or reassigned to, written under <paramref name="path"/>: exactly
+    /// one of <c>user</c> and <c>role</c>, a <c>user</c> expression that gives <c>text</c> over
+    /// <paramref name="scope"/>, and a <c>role</c> that <paramref name="findRole"/> finds, compared
+    /// exactly, unless its file was not loaded. The expression is not checked when the subject entity is unknown.
+    /// </summary>
+    private static void CheckAssignee(
+        ProcessResource process,
+        TaskAssigneeDefinition assignee,
+        string path,
+        ExpressionScope? scope,
+        Func<string, RoleResource?> findRole,
+        IReadOnlySet<string> unloadedRoleNames,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        if ((assignee.User is null) == (assignee.Role is null))
+        {
+            report(DiagnosticCodes.InvalidTaskAssignee, "A task's assignee must have exactly one of 'user' and 'role'.", path);
+        }
+
+        // A role file that was not loaded because of its own errors is not reported again.
+        if (assignee.Role is { } role)
+        {
+            if (findRole(role) is { } roleResource)
+            {
+                references.Add(process, $"{path}/role", ReferenceRelations.TaskRole, ResourceNode.Of(roleResource));
+            }
+            else if (!unloadedRoleNames.Contains(role))
+            {
+                report(DiagnosticCodes.UnknownTaskRole, $"The role '{role}' was not found. No declared role has that name.", $"{path}/role");
+            }
+        }
+
+        if (assignee.User is { } user && scope is not null)
+        {
+            var problem = CheckExpression(process, user, scope, ExpressionType.Text, $"{path}/user", references);
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, $"{path}/user");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks the <c>escalations</c> of each task step. Each <c>after</c> is a positive fixed duration,
+    /// and shorter than the step's <c>deadline.after</c> when the step has a deadline and both are valid.
+    /// An escalation has at least one of <c>reassign</c> and <c>notify</c>. A <c>reassign</c> is checked like
+    /// a task's assignee by <see cref="CheckAssignee"/>, and a <c>notify</c> like a <c>notify</c> step by
+    /// <see cref="CheckNotify"/>. The escalations are not checked when the process has no subject, which
+    /// is reported already. They may be in any order of <c>after</c>.
+    /// </summary>
+    private static void CheckEscalations(
+        ProcessResource process,
+        EntityResource? entity,
+        ExpressionScope? scope,
+        Func<string, EntityResource?> findEntity,
+        Func<string, RoleResource?> findRole,
+        IReadOnlySet<string> unloadedRoleNames,
+        Func<string, PageResource?> findPage,
+        IReadOnlySet<string> unloadedPageNames,
+        Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report,
+        List<Diagnostic> diagnostics)
+    {
+        if (process.Entity is null)
+        {
+            return;
+        }
+
+        for (var index = 0; index < process.Steps.Count; index++)
+        {
+            var step = process.Steps[index];
+            if (step.Type != ProcessStepDefinition.TaskStep || step.Escalations is not { } escalations)
+            {
+                continue;
+            }
+
+            TimeSpan? deadlineAfter = step.Deadline is { } deadline && IsoDuration.TryParse(deadline.After, out var parsedDeadline)
+                ? parsedDeadline
+                : null;
+            for (var escalation = 0; escalation < escalations.Count; escalation++)
+            {
+                var definition = escalations[escalation];
+                var path = $"/steps/{index}/escalations/{escalation}";
+                if (!IsoDuration.TryParse(definition.After, out var after))
+                {
+                    report(
+                        DiagnosticCodes.InvalidTaskDueIn,
+                        $"The duration '{definition.After}' is not valid. An escalation's 'after' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P3D', 'PT4H' or 'P1DT12H'. Years and months are not allowed.",
+                        $"{path}/after");
+                }
+                else if (deadlineAfter is { } limit && after >= limit)
+                {
+                    report(
+                        DiagnosticCodes.EscalationNotBeforeDeadline,
+                        $"The escalation's 'after' '{definition.After}' is not shorter than the deadline's 'after' '{step.Deadline!.After}'. An escalation must come before the deadline.",
+                        $"{path}/after");
+                }
+
+                if (definition.Reassign is null && definition.Notify is null)
+                {
+                    report(DiagnosticCodes.EscalationWithoutAction, "An escalation needs at least one of 'reassign' and 'notify'.", path);
+                }
+
+                if (definition.Reassign is { } reassign)
+                {
+                    CheckAssignee(process, reassign, $"{path}/reassign", scope, findRole, unloadedRoleNames, references, report);
+                }
+
+                if (definition.Notify is { } notify)
+                {
+                    CheckNotify(
+                        process,
+                        notify.To,
+                        notify.Channels,
+                        notify.Message,
+                        notify.Open,
+                        $"{path}/notify",
+                        entity,
+                        scope,
+                        findEntity,
+                        findRole,
+                        unloadedRoleNames,
+                        findPage,
+                        unloadedPageNames,
+                        textValues,
+                        references,
+                        report,
+                        diagnostics);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Checks each task step: its assignee has exactly one of <c>user</c> and <c>role</c>, a
     /// <c>user</c> expression gives <c>text</c> over <paramref name="scope"/>, and a <c>role</c> is
     /// a role <paramref name="findRole"/> finds, compared exactly, unless its file was not loaded. Its
@@ -2014,33 +2205,7 @@ internal static class ProcessChecker
             }
 
             var path = $"/steps/{index}";
-            var assignee = step.Assignee!;
-            if ((assignee.User is null) == (assignee.Role is null))
-            {
-                report(DiagnosticCodes.InvalidTaskAssignee, "A task's assignee must have exactly one of 'user' and 'role'.", $"{path}/assignee");
-            }
-
-            // A role file that was not loaded because of its own errors is not reported again.
-            if (assignee.Role is { } role)
-            {
-                if (findRole(role) is { } roleResource)
-                {
-                    references.Add(process, $"{path}/assignee/role", ReferenceRelations.TaskRole, ResourceNode.Of(roleResource));
-                }
-                else if (!unloadedRoleNames.Contains(role))
-                {
-                    report(DiagnosticCodes.UnknownTaskRole, $"The role '{role}' was not found. No declared role has that name.", $"{path}/assignee/role");
-                }
-            }
-
-            if (assignee.User is { } user && scope is not null)
-            {
-                var problem = CheckExpression(process, user, scope, ExpressionType.Text, $"{path}/assignee/user", references);
-                if (problem is not null)
-                {
-                    report(problem.Code, problem.Message, $"{path}/assignee/user");
-                }
-            }
+            CheckAssignee(process, step.Assignee!, $"{path}/assignee", scope, findRole, unloadedRoleNames, references, report);
 
             var formName = step.Form!;
             if (findForm(formName) is { } form)

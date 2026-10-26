@@ -133,7 +133,9 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 - **`pageSize`.** The default page size, from 1 to 100. It defaults to 20.
 - **`search`.** `true` lets the rows route take `search`, see
   [Query parameters](#query-parameters). Without it, or with `false`, the
-  route refuses `search`. At least one projected field must be searched, see
+  route refuses `search`. Page metadata gives it as `search`, and a table over
+  the data source then shows a search box, see the
+  [table widget](frontend.md). At least one projected field must be searched, see
   [Compile checks](#compile-checks).
 
 ### Aggregates
@@ -595,7 +597,7 @@ data sources.
   - A required data source parameter that is not bound is `AXC0060` at
     `/widgets/{i}/dataSource`. A chart or a KPI has no filter input, so every
     parameter that its `parameters` leaves unbound must be optional.
-  - A page parameter with the same name as an unbound parameter of its table,
+  - A page parameter named `page`, `pageSize`, `sort` or `search`, or with the same name as an unbound parameter of its table,
     ignoring letter case, is `AXC0231` at `/parameters/{i}/name`, because both
     live in the same URL query. A chart and a KPI have no filter input, so this
     check applies only to a table.
