@@ -70,7 +70,6 @@ function renderEditor() {
         resources={resources}
         path={null}
         diagnosticPaths={[]}
-        onOpenPath={vi.fn()}
         onOpen={vi.fn()}
         onSaved={vi.fn()}
         onTextsWritten={vi.fn()}
@@ -268,7 +267,6 @@ describe('StudioEditor for a scenario', () => {
           resources={[scenarioItem]}
           path={null}
           diagnosticPaths={[]}
-          onOpenPath={vi.fn()}
           onOpen={vi.fn()}
           onSaved={vi.fn()}
           onTextsWritten={vi.fn()}
@@ -399,7 +397,7 @@ function renderResource(
   names?: StudioNames,
   onTextsWritten = vi.fn(),
   path: string | null = null,
-  onOpenPath = vi.fn(),
+  diagnosticPaths: readonly string[] = [],
 ) {
   const editor = (current: string | null) => (
     <MemoryRouter>
@@ -411,8 +409,7 @@ function renderResource(
               item={item}
               resources={[item]}
               path={current}
-              diagnosticPaths={[]}
-              onOpenPath={onOpenPath}
+              diagnosticPaths={diagnosticPaths}
               onOpen={vi.fn()}
               onSaved={vi.fn()}
               onTextsWritten={onTextsWritten}
@@ -424,7 +421,7 @@ function renderResource(
     </MemoryRouter>
   )
   const { rerender } = render(editor(path))
-  return { onOpenPath, setPath: (next: string) => rerender(editor(next)) }
+  return { setPath: (next: string) => rerender(editor(next)) }
 }
 
 type PatchOperation = { op: string; path: string; value?: unknown }
@@ -602,6 +599,7 @@ describe('StudioEditor for a process', () => {
   it('edits a branch and the otherwise of a decision, keeping the unknown keys', async () => {
     const { fetchMock } = stubResource(processItem, processContent)
     renderResource(processItem)
+    await openFormTab()
 
     const when = await screen.findByTestId('studio-field-/steps/2/branches/0/when', {}, slow)
     const view = await expressionView(when)
@@ -621,6 +619,7 @@ describe('StudioEditor for a process', () => {
   it('adds a branch, keeping the unknown keys of the others', async () => {
     const { fetchMock } = stubResource(processItem, processContent)
     renderResource(processItem)
+    await openFormTab()
 
     const branches = await screen.findByTestId('studio-field-/steps/2/branches', {}, slow)
     await userEvent.click(within(branches).getByRole('button', { name: 'Add branch' }))
@@ -639,6 +638,7 @@ describe('StudioEditor for a process', () => {
   it('removes a branch, keeping the unknown keys of the others', async () => {
     const { fetchMock } = stubResource(processItem, processContent)
     renderResource(processItem)
+    await openFormTab()
 
     const second = await screen.findByTestId('studio-field-/steps/2/branches/1', {}, slow)
     await userEvent.click(within(second).getByRole('button', { name: 'Remove branch' }))
@@ -653,6 +653,7 @@ describe('StudioEditor for a process', () => {
   it('renames the end step with a patch of only its name', async () => {
     const { fetchMock } = stubResource(processItem, processContent)
     renderResource(processItem)
+    await openFormTab()
 
     const name = within(await screen.findByTestId('studio-step-9', {}, slow)).getByRole('textbox', {
       name: 'Step name',
@@ -667,6 +668,7 @@ describe('StudioEditor for a process', () => {
   it('adds a step of the chosen type with its required keys empty', async () => {
     const { fetchMock } = stubResource(processItem, processContent)
     renderResource(processItem)
+    await openFormTab()
 
     await userEvent.click(await screen.findByRole('combobox', { name: 'Add step' }, slow))
     await chooseOption('decision')
@@ -682,6 +684,7 @@ describe('StudioEditor for a process', () => {
   it('removes a step and leaves the transitions that name it', async () => {
     const { fetchMock } = stubResource(processItem, processContent)
     renderResource(processItem)
+    await openFormTab()
 
     const card = await screen.findByTestId('studio-step-4', {}, slow)
     expect(card).toHaveTextContent('markApproved')
@@ -698,6 +701,7 @@ describe('StudioEditor for a process', () => {
   it('moves a step up and down in file order', async () => {
     const { fetchMock } = stubResource(processItem, processContent)
     renderResource(processItem)
+    await openFormTab()
 
     const first = await screen.findByTestId('studio-step-0', {}, slow)
     expect(within(first).getByRole('button', { name: 'Move up' })).toBeDisabled()
@@ -740,6 +744,7 @@ describe('StudioEditor for a process', () => {
   it('changes a step type: forbidden keys go, required keys are added empty, the others stay', async () => {
     const { fetchMock } = stubResource(processItem, processContent)
     renderResource(processItem)
+    await openFormTab()
 
     const card = await screen.findByTestId('studio-step-0', {}, slow)
     await chooseOption('decision', within(card).getByTestId('studio-field-/steps/0/type'))
@@ -759,6 +764,7 @@ describe('StudioEditor for a process', () => {
   it('changes a step to a task with its required keys empty and keeps the unknown key', async () => {
     const { fetchMock } = stubResource(processItem, processContent)
     renderResource(processItem)
+    await openFormTab()
 
     const card = await screen.findByTestId('studio-step-0', {}, slow)
     await chooseOption('task', within(card).getByTestId('studio-field-/steps/0/type'))
@@ -779,6 +785,14 @@ describe('StudioEditor for a process', () => {
     expect(operations.slice(4).map((operation) => operation.value)).toEqual([{ textKey: '' }, {}, '', []])
   })
 
+  it('opens on the Design tab', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    expect(await screen.findByRole('tab', { name: 'Design' }, slow)).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'false')
+  })
+
   it('shows a node for a step added in the JSON view, without saving it', async () => {
     const { fetchMock } = stubResource(processItem, processContent)
     renderResource(processItem)
@@ -789,6 +803,7 @@ describe('StudioEditor for a process', () => {
     await userEvent.clear(json)
     await userEvent.click(json)
     await userEvent.paste(JSON.stringify(withExtraStep, null, 2))
+    await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
 
     expect(await screen.findByTestId('studio-graph-node-10', {}, slow)).toHaveAccessibleName('notify · end')
     expect(requests(fetchMock, 'PATCH')).toBe(0)
@@ -799,9 +814,13 @@ describe('StudioEditor for a process', () => {
     async (mode) => {
       localStorage.setItem('axis.themeMode', mode)
       stubResource(processItem, processContent)
-      const { onOpenPath } = renderResource(processItem)
+      renderResource(processItem)
       await screen.findByTestId('studio-graph-node-0', {}, slow)
       expect(document.querySelector('.react-flow')).toHaveClass(mode)
+      // The Design tab is focused first, then its panel, and the nodes come after them.
+      await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
+      await userEvent.tab()
+      expect(screen.getByRole('tabpanel')).toHaveFocus()
 
       for (const [index, step] of processContent.steps.entries()) {
         await userEvent.tab()
@@ -809,25 +828,81 @@ describe('StudioEditor for a process', () => {
         expect(node).toHaveFocus()
         expect(node).toHaveAccessibleName(`${step.name} · ${step.type}`)
         await userEvent.keyboard('{Enter}')
-        expect(onOpenPath).toHaveBeenLastCalledWith(`/steps/${index}`)
+        expect(
+          within(screen.getByTestId('studio-process-design')).getByTestId(`studio-step-${index}`),
+        ).toBeInTheDocument()
+        expect(node).toHaveAttribute('aria-current', 'true')
       }
     },
   )
 
-  it('marks the node of the open path as current', async () => {
+  it('shows a hint in the panel until a step is selected', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const design = await screen.findByTestId('studio-process-design', {}, slow)
+    expect(within(design).getByText('Select a step on the canvas.')).toBeInTheDocument()
+    expect(within(design).queryByTestId('studio-step-0')).not.toBeInTheDocument()
+  })
+
+  it('selects a step when its node is clicked, and no other', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    fireEvent.click(await screen.findByTestId('studio-graph-node-1', {}, slow))
+    expect(screen.getByTestId('studio-graph-node-1')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('studio-graph-node-0')).not.toHaveAttribute('aria-current')
+  })
+
+  it('selects the step that a path inside it names, and opens the Form tab', async () => {
     stubResource(processItem, processContent)
     renderResource(processItem, undefined, vi.fn(), '/steps/1/next')
 
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'))
+    await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
     expect(await screen.findByTestId('studio-graph-node-1', {}, slow)).toHaveAttribute('aria-current', 'true')
     expect(screen.getByTestId('studio-graph-node-0')).not.toHaveAttribute('aria-current')
   })
 
-  it('opens the transition of an edge when the edge is clicked', async () => {
+  it('selects the step that an edge leaves when the edge is clicked', async () => {
     stubResource(processItem, processContent)
-    const { onOpenPath } = renderResource(processItem)
+    renderResource(processItem)
 
     fireEvent.click(await screen.findByTestId('rf__edge-/steps/2/otherwise', {}, slow))
-    expect(onOpenPath).toHaveBeenCalledWith('/steps/2/otherwise')
+    const design = screen.getByTestId('studio-process-design')
+    expect(within(design).getByTestId('studio-step-2')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-graph-node-2')).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('moves the edge when the next step is changed in the panel, and Undo moves it back', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    fireEvent.click(await screen.findByTestId('studio-graph-node-0', {}, slow))
+    const edge = () => screen.getByTestId('rf__edge-/steps/0/next')
+    const oldTarget = processContent.steps.findIndex((step) => step.name === processContent.steps[0].next)
+    expect(edge()).toHaveAccessibleName(`Edge from 0 to ${oldTarget}`)
+
+    const panel = within(screen.getByTestId('studio-process-design'))
+    await chooseOption('done', panel.getByTestId('studio-field-/steps/0/next'))
+    expect(edge()).toHaveAccessibleName('Edge from 0 to 9')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(edge()).toHaveAccessibleName(`Edge from 0 to ${oldTarget}`)
+  })
+
+  it('marks the node of a step that a diagnostic path names', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem, undefined, vi.fn(), null, ['/steps/1/next'])
+
+    const marked = await screen.findByTestId('studio-graph-node-1', {}, slow)
+    expect(marked).toHaveAttribute('data-marked', 'true')
+    expect(marked).toHaveAccessibleName(
+      `${processContent.steps[1].name} · ${processContent.steps[1].type} · has diagnostics`,
+    )
+    const other = screen.getByTestId('studio-graph-node-0')
+    expect(other).not.toHaveAttribute('data-marked')
+    expect(other).not.toHaveAccessibleName(/has diagnostics/)
   })
 })
 
@@ -886,7 +961,6 @@ describe('StudioEditor for a text resource', () => {
             resources={[enItem, viItem]}
             path={null}
             diagnosticPaths={[]}
-            onOpenPath={vi.fn()}
             onOpen={vi.fn()}
             onSaved={vi.fn()}
             onTextsWritten={vi.fn()}
@@ -1445,7 +1519,6 @@ describe('StudioEditor for a form', () => {
                 resources={[formItem]}
                 path={null}
                 diagnosticPaths={[]}
-                onOpenPath={vi.fn()}
                 onOpen={vi.fn()}
                 onSaved={vi.fn()}
                 onTextsWritten={vi.fn()}
