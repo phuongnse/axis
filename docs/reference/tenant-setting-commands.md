@@ -10,8 +10,7 @@ The design follows [D87](../decisions/d87-tenant-setting-commands-and-key-rotati
 that already exist are built, see [platform audit records](#platform-audit-records). The database
 password rotation, [`tenant rotate-passwords`](#database-passwords), is built. The
 [deployment binding](#deployment-bindings) and [host](#hosts) commands are built too. So is
-[`tenant oidc set`](#sign-in-settings), except `--client-key` and `--retire-client-key`. The key
-rotation and those two options are _(planned for M16)_.
+[`tenant oidc set`](#sign-in-settings), with its client key options. The rest is _(planned for M16)_.
 
 ## Common rules
 
@@ -69,10 +68,11 @@ rotation and those two options are _(planned for M16)_.
 | `--endpoint-audience <value>`  | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it |
 | `--service-audience <value>`   | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it |
 | `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](security.md#fapi-20-profile)                      |
-| `--client-key`                 | _(planned for M16)_ Adds a client key for `private_key_jwt`, as a PEM from `AXIS_OIDC_CLIENT_KEY` or standard input |
-| `--retire-client-key <kid>`    | _(planned for M16)_ Removes the client key with that key id                                   |
+| `--client-key`                 | Adds a client key for `private_key_jwt`, as a PEM from `AXIS_OIDC_CLIENT_KEY` or standard input |
+| `--retire-client-key <kid>`    | Removes the client key with that key id                                                       |
 
-A successful run prints `<id> oidc ok`.
+A successful run prints `<id> oidc ok`. With `--client-key` it then prints `<id> client-key <kid>`
+and the public key as a PEM.
 
 - **The secret.** `--client-secret` takes no value. The secret comes from `AXIS_OIDC_CLIENT_SECRET`,
   or from the first line of standard input when the variable is not set, as in
@@ -88,15 +88,42 @@ A successful run prints `<id> oidc ok`.
 - **Audit.** One [platform audit record](#platform-audit-records) names every setting the command
   was given, even when the new value equals the stored one. The names are `authority`, `clientId`,
   `clientSecret`, `claimUserId`, `claimDisplayName`, `claimRoles`, `claimEmail`, `claimLocale`,
-  `endpointAudience`, `serviceAudience` and `profile`, in that order. A name is never a value.
-- **Client key rotation _(planned for M16)_.** A tenant holds at most two client keys. The server signs with the newest
-  and publishes both, so the identity provider can accept either while it changes over. Retiring the
-  last key of a `fapi2` tenant exits with code 2.
+  `endpointAudience`, `serviceAudience` and `profile`, in that order. A name is never a value. Then
+  come `retireClientKey:<kid>` and `clientKey:<kid>` for the key options, with the key id and never
+  the key.
+- **The client key.** `--client-key` takes no value. The key is an EC P-256 private key as a PEM. It
+  comes from `AXIS_OIDC_CLIENT_KEY`, or from the whole of standard input when the variable is not
+  set, as in `tenant oidc set <id> --client-key < key.pem`. The command stores the key encrypted, in
+  PKCS#8 form, as the tenant's newest key. It never prints the private key. A PEM that is empty or
+  is not an EC P-256 private key exits with code 2.
+  `--client-key` and `--client-secret` together need `AXIS_OIDC_CLIENT_SECRET` or
+  `AXIS_OIDC_CLIENT_KEY`. When neither is set, both would read standard input, so the command exits
+  with code 2.
+- **The key id.** The key id is the [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) JWK
+  thumbprint of the public key, with SHA-256, in base64url. Axis works it out from the key, so the
+  same key always has the same key id. The command prints it, with the public key as a PEM, and the
+  operator uses both at the identity provider. The client assertion carries it as its `kid`.
+- **Client key rotation.** A tenant holds at most two client keys. After its next refresh the server
+  signs every client assertion with the newest key. Axis has no JWKS address, so the operator
+  registers the public keys at the identity provider. The order is: register the new public key at
+  the identity provider, run `--client-key`, wait for the servers' refresh, then run
+  `--retire-client-key <old kid>`. If the key is added before the identity provider knows it, sign-in
+  fails until it is registered or the new key is retired. Keycloak's admin console imports one public
+  key per client. To let it hold two, give the client a JWKS, set through the admin API or a JWKS URL.
+- **Retiring a key.** `--retire-client-key <kid>` removes the key with that key id. When it removes
+  the newest key, the other key becomes the one the server signs with.
+- **The tenant after the change.** The checks look at the tenant as it will be after the whole run,
+  and one run may combine `--client-key`, `--retire-client-key` and `--profile`. So
+  `--profile fapi2 --client-key` turns on `fapi2` for a tenant without a key, and
+  `--profile standard --retire-client-key <kid>` removes the last key of a tenant that leaves `fapi2`.
+  When both key options are given, the key is retired first and then the new one is added.
 - **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, the tenant is unknown, the
   tenant is a preview tenant, which has no sign-in settings of its own, no setting is given, a claim
-  name or the profile is unknown, `--profile fapi2` is given for a tenant without a client key, the
-  authority is not an absolute `http` or `https` URL, the client id is blank, or the secret is
-  empty. The `version` stays and no audit record is written.
+  name or the profile is unknown, the tenant would be `fapi2` without a client key, the
+  authority is not an absolute `http` or `https` URL, the client id is blank, the secret is
+  empty, the client key is empty or not an EC P-256 private key, the tenant would hold a third
+  client key, the key is already held, the key id to retire is unknown or blank, or both the secret
+  and the key would read standard input. The `version` stays and no audit record is written.
 
 ## Hosts
 

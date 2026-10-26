@@ -259,7 +259,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 t.Id, t.Status, t.Version, t.DatabaseHost, t.DatabasePort, t.DatabaseName, t.RuntimeUser, t.SchemaUser,
                 Convert.ToHexString(t.RuntimePassword), Convert.ToHexString(t.SchemaPassword), t.OidcAuthority, t.OidcClientId,
                 Convert.ToHexString(t.OidcClientSecret), t.OidcProfile, t.ClaimUserId, t.ClaimDisplayName, t.ClaimRoles, t.ClaimEmail, t.ClaimLocale,
-                t.EndpointAudience, t.ServiceAudience, t.OidcClientKeyId, t.OidcPreviousClientKeyId, t.SchemaVersion, t.PreviewOf))
+                t.EndpointAudience, t.ServiceAudience, t.OidcClientKeyId, Convert.ToHexString(t.OidcClientKey ?? []), t.OidcPreviousClientKeyId,
+                Convert.ToHexString(t.OidcPreviousClientKey ?? []), t.SchemaVersion, t.PreviewOf))
             .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}"))
             .Concat(bindings.Select(binding => $"{binding.TenantId}|{binding.Name}|{binding.Kind}|{binding.Url}")));
     }
@@ -301,6 +302,16 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 if (tenant.RuntimePassword.Length > 0)
                 {
                     secrets.Add(Cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
+                }
+
+                foreach (var encrypted in new[] { tenant.OidcClientKey, tenant.OidcPreviousClientKey })
+                {
+                    if (encrypted is { Length: > 0 })
+                    {
+                        // The PEM body without the BEGIN and END lines and the line breaks.
+                        var pem = Cipher.Decrypt(tenant.Id, TenantSecretFields.OidcClientKey, encrypted).Reveal();
+                        secrets.Add(string.Concat(pem.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(line => !line.StartsWith("-----", StringComparison.Ordinal))));
+                    }
                 }
             }
 

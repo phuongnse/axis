@@ -429,8 +429,8 @@ stay session-only until then.
 It follows [D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant
 can turn on the FAPI 2.0 Security Profile for sign-in and for machine callers.
 The tenant setting, the client key, the startup check, the machine callers, and
-PAR, `private_key_jwt`, the `iss` check and DPoP at sign-in are built. The
-rotation and verification bullets below are _(planned for M16)_.
+PAR, `private_key_jwt`, the `iss` check, DPoP at sign-in and the client key rotation are built. The
+verification bullet below is _(planned for M16)_.
 
 - **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
   `standard` when unset. Any other value stops the server's start, naming the
@@ -509,8 +509,10 @@ rotation and verification bullets below are _(planned for M16)_.
   under `directory`, the current one and the previous one, and one under
   `configuration`. A tenant under `fapi2` without a key, or with a key without a
   key id, stops the server's start.
-- **Rotation** _(planned for M16)_. The tenant can hold a second key while the identity provider
-  changes over, see [tenant setting commands](tenant-setting-commands.md).
+- **Rotation.** The tenant can hold a second key while the identity provider changes over. The
+  operator registers the public keys at the identity provider, and the server signs with the
+  newest key after its next refresh. `tenant oidc set --client-key` and `--retire-client-key`
+  change the keys, see [tenant setting commands](tenant-setting-commands.md#sign-in-settings).
 - **Verification** _(planned for M16)_. The OpenID Foundation's conformance suite runs by hand
   against the development realm under `fapi2`. Its result is recorded in
   [ASVS](asvs.md). Axis seeks no certification.
@@ -522,7 +524,8 @@ rotation and verification bullets below are _(planned for M16)_.
   has three executors: the PKCE enforcer, the secure client authenticator that
   allows only `client-jwt`, and the signature algorithm check for signed JWT
   client assertions. The client's JWKS holds the public keys of two EC P-256
-  keys, `key-1` and `key-2`. Their private keys are committed as
+  keys, `key-1` and `key-2`. It lists each key under that name and under its key id from
+  `tenant oidc set --client-key`, the JWK thumbprint, so Keycloak accepts both. Their private keys are committed as
   `samples/keycloak/axis-fapi-key-1.pem` and `axis-fapi-key-2.pem`, for
   development and tests only. They are registered on this client of the
   development realm and nowhere else.

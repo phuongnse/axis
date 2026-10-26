@@ -4,8 +4,11 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Axis.Admin;
+using Axis.Administration;
 using Axis.Processes.Storage;
 using Axis.Server.Authentication;
+using Axis.Server.Tenancy;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -185,6 +188,63 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
     }
 
     [Fact]
+    public async Task A_client_key_added_by_the_command_signs_at_the_next_refresh_and_sign_in_keeps_working_after_the_old_key_is_retired()
+    {
+        var authority = await keycloak.StartAsync();
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        Assert.Equal(
+            0,
+            (await scenario.RunAsync(["tenant", "create", id, "--host", "localhost", "--oidc-authority", authority.ToString(), "--oidc-client-id", KeycloakFixture.FapiClientId])).Exit);
+        var oldKey = KeycloakFixture.FapiClientKey("key-1");
+        var newKey = KeycloakFixture.FapiClientKey("key-2");
+        Assert.True(TenantClientKeys.TryRead(oldKey, out _, out var oldKeyId, out _));
+        Assert.True(TenantClientKeys.TryRead(newKey, out _, out var newKeyId, out _));
+
+        // The realm lists each key under its thumbprint as well, so Keycloak accepts the key ids that the command prints.
+        Assert.Equal("c78k1xDMCWYQ6xjENt1SIlXg-51NnvHQaVaO5rwsk4k", oldKeyId);
+        Assert.Equal("9WHVOfd_bSEKHv5990xfBx9M4tKFIPnKDyERLW9seMI", newKeyId);
+        var recorder = new RecordingHandler();
+        var logs = new LogCollector();
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("Tenancy:Source", "directory");
+            builder.UseTestPlatform(scenario.Platform);
+
+            // An hour, so the timer never races the refreshes that the test triggers itself.
+            builder.UseSetting("Tenancy:RefreshInterval", "01:00:00");
+            builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(logs));
+            builder.ConfigureTestServices(services =>
+                services.Configure<OpenIdConnectOptions>(TenantSignIn.SchemeName(id), options => options.BackchannelHttpHandler = recorder));
+        });
+        var refresh = factory.Services.GetRequiredService<TenantDirectoryRefresh>();
+
+        // The first key is added before the host reads the tenant, so the server signs with it.
+        Assert.Equal(0, (await SetKeyAsync(scenario, id, oldKey, "--profile", "fapi2")).Exit);
+        await refresh.RefreshAsync(CancellationToken);
+        await SignInAndAssertKeyAsync(factory, authority, recorder, oldKeyId);
+
+        // The second key is the newest, so after the next refresh every assertion carries its key id.
+        Assert.Equal(0, (await SetKeyAsync(scenario, id, newKey)).Exit);
+        await refresh.RefreshAsync(CancellationToken);
+        await SignInAndAssertKeyAsync(factory, authority, recorder, newKeyId);
+
+        var retired = await scenario.RunAsync(
+            ["tenant", "oidc", "set", id, "--retire-client-key", oldKeyId],
+            extra: new Dictionary<string, string?> { ["Tenancy:Source"] = "directory" });
+        Assert.Equal(0, retired.Exit);
+        await refresh.RefreshAsync(CancellationToken);
+        await SignInAndAssertKeyAsync(factory, authority, recorder, newKeyId);
+
+        foreach (var key in new[] { oldKey, newKey })
+        {
+            var body = string.Concat(key.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(line => !line.StartsWith("-----", StringComparison.Ordinal)));
+            Assert.DoesNotContain(logs.Entries, entry => entry.Contains(body, StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
     public async Task A_fapi2_tenant_whose_provider_offers_no_par_endpoint_redirects_to_the_failed_page_and_logs_a_warning()
     {
         var authority = await keycloak.StartAsync();
@@ -200,6 +260,27 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
         Assert.Equal("/?signIn=failed", response.Headers.Location?.OriginalString);
         Assert.DoesNotContain(calls["nopar"].Calls, call => call.Url.EndsWith(ParPath, StringComparison.Ordinal));
         Assert.Contains(logs.Entries, entry => entry.StartsWith("Warning:", StringComparison.Ordinal) && entry.Contains("nopar", StringComparison.Ordinal));
+    }
+
+    private static Task<AdminResult> SetKeyAsync(AdminScenario scenario, string id, string pem, params string[] more) =>
+        scenario.RunAsync(
+            ["tenant", "oidc", "set", id, "--client-key", .. more],
+            extra: new Dictionary<string, string?> { ["Tenancy:Source"] = "directory", [AdminCommands.ClientKeySetting] = pem });
+
+    // Signs in with a new client and checks that every client assertion of that sign-in carries the key id.
+    private static async Task SignInAndAssertKeyAsync(WebApplicationFactory<Program> factory, Uri authority, RecordingHandler recorder, string keyId)
+    {
+        var before = recorder.Calls.Count;
+        using var client = CreateClient(factory, _fapiAddress);
+
+        var callback = await LogInAtKeycloakAsync(client, authority, "anna", _fapiAddress, par: true);
+        using var signedIn = await SendAsync(client, callback.PathAndQuery);
+
+        Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+        Assert.Equal("anna", await MeAsync(client));
+        var assertions = recorder.Calls.Skip(before).Where(call => call.Form.ContainsKey("client_assertion")).Select(call => call.Form["client_assertion"]).ToList();
+        Assert.True(assertions.Count >= 2, "The PAR request and the token request each carry an assertion.");
+        Assert.All(assertions, assertion => Assert.Equal(keyId, new JsonWebToken(assertion).Kid));
     }
 
     private async Task<string> CreateTenantDatabaseAsync(string prefix)
@@ -415,7 +496,7 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
     {
         private readonly ConcurrentQueue<RecordedCall> _calls = new();
 
-        public IReadOnlyCollection<RecordedCall> Calls => _calls;
+        public ConcurrentQueue<RecordedCall> Calls => _calls;
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {

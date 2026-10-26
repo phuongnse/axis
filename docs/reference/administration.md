@@ -10,8 +10,8 @@ The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rot
 `tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant binding list|set|remove`,
 `tenant host add|remove|move`, `migrate`, `activate`, `publisher` and `version`. The commands that
 change a tenant after it is created and rotate keys are in
-[tenant setting commands](tenant-setting-commands.md). The client key options and the key rotation
-are _(planned for M16)_ on the same page. A tenant can also come from the `Tenants`
+[tenant setting commands](tenant-setting-commands.md). That page also has the client key options
+of `tenant oidc set`. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
 [startup activation](host-settings.md#startup-activation).
 
@@ -894,9 +894,6 @@ admin host carries the same version in its OCI label, see
 - Deleting a tenant.
 - An HTTP API for provisioning.
 - Moving a tenant to another database server.
-- Commands that set a tenant's client key. `tenant oidc set --client-key` is _(planned for M16)_,
-  see [tenant setting commands](tenant-setting-commands.md) and
-  [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md).
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation.
 - Overwriting a tenant in place with a restore.
