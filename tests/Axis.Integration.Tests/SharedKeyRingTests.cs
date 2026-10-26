@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Xml.Linq;
 using Axis.Server.Authentication;
+using Axis.Server.Tenancy;
 using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Authentication;
@@ -27,7 +28,7 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
     [Fact]
     public async Task A_session_cookie_issued_by_one_instance_is_accepted_by_a_second_instance_on_the_same_platform_database()
     {
-        var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
+        var platform = await CreatePlatformDatabaseAsync();
         await using var first = CreateFactory(platform);
         await using var second = CreateFactory(platform);
 
@@ -40,7 +41,7 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
     [Fact]
     public async Task A_session_made_before_a_server_restart_is_accepted_by_a_new_instance()
     {
-        var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
+        var platform = await CreatePlatformDatabaseAsync();
         string cookie;
         await using (var before = CreateFactory(platform))
         {
@@ -56,7 +57,7 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
     [Fact]
     public async Task The_stored_keys_hold_no_plain_key_material_and_decrypt_with_the_installation_key_bound_to_their_id()
     {
-        var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
+        var platform = await CreatePlatformDatabaseAsync();
         await using (var factory = CreateFactory(platform))
         {
             await SignInAsync(factory);
@@ -87,7 +88,7 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
     [Fact]
     public async Task A_server_with_another_secret_key_on_a_platform_database_that_holds_a_key_fails_to_start_naming_the_setting()
     {
-        var platform = await database.CreateDatabaseAsync("platform", CancellationToken);
+        var platform = await CreatePlatformDatabaseAsync();
         await using (var first = CreateFactory(platform))
         {
             await SignInAsync(first);
@@ -99,6 +100,13 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
         var exception = Assert.ThrowsAny<Exception>(() => second.CreateClient());
 
         Assert.Contains("Platform:SecretKey", exception.ToString(), StringComparison.Ordinal);
+    }
+
+    // The sessions of the tenant live in its database, so that one needs its tables once.
+    private async Task<string> CreatePlatformDatabaseAsync()
+    {
+        await DataDatabaseFixture.MigrateTenantAsync(database.ConnectionString, CancellationToken);
+        return await database.CreateDatabaseAsync("platform", CancellationToken);
     }
 
     // The tenant stays on the class database. Only the platform database is a separate one.
@@ -167,17 +175,18 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
-            app.Use(async (context, nextMiddleware) =>
-            {
-                if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/test/session")
+            // The session store reads the tenant, which the real pipeline resolves only after this filter.
+            app.UseWhen(
+                context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/test/session",
+                branch =>
                 {
-                    await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("default", "anna", "Anna Employee", ["employee"]));
-                    context.Response.StatusCode = StatusCodes.Status204NoContent;
-                    return;
-                }
-
-                await nextMiddleware(context);
-            });
+                    branch.UseTenantResolution();
+                    branch.Run(async context =>
+                    {
+                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("default", "anna", "Anna Employee", ["employee"]));
+                        context.Response.StatusCode = StatusCodes.Status204NoContent;
+                    });
+                });
             next(app);
         };
     }

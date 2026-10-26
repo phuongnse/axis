@@ -50,6 +50,8 @@ export function referenceOptions(names: StudioNames, mark: ReferenceMark, draft:
       return names.processes.find(named)?.steps.map((step) => step.name) ?? []
     case 'parameter':
       return names.dataSources.find(named)?.parameters.map((parameter) => parameter.name) ?? []
+    case 'processParameter':
+      return names.processes.find(named)?.parameters.map((parameter) => parameter.name) ?? []
     case 'column':
       return names.dataSources.find(named)?.columns.map((column) => column.name) ?? []
     case 'operation':
@@ -61,7 +63,10 @@ export function referenceOptions(names: StudioNames, mark: ReferenceMark, draft:
   }
 }
 
-/** The type of the data source parameter that a `parameter` mark names with `key`, or `undefined` when it is not found. */
+/**
+ * The type of the parameter that a `parameter` mark (of a data source) or a `processParameter` mark (of a process)
+ * names with `key`, or `undefined` when it is not found.
+ */
 export function parameterType(
   names: StudioNames,
   mark: ReferenceMark,
@@ -69,14 +74,14 @@ export function parameterType(
   pointer: string,
   key: string,
 ): string | undefined {
-  if (typeof mark === 'string' || mark.part !== 'parameter') {
+  if (typeof mark === 'string' || (mark.part !== 'parameter' && mark.part !== 'processParameter')) {
     return undefined
   }
   const owner = getAt(draft, referencePointer(pointer, mark.of))
   if (typeof owner !== 'string') {
     return undefined
   }
-  return names.dataSources
+  return (mark.part === 'parameter' ? names.dataSources : names.processes)
     .find((item) => item.name.toLowerCase() === owner.toLowerCase())
     ?.parameters.find((parameter) => parameter.name.toLowerCase() === key.toLowerCase())?.type
 }

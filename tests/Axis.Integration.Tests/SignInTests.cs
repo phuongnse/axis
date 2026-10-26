@@ -1,4 +1,6 @@
+using System.Buffers.Text;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Server.Authentication;
@@ -72,7 +74,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     }
 
     [Fact]
-    public async Task The_session_holds_only_the_user_and_tenant_and_no_response_carries_a_token()
+    public async Task The_cookie_holds_only_the_session_id_the_row_holds_only_its_hash_and_no_response_carries_a_token()
     {
         using var client = CreateClient();
 
@@ -88,15 +90,53 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
             Assert.DoesNotContain("id_token", response, StringComparison.OrdinalIgnoreCase);
         }
 
-        var options = Factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(Session.Scheme);
-        var ticket = options.TicketDataFormat.Unprotect(signIn.SessionCookie);
-        Assert.NotNull(ticket);
-        Assert.Equal(
-            ["axis:display_name", "axis:role", "axis:role", "axis:tenant_id", "axis:user_id"],
-            ticket.Principal.Claims.Select(claim => claim.Type).Order(StringComparer.Ordinal));
-        Assert.Equal("a", ticket.Principal.FindFirst("axis:tenant_id")?.Value);
-        Assert.DoesNotContain(ticket.Properties.Items.Keys, key => key.StartsWith(".Token", StringComparison.Ordinal));
-        Assert.DoesNotContain(ticket.Properties.Items.Keys, key => key.Contains("code_verifier", StringComparison.Ordinal));
+        var sessionId = ReadSessionId(signIn.SessionCookie);
+        Assert.Matches("^[A-Za-z0-9_-]{43}$", sessionId);
+        var idBytes = Base64Url.DecodeFromChars(sessionId);
+        var row = Assert.Single(await ReadSessionsAsync("a"));
+        Assert.Equal(SHA256.HashData(idBytes), row.IdHash);
+        Assert.NotEqual(idBytes, row.IdHash);
+        Assert.NotEqual(signIn.SessionCookie, Base64Url.EncodeToString(row.IdHash));
+        Assert.NotEqual(sessionId, Base64Url.EncodeToString(row.IdHash));
+        Assert.Equal("anna", row.UserId);
+        Assert.Equal("Anna Employee", row.DisplayName);
+        Assert.Equal(["employee", "requester"], row.Roles.Order(StringComparer.Ordinal));
+        Assert.Empty(await ReadSessionsAsync("b"));
+    }
+
+    [Fact]
+    public async Task A_copied_cookie_stops_working_once_the_session_signs_out()
+    {
+        using var client = CreateClient();
+        var signIn = await SignInAsync(client, "anna", "/");
+        using var cookieless = CreateCookielessClient();
+        var copied = signIn.SessionCookie;
+        Assert.Equal(HttpStatusCode.OK, (await GetMeWithCookieAsync(cookieless, "localhost", copied)).StatusCode);
+
+        var signOut = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out");
+
+        Assert.Equal(HttpStatusCode.OK, signOut.StatusCode);
+        var afterSignOut = await GetMeWithCookieAsync(cookieless, "localhost", copied);
+        Assert.Equal(HttpStatusCode.Unauthorized, afterSignOut.StatusCode);
+        Assert.Empty(await ReadSessionsAsync("a"));
+    }
+
+    [Fact]
+    public async Task Signing_in_again_creates_a_new_session_id_and_ends_the_old_session()
+    {
+        using var client = CreateClient();
+
+        var first = await SignInAsync(client, "anna", "/");
+        var second = await SignInAsync(client, "anna", "/");
+
+        var firstId = ReadSessionId(first.SessionCookie);
+        var secondId = ReadSessionId(second.SessionCookie);
+        Assert.NotEqual(firstId, secondId);
+        var row = Assert.Single(await ReadSessionsAsync("a"));
+        Assert.Equal(SHA256.HashData(Base64Url.DecodeFromChars(secondId)), row.IdHash);
+        using var cookieless = CreateCookielessClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await GetMeWithCookieAsync(cookieless, "localhost", first.SessionCookie)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await GetMeWithCookieAsync(cookieless, "localhost", second.SessionCookie)).StatusCode);
     }
 
     [Fact]
@@ -104,12 +144,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         using var client = CreateClient();
         var signIn = await SignInAsync(client, "anna", "/");
-        using var cookieless = Factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            BaseAddress = _serverAddress,
-            AllowAutoRedirect = false,
-            HandleCookies = false,
-        });
+        using var cookieless = CreateCookielessClient();
 
         var sameTenant = await GetMeWithCookieAsync(cookieless, "localhost", signIn.SessionCookie);
         var otherTenant = await GetMeWithCookieAsync(cookieless, HostB, signIn.SessionCookie);
@@ -402,13 +437,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         {
             var connectionString = await database.CreateDatabaseAsync($"signin_{tenant}", CancellationToken);
             _databases[tenant] = connectionString;
-            await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync(CancellationToken);
-            await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
-            await using var data = DataDatabaseFixture.CreateContext(connection);
-            await configuration.Database.MigrateAsync(CancellationToken);
-            await data.Database.MigrateAsync(CancellationToken);
-            await PostgreSqlServer.GrantRuntimeRoleAsync(connectionString, CancellationToken);
+            await DataDatabaseFixture.MigrateTenantAsync(connectionString, CancellationToken);
         }
 
         _authority = await keycloak.StartAsync();
@@ -454,6 +483,25 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
             AllowAutoRedirect = false,
             HandleCookies = true,
         });
+
+    private HttpClient CreateCookielessClient() =>
+        Factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = _serverAddress,
+            AllowAutoRedirect = false,
+            HandleCookies = false,
+        });
+
+    /// <summary>The session id that the protected cookie value wraps, the only claim it holds.</summary>
+    private string ReadSessionId(string cookieValue)
+    {
+        var options = Factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(Session.Scheme);
+        var ticket = options.TicketDataFormat.Unprotect(cookieValue);
+        Assert.NotNull(ticket);
+        var claim = Assert.Single(ticket.Principal.Claims);
+        Assert.Equal("Microsoft.AspNetCore.Authentication.Cookies-SessionId", claim.Type);
+        return claim.Value;
+    }
 
     /// <summary>
     /// Signs in through the server and Keycloak's login form, and returns where the callback sent
@@ -602,6 +650,21 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         return rows;
     }
 
+    private async Task<List<SessionRow>> ReadSessionsAsync(string tenant)
+    {
+        await using var connection = new NpgsqlConnection(_databases[tenant]);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand("SELECT id_hash, user_id, display_name, roles FROM axis.sessions", connection);
+        var rows = new List<SessionRow>();
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows.Add(new SessionRow(reader.GetFieldValue<byte[]>(0), reader.GetString(1), reader.GetString(2), reader.GetFieldValue<string[]>(3)));
+        }
+
+        return rows;
+    }
+
     // A JWT is three base64url parts, and its header always starts with eyJ, which is {" encoded.
     [GeneratedRegex(@"eyJ[\w-]+\.[\w-]+\.")]
     private static partial Regex JwtPattern();
@@ -610,6 +673,8 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     private static partial Regex FormActionPattern();
 
     private sealed record SignInResult(string ReturnedTo, string SessionCookie);
+
+    private sealed record SessionRow(byte[] IdHash, string UserId, string DisplayName, string[] Roles);
 
     private sealed record ProfileRow(string UserId, string DisplayName, string? Email, string? Locale, DateTimeOffset FirstSignedInAt, DateTimeOffset LastSignedInAt);
 

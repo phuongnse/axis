@@ -314,7 +314,7 @@ operator uses it. The test then:
    HTTP requests, posting Keycloak's login form directly. Checks that the
    redirect carries `redirect_uri=https://one.axis.test/api/auth/callback` even
    when the client sends its own `X-Forwarded-Proto` and `X-Forwarded-Host`,
-   that every `Axis.Session` cookie is `Secure`, and that `GET /api/me`
+   that every `__Host-Axis.Session` cookie is `Secure` with `Path=/` and no domain, and that `GET /api/me`
    answers `200`. Then restarts `server` and checks that `GET /api/me` with the
    same cookie answers `200` through the proxy and on the ports of `server` and
    `server-2`.

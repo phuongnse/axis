@@ -256,6 +256,8 @@ A `seed` holds records with fixed ids for one entity:
   [Startup activation](host-settings.md#startup-activation)).
 - `values` has the shape of the `values` of a record API create body (see
   [Request bodies and values](record-api.md#request-bodies-and-values)).
+  A seed cannot set a `file` field, in a record or in a child row
+  _(planned for M15)_ (`AXC0259`).
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
@@ -515,7 +517,12 @@ new check is a new compile diagnostic.
 
 - **`file`.** One file, with optional `maxSize` and `accept`. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. See
-  [file fields](file-fields.md).
+  [file fields](file-fields.md). The compiler reports a `maxSize` below 1 or
+  above the file size limit (`AXC0257`), an `accept` entry that is not
+  `type/subtype` or `type/*` (`AXC0258`), and `unique` on the field
+  (`AXC0259`). `maxSize` or `accept` on another type, and `expression` on a
+  `file`, are `AXC0013`. In an expression a file allows only `is null` and
+  `is not null`.
 - **`references`.** A set of records of `target`, at most 1,000. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. Its
   expression type is `list<Target>`.
@@ -558,14 +565,14 @@ new check is a new compile diagnostic.
   ignoring letter case. They are the index columns, in order. An empty list,
   a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
 - **Field types.** An index holds a field that has a column. A
-  `child-collection` field is `AXC0259`. `references` and `file` fields join
+  `child-collection` field is `AXC0264`. `references` and `file` fields join
   it when they are built.
 - **Compile diagnostics.** Each is reported in the entity file:
-  - `AXC0257`: an index lists the same fields in the same order as an earlier
+  - `AXC0262`: an index lists the same fields in the same order as an earlier
     one, at `/indexes/{j}/fields`.
-  - `AXC0258`: a name in `fields` is no field of the entity, at
+  - `AXC0263`: a name in `fields` is no field of the entity, at
     `/indexes/{j}/fields/{k}`.
-  - `AXC0259`: a field of a type an index cannot hold, at the same path.
+  - `AXC0264`: a field of a type an index cannot hold, at the same path.
 - **Every reference.** Every `reference` field and every child table's
   `owner_id` is indexed without a declaration.
 

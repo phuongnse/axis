@@ -35,6 +35,21 @@ public sealed class DataDatabaseFixture : IAsyncLifetime
             .UseNpgsql(connection)
             .Options);
 
+    /// <summary>
+    /// Applies the configuration and data migrations to the database that <paramref name="schemaConnectionString"/>
+    /// names and gives the runtime role its rights, as a server does for a tenant database.
+    /// </summary>
+    public static async Task MigrateTenantAsync(string schemaConnectionString, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(schemaConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var configuration = CreateConfigurationContext(connection);
+        await using var data = CreateContext(connection);
+        await configuration.Database.MigrateAsync(cancellationToken);
+        await data.Database.MigrateAsync(cancellationToken);
+        await PostgreSqlServer.GrantRuntimeRoleAsync(schemaConnectionString, cancellationToken);
+    }
+
     public async ValueTask InitializeAsync()
     {
         await _database.InitializeAsync();

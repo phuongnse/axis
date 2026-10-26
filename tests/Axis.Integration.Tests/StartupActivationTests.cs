@@ -552,6 +552,27 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Runtime_role_reads_and_writes_the_rows_of_the_sessions_table()
+    {
+        var a = await CreateDatabaseAsync();
+        var b = await CreateDatabaseAsync();
+        using var folder = ApplicationFolder(TitleField);
+        await StartAsync(a, b, folder);
+
+        var runtime = PostgreSqlServer.RuntimeConnectionString(a);
+        await ScalarAsync(
+            runtime,
+            """
+            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at)
+            VALUES ('\x01'::bytea, 'anna', 'Anna Employee', ARRAY['employee'], now(), now())
+            """);
+        Assert.Equal("anna", await ScalarAsync(runtime, "SELECT user_id FROM axis.sessions WHERE id_hash = '\\x01'::bytea"));
+        await ScalarAsync(runtime, "UPDATE axis.sessions SET last_request_at = now() WHERE id_hash = '\\x01'::bytea");
+        await ScalarAsync(runtime, "DELETE FROM axis.sessions WHERE id_hash = '\\x01'::bytea");
+        Assert.Equal(0L, await ScalarAsync(runtime, "SELECT count(*) FROM axis.sessions"));
+    }
+
+    [Fact]
     public async Task Nobody_can_update_delete_or_truncate_a_stored_release_and_the_runtime_role_cannot_insert_one()
     {
         var a = await CreateDatabaseAsync();

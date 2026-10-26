@@ -255,6 +255,9 @@ sorted by file and then path.
 | `AXC0254` | A data change trigger lists `delete` with `create` or `update` in `on`. A delete trigger lists `delete` alone. Reported at `/on`. |
 | `AXC0255` | A delete trigger has `fields`. A delete removes the whole record, so no field changes. Reported at `/fields`. |
 | `AXC0256` | A delete trigger names a process with a subject. The record is gone, so a delete trigger starts a process without a subject. Reported at `/process`. |
-| `AXC0257` | An entity declares an index that lists the same fields in the same order as an earlier index, ignoring letter case. Reported at `/indexes/{j}/fields` of the later index, naming the earlier one. |
-| `AXC0258` | A field of an entity's index names no field of the entity, ignoring letter case. Reported at `/indexes/{j}/fields/{k}`. |
-| `AXC0259` | A field of an entity's index has a type an index cannot hold, which today is `child-collection`. Reported at `/indexes/{j}/fields/{k}`. |
+| `AXC0257` | A `file` field's `maxSize` is below 1 or above the file size limit the compile was given, 25 MB by default. Reported at `/fields/{i}/maxSize`. |
+| `AXC0258` | An entry of a `file` field's `accept` is not a media type `type/subtype` or `type/*`. `*/*` and parameters such as `;charset=` are refused. Reported at `/fields/{i}/accept/{j}`. |
+| `AXC0259` | A `file` field is used where none is allowed: `unique` on it, a data source `sort` or `groupBy` entry that names it, or a seed record that sets it. Reported at the property: `/fields/{i}/unique`, `/sort`, `/aggregate/groupBy/{i}` or `/records/{i}/values/{name}`, below a child row `/records/{i}/values/{collection}/{j}/{name}`. |
+| `AXC0262` | An entity declares an index that lists the same fields in the same order as an earlier index, ignoring letter case. Reported at `/indexes/{j}/fields` of the later index, naming the earlier one. |
+| `AXC0263` | A field of an entity's index names no field of the entity, ignoring letter case. Reported at `/indexes/{j}/fields/{k}`. |
+| `AXC0264` | A field of an entity's index has a type an index cannot hold, which today is `child-collection`. Reported at `/indexes/{j}/fields/{k}`. |
