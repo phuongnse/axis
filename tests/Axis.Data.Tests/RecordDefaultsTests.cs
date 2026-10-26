@@ -98,6 +98,19 @@ public sealed class RecordDefaultsTests
         Assert.Equal(["Required."], result.Errors["/values/owner"]);
     }
 
+    [Fact]
+    public void A_default_that_fails_keeps_the_defaults_that_worked()
+    {
+        var entity = Without("note", "owner");
+
+        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now);
+
+        Assert.Equal(["/values/ratio"], result.Errors!.Keys);
+        Assert.Equal(
+            [("title", (object?)"Hi"), ("state", "open"), ("priority", 3L), ("remindAt", _now)],
+            result.Values.Select(value => (value.Field.Name, value.Value)));
+    }
+
     /// <summary>The entity without the named fields, so one test reaches one default.</summary>
     private static EntityModel Without(params string[] names) =>
         _entity with { Fields = [.. _entity.Fields.Where(field => !names.Contains(field.Name))] };

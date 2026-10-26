@@ -9,6 +9,7 @@
     { "entity": "Item", "actions": ["create", "update"], "fields": ["name", "quantity"] },
     { "entity": "Ticket", "actions": ["read", "create"], "fields": ["title"] },
     { "entity": "Order", "actions": ["read"], "fields": ["lineCount"] },
+    { "entity": "Reminder", "actions": ["read", "create", "update"], "fields": ["title", "state"] },
     { "dataSource": "ItemsByName", "actions": ["read"] },
     { "dataSource": "ItemTotals", "actions": ["read"] },
     { "dataSource": "ItemsByDepartment", "actions": ["read"] },

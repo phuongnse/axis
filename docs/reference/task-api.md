@@ -186,7 +186,8 @@ It needs `Content-Type: application/json` and the
 
 - The body has `values` and `touched`, with the shapes of the record API.
   There is no `recordId`, because the subject record is the task's.
-- The response has `sections`, `fields` and `errors`, as in the record API.
+- The response has `sections`, `fields`, `errors` and `defaults`, as in the
+  record API. `defaults` is always `{}`, because the subject record exists.
 - It uses the form from the task's release and the subject record. Fields the
   user may not read are left out of `fields`.
 - It writes nothing, and runs no unique or reference-existence check.
