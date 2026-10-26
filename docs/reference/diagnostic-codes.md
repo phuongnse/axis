@@ -172,9 +172,9 @@ sorted by file and then path.
 | `AXC0162` | A schedule trigger's `dataSource` names no loaded data source, matched ignoring letter case. Reported at `/dataSource`. |
 | `AXC0163` | A schedule trigger's `dataSource` names a grouped data source. Reported at `/dataSource`. |
 | `AXC0164` | A schedule trigger's `dataSource` is over another entity than the process's subject entity. Reported at `/dataSource`. |
-| `AXC0165` | A key in a schedule trigger's `parameters` names no parameter of the data source, or repeats a parameter that an earlier key gives, ignoring letter case. Reported at `/parameters/{key}`. |
-| `AXC0166` | A value in a schedule trigger's `parameters` is not a literal of its parameter's type, or is `null` for a required parameter. Reported at `/parameters/{key}`. |
-| `AXC0167` | A schedule trigger does not give a parameter of its data source. Reported at `/parameters`, once for each missing parameter. |
+| `AXC0165` | A key in a schedule trigger's `parameters` names no parameter of the data source, or repeats a parameter that an earlier key gives, ignoring letter case. Without a data source, the keys are checked against the parameters of the process. Reported at `/parameters/{key}`. |
+| `AXC0166` | A value in a schedule trigger's `parameters` is not a literal of its parameter's type, or is `null` for a required parameter. Without a data source, `null` is never a literal of a process parameter. Reported at `/parameters/{key}`. |
+| `AXC0167` | A schedule trigger does not give a parameter of its data source, or of its process when it has no data source. Reported at `/parameters`, once for each missing parameter. |
 | `AXC0170` | A migration's `entity` names no loaded entity, matched ignoring letter case. Not reported when the entity's file failed to load, or when a migration of that entity name holds `dropEntity`. Reported at `/entity`. |
 | `AXC0171` | A `renameField`'s `from`, or a `dropField`'s or `convert`'s `field`, names no field of the entity as it is at that change. Reported at `/changes/{i}/from` or `/changes/{i}/field`. |
 | `AXC0172` | A `renameField`'s `to` is already a field of the entity at that change. Reported at `/changes/{i}/to`. |
@@ -245,8 +245,9 @@ sorted by file and then path.
 | `AXC0244` | A process has both `entity` and `parameters`, or neither. Reported at `/parameters` when it has both, and at the root of the file, with the path `""`, when it has neither. A process with both is then checked as a process with a subject. A process with neither is checked for its step graph and text keys only. |
 | `AXC0245` | An earlier parameter of the same process already uses this `name`, ignoring letter case. Reported at `/parameters/{i}/name` of the later parameter, naming the first one. See [Processes without a subject](process-flow.md#processes-without-a-subject). |
 | `AXC0246` | A step of a process without a subject needs a subject record: a `task` step, reported at `/steps/{i}/type`, an `updateRecord` or `raiseEvent` step, reported at `/steps/{i}/operation`, or a non-empty `output` on a `callConnector` or package operation step, reported at `/steps/{i}/output`. The other properties of such a step are not checked. |
-| `AXC0247` | A trigger names a process without a subject. Reported at `/process`, for an event, a data change and a schedule trigger. |
+| `AXC0247` | A trigger names a process without a subject. Reported at `/process`, for an event, a data change and a schedule trigger with a data source. |
 | `AXC0248` | A `sum`, `min` or `max` measure reads a `money` field with a `currencyField`, and the data source has no group field that reaches that currency field on the same record, through the same reference fields. Without it a total could add two currencies. A `count` and a money field with a fixed `currency` need no group. Reported at `/aggregate/measures/{i}/field`. |
-| `AXC0249` | An entity declares an index that lists the same fields in the same order as an earlier index, ignoring letter case. Reported at `/indexes/{j}/fields` of the later index, naming the earlier one. |
-| `AXC0250` | A field of an entity's index names no field of the entity, ignoring letter case. Reported at `/indexes/{j}/fields/{k}`. |
-| `AXC0251` | A field of an entity's index has a type an index cannot hold, which today is `child-collection`. Reported at `/indexes/{j}/fields/{k}`. |
+| `AXC0249` | A schedule trigger without a `dataSource` names a process with a subject. A scheduled job starts a process without a subject. Reported at `/process`. |
+| `AXC0250` | An entity declares an index that lists the same fields in the same order as an earlier index, ignoring letter case. Reported at `/indexes/{j}/fields` of the later index, naming the earlier one. |
+| `AXC0251` | A field of an entity's index names no field of the entity, ignoring letter case. Reported at `/indexes/{j}/fields/{k}`. |
+| `AXC0252` | A field of an entity's index has a type an index cannot hold, which today is `child-collection`. Reported at `/indexes/{j}/fields/{k}`. |

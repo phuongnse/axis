@@ -17,8 +17,8 @@ another system create a record and start a process on it in one call. The
 caller signs in with a bearer token, as
 [Machine callers](security.md#machine-callers) describes. Endpoints
 are an exception to the session and CSRF rules above, as are the
-[service accounts](security.md#service-accounts) of the record API. Data source
-rows and the process API add to them _(planned for M16)_. Under a tenant's `fapi2` profile an endpoint accepts
+[service accounts](security.md#service-accounts) of the record API, data source
+rows, process start and process inspection. Under a tenant's `fapi2` profile an endpoint accepts
 only DPoP-bound tokens, sent as `Authorization: DPoP` with a proof, see
 [machine callers under `fapi2`](security.md#fapi-20-profile).
 
@@ -86,9 +86,10 @@ One transaction then does the rest:
 1. With a key, it stores the receipt first. When the key is taken, it rolls
    back and answers as [Idempotency](#idempotency) describes.
 2. It maps the input to values and creates the record through the record
-   create command. So references, sequences, computed fields and validations
-   apply, as in a [record API create](record-api.md#create-update-and-delete). The
-   creator field gets the caller's id. Errors are a `400` keyed
+   create command. So references, sequences, field defaults, computed fields
+   and validations apply, as in a [record API create](record-api.md#create-update-and-delete).
+   A field the mapping leaves out gets its default, so a required field with
+   a default needs no mapping. The creator field gets the caller's id. Errors are a `400` keyed
    `/values/<field>`, and a unique-value conflict is a `409`.
 3. It starts the processes of the [data change triggers](process-events.md#starts-from-triggers)
    on `create` for the entity, as `system`, in the order of the release. A

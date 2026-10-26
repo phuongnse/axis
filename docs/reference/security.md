@@ -319,8 +319,9 @@ systems.
   authentication is the bearer token on paths under
   `/api/apps/{app}/endpoints/`, and the session everywhere else.
   [Service accounts](#service-accounts) send bearer tokens with another
-  audience to the record API, and to data source rows and the process API
-  _(planned for M16)_. The task API stays closed to bearer tokens.
+  audience to the record API, to data source rows, and to process start and
+  inspection. The operator commands follow _(planned for M16)_. The task API
+  stays closed to bearer tokens.
 - **Clock.** The expiry is checked against the server's clock service, with
   the usual 5 minutes of clock skew, so tests can replace the clock.
 - **No session.** On endpoint routes the session cookie is ignored and not
@@ -356,9 +357,9 @@ It follows
 A service account lets another system read and write records, read data
 source rows, and start and inspect processes, under the same policies as a
 user. It replaces the point of D27 that accepts bearer tokens only on endpoint
-routes. The record API takes service accounts now. Data source rows, the
-process API and the operator commands are _(planned for M16)_ and stay
-session-only until then.
+routes. The record API, data source rows, process start and process inspection
+take service accounts now. The operator commands are _(planned for M16)_ and
+stay session-only until then.
 
 - **What it is.** A client of the tenant's identity provider that gets
   access tokens through the client credentials grant. Axis issues no API key.
@@ -376,10 +377,10 @@ session-only until then.
   sets the column by hand.
 - **Routes.** A service account may call:
   - every route of the [record API](record-api.md), record history included;
-  - `GET /api/apps/{app}/data-sources/{dataSource}/rows` _(planned for M16)_;
-  - `POST /api/apps/{app}/processes/{process}/instances` _(planned for M16)_;
+  - `GET /api/apps/{app}/data-sources/{dataSource}/rows`;
+  - `POST /api/apps/{app}/processes/{process}/instances`;
   - the instance list and one instance of
-    [process inspection](process-inspection.md) _(planned for M16)_;
+    [process inspection](process-inspection.md);
   - the operator commands retry, cancel and resolve _(planned for M16)_.
 
   The server marks each of these routes, so the choice of scheme, the CSRF

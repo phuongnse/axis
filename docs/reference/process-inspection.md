@@ -16,7 +16,9 @@ are built, with the detail's `calls`. The `sensitive` flag, which hides more
 values, is built too. The widget is built, and so is the record history link to an
 instance.
 The user is the user of the
-[session](security.md#sign-in-and-the-session). The
+[session](security.md#sign-in-and-the-session), or a
+[service account](security.md#service-accounts) with a bearer token. A bad
+token is a `401` with `WWW-Authenticate: Bearer`. The
 [process inspector widget](process-inspector-widget.md) shows the same data.
 
 **Grant.** A `process` grant takes the action `inspect`, next to `start`.
@@ -28,8 +30,8 @@ start.
 **Order of checks.** A request is checked in this order, and the first
 failure is the response:
 
-1. The session, `401`. The title is the record API's "Sign in to read or
-   write this data.".
+1. The session or the bearer token, `401`. The title is the record API's "Sign
+   in to read or write this data.", or the bearer challenge's for a token.
 2. The application and the process, `404`. An unknown application or one with
    no active release has the title "No application is active under this
    name.". An unknown process has the title "The application has no process

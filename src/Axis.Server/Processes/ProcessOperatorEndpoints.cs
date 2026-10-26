@@ -168,7 +168,7 @@ internal static class ProcessOperatorEndpoints
 
         await transaction.CommitAsync(cancellationToken);
         return Results.Json(
-            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId!.Value, result.ReleaseId!.Value, ProcessStarts.Cancelled));
+            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId, result.ReleaseId!.Value, ProcessStarts.Cancelled));
     }
 
     private static async Task<IResult> RetryAsync(
@@ -301,7 +301,7 @@ internal static class ProcessOperatorEndpoints
 
         await transaction.CommitAsync(cancellationToken);
         return Results.Json(
-            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId!.Value, result.ReleaseId!.Value, ProcessStarts.Running));
+            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId, result.ReleaseId!.Value, ProcessStarts.Running));
     }
 
     private static async Task<IResult> ResolveAsync(
@@ -450,7 +450,7 @@ internal static class ProcessOperatorEndpoints
 
         await transaction.CommitAsync(cancellationToken);
         return Results.Json(
-            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId!.Value, result.ReleaseId!.Value, result.State!));
+            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId, result.ReleaseId!.Value, result.State!));
     }
 
     /// <summary>

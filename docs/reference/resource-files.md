@@ -91,7 +91,7 @@ site, and its widgets are its content:
 
 - A page holds one or more widgets. A leaf widget `type` is `table`, `form`,
   `taskInbox`, `processInspector`, `kpi` or `detail`. A `form` names a `form` resource, which lays out the fields of
-  one entity in sections (see [frontend.md](frontend.md)), or an `entity`, as
+  one entity in sections (see [form-widget.md](form-widget.md)), or an `entity`, as
   shorthand for all its fields in one section. A `table` names an `entity`, as
   shorthand for all records of that entity, or a `dataSource`. A `kpi` names a
   `dataSource` with one total row, one of its `measure`s and a `label`, and
@@ -534,11 +534,14 @@ new check is a new compile diagnostic.
   `references` and `child-collection` fields. The compiler checks it now. A
   forbidden combination is `AXC0013` at `/fields/{i}/default`, and an
   expression problem reports its own code at the same path. The compiled field
-  carries the checked default. The record command will apply it on create when
-  the body leaves the field out, see
-  [create, update and delete](record-api.md#create-update-and-delete). That is
-  still planned, so a default is not applied yet. `file` and `references` are
-  refused when those types arrive.
+  carries the checked default. A create applies it when the body
+  leaves the field out, see
+  [create, update and delete](record-api.md#create-update-and-delete). That
+  holds for the record API, the record command, inbound endpoints and seed
+  records. A required field with a default may be left out of a create, and
+  `now()` is the start time of the write transaction. An update never applies
+  a default. A default on a field of a child entity does nothing for its rows
+  yet. `file` and `references` are refused when those types arrive.
 - **`searchable`.** On a `text` field. `search` reads every searchable field,
   and the display field is always searchable. See
   [paging and sorting](record-api.md#paging-and-sorting).
@@ -554,14 +557,14 @@ new check is a new compile diagnostic.
   ignoring letter case. They are the index columns, in order. An empty list,
   a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
 - **Field types.** An index holds a field that has a column. A
-  `child-collection` field is `AXC0251`. `references` and `file` fields join
+  `child-collection` field is `AXC0252`. `references` and `file` fields join
   it when they are built.
 - **Compile diagnostics.** Each is reported in the entity file:
-  - `AXC0249`: an index lists the same fields in the same order as an earlier
+  - `AXC0250`: an index lists the same fields in the same order as an earlier
     one, at `/indexes/{j}/fields`.
-  - `AXC0250`: a name in `fields` is no field of the entity, at
+  - `AXC0251`: a name in `fields` is no field of the entity, at
     `/indexes/{j}/fields/{k}`.
-  - `AXC0251`: a field of a type an index cannot hold, at the same path.
+  - `AXC0252`: a field of a type an index cannot hold, at the same path.
 - **Every reference.** Every `reference` field and every child table's
   `owner_id` is indexed without a declaration.
 
@@ -700,7 +703,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
 
 ## Form conditions and steps
 
-A `form` resource (see [frontend](frontend.md)) can show, require and lock
+A `form` resource (see [form widget](form-widget.md)) can show, require and lock
 fields depending on the record, and can split its sections into wizard steps
 ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 The schema, the compile checks, the compiled model, the page and task metadata and the

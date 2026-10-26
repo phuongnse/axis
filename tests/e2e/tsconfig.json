@@ -15,6 +15,8 @@
     "csrf.ts",
     "dialogs.ts",
     "dialogs.test.ts",
+    "design-drag.ts",
+    "design-drag.test.ts",
     "select.ts",
     "sessions.ts",
     "folder-comparison.ts",

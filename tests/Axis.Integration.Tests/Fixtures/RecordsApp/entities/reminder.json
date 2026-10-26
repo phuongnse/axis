@@ -1,0 +1,12 @@
+{
+  "id": "6b2e1d3f-8c40-4f59-a072-3c4d5e6f7a01",
+  "kind": "entity",
+  "name": "Reminder",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "state", "type": "enum", "required": true, "values": ["open", "closed"], "default": "'open'" },
+    { "name": "priority", "type": "integer", "default": "3" },
+    { "name": "remindAt", "type": "date-time", "default": "now()" }
+  ]
+}
