@@ -21,6 +21,8 @@ export const locale = 'en'
 
 const apiPath = `/api/apps/${application}`
 const requestsPath = `${apiPath}/entities/Request/records`
+const loadingPath = `${apiPath}/entities/LoadingRequest/records`
+const failingPath = `${apiPath}/entities/FailingRequest/records`
 const categoriesPath = `${apiPath}/entities/Category/records`
 const formStatePath = `${apiPath}/forms/RequestForm/state`
 const tasksPath = `${apiPath}/tasks`
@@ -148,6 +150,28 @@ export const tableWidget: WidgetMetadata = {
     },
     { type: 'delete', labelKey: 'request.delete', recordsPath: requestsPath, visibleWhen: null },
   ],
+}
+
+/** The request table over a path whose request never finishes, so it stays loading. */
+export const loadingTableWidget: WidgetMetadata = {
+  ...tableWidget,
+  entity: { ...entity, recordsPath: loadingPath },
+}
+
+/** The request table over a path whose request fails, so it shows the load error. */
+export const failingTableWidget: WidgetMetadata = {
+  ...tableWidget,
+  entity: { ...entity, recordsPath: failingPath },
+}
+
+/** The answers only the loading state uses: a request that never settles. */
+export const loadingRoutes: Record<string, () => unknown> = {
+  [loadingPath]: () => new Promise<never>(() => {}),
+}
+
+/** The answers only the load error state uses: a request that fails with status 500. */
+export const failingRoutes: Record<string, () => unknown> = {
+  [failingPath]: () => new Response(null, { status: 500 }),
 }
 
 const form: FormMetadata = {

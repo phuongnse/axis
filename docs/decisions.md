@@ -105,3 +105,4 @@ files agree, title and status included.
 | [D92](decisions/d92-outbound-webhooks.md) | Outbound webhooks | **Agreed** |
 | [D93](decisions/d93-an-operator-web-console.md) | An operator web console | **Agreed** |
 | [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md) | Purchase requests prove the extensibility milestone | **Agreed** |
+| [D95](decisions/d95-widget-previews-show-the-states-a-design-change-touches.md) | Widget previews show the states a design change touches | **Agreed** |
