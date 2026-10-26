@@ -10,9 +10,9 @@ sections marked _(planned for Mx)_ are not built yet, and Dn refers to
 The design follows [D74](../decisions/d74-a-visual-process-designer.md). The
 Design tab, the canvas, the existing step panels, remove, undo, Tab and Enter,
 the diagnostic marks and the live region for removals are _(built)_. The
-palette and the live region for adds are _(built)_. The transitions, the
-panels of the new step types and the live region for moves are _(planned for
-M14)_.
+palette, the transitions and the live region for adds and transitions are
+_(built)_. The panels of the new step types and the live region for moves are
+_(planned for M14)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
   and JSON tabs. The three tabs edit one draft.
@@ -23,14 +23,14 @@ M14)_.
   process file holds no layout. Clicking a node selects its step. Clicking an
   edge, or pressing Enter on it, selects that edge and the step it leaves. The
   selected edge is drawn in the primary colour. The selected step and edge are
-  not written to the URL. The palette edits the canvas _(built)_.
-  _(Planned for M14)_ Dragging transitions edits it too.
+  not written to the URL. The palette and the transitions edit the canvas
+  _(built)_.
 - **Palette** _(built)_. It sits at the top of the panel beside the canvas and
   lists the step types and operations that `process.schema.json` defines today:
   `decision`, `task`, the operations `updateRecord`, `callConnector` and
-  `raiseEvent`, one "Package operation" entry, `subProcess` and `end`. A
-  Vitest test reads the schema and fails when a step type or a built-in
-  operation is missing from the palette. `timer`, `waitEvent`, `createRecord`
+  `raiseEvent`, one "Package operation" entry, `subProcess`, `timer` and
+  `end`. A Vitest test reads the schema and fails when a step type or a
+  built-in operation is missing from the palette. `waitEvent`, `createRecord`
   and `notify` join when the schema defines them, because their steps would
   always be invalid before that.
   - The package entry adds an operation step with an empty `operation`, which
@@ -57,11 +57,22 @@ M14)_.
     `next`, so a step added with one selected is unconnected. Enter on an edge
     selects it, so the keyboard reaches every transition.
   - Each add is one change of `steps`, so one Undo removes it.
-- **Transitions** _(planned for M14)_. Each step has a handle. Dragging from it to another step
-  sets a transition. A step with one transition sets it. A step with several,
-  a decision or a task, opens a small menu that lists its branches,
-  `otherwise`, its outcomes, or a new branch or outcome. The panel's pickers
-  set the same transitions by keyboard.
+- **Transitions** _(built)_. Every step except an `end` step has a handle at
+  its bottom edge. Dragging from it and dropping on another step sets a
+  transition. A drop anywhere on the target step counts. A step with one
+  transition, such as an operation, sets its `next` at once. A step with
+  several, a decision or a task, opens a small menu at the drop point. A
+  decision lists its branches, `otherwise` and "New branch". A task lists its
+  outcomes and "New outcome". The panel's pickers set the same transitions by
+  keyboard, and the handle has no keyboard way.
+  - Dropping on the step the drag started from does nothing. The panel's
+    pickers can still set a transition to the same step.
+  - Escape, or a click outside the menu, closes it and changes nothing.
+  - "New branch" adds a branch with an empty `when` that names the target.
+    "New outcome" adds an outcome with the first free name `outcome1`,
+    `outcome2` and so on, an empty label key and the target. The diagnostics
+    mark both until the author fills them in.
+  - Each drag, or each menu choice, is one edit and so one Undo.
 - **Remove** _(built)_. Removing a step removes it from `steps`. Removing an
   edge clears that transition: its target becomes empty, and its branch or
   outcome stays. A transition left naming a missing step is `AXC0070`, and the
@@ -93,11 +104,13 @@ M14)_.
   removes the selection. Each edge has a name made of its two steps and its
   branch or outcome, such as "financeCheck to markApproved · otherwise".
 - **Screen readers** _(partly built)_. Every add, move and remove has a
-  keyboard way, and a live region says what changed. Removals and adds are
-  _(built)_: a hidden live region says "Removed step remind", "Removed
-  transition financeCheck to markApproved", "Step remind added after resolve"
-  (or "Step remind added" for an unconnected step), or "An end step cannot be
-  inserted into a transition". Moves are _(planned for M14)_.
+  keyboard way, and a live region says what changed. Removals, adds and
+  transitions are _(built)_: a hidden live region says "Removed step remind",
+  "Removed transition financeCheck to markApproved", "Step remind added after
+  resolve" (or "Step remind added" for an unconnected step), "An end step cannot
+  be inserted into a transition" or "submit now goes to done". A choice from the
+  transition menu names its branch or outcome, such as "managerApproval ·
+  approve now goes to done". Moves are _(planned for M14)_.
 - **Diagnostics** _(built)_. Marks work as on the graph: a marked node has an
   error-coloured border, "has diagnostics" in its text label, and
   `data-marked`.

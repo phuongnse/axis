@@ -10,17 +10,19 @@ import {
   MarkerType,
   type Node,
   type NodeProps,
+  type OnConnectEnd,
   Position,
   ReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { type KeyboardEvent, useMemo } from 'react'
+import { type KeyboardEvent, useMemo, useRef } from 'react'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { type ProcessGraph, type ProcessGraphTransition, transitionName } from './processGraph'
 
 const nodeWidth = 200
 const nodeHeight = 48
+const handleSize = 10
 
 type StepNodeData = {
   index: number
@@ -29,6 +31,7 @@ type StepNodeData = {
   start: boolean
   current: boolean
   marked: boolean
+  connectable: boolean
 }
 
 type StepNode = Node<StepNodeData, 'step'>
@@ -81,7 +84,21 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
       >
         <strong>{data.name}</strong> <span>{data.type}</span>
       </button>
-      <Handle type="source" position={Position.Bottom} isConnectable={false} />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        isConnectable={data.connectable}
+        data-testid={`studio-graph-handle-${data.index}`}
+        aria-hidden
+        style={{
+          width: handleSize,
+          height: handleSize,
+          background: colour.primary,
+          border: `1px solid ${colour.surface}`,
+          cursor: data.connectable ? 'crosshair' : 'default',
+          display: data.connectable ? undefined : 'none',
+        }}
+      />
     </>
   )
 }
@@ -163,7 +180,10 @@ const edgeTestIdPrefix = 'rf__edge-'
  * in its label. Tab reaches the edges, which come before the nodes, and each edge is named by its two steps and its
  * branch or outcome. Enter or Space on an edge selects it. Delete or Backspace in the canvas calls `onRemove`. The
  * canvas and the midpoint of each edge are drop targets of the process designer's palette: the canvas for `/steps`, and
- * an edge for the path of its transition.
+ * an edge for the path of its transition. Every step but an `end` step has a handle at its bottom edge. Dragging from
+ * it and releasing on a step, anywhere on the node, calls `onConnect` with the two step numbers and the release point,
+ * relative to the canvas. The graph sets no transition itself. It has no keyboard way to connect, which the step
+ * panel's pickers give.
  */
 export default function StudioProcessGraph({
   graph,
@@ -172,6 +192,7 @@ export default function StudioProcessGraph({
   onSelect,
   onSelectEdge,
   onRemove,
+  onConnect,
 }: {
   graph: ProcessGraph
   selected: number | null
@@ -179,11 +200,13 @@ export default function StudioProcessGraph({
   onSelect: (index: number) => void
   onSelectEdge: (transition: ProcessGraphTransition) => void
   onRemove: () => void
+  onConnect: (source: number, target: number, point: { x: number; y: number }) => void
 }) {
   const t = useText()
   const { mode } = useThemeMode()
   const { colour } = useDesignTokens()
   const to = t('shell.studio.processGraph.to')
+  const section = useRef<HTMLElement>(null)
   const { setNodeRef } = useDroppable({ id: 'process-canvas', data: { pointer: '/steps' } })
 
   const { nodes, edges } = useMemo(() => {
@@ -197,7 +220,14 @@ export default function StudioProcessGraph({
         height: nodeHeight,
         handles: [
           { type: 'target', position: Position.Top, x: nodeWidth / 2, y: 0, width: 1, height: 1 },
-          { type: 'source', position: Position.Bottom, x: nodeWidth / 2, y: nodeHeight, width: 1, height: 1 },
+          {
+            type: 'source',
+            position: Position.Bottom,
+            x: nodeWidth / 2 - handleSize / 2,
+            y: nodeHeight - handleSize / 2,
+            width: handleSize,
+            height: handleSize,
+          },
         ],
         data: {
           index: step.index,
@@ -206,6 +236,7 @@ export default function StudioProcessGraph({
           start: graph.start === step.index,
           current: selected === step.index,
           marked: step.marked,
+          connectable: step.type !== 'end',
         },
       })),
       edges: graph.transitions.map((transition): Edge => {
@@ -229,6 +260,27 @@ export default function StudioProcessGraph({
     }
   }, [graph, selected, selectedEdge, colour, to])
 
+  // A drag ends on a node when React Flow snaps to its handle, and anywhere else on the node otherwise, so the node
+  // under the pointer is the target. `onConnect` is not set, or React Flow would report a snapped drag twice.
+  const onConnectEnd: OnConnectEnd = (event, state) => {
+    const source = state.fromNode?.id
+    if (source === undefined) {
+      return
+    }
+    const touch = 'changedTouches' in event ? event.changedTouches[0] : undefined
+    const x = touch?.clientX ?? (event as MouseEvent).clientX
+    const y = touch?.clientY ?? (event as MouseEvent).clientY
+    const target =
+      state.toNode?.id ??
+      document.elementFromPoint(x, y)?.closest('.react-flow__node')?.getAttribute('data-id') ??
+      undefined
+    if (target === undefined) {
+      return
+    }
+    const box = section.current?.getBoundingClientRect()
+    onConnect(Number(source), Number(target), { x: x - (box?.left ?? 0), y: y - (box?.top ?? 0) })
+  }
+
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
@@ -250,10 +302,13 @@ export default function StudioProcessGraph({
 
   return (
     <section
-      ref={setNodeRef}
+      ref={(element) => {
+        section.current = element
+        setNodeRef(element)
+      }}
       data-testid="studio-process-graph"
       aria-label={t('shell.studio.processGraph')}
-      style={{ height: 480 }}
+      style={{ height: 480, position: 'relative' }}
       onKeyDown={onKeyDown}
     >
       <ReactFlow
@@ -264,12 +319,13 @@ export default function StudioProcessGraph({
         colorMode={mode}
         fitView
         nodesDraggable={false}
-        nodesConnectable={false}
+        nodesConnectable
         nodesFocusable={false}
         elementsSelectable={false}
         edgesFocusable
         deleteKeyCode={null}
         zoomOnScroll={false}
+        onConnectEnd={onConnectEnd}
         onNodeClick={(_, node) => onSelect(Number(node.id))}
         onEdgeClick={(_, edge) => {
           const transition = graph.transitions.find((candidate) => candidate.path === edge.id)

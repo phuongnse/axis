@@ -101,6 +101,8 @@ public static class SchemaPlanner
             {
                 PlanNewTable(entity, table, childOwner);
             }
+
+            PlanJunctions(entity);
         }
 
         public void CheckRemovedEntities()
@@ -133,6 +135,67 @@ public static class SchemaPlanner
                     DestructiveChanges = [.. migrations.DestructiveChanges],
                     RecomputedEntityIds = [.. migrations.RecomputedEntityIds],
                 };
+
+        /// <summary>
+        /// Plans the junction table of each <c>references</c> field: it gets the table, its index and its
+        /// foreign keys when missing. A junction table without a field would lose its links, so it is
+        /// reported as a removed field.
+        /// </summary>
+        private void PlanJunctions(EntityModel entity)
+        {
+            var expected = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < entity.Fields.Count; index++)
+            {
+                var field = entity.Fields[index];
+                if (field.Type != FieldType.References)
+                {
+                    continue;
+                }
+
+                var junction = EntityNaming.Junction(entity.Id, field.Name);
+                expected.Add(junction);
+                if (!_tablesByName.TryGetValue(junction, out var existing))
+                {
+                    var owner = EntityNaming.Quote(EntityNaming.OwnerColumn);
+                    var target = EntityNaming.Quote(EntityNaming.TargetColumn);
+                    _creates.Add(
+                        $"CREATE TABLE {EntityNaming.QualifiedTable(junction)} ({owner} uuid NOT NULL, {target} uuid NOT NULL, "
+                        + $"CONSTRAINT {EntityNaming.Quote(EntityNaming.PrimaryKey(junction))} PRIMARY KEY ({owner}, {target}))");
+                    _alters.Add(
+                        $"CREATE INDEX {EntityNaming.Quote(EntityNaming.JunctionIndex(junction, EntityNaming.TargetColumn))} "
+                        + $"ON {EntityNaming.QualifiedTable(junction)} ({target})");
+                    AddJunctionForeignKey(junction, EntityNaming.OwnerColumn, entity.Id, " ON DELETE CASCADE");
+                    AddJunctionForeignKey(junction, EntityNaming.TargetColumn, field.Target!.Id, "");
+                    continue;
+                }
+
+                var targetColumn = existing.Columns.FirstOrDefault(column => column.Name == EntityNaming.TargetColumn);
+                if (targetColumn?.ReferencedTable is null)
+                {
+                    AddJunctionForeignKey(junction, EntityNaming.TargetColumn, field.Target!.Id, "");
+                }
+                else if (targetColumn.ReferencedTable != EntityNaming.Table(field.Target!.Id))
+                {
+                    _diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.IncompatibleFieldChange,
+                        $"The reference '{field.Name}' cannot change its target to '{field.Target.Name}'.",
+                        entity.File,
+                        $"/fields/{index}/target",
+                        entity.Id));
+                }
+            }
+
+            var prefix = EntityNaming.JunctionPrefix(entity.Id);
+            foreach (var name in _tablesByName.Keys.Where(name => name.StartsWith(prefix, StringComparison.Ordinal) && !expected.Contains(name)))
+            {
+                _diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.RemovedField,
+                    $"The junction table '{name}' has no references field. Restore the field.",
+                    entity.File,
+                    "/fields",
+                    entity.Id));
+            }
+        }
 
         private void PlanNewTable(EntityModel entity, string table, ChildOwner? childOwner)
         {
@@ -429,8 +492,15 @@ public static class SchemaPlanner
             AddForeignKey(table, EntityNaming.OwnerColumn, childOwner.Entity.Id, " ON DELETE CASCADE");
 
         private void AddForeignKey(string table, string column, Guid targetId, string onDelete) =>
+            AddForeignKey(table, column, EntityNaming.ForeignKey(table, column), targetId, onDelete);
+
+        // A junction table's names are shorter than the other foreign key names, to stay within 63 bytes.
+        private void AddJunctionForeignKey(string junction, string column, Guid targetId, string onDelete) =>
+            AddForeignKey(junction, column, EntityNaming.JunctionForeignKey(junction, column), targetId, onDelete);
+
+        private void AddForeignKey(string table, string column, string constraint, Guid targetId, string onDelete) =>
             _foreignKeys.Add(
-                $"ALTER TABLE {EntityNaming.QualifiedTable(table)} ADD CONSTRAINT {EntityNaming.Quote(EntityNaming.ForeignKey(table, column))} "
+                $"ALTER TABLE {EntityNaming.QualifiedTable(table)} ADD CONSTRAINT {EntityNaming.Quote(constraint)} "
                 + $"FOREIGN KEY ({EntityNaming.Quote(column)}) REFERENCES {EntityNaming.QualifiedTable(EntityNaming.Table(targetId))} ({EntityNaming.Quote(EntityNaming.IdColumn)}){onDelete}");
 
         private void RecordNewEnumValues(EntityModel entity, FieldModel field)
