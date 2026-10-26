@@ -30,6 +30,11 @@ const instancesPath = `${apiPath}/processes/Approve/instances`
 const deadLettersPath = `${apiPath}/processes/Approve/dead-letters`
 const requestsByStatusPath = `${apiPath}/data-sources/RequestsByStatus/rows`
 const requestTotalsPath = `${apiPath}/data-sources/RequestTotals/rows`
+const emptyRequestsPath = `${apiPath}/entities/EmptyRequest/records`
+const blankRequestsPath = `${apiPath}/entities/BlankRequest/records`
+const emptyTasksPath = `${apiPath}/empty-inbox/tasks`
+/** The rows of a data source with no rows, for the empty charts and kpi. */
+export const noRowsPath = `${apiPath}/data-sources/NoRequests/rows`
 
 export const requestId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
 const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
@@ -164,6 +169,12 @@ export const failingTableWidget: WidgetMetadata = {
   entity: { ...entity, recordsPath: failingPath },
 }
 
+/** The request table over a path with no requests, so it shows its empty text. */
+export const emptyTableWidget: WidgetMetadata = {
+  ...tableWidget,
+  entity: { ...entity, recordsPath: emptyRequestsPath },
+}
+
 /** The answers only the loading state uses: a request that never settles. */
 export const loadingRoutes: Record<string, () => unknown> = {
   [loadingPath]: () => new Promise<never>(() => {}),
@@ -211,7 +222,15 @@ export const formWidget: EntityWidgetMetadata = {
 /** A detail widget of a request: the form's sections, read-only, with the start button. */
 export const detailWidget: EntityWidgetMetadata = { ...formWidget, type: 'detail', detail: { record: 'request' } }
 
+/** The detail widget over a record whose values are all empty, so the Lines table has no rows. */
+export const blankDetailWidget: EntityWidgetMetadata = {
+  ...detailWidget,
+  entity: { ...entity, recordsPath: blankRequestsPath },
+}
+
 export const taskInboxWidget: WidgetMetadata = { ...widgetBase, type: 'taskInbox', tasksPath }
+
+export const emptyTaskInboxWidget: WidgetMetadata = { ...taskInboxWidget, tasksPath: emptyTasksPath }
 
 export const processInspectorWidget: WidgetMetadata = {
   ...widgetBase,
@@ -241,13 +260,13 @@ const requestsByStatus: DataSourceMetadata = {
 }
 
 /** A chart of the requests by status: bars and lines show two counts, and a pie shows one. */
-export function chartWidget(kind: ChartKind): WidgetMetadata {
+export function chartWidget(kind: ChartKind, rowsPath = requestsByStatusPath): WidgetMetadata {
   const requests = { name: 'requests', labelKey: 'chart.requests' }
   const urgent = { name: 'urgentRequests', labelKey: 'chart.urgentRequests' }
   return {
     ...widgetBase,
     type: 'chart',
-    dataSource: requestsByStatus,
+    dataSource: { ...requestsByStatus, rowsPath },
     chart: {
       kind,
       titleKey: 'chart.requestsByStatus',
@@ -280,6 +299,12 @@ export const kpiWidget: WidgetMetadata = {
     comparison: { measure: 'requests', labelKey: 'kpi.requests' },
     navigate: null,
   },
+}
+
+/** The kpi tile over a data source with no rows, so it shows its empty value. */
+export const emptyKpiWidget: WidgetMetadata = {
+  ...kpiWidget,
+  dataSource: { ...requestTotals, rowsPath: noRowsPath },
 }
 
 /** A columns widget: the request table at width 8 and a section with the task inbox at width 4. */
@@ -338,10 +363,34 @@ const recordPage: RecordPage = {
     savedRecord,
     savedRequest('7a2d3b4c-5e6f-4a71-9b82-a3c4d5e6f708', 'Replacement laptop chargers', 'approved'),
     savedRequest('8b3e4c5d-6f70-4b82-8c93-b4d5e6f70819', 'Whiteboard markers', 'draft'),
+    savedRequest(
+      '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+      'Replace the worn carpet tiles on the third floor, the meeting room chairs and the kitchen lights before the April safety audit and the board visit',
+      'submitted',
+    ),
   ],
   page: 1,
   pageSize: 20,
-  totalCount: 3,
+  totalCount: 4,
+}
+
+const emptyRecordPage: RecordPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
+
+const blankRecord: RecordItem = {
+  id: requestId,
+  version: 1,
+  values: {
+    title: null,
+    quantity: null,
+    amount: null,
+    urgent: null,
+    neededOn: null,
+    submittedAt: null,
+    status: null,
+    category: null,
+    lines: [],
+  },
+  labels: {},
 }
 
 const history: HistoryPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
@@ -355,9 +404,9 @@ const taskPage: TaskPage = {
       step: 'Review',
       labelKey: 'request.task.review',
       subject: { entity: 'Request', id: requestId, label: 'Standing desks for the new office' },
-      dueAt: '2026-03-20T17:00:00.000000Z',
+      dueAt: '2026-03-06T17:00:00.000000Z',
       claimedBy: null,
-      overdue: false,
+      overdue: true,
       createdAt: '2026-03-04T09:31:00.000000Z',
     },
     {
@@ -368,7 +417,7 @@ const taskPage: TaskPage = {
       labelKey: 'request.task.review',
       subject: { entity: 'Request', id: '8b3e4c5d-6f70-4b82-8c93-b4d5e6f70819', label: 'Whiteboard markers' },
       dueAt: null,
-      claimedBy: null,
+      claimedBy: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
       overdue: false,
       createdAt: '2026-03-05T14:02:00.000000Z',
     },
@@ -378,8 +427,19 @@ const taskPage: TaskPage = {
   totalCount: 2,
 }
 
+const emptyTaskPage: TaskPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
+
 const instancePage: InstancePage = {
   items: [
+    {
+      id: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+      subjectId: '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+      state: 'failed',
+      step: 'Notify',
+      releaseId,
+      createdAt: '2026-03-05T10:00:00.000000Z',
+      endedAt: '2026-03-05T10:20:00.000000Z',
+    },
     {
       id: 'be6b7f80-92a3-4eb5-bfc6-e708192a3b4c',
       subjectId: requestId,
@@ -401,7 +461,7 @@ const instancePage: InstancePage = {
   ],
   page: 1,
   pageSize: 20,
-  totalCount: 2,
+  totalCount: 3,
 }
 
 const deadLetterPage: DeadLetterPage = {
@@ -516,5 +576,9 @@ export const routes: Record<string, () => unknown> = {
   [deadLettersPath]: () => deadLetterPage,
   [requestsByStatusPath]: () => requestsByStatusPage,
   [requestTotalsPath]: () => requestTotalsPage,
+  [emptyRequestsPath]: () => emptyRecordPage,
+  [`${blankRequestsPath}/${requestId}`]: () => blankRecord,
+  [emptyTasksPath]: () => emptyTaskPage,
+  [noRowsPath]: () => emptyRecordPage,
   [`/api/sites/${sitePath}/texts/${locale}`]: () => ({ texts: siteTexts }),
 }
