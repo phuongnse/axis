@@ -941,7 +941,7 @@ The `application` manifest may name the application's time zone, see [D75](../de
   release.
 - **What uses it.** [`today()` and `toDate`](expressions.md#functions), a
   sequence's [`{yyyy}`](#sequences) and its yearly restart. The dates in
-  [notifications](notifications.md#placeholders) _(planned for M14)_ and M15's
+  [notifications](notifications.md#placeholders) _(planned for M14)_ and the
   date buckets of data sources use it too.
 - **What does not.** `now()` stays an instant. A schedule trigger keeps its own
   `timeZone`. The SPA shows a `date-time` in the browser's time zone, as
