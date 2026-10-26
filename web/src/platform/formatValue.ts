@@ -1,4 +1,5 @@
 import type { RecordValue, RowLabels } from './records'
+import { isJsonNumber } from './recordBody'
 import type { FieldMetadata } from './site'
 
 export interface FormatOptions {
@@ -20,15 +21,55 @@ export function enumLabel(
   return key ? text(key) : value
 }
 
+/** What formatting reads of a field or a data source column. */
+type Formatted = Pick<FieldMetadata, 'name' | 'type' | 'valueLabelKeys'> & {
+  scale?: number | null
+  currency?: string | null
+  currencyField?: string | null
+  currencyColumn?: string | null
+}
+
+const currencyCode = /^[A-Za-z]{3}$/
+
+/**
+ * The currency of a money field or column: its fixed code, or the row's value of the field or column
+ * that holds the code. It is null without a code of three letters, because a text currency field can
+ * hold anything and a wrong code would mislead.
+ */
+export function moneyCurrency(field: Formatted, row?: Record<string, unknown>): string | null {
+  const named = field.currencyField ?? field.currencyColumn
+  const code = field.currency ?? (named && row ? row[named] : null)
+  return typeof code === 'string' && currencyCode.test(code) ? code : null
+}
+
+// The text keeps every digit, so it is formatted as text. The digits are the field's scale or the
+// digits the API wrote when they are more, so formatting never rounds.
+function moneyText(field: Formatted, text: string, locale: string, row?: Record<string, unknown>): string {
+  const currency = moneyCurrency(field, row)
+  if (currency === null || !isJsonNumber(text)) {
+    return text
+  }
+  const written = /\.(\d+)/.exec(text)?.[1].length ?? 0
+  const digits = Math.max(field.scale ?? 0, written)
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(text as Intl.StringNumericLiteral)
+}
+
 /**
  * Formats a record value for display. Formatting never changes the value: numbers show exactly as
- * the API wrote them, and a reference shows the label of the record it points to.
+ * the API wrote them, a money amount adds its currency, and a reference shows the label of the record
+ * it points to. `row` is the values of the record or row, where a money amount reads its currency.
  */
 export function formatValue(
-  field: Pick<FieldMetadata, 'name' | 'type' | 'valueLabelKeys'>,
+  field: Formatted,
   value: RecordValue,
   labels: Record<string, string | RowLabels[]>,
   options: FormatOptions,
+  row?: Record<string, unknown>,
 ): string {
   if (value === null) {
     return ''
@@ -37,6 +78,8 @@ export function formatValue(
   switch (field.type) {
     case 'boolean':
       return text(value === true ? 'shell.table.yes' : 'shell.table.no')
+    case 'money':
+      return moneyText(field, String(value), locale, row)
     case 'enum':
       return enumLabel(field, String(value), text)
     case 'reference': {

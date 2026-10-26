@@ -40,7 +40,16 @@ export interface ApplicationSite {
 
 /** A field type as written in entity files. */
 export type FieldType =
-  'text' | 'integer' | 'decimal' | 'boolean' | 'date' | 'date-time' | 'enum' | 'reference' | 'child-collection'
+  | 'text'
+  | 'integer'
+  | 'decimal'
+  | 'money'
+  | 'boolean'
+  | 'date'
+  | 'date-time'
+  | 'enum'
+  | 'reference'
+  | 'child-collection'
 
 /** The entity a reference field points to, its display field and the path of its record API. */
 export interface ReferenceTarget {
@@ -68,6 +77,10 @@ export interface FieldMetadata {
   maxLength: number | null
   precision: number | null
   scale: number | null
+  /** The fixed currency code of a money field, or missing or `null` otherwise. */
+  currency?: string | null
+  /** The name of the field that holds the currency code of a money field, or missing or `null` otherwise. */
+  currencyField?: string | null
   /** The lowest accepted value as the literal was written, such as `10`, `0.5` or `2026-01-01`. */
   min: string | null
   /** The highest accepted value, written like `min`. */
@@ -114,9 +127,9 @@ export interface DataSourceColumn {
   /** The text key of each enum value's label, by value, or missing or `null` when the enum has no labels. */
   valueLabelKeys?: Record<string, string> | null
   target: ReferenceTarget | null
-  /** The fixed currency code of a money measure, or missing or `null` otherwise. */
+  /** The fixed currency code of a money column or measure, or missing or `null` otherwise. */
   currency?: string | null
-  /** The name of the group column that holds the currency code of a money measure, or missing or `null` otherwise. */
+  /** The name of the column that holds the currency code of a money column or measure, or missing or `null` otherwise. */
   currencyColumn?: string | null
 }
 

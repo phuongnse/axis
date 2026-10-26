@@ -75,6 +75,58 @@ public sealed class ApplicationSitesTests
         }
     }
 
+    [Fact]
+    public void Money_fields_and_projected_money_columns_carry_their_currency_or_currency_field()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
+        try
+        {
+            Write(root, "application.json", """{ "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }""");
+            Write(root, "entities/expense.json", """
+                { "id": "55555555-5555-4555-8555-555555555501", "kind": "entity", "name": "Expense", "formatVersion": 1,
+                  "fields": [
+                    { "name": "currency", "type": "enum", "values": ["USD", "EUR"] },
+                    { "name": "amount", "type": "money", "currencyField": "currency" },
+                    { "name": "fixedAmount", "type": "money", "currency": "VND" },
+                    { "name": "quantity", "type": "decimal" }
+                  ] }
+                """);
+            Write(root, "data-sources/expenses.json", """
+                { "id": "99999999-9999-4999-8999-999999999992", "kind": "dataSource", "name": "Expenses", "formatVersion": 1, "entity": "Expense",
+                  "fields": [ { "name": "currency", "path": "currency" }, { "name": "amount", "path": "amount" },
+                              { "name": "fixedAmount", "path": "fixedAmount" }, { "name": "quantity", "path": "quantity" } ] }
+                """);
+
+            var result = ApplicationCompiler.Compile(root);
+            Assert.Empty(result.Diagnostics);
+            Assert.NotNull(result.Model);
+
+            var fields = ApplicationSites.DescribeEntity(result.Model, "Expense").Fields;
+            var columns = ApplicationSites.DescribeDataSource(result.Model, "Expenses").Columns;
+
+            Assert.Equal(
+                [
+                    ("currency", null, null),
+                    ("amount", null, "currency"),
+                    ("fixedAmount", "VND", null),
+                    ("quantity", null, null),
+                ],
+                fields.Select(field => (field.Name, field.Currency, field.CurrencyField)));
+            Assert.Equal(
+                [
+                    ("currency", null, null),
+                    ("amount", null, "currency"),
+                    ("fixedAmount", "VND", null),
+                    ("quantity", null, null),
+                ],
+                columns.Select(column => (column.Name, column.Currency, column.CurrencyColumn)));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static void Write(string root, string relativePath, string content)
     {
         var fullPath = Path.Combine(root, relativePath);

@@ -32,6 +32,7 @@ function value(field: Typed, n: number): FieldValue {
     case 'integer':
       return String(n * 10)
     case 'decimal':
+    case 'money':
       return (n * 1250.5).toFixed(field.scale ?? 2)
     case 'boolean':
       return n % 2 === 1
