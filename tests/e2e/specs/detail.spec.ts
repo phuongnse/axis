@@ -33,7 +33,7 @@ test('a detail page shows a note read-only, its start button closes the note and
   // The worker runs the first step some time after the start.
   await expect(async () => {
     await page.reload()
-    await expect(detail).toContainText('closed', { timeout: 1_000 })
+    await expect(detail).toContainText('Closed', { timeout: 1_000 })
   }).toPass({ timeout: 30_000 })
 
   await page.getByRole('button', { name: 'Edit note', exact: true }).click()
