@@ -231,9 +231,9 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 - in the server and the worker, the runtime database role
   is a superuser, owns the `axis` or `entities` schema, or may create objects
   in either, or is a member of a role that is or may;
-- a binding has a missing `Kind` or one other than `url` or `secret`, a blank
-  `Value`, or is a `url` binding whose value is not an absolute `http` or
-  `https` URL. The message names the tenant and the binding, never the value;
+- a binding has a missing `Kind` or one other than `url`, `secret` or `storage`, a blank
+  `Value`, is a `url` binding whose value is not an absolute `http` or
+  `https` URL, or is a `storage` binding whose value is not `database`. The message names the tenant and the binding, never the value;
 - outside Development, the configuration source that wins for a `secret`
   binding's `Value` is a file, such as `appsettings.json`. Environment
   variables, command-line arguments, mounted secret files and in-memory
