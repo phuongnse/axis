@@ -9,7 +9,7 @@ marked _(planned for M15)_ are not built yet, and Dn refers to
 
 Upload up to the `pending` state, the storage of a file's details and bytes,
 attach by a record write, the file value in a read, replace and remove, and
-audit are _(built)_. Download, the sweep and the SPA are _(planned for M15)_. Inbound
+audit and the sweep are _(built)_. Download and the SPA are _(planned for M15)_. Inbound
 endpoints, task completion and process steps attach nothing for now, so a file
 id they send that the record does not already hold fails.
 
@@ -128,9 +128,12 @@ This is _(planned for M15)_.
   collection, and that the write did not send. A record delete marks every
   file of the record, also a file of a child row, in the same statement as the
   delete. A refused write leaves the files as they were.
-- **Sweep** _(planned for M15)_. A worker sweep purges `deleted` files and
-  `pending` files older than 24 hours. Until it is built, failed and abandoned
-  uploads stay in the tenant database. It is internal, so it needs no scheduled job.
+- **Sweep** _(built)_. A worker sweep purges `deleted` files and `pending`
+  files uploaded more than 24 hours ago, with their bytes. The worker's clock
+  sets the 24 hours. The sweep runs when a tenant becomes ready and then at most
+  every 5 minutes for each tenant, see
+  [process execution](process-execution.md#worker-settings). An `attached` file is never
+  purged. It is internal, so it needs no scheduled job.
 - **Backup.** Files in the tenant database are in the tenant's `pg_dump`, so
   [tenant backup](administration.md) archives hold them.
 - **Audit** _(built)_. An audit record names the file field that changed,
