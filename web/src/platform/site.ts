@@ -248,12 +248,13 @@ export type RowAction = WidgetAction | DeleteAction
 /**
  * What the signed-in user may do with a table or form widget's entity, or with the root entity of
  * its data source. `actions` lists the granted entity actions in the order `read`, `create`,
- * `update`, `delete`. `createFields` and `updateFields` list the fields a create and an update may
- * write, in declaration order, and are `[]` when the action is not granted. This only shapes the UI:
- * the server checks every request.
+ * `update`, `delete`, then `import` on a table over an entity, for a user with `import` and `create`.
+ * `createFields` and `updateFields` list the fields a create and an update may write, in
+ * declaration order, and are `[]` when the action is not granted. This only shapes the UI: the
+ * server checks every request.
  */
 export interface WidgetAccess {
-  actions: ('read' | 'create' | 'update' | 'delete')[]
+  actions: ('read' | 'create' | 'update' | 'delete' | 'export' | 'import')[]
   createFields: string[]
   updateFields: string[]
 }

@@ -5,6 +5,8 @@ import { useCanvasActions } from './canvasActions'
 import { FileLink } from './FileInput'
 import { FilterBar } from './FilterBar'
 import { formatValue } from './formatValue'
+import { ImportDialog } from './ImportDialog'
+import { importsPath } from './imports'
 import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
 import { markCurrentPage } from './pagination'
 import { newIdempotencyKey, startProcess } from './processes'
@@ -114,7 +116,10 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * again, and a failure shows above the table. Each `delete` row action is a button on every row with an
  * id that opens a confirmation dialog, then sends `DELETE` to the record API. A `204` shows a success
  * message above the table and loads the current page of rows again. A `403`, `404` or `409` shows its own
- * message above the table and keeps the rows, and any other answer shows a generic failure. A toolbar action to a form page
+ * message above the table and keeps the rows, and any other answer shows a generic failure. A table
+ * over an entity whose access lists `import` has an Import button next to the toolbar actions, which opens the
+ * import dialog. When the import is committed the dialog closes, a success message shows above the table and
+ * the current page of rows loads again. The canvas draws the button and opens nothing. A toolbar action to a form page
  * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
  * a button whose expressions the SPA cannot work out is hidden. Below 768 px, a row's actions fold
  * into one "Actions" menu.
@@ -178,6 +183,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   // The delete waiting for the user's confirmation.
   const [confirming, setConfirming] = useState<{ action: DeleteAction; rowId: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // Whether the import dialog is open.
+  const [importing, setImporting] = useState(false)
   const loading = state.url !== requestUrl
   const failed = state.failed && !loading
   const parameterErrors = loading ? undefined : state.parameterErrors
@@ -454,9 +461,12 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     return path && (!creates || widget.access?.actions.includes('create')) ? [{ action, path, index }] : []
   })
 
+  // An entity table offers an import to a user whose access lists it. The canvas draws the button and opens nothing.
+  const canImport = widget.entity !== null && widget.access?.actions.includes('import') === true
+
   return (
     <Flex vertical gap="middle" aria-busy={loading}>
-      {toolbarButtons.length > 0 && (
+      {(toolbarButtons.length > 0 || canImport) && (
         <Flex justify="flex-end" gap="small">
           {toolbarButtons.map(({ action, path, index }) => (
             <Button
@@ -467,6 +477,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
               {t(action.labelKey)}
             </Button>
           ))}
+          {canImport && <Button onClick={() => !canvas.active && setImporting(true)}>{t('shell.table.import')}</Button>}
         </Flex>
       )}
       {parameters.length > 0 && (
@@ -479,6 +490,19 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       )}
       {actionError !== null && <Alert data-testid="table-action-error" type="error" title={actionError} />}
       {actionDone !== null && <Alert data-testid="table-action-done" type="success" title={actionDone} />}
+      {importing && (
+        <ImportDialog
+          importsPath={importsPath(path)}
+          fields={widget.entity?.fields ?? []}
+          onClose={() => setImporting(false)}
+          onCommitted={() => {
+            setImporting(false)
+            setActionError(null)
+            setActionDone(t('shell.table.imported'))
+            setReloads((count) => count + 1)
+          }}
+        />
+      )}
       {confirming !== null && (
         <Modal
           open

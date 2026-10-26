@@ -317,6 +317,27 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
             Assert.Single(fieldedPage.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("access").GetRawText());
     }
 
+    [Fact]
+    public async Task Access_lists_import_last_on_an_entity_table_for_a_user_who_holds_it()
+    {
+        using var employee = fixture.CreateClient().SignedInAs("anna");
+        using var reader = fixture.CreateClient().SignedInAs("rita");
+
+        using var table = await GetJsonAsync(employee, "/api/sites/records/pages/items", HostA);
+        using var form = await GetJsonAsync(employee, "/api/sites/records/pages/itemform", HostA);
+        using var dataSourceTable = await GetJsonAsync(employee, "/api/sites/records/pages/itemsbydepartment", HostA);
+        using var readerTable = await GetJsonAsync(reader, "/api/sites/records/pages/items", HostA);
+
+        Assert.Equal(["read", "create", "update", "delete", "import"], AccessActions(table));
+        Assert.Equal(["read", "create", "update", "delete"], AccessActions(form));
+        Assert.Equal(["read", "create", "update", "delete"], AccessActions(dataSourceTable));
+        Assert.Equal(["read"], AccessActions(readerTable));
+    }
+
+    private static string[] AccessActions(JsonDocument page) =>
+        [.. Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList())
+            .GetProperty("access").GetProperty("actions").EnumerateArray().Select(action => action.GetString()!)];
+
     [Theory]
     [InlineData("items")]
     [InlineData("itemsections")]

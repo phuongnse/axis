@@ -3,7 +3,20 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import { journeyURL } from "./server-settings";
 
-export type SampleUser = "anna" | "lan" | "binh" | "chau" | "dung" | "giang" | "hoa" | "khoa" | "linh" | "minh" | "nam";
+export type SampleUser =
+  | "anna"
+  | "lan"
+  | "binh"
+  | "chau"
+  | "dung"
+  | "giang"
+  | "hoa"
+  | "khoa"
+  | "linh"
+  | "minh"
+  | "nam"
+  | "quan"
+  | "thao";
 
 /** The sample users and the roles the development realm gives them. */
 export const sampleUsers: Record<SampleUser, string[]> = {
@@ -18,13 +31,21 @@ export const sampleUsers: Record<SampleUser, string[]> = {
   linh: ["service-desk-lead"],
   minh: ["approver"],
   nam: ["service-desk-lead"],
+  quan: ["asset-manager"],
+  thao: ["auditor"],
 };
 
-const journeyRoles = ["author", "requester", "service-desk-lead", "agent", "approver"];
+const journeyRoles = [
+  "author",
+  "requester",
+  "service-desk-lead",
+  "agent",
+  "approver",
+];
 
 /** The users who sign in on the journey host: those who hold the author, requester, service desk lead, agent or approver role. */
-export const journeyUsers = (Object.keys(sampleUsers) as SampleUser[]).filter((user) =>
-  sampleUsers[user].some((role) => journeyRoles.includes(role)),
+export const journeyUsers = (Object.keys(sampleUsers) as SampleUser[]).filter(
+  (user) => sampleUsers[user].some((role) => journeyRoles.includes(role)),
 );
 
 /** The file where the setup step saves `user`'s browser session. */
@@ -41,14 +62,22 @@ export function journeySessionFile(user: SampleUser) {
  * Checks that `GET /api/me` answers as `user`, and throws an error naming both users when it does not. `origin`
  * is the server to ask, and empty for the main E2E server.
  */
-export async function expectSessionUser(page: Page, user: SampleUser, origin = "") {
+export async function expectSessionUser(
+  page: Page,
+  user: SampleUser,
+  origin = "",
+) {
   const response = await page.request.get(`${origin}/api/me`);
   if (response.status() !== 200) {
-    throw new Error(`Expected the session of ${user}, but GET /api/me answers ${response.status()}.`);
+    throw new Error(
+      `Expected the session of ${user}, but GET /api/me answers ${response.status()}.`,
+    );
   }
   const { id } = (await response.json()) as { id: string };
   if (id !== user) {
-    throw new Error(`Expected the session of ${user}, but GET /api/me answers as ${id}.`);
+    throw new Error(
+      `Expected the session of ${user}, but GET /api/me answers as ${id}.`,
+    );
   }
 }
 
@@ -80,7 +109,9 @@ export async function useSession(page: Page, user: SampleUser) {
 
 /** Does what `useSession` does with `user`'s session on the journey host, and checks `/api/me` there. */
 export async function useJourneySession(page: Page, user: SampleUser) {
-  const { cookies } = JSON.parse(await readFile(journeySessionFile(user), "utf8"));
+  const { cookies } = JSON.parse(
+    await readFile(journeySessionFile(user), "utf8"),
+  );
   await leavePage(page);
   await page.context().clearCookies();
   await page.context().addCookies(cookies);

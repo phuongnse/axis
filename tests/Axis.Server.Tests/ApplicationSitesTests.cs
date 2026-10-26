@@ -288,4 +288,21 @@ public sealed class ApplicationSitesTests
         Assert.Equal(entity.Fields.Select(field => field.Name), table.Access.UpdateFields);
         Assert.Null(inbox.Access);
     }
+
+    [Fact]
+    public void Unshaped_access_lists_import_last_on_an_entity_table_only()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+
+        var entityTable = Assert.IsType<WidgetMetadata>(Assert.Single(ApplicationSites.FindPage(result.Model, "Departments")!.Widgets));
+        var dataSourceTable = Assert.IsType<WidgetMetadata>(Assert.Single(ApplicationSites.FindPage(result.Model, "PurchaseRequests")!.Widgets));
+
+        Assert.NotNull(entityTable.Entity);
+        Assert.NotNull(entityTable.Access);
+        Assert.Equal(["read", "create", "update", "delete", "import"], entityTable.Access.Actions);
+        Assert.NotNull(dataSourceTable.Access);
+        Assert.DoesNotContain("import", dataSourceTable.Access.Actions);
+    }
 }
