@@ -10,6 +10,9 @@
     { "entity": "Order", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Product", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Ticket", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Reminder", "actions": ["read", "create", "update"] },
+    { "entity": "Gauge", "actions": ["read", "create", "update"] },
+    { "entity": "Reading", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Expense", "actions": ["read", "create", "update", "delete"] },
     { "dataSource": "ActiveItems", "actions": ["read"] },
     { "dataSource": "ItemTotalsByDepartment", "actions": ["read"] },
@@ -17,11 +20,13 @@
     { "dataSource": "ItemTotalsInDepartment", "actions": ["read"] },
     { "dataSource": "ItemCountsByDepartment", "actions": ["read"] },
     { "dataSource": "ItemsByDepartment", "actions": ["read"] },
+    { "dataSource": "ItemStatuses", "actions": ["read"] },
     { "dataSource": "ItemsByName", "actions": ["read"] },
     { "dataSource": "ItemsMatching", "actions": ["read"] },
     { "dataSource": "ItemsNamed", "actions": ["read"] },
     { "dataSource": "ItemsOverflow", "actions": ["read"] },
     { "dataSource": "OverdueTickets", "actions": ["read"] },
-    { "dataSource": "ItemNames", "actions": ["read"] }
+    { "dataSource": "ItemNames", "actions": ["read"] },
+    { "dataSource": "ExpenseTotalsByCurrency", "actions": ["read"] }
   ]
 }

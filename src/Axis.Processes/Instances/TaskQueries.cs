@@ -15,7 +15,7 @@ public static class TaskQueries
     private const string Columns =
         """
         id, process_instance_id, process_id, release_id, application_id, step, subject_entity_id, subject_id,
-        assignee_kind, assignee, form_id, due_at, state, outcome, completed_by, completed_at, created_at, claimed_by, claimed_at
+        assignee_kind, assignee, form_id, due_at, state, outcome, completed_by, completed_at, created_at, expired_at, claimed_by, claimed_at
         """;
 
     private const string MayActWhere =
@@ -188,8 +188,9 @@ public static class TaskQueries
             CompletedBy = reader.IsDBNull(14) ? null : reader.GetString(14),
             CompletedAt = reader.IsDBNull(15) ? null : reader.GetFieldValue<DateTimeOffset>(15),
             CreatedAt = reader.GetFieldValue<DateTimeOffset>(16),
-            ClaimedBy = reader.IsDBNull(17) ? null : reader.GetString(17),
-            ClaimedAt = reader.IsDBNull(18) ? null : reader.GetFieldValue<DateTimeOffset>(18),
+            ExpiredAt = reader.IsDBNull(17) ? null : reader.GetFieldValue<DateTimeOffset>(17),
+            ClaimedBy = reader.IsDBNull(18) ? null : reader.GetString(18),
+            ClaimedAt = reader.IsDBNull(19) ? null : reader.GetFieldValue<DateTimeOffset>(19),
         };
 }
 

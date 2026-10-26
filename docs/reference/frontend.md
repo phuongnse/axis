@@ -126,16 +126,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
             {
               "name": "name", "type": "text", "labelKey": null,
               "required": true, "unique": false, "computed": false, "sequence": false,
-              "creator": false, "maxLength": 100,
-              "precision": null, "scale": null, "values": null, "target": null,
-              "fields": null
+              "creator": false, "maxLength": 100, "minLength": null,
+              "precision": null, "scale": null, "min": null, "max": null, "values": null, "valueLabelKeys": null, "target": null, "fields": null
             },
             {
               "name": "department", "type": "reference", "labelKey": "item.department",
               "required": false, "unique": false, "computed": false, "sequence": false,
-              "creator": false, "maxLength": null,
-              "precision": null, "scale": null, "values": null,
-              "target": {
+              "creator": false, "maxLength": null, "minLength": null, "precision": null,
+              "scale": null, "min": null, "max": null, "values": null, "valueLabelKeys": null, "target": {
                 "entity": "Department",
                 "displayField": "name",
                 "recordsPath": "/api/apps/RecordsApp/entities/Department/records"
@@ -184,7 +182,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `"entity": null`, `"form": null`, `"actions": []` and `"access": null`.
   - Every widget also has `form`, never left out. It is the widget's form
     resource on a `form` widget that names one, and `null` otherwise. It is
-    described under **Form metadata** of the form widget.
+    described under **Form metadata** of the [form widget](form-widget.md).
   - Every widget also has `tasksPath`, never left out. It is described under
     the task inbox widget, and is `null` on every other widget.
   - Every widget also has `process` and `instancesPath`,
@@ -195,7 +193,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     is written after `access`, `kpi` after `detail` and `chart` after `kpi`. The
     examples on this page leave out all three, which are `null` on all of them.
   - Every widget also has `actions`, never left out. It
-    is described under the form widget, and is `[]` on a widget it does not
+    is described under the [form widget](form-widget.md), and is `[]` on a widget it does not
     apply to. A table's `startProcess` row actions are left out without
     `start`, and its `delete` row action without `delete`.
   - Every widget also has `rowActions` and `toolbarActions`, never left out.
@@ -258,10 +256,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     no column for it, and forms show its rows.
   - Each field has its name, its `type` as written in entity files (such as
     `date-time`), its label key, `required`, `unique`, `computed`, `sequence` and `creator`,
-    `maxLength` for text, `precision` and `scale` for decimal, `values` for enum, `target`
-    for reference, and `fields` for child collection. A property the field's
+    `maxLength` and `minLength` for text, `min` and `max` for integer, decimal, date and
+    date-time, `precision` and `scale` for decimal, `values` for enum, `valueLabelKeys` for an enum with `valueLabels`, `target` for
+    reference, and `fields` for child collection. `min` and `max` are strings in the
+    entity file's literal form, such as `"0.5"` or `"2026-01-01"`. A property the field's
     type does not have, or a label the file leaves out, is `null`; it is
-    never left out.
+    never left out. `valueLabelKeys` maps each enum value to the text key of
+    its label, and is `null` when the enum has no labels.
   - `computed` is `true` for a [computed field](resource-files.md#entity-logic).
     The server sets its value on every write, so the form shows it read-only
     and never sends it.
@@ -454,14 +455,18 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         {
           "name": "statusFilter", "type": "enum", "required": false,
           "labelKey": "requests.statusFilter",
-          "values": ["draft", "submitted", "approved", "rejected"], "target": null
+          "values": ["draft", "submitted", "approved", "rejected"],
+          "valueLabelKeys": { "draft": "request.status.draft", "submitted": "request.status.submitted", "approved": "request.status.approved", "rejected": "request.status.rejected" },
+          "target": null
         }
       ],
       "pageSize": 20,
       "columns": [
         {
           "name": "status", "type": "enum", "labelKey": "request.status",
-          "values": ["draft", "submitted", "approved", "rejected"], "target": null
+          "values": ["draft", "submitted", "approved", "rejected"],
+          "valueLabelKeys": { "draft": "request.status.draft", "submitted": "request.status.submitted", "approved": "request.status.approved", "rejected": "request.status.rejected" },
+          "target": null
         }
       ]
     }
@@ -469,20 +474,24 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
     - **Parameters.** A parameter's `labelKey` is the text key of its label, or
       `null` when it has none. `values` and `target` are `null` when the type
-      has none.
+      has none. `valueLabelKeys` maps each enum value to the text key of its
+      label. It is `null` without `valueLabels`. The SPA resolves the keys with
+      the site texts, while rows keep the raw value.
     - **Columns.** There is one column per projected field, in order. For a
       grouped data source, the columns are the group fields in `groupBy`
       order, then the measures. The header is the label of the field the
       path ends at, else the projected name. A measure has no `labelKey`, so
       its header is its name. A `count` is an `integer` column, a `sum` is a
-      `decimal` column, and a `min` or `max` has its field's type. Sorting,
-      values and labels follow the rules below, by the column's type.
+      `decimal` column, and a `min` or `max` has its field's type. A column
+      over a labelled enum field has the same `valueLabelKeys` as the field,
+      and `null` otherwise. Sorting, values and labels follow the rules below,
+      by the column's type.
     - **Page size.** The data source's `pageSize` is the table's default page
       size. It is offered with 10, 20, 50 and 100 when it is not one of them,
       and the URL leaves it out.
     - **Filter inputs.** A filter bar above the rows has one input per
       parameter, in declaration order. It shows the parameter's label, or its
-      name when `labelKey` is `null`. Each input is the kind the form widget
+      name when `labelKey` is `null`. Each input is the kind the [form widget](form-widget.md)
       uses for that type, with two exceptions. A `boolean` is a Yes/No
       choice that can be cleared, because an optional parameter has three
       states: true, false and not given. A `reference` has a choose button
@@ -553,7 +562,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     Chromium 114, Firefox 135 or Safari 18.4) falls back to the parsed
     number, so `1250.50` shows as `1250.5` there. The web unit tests need
     Node 22 or later for the same reason. The API never coerces a string to a
-    number, so the form widget sends numbers back as JSON numbers.
+    number, so the [form widget](form-widget.md) sends numbers back as JSON numbers.
   - **Links.** The table has no open link and no create button of its own. A
     sample opens a record with a `rowActions` navigate with `record: id`, and
     creates one with a `toolbarActions` navigate without `record`, still gated
@@ -658,276 +667,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **States.** Loading, empty and error states use the shared table and
     alert with platform texts. While the next page loads, the current rows
     stay under the loading overlay.
-- **Form resource**. A `form` resource lays out the fields
-  of one entity in sections, and any field can be read-only. One form serves
-  both a page and a task (D20).
-
-  ```json
-  {
-    "id": "8b3e5c71-4d2a-4f6b-9c0e-1a2b3c4d5e6f",
-    "kind": "form",
-    "name": "PurchaseRequestReview",
-    "formatVersion": 1,
-    "entity": "PurchaseRequest",
-    "sections": [
-      {
-        "title": { "textKey": "purchaseRequest.sections.request" },
-        "fields": [
-          { "field": "title", "readOnly": true },
-          { "field": "department", "readOnly": true },
-          { "field": "supplier", "readOnly": true },
-          { "field": "lineItems", "readOnly": true },
-          { "field": "totalAmount", "readOnly": true }
-        ]
-      },
-      {
-        "title": { "textKey": "purchaseRequest.sections.decision" },
-        "fields": [{ "field": "decisionComments" }]
-      }
-    ]
-  }
-  ```
-
-  - Each section has a `title` label and its `fields`, in the order shown.
-    Each entry names a `field` of the entity. `readOnly` is optional and
-    `false` by default.
-  - A field appears at most once in the form. A field the form does not list
-    is not shown and never sent.
-  - Computed, sequence and creator fields are always read-only, whatever
-    `readOnly` says.
-  - On a page, `readOnly` only shapes the UI. The record API enforces the
-    user's field write grants, so it still accepts a read-only field that an
-    `update` grant covers. In a task, the server
-    enforces it: completing a task rejects a value for a field the form does
-    not make editable (see [Task API](task-api.md)).
-  - A section's `fields` and the form's `sections` hold at least one entry,
-    and a section without a `title` breaks the schema (`AXC0004`).
-  - Compile checks: an `entity` that names no loaded entity is `AXC0074`. A
-    `field` the entity does not have is `AXC0075`. A field listed again, in
-    any section and ignoring letter case, is `AXC0076`. A section title key
-    that no locale has is `AXC0028`. See
-    [Configuration pipeline](configuration.md#configuration-pipeline).
-  - A form over a child entity is not checked yet.
-  - Fields get `visibleWhen`, `requiredWhen` and `readOnlyWhen`, sections get
-    `visibleWhen` and a `name`, and a form may have `steps`. The compiler
-    checks them. The form widget and the task page follow their conditions
-    through the server, and show `steps` as a wizard, see
-    [form widget conditions](form-widget-conditions.md). See
-    [Form conditions and steps](resource-files.md#form-conditions-and-steps).
-- **Form widget.** A page whose widget is a `form` creates a record at
-  `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
-  record API. It adds no rules of its own: the server validates.
-  - **Inputs.** There is one input per field, in declaration order, labelled
-    with the field's label or the field name. A widget that names a `form`
-    shows only the fields its form lists, in its order, under the section
-    titles (see **Form binding**). A required field's label is
-    marked, but the mark blocks nothing: the server still decides.
-
-    | Field type | Input |
-    | --- | --- |
-    | `text` | a text input limited to `maxLength` |
-    | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is |
-    | `boolean` | a checkbox |
-    | `date` | a date picker |
-    | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction |
-    | `enum` | a choice of the declared values, as written in the entity file, or their labels with `valueLabels`. A `file` field gets the [file input](file-fields.md#in-the-spa), and `min`, `max` and `minLength` show as limits _(planned for M15)_ |
-    | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
-    | `child-collection` | a table of its rows, described under **Child collections** |
-    | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
-
-  - **Lookup.** The choose button opens a dialog titled with the field's
-    label. It lists the target entity's records through their record API,
-    sorted ascending by the target's display field, in one column for that
-    field. The record API lists only the target records that match the
-    user's read filters. It pages 20 records at a time and keeps nothing in the URL.
-    Loading, empty and error states use the table's texts. Clicking a row
-    or pressing Enter on it picks the record and closes the dialog. The same
-    dialog picks the record of a `reference` filter input.
-  - **Lookup search.** A search box above the list filters the records to
-    those whose display field contains the typed text, ignoring letter case.
-    The search applies 300 ms after typing stops, so typing does not request
-    records for every key. The SPA trims the text and sends it as the record
-    API's `search` parameter, and leaves `search` out when the text is empty.
-    A new search starts again at page 1. Like paging, the search stays out
-    of the URL and is empty each time the dialog opens.
-  - **Reference label.** On edit, the label starts from the record's
-    `labels`. A picked record's display field value replaces it at once. A
-    changed reference is sent as the record id, and a cleared one as `null`.
-    Picking the record that was already set leaves the field unchanged.
-  - **Child collections.** A child collection field shows its rows as a
-    table under the field's label.
-    - There is one column per child field, headed by its label or its name.
-      Each cell uses the input the form uses for that field type, so number
-      text, dates and enums behave as in the rest of the form. A cell
-      input's accessible name is the column header and the one-based row
-      number, such as `Quantity 2`. A computed child field's cell is a
-      read-only text input with the row's value, formatted as a table cell
-      shows it.
-    - Each row has a remove button. An add button below the table appends a
-      row with every child field `null`. Rows cannot be reordered.
-    - When rows were added, removed or edited, the form sends the whole row
-      list, as [record-api.md](record-api.md#child-rows-computed-fields-and-validations) describes. Each row holds its
-      non-null child fields in declaration order, without its computed fields. Rows are compared by value
-      with the rows the form started from, so an edit that is typed and then
-      undone leaves the collection out of the body.
-    - A key `/values/<collection>/<index>/<field>` for an existing row and a
-      child field shows its messages under that cell. A key
-      `/values/<collection>` shows under the table. Any other key inside the
-      collection, such as a whole row, shows above the form. Adding or
-      removing a row clears the collection's cell errors, because their
-      indexes would point at the wrong rows.
-  - **Changed fields.** The form sends only the fields whose value differs
-    from the value it started from. It never sends a computed, sequence, creator
-    or read-only field, nor a field its form does not show. A new record starts with every field
-    `null` and every child collection empty, so an untouched field stays out of a create and the server
-    decides what is required. An edit also sends the `version` it read. An
-    emptied text or number input is sent as `null`.
-  - **Number text.** The body is written by hand, so an integer or decimal
-    goes out as the typed text and no digit is lost. Text that is not a JSON
-    number, such as `1,5`, goes out as a JSON string, and the server rejects
-    it on its field. The form never turns number text into a JavaScript
-    number.
-  - **Errors.** A `400` or `409` problem is mapped by its JSON Pointer keys. A
-    key `/values/<field>` for a field of the form shows its messages under
-    that field. Every other key, such as `""`, `/values` or `/version`, shows
-    above the form. A save that fails in any other way shows a shared error
-    there too. Every message is looked up in the site texts first, so a
-    failed validation, whose message is a text key, shows its text in the
-    user's locale. A fixed message such as "Required." is no text key, so it
-    shows unchanged.
-  - **Conflicts.** A `409` on edit that names no field is a stale version. The
-    form shows a conflict message with a reload button, which loads the
-    current values and version and drops the user's changes. A duplicate
-    unique value is a `409` keyed `/values/<field>`, so it shows under its
-    field.
-  - **Return address.** Save and cancel return to the table page that opened
-    the form, with its paging and sorting, which the table passes in history
-    state. Without it, such as in a new tab, they go to `/{site}`, which opens
-    the site's first page. Only an address inside the same site is used.
-  - **Keys.** Enter in a date or date-time picker only confirms the picked
-    value and never sends the form. Enter in a text input sends the form, as
-    in any form.
-  - **History**. The form page of a saved record shows the record's history
-    from the [history endpoint](record-api.md#audit-records-and-history) in a
-    panel below the form, newest first. A new record has no history panel.
-    - Each entry shows its action, who did it, its time and a short summary.
-      The action is a platform text, such as "Updated" or "Task decided". An
-      action without a text shows as it is.
-    - Who did it is the stored `actorName`. Without one, it is "System" for
-      `system`, "Anonymous" for `anonymous`, or else the raw user id.
-    - The time uses the user's locale, with the medium date and time styles.
-    - The summary is built from the details. It lists the labels of the
-      fields it names, then the task outcome, then the step, joined by " · ".
-      An entry whose details name none of them has no summary. Outcome and
-      step names show as declared, such as `approve`. Comments and other
-      field values are never shown, because audit records never hold them.
-    - An entry whose `inspectPath` is not `null` links to the instance page
-      of the first page of the site whose widget is a `processInspector` that
-      names the entry's process. The link reads "Open instance". The process
-      and the instance id are the segments of `inspectPath`. The panel looks
-      at the pages of the site's navigation in order, and loads their page
-      metadata only when an entry has an `inspectPath`. The entry shows no
-      link when no such page is in the navigation.
-    - The panel shows 20 entries per page, with a paging control when there
-      are more. The page is the panel's own and stays out of the URL.
-    - When the history fails to load, an error shows inside the panel, and
-      the form still works.
-  - **Sequence fields**. Page metadata marks a field that
-    names a [sequence](resource-files.md#sequences), so the form shows it
-    read-only. It is empty on a new record, and the form never sends it.
-  - **Creator fields**. Page metadata marks a field that declares
-    [`creator`](roles-and-policies.md#record-creator), so the form shows it
-    read-only. It is empty on a new record, shows the creating user's id once
-    saved, and the form never sends it.
-  - **Form binding**. A `form` widget names a `form`
-    resource, or an `entity` as shorthand for all its fields in declaration
-    order. Naming both or neither is `AXC0060`, and a `form` that names no
-    loaded form is `AXC0077`. With a `form`, the widget shows its sections in
-    order, each under its title as a heading, and shows a read-only field as
-    on a computed field. A read-only child collection shows its rows with
-    every cell read-only, and has no add or remove buttons. The widget sends
-    only the editable fields it shows. A server error on a field the form
-    does not show appears above the form.
-  - **Start process action**. A `form` widget can declare
-    `startProcess` actions. On a saved record, each is shown as a button
-    next to Save and Cancel, with its label. For a signed-in user, page
-    metadata lists only the actions whose process the user holds a `start`
-    grant on. A new record shows no action buttons, so a failed start never
-    leaves a record behind on a form that still says new.
-
-    ```json
-    {
-      "type": "form",
-      "form": "PurchaseRequestEdit",
-      "actions": [
-        {
-          "type": "startProcess",
-          "process": "PurchaseRequestApproval",
-          "label": { "textKey": "purchaseRequest.submit" }
-        }
-      ]
-    }
-    ```
-
-    - The process must name the form's entity as its subject. An unknown
-      process is `AXC0087`, and a process over another entity is `AXC0088`,
-      both at `/widgets/{i}/actions/{j}/process`. `actions` on another
-      widget type is `AXC0060`. The label joins the `AXC0028` check.
-    - A click saves the changed fields first, as the save button does. If
-      the save fails, its errors show as for a save, and nothing starts. When
-      no field has changed, the save is skipped, so the record's version and
-      history do not change for nothing.
-    - Then it posts `{ "subjectId" }` to the
-      [start endpoint](processes.md#start-endpoint) with an
-      `Idempotency-Key`. When a click got no final answer, a network error or
-      a `5xx`, the next click sends the same key, so a lost response cannot
-      start a second instance. Any other answer ends the key, and the next
-      click sends a new one.
-    - On `201` it shows a success message and loads the record again. The
-      first step runs on the worker after the `201`, so the record may still
-      show its old status until it is loaded again later.
-    - A `400`, such as a failed start condition, shows its messages above
-      the form, looked up in the site texts first. A `409` shows a platform
-      text saying the record is already in a running process. Any other
-      answer shows a generic platform error.
-    - The button is disabled while the save and the start run.
-  - **Conditions and steps**. The widget asks the server which fields to
-    show, require and lock, and which messages to show. The conditions and the
-    steps are built. See
-    [form-widget-conditions.md](form-widget-conditions.md).
-  - **Form metadata**. Page metadata gives the widget's
-    `entity` with all its fields, so the SPA knows every field's type. It
-    adds:
-    - `form`: `{ "name", "sections": [ { "name", "titleKey", "visibleWhen", "fields": [ { "name", "readOnly", "visibleWhen" } ] } ], "steps": [ { "titleKey", "sections" } ] }`,
-      or `null` when the widget names an `entity`. `readOnly` already
-      includes computed, sequence and creator fields. Field names are as the entity
-      declares them.
-    - `actions`: `[ { "type", "process", "labelKey", "instancesPath", "visibleWhen" } ]`,
-      or `[]`. `instancesPath` is the start endpoint, such as
-      `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,
-      so the SPA never builds it itself. A `navigate` action is
-      `{ "type": "navigate", "page", "labelKey", "parameters", "record", "opensForm", "paths", "visibleWhen" }`, with
-      the target page's declared name. `parameters` maps each parameter name,
-      as the target page declares it, to its expression, or is `{}`. `record`
-      is the expression of the record id, or `null`. The expressions go to the
-      browser as written. They may use a reference path such as
-      `department.name`. `paths` maps each reference along such a path, by its
-      declared field names up to that reference, such as `department` for
-      `department.name` and `customer` and `customer.parent` for
-      `customer.parent.name`, to the record API of that reference's target
-      entity, so the SPA never builds it. It is `{}` when the action uses no
-      path. The SPA resolves a path on click, see **Values**. `opensForm` is `true` when the target page holds a
-      form widget, so the SPA opens `/new` without `record`. It follows file
-      order. A saved record shows a button for each `navigate` action after
-      its `startProcess` buttons, with values from the record as it was
-      loaded, so unsaved edits are not used. A new record shows none.
-    - `form` also holds `visibleWhen` on each field and section, as `true`
-      when it has a condition and `false` otherwise. It holds `steps`, each
-      with a `titleKey` and its section names, and `[]` when the form has
-      none. Each section has a `name`, which is `null` when it has none. It
-      holds no expressions, because they stay on the server. A user who may
-      not read any field of a section gets no such section, and its name is
-      left out of the steps. A step left with no section is left out.
+- **Form resource**. A `form` resource lays out the fields of one entity in sections. See [form-widget.md](form-widget.md).
+- **Form widget.** A page whose widget is a `form` creates and edits one record through the record API. See [form-widget.md](form-widget.md).
 - **Detail widget**. A page whose widget is a `detail` shows one record
   read-only. See [detail-chart-kpi-widgets.md](detail-chart-kpi-widgets.md).
 - **Chart widget**. A page whose widget is a `chart` draws a data source.

@@ -582,6 +582,77 @@ public sealed class TriggerCompilerTests
         Assert.Equal((DiagnosticCodes.UnknownTriggerProcess, "/process"), (diagnostic.Code, diagnostic.Path));
     }
 
+    [Fact]
+    public void A_schedule_trigger_without_a_data_source_over_a_process_with_a_subject_is_axc0249_at_the_process()
+    {
+        using var folder = Folder().With("triggers/nightly.json", JobTrigger("NoteReview"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.ScheduleJobProcessWithSubject, "triggers/nightly.json", "/process"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("NoteReview", diagnostic.Message);
+    }
+
+    [Fact]
+    public void A_scheduled_job_that_leaves_out_a_process_parameter_is_axc0167_at_parameters()
+    {
+        using var folder = WithSubjectlessProcess(Folder()).With("triggers/nightly.json", JobTrigger("NightlyJob"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MissingTriggerParameter, "/parameters"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("NightlyJob", diagnostic.Message);
+    }
+
+    [Fact]
+    public void A_scheduled_job_over_a_process_without_a_subject_compiles_with_no_data_source_and_the_typed_parameter_values()
+    {
+        using var folder = WithSubjectlessProcess(Folder()).With("triggers/nightly.json", JobTrigger("NightlyJob", """, "parameters": { "DAYS": 2 } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var trigger = Assert.Single(result.Model.Triggers);
+        Assert.Equal((TriggerType.Schedule, TriggerMode.Async), (trigger.Type, trigger.Mode));
+        Assert.Null(trigger.DataSource);
+        Assert.Equal(new ProcessReference(Guid.Parse("77777777-7777-4777-8777-777777777703"), "NightlyJob"), trigger.Process);
+
+        // The values are keyed by the declared names.
+        Assert.Equal([new KeyValuePair<string, object?>("days", 2L)], trigger.Parameters!.ToList());
+    }
+
+    [Theory]
+    [InlineData(""" "days": 2, "other": 1 """, DiagnosticCodes.UnknownTriggerParameter, "/parameters/other")]
+    [InlineData(""" "days": 2, "DAYS": 3 """, DiagnosticCodes.UnknownTriggerParameter, "/parameters/DAYS")]
+    [InlineData(""" "days": "2" """, DiagnosticCodes.InvalidTriggerParameterValue, "/parameters/days")]
+    [InlineData(""" "days": 2.5 """, DiagnosticCodes.InvalidTriggerParameterValue, "/parameters/days")]
+    [InlineData(""" "days": null """, DiagnosticCodes.InvalidTriggerParameterValue, "/parameters/days")]
+    public void A_scheduled_job_parameter_that_is_unknown_repeated_or_mistyped_is_a_diagnostic_at_its_key(string parameters, string code, string path)
+    {
+        using var folder = WithSubjectlessProcess(Folder())
+            .With("triggers/nightly.json", JobTrigger("NightlyJob", $$""", "parameters": { {{parameters}} } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, path), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_schedule_trigger_with_a_data_source_over_a_process_without_a_subject_is_still_axc0247()
+    {
+        using var folder = WithSubjectlessProcess(ScheduleFolder())
+            .With("triggers/nightly.json", ScheduleTrigger(process: "NightlyJob", rest: """, "parameters": { "minPriority": 3, "status": null } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.TriggerProcessWithoutSubject, "/process"), (diagnostic.Code, diagnostic.Path));
+    }
+
     private const string NoteRowsId = "99999999-9999-4999-8999-999999999901";
     private const string TypedRowsId = "99999999-9999-4999-8999-999999999904";
 
@@ -593,6 +664,12 @@ public sealed class TriggerCompilerTests
         string rest = "") => $$"""
         { "id": "{{TriggerId}}", "kind": "trigger", "name": "Nightly", "formatVersion": 1, "type": "schedule",
           "schedule": "{{schedule}}", "timeZone": "{{timeZone}}", "dataSource": "{{dataSource}}", "process": "{{process}}" {{rest}} }
+        """;
+
+    /// <summary>A schedule trigger without a data source, a scheduled job.</summary>
+    private static string JobTrigger(string process, string rest = "") => $$"""
+        { "id": "{{TriggerId}}", "kind": "trigger", "name": "Nightly", "formatVersion": 1, "type": "schedule",
+          "schedule": "0 6 * * 1-5", "timeZone": "Europe/Berlin", "process": "{{process}}" {{rest}} }
         """;
 
     /// <summary>

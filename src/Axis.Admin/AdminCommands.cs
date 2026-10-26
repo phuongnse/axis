@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Axis.Administration;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
@@ -37,9 +38,11 @@ internal static partial class AdminCommands
 
     public const string ClientSecretSetting = "AXIS_OIDC_CLIENT_SECRET";
 
+    public const string BindingSecretSetting = "AXIS_BINDING_SECRET";
+
     public const string PathSetting = "PATH";
 
-    private const string Usage =
+    internal const string Usage =
         """
         Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>
                tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...
@@ -49,7 +52,15 @@ internal static partial class AdminCommands
                activate <folder> [--tenant <id>]
                tenant suspend <id>
                tenant resume <id>
+               tenant rotate-passwords <id>
                tenant list
+               tenant binding list <id>
+               tenant binding set <id> <name> --url <value>
+               tenant binding set <id> <name> --secret
+               tenant binding remove <id> <name>
+               tenant host add <id> <host>
+               tenant host remove <id> <host>
+               tenant host move <host> --to <id>
                publisher
                version
         """;
@@ -60,12 +71,22 @@ internal static partial class AdminCommands
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken) =>
-        RunAsync(args, configuration, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, cancellationToken);
+        RunAsync(args, configuration, TextReader.Null, output, error, cancellationToken);
+
+    public static Task<int> RunAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextReader input,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken) =>
+        RunAsync(args, configuration, input, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, cancellationToken);
 
     // The publisher lease and the test limit are parameters so that tests can use short ones. The product has no setting for them.
     internal static async Task<int> RunAsync(
         string[] args,
         IConfiguration configuration,
+        TextReader input,
         TextWriter output,
         TextWriter error,
         TimeSpan publisherLease,
@@ -74,6 +95,7 @@ internal static partial class AdminCommands
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
 
@@ -84,7 +106,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        return await command.RunAsync(new AdminRun(command, args, configuration, output, error, publisherLease, publisherTestLimit, cancellationToken));
+        return await command.RunAsync(new AdminRun(command, args, configuration, input, output, error, publisherLease, publisherTestLimit, cancellationToken));
     }
 
     /// <summary>
@@ -98,7 +120,14 @@ internal static partial class AdminCommands
         new("tenant restore", AuditMark.OnePerTenant, run => RestoreAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant suspend", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant rotate-passwords", AuditMark.OnePerTenant, run => RotatePasswordsAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant list", AuditMark.None, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant binding list", AuditMark.None, TenantSettings.BindingListAsync),
+        new("tenant binding set", AuditMark.OnePerTenant, TenantSettings.BindingSetAsync),
+        new("tenant binding remove", AuditMark.OnePerTenant, TenantSettings.BindingRemoveAsync),
+        new("tenant host add", AuditMark.OnePerTenant, TenantSettings.HostAddAsync),
+        new("tenant host remove", AuditMark.OnePerTenant, TenantSettings.HostRemoveAsync),
+        new("tenant host move", AuditMark.OnePerTenant, TenantSettings.HostMoveAsync),
         new("migrate", AuditMark.OnePerTenant, run => MigrateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.CancellationToken)),
@@ -206,6 +235,125 @@ internal static partial class AdminCommands
             "resume" => await TenantStatus.ResumeAsync(connectionString, args[2], new TenantAudit(command, connectionString), output, error, cancellationToken),
             _ => await TenantStatus.ListAsync(connectionString, output, error, cancellationToken),
         };
+    }
+
+    /// <summary>
+    /// <c>tenant rotate-passwords</c>. Everything that can be refused is checked before the audit record, so a refusal changes
+    /// nothing. The rules of the rotation are in <see cref="TenantPasswordRotation"/>.
+    /// </summary>
+    private static async Task<int> RotatePasswordsAsync(
+        string command,
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        if (args.Length != 3 || args[2].StartsWith("--", StringComparison.Ordinal))
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        // A setting's own message holds its value, so this says only which setting is wrong.
+        TenancySource source;
+        try
+        {
+            source = TenancySettings.Source(configuration);
+        }
+        catch (InvalidOperationException)
+        {
+            error.WriteLine($"The setting {TenancySettings.SourceSetting} must be 'configuration' or 'directory'.");
+            return 2;
+        }
+
+        if (source != TenancySource.Directory)
+        {
+            error.WriteLine("This command needs Tenancy:Source=directory.");
+            return 2;
+        }
+
+        var settings = ReadCreateSettings(configuration, needsClientSecret: false, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        var id = args[2];
+        TenantRow? row;
+        try
+        {
+            var refusal = await AdminRoleProblemAsync(settings, cancellationToken)
+                ?? await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+            if (refusal is not null)
+            {
+                error.WriteLine(refusal);
+                return 2;
+            }
+
+            await using var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(settings.PlatformConnectionString).Options);
+            row = await platform.Tenants.AsNoTracking().SingleOrDefaultAsync(tenant => tenant.Id == id, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+        {
+            error.WriteLine($"The setting {PlatformSetting} could not be used to read the tenant directory.");
+            return 2;
+        }
+
+        if (row is null)
+        {
+            error.WriteLine("The tenant does not exist.");
+            return 2;
+        }
+
+        if (row.Status == Provisioning)
+        {
+            error.WriteLine($"The tenant '{id}' is still provisioning. Finish it with tenant create.");
+            return 2;
+        }
+
+        if (!await new TenantAudit(command, settings.PlatformConnectionString).WriteAsync(id, output, cancellationToken, [row.RuntimeUser, row.SchemaUser]))
+        {
+            return 1;
+        }
+
+        try
+        {
+            await using var admin = new NpgsqlConnection(settings.Admin.ConnectionString);
+            await admin.OpenAsync(cancellationToken);
+
+            // The runtime role first, so that the server gets its new password as early as possible.
+            return await RotateStepAsync(id, "runtime-password", () => TenantPasswordRotation.RotateRuntimeAsync(settings.Cipher, settings.PlatformConnectionString, admin, row, cancellationToken), output)
+                && await RotateStepAsync(id, "schema-password", () => TenantPasswordRotation.RotateSchemaAsync(settings.Cipher, settings.PlatformConnectionString, admin, row, cancellationToken), output)
+                ? 0
+                : 1;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
+        {
+            output.WriteLine($"{id} runtime-password failed: {TenantDatabaseSteps.Safe(exception)}");
+            return 1;
+        }
+    }
+
+    private static async Task<bool> RotateStepAsync(string id, string step, Func<Task> rotate, TextWriter output)
+    {
+        try
+        {
+            await rotate();
+            output.WriteLine($"{id} {step} ok");
+            return true;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
+        {
+            output.WriteLine($"{id} {step} failed: {TenantDatabaseSteps.Safe(exception)}");
+            return false;
+        }
     }
 
     private static async Task<int> BackupAsync(
@@ -945,7 +1093,7 @@ internal static partial class AdminCommands
     }
 
     /// <summary><c>tenant suspend</c>, <c>resume</c> and <c>list</c> need only the platform database. They decrypt nothing and create no role or database.</summary>
-    private static string? ReadDirectorySettings(IConfiguration configuration, out string problem)
+    internal static string? ReadDirectorySettings(IConfiguration configuration, out string problem)
     {
         problem = "";
         var platform = configuration[PlatformSetting];
@@ -967,7 +1115,7 @@ internal static partial class AdminCommands
     }
 
     /// <summary>Reads the settings that <c>tenant create</c>, <c>tenant backup</c> and <c>migrate</c> need: the platform database and the key of the tenant secrets.</summary>
-    private static PlatformSettings? ReadPlatformSettings(IConfiguration configuration, out string problem)
+    internal static PlatformSettings? ReadPlatformSettings(IConfiguration configuration, out string problem)
     {
         problem = "";
         var platform = configuration[PlatformSetting];

@@ -17,9 +17,10 @@ another system create a record and start a process on it in one call. The
 caller signs in with a bearer token, as
 [Machine callers](security.md#machine-callers) describes. Endpoints
 are an exception to the session and CSRF rules above, as are the
-[service accounts](security.md#service-accounts) of the record API. Data source
-rows and the process API add to them _(planned for M16)_. Under a tenant's `fapi2` profile an endpoint accepts
-only DPoP-bound tokens _(planned for M16)_.
+[service accounts](security.md#service-accounts) of the record API, data source
+rows, process start and process inspection. Under a tenant's `fapi2` profile an endpoint accepts
+only DPoP-bound tokens, sent as `Authorization: DPoP` with a proof, see
+[machine callers under `fapi2`](security.md#fapi-20-profile).
 
 ## The call
 
@@ -48,6 +49,8 @@ Idempotency-Key: po-import-20261012-0042
   and `{entity}` do on the record routes.
 - **Bearer token.** `Authorization: Bearer <token>` is required. A session
   cookie is ignored, so it neither signs the caller in nor causes an error.
+  Under the `fapi2` profile the call sends `Authorization: DPoP <token>` and a
+  `DPoP` proof header instead.
 - **No CSRF header.** The call needs no `X-Axis-Csrf` header. A browser
   cannot send a bearer token on its own, so a cross-site page cannot make the
   call for a signed-in user.
@@ -67,7 +70,8 @@ Idempotency-Key: po-import-20261012-0042
 
 A call is checked in this order, and the first failure is the response:
 
-1. The bearer token, `401` with `WWW-Authenticate: Bearer`. It comes before
+1. The bearer token, `401` with `WWW-Authenticate: Bearer` (`DPoP` under
+   `fapi2`, with its proof). It comes before
    the path, so a caller without a valid token cannot learn which
    applications or endpoints exist.
 2. The application and the endpoint, `404`.
@@ -82,9 +86,10 @@ One transaction then does the rest:
 1. With a key, it stores the receipt first. When the key is taken, it rolls
    back and answers as [Idempotency](#idempotency) describes.
 2. It maps the input to values and creates the record through the record
-   create command. So references, sequences, computed fields and validations
-   apply, as in a [record API create](record-api.md#create-update-and-delete). The
-   creator field gets the caller's id. Errors are a `400` keyed
+   create command. So references, sequences, field defaults, computed fields
+   and validations apply, as in a [record API create](record-api.md#create-update-and-delete).
+   A field the mapping leaves out gets its default, so a required field with
+   a default needs no mapping. The creator field gets the caller's id. Errors are a `400` keyed
    `/values/<field>`, and a unique-value conflict is a `409`.
 3. It starts the processes of the [data change triggers](process-events.md#starts-from-triggers)
    on `create` for the entity, as `system`, in the order of the release. A
@@ -187,7 +192,9 @@ values, or the start condition fails. Nothing is written.
 **`401`.** No `Authorization` header, a token that is not a bearer token,
 or a token whose signature, issuer, audience or expiry fails. A tenant
 without `Oidc:EndpointAudience` answers `401` to every call. The response
-carries `WWW-Authenticate: Bearer`, and it never says which check failed:
+carries `WWW-Authenticate: Bearer`, and it never says which check failed. Under
+the `fapi2` profile it carries `WWW-Authenticate: DPoP algs="ES256 PS256"`, and
+a plain bearer token or a missing or wrong DPoP proof is a `401` as well:
 
 ```http
 HTTP/1.1 401 Unauthorized

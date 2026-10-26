@@ -21,7 +21,7 @@ internal static class ProcessSteps
     {
         await using var command = new NpgsqlCommand(
             $"""
-            SELECT application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, {SqlTranslator.NowSql}
+            SELECT application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, {SqlTranslator.NowSql}, parameters::text
             FROM axis.process_instances WHERE id = @id
             """,
             Connection(transaction),
@@ -37,13 +37,14 @@ internal static class ProcessSteps
             id,
             reader.GetGuid(0),
             reader.GetGuid(1),
-            reader.GetGuid(2),
-            reader.GetGuid(3),
+            reader.IsDBNull(2) ? null : reader.GetGuid(2),
+            reader.IsDBNull(3) ? null : reader.GetGuid(3),
             reader.GetGuid(4),
             reader.GetString(5),
             reader.GetInt64(6),
             reader.GetString(7),
-            reader.GetFieldValue<DateTimeOffset>(8));
+            reader.GetFieldValue<DateTimeOffset>(8),
+            reader.IsDBNull(9) ? null : JsonNode.Parse(reader.GetString(9))!.AsObject());
     }
 
     /// <summary>
@@ -214,18 +215,23 @@ internal static class ProcessSteps
         transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
 }
 
-/// <summary>An instance as a step loads it. <see cref="Now"/> is the time of the step's transaction.</summary>
+/// <summary>
+/// An instance as a step loads it. <see cref="Now"/> is the time of the step's transaction. The subject
+/// ids are <see langword="null"/> for an instance of a process without a subject, and
+/// <see cref="Parameters"/> holds its parameter values. It is <see langword="null"/> for an instance with a subject.
+/// </summary>
 internal sealed record LoadedInstance(
     Guid Id,
     Guid ApplicationId,
     Guid ProcessId,
-    Guid SubjectEntityId,
-    Guid SubjectId,
+    Guid? SubjectEntityId,
+    Guid? SubjectId,
     Guid ReleaseId,
     string State,
     long Revision,
     string Step,
-    DateTimeOffset Now);
+    DateTimeOffset Now,
+    JsonObject? Parameters);
 
 /// <summary>One occurrence of a step, as its history row records it.</summary>
 /// <param name="Revision">The instance revision the step ran at.</param>

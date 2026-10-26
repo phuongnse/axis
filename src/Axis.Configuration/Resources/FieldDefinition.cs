@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Axis.Configuration.Resources;
 
 /// <summary>
@@ -18,6 +20,14 @@ public sealed record FieldDefinition
     public bool? Unique { get; init; }
 
     public int? MaxLength { get; init; }
+
+    public int? MinLength { get; init; }
+
+    /// <summary>The lowest value of an integer, decimal, date or date-time field, as written, or null when it has none.</summary>
+    public JsonElement? Min { get; init; }
+
+    /// <summary>The highest value of an integer, decimal, date or date-time field, as written, or null when it has none.</summary>
+    public JsonElement? Max { get; init; }
 
     public int? Precision { get; init; }
 

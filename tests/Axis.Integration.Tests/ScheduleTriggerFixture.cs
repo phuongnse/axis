@@ -10,11 +10,14 @@ using Microsoft.Extensions.Logging;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// Nine tenants, <c>a</c> to <c>i</c>, each with its own database holding StepApp plus a
+/// Twelve tenants, <c>a</c> to <c>l</c>, each with its own database holding StepApp plus a
 /// schedule trigger. Tenants <c>e</c> and <c>g</c> start with <see cref="HourlyFolder"/>, a copy of
-/// the application whose trigger runs every hour in UTC, and the others with the daily one. <c>ReviewLargeRequests</c> runs at 06:00 Berlin time and starts
+/// the application whose trigger runs every hour in UTC, tenant <c>l</c> with <see cref="JobFolder"/>, a copy
+/// whose only trigger is the scheduled job <c>TallyDaily</c>, and the others with the daily one. <c>ReviewLargeRequests</c> runs at 06:00 Berlin time and starts
 /// <c>RoleApprove</c> for each request of the data source <c>LargeRequests</c>, those with an
-/// amount of at least the fixed <c>minAmount</c> of 1000. Each test uses its own tenant, so record
+/// amount of at least the fixed <c>minAmount</c> of 1000. <c>TallyDaily</c> has no data source and starts
+/// the process <c>Tally</c>, which has no subject, once at 06:00 Berlin time with the fixed <c>days</c> of 3 and
+/// <c>since</c> of 2026-01-01. Each test uses its own tenant, so record
 /// sets do not mix. Workers are built from the worker's own registration and never started, so a
 /// test runs the work items itself.
 /// </summary>
@@ -27,6 +30,7 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
     private readonly List<ServiceProvider> _workers = [];
     private TemporaryFolder? _folder;
     private TemporaryFolder? _hourlyFolder;
+    private TemporaryFolder? _jobFolder;
     private IConfiguration? _settings;
 
     /// <summary>Every log entry of the workers.</summary>
@@ -37,6 +41,9 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
 
     /// <summary>A copy of the application whose trigger runs at the start of every hour, with the same ids.</summary>
     internal string HourlyFolder => (_hourlyFolder ?? throw new InvalidOperationException("The fixture is not initialized.")).Path;
+
+    /// <summary>A copy of the application without <c>ReviewLargeRequests</c>, with the process <c>Tally</c> and the scheduled job <c>TallyDaily</c> that starts it.</summary>
+    internal string JobFolder => (_jobFolder ?? throw new InvalidOperationException("The fixture is not initialized.")).Path;
 
     public async ValueTask InitializeAsync()
     {
@@ -87,9 +94,49 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
                     : content);
         }
 
-        foreach (var id in new[] { "a", "b", "c", "d", "e", "f", "g", "h", "i" })
+        _jobFolder = new TemporaryFolder();
+        foreach (var file in Directory.EnumerateFiles(_folder.Path, "*", SearchOption.AllDirectories))
         {
-            var tenant = new ProcessStepFixture(id, id is "e" or "g" ? _hourlyFolder.Path : _folder.Path);
+            var relativePath = Path.GetRelativePath(_folder.Path, file);
+            if (relativePath != "triggers/review-large-requests.json")
+            {
+                _jobFolder.With(relativePath, await File.ReadAllTextAsync(file));
+            }
+        }
+
+        _jobFolder
+            .With("processes/tally.json", """
+                {
+                  "id": "4b8d2e6a-7c1f-4a93-8e05-1f6a3c9d7b52",
+                  "kind": "process",
+                  "name": "Tally",
+                  "formatVersion": 1,
+                  "parameters": [{ "name": "days", "type": "integer" }, { "name": "since", "type": "date-time" }],
+                  "start": "check",
+                  "steps": [
+                    { "name": "check", "type": "decision", "branches": [{ "when": "days > 5", "next": "late" }], "otherwise": "early" },
+                    { "name": "late", "type": "end" },
+                    { "name": "early", "type": "end" }
+                  ]
+                }
+                """)
+            .With("triggers/tally-daily.json", """
+                {
+                  "id": "c3d9a1e7-5b24-4f68-9a0d-2e7b8c4f1a65",
+                  "kind": "trigger",
+                  "name": "TallyDaily",
+                  "formatVersion": 1,
+                  "type": "schedule",
+                  "schedule": "0 6 * * *",
+                  "timeZone": "Europe/Berlin",
+                  "process": "Tally",
+                  "parameters": { "days": 3, "since": "2026-01-01T00:00:00Z" }
+                }
+                """);
+
+        foreach (var id in new[] { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l" })
+        {
+            var tenant = new ProcessStepFixture(id, id switch { "e" or "g" => _hourlyFolder.Path, "l" => _jobFolder.Path, _ => _folder.Path });
             _tenantList.Add(tenant);
             _tenants[id] = tenant;
             await tenant.InitializeAsync();
@@ -119,20 +166,37 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
 
         _folder?.Dispose();
         _hourlyFolder?.Dispose();
+        _jobFolder?.Dispose();
     }
 
     /// <summary>The database of <paramref name="tenantId"/>.</summary>
     public ProcessStepFixture Tenant(string tenantId) => _tenants[tenantId];
 
-    /// <summary>Builds a worker for the nine tenants. The fixture disposes it.</summary>
-    public WorkItemRunner NewWorker()
+    /// <summary>
+    /// Builds a worker for the twelve tenants. The fixture disposes it. <paramref name="deliveryAttempts"/>
+    /// sets <c>Worker:DeliveryAttempts</c> and leaves the default when it is <see langword="null"/>.
+    /// </summary>
+    public WorkItemRunner NewWorker(int? deliveryAttempts = null) =>
+        NewWorkerServices(deliveryAttempts).GetRequiredService<WorkItemRunner>();
+
+    /// <summary>Builds the services of a worker like <see cref="NewWorker"/>, so a test can read its handlers. The fixture disposes them.</summary>
+    internal ServiceProvider NewWorkerServices(int? deliveryAttempts = null)
     {
+        var settings = _settings ?? throw new InvalidOperationException("The fixture is not initialized.");
+        if (deliveryAttempts is { } attempts)
+        {
+            settings = new ConfigurationBuilder()
+                .AddConfiguration(settings)
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:DeliveryAttempts"] = attempts.ToString(System.Globalization.CultureInfo.InvariantCulture) })
+                .Build();
+        }
+
         var worker = new ServiceCollection()
             .AddLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace))
-            .AddAxisWorker(_settings ?? throw new InvalidOperationException("The fixture is not initialized."), new HostingEnvironment { EnvironmentName = "Testing" })
+            .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" })
             .BuildServiceProvider();
         _workers.Add(worker);
-        return worker.GetRequiredService<WorkItemRunner>();
+        return worker;
     }
 
     /// <summary>Claims and runs the tenant's due work items of every kind on <paramref name="worker"/> until none is left.</summary>

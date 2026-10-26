@@ -176,11 +176,11 @@ A `createRecord` operation creates a record of another entity:
 ## Processes without a subject
 
 A process may leave out `entity`. It then declares typed `parameters`. The
-compile checks in this section are built. Starting these processes, and the
-instance storage, other starts and inspection described below, are _(planned for
-M14)_. Until the start endpoint is built, it answers `400` for such a process,
-the instance list is empty, and the instance detail and the operator commands
-answer `404`.
+compile checks in this section are built, and so are the instance storage,
+running such an instance on the engine and the start endpoint. The other starts
+and inspection described below are _(planned for M14)_. Until inspection is
+built, the instance list is empty, and the instance detail and the operator
+commands answer `404`.
 
 ```json
 {
@@ -226,18 +226,24 @@ answer `404`.
   `updateRecord`, `raiseEvent` and the outputs. The compiler reports no other
   problem in such a step.
 - **Triggers and other starts by name.** An event, data change or schedule
-  trigger that names a process without a subject is `AXC0247`. An endpoint, a
+  trigger that names a process without a subject is `AXC0247`, except a
+  schedule trigger without a data source, which must name one (`AXC0249`
+  otherwise). An endpoint, a
   page `startProcess` action and a scenario step that name one are reported
   with their usual codes for a process over another entity: `AXC0117`,
   `AXC0088` and `AXC0184`.
 - **Instance.** `axis.process_instances` stores `subject_id` as null and the
   values in a `parameters` `jsonb` column. The partial unique index treats a
   null subject as one value (`NULLS NOT DISTINCT`), so one instance of the
-  process runs at a time.
+  process runs at a time. The engine evaluates a decision `when` and the inputs
+  of a connector or package operation over the stored values, and locks, reads
+  and writes no record. The step history `input` has a null `subjectId` and
+  `subjectVersion`.
 - **Start endpoint.** The body is `{ "parameters": { … } }` instead of
   `{ "subjectId" }`. A missing, unknown or mistyped parameter is a `400` keyed
   `/parameters/{name}`. The `startCondition` sees the parameters. A running
-  instance is the `409`. The user needs the `start` grant only.
+  instance is the `409`. The user needs the `start` grant only. See
+  [the start endpoint](processes.md#a-process-without-a-subject).
 - **Other starts.** A [schedule trigger without a data
   source](process-events.md#scheduled-jobs), a [delete
   trigger](process-events.md#delete-triggers) and a sub-process step give the

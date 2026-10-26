@@ -55,6 +55,13 @@ internal static class RecordInputMessages
     public static string MaxLength(int maxLength) =>
         string.Create(CultureInfo.InvariantCulture, $"Must be at most {maxLength} characters.");
 
+    public static string MinLength(int minLength) =>
+        string.Create(CultureInfo.InvariantCulture, $"Must be at least {minLength} characters.");
+
+    public static string AtLeast(string min) => $"Must be at least {min}.";
+
+    public static string AtMost(string max) => $"Must be at most {max}.";
+
     public static string IntegerDigits(long digits) =>
         string.Create(CultureInfo.InvariantCulture, $"Must have at most {digits} integer digits.");
 

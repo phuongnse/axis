@@ -85,11 +85,10 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
         await using var stub = PurchasingStubApp.Create(["--urls", "http://127.0.0.1:0"]);
         await stub.StartAsync(CancellationToken);
         var stubAddress = stub.Services.GetRequiredService<IServer>().Features.GetRequiredFeature<IServerAddressesFeature>().Addresses.Single();
-        await scenario.SetBindingAsync(newId, UrlBinding, binding => binding.Url = stubAddress);
-        await scenario.SetBindingAsync(
-            newId,
-            SecretBinding,
-            binding => binding.SecretValue = AdminScenario.Cipher.Encrypt(newId, TenantSecretFields.Binding(SecretBinding), "restored-token"));
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", newId, UrlBinding, "--url", stubAddress], extra: AdminScenario.Directory)).Exit);
+        Assert.Equal(
+            0,
+            (await scenario.RunAsync(["tenant", "binding", "set", newId, SecretBinding, "--secret"], input: "restored-token", extra: AdminScenario.Directory)).Exit);
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "resume", newId])).Exit);
 
         await using var server = CreateDirectoryServer(scenario.Platform);

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Model;
 using Axis.Data.Records;
 using static Axis.Data.Tests.Models;
@@ -501,6 +502,122 @@ public sealed class RecordInputParserTests
         }
     }
 
+    private static readonly EntityModel _ranged = Entity(
+        Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e08"),
+        "Reading",
+        "entities/reading.json",
+        Field("count", FieldType.Integer) with { Min = "-5", Max = "10" },
+        Field("amount", FieldType.Decimal) with { Min = "0.5", Max = "99.50" },
+        Field("day", FieldType.Date) with { Min = "2026-01-01", Max = "2026-12-31" },
+        Field("at", FieldType.DateTime) with { Min = "2026-01-01T00:00:00+02:00", Max = "2026-01-02T00:00:00Z" },
+        Field("code", FieldType.Text) with { MinLength = 3, MaxLength = 5 },
+        Field("floor", FieldType.Integer) with { Min = "0" },
+        Field("ceiling", FieldType.Integer) with { Max = "0" });
+
+    /// <summary>A value on or inside a limit is accepted, and one outside it is refused with the limit's message.</summary>
+    public static TheoryData<string, string, string?> RangeCases => new()
+    {
+        { "count", "-5", null },
+        { "count", "-6", "Must be at least -5." },
+        { "count", "10", null },
+        { "count", "11", "Must be at most 10." },
+        { "count", "1e1", null },
+        { "count", "9223372036854775807", "Must be at most 10." },
+        { "count", "-9223372036854775808", "Must be at least -5." },
+        { "floor", "-1", "Must be at least 0." },
+        { "floor", "9223372036854775807", null },
+        { "ceiling", "1", "Must be at most 0." },
+        { "ceiling", "-9223372036854775808", null },
+        { "amount", "0.5", null },
+        { "amount", "0.50", null },
+        { "amount", "0.49", "Must be at least 0.5." },
+        { "amount", "99.5", null },
+        { "amount", "99.51", "Must be at most 99.50." },
+        { "amount", "-0", "Must be at least 0.5." },
+        { "amount", "5e-1", null },
+        { "amount", "4.9e-1", "Must be at least 0.5." },
+        { "day", "\"2026-01-01\"", null },
+        { "day", "\"2025-12-31\"", "Must be at least 2026-01-01." },
+        { "day", "\"2026-12-31\"", null },
+        { "day", "\"2027-01-01\"", "Must be at most 2026-12-31." },
+        { "at", "\"2025-12-31T22:00:00Z\"", null },
+        { "at", "\"2025-12-31T21:59:59Z\"", "Must be at least 2026-01-01T00:00:00+02:00." },
+        { "at", "\"2026-01-01T00:00:00+02:00\"", null },
+        { "at", "\"2026-01-02T00:00:00Z\"", null },
+        { "at", "\"2026-01-02T01:00:00+01:00\"", null },
+        { "at", "\"2026-01-02T00:00:00.000001Z\"", "Must be at most 2026-01-02T00:00:00Z." },
+        { "code", "\"abc\"", null },
+        { "code", "\"ab\"", "Must be at least 3 characters." },
+        { "code", "\"abcde\"", null },
+        { "code", "\"abcdef\"", "Must be at most 5 characters." },
+        // Code points count, not UTF-16 units: two of these are 2 characters, three are enough.
+        { "code", "\"\ud83d\ude00\ud83d\ude00\"", "Must be at least 3 characters." },
+        { "code", "\"\ud83d\ude00\ud83d\ude00\ud83d\ude00\"", null },
+    };
+
+    [Theory]
+    [MemberData(nameof(RangeCases))]
+    public void A_value_outside_a_limit_is_an_error_at_its_pointer(string field, string json, string? message)
+    {
+        foreach (var (operation, version) in new[] { (RecordOperation.Create, ""), (RecordOperation.Update, "\"version\": 1, ") })
+        {
+            var body = $$"""{ {{version}}"values": { "{{field}}": {{json}} } }""";
+
+            var result = RecordInputParser.Parse(Encoding.UTF8.GetBytes(body), _ranged, Application(_ranged), operation);
+
+            if (message is null)
+            {
+                Assert.Null(result.Errors);
+                Assert.NotNull(result.Input);
+            }
+            else
+            {
+                Assert.Null(result.Input);
+                Assert.NotNull(result.Errors);
+                Assert.Equal([($"/values/{field}", message)], result.Errors.Select(error => (error.Key, Assert.Single(error.Value))));
+            }
+        }
+    }
+
+    [Fact]
+    public void A_decimal_with_more_digits_than_the_limit_is_compared_exactly()
+    {
+        var field = Field("amount", FieldType.Decimal) with { Min = "0.5", Max = "1" };
+        var entity = Entity(Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e09"), "Exact", "entities/exact.json", field);
+        var application = Application(entity);
+
+        string? Message(string json) =>
+            RecordInputParser.Parse(Encoding.UTF8.GetBytes($$"""{ "values": { "amount": {{json}} } }"""), entity, application, RecordOperation.Create)
+                .Errors?["/values/amount"].Single();
+
+        Assert.Equal("Must be at least 0.5.", Message("0.49999999999999999999999999999999"));
+        Assert.Null(Message("0.50000000000000000000000000000001"));
+        Assert.Null(Message("1.00"));
+        Assert.Equal("Must be at most 1.", Message("1.00000000000000000000000000000001"));
+    }
+
+    [Fact]
+    public void A_limit_does_not_apply_to_a_missing_or_null_value()
+    {
+        var result = RecordInputParser.Parse(
+            """{ "values": { "count": null, "code": null } }"""u8.ToArray(), _ranged, Application(_ranged), RecordOperation.Create);
+
+        Assert.Null(result.Errors);
+        Assert.NotNull(result.Input);
+    }
+
+    [Fact]
+    public void A_draft_value_outside_a_limit_is_an_error_at_its_pointer()
+    {
+        using var document = System.Text.Json.JsonDocument.Parse("""{ "count": 11, "code": "abc" }""");
+
+        var result = RecordInputParser.ParseDraft(document.RootElement, _ranged, Application(_ranged));
+
+        Assert.NotNull(result);
+        Assert.Equal([("/values/count", "Must be at most 10.")], result.Errors.Select(error => (error.Key, Assert.Single(error.Value))));
+        Assert.Equal(["code"], result.Input.Values.Select(value => value.Field.Name));
+    }
+
     /// <summary>An owner whose <c>total</c> is computed, with rows whose <c>code</c> is computed.</summary>
     private static (EntityModel Entity, ApplicationModel Application) ComputedModels()
     {
@@ -530,6 +647,43 @@ public sealed class RecordInputParserTests
         Assert.NotNull(result.Input);
         return Assert.Single(result.Input.Values, value => value.Field.Name == field).Value;
     }
+
+    [Fact]
+    public void A_required_field_with_a_default_may_be_left_out_of_the_owner_but_not_of_a_row()
+    {
+        var line = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e11"),
+            "DefaultedLine",
+            "entities/defaulted-line.json",
+            WithDefault(Field("kind", FieldType.Text, required: true)));
+        var owner = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e12"),
+            "Defaulted",
+            "entities/defaulted.json",
+            Field("title", FieldType.Text),
+            WithDefault(Field("kind", FieldType.Text, required: true)),
+            Field("lines", FieldType.ChildCollection, target: line));
+        var application = Application(owner, line);
+
+        var left = RecordInputParser.Parse(
+            Encoding.UTF8.GetBytes("""{ "values": { "title": "Hi", "lines": [{}] } }"""), owner, application, RecordOperation.Create);
+        var sentNull = RecordInputParser.Parse(
+            Encoding.UTF8.GetBytes("""{ "values": { "kind": null } }"""), owner, application, RecordOperation.Create);
+
+        Assert.Equal(["/values/lines/0/kind"], left.Errors!.Keys);
+        Assert.Equal(["Required."], left.Errors["/values/lines/0/kind"]);
+        Assert.Equal(["/values/kind"], sentNull.Errors!.Keys);
+        Assert.Equal(["Required."], sentNull.Errors["/values/kind"]);
+
+        var ownerOnly = RecordInputParser.Parse(
+            Encoding.UTF8.GetBytes("""{ "values": { "title": "Hi" } }"""), owner, application, RecordOperation.Create);
+
+        Assert.Null(ownerOnly.Errors);
+        Assert.Equal(["title"], ownerOnly.Input!.Values.Select(value => value.Field.Name));
+    }
+
+    private static FieldModel WithDefault(FieldModel field) =>
+        field with { Default = ExpressionModel.Compile("'x'", ExpressionScopes.ForEntity([]), ExpressionScopes.TypeOf(field)!) };
 
     private static RecordInputResult Parse(string json, RecordOperation operation) =>
         RecordInputParser.Parse(Encoding.UTF8.GetBytes(json), _entity, _application, operation);

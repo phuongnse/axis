@@ -521,7 +521,7 @@ The `{id}` names the saved page.
   ([D66](../decisions/d66-a-visual-form-designer-for-form-resources.md)). The
   answer is `{ widget, diagnostics }`. `widget` has the shape of a `form`
   widget that names this form, see **Form metadata** in
-  [frontend.md](frontend.md): `entity` with all its fields, `form`,
+  [form-widget.md](form-widget.md): `entity` with all its fields, `form`,
   `actions: []`, and an `access` that lists every action and writable field.
   Each section, field and step also carries `path`, such as `/sections/0`,
   `/sections/0/fields/1` and `/steps/0`. It has no expressions, and its

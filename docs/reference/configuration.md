@@ -243,7 +243,7 @@ flowchart LR
      `record` on a target that holds no form widget, or whose form is over
      another entity, is `AXC0235` at `/record`. A parse error or an unknown
      name keeps the expression's own code.
-   - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
+   - **Forms.** A [form](form-widget.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded
      because of its own errors is not reported again. Each section `field`
@@ -303,8 +303,12 @@ flowchart LR
      or a `sum`, `min` or `max` without one, is `AXC0063` at
      `/aggregate/measures/{i}`. A measure `field` that names no projected
      field, or whose type the function does not take, is `AXC0063` at
-     `/aggregate/measures/{i}/field`. A measure field whose path is already
-     `AXC0043` is not reported again. When the data source is grouped, the
+     `/aggregate/measures/{i}/field`. `sum` takes an integer, a decimal or a
+     money field, and `min` and `max` also take a date or a date-time. A measure
+     field whose path is already `AXC0043` is not reported again. A `sum`, `min`
+     or `max` over a money field with a `currencyField`, without a group field
+     that reaches that currency field on the same record, is `AXC0248` at
+     `/aggregate/measures/{i}/field`. When the data source is grouped, the
      `sort` must exactly match a group field that is not a `reference`, or a
      measure, otherwise it is `AXC0045`. A parameter name that is
      also a field of the entity, is `page`, `pageSize` or `sort`, or repeats
@@ -339,8 +343,8 @@ flowchart LR
      [Compile checks](processes.md#compile-checks). Step names are unique ignoring letter case: a later step with a
      name already used is `AXC0069` at `/steps/{i}/name`, naming the first
      step. `start`, each branch `next`, each `otherwise`, each operation
-     `next` and each task outcome `next` must name a step, ignoring letter
-     case, otherwise it is `AXC0070` at that property. A
+     `next`, each task outcome `next` and each task `deadline` `next` must name a
+     step, ignoring letter case, otherwise it is `AXC0070` at that property. A
      transition goes to the first step with its name. A step that cannot be
      reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
      when `start` is unknown. A step with no path to an `end` step is
@@ -350,7 +354,7 @@ flowchart LR
      transitions out of a `task` step are not followed, so a loop through a
      task is allowed. The steps are walked in
      file order, with the branches, then `otherwise`, then `next`, then the
-     outcomes. A step whose name is
+     outcomes, then the deadline's `next`. A step whose name is
      already `AXC0069` is left out of `AXC0071`, `AXC0072` and `AXC0073`. The
      `startCondition` expression and each decision `when` are parsed and
      type-checked as a boolean over the entity's fields, computed ones
@@ -423,7 +427,8 @@ flowchart LR
      reported again. A form over another entity than the process's is
      `AXC0083` at `/steps/{i}/form`. It is not checked when either entity is
      unknown. A `dueIn` that is not a positive whole-number duration is
-     `AXC0084` at `/steps/{i}/dueIn`. A later outcome with a name already
+     `AXC0084` at `/steps/{i}/dueIn`, and so is a `deadline` `after`, at
+     `/steps/{i}/deadline/after`. A later outcome with a name already
      used in the step, ignoring letter case, is `AXC0085` at
      `/steps/{i}/outcomes/{j}/name`. The task `label` and each outcome
      `label` join the `AXC0028` check. A decision with no branches, an
@@ -444,7 +449,7 @@ flowchart LR
      of it is checked. An action its target's kind does not take is `AXC0091`
      at `/grants/{i}/actions/{j}`. An `export` without a `read`, or an
      `import` without a `create`, on the same target in the same policy is
-     `AXC0248` at `/grants/{i}/actions/{j}`. A `filter` or `fields` on a
+     `AXC0250` at `/grants/{i}/actions/{j}`. A `filter` or `fields` on a
      `dataSource`, `process` or `endpoint` grant is `AXC0091` at
      `/grants/{i}/filter` or `/grants/{i}/fields`. A target that names no
      loaded entity, data source, process or endpoint, ignoring letter case, is
@@ -559,7 +564,11 @@ flowchart LR
      type is `AXC0166` at `/parameters/{key}`. Each parameter that no key
      gives is `AXC0167` at `/parameters`, once for each parameter, even when
      `parameters` is left out. The parameters are not checked when the data
-     source is unknown. A name whose data source file was not loaded because
+     source is unknown. A schedule trigger without a `dataSource` is a
+     scheduled job. Its process must have no subject, otherwise it is
+     `AXC0249` at `/process`, and the parameter checks then read the process's
+     parameters. A `null` is `AXC0166` there. They are not checked when the
+     process is unknown or has a subject. A name whose data source file was not loaded because
      of its own errors is not reported again. The
      [schedule trigger](integration-resources.md#events-and-triggers) section lists the rules.
 

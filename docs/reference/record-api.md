@@ -196,16 +196,25 @@ Writes go through the record command in `Axis.Processes`, which hosts without
 HTTP also call. The record API maps its outcome to the responses below.
 
 - **Create.** `POST` takes `{ "values": { ... } }`. The record gets a new
-  version 7 UUID as its id and `version` 1. Fields the body leaves out are
-  SQL `NULL`. From M15 a field with a `default` that the body leaves out gets
-  its default, and a body that sends `null` keeps `null`
-  _(planned for M15)_. The response is `201` with the record, and `Location` is
+  version 7 UUID as its id and `version` 1. A field with a `default` that the
+  body leaves out gets its default, and a body that sends `null` keeps `null`.
+  Any other field the body leaves out is SQL `NULL`. A required field with a
+  default may be left out, but sending `null` for it is still a `400`
+  "Required.". `now()` in a default is the start time of the write
+  transaction, the same time the validations and the `record.created` audit
+  record see. A default that fails at run time, such as a division by zero,
+  is a `400` at `/values/<field>` with "Could not be computed.", and nothing
+  is written. The same holds for a record the record command creates as
+  `system`. A field filled from its default is not checked against the
+  user's field grants, because the server sets it. Rows of a child collection
+  get no defaults yet: a field a row leaves out is SQL `NULL`, and its
+  required fields stay required. The response is `201` with the record, and `Location` is
   `/api/apps/{app}/entities/{entity}/records/{id}`. It uses the application
   and entity names from the active model, not the letter case of the request,
   so a record always has one URL. The id is in the lowercase hyphenated form.
 - **Update.** `PATCH` takes `{ "version": n, "values": { ... } }`. Only the
-  fields in `values` change, and fields left out keep their value. `null`
-  clears a field that is not required. An empty `values` only increments
+  fields in `values` change, and fields left out keep their value. An update
+  never applies a `default`. `null` clears a field that is not required. An empty `values` only increments
   `version`. The response is `200` with the record and its new version.
 - **Data change triggers.** A create or update that commits also starts the
   processes of the matching [data change triggers](process-events.md#starts-from-triggers)
@@ -524,8 +533,24 @@ is not a `text`. A wrong JSON type or a value outside its bounds is an error at
 | `file` _(planned for M15)_ | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field, see [file fields](file-fields.md#upload) | `Guid` |
 | `references` _(planned for M15)_ | An array of distinct record ids, at most 1,000. The whole set replaces the stored one | `Guid[]` |
 
-From M15 _(planned for M15)_, a value outside a field's `min`, `max` or
-`minLength` is an error at the field's pointer, as for `maxLength`.
+A value outside a field's limits is an error at the field's pointer, as for
+`maxLength`. A value equal to a limit is accepted, and a missing or `null`
+value is never checked against a limit.
+
+- `min` and `max` apply to `integer`, `decimal`, `money`, `date` and
+  `date-time` values. The messages are "Must be at least 1." and "Must be at most 10.",
+  with the limit as written in the entity file. A `decimal` or `money` is compared
+  exactly, with no rounding, so `0.49999999999999999999999999999999` is below
+  `0.5`. A `date-time` is compared as an instant in UTC, whatever offset the
+  value or the limit is written with.
+- `minLength` applies to `text` values and counts code points, as `maxLength`
+  does. The message is "Must be at least 3 characters.".
+- The check is part of the request parser, so the record API, processes, task
+  completion, form state, inbound endpoints and seeds all apply it. The limits
+  are not stored as a `CHECK` constraint, so a stored row outside a tightened
+  limit keeps its values and is read back unchanged.
+- An endpoint `input` field has no limits of its own. An endpoint that writes
+  a record is still checked by the entity field's limits.
 
 **Errors** are a dictionary from RFC 6901 JSON Pointer into the body to its
 messages, in ordinal key order, usable as is for a validation problem

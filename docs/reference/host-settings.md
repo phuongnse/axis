@@ -76,8 +76,11 @@ development or E2E server serves a real application without a separate step.
     computed value alone never causes a write.
 
   Each record goes through the record input parser as a create body, so the
-  record API's rules apply, and a synced seed still needs every required
-  field. Every record is parsed before any write, and every invalid value is
+  record API's rules apply. A seed record that leaves out a field with a
+  `default` gets the default when it is inserted, with `now()` the start time
+  of the transaction, and a required field with a default may be left out. A
+  synced seed still needs every required field that has no default, and its
+  update of an existing record applies no default. Every record is parsed before any write, and every invalid value is
   `AXC0033` at `/records/{i}/values/<field>`, as is a value for a
   [computed field](resource-files.md#entity-logic) or a [sequence](resource-files.md#sequences) field. An
   inserted seed record gets the sequence's next number, like any other
@@ -391,7 +394,7 @@ for `tenant create` and `tenant restore`. `migrate`, `tenant suspend`, `tenant r
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create` and `tenant restore`. |
+| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create`, `tenant restore` and `tenant rotate-passwords`. |
 
 As an environment variable it is `Admin__ConnectionString`.
 

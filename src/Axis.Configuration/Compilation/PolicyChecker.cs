@@ -13,7 +13,7 @@ namespace Axis.Configuration.Compilation;
 /// <c>delete</c>, <c>export</c> and <c>import</c> for an entity, <c>read</c> and <c>export</c> for
 /// a data source, <c>start</c>, <c>inspect</c>, <c>cancel</c>, <c>retry</c> and <c>resolve</c> for a process and <c>invoke</c> for an endpoint. An
 /// <c>export</c> needs a <c>read</c> and an <c>import</c> needs a <c>create</c> on the same target
-/// in the same policy (<c>AXC0248</c>). Only an entity grant
+/// in the same policy (<c>AXC0250</c>). Only an entity grant
 /// has a <c>filter</c> or <c>fields</c>. The target
 /// is loaded, ignoring letter case, and an entity target is not a child entity. Each of its
 /// <c>fields</c> is a field of the entity, ignoring letter case. Its <c>filter</c> parses,

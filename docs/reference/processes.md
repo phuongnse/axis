@@ -242,16 +242,20 @@ and [notifications](notifications.md#notify-operation).
     such as `department.manager`. A `role` names a role the user must hold.
     Queues come later. _(Planned for M14)_ A user who holds the role may
     claim the task, see [Claim and release](task-deadlines.md#claim-and-release).
-  - `form` names a [form resource](frontend.md) whose entity is the subject
+  - `form` names a [form resource](form-widget.md) whose entity is the subject
     entity. The task page shows it over the subject record.
   - `dueIn` is optional. It is a positive ISO 8601 duration in whole
     numbers: either weeks, such as `P2W`, or days with an optional time part
     of hours, minutes and seconds, such as `P3D`, `PT4H` or `P1DT12H`. Years
     and months are `AXC0084` until calendar durations come with the
     [time zone rule](../decisions/d22-current-time-and-time-zones.md), because they have no fixed length. The task's due date is the time the task is created plus `dueIn`. It is
-    shown only. Escalation needs timers, so it comes later. _(Planned for
-    M14)_ `escalations` and a `deadline`, see
+    shown only.
+  - `deadline` is optional. It is `{ "after", "next" }`. `after` is a duration
+    by the rule of `dueIn`, counted from the task's creation. `next` names a
+    step. When the task is still `open` after that time, the task becomes
+    `expired` and the instance moves to `next`, see
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
+    _(Planned for M14)_ `escalations`, see the same section.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
     the task is completed with it.
@@ -290,7 +294,9 @@ reported in one pass. See
   A process without a subject has no `task`, `updateRecord` or `raiseEvent`
   step and no `output` on a connector or package step (`AXC0246`). Its start
   condition and each `when` see its parameters and the named rules, and no
-  field, path or `id`. A trigger that names such a process is `AXC0247`. The
+  field, path or `id`. A trigger that names such a process is `AXC0247`, except a schedule trigger
+  without a data source, see [Scheduled
+  jobs](process-events.md#scheduled-jobs). The
   start endpoint answers `400` for it until starting these processes is built,
   see [Processes without a
   subject](process-flow.md#processes-without-a-subject).
@@ -370,7 +376,8 @@ reported in one pass. See
 
 ## Start endpoint
 
-A start creates an instance for one subject record:
+A start creates an instance for one subject record. A process without a subject
+takes [parameters instead](#a-process-without-a-subject):
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances
@@ -419,9 +426,13 @@ The `201` has no `Location` header. Reading an instance needs an `inspect`
 grant, which the user who started it may not hold. See the
 [instance detail](process-inspection.md#instance-detail).
 
-A start needs a session, a `start` grant on the process and read access to
-the subject record, as [Authorization](security.md#authorization)
-describes.
+A start needs a session, or a bearer token of a
+[service account](security.md#service-accounts), a `start` grant on the process
+and read access to the subject record, as
+[Authorization](security.md#authorization) describes. A request with a bearer
+token needs no CSRF header, and its caller id is the actor of the
+`process.started` audit record. A bad token is a `401` with
+`WWW-Authenticate: Bearer`.
 
 - **Subject the user may not read.** A subject record the user may not read
   does not exist for them. That is a record outside every filter of their
@@ -431,14 +442,14 @@ describes.
 
 A request is checked in this order, and the first failure is the response:
 
-1. The session, `401`.
+1. The session or the bearer token, `401`.
 2. The application and the process, `404`.
 3. The `start` grant on the process, `403`.
 4. The content type, `415`.
 5. The body, `400`.
 6. The `Idempotency-Key` header, `400`.
 
-A start without the CSRF header is a `403` before any of these checks. Read
+A start by a session without the CSRF header is a `403` before any of these checks. Read
 access to the subject record is checked in the transaction, when the record
 is read.
 
@@ -483,6 +494,43 @@ caller, and its details add the endpoint's name.
 - Concurrent repeats are serialized by the receipt's unique key, so only one
   of them starts an instance.
 
+### A process without a subject
+
+A [process without a subject](process-flow.md#processes-without-a-subject)
+takes its typed parameters instead of a record id:
+
+```http
+POST /api/apps/{app}/processes/{process}/instances
+Content-Type: application/json
+
+{ "parameters": { "days": 31 } }
+```
+
+The checks run in the order above, and so do the answers. The differences are
+these:
+
+- **`201`.** The body has the same keys, and `subjectId` is `null`. The
+  instance stores the parameter values.
+- **`400` for a body.** The body must be exactly one `parameters` property,
+  and its value must be an object. Anything else is one error keyed
+  `/parameters`.
+- **`400` for a parameter.** Each declared parameter must be given once, by its
+  exact name, letter case included, with a value of its type, read as a record
+  field value of that type is. A missing, unknown, repeated, `null` or
+  mistyped parameter is an error keyed `/parameters/{name}`. All the errors
+  are in one response.
+- **`400` for a start condition.** The `startCondition` is checked over the
+  parameters. A failure is an error keyed `/parameters` that holds the
+  condition's message text key.
+- **`409`.** A `running` or `waiting` instance of the process exists. The title
+  is "A running or waiting instance of this process already exists.".
+- **`403`.** The user needs the `start` grant only. There is no record, so no
+  `read` check runs and there is no policy `409`.
+- **`422`.** The `Idempotency-Key` was used before with other parameter values.
+  The receipt stores a null subject, and the values are compared with those
+  stored on the receipt's instance. Decimals count as equal when they are the
+  same number.
+
 ## Instance states
 
 | State | Meaning |
@@ -505,11 +553,11 @@ record. An operator can cancel a `running` or `waiting` instance, see
 | `open` | The task waits for a decision. |
 | `completed` | The decision is recorded, and the instance moves on. |
 | `cancelled` | An operator cancelled the task's instance. The task has no decision and leaves every inbox. See [Cancel](process-inspection.md#cancel). |
+| `expired` | The task's `deadline` passed while it was `open`, and the instance moved to the deadline's `next` step. The task has no decision and leaves every inbox. It cannot be completed. See [Escalations and deadline](task-deadlines.md#escalations-and-deadline). |
 
 A task has no other state. Its due date is only shown, so there is no overdue
-state. _(Planned for M14)_ A deadline makes a task `expired`, and the task API
-reports an open task past its due date as overdue, see
-[Task states](task-deadlines.md#task-states).
+state. _(Planned for M14)_ The task API reports an open task past its due date
+as overdue, see [Task states](task-deadlines.md#task-states).
 
 ## Releases and running work
 
@@ -620,10 +668,12 @@ database, with history in `axis.__processes_migrations` (see
   and is null before. A retry clears it.
   A partial unique index on
   application, process and subject record, where the state is `running` or
-  `waiting`, enforces one start per submission.
-  _(Planned for M14)_ The index treats a null subject as one value, and the
-  table gains `parameters`, `parent_instance_id` and `parent_step`, see
-  [process flow](process-flow.md).
+  `waiting`, enforces one start per submission. The index treats a null subject
+  as one value (`NULLS NOT DISTINCT`), so a process without a subject has one
+  open instance. The subject columns are null for such an instance, and its
+  `parameters` `jsonb` column holds the values it started with, see
+  [process flow](process-flow.md#processes-without-a-subject).
+  _(Planned for M14)_ The table gains `parent_instance_id` and `parent_step`.
   Three more indexes serve the inspector's instance list: one by application,
   process and start time, newest first, one by application, process, state and
   start time, and one by subject record.
@@ -637,8 +687,8 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. `{ "command": "cancel" }` for an operator cancel. `{ "command": "retry" }` for an operator retry. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
-  | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion. Null for other steps and failed steps |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "taskId", "next" }` for a task whose deadline expired it, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. `{ "command": "cancel" }` for an operator cancel. `{ "command": "retry" }` for an operator retry. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
+  | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion, and `deadline` for a task its deadline expired. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step. The exception type, or a fixed text that names the step, part, field pointer or message key. Never the exception message or a value, see [Step errors](process-inspection.md#step-errors-in-inspection) |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `finished_at` | `timestamptz` | When the row was written, `clock_timestamp()` |
@@ -666,7 +716,8 @@ database, with history in `axis.__processes_migrations` (see
   current. A run starts a new trace with a link to that span, see
   [Telemetry](../architecture.md#telemetry). A rescheduled item keeps them.
   Activation that queues a `trigger.schedule` item again replaces them.
-  Two more kinds come with [schedules](process-events.md#schedules), and a third with
+  Two more kinds come with [schedules](process-events.md#schedules), one with
+  [task deadlines](task-deadlines.md), and one with
   [computed fields](migrations.md#recomputing-computed-fields):
   - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
     also has the `trigger_id`, and its `due_at` is the next occurrence. A
@@ -675,12 +726,17 @@ database, with history in `axis.__processes_migrations` (see
     Its item also has the `trigger_id`, the `release_id` that was active at
     the occurrence and the `occurrence_at` time. Its `cursor` is the last
     record id it handled, and is null before its first batch.
+  - `task.deadline` expires one task at its deadline. Its item also has the
+    `task_id` of the task and the `process_instance_id` of its instance, and
+    its `due_at` is the task step's time plus the deadline's `after`. See
+    [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
   - `computed.backfill` recomputes the out-of-date rows of
     one entity. Its item also has the `entity_id`, and each claim runs one
     batch of up to 500 rows. See
     [Recomputing computed fields](migrations.md#recomputing-computed-fields).
 - `axis.process_start_receipts`: the stored `201` response of each
-  `Idempotency-Key`, unique per application, process and key.
+  `Idempotency-Key`, unique per application, process and key. The subject is
+  null for a process without a subject.
 - `axis.endpoint_receipts`: the record and instance of each endpoint call's
   `Idempotency-Key`, unique per application, endpoint, caller and key, with a
   hash of the input. See [Idempotency](inbound-endpoints.md#idempotency).
@@ -702,10 +758,11 @@ database, with history in `axis.__processes_migrations` (see
   | `assignee` | `text` | The user id that the `user` expression gave, or the role name |
   | `form_id` | `uuid` | The id of the step's form |
   | `due_at` | `timestamptz`, null | `created_at` plus `dueIn`, or null when the step has no `dueIn` |
-  | `state` | `text` | `open`, `completed` or `cancelled` |
-  | `outcome` | `text`, null | The outcome the task was completed with. Null while it is `open`, and for a `cancelled` task |
-  | `completed_by` | `text`, null | The user who completed the task. Null while it is `open`, and for a `cancelled` task |
-  | `completed_at` | `timestamptz`, null | When the task was completed. Null while it is `open`, and for a `cancelled` task |
+  | `state` | `text` | `open`, `completed`, `cancelled` or `expired` |
+  | `outcome` | `text`, null | The outcome the task was completed with. Null while it is `open`, and for a `cancelled` or `expired` task |
+  | `completed_by` | `text`, null | The user who completed the task. Null while it is `open`, and for a `cancelled` or `expired` task |
+  | `completed_at` | `timestamptz`, null | When the task was completed. Null while it is `open`, and for a `cancelled` or `expired` task |
+  | `expired_at` | `timestamptz`, null | When the deadline expired the task. Null unless the task is `expired`. The task API does not return it |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
 - `axis.connector_calls`: one row per staged connector
   call, see [Connector calls](process-execution.md#connector-calls). A unique index on
