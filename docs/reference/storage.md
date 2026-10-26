@@ -118,11 +118,15 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | Unique constraint                  | `uq_` + table + `_` + hash of the column name                             | 54         |
   | Foreign key                        | `fk_` + table + `_` + hash of the column name                             | 54         |
   | Index _(planned for M15)_          | `ix_` + table + `_` + hash of the column list                             | 54         |
-  | Junction table _(planned for M15)_ | `m_` + entity `id` + `_` + hash of the field name                         | 51         |
+  | Junction table                     | `m_` + entity `id` + `_` + hash of the field name                         | 51         |
+  | Junction foreign key / index       | `fk_` or `ix_` + junction table + `_` + first 8 hex of the hash           | 63         |
 
   The hash is the first 16 lowercase hex characters of SHA-256 over the UTF-8
   column name. For an index it is over the column names joined by commas, in
-  order, and for a junction table over the field name in lowercase. Because names are ASCII and at most 60 characters, every
+  order, and for a junction table over the field name in lowercase. A junction
+  table's foreign keys and index use only the first 8 hex characters of the
+  hash, because the full hash after the 51-character table name would be 71
+  bytes. Because names are ASCII and at most 60 characters, every
   identifier fits PostgreSQL's 63-byte limit by construction and is never
   truncated. Identifiers are always double-quoted in SQL.
 
@@ -593,11 +597,17 @@ access. It returns diagnostics, SQL statements and the new records to write.
     worker builds it with `CREATE INDEX CONCURRENTLY`. An index the build
     leaves `INVALID` is dropped and built again. Until it is valid, queries
     work without it.
-- **Junction tables** _(planned for M15)_. A `references` field gets a
-  junction table with `owner_id`, a foreign key to the owner deleted with it,
-  and `target_id`, a foreign key to the target that refuses a delete while
-  linked. Its primary key is both columns. Removing the field drops nothing
-  and is `AXC0015`, as for a column. See
+- **Junction tables.** A `references` field gets a junction table with
+  `owner_id`, a foreign key to the owner deleted with it, and `target_id`, a
+  foreign key to the target that refuses a delete while linked. Its primary
+  key is both columns, and `target_id` has an `ix_` index. A junction table
+  whose `target_id` foreign key is missing gets it, and one that points at
+  another table than the field's target is `AXC0016` at
+  `/fields/{i}/target`. Junction tables are not recorded in
+  `provisioned_entities`: the planner finds them in the catalog by the
+  `m_` + entity `id` prefix. Removing the field drops nothing and is
+  `AXC0015` at `/fields`, as for a column. The record API does not read or
+  write the links yet. See
   [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md).
 
 ## Child tables and computed columns

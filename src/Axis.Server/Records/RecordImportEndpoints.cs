@@ -34,7 +34,7 @@ internal static class RecordImportEndpoints
         {
             var imports = endpoints.MapGroup(pattern);
             imports.MapPost("", UploadAsync);
-            imports.MapGet("/{id}", GetAsync);
+            imports.MapGet("/{id}", GetAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
         }
     }
 
