@@ -85,6 +85,12 @@ public sealed record RecordCommandResult(
     IDictionary<string, string[]>? Errors = null,
     RecordConflict? Conflict = null);
 
+/// <summary>The parsed body of a create: the input, or the failure the create answers with. Never both.</summary>
+public sealed record RecordCreateParse(RecordInput? Input, RecordCommandResult? Failure);
+
+/// <summary>The record of a create after its checks: the computed values and rows, or the errors. Never both.</summary>
+public sealed record RecordCreatePrepared(RecordComputeResult? Computed, IDictionary<string, string[]>? Errors);
+
 /// <summary>Reads the body of a write, or returns null when the request is not JSON.</summary>
 public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationToken);
 
@@ -163,18 +169,13 @@ public static class RecordCommand
             return new RecordCommandResult(RecordCommandOutcome.UnsupportedContent);
         }
 
-        var parsed = RecordInputParser.Parse(body, model, application, RecordOperation.Create);
-        if (parsed.Errors is { } errors)
+        var parse = ParseCreate(application, model, actor, body);
+        if (parse.Failure is { } parseFailure)
         {
-            return Invalid(errors);
+            return parseFailure;
         }
 
-        if (RecordFieldAccess.Unwritable(parsed.Input!, PolicyEvaluator.Fields(application, actor.Roles, model, PolicyAction.Create)) is { } unwritable)
-        {
-            return new RecordCommandResult(RecordCommandOutcome.UnwritableFields, Errors: unwritable);
-        }
-
-        var input = parsed.Input!;
+        var input = parse.Input!;
         RecordWriteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
@@ -188,33 +189,16 @@ public static class RecordCommand
             }
 
             // The defaults, the computed fields and the validations run in the write transaction, so their
-            // now() is its start time. The defaults and the creator fields are set before the computed fields
-            // and validations, so they see the record as it will be stored.
+            // now() is its start time.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var defaults = RecordDefaults.Apply(model, input.Values, now);
-            if (defaults.Errors is { } defaultErrors)
+            var prepared = PrepareCreate(application, model, actor, input, formModel, now);
+            if (prepared.Errors is { } prepareErrors)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                return Invalid(defaultErrors);
+                return Invalid(prepareErrors);
             }
 
-            var values = RecordCreator.WithCreator(model, defaults.Values, actor.Id);
-            var computed = RecordComputer.ComputeCreate(application, model, values, input.Rows);
-            if (computed.Errors is { } computeErrors)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return Invalid(computeErrors);
-            }
-
-            var failures = RecordFormRequirements.Merge(
-                formModel is null ? null : RecordFormRequirements.Check(application, model, formModel, null, computed.Values, computed.Rows, now),
-                RecordValidator.ValidateCreate(application, model, computed.Values, computed.Rows, now));
-            if (failures is not null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return Invalid(failures);
-            }
-
+            var computed = prepared.Computed!;
             result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, cancellationToken: cancellationToken);
             var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
             var outside = written is not null
@@ -243,6 +227,68 @@ public static class RecordCommand
         }
 
         return WriteResult(result);
+    }
+
+    /// <summary>
+    /// Parses the body of a create and checks that the actor's <c>create</c> grants cover every field it sets.
+    /// Nothing is read from storage. The result holds the input, or the failure a create answers with:
+    /// <see cref="RecordCommandOutcome.Invalid"/> or <see cref="RecordCommandOutcome.UnwritableFields"/>.
+    /// </summary>
+    public static RecordCreateParse ParseCreate(ApplicationModel application, EntityModel model, RecordActor actor, ReadOnlyMemory<byte> body)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(actor);
+
+        var parsed = RecordInputParser.Parse(body, model, application, RecordOperation.Create);
+        if (parsed.Errors is { } errors)
+        {
+            return new RecordCreateParse(null, Invalid(errors));
+        }
+
+        return RecordFieldAccess.Unwritable(parsed.Input!, PolicyEvaluator.Fields(application, actor.Roles, model, PolicyAction.Create)) is { } unwritable
+            ? new RecordCreateParse(null, new RecordCommandResult(RecordCommandOutcome.UnwritableFields, Errors: unwritable))
+            : new RecordCreateParse(parsed.Input, null);
+    }
+
+    /// <summary>
+    /// Runs the checks of a create on a parsed input, without storage: the defaults, then the creator
+    /// fields, the computed fields, and the form's <c>requiredWhen</c> conditions and the entity's validations.
+    /// <paramref name="now"/> is the start time of the transaction that does the work. The result holds the
+    /// computed values and rows, or the errors by JSON Pointer.
+    /// </summary>
+    public static RecordCreatePrepared PrepareCreate(
+        ApplicationModel application,
+        EntityModel model,
+        RecordActor actor,
+        RecordInput input,
+        FormModel? form,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(input);
+
+        // The defaults and the creator fields are set before the computed fields and validations, so they
+        // see the record as it will be stored.
+        var defaults = RecordDefaults.Apply(model, input.Values, now);
+        if (defaults.Errors is { } defaultErrors)
+        {
+            return new RecordCreatePrepared(null, defaultErrors);
+        }
+
+        var values = RecordCreator.WithCreator(model, defaults.Values, actor.Id);
+        var computed = RecordComputer.ComputeCreate(application, model, values, input.Rows);
+        if (computed.Errors is { } computeErrors)
+        {
+            return new RecordCreatePrepared(null, computeErrors);
+        }
+
+        var failures = RecordFormRequirements.Merge(
+            form is null ? null : RecordFormRequirements.Check(application, model, form, null, computed.Values, computed.Rows, now),
+            RecordValidator.ValidateCreate(application, model, computed.Values, computed.Rows, now));
+        return new RecordCreatePrepared(failures is null ? computed : null, failures);
     }
 
     /// <summary>Updates the record with <paramref name="recordId"/> from the body that <paramref name="readBody"/> reads.</summary>
