@@ -15,6 +15,7 @@ public sealed class RecordImportCsvTests
         Field("Count", FieldType.Integer),
         Field("price", FieldType.Decimal),
         Field("active", FieldType.Boolean),
+        Field("attachment", FieldType.File),
         Field("lines", FieldType.ChildCollection, target: Entity(Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1b02"), "Line", "entities/line.json")));
 
     [Fact]
@@ -119,6 +120,16 @@ public sealed class RecordImportCsvTests
         Assert.Equal(["/columns/2", "/columns/3", "/columns/4", "/columns/5"], errors!.Keys);
         Assert.Equal("Is not a field of this entity.", errors["/columns/2"][0]);
         Assert.Equal("Is named more than once.", errors["/columns/3"][0]);
+    }
+
+    [Fact]
+    public void A_file_column_is_an_error_at_its_position()
+    {
+        var (columns, errors) = RecordImportColumns.Map(["name", "attachment"], _entity);
+
+        Assert.Null(columns);
+        Assert.Equal(["/columns/2"], errors!.Keys);
+        Assert.Equal("Is a file, which an import cannot set.", errors["/columns/2"][0]);
     }
 
     [Fact]

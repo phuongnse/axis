@@ -10,7 +10,7 @@ _(planned for M15)_ are not built yet, and Dn refers to
 Everything on this page is _(planned for M15)_, except the grants, the
 policy matrix, the export routes, and the upload, dry run and commit of a CSV
 or `xlsx` import, which are built. A commit only creates records. `key`
-matching, references and the file cleanup of an import are not built.
+matching and the file cleanup of an import are not built.
 
 ## Grants
 
@@ -104,8 +104,8 @@ matching, references and the file cleanup of an import are not built.
 - **CSV format.** UTF-8 with the quoting of RFC 4180: a cell in double quotes
   may hold commas, line breaks and doubled quotes. A leading byte order mark is
   skipped. The first row names the fields of the entity's table, matching
-  ignoring letter case. An unknown name, a field named twice, and a child
-  collection are errors.
+  ignoring letter case. An unknown name, a field named twice, a child
+  collection, a `references` field and a file field are errors.
 - **Spreadsheet format.** _(built)_ Only the first sheet of an
   `xlsx` workbook is read, and other sheets are ignored. Its first row with a
   value is the header, and a row with no value is skipped. A data row's number
@@ -128,9 +128,10 @@ matching, references and the file cleanup of an import are not built.
   item per import. It parses every row and runs each through the record
   command's checks as the user who uploaded the file, without storing
   anything: parsing, field grants, defaults, computed fields and validations.
-  It writes no record, no audit record and no sequence number. It does not
-  check that a referenced record exists or that a unique value is free, so a
-  `checked` import can still fail at commit. The import becomes `checked`
+  It writes no record, no audit record and no sequence number. It reads
+  storage only to look up the display values of reference cells, see
+  References. It does not check that a record id exists or that a unique value
+  is free, so a `checked` import can still fail at commit. The import becomes `checked`
   with no errors, or `failed` with every error keyed
   `/rows/{n}/values/{field}`, `n` counting data rows from 1. A failed import's
   file is deleted at once. The dry run ends the link between the import and its
@@ -168,12 +169,21 @@ matching, references and the file cleanup of an import are not built.
   every row creates a record, even with a `key`, so a row whose key is taken
   fails the whole import on that unique value. Once it is built, with a `key`,
   a row whose key matches a record updates it, and other rows create records.
-- **References.** A reference column takes a record id, or the target's
-  display value when that value is unique.
+- **References.** _(built)_ A reference column takes a record id, or the
+  target's display value. A cell that is a record id is used as it is. Any
+  other cell is looked up by an exact match on the target's display field, in
+  both the dry run and the commit, and each distinct value is looked up once
+  per run. The lookup runs only when the uploader may read the target's display
+  field, and the target's record filters do not narrow it, as they do not hide
+  a label, see [security](security.md). Otherwise the cell is checked as a
+  record id. A value that matches no record, or more than one, is an error at
+  `/rows/{n}/values/{field}` that does not repeat the value.
 - **Triggers.** _(built for creates)_ Each created or updated record fires its
   data change triggers in the commit's transaction, as any record command
   write does.
-- **Not imported.** Child rows, `references` fields and files.
+- **Not imported.** _(built)_ Child rows, `references` fields and files. A
+  column that names a child collection, a `references` field or a file field
+  is an error at `/columns/{n}`.
 - **Audit.** _(built for creates)_ A committed import writes `records.imported`
   with the entity and the counts of created and updated records. The count of
   updated records is 0 until key matching is built.

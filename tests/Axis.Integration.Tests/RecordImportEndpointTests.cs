@@ -19,6 +19,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
 {
     private const string Items = "/api/apps/RecordsApp/entities/Item";
     private const string Tickets = "/api/apps/RecordsApp/entities/Ticket";
+    private const string Products = "/api/apps/RecordsApp/entities/Product/records";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -278,6 +279,71 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task A_reference_cell_may_hold_the_targets_display_value_and_the_commit_links_the_records()
+    {
+        await ResetAsync();
+        var desk = await CreateProductAsync("Desk");
+        var lamp = await CreateProductAsync("Lamp");
+        var chair = await CreateProductAsync("Chair");
+        var upload = await UploadAsync(fixture.Client, Tickets, $"title,code,product\nA,a1,Desk\nB,b1,Lamp\nC,c1,{chair:D}\nD,d1,Desk\nE,e1,\n");
+        await RunChecksAsync();
+        Assert.Equal("checked", await StateAsync(upload.Id, Tickets));
+
+        using var accepted = await CommitAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        await RunCommitsAsync();
+
+        Assert.Equal("committed", await StateAsync(upload.Id, Tickets));
+        Assert.Equal(5L, await TicketCountAsync());
+        Assert.Equal(desk, await ProductOfAsync("a1"));
+        Assert.Equal(lamp, await ProductOfAsync("b1"));
+        Assert.Equal(chair, await ProductOfAsync("c1"));
+        Assert.Equal(desk, await ProductOfAsync("d1"));
+        Assert.Null(await ProductOfAsync("e1"));
+    }
+
+    [Fact]
+    public async Task A_display_value_that_matches_no_record_or_more_than_one_fails_the_dry_run_without_repeating_the_value()
+    {
+        await ResetAsync();
+        await CreateProductAsync("Chair");
+        await CreateProductAsync("Chair");
+        await CreateProductAsync("Desk");
+        var upload = await UploadAsync(fixture.Client, Tickets, "title,code,product\nA,a1,Chair\nB,b1,Nothing\nC,c1,Desk\nD,d1,desk\n");
+
+        await RunChecksAsync();
+
+        using var failed = await GetAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        var errors = failed.RootElement.GetProperty("errors");
+        Assert.Equal(
+            ["/rows/1/values/product", "/rows/2/values/product", "/rows/4/values/product"],
+            errors.EnumerateObject().Select(error => error.Name));
+        Assert.Equal("Matches more than one record by its display value.", errors.GetProperty("/rows/1/values/product")[0].GetString());
+        Assert.Equal("Matches no record by its display value.", errors.GetProperty("/rows/2/values/product")[0].GetString());
+        Assert.DoesNotContain("Chair", errors.GetRawText());
+        Assert.DoesNotContain("Nothing", errors.GetRawText());
+        Assert.Equal(0L, await TicketCountAsync());
+    }
+
+    [Fact]
+    public async Task A_display_value_is_not_looked_up_for_an_uploader_who_may_not_read_the_targets_display_field()
+    {
+        await ResetAsync();
+        await CreateProductAsync("Desk");
+        var upload = await UploadAsync(fixture.Client, Tickets, "title,code,product\nA,a1,Desk\n");
+        await fixture.ExecuteAsync(TenantA, "UPDATE axis.record_imports SET uploader_roles = '{filtered}'");
+
+        await RunChecksAsync();
+
+        using var failed = await GetAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        var error = Assert.Single(failed.RootElement.GetProperty("errors").EnumerateObject());
+        Assert.Equal("/rows/1/values/product", error.Name);
+        Assert.DoesNotContain("display value", error.Value[0].GetString());
+    }
+
+    [Fact]
     public async Task A_row_that_fails_at_write_time_rolls_back_every_row_and_fails_the_import_with_that_rows_errors()
     {
         await ResetAsync();
@@ -462,6 +528,17 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
             return EntityNaming.QualifiedTable(EntityNaming.Table(ticket.Id));
         }
     }
+
+    private async Task<Guid> CreateProductAsync(string name)
+    {
+        using var response = await SendAsync(fixture.Client, HttpMethod.Post, Products, $$"""{ "values": { "name": "{{name}}" } }""", "application/json");
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var created = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return created.RootElement.GetProperty("id").GetGuid();
+    }
+
+    private async Task<Guid?> ProductOfAsync(string code) =>
+        await fixture.ScalarAsync(TenantA, $"SELECT f_product FROM {TicketTable} WHERE f_code = '{code}'") as Guid?;
 
     private async Task<long> TicketCountAsync(string? where = null) =>
         (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM {TicketTable}{(where is null ? "" : $" WHERE {where}")}"))!;
