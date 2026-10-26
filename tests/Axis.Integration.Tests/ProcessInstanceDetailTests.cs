@@ -20,11 +20,13 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "graph", "path", "tasks", "calls", "commands"],
+            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("Break", root.GetProperty("process").GetString());
         Assert.Equal("failed", root.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("parent").ValueKind);
+        Assert.Empty(root.GetProperty("subProcesses").EnumerateArray());
         Assert.Equal(DateTimeKind.Utc, root.GetProperty("createdAt").GetDateTime().Kind);
         var path = Assert.Single(root.GetProperty("path").EnumerateArray());
         Assert.Equal(
@@ -114,6 +116,74 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Empty(steps[1].GetProperty("transitions").EnumerateArray());
         Assert.Empty(root.GetProperty("path").EnumerateArray());
         Assert.Empty(root.GetProperty("tasks").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_parent_lists_its_sub_processes_and_each_sub_process_names_its_parent()
+    {
+        var parent = await StartAndRunAsync(TenantA, "RoleApprove");
+        var first = await StartChildAsync(TenantA, "Decide", parent, "fulfil");
+        var second = await StartChildAsync(TenantA, "Decide", parent, "fulfil");
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_instances SET state = 'failed', ended_at = now() WHERE id = @id",
+            ("id", second));
+
+        using var body = await GetOkAsync(TenantA, "RoleApprove", parent);
+
+        var items = body.RootElement.GetProperty("subProcesses").EnumerateArray().ToList();
+        Assert.Equal([first, second], items.Select(item => item.GetProperty("id").GetGuid()));
+        Assert.All(
+            items,
+            item =>
+            {
+                Assert.Equal(
+                    ["id", "process", "step", "state", "createdAt", "endedAt"],
+                    item.EnumerateObject().Select(property => property.Name));
+                Assert.Equal("Decide", item.GetProperty("process").GetString());
+                Assert.Equal("fulfil", item.GetProperty("step").GetString());
+                Assert.Equal(DateTimeKind.Utc, item.GetProperty("createdAt").GetDateTime().Kind);
+            });
+        Assert.Equal(["running", "failed"], items.Select(item => item.GetProperty("state").GetString()));
+        Assert.Equal(JsonValueKind.Null, items.Single(item => item.GetProperty("id").GetGuid() == first).GetProperty("endedAt").ValueKind);
+        Assert.Equal(JsonValueKind.String, items.Single(item => item.GetProperty("id").GetGuid() == second).GetProperty("endedAt").ValueKind);
+
+        using var child = await GetOkAsync(TenantA, "Decide", first);
+        var named = child.RootElement.GetProperty("parent");
+        Assert.Equal(["id", "process", "step"], named.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(parent, named.GetProperty("id").GetGuid());
+        Assert.Equal("RoleApprove", named.GetProperty("process").GetString());
+        Assert.Equal("fulfil", named.GetProperty("step").GetString());
+        Assert.Empty(child.RootElement.GetProperty("subProcesses").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_sub_process_of_a_process_the_user_may_not_inspect_is_left_out()
+    {
+        var parent = await StartAndRunAsync(TenantA, "RoleApprove");
+        var child = await StartChildAsync(TenantA, "Rework", parent, "fulfil");
+
+        using var hidden = await GetOkAsync(TenantA, "RoleApprove", parent, "ines");
+        using var shown = await GetOkAsync(TenantA, "RoleApprove", parent, "lena");
+
+        Assert.Empty(hidden.RootElement.GetProperty("subProcesses").EnumerateArray());
+        var item = Assert.Single(shown.RootElement.GetProperty("subProcesses").EnumerateArray());
+        Assert.Equal(child, item.GetProperty("id").GetGuid());
+        Assert.Equal("Rework", item.GetProperty("process").GetString());
+    }
+
+    [Fact]
+    public async Task A_parent_of_a_process_the_user_may_not_inspect_shows_as_null()
+    {
+        var parent = await fixture.StartAsync(TenantA, "Rework", await fixture.InsertRequestAsync(TenantA, null));
+        var child = await StartChildAsync(TenantA, "Decide", parent, "fulfil");
+
+        using var hidden = await GetOkAsync(TenantA, "Decide", child, "ines");
+        using var shown = await GetOkAsync(TenantA, "Decide", child, "lena");
+
+        Assert.Equal(JsonValueKind.Null, hidden.RootElement.GetProperty("parent").ValueKind);
+        Assert.Equal(parent, shown.RootElement.GetProperty("parent").GetProperty("id").GetGuid());
+        Assert.Equal("Rework", shown.RootElement.GetProperty("parent").GetProperty("process").GetString());
     }
 
     [Fact]
@@ -325,6 +395,21 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         step.GetProperty("transitions").EnumerateArray()
             .Select(transition => (transition.GetProperty("next").GetString(), transition.GetProperty("on").GetString()))
             .ToList();
+
+    // Starts an instance of the process on a new request and links it as a sub-process of the parent instance.
+    // StepApp has no sub-process step, so the link is written as the engine would write it.
+    private async Task<Guid> StartChildAsync(string tenant, string process, Guid parent, string step)
+    {
+        var subject = await fixture.InsertRequestAsync(tenant, null);
+        var child = await fixture.StartAsync(tenant, process, subject);
+        await fixture.ExecuteAsync(
+            tenant,
+            "UPDATE axis.process_instances SET parent_instance_id = @parent, parent_step = @step WHERE id = @id",
+            ("parent", parent),
+            ("step", step),
+            ("id", child));
+        return child;
+    }
 
     private async Task<Guid> StartAndRunAsync(string tenant, string process)
     {
