@@ -487,7 +487,7 @@ public static partial class RecordInputParser
             FieldType.Date => ReadDate(element, field, out value),
             FieldType.DateTime => ReadDateTime(element, field, out value),
             FieldType.Enum => ReadEnum(element, field, out value),
-            FieldType.Reference => ReadReference(element, out value),
+            FieldType.Reference or FieldType.File => ReadReference(element, out value),
             _ => throw new ArgumentOutOfRangeException(nameof(field), field.Type, "Unknown field type."),
         };
     }

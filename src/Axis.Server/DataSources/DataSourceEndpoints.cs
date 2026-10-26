@@ -294,8 +294,8 @@ internal static class DataSourceEndpoints
         }
     }
 
-    // The columns of a row in the order the row holds them. A count is an integer, a sum a decimal, and a
-    // minimum or maximum has the type of its field.
+    // The columns of a row in the order the row holds them. A count or a count of distinct values is an
+    // integer, a sum or an average a decimal, and a minimum or maximum has the type of its field.
     private static List<ExportColumn> ExportColumns(DataSourceModel model) =>
         model.Aggregate is { } aggregate
             ?
@@ -305,8 +305,8 @@ internal static class DataSourceEndpoints
                     measure.Name,
                     measure.Function switch
                     {
-                        AggregateFunction.Count => FieldType.Integer,
-                        AggregateFunction.Sum => FieldType.Decimal,
+                        AggregateFunction.Count or AggregateFunction.CountDistinct => FieldType.Integer,
+                        AggregateFunction.Sum or AggregateFunction.Avg => FieldType.Decimal,
                         _ => measure.Field!.Field.Type,
                     })),
             ]

@@ -378,7 +378,7 @@ reported in one pass. See
   or any task property (`AXC0004`).
 - A timer has `next`, and no `branches`, `otherwise`, `operation`, `set`,
   `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` or any task
-  property (`AXC0004`). It has exactly one of `wait` and `until` (`AXC0277` at
+  property (`AXC0004`). It has exactly one of `wait` and `until` (`AXC0278` at
   `/steps/{i}`). A `wait` is a positive fixed-length duration, by the rule of a
   task's `dueIn` (`AXC0084` at `/steps/{i}/wait`). An `until` gives a
   `date-time`, with the same scope as a `when`. A problem is reported at

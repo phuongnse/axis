@@ -17,6 +17,7 @@
     { "entity": "Expense", "actions": ["read", "create", "update", "delete"] },
     { "dataSource": "ActiveItems", "actions": ["read"] },
     { "dataSource": "ItemTotalsByDepartment", "actions": ["read"] },
+    { "dataSource": "ItemAveragesByDepartment", "actions": ["read"] },
     { "dataSource": "ItemTotals", "actions": ["read"] },
     { "dataSource": "ItemTotalsInDepartment", "actions": ["read"] },
     { "dataSource": "ItemCountsByDepartment", "actions": ["read"] },

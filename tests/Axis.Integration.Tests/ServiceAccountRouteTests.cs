@@ -12,7 +12,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// A service account's bearer token reaches only the routes marked with <see cref="ServiceAccountRoute"/>, the record,
-/// data source rows, process start and process inspection routes, and the endpoint routes, which take their own token. The test reads every <c>/api</c> route from the
+/// data source rows, process start and process inspection routes, the file upload routes, and the endpoint routes, which take their own token. The test reads every <c>/api</c> route from the
 /// server's endpoint data source, so a new route that accepts the token by mistake fails it. The database is
 /// unreachable, so a request that reaches it fails the test.
 /// </summary>
@@ -64,6 +64,8 @@ public sealed class ServiceAccountRouteTests(KeycloakFixture keycloak) : IAsyncL
                 "POST /api/apps/{app}/processes/{process}/instances",
                 "GET /api/apps/{app}/processes/{process}/instances",
                 "GET /api/apps/{app}/processes/{process}/instances/{id}",
+                "POST /api/apps/{app}/entities/{entity}/fields/{field}/files",
+                "POST /api/apps/{app}/entities/{entity}/fields/{collection}/{field}/files",
             ])
             .Order(StringComparer.Ordinal);
 

@@ -33,6 +33,26 @@ public sealed class ProcessWithoutSubjectTests(ProcessStepFixture fixture) : ICl
         }
         """;
 
+    private const string Dated = """
+        {
+          "id": "7e3a9c1d-5b2f-4d68-a014-9c8b7a6d5e43",
+          "kind": "process",
+          "name": "Dated",
+          "formatVersion": 1,
+          "parameters": [{ "name": "days", "type": "integer" }],
+          "startCondition": {
+            "expression": "days > 0 and today() > date('2000-01-01')",
+            "message": { "textKey": "request.amountNegative" }
+          },
+          "start": "check",
+          "steps": [
+            { "name": "check", "type": "decision", "branches": [{ "when": "toDate(now()) > date('2000-01-01')", "next": "late" }], "otherwise": "early" },
+            { "name": "late", "type": "end" },
+            { "name": "early", "type": "end" }
+          ]
+        }
+        """;
+
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -99,13 +119,30 @@ public sealed class ProcessWithoutSubjectTests(ProcessStepFixture fixture) : ICl
         Assert.Equal(audits, await StartedAuditCountAsync(model));
     }
 
+    [Fact]
+    public async Task A_start_condition_and_a_decision_over_the_parameters_can_use_today_and_to_date()
+    {
+        var (releaseId, model) = await fixture.ActivateCopyWithFilesAsync(("processes/dated.json", Dated));
+
+        var (result, instanceId) = await StartAsync(model, releaseId, 1, "Dated");
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal(ProcessStartOutcome.Started, result.Outcome);
+        Assert.Null(result.ErrorKind);
+        var instance = await fixture.InstanceAsync(instanceId);
+        Assert.Equal(("completed", "late", true), (instance.State, instance.Step, instance.Ended));
+        var history = await fixture.HistoryAsync(instanceId);
+        Assert.Equal(["check", "late"], history.Select(row => row.Step));
+        Assert.All(history, row => Assert.Null(row.Error));
+    }
+
     private async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync() =>
         await fixture.ActivateCopyWithFilesAsync(("processes/tally.json", Tally));
 
-    /// <summary>Starts <c>Tally</c> with <paramref name="days"/> in its own transaction and commits it.</summary>
-    private async Task<(ProcessStartResult Result, Guid InstanceId)> StartAsync(ApplicationModel model, Guid releaseId, long days)
+    /// <summary>Starts <paramref name="processName"/> with <paramref name="days"/> in its own transaction and commits it.</summary>
+    private async Task<(ProcessStartResult Result, Guid InstanceId)> StartAsync(ApplicationModel model, Guid releaseId, long days, string processName = "Tally")
     {
-        Assert.True(model.TryGetProcess("Tally", out var process));
+        Assert.True(model.TryGetProcess(processName, out var process));
         var instanceId = Guid.CreateVersion7();
         await using var connection = await fixture.DataSource.OpenConnectionAsync(CancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(CancellationToken);

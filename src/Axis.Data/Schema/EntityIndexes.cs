@@ -50,4 +50,15 @@ internal static class EntityIndexes
 
         return indexes;
     }
+
+    /// <summary>
+    /// The statement that creates <paramref name="index"/> on <paramref name="table"/>. With <paramref name="concurrently"/>
+    /// it does not block writes to the table, and it cannot run in a transaction block.
+    /// </summary>
+    public static string CreateSql(string table, ExpectedIndex index, bool concurrently = false) =>
+        $"CREATE {(index.Unique ? "UNIQUE " : "")}INDEX {(concurrently ? "CONCURRENTLY " : "")}{EntityNaming.Quote(index.Name)} ON {EntityNaming.QualifiedTable(table)} ({string.Join(", ", index.Columns.Select(EntityNaming.Quote))})";
+
+    /// <summary>The statement that drops the index <paramref name="name"/>. Concurrently, it cannot run in a transaction block.</summary>
+    public static string DropSql(string name, bool concurrently = false) =>
+        $"DROP INDEX {(concurrently ? "CONCURRENTLY " : "")}{EntityNaming.Quote(EntityNaming.Schema)}.{EntityNaming.Quote(name)}";
 }
