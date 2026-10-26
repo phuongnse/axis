@@ -6,7 +6,7 @@ public enum TriggerType
     /// <summary>A raised event.</summary>
     Event,
 
-    /// <summary>A record of the process's subject entity that was created or updated.</summary>
+    /// <summary>A record of the process's subject entity that was created or updated, or a record of the entity that was deleted, which starts a process without a subject.</summary>
     DataChange,
 
     /// <summary>A cron schedule, for each row of a data source, or for a scheduled job without a data source, once.</summary>
@@ -24,6 +24,9 @@ public enum DataChangeKinds
 
     /// <summary>A record is updated.</summary>
     Update = 2,
+
+    /// <summary>A record is deleted.</summary>
+    Delete = 4,
 }
 
 /// <summary>How a trigger starts its process.</summary>
@@ -40,9 +43,11 @@ public enum TriggerMode
 /// A compiled trigger: it starts a process when something happens. An event trigger starts the
 /// process for the record a raised event names, either later in async mode or in the raising
 /// step's transaction in sync mode. A data change trigger starts it for a record that was created
-/// or updated. Data change triggers fire on record API creates and updates and on an inbound
-/// endpoint's create. A schedule trigger starts it on a cron schedule in its own time zone, for each
-/// row of a data source with fixed parameter values. The worker runs the occurrences.
+/// or updated, or, for a delete trigger, a process without a subject for a record that was deleted. Data
+/// change triggers fire on record API creates and updates and on an inbound endpoint's create. A delete
+/// trigger fires on a delete through the record command. A schedule trigger starts it on a cron schedule
+/// in its own time zone, for each row of a data source with fixed parameter values. The worker runs the
+/// occurrences.
 /// </summary>
 public sealed record TriggerModel
 {
@@ -70,11 +75,17 @@ public sealed record TriggerModel
     /// <summary>The declared names of the fields whose change starts the trigger, or null when a change to any field does. It is set for a data change trigger only.</summary>
     public IReadOnlyList<string>? Fields { get; init; }
 
-    /// <summary>The process the trigger starts. Its subject entity is the event's or the watched entity.</summary>
+    /// <summary>The process the trigger starts. Its subject entity is the event's or the watched entity, and a delete trigger's process has none.</summary>
     public required ProcessReference Process { get; init; }
 
     /// <summary>The boolean condition over the event's payload fields or over the watched record, or null when every occurrence starts the process.</summary>
     public ExpressionModel? When { get; init; }
+
+    /// <summary>
+    /// The expressions that give the process's parameters from the deleted record, by declared name, in the
+    /// declaration order of the process. It is set for a delete trigger only.
+    /// </summary>
+    public IReadOnlyDictionary<string, ExpressionModel>? ParameterExpressions { get; init; }
 
     /// <summary>The cron of a schedule trigger. It is set for a schedule trigger only.</summary>
     public CronSchedule? Schedule { get; init; }

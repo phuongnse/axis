@@ -18,7 +18,7 @@ internal static class ProcessParameters
 
     /// <summary>
     /// Maps the CLR <paramref name="values"/> of a trigger, by parameter name ignoring letter case, to the
-    /// stored JSON form of each parameter the process declares. Returns null when a value is missing or
+    /// stored JSON form of each parameter the process declares. An integer fills a decimal parameter. Returns null when a value is missing or
     /// its type does not fit the parameter's type.
     /// </summary>
     public static JsonObject? ToJson(ProcessModel process, IReadOnlyDictionary<string, object?> values)
@@ -34,6 +34,8 @@ internal static class ProcessParameters
                 (FieldType.Text, string text) => JsonValue.Create(text),
                 (FieldType.Integer, long number) => JsonValue.Create(number),
                 (FieldType.Decimal, decimal number) => JsonValue.Create(number),
+                // The checker lets an integer expression fill a decimal parameter, and the interpreter gives a long.
+                (FieldType.Decimal, long number) => JsonValue.Create((decimal)number),
                 (FieldType.Boolean, bool flag) => JsonValue.Create(flag),
                 (FieldType.Date, DateOnly date) => JsonValue.Create(date.ToString(DateFormat, CultureInfo.InvariantCulture)),
                 (FieldType.DateTime, DateTimeOffset time) => JsonValue.Create(time.UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture)),

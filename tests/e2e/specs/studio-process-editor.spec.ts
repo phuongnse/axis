@@ -231,7 +231,8 @@ test.describe('Studio edits a process in the process editor', () => {
 
       await page.getByRole('tab', { name: 'Design', exact: true }).click()
       await page.getByRole('button', { name: 'Undo', exact: true }).click()
-      await expect(page.getByRole('button', { name: 'markReturned · operation', exact: true })).toBeVisible()
+      // The save marked steps by the saved file's numbers, so the restored node may carry another node's mark.
+      await expect(page.getByTestId(`studio-graph-node-${removed}`)).toHaveAccessibleName(/^markReturned · operation/)
     } finally {
       await writeFile(target, original)
     }

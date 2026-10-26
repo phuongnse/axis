@@ -42,18 +42,25 @@ public sealed record ProcessCancelResult(
     Guid? SubjectId = null);
 
 /// <summary>
-/// Cancels a <c>running</c> or <c>waiting</c> instance in the caller's transaction. The user's
-/// <c>cancel</c> grant is the caller's check. The instance's subject record must be readable by
-/// the user, or the instance does not exist for them. When a <c>read</c> filter of the user reads a
-/// computed field that is being recomputed, the cancel is refused first, before the instance is found.
-/// The statements run in one order: the
-/// instance's open tasks, then the instance, then its connector and package calls. A task
-/// completion locks its task before the instance, so locking the instance first would deadlock
-/// with it. A call that is <c>sending</c> or <c>unknown</c> may have reached the other system, and
-/// stops the cancel. Otherwise the instance becomes <c>cancelled</c> at the next revision, which
+/// Cancels a <c>running</c> or <c>waiting</c> instance, and its running or waiting sub-processes, in the
+/// caller's transaction. The user's <c>cancel</c> grant is the caller's check. The instance's subject
+/// record must be readable by the user, or the instance does not exist for them. When a <c>read</c>
+/// filter of the user reads a computed field that is being recomputed, the cancel is refused first,
+/// before the instance is found.
+/// The statements run in one order. An instance that has a parent locks the parent row first, so a
+/// cancel of a child and a cancel of its parent meet on the parent. Then come the instance's open
+/// tasks, the instance, and its connector and package calls. A task completion locks its task before
+/// the instance, so locking the instance first would deadlock with it. The cancel repeats tasks, instance
+/// and calls for each running or waiting child, depth first, before it writes anything. A call that is
+/// <c>sending</c> or <c>unknown</c> in the instance or in any child may have reached the other system, and
+/// stops the cancel. Otherwise each instance becomes <c>cancelled</c> at the next revision, which
 /// fences a step a worker already loaded. Its open tasks become <c>cancelled</c> with no outcome.
 /// Its <c>pending</c> calls become <c>cancelled</c> and their stored input is cleared. Its work
-/// items are deleted. A history row and the audit record <c>process.cancelled</c> are written.
+/// items are deleted. A history row and the audit record <c>process.cancelled</c> are written, with
+/// the same user and reason for every instance of the tree. When the cancelled instance is a child and
+/// its parent is <c>waiting</c> on the sub-process step for this child, the parent fails with a fixed error,
+/// a history row and the audit record <c>process.failed</c> as <c>system</c>. A parent that is being
+/// cancelled is not <c>waiting</c>, so it ends as <c>cancelled</c>.
 /// The command never commits or rolls back. A result other than <see cref="ProcessCancelOutcome.Cancelled"/>
 /// may have locked rows, so the caller rolls back.
 /// </summary>
@@ -93,18 +100,25 @@ public static class ProcessCancelCommand
             return new ProcessCancelResult(ProcessCancelOutcome.PendingFilter);
         }
 
-        // The open tasks come first, because a task completion locks its task and then the instance.
+        // The parent comes first, because a cancel of the parent locks the parent and then the child.
+        var parentId = await ReadParentAsync(transaction, instanceId, cancellationToken);
+        var parent = parentId is { } id ? await LockParentAsync(transaction, id, cancellationToken) : null;
+
+        // The open tasks come next, because a task completion locks its task and then the instance.
         await LockOpenTasksAsync(transaction, instanceId, cancellationToken);
 
         var instance = await LockInstanceAsync(transaction, instanceId, cancellationToken);
-        if (instance is null || instance.ApplicationId != active.Manifest.Id || instance.ProcessId != process.Id)
+
+        // An instance of a process without a subject is not found here until inspection and operator
+        // support for it are built. The cascade still cancels such a child.
+        if (instance is not { SubjectId: { } subjectId } || instance.ApplicationId != active.Manifest.Id || instance.ProcessId != process.Id)
         {
             return new ProcessCancelResult(ProcessCancelOutcome.NotFound);
         }
 
         if (!read.Granted
             || (read.Filters is { } filters
-                && await RecordCommand.MatchAsync(connection, transaction, active, entity, instance.SubjectId, filters, userId, loggerFactory, cancellationToken)
+                && await RecordCommand.MatchAsync(connection, transaction, active, entity, subjectId, filters, userId, loggerFactory, cancellationToken)
                     is not { Found: true, Matched: true }))
         {
             return new ProcessCancelResult(ProcessCancelOutcome.NotFound);
@@ -115,23 +129,90 @@ public static class ProcessCancelCommand
             return new ProcessCancelResult(ProcessCancelOutcome.NotActive);
         }
 
-        if (await FindCallInFlightAsync(transaction, instanceId, cancellationToken) is { } inFlight)
+        var result = await CancelTreeAsync(connection, transaction, instanceId, userId, userName, reason, cancellationToken);
+        if (result.Outcome == ProcessCancelOutcome.Cancelled && parent is not null)
+        {
+            await FailParentAsync(connection, transaction, parentId!.Value, parent, instance.ParentStep, instanceId, cancellationToken);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Cancels the running or waiting instance <paramref name="instanceId"/> and its running or waiting
+    /// children, in two phases. The first locks every instance of the tree with its tasks and calls and
+    /// returns <see cref="ProcessCancelOutcome.CallInFlight"/> before any write. The second writes in lock
+    /// order. The caller has locked the instance, found it active and checked the user's access.
+    /// </summary>
+    internal static async Task<ProcessCancelResult> CancelTreeAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid instanceId,
+        string userId,
+        string userName,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var tree = new LockedTree();
+        await LockTreeAsync(transaction, instanceId, tree, cancellationToken);
+        if (tree.InFlight is { } inFlight)
         {
             return new ProcessCancelResult(ProcessCancelOutcome.CallInFlight, inFlight);
         }
 
-        var revision = await CancelInstanceAsync(transaction, instanceId, cancellationToken)
-            ?? throw new InvalidOperationException($"The locked instance '{instanceId}' could not be cancelled.");
-        var taskIds = await CancelTasksAsync(transaction, instanceId, cancellationToken);
-        var operationIds = await CancelCallsAsync(transaction, "axis.connector_calls", instanceId, cancellationToken);
-        operationIds.AddRange(await CancelCallsAsync(transaction, "axis.package_calls", instanceId, cancellationToken));
-        await DeleteWorkItemsAsync(transaction, instanceId, cancellationToken);
-
+        var root = tree.Instances.FirstOrDefault(locked => locked.Id == instanceId)
+            ?? throw new InvalidOperationException($"The locked instance '{instanceId}' is not running or waiting.");
         var startedAt = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+        foreach (var instance in tree.Instances)
+        {
+            await CancelOneAsync(transaction, instance, userId, userName, reason, startedAt, cancellationToken);
+        }
+
+        return new ProcessCancelResult(ProcessCancelOutcome.Cancelled, ReleaseId: root.ReleaseId, SubjectId: root.SubjectId);
+    }
+
+    // Locks the open tasks, the instance and its calls, then goes on with its running or waiting children.
+    private static async Task LockTreeAsync(NpgsqlTransaction transaction, Guid instanceId, LockedTree tree, CancellationToken cancellationToken)
+    {
+        await LockOpenTasksAsync(transaction, instanceId, cancellationToken);
+        var instance = await LockInstanceAsync(transaction, instanceId, cancellationToken);
+        if (instance is not { State: ProcessStarts.Running or ProcessStarts.Waiting })
+        {
+            return;
+        }
+
+        tree.Instances.Add(instance);
+        if (await FindCallInFlightAsync(transaction, instanceId, cancellationToken) is { } inFlight)
+        {
+            tree.InFlight ??= inFlight;
+        }
+
+        foreach (var childId in await FindChildrenAsync(transaction, instanceId, cancellationToken))
+        {
+            await LockTreeAsync(transaction, childId, tree, cancellationToken);
+        }
+    }
+
+    private static async Task CancelOneAsync(
+        NpgsqlTransaction transaction,
+        LockedInstance instance,
+        string userId,
+        string userName,
+        string reason,
+        DateTimeOffset startedAt,
+        CancellationToken cancellationToken)
+    {
+        var revision = await CancelInstanceAsync(transaction, instance.Id, cancellationToken)
+            ?? throw new InvalidOperationException($"The locked instance '{instance.Id}' could not be cancelled.");
+        var taskIds = await CancelTasksAsync(transaction, instance.Id, cancellationToken);
+        var operationIds = await CancelCallsAsync(transaction, "axis.connector_calls", instance.Id, cancellationToken);
+        operationIds.AddRange(await CancelCallsAsync(transaction, "axis.package_calls", instance.Id, cancellationToken));
+        await DeleteWorkItemsAsync(transaction, instance.Id, cancellationToken);
+
         await ProcessSteps.InsertHistoryAsync(
             transaction,
             new StepOccurrence(
-                instanceId,
+                instance.Id,
                 instance.Step,
                 revision,
                 new JsonObject { ["subjectId"] = instance.SubjectId, ["subjectVersion"] = null },
@@ -156,12 +237,110 @@ public static class ProcessCancelCommand
                 instance.ApplicationId,
                 instance.SubjectEntityId,
                 instance.SubjectId,
-                instanceId,
+                instance.Id,
                 details,
                 userName),
             cancellationToken);
+    }
 
-        return new ProcessCancelResult(ProcessCancelOutcome.Cancelled, ReleaseId: instance.ReleaseId, SubjectId: instance.SubjectId);
+    // Fails the parent when it waits on its sub-process step for this child. The latest history row of the step
+    // names the child it waits for, so an old child of a looped step does not fail a newer wait.
+    private static async Task FailParentAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid parentId,
+        LockedParent parent,
+        string? parentStep,
+        Guid childId,
+        CancellationToken cancellationToken)
+    {
+        if (parent.State != ProcessStarts.Waiting || parentStep is null || parent.Step != parentStep)
+        {
+            return;
+        }
+
+        var waiting = await ProcessSteps.FindLatestOutputAsync(transaction, parentId, parentStep, cancellationToken);
+        if (!Guid.TryParse(waiting?["childInstanceId"]?.GetValue<string>(), out var waitedFor) || waitedFor != childId)
+        {
+            return;
+        }
+
+        if (!await ProcessSteps.TryFailWaitingAsync(transaction, parentId, parentStep, parent.Revision, cancellationToken))
+        {
+            throw new InvalidOperationException($"The locked parent '{parentId}' could not be failed.");
+        }
+
+        var startedAt = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+        await ProcessSteps.InsertHistoryAsync(
+            transaction,
+            new StepOccurrence(
+                parentId,
+                parentStep,
+                parent.Revision,
+                new JsonObject { ["subjectId"] = parent.SubjectId, ["subjectVersion"] = null },
+                new JsonObject { ["childInstanceId"] = childId },
+                Decision: null,
+                Error: $"The sub-process of the step '{parentStep}' was cancelled.",
+                startedAt),
+            cancellationToken);
+        await AuditRecords.AppendAsync(
+            transaction,
+            new AuditEntry(
+                AuditActors.System,
+                AuditActions.ProcessFailed,
+                parent.ApplicationId,
+                parent.SubjectEntityId,
+                parent.SubjectId,
+                parentId,
+                new JsonObject { ["step"] = parentStep }),
+            cancellationToken);
+    }
+
+    private static async Task<Guid?> ReadParentAsync(NpgsqlTransaction transaction, Guid instanceId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT parent_instance_id FROM axis.process_instances WHERE id = @id",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", instanceId);
+        return await command.ExecuteScalarAsync(cancellationToken) is Guid parentId ? parentId : null;
+    }
+
+    private static async Task<LockedParent?> LockParentAsync(NpgsqlTransaction transaction, Guid parentId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT state, step, revision, application_id, subject_entity_id, subject_id
+            FROM axis.process_instances WHERE id = @id FOR UPDATE
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", parentId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new LockedParent(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetInt64(2),
+            reader.GetGuid(3),
+            reader.IsDBNull(4) ? null : reader.GetGuid(4),
+            reader.IsDBNull(5) ? null : reader.GetGuid(5));
+    }
+
+    private static async Task<List<Guid>> FindChildrenAsync(NpgsqlTransaction transaction, Guid instanceId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT id FROM axis.process_instances WHERE parent_instance_id = @id AND state IN (@running, @waiting) ORDER BY id",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", instanceId);
+        command.Parameters.AddWithValue("running", ProcessStarts.Running);
+        command.Parameters.AddWithValue("waiting", ProcessStarts.Waiting);
+        return await ReadIdsAsync(command, cancellationToken);
     }
 
     private static async Task LockOpenTasksAsync(NpgsqlTransaction transaction, Guid instanceId, CancellationToken cancellationToken)
@@ -182,7 +361,7 @@ public static class ProcessCancelCommand
     {
         await using var command = new NpgsqlCommand(
             """
-            SELECT application_id, process_id, subject_entity_id, subject_id, release_id, state, step
+            SELECT application_id, process_id, subject_entity_id, subject_id, release_id, state, step, parent_step
             FROM axis.process_instances WHERE id = @id FOR UPDATE
             """,
             Connection(transaction),
@@ -194,21 +373,16 @@ public static class ProcessCancelCommand
             return null;
         }
 
-        // An instance of a process without a subject has null subject columns. It is not found here until
-        // inspection and operator support for it are built.
-        if (reader.IsDBNull(3))
-        {
-            return null;
-        }
-
         return new LockedInstance(
+            instanceId,
             reader.GetGuid(0),
             reader.GetGuid(1),
-            reader.GetGuid(2),
-            reader.GetGuid(3),
+            reader.IsDBNull(2) ? null : reader.GetGuid(2),
+            reader.IsDBNull(3) ? null : reader.GetGuid(3),
             reader.GetGuid(4),
             reader.GetString(5),
-            reader.GetString(6));
+            reader.GetString(6),
+            reader.IsDBNull(7) ? null : reader.GetString(7));
     }
 
     // Locks every call of the instance, connector calls first, and returns the first one that may have reached the other system.
@@ -304,12 +478,31 @@ public static class ProcessCancelCommand
     private static NpgsqlConnection Connection(NpgsqlTransaction transaction) =>
         transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
 
+    // The subject ids are null for an instance of a process without a subject.
     private sealed record LockedInstance(
+        Guid Id,
         Guid ApplicationId,
         Guid ProcessId,
-        Guid SubjectEntityId,
-        Guid SubjectId,
+        Guid? SubjectEntityId,
+        Guid? SubjectId,
         Guid ReleaseId,
         string State,
-        string Step);
+        string Step,
+        string? ParentStep);
+
+    private sealed record LockedParent(
+        string State,
+        string Step,
+        long Revision,
+        Guid ApplicationId,
+        Guid? SubjectEntityId,
+        Guid? SubjectId);
+
+    // The instances to cancel in lock order, and the first call of the tree that is sending or unknown.
+    private sealed class LockedTree
+    {
+        public List<LockedInstance> Instances { get; } = [];
+
+        public Guid? InFlight { get; set; }
+    }
 }

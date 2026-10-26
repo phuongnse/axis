@@ -38,6 +38,12 @@ public sealed class ProcessInstanceRow
     /// </summary>
     public string? Parameters { get; init; }
 
+    /// <summary>The instance of the process that started this one with a sub-process step, or <see langword="null"/> for any other start.</summary>
+    public Guid? ParentInstanceId { get; init; }
+
+    /// <summary>The declared name of the sub-process step in the parent that started this instance, or <see langword="null"/> when it has no parent.</summary>
+    public string? ParentStep { get; init; }
+
     public DateTimeOffset CreatedAt { get; init; }
 
     /// <summary>When the instance became <c>completed</c> or <c>failed</c>, or <see langword="null"/> while it has not ended.</summary>

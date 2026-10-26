@@ -56,7 +56,7 @@ namespace Axis.Server.Records;
 /// "Required." wins over a validation message on the same field), then storage (404, 409). An
 /// update of an entity with computed fields or validations, or with a form that has
 /// <c>requiredWhen</c> conditions, reads the stored record first, so an unknown record is a 404 there.
-/// A create or update that finds a different active release under the start lock runs again from
+/// A create, update or delete that finds a different active release under the start lock runs again from
 /// the path check on the new release, and answers 503 after three attempts. Nothing is written by
 /// an attempt that finds a change.
 /// A delete is 204, or 404 or 409 from storage. It is also a 409 when a running or waiting process works on
@@ -486,6 +486,7 @@ internal static class RecordEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -494,20 +495,32 @@ internal static class RecordEndpoints
             return Grants.SignInRequired(httpContext);
         }
 
-        var (application, model, notFound, _) = await ResolveEntityAsync(app, EntityName(httpContext, entity), resolver, cancellationToken);
-        if (model is null)
+        // A release change under the start lock sends the delete back to resolution, so the delete triggers come from the new release.
+        for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            return notFound!;
+            var (application, model, notFound, releaseId) = await ResolveEntityAsync(app, EntityName(httpContext, entity), resolver, cancellationToken);
+            if (model is null)
+            {
+                return notFound!;
+            }
+
+            if (!TryParseId(id, out var recordId))
+            {
+                return UnparsedId(application!, user, model, PolicyAction.Delete);
+            }
+
+            var connection = await database.GetConnectionAsync(cancellationToken);
+            var result = await RecordCommand.DeleteAsync(
+                connection, TenantId(tenants), application!, releaseId, model, recordId, Actor(user), loggerFactory, cancellationToken);
+            if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
+            {
+                continue;
+            }
+
+            return result.Outcome == RecordCommandOutcome.Deleted ? Results.NoContent() : WriteFailure(result);
         }
 
-        if (!TryParseId(id, out var recordId))
-        {
-            return UnparsedId(application!, user, model, PolicyAction.Delete);
-        }
-
-        var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await RecordCommand.DeleteAsync(connection, application!, model, recordId, Actor(user), loggerFactory, cancellationToken);
-        return result.Outcome == RecordCommandOutcome.Deleted ? Results.NoContent() : WriteFailure(result);
+        return ReleaseRetry.Changed();
     }
 
     private static RecordActor Actor(CurrentUserResponse user) => new(user.Id, user.DisplayName, user.Roles);
