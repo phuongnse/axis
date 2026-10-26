@@ -339,7 +339,7 @@ public static class ApplicationSites
         ApplicationModel application, DataSourceFieldModel column, IEnumerable<DataSourceFieldModel> siblings) =>
         new(
             column.Name,
-            FieldTypes.Name(column.Field.Type),
+            FieldTypes.Name(column.ValueType),
             column.Field.Label?.TextKey,
             column.Field.Values,
             LabelKeys(column.Field.Values, column.Field.ValueLabels),

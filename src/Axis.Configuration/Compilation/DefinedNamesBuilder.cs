@@ -87,9 +87,12 @@ internal static class DefinedNamesBuilder
         }
 
         var columns = new List<DefinedColumn>();
-        foreach (var name in aggregate.GroupBy)
+        foreach (var group in aggregate.GroupBy)
         {
-            columns.Add(fields.Find(field => field.Name == name) ?? new DefinedColumn(name, null));
+            var column = fields.Find(field => field.Name == group.Field) ?? new DefinedColumn(group.Field, null);
+
+            // A bucketed group holds the first date of its bucket, so it is a date whatever the field is.
+            columns.Add(group.Bucket is not null && column.Type is not null ? column with { Type = "date" } : column);
         }
 
         foreach (var measure in aggregate.Measures)
@@ -111,7 +114,7 @@ internal static class DefinedNamesBuilder
             ModuleOf(dataSource),
             [.. parameters],
             columns,
-            [.. aggregate.GroupBy]);
+            [.. aggregate.GroupBy.Select(group => group.Field)]);
     }
 
     private static List<DefinedText> Texts(IReadOnlyList<TextResource> texts, ReferenceIndex index)
