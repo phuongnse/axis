@@ -199,7 +199,7 @@ public static class RecordCommand
             }
 
             var computed = prepared.Computed!;
-            result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, cancellationToken: cancellationToken);
+            result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cancellationToken: cancellationToken);
             var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
             var outside = written is not null
                 && !await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken);
@@ -437,7 +437,7 @@ public static class RecordCommand
                 before = await RecordQueries.GetAsync(connection, application, model, recordId, cancellationToken);
             }
 
-            result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cancellationToken);
+            result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cancellationToken: cancellationToken);
             var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
             var outside = written is not null
                 && !await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken);

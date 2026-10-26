@@ -1,5 +1,6 @@
 using System.Globalization;
 using Axis.Configuration.Model;
+using Axis.Data.Files;
 using Axis.Data.Naming;
 using Npgsql;
 using NpgsqlTypes;
@@ -31,6 +32,10 @@ public static class RecordCommands
     /// create returns before it touches a counter. The caller must hold a transaction when
     /// <paramref name="rows"/> or <paramref name="links"/> is not empty or the entity has a sequence field, and roll it back
     /// unless the record is <see cref="RecordWriteOutcome.Written"/>, which hands the number back.
+    /// A file value also needs the caller's transaction: the file is attached to the record after the
+    /// reference check. It must be a pending file that <paramref name="uploader"/> uploaded for the same
+    /// entity and field path. Without an <paramref name="uploader"/> nothing attaches, so any file id is
+    /// <see cref="RecordWriteOutcome.Invalid"/>.
     /// </summary>
     public static async Task<RecordWriteResult> CreateAsync(
         NpgsqlConnection connection,
@@ -41,6 +46,7 @@ public static class RecordCommands
         IReadOnlyList<RecordRows> rows,
         IReadOnlyList<RecordLinks>? links = null,
         Guid? id = null,
+        string? uploader = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -55,9 +61,15 @@ public static class RecordCommands
             return missing;
         }
 
+        var recordId = id ?? Guid.CreateVersion7();
+        if (await AttachFilesAsync(connection, application, entity, recordId, uploader, values, rows, cancellationToken) is { } refused)
+        {
+            return refused;
+        }
+
         values = await WithSequenceNumbersAsync(connection, application, entity, values, cancellationToken);
         await using var command = new NpgsqlCommand { Connection = connection };
-        command.Parameters.AddWithValue("id", id ?? Guid.CreateVersion7());
+        command.Parameters.AddWithValue("id", recordId);
         command.Parameters.AddWithValue("release", releaseId);
         var columns = new List<string>
         {
@@ -93,6 +105,11 @@ public static class RecordCommands
     /// no values, no rows and no links only increments the version. The caller must hold a transaction when
     /// <paramref name="rows"/> or <paramref name="links"/> is not empty, and roll it back unless the record is
     /// <see cref="RecordWriteOutcome.Written"/>.
+    /// A file value also needs the caller's transaction: the file is attached to the record after the
+    /// reference check. It must be a pending file that <paramref name="uploader"/> uploaded for the same
+    /// entity and field path, or a file already attached to this record at that path, which is kept.
+    /// Without an <paramref name="uploader"/> nothing new attaches, so any other file id is
+    /// <see cref="RecordWriteOutcome.Invalid"/>.
     /// </summary>
     public static async Task<RecordWriteResult> UpdateAsync(
         NpgsqlConnection connection,
@@ -104,6 +121,7 @@ public static class RecordCommands
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
         IReadOnlyList<RecordLinks>? links = null,
+        string? uploader = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -116,6 +134,11 @@ public static class RecordCommands
         if (await FindMissingReferencesAsync(connection, values, rows, links, cancellationToken) is { } missing)
         {
             return missing;
+        }
+
+        if (await AttachFilesAsync(connection, application, entity, id, uploader, values, rows, cancellationToken) is { } refused)
+        {
+            return refused;
         }
 
         var table = RecordQueries.Table(entity);
@@ -628,6 +651,82 @@ public static class RecordCommands
         return errors.Count > 0 ? new RecordWriteResult(RecordWriteOutcome.MissingReference, Errors: errors) : null;
     }
 
+    /// <summary>
+    /// Attaches every non-null file value of the owner and of each row of <paramref name="rows"/> to
+    /// the record <paramref name="recordId"/>, even a file of a child row, in one statement. A file
+    /// that does not attach, such as an unknown, foreign or elsewhere-attached id, and a file id that
+    /// an earlier cell already holds, is <see cref="RecordWriteOutcome.Invalid"/> at its cell, such
+    /// as <c>/values/attachments/0/file</c>. Returns null when every file attached or there is none.
+    /// </summary>
+    private static async Task<RecordWriteResult?> AttachFilesAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        EntityModel entity,
+        Guid recordId,
+        string? uploader,
+        IReadOnlyList<RecordValue> values,
+        IReadOnlyList<RecordRows> rows,
+        CancellationToken cancellationToken)
+    {
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var cells = new List<(string Pointer, Guid Id, Guid EntityId, string Path)>();
+        var seen = new HashSet<Guid>();
+
+        void Collect(RecordValue value, string pointer, Guid entityId, string path)
+        {
+            if (value is not { Field.Type: FieldType.File, Value: Guid file })
+            {
+                return;
+            }
+
+            if (seen.Add(file))
+            {
+                cells.Add((pointer, file, entityId, path));
+            }
+            else
+            {
+                errors[pointer] = [Messages.UnknownFile];
+            }
+        }
+
+        foreach (var value in values)
+        {
+            Collect(value, ValuesPointer + value.Field.Name, entity.Id, value.Field.Name);
+        }
+
+        foreach (var collection in rows)
+        {
+            for (var position = 0; position < collection.Rows.Count; position++)
+            {
+                foreach (var value in collection.Rows[position])
+                {
+                    Collect(
+                        value,
+                        string.Create(CultureInfo.InvariantCulture, $"{ValuesPointer}{collection.Collection.Name}/{position}/{value.Field.Name}"),
+                        collection.Child.Id,
+                        $"{collection.Collection.Name}/{value.Field.Name}");
+                }
+            }
+        }
+
+        if (cells.Count > 0)
+        {
+            var attached = await FileStore.AttachAsync(
+                connection,
+                application.Manifest.Id,
+                recordId,
+                uploader,
+                [.. cells.Select(cell => (cell.Id, cell.EntityId, cell.Path))],
+                cancellationToken);
+            foreach (var cell in cells.Where(cell => !attached.Contains(cell.Id)))
+            {
+                errors[cell.Pointer] = [Messages.UnknownFile];
+            }
+        }
+
+        return errors.Count > 0 ? new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: errors) : null;
+    }
+
     private static async Task AddMissingLinksAsync(
         NpgsqlConnection connection,
         RecordLinks links,
@@ -719,7 +818,7 @@ public static class RecordCommands
             FieldType.Boolean => NpgsqlDbType.Boolean,
             FieldType.Date => NpgsqlDbType.Date,
             FieldType.DateTime => NpgsqlDbType.TimestampTz,
-            FieldType.Reference => NpgsqlDbType.Uuid,
+            FieldType.Reference or FieldType.File => NpgsqlDbType.Uuid,
             _ => throw new ArgumentOutOfRangeException(nameof(value), value.Field.Type, "Unknown field type."),
         };
         command.Parameters.Add(new NpgsqlParameter(name, type) { Value = value.Value ?? DBNull.Value });

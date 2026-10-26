@@ -64,6 +64,8 @@ public sealed class RecordApiFixture : IAsyncLifetime
     private WebApplicationFactory<Program>? _factory;
     private HttpClient? _client;
     private ApplicationModel? _model;
+    private ApplicationModel? _filesModel;
+    private Guid _filesReleaseId;
 
     public HttpClient Client => _client ?? throw new InvalidOperationException("The test host is not started.");
 
@@ -78,6 +80,12 @@ public sealed class RecordApiFixture : IAsyncLifetime
 
     /// <summary>The compiled model of the RecordsApp fixture, the same in both tenants.</summary>
     public ApplicationModel Model => _model ?? throw new InvalidOperationException("The fixture is not initialized.");
+
+    /// <summary>The compiled model of the FilesApp fixture, which is active in tenant A.</summary>
+    public ApplicationModel FilesModel => _filesModel ?? throw new InvalidOperationException("The fixture is not initialized.");
+
+    /// <summary>The id of the active release of the FilesApp fixture in tenant A.</summary>
+    public Guid FilesReleaseId => _filesReleaseId;
 
     /// <summary>The name of an application compiled in tenant A but never activated.</summary>
     public string DormantApp { get; } = $"Dormant{Guid.NewGuid():N}";
@@ -131,6 +139,8 @@ public sealed class RecordApiFixture : IAsyncLifetime
                 Assert.Empty(files.Diagnostics);
                 var filesActivated = await ReleaseActivator.ActivateAsync(files, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance);
                 Assert.Empty(filesActivated.Diagnostics);
+                _filesModel = files.Model;
+                _filesReleaseId = files.Release!.Id;
 
                 using var dormant = new TemporaryFolder().With(
                     "application.json",
