@@ -9,7 +9,9 @@ namespace Axis.Configuration.Compilation;
 /// with its expression type. A computed field is left out when <c>includeComputed</c> is false,
 /// as for the expression of a computed field. A repeated name keeps its first field, ignoring
 /// letter case. When a child lookup is given, each child collection whose child entity it finds
-/// is a collection an aggregate can name. Its item scope holds the child's fields, computed ones
+/// is a collection an aggregate can name, and so is each references field whose target the lookup
+/// finds, except in the scope of a computed field or a computed input, where the field is an unknown
+/// name. The item scope of a collection holds the child's or the target's fields, computed ones
 /// included, with no rules and no collections. The named <c>rules</c> are callable only where they
 /// are given, which for now is the top level of a validation, a data source filter, a process
 /// condition and a policy filter. A process without a subject has a scope of its parameters and the
@@ -60,7 +62,8 @@ public static class ExpressionScopes
         bool includeComputed = true,
         IEnumerable<ExpressionRule>? rules = null,
         Func<string, EntityResource?>? findEntity = null,
-        IEnumerable<string>? modules = null)
+        IEnumerable<string>? modules = null,
+        bool references = true)
     {
         var all = fields.ToList();
         return Build(
@@ -68,7 +71,7 @@ public static class ExpressionScopes
                 .Where(field => includeComputed || field.Expression is null)
                 .Select(field => (field.Name, TypeOf(field))),
             rules,
-            findEntity is null ? null : CollectionsOf(all, findEntity),
+            findEntity is null ? null : CollectionsOf(all, findEntity, references),
             referenceFields: null,
             modules);
     }
@@ -205,7 +208,7 @@ public static class ExpressionScopes
     /// <summary>
     /// The scope of a migration's <c>fill</c> or <c>convert</c> value: the record's own fields, as
     /// the entity had them before the change. The scope has no rules, no collections and resolves no
-    /// paths. A child collection is not a field here.
+    /// paths. A child collection or a references field is not a field here.
     /// </summary>
     internal static ExpressionScope ForMigration(IEnumerable<(string Name, FieldDefinition Field)> fields) =>
         Build(
@@ -230,14 +233,14 @@ public static class ExpressionScopes
             collections: null,
             referenceFields: findEntity is null ? null : ReferenceFieldsOf(findEntity));
 
-    /// <summary>The expression type of a field's value, or null for a child collection.</summary>
+    /// <summary>The expression type of a field's value, or null for a child collection or a references field.</summary>
     public static ExpressionType? TypeOf(FieldModel field)
     {
         ArgumentNullException.ThrowIfNull(field);
         return TypeOf(field.Name, field.Type, field.Values, field.Target?.Name);
     }
 
-    /// <summary>The expression type of a field's value, or null for a child collection.</summary>
+    /// <summary>The expression type of a field's value, or null for a child collection or a references field.</summary>
     internal static ExpressionType? TypeOf(FieldDefinition field) =>
         TypeOf(field.Name, FieldTypes.Parse(field.Type), field.Values, field.Target);
 
@@ -247,12 +250,18 @@ public static class ExpressionScopes
     /// <summary>The expression type of a scalar field type other than <c>enum</c>, as a package operation field declares it.</summary>
     internal static ExpressionType TypeOf(FieldType scalarType) => TypeOf("", scalarType, null, null)!;
 
-    /// <summary>Each child collection whose child entity is found, with the child's fields, computed ones included, as its item scope.</summary>
+    /// <summary>
+    /// Each child collection whose child entity is found, with the child's fields, computed ones
+    /// included, as its item scope. Each references field whose target is found is one too, unless
+    /// <paramref name="references"/> is false.
+    /// </summary>
     private static List<ExpressionCollection> CollectionsOf(
-        IEnumerable<FieldDefinition> fields, Func<string, EntityResource?> findEntity) =>
+        IEnumerable<FieldDefinition> fields, Func<string, EntityResource?> findEntity, bool references = true) =>
         [
             .. fields
-                .Where(field => FieldTypes.Parse(field.Type) == FieldType.ChildCollection && field.Target is not null)
+                .Where(field => field.Target is not null
+                    && (FieldTypes.Parse(field.Type) == FieldType.ChildCollection
+                        || (references && FieldTypes.Parse(field.Type) == FieldType.References)))
                 .Select(field => findEntity(field.Target!) is { } child
                     ? new ExpressionCollection(field.Name, child.Name, ForEntity(child.Fields))
                     : null)
@@ -308,6 +317,8 @@ public static class ExpressionScopes
             FieldType.DateTime => ExpressionType.DateTime,
             FieldType.Enum => ExpressionType.Enum(name, values ?? []),
             FieldType.Reference => ExpressionType.Reference(target ?? ""),
+            FieldType.References => null,
+            FieldType.File => ExpressionType.File,
             FieldType.ChildCollection => null,
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown field type."),
         };

@@ -4,9 +4,20 @@ import { useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { formatValue } from './formatValue'
 import { buildCompleteBody } from './recordBody'
-import { fetchRecord } from './records'
+import { fetchRecord, type RecordProblem } from './records'
+import { ReassignDialog } from './ReassignDialog'
 import type { WidgetMetadata } from './site'
-import { assignedElsewhere, completeTask, fetchTask, runTaskCommand, type TaskItem } from './tasks'
+import {
+  assignedElsewhere,
+  completeTask,
+  fetchTask,
+  reassignTask,
+  runTaskCommand,
+  usersPath,
+  type ReassignBody,
+  type ReassignRole,
+  type TaskItem,
+} from './tasks'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
 import { useReleaseTexts } from './useReleaseTexts'
@@ -43,6 +54,11 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * An overdue task shows an "Overdue" tag beside the due date. An open task shows a Claim and a
  * Release button for each of `claim` and `release` that the task read's `commands` lists. A click
  * shows the task the route returns. A 403 or 409 shows a message and loads the task again.
+ *
+ * An open task whose `commands` lists `reassign` also shows a Reassign button. It opens a dialog
+ * where the user picks a role of the task read's `reassignRoles` or a person, and gives a reason.
+ * On success the page returns to the inbox. A 400 shows in the dialog. A 403 or 409 closes the
+ * dialog, shows the same message as Claim and Release and loads the task again.
  *
  * The page shows the texts of the release the task started on, for the current and the fallback
  * locale, before the site texts and the platform texts. So a label a newer release reworded or
@@ -106,6 +122,20 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
     }
   }
 
+  // A 400 goes back to the dialog, and a 403 or 409 comes back as the message to show.
+  const onReassign = async (body: ReassignBody): Promise<ReassignAnswer> => {
+    const result = await reassignTask(tasksPath, taskId, body)
+    if (result.ok) {
+      navigate(inboxPath)
+      return null
+    }
+    if ('problem' in result) {
+      return { problem: result.problem }
+    }
+    setTask(await fetchTask(tasksPath, taskId))
+    return { message: { type: 'warning', text: t('shell.task.commandRefused') } }
+  }
+
   if (task === undefined) {
     return null
   }
@@ -134,6 +164,7 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
         onAssignedElsewhere={() => setTask(assignedElsewhere)}
         onDecided={() => void onDecided()}
         onCommand={onCommand}
+        onReassign={onReassign}
       />
     </TextProvider>
   )
@@ -149,6 +180,12 @@ interface CommandMessage {
   text: string
 }
 
+/**
+ * What the page answers a reassign with: the problem of a 400 for the dialog to show, the message of
+ * a 403 or 409 that closes the dialog, or `null` when it succeeded.
+ */
+type ReassignAnswer = { problem: RecordProblem } | { message: CommandMessage } | null
+
 interface TaskBodyProps {
   task: TaskItem
   tasksPath: string
@@ -159,13 +196,24 @@ interface TaskBodyProps {
   onDecided: () => void
   /** Runs the command and returns the message to show, or `null` when it succeeded. */
   onCommand: (command: 'claim' | 'release') => Promise<CommandMessage | null>
+  onReassign: (body: ReassignBody) => Promise<ReassignAnswer>
 }
 
 /**
- * The task's label, subject and due date, then its Claim and Release buttons and form while it is
- * open, or the message that it is expired or completed. It reads the release texts.
+ * The task's label, subject and due date, then its Claim, Release and Reassign buttons and form
+ * while it is open, or the message that it is expired or completed. It reads the release texts.
  */
-function TaskBody({ task, tasksPath, locale, open, onDone, onAssignedElsewhere, onDecided, onCommand }: TaskBodyProps) {
+function TaskBody({
+  task,
+  tasksPath,
+  locale,
+  open,
+  onDone,
+  onAssignedElsewhere,
+  onDecided,
+  onCommand,
+  onReassign,
+}: TaskBodyProps) {
   const t = useText()
   return (
     <Flex vertical gap="middle">
@@ -190,7 +238,13 @@ function TaskBody({ task, tasksPath, locale, open, onDone, onAssignedElsewhere, 
         <Alert data-testid="task-expired" type="info" title={t('shell.task.expired')} />
       ) : open ? (
         <>
-          <TaskCommands commands={task.commands} onCommand={onCommand} />
+          <TaskCommands
+            commands={task.commands}
+            reassignRoles={task.reassignRoles}
+            usersPath={usersPath(tasksPath)}
+            onCommand={onCommand}
+            onReassign={onReassign}
+          />
           <OpenTaskForm
             task={task}
             tasksPath={tasksPath}
@@ -209,18 +263,26 @@ function TaskBody({ task, tasksPath, locale, open, onDone, onAssignedElsewhere, 
 
 interface TaskCommandsProps {
   commands: string[]
+  reassignRoles: ReassignRole[]
+  usersPath: string
   onCommand: (command: 'claim' | 'release') => Promise<CommandMessage | null>
+  onReassign: (body: ReassignBody) => Promise<ReassignAnswer>
 }
 
 const taskCommands = ['claim', 'release'] as const
 
-/** A button for each of `claim` and `release` that `commands` lists, and the message of a command that failed. */
-function TaskCommands({ commands, onCommand }: TaskCommandsProps) {
+/**
+ * A button for each of `claim` and `release` that `commands` lists, a Reassign button with its
+ * dialog when it lists `reassign`, and the message of a command that failed.
+ */
+function TaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassign }: TaskCommandsProps) {
   const t = useText()
   // The command being sent, so both buttons wait for its answer.
   const [pending, setPending] = useState<string | null>(null)
   const [message, setMessage] = useState<CommandMessage | null>(null)
+  const [reassigning, setReassigning] = useState(false)
   const listed = taskCommands.filter((command) => commands.includes(command))
+  const canReassign = commands.includes('reassign')
 
   const run = async (command: (typeof taskCommands)[number]) => {
     if (pending !== null) {
@@ -235,7 +297,18 @@ function TaskCommands({ commands, onCommand }: TaskCommandsProps) {
     }
   }
 
-  if (listed.length === 0 && message === null) {
+  // A 403 or 409 closes the dialog and shows its message. A 400 goes back to the dialog.
+  const reassign = async (body: ReassignBody): Promise<RecordProblem | null> => {
+    const answer = await onReassign(body)
+    if (answer !== null && 'message' in answer) {
+      setReassigning(false)
+      setMessage(answer.message)
+      return null
+    }
+    return answer === null ? null : answer.problem
+  }
+
+  if (listed.length === 0 && !canReassign && message === null) {
     return null
   }
   return (
@@ -252,7 +325,20 @@ function TaskCommands({ commands, onCommand }: TaskCommandsProps) {
             {t(`shell.task.${command}`)}
           </Button>
         ))}
+        {canReassign && (
+          <Button disabled={pending !== null} onClick={() => setReassigning(true)}>
+            {t('shell.task.reassign')}
+          </Button>
+        )}
       </Flex>
+      {reassigning && (
+        <ReassignDialog
+          roles={reassignRoles}
+          usersPath={usersPath}
+          onSend={reassign}
+          onClose={() => setReassigning(false)}
+        />
+      )}
     </Flex>
   )
 }

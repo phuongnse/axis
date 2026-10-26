@@ -20,6 +20,7 @@ public sealed class ExpressionTypeCheckerTests
         ["pe2"] = ExpressionType.EnumParameter("other", ["draft", "archived"]),
         ["r"] = ExpressionType.Reference("department"),
         ["r2"] = ExpressionType.Reference("supplier"),
+        ["f"] = ExpressionType.File,
     });
 
     public static TheoryData<string> Fields => ["t", "i", "d", "b", "dt", "ts", "e", "r"];
@@ -541,8 +542,8 @@ public sealed class ExpressionTypeCheckerTests
     }
 
     [Theory]
-    [InlineData("sum(title, amount)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'sum' needs a child collection for argument 1, found text at character 1.")]
-    [InlineData("count(1)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'count' needs a child collection for argument 1, found integer at character 1.")]
+    [InlineData("sum(title, amount)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'sum' needs a child collection or a references field for argument 1, found text at character 1.")]
+    [InlineData("count(1)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'count' needs a child collection or a references field for argument 1, found integer at character 1.")]
     [InlineData("count(missing)", ExpressionDiagnosticCodes.UnknownName, "Unknown field 'missing' at character 7.")]
     [InlineData("sum(lineItems)", ExpressionDiagnosticCodes.WrongArgumentCount, "Function 'sum' needs 2 arguments, found 1 at character 1.")]
     [InlineData("count(lineItems, ok, 1)", ExpressionDiagnosticCodes.WrongArgumentCount, "Function 'count' needs 1 argument, found 3 at character 1.")]
@@ -562,6 +563,46 @@ public sealed class ExpressionTypeCheckerTests
         var diagnostic = CheckFails(text, ExpressionType.Null, CollectionScope());
 
         Assert.Equal((code, message), (diagnostic.Code, diagnostic.Message));
+    }
+
+    [Theory]
+    [InlineData("f is null")]
+    [InlineData("f is not null")]
+    [InlineData("f is not null and t == 'a'")]
+    [InlineData("not (f is null)")]
+    [InlineData("if(f is null, true, false)")]
+    public void A_file_field_is_accepted_as_the_operand_of_a_null_check(string text)
+    {
+        var result = Check(text, ExpressionType.Boolean);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+    }
+
+    [Theory]
+    [InlineData("f == null", 1)]
+    [InlineData("null != f", 9)]
+    [InlineData("f == f", 1)]
+    [InlineData("f in ('a', 'b')", 1)]
+    [InlineData("f is null or f", 14)]
+    [InlineData("coalesce(f, null) is null", 10)]
+    [InlineData("coalesce(null, f) is null", 16)]
+    [InlineData("f", 1)]
+    [InlineData("not f", 5)]
+    [InlineData("length(f) > 0", 8)]
+    public void A_file_field_in_any_other_use_is_a_type_error_at_the_file(string text, int character)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Boolean);
+
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.TypeMismatch, $"A file allows only 'is null' and 'is not null' at character {character}."),
+            (diagnostic.Code, diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_file_is_named_file_in_messages_and_never_fits_another_type()
+    {
+        Assert.Equal("file", ExpressionType.File.ToString());
+        Assert.NotEqual(ExpressionType.Text, ExpressionType.File);
     }
 
     [Fact]

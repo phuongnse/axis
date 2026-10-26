@@ -157,6 +157,7 @@ public sealed class ForwardedHeadersTests
         builder.UseSetting("Tenants:b:ConnectionString", UnreachableDatabase);
         builder.UseSetting("Tenants:b:SchemaConnectionString", UnreachableDatabase);
         builder.UseTestOidc("default", "b");
+        builder.UseInMemorySessions();
         builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, SessionStartupFilter>());
     }
 

@@ -208,7 +208,7 @@ see the Data sources bullet of the Resolve step in
   only through its owner's child collection.
 - Each `path` names a field of the root entity, or goes through `reference`
   fields only, takes at most 3 hops, and does not end at a
-  `child-collection`. A path through a field that is not a `reference`, an
+  `child-collection` or a `references` field. A path through a field that is not a `reference`, an
   unknown field and more than 3 hops are each `AXC0043` at
   `/fields/{i}/path`, with a message that says which.
 - Field names are unique, compared exactly (`AXC0044`).
@@ -266,6 +266,8 @@ see the Data sources bullet of the Resolve step in
 - When the data source is grouped, `sort` names a group field whose path
   does not end at a `reference`, or a measure, instead of a projected field
   (`AXC0045`).
+- `sort` and a `groupBy` entry cannot name a projected `file` field
+  _(planned for M15)_ (`AXC0259`, at `/sort` or `/aggregate/groupBy/{i}`).
 
 ## Endpoint
 

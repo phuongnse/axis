@@ -75,6 +75,7 @@ public sealed class DefaultCompilerTests
     [InlineData("""{ "name": "number", "type": "text", "sequence": "PurchaseRequestNumber", "default": "'x'" }""", "sequence")]
     [InlineData("""{ "name": "requester", "type": "text", "creator": true, "default": "'x'" }""", "creator")]
     [InlineData("""{ "name": "customer", "type": "reference", "target": "Customer", "default": "null" }""", "reference")]
+    [InlineData("""{ "name": "customers", "type": "references", "target": "Customer", "default": "null" }""", "references")]
     [InlineData("""{ "name": "more", "type": "child-collection", "target": "Note", "default": "null" }""", "child-collection")]
     public void Default_that_clashes_is_a_single_invalid_constraint(string orderField, string messagePart)
     {
@@ -117,7 +118,9 @@ public sealed class DefaultCompilerTests
             FieldType.DateTime => ("""{ "name": "extra", "type": "date-time", "default": "now()" }""", true),
             FieldType.Enum => ("""{ "name": "extra", "type": "enum", "values": ["low", "high"], "default": "'low'" }""", true),
             FieldType.Reference => ("""{ "name": "extra", "type": "reference", "target": "Customer", "default": "null" }""", false),
+            FieldType.References => ("""{ "name": "extra", "type": "references", "target": "Customer", "default": "null" }""", false),
             FieldType.ChildCollection => ("""{ "name": "extra", "type": "child-collection", "target": "Note", "default": "null" }""", false),
+            FieldType.File => ("""{ "name": "extra", "type": "file", "default": "null" }""", false),
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Add this field type to the test."),
         };
         Assert.Contains($"\"{FieldTypes.Name(type)}\"", field, StringComparison.Ordinal);

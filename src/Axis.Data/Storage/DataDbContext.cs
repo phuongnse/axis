@@ -5,8 +5,8 @@ namespace Axis.Data.Storage;
 /// <summary>
 /// The data module's tables in a tenant database: what has been provisioned in the
 /// <c>entities</c> schema, the migrations applied to it, the counters of the sequences, the audit records, the user
-/// profiles and the computed fields whose expression failed for a record. The caller supplies the connection to the
-/// tenant database.
+/// profiles, the computed fields whose expression failed for a record, and the signed-in sessions. The caller
+/// supplies the connection to the tenant database.
 /// </summary>
 public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbContext(options)
 {
@@ -33,6 +33,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
     public DbSet<ComputedFieldErrorRow> ComputedFieldErrors => Set<ComputedFieldErrorRow>();
 
     public DbSet<PendingComputedFieldRow> PendingComputedFields => Set<PendingComputedFieldRow>();
+
+    public DbSet<SessionRow> Sessions => Set<SessionRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
@@ -142,6 +144,18 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             audit.HasIndex(a => new { a.EntityId, a.RecordId, a.OccurredAt, a.Id })
                 .IsDescending(false, false, true, true)
                 .HasDatabaseName("ix_audit_records_entity_id_record_id_occurred_at_id");
+        });
+
+        modelBuilder.Entity<SessionRow>(session =>
+        {
+            session.ToTable("sessions");
+            session.HasKey(s => s.IdHash).HasName("pk_sessions");
+            session.Property(s => s.IdHash).HasColumnName("id_hash").HasColumnType("bytea").ValueGeneratedNever();
+            session.Property(s => s.UserId).HasColumnName("user_id");
+            session.Property(s => s.DisplayName).HasColumnName("display_name");
+            session.Property(s => s.Roles).HasColumnName("roles").HasColumnType("text[]");
+            session.Property(s => s.SignedInAt).HasColumnName("signed_in_at");
+            session.Property(s => s.LastRequestAt).HasColumnName("last_request_at");
         });
     }
 }

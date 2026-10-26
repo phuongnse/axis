@@ -13,7 +13,9 @@ public static class FieldTypes
         ["date-time"] = FieldType.DateTime,
         ["enum"] = FieldType.Enum,
         ["reference"] = FieldType.Reference,
+        ["references"] = FieldType.References,
         ["child-collection"] = FieldType.ChildCollection,
+        ["file"] = FieldType.File,
         ["money"] = FieldType.Money,
     };
 

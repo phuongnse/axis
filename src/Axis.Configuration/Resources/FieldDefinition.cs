@@ -33,6 +33,12 @@ public sealed record FieldDefinition
 
     public int? Scale { get; init; }
 
+    /// <summary>The largest size in bytes of a file field's file, or null when the host limit applies.</summary>
+    public long? MaxSize { get; init; }
+
+    /// <summary>The media types a file field accepts, each <c>type/subtype</c> or <c>type/*</c>, or null for any.</summary>
+    public IReadOnlyList<string>? Accept { get; init; }
+
     public string? Target { get; init; }
 
     /// <summary>The ISO 4217 code of a money field's fixed currency, or null when not declared.</summary>

@@ -9,9 +9,10 @@ sections marked _(planned for Mx)_ are not built yet, and Dn refers to
 
 The design follows [D74](../decisions/d74-a-visual-process-designer.md). The
 Design tab, the canvas, the existing step panels, remove, undo, Tab and Enter,
-the transitions, the diagnostic marks and the live region for removals and
-transitions are _(built)_. The palette, the panels of the new step types and
-the live region for adds and moves are _(planned for M14)_.
+the diagnostic marks and the live region for removals are _(built)_. The
+palette, the transitions and the live region for adds and transitions are
+_(built)_. The panels of the new step types and the live region for moves are
+_(planned for M14)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
   and JSON tabs. The three tabs edit one draft.
@@ -22,20 +23,40 @@ the live region for adds and moves are _(planned for M14)_.
   process file holds no layout. Clicking a node selects its step. Clicking an
   edge, or pressing Enter on it, selects that edge and the step it leaves. The
   selected edge is drawn in the primary colour. The selected step and edge are
-  not written to the URL. _(Planned for M14)_ The canvas becomes editable by
-  the palette.
-- **Palette** _(planned for M14)_. It lists the step types: `decision`, `task`, the operations
-  (`updateRecord`, `createRecord`, `callConnector`, `raiseEvent`, `notify` and
-  the package operations of the application's packages), `timer`,
-  `waitEvent`, `subProcess` and `end`.
-  - Dropping a type on the canvas adds a step with a unique name and no
-    transitions. Its diagnostics mark it until the author fills it in.
-  - Dropping a type on an edge inserts the step into that transition: the
-    transition names the new step, and the new step's `next` names the old
-    target. A type with no `next`, such as `decision`, gets the old target as
-    its `otherwise`, and `end` cannot be dropped on an edge.
-  - A keyboard user picks a type and inserts it after the selected step, by
-    the same rule.
+  not written to the URL. The palette and the transitions edit the canvas
+  _(built)_.
+- **Palette** _(built)_. It sits at the top of the panel beside the canvas and
+  lists the step types and operations that `process.schema.json` defines today:
+  `decision`, `task`, the operations `updateRecord`, `callConnector` and
+  `raiseEvent`, one "Package operation" entry, `subProcess` and `end`. A
+  Vitest test reads the schema and fails when a step type or a built-in
+  operation is missing from the palette. `timer`, `waitEvent`, `createRecord`
+  and `notify` join when the schema defines them, because their steps would
+  always be invalid before that.
+  - The package entry adds an operation step with an empty `operation`, which
+    the author types as `<package>/<operation>` in the panel, as the operation
+    picker does. One entry per package operation of the application _(planned)_
+    needs the names endpoint to list them.
+  - A new step is added at the end of `steps`, with a unique name such as
+    `updateRecord1` (the operation's name, or the type's, with the first free
+    number, ignoring letter case), its required keys empty and no
+    transitions. It becomes the selected step, and its diagnostics mark it
+    until the author fills it in.
+  - Dropping a type on the canvas adds an unconnected step.
+  - Dropping a type on an edge inserts the step into that transition. The drop
+    target is the edge's midpoint, a small area that does not take clicks, so
+    clicking an edge still selects it. The transition names the new step, and
+    the new step's `next` names the old target. A type with no `next`, such as
+    `decision`, gets the old target as its `otherwise`. A `task` gets one
+    outcome with an empty name and label, whose `next` is the old target, and
+    diagnostics mark the empty name and label until the author fills them in.
+    `end` cannot be dropped on an edge, and nothing changes.
+  - A keyboard user presses a palette button, with Enter or Space, and the step
+    goes in by the same rule: into the selected edge, else after the selected
+    step's `next`, else unconnected. A `decision`, `task` or `end` step has no
+    `next`, so a step added with one selected is unconnected. Enter on an edge
+    selects it, so the keyboard reaches every transition.
+  - Each add is one change of `steps`, so one Undo removes it.
 - **Transitions** _(built)_. Every step except an `end` step has a handle at
   its bottom edge. Dragging from it and dropping on another step sets a
   transition. A drop anywhere on the target step counts. A step with one
@@ -83,12 +104,13 @@ the live region for adds and moves are _(planned for M14)_.
   removes the selection. Each edge has a name made of its two steps and its
   branch or outcome, such as "financeCheck to markApproved · otherwise".
 - **Screen readers** _(partly built)_. Every add, move and remove has a
-  keyboard way, and a live region says what changed. Removals and transitions
-  are _(built)_: a hidden live region says "Removed step remind", "Removed
-  transition financeCheck to markApproved" or "submit now goes to done". A
-  choice from the menu names its branch or outcome, such as "managerApproval ·
-  approve now goes to done". Adds and moves, such as "Step remind added
-  after resolve", are _(planned for M14)_.
+  keyboard way, and a live region says what changed. Removals, adds and
+  transitions are _(built)_: a hidden live region says "Removed step remind",
+  "Removed transition financeCheck to markApproved", "Step remind added after
+  resolve" (or "Step remind added" for an unconnected step), "An end step cannot
+  be inserted into a transition" or "submit now goes to done". A choice from the
+  transition menu names its branch or outcome, such as "managerApproval ·
+  approve now goes to done". Moves are _(planned for M14)_.
 - **Diagnostics** _(built)_. Marks work as on the graph: a marked node has an
   error-coloured border, "has diagnostics" in its text label, and
   `data-marked`.

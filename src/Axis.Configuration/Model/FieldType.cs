@@ -14,6 +14,8 @@ public enum FieldType
     DateTime,
     Enum,
     Reference,
+    References,
     ChildCollection,
+    File,
     Money,
 }

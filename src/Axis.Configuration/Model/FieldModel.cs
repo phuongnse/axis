@@ -6,10 +6,11 @@ namespace Axis.Configuration.Model;
 /// A compiled field. Type-specific properties are set only for the type they belong to:
 /// <see cref="MaxLength"/> and <see cref="MinLength"/> for text, <see cref="Min"/> and
 /// <see cref="Max"/> for integer, decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal and
-/// money, <see cref="Currency"/> and <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum, <see cref="Target"/> for reference and child collection,
-/// <see cref="TargetDisplayField"/> for reference, and <see cref="Sequence"/> and
-/// <see cref="Creator"/> for text, and <see cref="Default"/> for text, integer, decimal, money, boolean,
-/// date, date-time and enum.
+/// money, <see cref="Currency"/> and <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum,
+/// <see cref="Target"/> for reference, references and child collection,
+/// <see cref="TargetDisplayField"/> for reference and references, <see cref="MaxSize"/> and <see cref="Accept"/> for file,
+/// and <see cref="Sequence"/> and <see cref="Creator"/> for text, and <see cref="Default"/> for text,
+/// integer, decimal, money, boolean, date, date-time and enum.
 /// </summary>
 public sealed record FieldModel
 {
@@ -40,6 +41,12 @@ public sealed record FieldModel
 
     public int? Scale { get; init; }
 
+    /// <summary>The largest size in bytes of a file field's file, or null when the host limit applies.</summary>
+    public long? MaxSize { get; init; }
+
+    /// <summary>The media types a file field accepts, or null for any.</summary>
+    public IReadOnlyList<string>? Accept { get; init; }
+
     /// <summary>The ISO 4217 code of the fixed currency, set only for money fields that declare one.</summary>
     public string? Currency { get; init; }
 
@@ -53,7 +60,7 @@ public sealed record FieldModel
 
     public EntityReference? Target { get; init; }
 
-    /// <summary>The declared name of the target entity's display field, set only for reference fields.</summary>
+    /// <summary>The declared name of the target entity's display field, set only for reference and references fields.</summary>
     public string? TargetDisplayField { get; init; }
 
     /// <summary>The expression of a computed field, or null for a field that clients write.</summary>
@@ -82,7 +89,8 @@ public sealed record FieldModel
 
     /// <summary>
     /// Whether the field is stored in a column of its entity's table. A child collection has no
-    /// column: its rows live in the child entity's table.
+    /// column: its rows live in the child entity's table. A references field has none either: its
+    /// links will live in a table of their own.
     /// </summary>
-    public bool HasColumn => Type != FieldType.ChildCollection;
+    public bool HasColumn => Type is not (FieldType.ChildCollection or FieldType.References);
 }

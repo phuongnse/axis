@@ -1,6 +1,11 @@
 import dagre from '@dagrejs/dagre'
+import { useDroppable } from '@dnd-kit/core'
 import {
+  BaseEdge,
   type Edge,
+  EdgeLabelRenderer,
+  type EdgeProps,
+  getBezierPath,
   Handle,
   MarkerType,
   type Node,
@@ -100,6 +105,72 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
 
 const nodeTypes = { step: StepNodeView }
 
+/**
+ * An edge drawn as the default edge is, with a drop target at its midpoint: a transition that a palette entry can be
+ * dropped on. The target takes no pointer events, so a click still reaches the edge, and the drag library measures it
+ * all the same. The drop target has no transform of its own, because the drag library measures an element without it.
+ */
+function TransitionEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  label,
+  labelStyle,
+  labelBgStyle,
+  markerEnd,
+  style,
+}: EdgeProps) {
+  const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
+  const { colour } = useDesignTokens()
+  const { setNodeRef, isOver } = useDroppable({ id: `edge:${id}`, data: { pointer: id } })
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={path}
+        label={label}
+        labelX={labelX}
+        labelY={labelY}
+        labelStyle={labelStyle}
+        labelBgStyle={labelBgStyle}
+        markerEnd={markerEnd}
+        style={style}
+      />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(${labelX}px, ${labelY}px)`,
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            ref={setNodeRef}
+            data-testid={`studio-process-edge-drop-${id}`}
+            style={{
+              position: 'absolute',
+              left: -dropWidth / 2,
+              top: -dropHeight / 2,
+              width: dropWidth,
+              height: dropHeight,
+              pointerEvents: 'none',
+              outline: isOver ? `2px solid ${colour.primary}` : undefined,
+            }}
+          />
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  )
+}
+
+const edgeTypes = { transition: TransitionEdge }
+const dropWidth = 56
+const dropHeight = 28
+
 const edgeTestIdPrefix = 'rf__edge-'
 
 /**
@@ -107,10 +178,12 @@ const edgeTestIdPrefix = 'rf__edge-'
  * edge selects itself and the step it leaves. The selected step is the node marked current, and the selected edge is
  * drawn in the primary colour. A step that a diagnostic path names has an error-coloured border and "has diagnostics"
  * in its label. Tab reaches the edges, which come before the nodes, and each edge is named by its two steps and its
- * branch or outcome. Enter or Space on an edge selects it. Delete or Backspace in the canvas calls `onRemove`. Every step
- * but an `end` step has a handle at its bottom edge. Dragging from it and releasing on a step, anywhere on the node,
- * calls `onConnect` with the two step numbers and the release point, relative to the canvas. The graph sets no
- * transition itself. It has no keyboard way to connect, which the step panel's pickers give.
+ * branch or outcome. Enter or Space on an edge selects it. Delete or Backspace in the canvas calls `onRemove`. The
+ * canvas and the midpoint of each edge are drop targets of the process designer's palette: the canvas for `/steps`, and
+ * an edge for the path of its transition. Every step but an `end` step has a handle at its bottom edge. Dragging from
+ * it and releasing on a step, anywhere on the node, calls `onConnect` with the two step numbers and the release point,
+ * relative to the canvas. The graph sets no transition itself. It has no keyboard way to connect, which the step
+ * panel's pickers give.
  */
 export default function StudioProcessGraph({
   graph,
@@ -134,6 +207,7 @@ export default function StudioProcessGraph({
   const { colour } = useDesignTokens()
   const to = t('shell.studio.processGraph.to')
   const section = useRef<HTMLElement>(null)
+  const { setNodeRef } = useDroppable({ id: 'process-canvas', data: { pointer: '/steps' } })
 
   const { nodes, edges } = useMemo(() => {
     const place = placeSteps(graph)
@@ -170,6 +244,7 @@ export default function StudioProcessGraph({
         const stroke = current ? colour.primary : colour.textMuted
         return {
           id: transition.path,
+          type: 'transition',
           source: String(transition.source),
           target: String(transition.target),
           label: transition.label ?? transition.kind,
@@ -227,9 +302,12 @@ export default function StudioProcessGraph({
 
   return (
     <section
+      ref={(element) => {
+        section.current = element
+        setNodeRef(element)
+      }}
       data-testid="studio-process-graph"
       aria-label={t('shell.studio.processGraph')}
-      ref={section}
       style={{ height: 480, position: 'relative' }}
       onKeyDown={onKeyDown}
     >
@@ -237,6 +315,7 @@ export default function StudioProcessGraph({
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         colorMode={mode}
         fitView
         nodesDraggable={false}

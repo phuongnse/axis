@@ -7,6 +7,7 @@ import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { OperationPanel } from './OperationPanel'
 import { operationJsonOnlyKeys } from './operationKeys'
+import { requiredStepKeys } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
 
@@ -68,14 +69,6 @@ const forbiddenStepKeys: Record<string, string[]> = {
     'dueIn',
     'outcomes',
   ],
-}
-
-/** The keys a step type requires, with the empty value that a new key starts with. */
-const requiredStepKeys: Record<string, Content> = {
-  decision: { branches: [], otherwise: '' },
-  task: { label: { textKey: '' }, assignee: {}, form: '', outcomes: [] },
-  operation: { operation: '', next: '' },
-  end: {},
 }
 
 function isContent(value: unknown): value is Content {

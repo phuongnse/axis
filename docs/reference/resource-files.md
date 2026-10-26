@@ -256,6 +256,8 @@ A `seed` holds records with fixed ids for one entity:
   [Startup activation](host-settings.md#startup-activation)).
 - `values` has the shape of the `values` of a record API create body (see
   [Request bodies and values](record-api.md#request-bodies-and-values)).
+  A seed cannot set a `file` field, in a record or in a child row
+  _(planned for M15)_ (`AXC0259`).
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
@@ -489,7 +491,7 @@ is `AXC0013`.
   `false`, is `AXC0013`.
 - `expression` makes the field a computed field. `required` on a computed
   field is `AXC0013` at `/fields/{i}/required`, and an `expression` on a
-  `reference` or `child-collection` field is `AXC0013` at
+  `reference`, `references` or `child-collection` field is `AXC0013` at
   `/fields/{i}/expression`. See [Entity logic](#entity-logic).
 - `sequence` names a [sequence](#sequences), ignoring letter case. It cannot
   be combined with `required: true` or `expression`, and a child entity's
@@ -514,10 +516,24 @@ new check is a new compile diagnostic.
 
 - **`file`.** One file, with optional `maxSize` and `accept`. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. See
-  [file fields](file-fields.md).
+  [file fields](file-fields.md). The compiler reports a `maxSize` below 1 or
+  above the file size limit (`AXC0257`), an `accept` entry that is not
+  `type/subtype` or `type/*` (`AXC0258`), and `unique` on the field
+  (`AXC0259`). `maxSize` or `accept` on another type, and `expression` on a
+  `file`, are `AXC0013`. In an expression a file allows only `is null` and
+  `is not null`.
 - **`references`.** A set of records of `target`, at most 1,000. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. Its
-  expression type is `list<Target>`.
+  expression type is `list<Target>`. The compile side is built. `unique`,
+  `expression` and `default` are `AXC0013`, and a missing `target` is
+  `AXC0014`. A `target` that is a child
+  entity is `AXC0040`, and one without a `displayField` is `AXC0030`. A
+  `references` field on a child entity is `AXC0041`. It has no column, so a
+  data source cannot project it (`AXC0043`), an endpoint cannot map it
+  (`AXC0121`) and a process `updateRecord` cannot set it. Its storage and the
+  record API are still planned, so until they land the record API leaves the
+  field out of record values and a body that sets it is a `400` unknown
+  property.
 - **`valueLabels`.** On an `enum` field, a map from every value to a
   `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
   "priority.low" } }`. It covers every value, and its keys join `AXC0028`. An
@@ -540,8 +556,9 @@ new check is a new compile diagnostic.
   records. A required field with a default may be left out of a create, and
   `now()` is the start time of the write transaction. An update never applies
   a default. The [form state endpoint](record-api.md#form-state) returns the
-  defaults of a new record, and the form widget shows them on a new form. A default on a field of a child entity does nothing for its rows
-  yet. `file` and `references` are refused when those types arrive.
+  defaults of a new record, and the form widget shows them on a new form. A
+  default on a field of a child entity does nothing for its rows yet. `file` is
+  refused when that type arrives.
 - **`searchable`.** On a `text` field. `search` reads every searchable field,
   and the display field is always searchable. See
   [paging and sorting](record-api.md#paging-and-sorting).
@@ -671,12 +688,12 @@ validation calls the rules of its own module, see [modules](modules-and-template
   describes.
 - **Limits on a child entity.** A child entity:
   - is owned by exactly one `child-collection` field (`AXC0039`);
-  - is never the `target` of a `reference` (`AXC0040`);
+  - is never the `target` of a `reference` or `references` field (`AXC0040`);
   - is never the `entity` of a data source (`AXC0064`) or of a process
     (`AXC0068`);
   - has no record routes of its own;
-  - has no `child-collection` fields (`AXC0041`). It may have `reference`
-    fields, as real line items point to a product, see
+  - has no `child-collection` or `references` fields (`AXC0041`). It may have
+    `reference` fields, as real line items point to a product, see
     [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md). A
     reference from a child row gets a foreign key, and its labels follow the
     rows, see
