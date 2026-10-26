@@ -298,6 +298,7 @@ const requestsByStatus: DataSourceMetadata = {
   entity: 'Request',
   parameters: [],
   pageSize: 100,
+  search: false,
   columns: [
     {
       name: 'status',
@@ -334,6 +335,7 @@ const requestTotals: DataSourceMetadata = {
   entity: 'Request',
   parameters: [],
   pageSize: 1,
+  search: false,
   columns: [
     { name: 'requests', type: 'integer', labelKey: null, values: null, target: null },
     { name: 'amountSum', type: 'decimal', labelKey: null, values: null, target: null },

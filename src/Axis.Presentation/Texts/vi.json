@@ -30,6 +30,7 @@
   "shell.table.no": "Không",
   "shell.table.empty": "Chưa có bản ghi nào.",
   "shell.table.loadFailed": "Không thể tải bản ghi.",
+  "shell.table.search": "Tìm kiếm",
   "shell.table.rowActions": "Thao tác",
   "shell.table.delete": "Xóa",
   "shell.table.deleteConfirm": "Xóa bản ghi này? Không thể hoàn tác.",
