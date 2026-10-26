@@ -16,9 +16,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   server is the confidential client: it exchanges the code for tokens, reads
   the claims from the ID token and keeps no token after that (D9). The
   identity provider returns the code in the query string. The request asks
-  for the `openid`, `profile` and `email` scopes. Pushed
-  authorization requests stay off until FAPI 2.0 work (D9). Under a tenant's
-  `fapi2` profile they are required _(planned for M16)_, see
+  for the `openid`, `profile` and `email` scopes. Pushed authorization
+  requests (PAR) stay off under the `standard` profile (D9). Under a tenant's
+  `fapi2` profile they are required, see
   [FAPI 2.0 profile](#fapi-20-profile).
   - The server registers one OIDC client per tenant. All of them share the
     callback path, and each one ignores a callback that arrives on another
@@ -371,10 +371,9 @@ stay session-only until then.
   `axis-services`. A tenant without it accepts no service account token, and
   neither does a preview tenant, which takes neither audience from its main
   tenant. Under `Tenancy:Source=directory` the setting is the
-  `service_audience` column of `platform.tenants`. `tenant oidc set` will
-  change it _(planned for M16)_, see
-  [tenant setting commands](tenant-setting-commands.md). Until then an operator
-  sets the column by hand.
+  `service_audience` column of `platform.tenants`.
+  [`tenant oidc set --service-audience`](tenant-setting-commands.md#sign-in-settings)
+  changes it.
 - **Routes.** A service account may call:
   - every route of the [record API](record-api.md), record history included;
   - `GET /api/apps/{app}/data-sources/{dataSource}/rows`;
@@ -429,23 +428,47 @@ stay session-only until then.
 
 It follows [D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant
 can turn on the FAPI 2.0 Security Profile for sign-in and for machine callers.
-The tenant setting, the client key, the startup check and the machine callers
-are built. Nothing uses the profile at sign-in yet, and the sign-in, rotation,
-verification and Keycloak bullets below are _(planned for M16)_.
+The tenant setting, the client key, the startup check, the machine callers, and
+PAR, `private_key_jwt`, the `iss` check and DPoP at sign-in are built. The
+rotation and verification bullets below are _(planned for M16)_.
 
 - **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
   `standard` when unset. Any other value stops the server's start, naming the
   tenant. A preview tenant takes its main tenant's profile.
-- **Sign-in under `fapi2`** _(planned for M16)_.
+- **Sign-in under `fapi2`.**
   - The server sends the authorization request through pushed authorization
-    requests (PAR). A provider that does not offer PAR fails the tenant's
-    sign-in, and the server logs why.
-  - PKCE with `S256`, as under `standard`.
-  - The client authenticates at the token endpoint with `private_key_jwt`.
-    The tenant has no client secret.
+    requests (PAR), PKCE `S256` included. The browser goes to the identity
+    provider with only the `request_uri` that comes back. A provider whose
+    metadata has no PAR endpoint fails the tenant's sign-in: the server logs a
+    warning that names the tenant, and the browser goes to `/?signIn=failed`.
+    No audit record is written, as no callback happened.
+  - The client authenticates at the PAR endpoint and at the token endpoint with
+    `private_key_jwt`: a JWT of 60 seconds, signed with the tenant's newest
+    client key, with the `kid` of that key. Its `iss` and `sub` are the client
+    id, its `aud` is the tenant's `Authority`, and each request has its own
+    `jti`. The server sends no client secret, even when the tenant has one.
+    Client keys are EC P-256 keys and the assertion is signed with ES256. RSA
+    keys are not supported.
   - The server checks the `iss` parameter of the authorization response
-    against the tenant's `Authority` (RFC 9207).
-  - The token request carries a DPoP proof.
+    (RFC 9207). It must equal the tenant's `Authority` character for
+    character, after one trailing `/` is removed from the `Authority`. A
+    callback with no `iss`, or a different one, creates no session and writes
+    `session.signInRefused` with the reason `invalidIssuer`. The check runs
+    after the state checks, so a callback with a bad state is still refused as
+    `invalidState` or `otherTenant`. The code is never sent to the token
+    endpoint. An error response from the provider is refused as
+    `providerError`, whatever its `iss`.
+  - The token request carries a DPoP proof (RFC 9449), signed with a new P-256
+    key that is made for each sign-in and thrown away after it. The proof has
+    `typ` `dpop+jwt`, the `htm` `POST` and the token endpoint as `htu`, and
+    holds only the public key. If the provider answers `use_dpop_nonce`, the
+    server sends the request once more, with the nonce in a new proof signed
+    with the same key and with a new client assertion. A second refusal fails
+    the sign-in as `providerError`. The authorization code is not bound to the
+    key, and the PAR request carries no proof. The server keeps no token after
+    sign-in, so the DPoP-bound access token is discarded.
+  - A `standard` tenant is unchanged: no PAR, no `iss` check, no DPoP, and a
+    client secret.
 - **Machine callers under `fapi2`.** Inbound endpoints and service accounts
   accept only access tokens bound to a DPoP key (RFC 9449). A DPoP proof is a
   short signed JWT that the caller makes for each request, so a stolen token is
@@ -478,7 +501,7 @@ verification and Keycloak bullets below are _(planned for M16)_.
     which never says which check failed. A tenant under `standard` answers
     `WWW-Authenticate: Bearer`, as before.
 - **The client key.** A tenant under `fapi2` has a private key for
-  `private_key_jwt`. Under `configuration` it comes from the environment,
+  `private_key_jwt`, an EC P-256 key as a PEM (PKCS#8). Under `configuration` it comes from the environment,
   such as `Tenants__default__Oidc__ClientKey`, as a PEM, with its key id in
   `Oidc:ClientKeyId`. Under `directory` it is stored encrypted in the tenant
   directory, with the field name `oidc_client_key` and its key id, see
@@ -491,8 +514,18 @@ verification and Keycloak bullets below are _(planned for M16)_.
 - **Verification** _(planned for M16)_. The OpenID Foundation's conformance suite runs by hand
   against the development realm under `fapi2`. Its result is recorded in
   [ASVS](asvs.md). Axis seeks no certification.
-- **Keycloak** _(planned for M16)_. The development realm gets a second client, set up for FAPI
-  2.0 with a client policy, so tests cover both profiles.
+- **Keycloak.** The development realm has a second client, `axis-fapi`, so
+  tests cover both profiles. Only an integration test host uses it. It has no
+  secret and authenticates with `private_key_jwt`, and it requires PAR and
+  PKCE `S256`. A client policy applies to a client that has a `fapi2` role, and
+  only `axis-fapi` has one, so it never touches the other clients. Its profile `axis-fapi2`
+  has three executors: the PKCE enforcer, the secure client authenticator that
+  allows only `client-jwt`, and the signature algorithm check for signed JWT
+  client assertions. The client's JWKS holds the public keys of two EC P-256
+  keys, `key-1` and `key-2`. Their private keys are committed as
+  `samples/keycloak/axis-fapi-key-1.pem` and `axis-fapi-key-2.pem`, for
+  development and tests only. They are registered on this client of the
+  development realm and nowhere else.
 
 ## Authorization
 
@@ -518,7 +551,7 @@ The `role` and `policy` resource files are described in
   ignored. A user matches a policy when they hold any of its roles.
 - **Grants.** A policy holds grants. Each grant gives actions on one target:
   `read`, `create`, `update` and `delete` on an entity, `read` on a data
-  source, or `start`, `inspect`, `cancel`, `retry` and `resolve` on a process. `inspect` lists a process's
+  source, or `start`, `inspect`, `cancel`, `retry`, `resolve` and `reassign` on a process. `inspect` lists a process's
   instances, see [process inspection](process-inspection.md#process-inspection).
   `cancel` stops a running or waiting instance, see
   [Cancel](process-inspection.md#cancel). `retry` runs a failed instance

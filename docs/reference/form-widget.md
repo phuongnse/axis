@@ -74,6 +74,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     | --- | --- |
     | `text` | a text input limited to `maxLength`. With `minLength` it also has the `minlength` attribute and shows the character count against the limits, such as `0 / 3–10`, or `0 / ≥3` with no `maxLength` |
     | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is. With `min` or `max` its placeholder shows the range, such as `1 – 10`, `≥ 1` or `≤ 10`, and a typed number outside the range is marked invalid. It is never blocked, because the server decides |
+    | `money` | the input of a decimal with the currency code beside the box. The code is `currency`, or the current value of `currencyField` in the form, or in the row of a child collection. Without a code of three letters nothing is shown beside the box. It sends the typed text as a plain JSON number |
     | `boolean` | a checkbox |
     | `date` | a date picker. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
     | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
@@ -129,11 +130,10 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     `null` and every child collection empty, so an untouched field stays out of a create and the server
     decides what is required. An edit also sends the `version` it read. An
     emptied text or number input is sent as `null`.
-  - **Number text.** The body is written by hand, so an integer or decimal
-    goes out as the typed text and no digit is lost. Text that is not a JSON
-    number, such as `1,5`, goes out as a JSON string, and the server rejects
-    it on its field. The form never turns number text into a JavaScript
-    number.
+  - **Number text.** The body is written by hand, so an integer, decimal or money
+    amount goes out as the typed text and no digit is lost. Text that is not a JSON number,
+    such as `1,5`, goes out as a JSON string, and the server rejects it on its field. The form
+    never turns number text into a JavaScript number.
   - **Errors.** A `400` or `409` problem is mapped by its JSON Pointer keys. A
     key `/values/<field>` for a field of the form shows its messages under
     that field. Every other key, such as `""`, `/values` or `/version`, shows

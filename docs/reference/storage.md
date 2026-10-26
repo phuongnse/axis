@@ -657,9 +657,11 @@ schema of the tenant database.
     | `session.signedIn`      | The callback creates a session           | The user id and the display name | `{ "clientAddress" }`           |
     | `session.signedOut`     | `POST /api/auth/sign-out` with a session | The user id and the display name | `{ "clientAddress" }`           |
     | `session.signInRefused` | The callback is refused                  | `anonymous`, null                | `{ "reason", "clientAddress" }` |
-    - `reason` is one of `otherTenant`, `invalidToken`, `invalidState` or
-      `providerError`. The last covers a person who cancels at the identity
-      provider, and a provider error.
+    - `reason` is one of `otherTenant`, `invalidToken`, `invalidState`,
+      `invalidIssuer` or `providerError`. `invalidIssuer` is a `fapi2` callback
+      whose `iss` is missing or is not the tenant's `Authority`.
+      `providerError` covers a person who cancels at the identity provider, and
+      a provider error.
     - `application_id`, `entity_id`, `record_id` and `process_instance_id` are
       null.
     - `clientAddress` is always present. It is the address as text, with an
@@ -675,6 +677,13 @@ schema of the tenant database.
     - They never hold a token, a cookie or the user agent.
     - A session that expires writes nothing. A sign-out with no session writes
       nothing.
+  - **Dead letter actions.** A redeliver or a discard of a
+    [dead letter](process-events.md#routes) writes `deadLetter.redelivered` or
+    `deadLetter.discarded`, with the user as `actor`. The `application_id` is
+    set, and `entity_id`, `record_id` and `process_instance_id` are null,
+    because a dead letter has no subject record. The `details` are
+    `{ "deadLetterId", "kind", "triggerId", "eventId", "occurrenceAt", "reason" }`,
+    with null for the ids that the kind lacks.
 
   - An index on `(entity_id, record_id, occurred_at desc, id desc)` serves
     the [record history](record-api.md#audit-records-and-history).

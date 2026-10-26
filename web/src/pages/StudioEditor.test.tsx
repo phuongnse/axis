@@ -401,27 +401,30 @@ function renderResource(
   path: string | null = null,
   onOpenPath = vi.fn(),
 ) {
-  render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioNamesContext.Provider value={names}>
-          <StudioEditor
-            application="Shop"
-            item={item}
-            resources={[item]}
-            path={path}
-            diagnosticPaths={[]}
-            onOpenPath={onOpenPath}
-            onOpen={vi.fn()}
-            onSaved={vi.fn()}
-            onTextsWritten={onTextsWritten}
-            onDeleted={vi.fn()}
-          />
-        </StudioNamesContext.Provider>
-      </TextProvider>
-    </ThemeModeProvider>,
+  const editor = (current: string | null) => (
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioNamesContext.Provider value={names}>
+            <StudioEditor
+              application="Shop"
+              item={item}
+              resources={[item]}
+              path={current}
+              diagnosticPaths={[]}
+              onOpenPath={onOpenPath}
+              onOpen={vi.fn()}
+              onSaved={vi.fn()}
+              onTextsWritten={onTextsWritten}
+              onDeleted={vi.fn()}
+            />
+          </StudioNamesContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>
   )
-  return onOpenPath
+  const { rerender } = render(editor(path))
+  return { onOpenPath, setPath: (next: string) => rerender(editor(next)) }
 }
 
 type PatchOperation = { op: string; path: string; value?: unknown }
@@ -796,7 +799,7 @@ describe('StudioEditor for a process', () => {
     async (mode) => {
       localStorage.setItem('axis.themeMode', mode)
       stubResource(processItem, processContent)
-      const onOpenPath = renderResource(processItem)
+      const { onOpenPath } = renderResource(processItem)
       await screen.findByTestId('studio-graph-node-0', {}, slow)
       expect(document.querySelector('.react-flow')).toHaveClass(mode)
 
@@ -821,7 +824,7 @@ describe('StudioEditor for a process', () => {
 
   it('opens the transition of an edge when the edge is clicked', async () => {
     stubResource(processItem, processContent)
-    const onOpenPath = renderResource(processItem)
+    const { onOpenPath } = renderResource(processItem)
 
     fireEvent.click(await screen.findByTestId('rf__edge-/steps/2/otherwise', {}, slow))
     expect(onOpenPath).toHaveBeenCalledWith('/steps/2/otherwise')
@@ -1076,6 +1079,70 @@ describe('StudioEditor for a page', () => {
     expect(await screen.findByTestId('studio-page-editor', {}, slow)).toBeInTheDocument()
     expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('form · PurchaseRequest')
     expect(screen.getByTestId('studio-field-/widgets/0/actions/0/process')).toBeInTheDocument()
+  })
+
+  it('opens on the Design tab', async () => {
+    stubResource(pageItem, tablePage)
+    renderResource(pageItem, pageNames)
+
+    await waitFor(
+      () => expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true'),
+      slow,
+    )
+  })
+
+  it('selects the Form tab and scrolls to a field of a widget on a path', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      stubResource(pageItem, tablePage)
+      renderResource(pageItem, pageNames, vi.fn(), '/widgets/0/actions/0/process')
+
+      await waitFor(
+        () => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'),
+        slow,
+      )
+      const field = await screen.findByTestId('studio-field-/widgets/0/actions/0/process', {}, slow)
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+      expect(scrollIntoView.mock.contexts).toEqual([field])
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
+  it('moves from the Design tab to the Form tab for a path opened later', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      stubResource(pageItem, tablePage)
+      const { setPath } = renderResource(pageItem, pageNames)
+      await waitFor(
+        () => expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true'),
+        slow,
+      )
+
+      setPath('/widgets/0/actions/0/process')
+
+      await waitFor(
+        () => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'),
+        slow,
+      )
+      const field = await screen.findByTestId('studio-field-/widgets/0/actions/0/process', {}, slow)
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+      expect(scrollIntoView.mock.contexts).toEqual([field])
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
+  it('selects the JSON tab for a path the page editor cannot show', async () => {
+    stubResource(pageItem, tablePage)
+    renderResource(pageItem, pageNames, vi.fn(), '/x-extra')
+
+    await waitFor(
+      () => expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true'),
+      slow,
+    )
   })
 
   it('patches only the edit and keeps the unknown keys on the file and the widget', async () => {
@@ -1391,6 +1458,16 @@ describe('StudioEditor for a form', () => {
     )
   }
 
+  it('opens on the Design tab', async () => {
+    stubForm()
+    renderForm()
+
+    await waitFor(
+      () => expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true'),
+      slow,
+    )
+  })
+
   it('undoes and redoes the insert of a palette field', async () => {
     stubForm()
     renderForm()
@@ -1495,6 +1572,16 @@ describe('StudioEditor for an entity', () => {
   function sentFields(fetchMock: ReturnType<typeof vi.fn>): unknown {
     return sentPatch(fetchMock).find((operation) => operation.path === '/fields')!.value
   }
+
+  it('opens on the Form tab', async () => {
+    stubResource(resources[1], entityContent)
+    renderResource(resources[1])
+
+    await waitFor(
+      () => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'),
+      slow,
+    )
+  })
 
   it('opens in the designer and keeps the JSON tab with the draft', async () => {
     stubResource(designedItem, designed)

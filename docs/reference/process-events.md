@@ -213,7 +213,10 @@ triggers of the active release:
 
 1. The worker reads the triggers for the event's name, ignoring letter case.
    With none, or when the application has no active release, the item is
-   deleted with no other write.
+   deleted with no other write. An item that names a trigger, one queued by a
+   [redeliver](#dead-letters), keeps only that trigger. When the active release
+   does not have it as an `async` trigger on the event, the item is deleted
+   with no other write, and the worker logs a warning.
 2. For each trigger, one transaction does this:
    1. It checks the item's claim and extends its lease.
    2. It inserts a receipt into `axis.trigger_starts`, keyed by the trigger,
@@ -406,9 +409,9 @@ process without a subject when a record is deleted:
 }
 ```
 
-- `delete` is listed alone. With `create` or `update` it is `AXC0250`, and a
-  `fields` list is `AXC0251`.
-- The process must have no subject, otherwise it is `AXC0252`. `parameters`
+- `delete` is listed alone. With `create` or `update` it is `AXC0254`, and a
+  `fields` list is `AXC0255`.
+- The process must have no subject, otherwise it is `AXC0256`. `parameters`
   maps each process parameter to an expression over the record as it was before
   the delete, of the parameter's type, with the scope of a data change trigger's
   `when`. So does `when`. An unknown or repeated key is `AXC0165`, a value that
@@ -441,10 +444,11 @@ process without a subject when a record is deleted:
 
 Deliveries that keep failing stop after a limit and are kept as dead letters, see
 [D72](../decisions/d72-a-delivery-limit-and-dead-letters.md). The counting, the
-backoff, the limit, the two tables, the log and the metric are built for the start
-of an `async` trigger from `event.deliver` and for `trigger.fanOut`.
-_(Planned for M14)_ The email kind, the waiting-instance target and the routes
-below are not built yet.
+backoff, the limit, the two tables, the log, the metric and the
+[routes](#routes) are built for the start of an `async` trigger from
+`event.deliver` and for `trigger.fanOut`.
+_(Planned for M14)_ The email kind and the waiting-instance target are not built
+yet.
 
 **What counts.** Three kinds of work item deliver something, and each
 failure is counted for its own target:
@@ -510,7 +514,7 @@ the trigger and `occurrence_at`.
 | `settled_by` | `text`, null | The user who redelivered or discarded it |
 | `created_at`, `settled_at` | `timestamptz` | When it was written and settled |
 
-**Routes.**
+### Routes
 
 ```http
 GET /api/apps/{app}/processes/{process}/dead-letters?state=open
@@ -523,15 +527,59 @@ Content-Type: application/json
 
 - Listing needs the `inspect` grant on the process. Redeliver and discard need
   its `retry` grant. The `reason` follows the rule of the
-  [operator commands](process-inspection.md#operator-commands).
+  [operator commands](process-inspection.md#operator-commands). Listing does not
+  check whether the user may read the event's record, because a dead letter
+  holds ids and a fixed error text, never a record value.
 - **Redeliver** clears the target's count, removes a `deadLettered` receipt,
   and queues the delivery again for that target only. **Discard** closes the
   dead letter. Either one on a dead letter that is not `open` is a `409`.
 - The audit records are `deadLetter.redelivered` and `deadLetter.discarded`,
-  with the reason.
+  with the reason, see [audit records](storage.md#audit-records-and-sequence-counters).
 - The [process inspector widget](process-inspector-widget.md) lists the open
   dead letters of its process, with Redeliver and Discard for a user with the
   grant.
+
+**The list.** It shows the dead letters of the process, newest first, paged as
+the instance list is, with `page`, `pageSize`, `totalCount` and `items`. The
+optional `state` is `open`, `redelivered` or `discarded`. Any other value is a
+`400` keyed `state`, and without it every state is listed. A request is checked
+in this order: session (`401`), application and process (`404`), the `inspect`
+grant (`403`), then the query (`400`). Each item has `id`, `kind`, `eventId`,
+`triggerId`, `processInstanceId`, `emailId`, `occurrenceAt`, `attempts`,
+`lastError`, `state`, `reason`, `settledBy`, `createdAt`, `settledAt` and
+`commands`, with times in UTC and null for what its kind lacks. `commands` is
+`["redeliver", "discard"]` for an `open` dead letter when the user holds the
+`retry` grant, and empty otherwise.
+
+**The commands.** A command is checked in this order: session (`401`),
+application and process (`404`), the `retry` grant (`403`), content type
+(`415`), then the body (`400`), which is exactly `{ "reason": "<text>" }`. An
+`id` that is not a hyphenated UUID, or that names no dead letter of this
+process, is a `404` titled "No dead letter of this process exists with this
+id.". One transaction then locks the row and runs the command. A dead letter
+that is not `open` is a `409` titled "The dead letter is not open.". A refused
+command writes nothing. A success answers `200` with the dead letter in the
+list's shape, now settled with its reason and the user in `settledBy`, and
+with empty `commands`.
+
+- **`event.deliver`.** A redeliver needs the trigger as an `async` event trigger
+  in the active release. Otherwise it is a `409` titled "The trigger of the dead
+  letter is not in the active release.". It clears the count of the trigger and
+  the event, removes the trigger's `deadLettered` receipt and queues an
+  `event.deliver` item that names the trigger. The worker then delivers to that
+  trigger alone, see [event delivery](#event-delivery). A trigger that already
+  started its process for the occurrence is not run again.
+- **`trigger.fanOut`.** A redeliver needs the schedule trigger in the active
+  release, with the same `409` otherwise. It clears the count of the occurrence
+  and queues the fan-out on the active release. The receipts skip the records
+  that already started for that occurrence.
+- **Other kinds.** A redeliver of a kind that is not built is a `409` titled
+  "This kind of dead letter cannot be redelivered.". Discard closes a dead
+  letter of any kind.
+- **Audit.** Each success writes `deadLetter.redelivered` or `deadLetter.discarded`
+  in the same transaction. It names the application and no entity, record or
+  instance, and its details are `deadLetterId`, `kind`, `triggerId`, `eventId`,
+  `occurrenceAt` and `reason`, with null for what the kind lacks.
 
 **Logs and metrics.** The worker logs each dead letter at Warning level with
 its kind and target ids, and counts it in `axis.dead_letters.created`, with

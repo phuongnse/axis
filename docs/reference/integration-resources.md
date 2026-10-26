@@ -497,7 +497,7 @@ and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
   without a subject is `AXC0247`, whatever the trigger type. The exceptions are
   a schedule trigger without a data source, which must name a process without
   a subject, otherwise it is `AXC0249`, and a delete trigger, which must too,
-  otherwise it is `AXC0252`.
+  otherwise it is `AXC0256`.
 - The subject entity matches. The event's entity, the `entity`, or the data
   source's root entity is the process's subject entity.
 - The `event` exists.
@@ -505,8 +505,8 @@ and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
 - A data change trigger's `when` has the scope of a process expression over
   the new record, and gives a boolean.
 - `on` is non-empty and holds only `create`, `update` and `delete`. A delete
-  trigger lists `delete` alone, otherwise it is `AXC0250`, and it has no
-  `fields`, otherwise it is `AXC0251`.
+  trigger lists `delete` alone, otherwise it is `AXC0254`, and it has no
+  `fields`, otherwise it is `AXC0255`.
 - Each name in `fields` names a field of the entity that is not computed.
 - `mode` is `async` or `sync`.
 - `schedule` is a valid cron expression.

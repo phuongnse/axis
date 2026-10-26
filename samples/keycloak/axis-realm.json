@@ -55,6 +55,12 @@
           "name": "reporting-system",
           "clientRole": true
         }
+      ],
+      "axis-fapi": [
+        {
+          "name": "fapi2",
+          "clientRole": true
+        }
       ]
     }
   },
@@ -179,6 +185,46 @@
             "included.custom.audience": "axis-services",
             "id.token.claim": "false",
             "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "axis-fapi",
+      "name": "Axis FAPI 2.0",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-jwt",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5206/*"
+      ],
+      "attributes": {
+        "require.pushed.authorization.requests": "true",
+        "pkce.code.challenge.method": "S256",
+        "token.endpoint.auth.signing.alg": "ES256",
+        "use.jwks.url": "false",
+        "use.jwks.string": "true",
+        "jwks.string": "{\"keys\":[{\"kty\":\"EC\",\"x\":\"rGTy1TGk-1cS1k0hNdvOJ0sJWSkVfTyx3_Z9QTPwxXo\",\"y\":\"nI8Vhzj6ezbaT6FZh_OeYRdcgVv8OeOitsZca3QNNOc\",\"crv\":\"P-256\",\"kid\":\"key-1\",\"use\":\"sig\",\"alg\":\"ES256\"},{\"kty\":\"EC\",\"x\":\"B-t2hith012YRuDz5Ed1O-hXah_MZGBX29jiBb8pQ44\",\"y\":\"lC256uEhJvcOxMQ2VkuPC8ybFMx27tksPLwp7Bfg-F4\",\"crv\":\"P-256\",\"kid\":\"key-2\",\"use\":\"sig\",\"alg\":\"ES256\"}]}"
+      },
+      "protocolMappers": [
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "axis",
+            "claim.name": "roles",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
           }
         }
       ]
@@ -432,5 +478,66 @@
         ]
       }
     }
-  ]
+  ],
+  "clientProfiles": {
+    "profiles": [
+      {
+        "name": "axis-fapi2",
+        "description": "FAPI 2.0 settings for the axis-fapi client",
+        "executors": [
+          {
+            "executor": "pkce-enforcer",
+            "configuration": {
+              "auto-configure": "false"
+            }
+          },
+          {
+            "executor": "secure-client-authenticator",
+            "configuration": {
+              "allowed-client-authenticators": [
+                "client-jwt"
+              ],
+              "default-client-authenticator": "client-jwt"
+            }
+          },
+          {
+            "executor": "secure-signature-algorithm-signed-jwt",
+            "configuration": {
+              "require-client-assertion": "true"
+            }
+          },
+          {
+            "executor": "dpop-bind-enforcer",
+            "configuration": {
+              "auto-configure": "false",
+              "enforce-authorization-code-binding-to-dpop": "false"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "clientPolicies": {
+    "policies": [
+      {
+        "name": "axis-fapi2-policy",
+        "description": "Applies the axis-fapi2 profile to clients that hold the fapi2 role",
+        "enabled": true,
+        "conditions": [
+          {
+            "condition": "client-roles",
+            "configuration": {
+              "type": "role",
+              "roles": [
+                "fapi2"
+              ]
+            }
+          }
+        ],
+        "profiles": [
+          "axis-fapi2"
+        ]
+      }
+    ]
+  }
 }

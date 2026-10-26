@@ -7,10 +7,10 @@ activate releases, and back up and restore tenants. It follows
 and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
-`tenant list`, `tenant backup`, `tenant restore`, `tenant binding list|set|remove`,
+`tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant binding list|set|remove`,
 `tenant host add|remove|move`, `migrate`, `activate`, `publisher` and `version`. The commands that
 change a tenant after it is created and rotate keys are in
-[tenant setting commands](tenant-setting-commands.md). The sign-in settings and the key rotation
+[tenant setting commands](tenant-setting-commands.md). The client key options and the key rotation
 are _(planned for M16)_ on the same page. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
 [startup activation](host-settings.md#startup-activation).
@@ -43,7 +43,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
 | `Tenancy:Source` | `Tenancy__Source` | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
 | none | `AXIS_BINDING_SECRET` | The value of the `secret` binding that `tenant binding set --secret` sets. When it is unset, the value comes from standard input. It is never a command-line option. Only that command reads it. |
-| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. Only `tenant create` and `tenant restore` read it. It is never a command-line option, so it does not appear in a process list. |
+| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. `tenant create` and `tenant restore` read it, and so does `tenant oidc set --client-secret`, which reads the first line of standard input when the variable is not set. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
 A missing or invalid setting exits with code 2 before any tenant work. The
@@ -190,7 +190,8 @@ with code 2.
   `PUBLIC`, and grants both only to the runtime role. Without this, any login
   role of the database server could connect to the tenant database.
 - The command sets no claim names, endpoint audience or service audience. They stay empty, so the
-  hosts use their defaults. It sets no deployment binding either, except the
+  hosts use their defaults. [`tenant oidc set`](tenant-setting-commands.md#sign-in-settings) sets
+  them later. It sets no deployment binding either, except the
   `url` bindings that `--binding` gives a preview tenant.
 
 **Names.** The role and database names come from the id. PostgreSQL names hold
@@ -452,7 +453,8 @@ option or a missing setting.
 
 Set each `secret` binding with
 [`tenant binding set <id> <name> --secret`](tenant-setting-commands.md#deployment-bindings).
-`tenant oidc set --client-secret` sets the OIDC client secret _(planned for M16)_, see
+[`tenant oidc set --client-secret`](tenant-setting-commands.md#sign-in-settings) sets the OIDC
+client secret again, see
 [tenant setting commands](tenant-setting-commands.md).
 
 **Restoring over an existing tenant.** There is no in-place overwrite.
@@ -892,8 +894,7 @@ admin host carries the same version in its OCI label, see
 - Deleting a tenant.
 - An HTTP API for provisioning.
 - Moving a tenant to another database server.
-- Commands that set a tenant's claim names or endpoint audience. `tenant create`
-  sets none of them, so they stay empty. `tenant oidc set` is _(planned for M16)_,
+- Commands that set a tenant's client key. `tenant oidc set --client-key` is _(planned for M16)_,
   see [tenant setting commands](tenant-setting-commands.md) and
   [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md).
 - Point-in-time recovery of a tenant, and restoring a tenant into another

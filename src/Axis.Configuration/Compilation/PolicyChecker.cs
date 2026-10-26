@@ -10,7 +10,7 @@ namespace Axis.Configuration.Compilation;
 /// a declared role, matched exactly. Each grant has exactly one target: an <c>entity</c>, a
 /// <c>dataSource</c>, a <c>process</c> or an <c>endpoint</c>. Its actions are ones that target
 /// takes: <c>read</c>, <c>create</c>, <c>update</c> and <c>delete</c> for an entity, <c>read</c> for
-/// a data source, <c>start</c>, <c>inspect</c>, <c>cancel</c>, <c>retry</c> and <c>resolve</c> for a process and <c>invoke</c> for an endpoint. Only an entity grant
+/// a data source, <c>start</c>, <c>inspect</c>, <c>cancel</c>, <c>retry</c>, <c>resolve</c> and <c>reassign</c> for a process and <c>invoke</c> for an endpoint. Only an entity grant
 /// has a <c>filter</c> or <c>fields</c>. The target
 /// is loaded, ignoring letter case, and an entity target is not a child entity. Each of its
 /// <c>fields</c> is a field of the entity, ignoring letter case. Its <c>filter</c> parses,
@@ -25,7 +25,7 @@ internal static class PolicyChecker
 {
     private static readonly PolicyAction[] _entityActions = [PolicyAction.Read, PolicyAction.Create, PolicyAction.Update, PolicyAction.Delete];
     private static readonly PolicyAction[] _dataSourceActions = [PolicyAction.Read];
-    private static readonly PolicyAction[] _processActions = [PolicyAction.Start, PolicyAction.Inspect, PolicyAction.Cancel, PolicyAction.Retry, PolicyAction.Resolve];
+    private static readonly PolicyAction[] _processActions = [PolicyAction.Start, PolicyAction.Inspect, PolicyAction.Cancel, PolicyAction.Retry, PolicyAction.Resolve, PolicyAction.Reassign];
     private static readonly PolicyAction[] _endpointActions = [PolicyAction.Invoke];
 
     /// <summary>
@@ -328,7 +328,8 @@ internal static class PolicyChecker
             "cancel" => PolicyAction.Cancel,
             "retry" => PolicyAction.Retry,
             "resolve" => PolicyAction.Resolve,
-            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "The JSON Schema allows only read, create, update, delete, start, invoke, inspect, cancel, retry and resolve."),
+            "reassign" => PolicyAction.Reassign,
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "The JSON Schema allows only read, create, update, delete, start, invoke, inspect, cancel, retry, resolve and reassign."),
         };
 
     private static string Name(PolicyAction action) => action.ToString().ToLowerInvariant();

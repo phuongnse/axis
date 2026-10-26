@@ -232,15 +232,12 @@ afterEach(() => {
 })
 
 describe('the Design tab of a page', () => {
-  it('opens on the Form tab, then draws the posted draft, and draws again after an edit in the Form tab and the JSON tab', async () => {
+  it('opens on the Design tab, then draws the posted draft, and draws again after an edit in the Form tab and the JSON tab', async () => {
     const { fetchMock, posts } = stub(content([{ type: 'kpi' }]))
     renderEditor()
 
-    await screen.findByTestId('studio-page-editor', {}, slow)
-    expect(screen.queryByTestId('studio-page-canvas')).not.toBeInTheDocument()
-
-    await openTab('Design')
     const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
+    expect(screen.queryByTestId('studio-page-editor')).not.toBeInTheDocument()
     expect(await within(canvas).findByTestId('kpi-tile', {}, slow)).toBeInTheDocument()
     await waitFor(
       () => expect(within(canvas).getByTestId('kpi-value')).toHaveTextContent('Total amount: 1250.50'),

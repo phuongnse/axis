@@ -76,9 +76,13 @@ public static class DiagnosticCodes
     public const string StepNeedsSubject = "AXC0246";
     public const string TriggerProcessWithoutSubject = "AXC0247";
     public const string ScheduleJobProcessWithSubject = "AXC0249";
-    public const string DeleteTriggerWithOtherKinds = "AXC0250";
-    public const string DeleteTriggerWithFields = "AXC0251";
-    public const string DeleteTriggerProcessWithSubject = "AXC0252";
+    public const string UnknownSubProcess = "AXC0250";
+    public const string SubProcessCycle = "AXC0251";
+    public const string InvalidSubProcessSubject = "AXC0252";
+    public const string InvalidSubProcessParameters = "AXC0253";
+    public const string DeleteTriggerWithOtherKinds = "AXC0254";
+    public const string DeleteTriggerWithFields = "AXC0255";
+    public const string DeleteTriggerProcessWithSubject = "AXC0256";
     public const string UnknownOperation = "AXC0078";
     public const string UnknownSetField = "AXC0079";
     public const string ReadOnlySetField = "AXC0080";
