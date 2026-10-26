@@ -334,7 +334,7 @@ reported in one pass. See
   `when`. A problem is reported at `/steps/{i}/set/{field}` with its
   expression code, such as `AXC0048` for a value of the wrong type.
 - A `createRecord` step names a loaded root entity in `entity`. An unknown
-  entity is `AXC0257` and a child entity is `AXC0258`, both at
+  entity is `AXC0260` and a child entity is `AXC0261`, both at
   `/steps/{i}/entity`. Its `set` keys and values are checked against that
   entity as above, and a creator field is `AXC0080` too. See
   [Create record operation](process-flow.md#create-record-operation).

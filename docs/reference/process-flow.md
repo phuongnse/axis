@@ -189,7 +189,7 @@ A `createRecord` operation creates a record of another entity:
 ```
 
 - `entity` names a root entity of the application, not a child entity. An
-  unknown entity is `AXC0257` and a child entity is `AXC0258`, both reported at
+  unknown entity is `AXC0260` and a child entity is `AXC0261`, both reported at
   `/steps/{i}/entity`. Neither is reported when the entity's file failed to
   load.
 - `set` is required and has at least one field. It maps fields of that entity
