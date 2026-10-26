@@ -20,7 +20,8 @@ namespace Axis.Scenarios.Runner;
 /// whose time has already passed runs. <see cref="AdvanceAsync"/> runs them too, and the <c>task.escalate</c> and <c>task.deadline</c> items,
 /// after the scenario's <c>now</c> moved, so a task is escalated and expires only when the scenario's time reaches the escalation or the deadline. The items run over
 /// the scenario's connection string, so they read the scenario's <c>now</c> too, and a due time is
-/// compared with it. Leases keep the database clock.
+/// compared with it. Leases keep the database clock. <see cref="AdvanceAsync"/> also runs the <c>notification.email</c> items
+/// with no mail host, so each stays queued and nothing is sent.
 /// </summary>
 internal sealed class ScenarioWork : IDisposable
 {
@@ -66,6 +67,7 @@ internal sealed class ScenarioWork : IDisposable
                 .. externalHandlers,
                 new TriggerScheduleHandler(models, loggerFactory.CreateLogger<TriggerScheduleHandler>()),
                 new TriggerFanOutHandler(models, new DeliverySettings(5), loggerFactory.CreateLogger<TriggerFanOutHandler>()),
+                new NotificationEmailHandler(new EmailDefaults(null), null, loggerFactory.CreateLogger<NotificationEmailHandler>()),
             ],
             loggerFactory);
     }

@@ -110,10 +110,10 @@ public sealed class ProcessNotifyStepTests(ProcessStepFixture fixture) : IClassF
     [Fact]
     public async Task Notify_step_with_the_email_channel_stages_one_pending_email_and_queued_item_for_each_address()
     {
-        var (releaseId, model) = await ActivateMailReleaseAsync();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken);
         var subjectId = await fixture.InsertRequestAsync(500m, 4);
         var title = $"Request {subjectId:N}";
-        await UpsertProfileAsync(title, "vi", $"vi.{subjectId:N}@example.test");
+        await NotifyMailApp.UpsertProfileAsync(fixture, title, "vi", $"vi.{subjectId:N}@example.test", CancellationToken);
         var instanceId = await fixture.StartAsync("NotifyMail", subjectId, releaseId, model);
 
         await fixture.RunUntilIdleAsync(CancellationToken);
@@ -146,7 +146,7 @@ public sealed class ProcessNotifyStepTests(ProcessStepFixture fixture) : IClassF
     [Fact]
     public async Task Notify_step_stages_no_email_for_a_user_without_a_profile_email_and_logs_the_user()
     {
-        var (releaseId, model) = await ActivateMailReleaseAsync();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken);
         var subjectId = await fixture.InsertRequestAsync(500m, 4);
         var title = $"Request {subjectId:N}";
         var instanceId = await fixture.StartAsync("NotifyMail", subjectId, releaseId, model);
@@ -169,10 +169,10 @@ public sealed class ProcessNotifyStepTests(ProcessStepFixture fixture) : IClassF
     [Fact]
     public async Task Notify_step_that_fails_after_staging_its_emails_leaves_no_email_and_no_item()
     {
-        var (releaseId, model) = await ActivateMailReleaseAsync();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken);
         var subjectId = await fixture.InsertRequestAsync(500m, 4);
         var title = $"Request {subjectId:N}";
-        await UpsertProfileAsync(title, "vi", $"vi.{subjectId:N}@example.test");
+        await NotifyMailApp.UpsertProfileAsync(fixture, title, "vi", $"vi.{subjectId:N}@example.test", CancellationToken);
         var instanceId = await fixture.StartAsync("NotifyMail", subjectId, releaseId, model);
 
         // The history row is written after the emails are staged. The failure's own row has an error, so it still goes in.
@@ -211,39 +211,6 @@ public sealed class ProcessNotifyStepTests(ProcessStepFixture fixture) : IClassF
             await fixture.CountAsync(
                 "SELECT count(*) FROM axis.process_work_items WHERE kind = 'notification.email' AND process_instance_id = @id",
                 ("id", instanceId)));
-    }
-
-    /// <summary>
-    /// Activates a copy of StepApp with the process NotifyMail and Vietnamese texts. The process notifies the title user and
-    /// <c>ops@example.test</c> by both channels, and the comment user, who is null.
-    /// </summary>
-    private async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateMailReleaseAsync()
-    {
-        var process = await File.ReadAllTextAsync(Path.Combine(ProcessStepFixture.StepAppFolder, "processes", "notify.json"), CancellationToken);
-        process = process
-            .Replace("d74f217a-8513-4825-9467-c3aa720d70a5", "d74f217a-8513-4825-9467-c3aa720d70b6", StringComparison.Ordinal)
-            .Replace("\"name\": \"Notify\"", "\"name\": \"NotifyMail\"", StringComparison.Ordinal)
-            .Replace("""{ "role": "reviewer" }""", """{ "email": "'ops@example.test'" }""", StringComparison.Ordinal)
-            .Replace("""["inApp"]""", """["inApp", "email"]""", StringComparison.Ordinal);
-        var texts = await File.ReadAllTextAsync(Path.Combine(ProcessStepFixture.StepAppFolder, "texts", "en.json"), CancellationToken);
-        texts = texts
-            .Replace("0b6e1f4c-5d2a-4e8b-9c3f-7a1d2e4b6c81", "0b6e1f4c-5d2a-4e8b-9c3f-7a1d2e4b6c82", StringComparison.Ordinal)
-            .Replace("\"TextsEn\"", "\"TextsVi\"", StringComparison.Ordinal)
-            .Replace("\"locale\": \"en\"", "\"locale\": \"vi\"", StringComparison.Ordinal)
-            .Replace("\"Amount {amount}.\"", "\"Số tiền {amount}.\"", StringComparison.Ordinal)
-            .Replace("\"Request {title}\"", "\"Yêu cầu {title}\"", StringComparison.Ordinal);
-        var site = await File.ReadAllTextAsync(Path.Combine(ProcessStepFixture.StepAppFolder, "sites", "steps.json"), CancellationToken);
-        site = site.Replace("\"available\": [\"en\"]", "\"available\": [\"en\", \"vi\"]", StringComparison.Ordinal);
-        return await fixture.ActivateCopyWithFilesAsync(
-            ("processes/notify-mail.json", process),
-            ("texts/vi.json", texts),
-            ("sites/steps.json", site));
-    }
-
-    private async Task UpsertProfileAsync(string userId, string locale, string email)
-    {
-        await using var connection = await fixture.DataSource.OpenConnectionAsync(CancellationToken);
-        await UserProfiles.UpsertAsync(connection, userId, "Requester", email, locale, CancellationToken);
     }
 
     /// <summary>The outbox rows whose subject matches <paramref name="subjectPattern"/>, ordered by address.</summary>

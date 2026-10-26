@@ -107,6 +107,11 @@ are published on `127.0.0.1` only. The server creates Studio's new applications 
 to move that folder. On Linux the server runs as UID 1654, so create the folder first and make it
 writable by that UID. Docker creates a missing folder as root.
 
+Compose runs no mail server, so the worker logs one warning per tenant and sends no email, and the
+emails of `notify` steps stay queued. Set `Email__Smtp__Host`, `Email__Smtp__Port`,
+`Email__Smtp__UseTls` and `Email__From` on the worker to turn sending on. See
+[mail settings](reference/notifications.md#mail-settings).
+
 ## Database roles
 
 The integration test fixtures create two database
@@ -187,6 +192,10 @@ works on a fresh clone:
   databases. Each line starts with `[server]`, `[worker]` or `[web]`, and the
   script's own messages start with `[dev]`. The SPA proxies `/api` and `/health`
   to the server.
+- It starts no mail server, so the worker logs one warning per tenant and sends no email, and the
+  emails of `notify` steps stay queued. Export `Email__Smtp__Host`, `Email__Smtp__Port`,
+  `Email__Smtp__UseTls` and `Email__From` to turn sending on. See
+  [mail settings](reference/notifications.md#mail-settings).
 - It also runs one publisher, `axis-admin publisher`, with
   its lines starting with `[publisher]`. It starts once the server has
   migrated the tenant databases. It runs from the built `Axis.Admin.dll`, not under
