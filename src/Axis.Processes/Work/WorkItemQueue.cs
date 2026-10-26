@@ -43,7 +43,7 @@ public static class WorkItemQueue
                 AND (lease_expires_at IS NULL OR lease_expires_at <= now())
         """;
 
-    private const string ClaimedColumnsSql = "w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor, w.entity_id, w.trace_id, w.span_id, w.task_id, w.revision";
+    private const string ClaimedColumnsSql = "w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor, w.entity_id, w.trace_id, w.span_id, w.task_id, w.revision, w.email_id";
 
     internal const string ReadDueSql = $"""
         SELECT kind, count(*), extract(epoch FROM {SqlTranslator.NowSql} - min(due_at))::double precision
@@ -59,8 +59,9 @@ public static class WorkItemQueue
     /// the event occurrence it delivers, <paramref name="packageCallId"/> the package call it runs,
     /// <paramref name="triggerId"/> the schedule trigger it runs, <paramref name="releaseId"/> the
     /// release whose trigger a fan-out runs, <paramref name="occurrenceAt"/> its occurrence,
-    /// <paramref name="taskId"/> the task a deadline expires, and <paramref name="revision"/> the
-    /// revision of the instance that a timer item resumes.
+    /// <paramref name="taskId"/> the task a deadline expires, <paramref name="revision"/> the
+    /// revision of the instance that a timer item resumes, and <paramref name="emailId"/> the outbox
+    /// email a <c>notification.email</c> item sends.
     /// </summary>
     public static async Task<Guid> EnqueueAsync(
         NpgsqlConnection connection,
@@ -77,14 +78,15 @@ public static class WorkItemQueue
         Guid? releaseId = null,
         DateTimeOffset? occurrenceAt = null,
         Guid? taskId = null,
-        long? revision = null)
+        long? revision = null,
+        Guid? emailId = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         var id = Guid.CreateVersion7();
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id, connector_call_id, event_id, package_call_id, trigger_id, release_id, occurrence_at, trace_id, span_id, task_id, revision)
-            VALUES (@id, @tenant, @kind, @due, @instance, @call, @event, @packageCall, @trigger, @release, @occurrence, @trace, @span, @task, @revision)
+            INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at, process_instance_id, connector_call_id, event_id, package_call_id, trigger_id, release_id, occurrence_at, trace_id, span_id, task_id, revision, email_id)
+            VALUES (@id, @tenant, @kind, @due, @instance, @call, @event, @packageCall, @trigger, @release, @occurrence, @trace, @span, @task, @revision, @email)
             """,
             connection,
             transaction);
@@ -103,6 +105,7 @@ public static class WorkItemQueue
         command.Parameters.Add(new NpgsqlParameter("span", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentSpanId() ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("task", NpgsqlDbType.Uuid) { Value = (object?)taskId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("revision", NpgsqlDbType.Bigint) { Value = revision is { } rev ? rev : DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("email", NpgsqlDbType.Uuid) { Value = (object?)emailId ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
         return id;
     }
@@ -154,7 +157,8 @@ public static class WorkItemQueue
                 await reader.IsDBNullAsync(14, cancellationToken) ? null : reader.GetString(14),
                 await reader.IsDBNullAsync(15, cancellationToken) ? null : reader.GetString(15)),
             await reader.IsDBNullAsync(16, cancellationToken) ? null : reader.GetGuid(16),
-            await reader.IsDBNullAsync(17, cancellationToken) ? null : reader.GetInt64(17));
+            await reader.IsDBNullAsync(17, cancellationToken) ? null : reader.GetInt64(17),
+            await reader.IsDBNullAsync(18, cancellationToken) ? null : reader.GetGuid(18));
     }
 
     /// <summary>

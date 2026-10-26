@@ -13,6 +13,8 @@ public static class UserProfiles
 
     private const string LocaleSql = """SELECT "locale" FROM "axis"."user_profiles" WHERE "user_id" = @user""";
 
+    private const string ContactsSql = """SELECT "user_id", "email", "locale" FROM "axis"."user_profiles" WHERE "user_id" = ANY(@users)""";
+
     private const string SearchSql =
         """
         SELECT "user_id", "display_name" FROM "axis"."user_profiles"
@@ -84,6 +86,35 @@ public static class UserProfiles
     }
 
     /// <summary>
+    /// The email and locale of the profiles of <paramref name="userIds"/>, by user id. A user with no profile is not in the result.
+    /// </summary>
+    /// <param name="transaction">The transaction the read joins, or null.</param>
+    public static async Task<IReadOnlyDictionary<string, UserContact>> FindContactsAsync(
+        NpgsqlConnection connection, NpgsqlTransaction? transaction, IReadOnlyCollection<string> userIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(userIds);
+
+        var contacts = new Dictionary<string, UserContact>(StringComparer.Ordinal);
+        if (userIds.Count == 0)
+        {
+            return contacts;
+        }
+
+        await using var command = new NpgsqlCommand(ContactsSql, connection, transaction);
+        command.Parameters.Add(new NpgsqlParameter("users", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = userIds.ToArray() });
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            contacts[reader.GetString(0)] = new UserContact(
+                await reader.IsDBNullAsync(1, cancellationToken) ? null : reader.GetString(1),
+                await reader.IsDBNullAsync(2, cancellationToken) ? null : reader.GetString(2));
+        }
+
+        return contacts;
+    }
+
+    /// <summary>
     /// The profiles whose display name contains <paramref name="search"/>, ignoring letter case, sorted by display name and
     /// then user id. An empty search matches every profile.
     /// </summary>
@@ -112,3 +143,8 @@ public static class UserProfiles
 /// <param name="Id">The user id, the subject of the ID token.</param>
 /// <param name="DisplayName">The name shown for the user.</param>
 public sealed record UserProfileSummary(string Id, string DisplayName);
+
+/// <summary>How to reach a user by email.</summary>
+/// <param name="Email">The profile's email, or null when the profile has none.</param>
+/// <param name="Locale">The profile's locale, or null when the profile has none.</param>
+public sealed record UserContact(string? Email, string? Locale);

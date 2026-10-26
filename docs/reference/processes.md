@@ -28,8 +28,8 @@ model. The worker host, its claims (see [Execution](process-execution.md#executi
 the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_tasks`, `axis.process_start_receipts`,
 `axis.endpoint_receipts`, `axis.process_work_items`, `axis.connector_calls`,
-`axis.package_calls`, `axis.events`, `axis.notifications` and
-`axis.notification_reads` tables are built too. So is the engine that runs
+`axis.package_calls`, `axis.events`, `axis.notifications`,
+`axis.notification_reads` and `axis.email_outbox` tables are built too. So is the engine that runs
 `decision`, `task`, `operation`, `end` and `timer` steps, see
 [Running a step](process-execution.md#running-a-step). The [task API](task-api.md) routes that
 list the user's tasks, read one task and complete one are built. Completing
@@ -780,6 +780,9 @@ database, with history in `axis.__processes_migrations` (see
     `task_id` of the task and the `process_instance_id` of its instance, and
     its `due_at` is the task step's time plus the deadline's `after`. See
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
+  - `notification.email` sends one email of `axis.email_outbox`. Its item also
+    has the `email_id` of the row. No handler runs it yet _(planned for M14)_.
+    See [Email](notifications.md#email).
   - `computed.backfill` recomputes the out-of-date rows of
     one entity. Its item also has the `entity_id`, and each claim runs one
     batch of up to 500 rows. See
@@ -943,6 +946,20 @@ database, with history in `axis.__processes_migrations` (see
   | `notification_id` | `uuid` | The notification's id |
   | `user_id` | `text` | The user who read it |
   | `read_at` | `timestamptz` | When the user read it, `now()` |
+- `axis.email_outbox`: one row per email that a `notify` step with the `email`
+  channel staged, see [Email](notifications.md#email). Times use the database clock.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `uuid` | A version 7 UUID. The row's `notification.email` item names it in `email_id`, without a foreign key |
+  | `application_id`, `release_id` | `uuid` | The application, and the release the notifying instance is pinned to, which gave the texts |
+  | `notification_id`, `step` | `uuid`, `text` | The step run's notification id, which all its emails share, and the name of the `notify` step |
+  | `address` | `text` | The address the email goes to, not validated when staged |
+  | `locale` | `text`, null | The locale of the texts. Null when the release has none |
+  | `subject`, `body` | `text` | The rendered subject, and the plain text body with the page link if any |
+  | `message_id` | `text` | The `Message-ID` header. A unique index keeps it once |
+  | `state` | `text` | `pending` or `sent`, `pending` at first |
+  | `created_at`, `sent_at` | `timestamptz` | The start of the step's transaction, `now()`, and when the email was sent, null while it is pending |
 - `axis.trigger_schedules`: the schedule state, one row per
   schedule trigger of the tenant, see [Schedules](process-events.md#schedules). Activation
   writes it.

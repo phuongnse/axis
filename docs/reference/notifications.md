@@ -6,10 +6,11 @@ notifications, user profiles and the mail settings. The conventions of
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The [user profiles](#user-profiles) section, the compile checks of the notify
-operation and of placeholders, the run of the notify step and the storage of
-in-app notifications, the routes that list them and mark them read, and their
-retention are built. The bell and email are _(planned for M14)_, as is
-everything else in this file that says so. The design follows
+operation and of placeholders, the run of the notify step, the storage of
+in-app notifications, the routes that list them and mark them read, their
+retention, and the staging of emails in the outbox are built. The bell and the
+sending of emails are _(planned for M14)_, as is everything else in this file
+that says so. The design follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
 [D75](../decisions/d75-the-application-time-zone.md). New compile problems are
@@ -143,19 +144,30 @@ A text value may hold named placeholders, such as
 - **Outbox.** For each email recipient, the step's transaction renders the
   subject and body from the pinned release's texts in the recipient's locale,
   and stores them in `axis.email_outbox` with the address and a stable
-  `Message-ID`. It queues one `notification.email` work item per row.
-- **Sending.** The item sends the email over SMTP, outside any transaction,
+  `Message-ID`. It queues one `notification.email` work item per row. The
+  `Message-ID` is `<{row id}@{host}>`, with the tenant's first host, or
+  `<{row id}@axis.invalid>` when the tenant has no host. A step run stages at
+  most one email per address, ignoring letter case, with the locale of the
+  first recipient that gave it. No worker runs the items yet, so they stay
+  queued until sending is built.
+- **Sending.** _(Planned for M14)_ The item sends the email over SMTP, outside any transaction,
   then marks the row `sent`. A failure is counted and tried again with the
   backoff and limit of [dead letters](process-events.md#dead-letters), then
   becomes a dead letter of kind `notification.email`.
-- **At least once.** A crash after the send and before the mark sends again.
+- **At least once.** _(Planned for M14)_ A crash after the send and before the mark sends again.
   The same `Message-ID` lets a receiver drop the repeat.
 - **Locale.** The recipient's profile locale when the release has texts for
   it, otherwise the first locale of the release in ordinal order.
 - **Body.** Plain text, with the page link as an absolute URL on the tenant's
-  host when `open` is set.
+  first host when `open` is set. The link is on its own line after a blank line.
+  It is `https://{host}/{site}/{page}`, the address form of
+  the routing of [frontend.md](frontend.md), with the page name in lower
+  case and the page parameters as query values. The site is the first site
+  whose navigation lists the page, otherwise the application's first site. An
+  email has no link when the tenant has no host or the application has no
+  site. In a test scenario the tenant has no host, so its emails have no link.
 - **Logs.** A `user` recipient without a profile or an email gets no email.
-  The worker logs it at Information level with the step and the user id,
+  The step logs it at Information level with the step and the user id,
   never the address.
 - **Scenarios.** In a test scenario, email is stubbed. An `expectNotification`
   step checks the recipient, the channel and the values of a notification.

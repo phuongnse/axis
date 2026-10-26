@@ -214,6 +214,80 @@ namespace Axis.Processes.Storage.Migrations
                     b.ToTable("delivery_failures", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Processes.Storage.EmailOutboxRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("address");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Locale")
+                        .HasColumnType("text")
+                        .HasColumnName("locale");
+
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("message_id");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("notification_id");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("pending")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Step")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("step");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("subject");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_outbox");
+
+                    b.HasIndex("MessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_email_outbox_message_id");
+
+                    b.ToTable("email_outbox", "axis");
+                });
+
             modelBuilder.Entity("Axis.Processes.Storage.EndpointReceiptRow", b =>
                 {
                     b.Property<Guid>("ApplicationId")
@@ -926,6 +1000,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.Property<DateTimeOffset>("DueAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("due_at");
+
+                    b.Property<Guid?>("EmailId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("email_id");
 
                     b.Property<Guid?>("EntityId")
                         .HasColumnType("uuid")

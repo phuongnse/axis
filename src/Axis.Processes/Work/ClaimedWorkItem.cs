@@ -17,6 +17,7 @@ namespace Axis.Processes.Work;
 /// <param name="QueuedBy">The span that queued the item, which the item's run links to, or <see langword="null"/> when the item stores none.</param>
 /// <param name="TaskId">The task a <c>task.deadline</c> item expires, or <see langword="null"/> for other work.</param>
 /// <param name="Revision">The instance revision a <c>process.timer</c> item resumes at, or <see langword="null"/> for other work.</param>
+/// <param name="EmailId">The outbox email a <c>notification.email</c> item sends, or <see langword="null"/> for other work.</param>
 public sealed record ClaimedWorkItem(
     Guid Id,
     string TenantId,
@@ -35,4 +36,5 @@ public sealed record ClaimedWorkItem(
     Guid? EntityId,
     ActivityContext? QueuedBy = null,
     Guid? TaskId = null,
-    long? Revision = null);
+    long? Revision = null,
+    Guid? EmailId = null);

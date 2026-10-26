@@ -1,7 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Axis.Configuration.Compilation;
-using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
 using Axis.Data.Profiles;
 using Axis.Policy;
@@ -85,16 +83,16 @@ internal static class NotificationEndpoints
             if (!texts.TryGetValue(item.ReleaseId, out var resource))
             {
                 var release = await resolver.GetReleaseModelAsync(item.ReleaseId, cancellationToken);
-                resource = ChooseTexts(release, locale);
+                resource = NotificationTexts.ChooseTexts(release, locale);
                 texts[item.ReleaseId] = resource;
             }
 
-            var values = ReadValues(item.Values);
+            var values = NotificationTexts.ReadValues(item.Values);
             items.Add(new NotificationListItem(
                 item.Id,
                 item.ReleaseId,
-                Render(resource, item.SubjectKey, values),
-                Render(resource, item.BodyKey, values),
+                NotificationTexts.Render(resource, item.SubjectKey, values),
+                NotificationTexts.Render(resource, item.BodyKey, values),
                 item.OpenPage is { } openPage
                     ? new NotificationOpen(openPage, ParseParameters(item.OpenParameters))
                     : null,
@@ -157,41 +155,6 @@ internal static class NotificationEndpoints
         var connection = await database.GetConnectionAsync(cancellationToken);
         await NotificationQueries.MarkAllReadAsync(connection, active.Model.Manifest.Id, user.Id, roles, cancellationToken);
         return Results.NoContent();
-    }
-
-    // The profile locale when the release has texts for it, otherwise the first locale in ordinal order.
-    private static TextResource? ChooseTexts(ApplicationModel release, string? locale)
-    {
-        if (locale is not null
-            && release.Texts.FirstOrDefault(text => string.Equals(text.Locale, locale, StringComparison.Ordinal)) is { } preferred)
-        {
-            return preferred;
-        }
-
-        return release.Texts.OrderBy(text => text.Locale, StringComparer.Ordinal).FirstOrDefault();
-    }
-
-    private static string Render(TextResource? resource, string key, IReadOnlyDictionary<string, string> values) =>
-        resource is not null && resource.Texts.TryGetValue(key, out var text) ? TextPlaceholders.Fill(text, values) : key;
-
-    // The values are stored as a JSON object. Each is filled in as raw text.
-    private static Dictionary<string, string> ReadValues(string json)
-    {
-        var values = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (JsonNode.Parse(json) is JsonObject stored)
-        {
-            foreach (var (name, value) in stored)
-            {
-                values[name] = value switch
-                {
-                    null => string.Empty,
-                    JsonValue text when text.TryGetValue<string>(out var raw) => raw,
-                    _ => value.ToJsonString(),
-                };
-            }
-        }
-
-        return values;
     }
 
     private static JsonElement ParseParameters(string? json)

@@ -55,8 +55,8 @@ sends it, see [Staging and the call](#staging-and-the-call). A package
 operation step stages its call, and a `package.call` item runs it, see
 [Staging a package call](#staging-a-package-call). A `raiseEvent`
 operation step stores its event, see [Raise event step](process-events.md#raise-event-step).
-A `notify` operation step stores its in-app notification, see
-[Notify operation](notifications.md#notify-operation).
+A `notify` operation step stores its in-app notification and stages its
+emails, see [Notify operation](notifications.md#notify-operation).
 A `timer` step sets the instance `waiting`, and a `process.timer` item resumes
 it, see [Timer step](process-flow.md#timer-step).
 A `task.deadline` item expires the task of a task step that has a `deadline`,
@@ -64,9 +64,10 @@ see [task deadlines](task-deadlines.md#escalations-and-deadline).
 A `subProcess` step starts its child and waits, and a `process.resume` item
 resumes the parent when the child completes, see
 [Sub-process step](process-flow.md#sub-process-step).
-_(Planned for M14)_ The worker also runs `waitEvent` steps and the email of the
-`notify` operation, with the work item kinds
-`task.escalate` and `notification.email`, see [process flow](process-flow.md),
+_(Planned for M14)_ The worker also runs `waitEvent` steps and sends the staged
+emails of the `notify` operation, with the work item kinds
+`task.escalate` and `notification.email`. A `notify` step already queues a
+`notification.email` item for each email, and it stays queued until then. See [process flow](process-flow.md),
 [task deadlines](task-deadlines.md) and [notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
 one transaction:
@@ -116,7 +117,8 @@ one transaction:
      instance stays `running` on its `next` step.
    - A **`notify`** operation evaluates its `user` recipients, its `values`
      and the parameters of its `open` page on the record, even when `channels`
-     has only `email`. A `user` that gives `null` or blank text has no
+     has only `email`. It evaluates its `email` recipients when `channels` has
+     `email`. A `user` or `email` that gives `null` or blank text has no
      recipient. A run-time error in any of them fails the step. The instance
      stays `running` on its `next` step. A process without a subject may
      notify.
@@ -159,7 +161,14 @@ one transaction:
    `axis.notifications` for each distinct `user` and `role` recipient, all
    with one new notification id, see
    [In-app notifications](notifications.md#in-app-notifications). It inserts
-   none when it has no recipient. The `email` channel stores nothing yet.
+   none when it has no recipient.
+
+   A `notify` step with the `email` channel then stages one email for each
+   address, in the same transaction: a row in `axis.email_outbox` and a queued
+   `notification.email` work item that names it. The addresses are those of the
+   `user` recipients' profiles and the `email` recipients, each once. A `user`
+   with no profile or no email gets none, and is logged with the step and the
+   user id. See [Email](notifications.md#email).
 
    An `updateRecord` operation then writes the values the way a record
    update does. Each value must fit its field, and a `null` for a required
