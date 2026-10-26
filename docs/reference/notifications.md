@@ -7,8 +7,9 @@ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The [user profiles](#user-profiles) section, the compile checks of the notify
 operation and of placeholders, the run of the notify step and the storage of
-in-app notifications are built. The read routes, the bell, retention and email
-are _(planned for M14)_, as is everything else in this file that says so. The design follows
+in-app notifications and the routes that list them and mark them read are built.
+The bell, retention and email are _(planned for M14)_, as is everything else in
+this file that says so. The design follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
 [D75](../decisions/d75-the-application-time-zone.md). New compile problems are
@@ -105,12 +106,30 @@ A text value may hold named placeholders, such as
   and user who read it.
 - **Routes.**
   - `GET /api/apps/{app}/notifications?page=&pageSize=&unread=` lists the
-    user's notifications, newest first, with `unreadCount`. Texts come from the
-    notification's release.
-  - `POST /api/apps/{app}/notifications/{id}/read` marks one read.
-  - `POST /api/apps/{app}/notifications/read-all` marks all read.
-  - Nobody deletes a notification. The routes need a session, and follow the
-    CSRF rule.
+    user's notifications, newest first. It answers `items`, `page`, `pageSize`,
+    `totalCount` and `unreadCount`. With `unread=true` the items and
+    `totalCount` are the unread ones only, and `unreadCount` always counts
+    every unread one. An item has `id`, `releaseId`, `subject`, `body`, `open`,
+    `read` and `createdAt`. `open` is `{ "page", "parameters" }` with the
+    stored raw parameters, or null when the notification opens no page. A
+    notification sent to the user and to a role the user holds is listed once.
+    A bad `page`, `pageSize` or `unread` (`true` or `false`) is a 400 that
+    lists every bad parameter.
+  - Texts come from the notification's release, in the user's profile locale
+    when that release has texts for it, otherwise its first locale in ordinal
+    order, as for [email](#email). Each `{name}` is filled with the stored value
+    as raw text: a string as it is, a number or a boolean as JSON writes it,
+    null as empty text and any other value as JSON. A text key the locale does
+    not have shows as the key. _(Planned for M14)_ Values are formatted in the
+    user's locale, as [placeholders](#placeholders) says.
+  - `POST /api/apps/{app}/notifications/{id}/read` marks one read, and
+    `POST /api/apps/{app}/notifications/read-all` marks every notification the
+    user sees now read. Both write read rows for the caller only, so another
+    recipient's unread count does not change. Both answer 204 with no body, and
+    so does marking a notification that is already read. A notification the
+    user does not see, or that does not exist, is a 404.
+  - Nobody deletes a notification. The routes need a session (401), and the
+    POSTs follow the CSRF rule.
 - **Kept for.** `Notifications:RetentionDays`, default 90. The worker deletes
   older rows once a day.
 - **Site shell.** A bell in the site header shows the unread count. It opens

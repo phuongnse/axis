@@ -11,6 +11,8 @@ public static class UserProfiles
 {
     private const string ExistsSql = """SELECT EXISTS (SELECT 1 FROM "axis"."user_profiles" WHERE "user_id" = @user)""";
 
+    private const string LocaleSql = """SELECT "locale" FROM "axis"."user_profiles" WHERE "user_id" = @user""";
+
     private const string SearchSql =
         """
         SELECT "user_id", "display_name" FROM "axis"."user_profiles"
@@ -68,6 +70,17 @@ public static class UserProfiles
         await using var command = new NpgsqlCommand(ExistsSql, connection, transaction);
         command.Parameters.AddWithValue("user", userId);
         return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    /// <summary>The locale of the user's profile, or null when the user has no profile or the profile has no locale.</summary>
+    public static async Task<string?> FindLocaleAsync(NpgsqlConnection connection, string userId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        await using var command = new NpgsqlCommand(LocaleSql, connection);
+        command.Parameters.AddWithValue("user", userId);
+        return await command.ExecuteScalarAsync(cancellationToken) as string;
     }
 
     /// <summary>

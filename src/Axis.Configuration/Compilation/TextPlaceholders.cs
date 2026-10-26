@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Axis.Configuration.Compilation;
 
 /// <summary>
@@ -62,6 +64,56 @@ public static class TextPlaceholders
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Fills the placeholders of <paramref name="text"/>. Each <c>{name}</c> becomes the value of <c>name</c>, or stays
+    /// as written when <paramref name="values"/> has none. <c>{{</c> and <c>}}</c> become one brace. A brace that is
+    /// not part of a placeholder is kept as it is, so a text that <see cref="TryParse"/> refuses does not throw.
+    /// </summary>
+    public static string Fill(string text, IReadOnlyDictionary<string, string> values)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(values);
+
+        var result = new StringBuilder(text.Length);
+        var index = 0;
+        while (index < text.Length)
+        {
+            var current = text[index];
+            if ((current == '{' || current == '}') && index + 1 < text.Length && text[index + 1] == current)
+            {
+                result.Append(current);
+                index += 2;
+            }
+            else if (current == '{')
+            {
+                var end = index + 1;
+                while (end < text.Length && IsNameCharacter(text[end]))
+                {
+                    end++;
+                }
+
+                if (end > index + 1 && end < text.Length && text[end] == '}')
+                {
+                    var name = text[(index + 1)..end];
+                    result.Append(values.TryGetValue(name, out var value) ? value : text[index..(end + 1)]);
+                    index = end + 1;
+                }
+                else
+                {
+                    result.Append(current);
+                    index++;
+                }
+            }
+            else
+            {
+                result.Append(current);
+                index++;
+            }
+        }
+
+        return result.ToString();
     }
 
     private static bool IsNameCharacter(char character) =>
