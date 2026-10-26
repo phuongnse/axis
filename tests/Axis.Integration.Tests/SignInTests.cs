@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
 
@@ -27,6 +28,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     private const string ClientAddress = "203.0.113.7";
     private const string UserAgent = "AxisAuditProbe/1.0";
     private const string HostB = "b.example.test";
+    private const string ProfileSelect = "SELECT user_id, display_name, email, locale, first_signed_in_at, last_signed_in_at FROM axis.user_profiles";
     private const string AuditSelect = "SELECT actor, actor_name, action, application_id, details::text FROM axis.audit_records";
 
     // The realm's client accepts redirects to http://localhost:5206/*, the development server.
@@ -297,6 +299,103 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Equal(2, (await ReadAuditAsync("a")).Count);
     }
 
+    [Fact]
+    public async Task Sign_in_saves_the_profile_with_the_email_and_locale_from_the_token()
+    {
+        using var client = CreateClient();
+
+        await SignInAsync(client, "anna", "/");
+
+        var profile = Assert.Single(await ReadProfilesAsync("a"));
+        Assert.Equal("anna", profile.UserId);
+        Assert.Equal("Anna Employee", profile.DisplayName);
+        Assert.Equal("anna@axis.local", profile.Email);
+        Assert.Equal("vi", profile.Locale);
+        Assert.True(profile.FirstSignedInAt <= profile.LastSignedInAt);
+        Assert.Empty(await ReadProfilesAsync("b"));
+    }
+
+    [Fact]
+    public async Task A_later_sign_in_updates_the_profile_and_keeps_the_first_sign_in_time()
+    {
+        using (var first = CreateClient())
+        {
+            await SignInAsync(first, "anna", "/");
+        }
+
+        var before = Assert.Single(await ReadProfilesAsync("a"));
+        await using var otherName = Factory.WithWebHostBuilder(builder => builder.UseSetting("Tenants:a:Oidc:Claims:DisplayName", "given_name"));
+        using (var second = CreateClient(otherName))
+        {
+            await SignInAsync(second, "anna", "/");
+        }
+
+        var after = Assert.Single(await ReadProfilesAsync("a"));
+        Assert.Equal("Anna Employee", before.DisplayName);
+        Assert.Equal("Anna", after.DisplayName);
+        Assert.Equal(before.FirstSignedInAt, after.FirstSignedInAt);
+        Assert.True(after.LastSignedInAt > before.LastSignedInAt);
+    }
+
+    [Fact]
+    public async Task A_tenant_that_names_other_claims_stores_their_values_and_a_missing_claim_stores_null()
+    {
+        await using (var named = Factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Tenants:a:Oidc:Claims:Email", "preferred_username");
+            builder.UseSetting("Tenants:a:Oidc:Claims:Locale", "given_name");
+        }))
+        {
+            using var client = CreateClient(named);
+            await SignInAsync(client, "anna", "/");
+        }
+
+        var stored = Assert.Single(await ReadProfilesAsync("a"));
+        Assert.Equal("anna", stored.Email);
+        Assert.Equal("Anna", stored.Locale);
+
+        await using var missing = Factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Tenants:a:Oidc:Claims:Email", "axis_missing_email");
+            builder.UseSetting("Tenants:a:Oidc:Claims:Locale", "axis_missing_locale");
+        });
+        using (var client = CreateClient(missing))
+        {
+            await SignInAsync(client, "anna", "/");
+        }
+
+        var cleared = Assert.Single(await ReadProfilesAsync("a"));
+        Assert.Null(cleared.Email);
+        Assert.Null(cleared.Locale);
+        Assert.Equal("Anna Employee", cleared.DisplayName);
+    }
+
+    [Fact]
+    public async Task A_profile_that_cannot_be_written_does_not_refuse_the_sign_in_and_the_warning_holds_no_email()
+    {
+        await using (var connection = new NpgsqlConnection(_databases["a"]))
+        {
+            await connection.OpenAsync(CancellationToken);
+            await using var drop = new NpgsqlCommand("DROP TABLE axis.user_profiles", connection);
+            await drop.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        var logs = new LogCollector();
+        await using var host = Factory.WithWebHostBuilder(builder =>
+            builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(logs)));
+        using var client = CreateClient(host);
+
+        var signIn = await SignInAsync(client, "anna", "/apps/purchase-requests");
+        var me = await SendAsync(client, HttpMethod.Get, "/api/me");
+
+        Assert.Equal("/apps/purchase-requests", signIn.ReturnedTo);
+        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        Assert.Single(await ReadAuditAsync("a", "session.signedIn"));
+        var warning = Assert.Single(logs.Entries, entry => entry.Contains("The profile of the signed-in user could not be written.", StringComparison.Ordinal));
+        Assert.StartsWith("Warning:", warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("anna@axis.local", warning, StringComparison.Ordinal);
+    }
+
     public async ValueTask InitializeAsync()
     {
         foreach (var tenant in new[] { "a", "b" })
@@ -346,8 +445,10 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         builder.UseSetting($"Tenants:{tenant}:Oidc:ClientSecret", KeycloakFixture.ClientSecret);
     }
 
-    private HttpClient CreateClient(WebApplicationFactory<Program>? factory = null) =>
-        (factory ?? Factory).CreateClient(new WebApplicationFactoryClientOptions
+    private HttpClient CreateClient() => CreateClient(Factory);
+
+    private static HttpClient CreateClient(WebApplicationFactory<Program> factory) =>
+        factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             BaseAddress = _serverAddress,
             AllowAutoRedirect = false,
@@ -453,6 +554,27 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         return response;
     }
 
+    private async Task<List<ProfileRow>> ReadProfilesAsync(string tenant)
+    {
+        await using var connection = new NpgsqlConnection(_databases[tenant]);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(ProfileSelect, connection);
+        var rows = new List<ProfileRow>();
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows.Add(new ProfileRow(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.GetFieldValue<DateTimeOffset>(4),
+                reader.GetFieldValue<DateTimeOffset>(5)));
+        }
+
+        return rows;
+    }
+
     private async Task<List<AuditRow>> ReadAuditAsync(string tenant, string? action = null)
     {
         await using var connection = new NpgsqlConnection(_databases[tenant]);
@@ -488,6 +610,8 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     private static partial Regex FormActionPattern();
 
     private sealed record SignInResult(string ReturnedTo, string SessionCookie);
+
+    private sealed record ProfileRow(string UserId, string DisplayName, string? Email, string? Locale, DateTimeOffset FirstSignedInAt, DateTimeOffset LastSignedInAt);
 
     private sealed record AuditRow(string Actor, string? ActorName, string Action, Guid? ApplicationId, string Details);
 

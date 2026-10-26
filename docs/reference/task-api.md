@@ -140,9 +140,9 @@ state:
   earlier release keeps its own layout. It has the shape of a form widget's
   `form` metadata, plus `entity` in the shape of a widget's `entity`
   metadata, so the task page knows each field's type. See
-  [frontend](frontend.md). The example shortens both.
+  [form widget](form-widget.md) and [frontend](frontend.md). The example shortens both.
   The `form` carries the same additions as the form metadata in
-  [frontend](frontend.md): `visibleWhen` as a yes or no flag on each field
+  [form widget](form-widget.md): `visibleWhen` as a yes or no flag on each field
   and section, each section's `name` (`null` when it has none), and `steps`
   (`[]` when the form has none). Sections the user cannot read, and the steps
   left empty by that, are left out. The condition expressions stay on the

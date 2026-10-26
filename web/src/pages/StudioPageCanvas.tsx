@@ -299,7 +299,8 @@ function isContent(value: unknown): value is Record<string, unknown> {
  * and `aria-current`. Its name is its summary, or its type, and "has diagnostics" when marked. It tells the widgets
  * inside that they are on the canvas, and which of their actions is selected. A widget with a path can be dragged with
  * the pointer to move it. The drag starts on the innermost frame under the pointer, and the widget is dimmed while it
- * is dragged. With `onMove`, Alt+ArrowDown or Alt+ArrowUp on the frame itself moves its widget.
+ * is dragged. With `onMove`, Alt+ArrowDown or Alt+ArrowUp on the frame itself moves its widget. While a drag is over it
+ * as the drop target, it has `data-drop-over`.
  */
 function CanvasWidgetFrame({
   type,
@@ -355,6 +356,7 @@ function CanvasWidgetFrame({
       data-testid="studio-canvas-widget"
       data-path={path}
       data-marked={marked ? 'true' : undefined}
+      data-drop-over={droppable.isOver ? 'true' : undefined}
       aria-label={marked ? `${label} · ${t('shell.studio.design.hasDiagnostics')}` : label}
       aria-current={selected ? 'true' : undefined}
       tabIndex={path === undefined ? undefined : 0}
@@ -390,7 +392,8 @@ function CanvasWidgetFrame({
 /**
  * A widget list of the canvas, and a drop target for a palette type or a moved widget: a drop on it, outside any
  * widget of the list, appends to the list. It has a dashed border while a drag is over it or while the list is empty,
- * and a minimum height so that an empty list can be hit.
+ * and a minimum height so that an empty list can be hit. While a drag is over it as the drop target, it has
+ * `data-drop-over`.
  */
 function CanvasListFrame({ pointer, empty, children }: { pointer: string; empty: boolean; children?: ReactNode }) {
   const { colour, radius } = useDesignTokens()
@@ -400,6 +403,7 @@ function CanvasListFrame({ pointer, empty, children }: { pointer: string; empty:
       ref={setNodeRef}
       data-testid="studio-canvas-list"
       data-list={pointer}
+      data-drop-over={isOver ? 'true' : undefined}
       style={{
         minHeight: 32,
         border: `1px dashed ${isOver ? colour.primary : empty ? colour.border : 'transparent'}`,

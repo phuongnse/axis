@@ -7,12 +7,12 @@ activate releases, rotate the installation key, and back up and restore tenants.
 and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
-`tenant list`, `tenant backup`, `tenant restore`, `migrate`, `activate`, `platform rekey`,
-`publisher` and `version`. `platform rekey` is in
-[installation key](tenant-setting-commands.md#installation-key). The commands that change a tenant
-after it is created and rotate other keys are in
-[tenant setting commands](tenant-setting-commands.md) _(planned for M16)_. A tenant can also come
-from the `Tenants`
+`tenant list`, `tenant backup`, `tenant restore`, `tenant binding list|set|remove`,
+`tenant host add|remove|move`, `migrate`, `activate`, `platform rekey`, `publisher` and `version`.
+`platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). The
+commands that change a tenant after it is created and rotate other keys are in
+[tenant setting commands](tenant-setting-commands.md). The sign-in settings are
+_(planned for M16)_ on the same page. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
 [startup activation](host-settings.md#startup-activation).
 
@@ -43,6 +43,8 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
 | `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate`, `publisher` and `tenant restore` read it. |
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
+| `Tenancy:Source` | `Tenancy__Source` | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
+| none | `AXIS_BINDING_SECRET` | The value of the `secret` binding that `tenant binding set --secret` sets. When it is unset, the value comes from standard input. It is never a command-line option. Only that command reads it. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. Only `tenant create` and `tenant restore` read it. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
@@ -56,6 +58,11 @@ nor `AXIS_OIDC_CLIENT_SECRET`.
 
 `platform rekey` reads only `ConnectionStrings:PlatformSchema`, `Platform:SecretKey` and
 `Platform:PreviousSecretKey`. It needs no admin role, no client secret and no `Tenancy:Source`.
+
+The `tenant binding` and `tenant host` commands read `ConnectionStrings:PlatformSchema` and
+need `Tenancy:Source=directory`. Only `tenant binding set --secret` also reads
+`Platform:SecretKey`, because it encrypts. See
+[tenant setting commands](tenant-setting-commands.md).
 
 `tenant backup` reads only `ConnectionStrings:PlatformSchema`,
 `Platform:SecretKey` and `PATH`. It creates no role or database, so it needs
@@ -329,9 +336,14 @@ A tenant in any status except `provisioning` can be backed up, also a
 | `claimUserId` | The claim name of the user id, or `null` for the default. |
 | `claimDisplayName` | The claim name of the display name, or `null` for the default. |
 | `claimRoles` | The claim name of the roles, or `null` for the default. |
+| `claimEmail` | The claim name of the email, or `null` for the default. |
+| `claimLocale` | The claim name of the locale, or `null` for the default. |
 | `endpointAudience` | The endpoint audience, or `null` for the default. |
 | `serviceAudience` | The service audience, or `null` when the tenant accepts no service account token. An archive from before the field reads as `null`. |
 | `bindings` | The bindings, in ordinal order of the name. Each has `name`, `kind` and, for a `url` binding, `url`. |
+
+An archive written before `claimEmail` and `claimLocale` existed has neither, and a
+restore reads both as `null`.
 
 A `secret` binding holds only its name and kind. The database server, the
 database name, the role names and the `version` of the entry are not in the
@@ -443,17 +455,18 @@ option or a missing setting.
    holds none of them.
 2. Run [`tenant resume <id>`](#tenant-resume).
 
-No command sets a binding yet, see [Not built yet](#not-built-yet).
-`tenant oidc set --client-secret` and `tenant binding set` do step 1
-_(planned for M16)_, see [tenant setting commands](tenant-setting-commands.md).
+Set each `secret` binding with
+[`tenant binding set <id> <name> --secret`](tenant-setting-commands.md#deployment-bindings).
+`tenant oidc set --client-secret` sets the OIDC client secret _(planned for M16)_, see
+[tenant setting commands](tenant-setting-commands.md).
 
 **Restoring over an existing tenant.** There is no in-place overwrite.
 
 1. Run [`tenant suspend`](#tenant-suspend) on the tenant.
 2. Restore the archive under a new id, with a temporary host.
 3. Set the secrets again and resume the new tenant.
-4. Move the hosts from the old tenant to the new one. No command does this yet,
-   see [Not built yet](#not-built-yet).
+4. Move the hosts from the old tenant to the new one with
+   [`tenant host move`](tenant-setting-commands.md#hosts).
 
 The old tenant stays in the directory, because there is no tenant delete.
 
@@ -892,17 +905,12 @@ admin host carries the same version in its OCI label, see
 - Deleting a tenant.
 - An HTTP API for provisioning.
 - Moving a tenant to another database server.
-- Commands that set a tenant's deployment bindings, claim names or endpoint
-  audience. `tenant create` sets none of them, so they stay empty. The one
-  exception is `--binding` on a `tenant create --preview-of`. `tenant binding`
-  and `tenant oidc set` are _(planned for M16)_, see
-  [tenant setting commands](tenant-setting-commands.md) and
+- Commands that set a tenant's claim names or endpoint audience. `tenant create`
+  sets none of them, so they stay empty. `tenant oidc set` is _(planned for M16)_,
+  see [tenant setting commands](tenant-setting-commands.md) and
   [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md).
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation.
 - Overwriting a tenant in place with a restore.
-- A command that moves a host from one tenant to another. Restoring over an
-  existing tenant ends with this step. `tenant host move` is
-  _(planned for M16)_, see [hosts](tenant-setting-commands.md#hosts).
-- The platform audit records of the setting commands are planned with them, see
+- The platform audit records of the sign-in setting commands are planned with them, see
   [platform audit records](tenant-setting-commands.md#platform-audit-records).

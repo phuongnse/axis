@@ -243,7 +243,7 @@ flowchart LR
      `record` on a target that holds no form widget, or whose form is over
      another entity, is `AXC0235` at `/record`. A parse error or an unknown
      name keeps the expression's own code.
-   - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
+   - **Forms.** A [form](form-widget.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded
      because of its own errors is not reported again. Each section `field`
@@ -562,7 +562,11 @@ flowchart LR
      type is `AXC0166` at `/parameters/{key}`. Each parameter that no key
      gives is `AXC0167` at `/parameters`, once for each parameter, even when
      `parameters` is left out. The parameters are not checked when the data
-     source is unknown. A name whose data source file was not loaded because
+     source is unknown. A schedule trigger without a `dataSource` is a
+     scheduled job. Its process must have no subject, otherwise it is
+     `AXC0249` at `/process`, and the parameter checks then read the process's
+     parameters. A `null` is `AXC0166` there. They are not checked when the
+     process is unknown or has a subject. A name whose data source file was not loaded because
      of its own errors is not reported again. The
      [schedule trigger](integration-resources.md#events-and-triggers) section lists the rules.
 

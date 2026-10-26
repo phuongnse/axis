@@ -15,7 +15,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 - **Flow.** Sign-in uses the OIDC authorization code flow with PKCE. The
   server is the confidential client: it exchanges the code for tokens, reads
   the claims from the ID token and keeps no token after that (D9). The
-  identity provider returns the code in the query string. Pushed
+  identity provider returns the code in the query string. The request asks
+  for the `openid`, `profile` and `email` scopes. Pushed
   authorization requests stay off until FAPI 2.0 work (D9). Under a tenant's
   `fapi2` profile they are required _(planned for M16)_, see
   [FAPI 2.0 profile](#fapi-20-profile).
@@ -27,10 +28,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   display name and the roles. Each claim name is optional, and the defaults
   are `sub`, `name` and `roles`. The optional `EndpointAudience` is for
   [machine callers](#machine-callers), and the optional `ServiceAudience` is
-  for [service accounts](#service-accounts). _(Planned for M14)_ `Claims` also names
-  `Email` and `Locale`, by default `email` and `locale`, which each sign-in
-  writes to the user's profile, see
-  [User profiles](notifications.md#user-profiles).
+  for [service accounts](#service-accounts). `Claims` also names `Email` and
+  `Locale`, by default `email` and `locale`, which each sign-in writes to the
+  user's profile, see [User profiles](notifications.md#user-profiles).
 
   ```json
   "default": {
@@ -40,7 +40,13 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
       "Authority": "http://localhost:8080/realms/axis",
       "ClientId": "axis",
       "ClientSecret": "...",
-      "Claims": { "UserId": "sub", "DisplayName": "name", "Roles": "roles" }
+      "Claims": {
+        "UserId": "sub",
+        "DisplayName": "name",
+        "Roles": "roles",
+        "Email": "email",
+        "Locale": "locale"
+      }
     }
   }
   ```
@@ -245,7 +251,7 @@ sample reuses a user that holds the role it needs before it adds a user.
 
 | User    | Roles                   | Used by                                                                                          |
 | ------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
-| `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey |
+| `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
 | `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                                         |
 | `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                         |
 | `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                         |
@@ -315,8 +321,9 @@ systems.
   authentication is the bearer token on paths under
   `/api/apps/{app}/endpoints/`, and the session everywhere else.
   [Service accounts](#service-accounts) send bearer tokens with another
-  audience to the record API, and to data source rows and the process API
-  _(planned for M16)_. The task API stays closed to bearer tokens.
+  audience to the record API, to data source rows, and to process start and
+  inspection. The operator commands follow _(planned for M16)_. The task API
+  stays closed to bearer tokens.
 - **Clock.** The expiry is checked against the server's clock service, with
   the usual 5 minutes of clock skew, so tests can replace the clock.
 - **No session.** On endpoint routes the session cookie is ignored and not
@@ -352,9 +359,9 @@ It follows
 A service account lets another system read and write records, read data
 source rows, and start and inspect processes, under the same policies as a
 user. It replaces the point of D27 that accepts bearer tokens only on endpoint
-routes. The record API takes service accounts now. Data source rows, the
-process API and the operator commands are _(planned for M16)_ and stay
-session-only until then.
+routes. The record API, data source rows, process start and process inspection
+take service accounts now. The operator commands are _(planned for M16)_ and
+stay session-only until then.
 
 - **What it is.** A client of the tenant's identity provider that gets
   access tokens through the client credentials grant. Axis issues no API key.
@@ -372,10 +379,10 @@ session-only until then.
   sets the column by hand.
 - **Routes.** A service account may call:
   - every route of the [record API](record-api.md), record history included;
-  - `GET /api/apps/{app}/data-sources/{dataSource}/rows` _(planned for M16)_;
-  - `POST /api/apps/{app}/processes/{process}/instances` _(planned for M16)_;
+  - `GET /api/apps/{app}/data-sources/{dataSource}/rows`;
+  - `POST /api/apps/{app}/processes/{process}/instances`;
   - the instance list and one instance of
-    [process inspection](process-inspection.md) _(planned for M16)_;
+    [process inspection](process-inspection.md);
   - the operator commands retry, cancel and resolve _(planned for M16)_.
 
   The server marks each of these routes, so the choice of scheme, the CSRF

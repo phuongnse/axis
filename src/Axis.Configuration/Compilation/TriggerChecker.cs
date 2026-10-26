@@ -19,7 +19,9 @@ namespace Axis.Configuration.Compilation;
 /// and <c>when</c> is not checked without the event or the entity. A schedule trigger has a valid cron
 /// and a known IANA time zone, and names a loaded data source that is not grouped and is over the
 /// process's subject entity. Its parameters give a literal value of its type to every parameter of the
-/// data source and name no other.
+/// data source and name no other. A schedule trigger without a data source is a scheduled job. It names
+/// a process without a subject, and its parameters give a literal value of its type to every parameter
+/// of the process and name no other.
 /// </summary>
 internal static class TriggerChecker
 {
@@ -58,7 +60,8 @@ internal static class TriggerChecker
                     "/process");
             }
 
-            if (process is { Entity: null })
+            // A scheduled job, a schedule trigger without a data source, starts a process without a subject.
+            if (process is { Entity: null } && !(trigger.Type == "schedule" && trigger.DataSource is null))
             {
                 Report(
                     DiagnosticCodes.TriggerProcessWithoutSubject,
@@ -221,8 +224,9 @@ internal static class TriggerChecker
     }
 
     /// <summary>
-    /// Checks a schedule trigger in one pass. The schema requires its cron, time zone and data
-    /// source. An unknown data source stops the check of its parameters.
+    /// Checks a schedule trigger in one pass. The schema requires its cron and time zone. An unknown
+    /// data source stops the check of its parameters. Without a data source the trigger is a scheduled
+    /// job, and its parameters are checked against the process's.
     /// </summary>
     private static void CheckSchedule(
         TriggerResource trigger,
@@ -247,10 +251,16 @@ internal static class TriggerChecker
                 "/timeZone");
         }
 
-        var dataSource = findDataSource(trigger.DataSource!);
+        if (trigger.DataSource is null)
+        {
+            CheckJobParameters(trigger, process, report);
+            return;
+        }
+
+        var dataSource = findDataSource(trigger.DataSource);
         if (dataSource is null)
         {
-            if (!unloadedDataSourceNames.Contains(trigger.DataSource!))
+            if (!unloadedDataSourceNames.Contains(trigger.DataSource))
             {
                 report(
                     DiagnosticCodes.UnknownTriggerDataSource,
@@ -330,6 +340,74 @@ internal static class TriggerChecker
         }
     }
 
+    /// <summary>
+    /// Checks the parameters of a scheduled job against the process's. A process that is not loaded
+    /// has a diagnostic of its own, and a process with a subject is reported once, without its
+    /// parameters.
+    /// </summary>
+    private static void CheckJobParameters(TriggerResource trigger, ProcessResource? process, Action<string, string, string> report)
+    {
+        if (process is null)
+        {
+            return;
+        }
+
+        if (process.Entity is not null)
+        {
+            report(
+                DiagnosticCodes.ScheduleJobProcessWithSubject,
+                $"The process '{process.Name}' has a subject, so a schedule trigger without a data source cannot start it. Name a process without a subject, or give a dataSource.",
+                "/process");
+            return;
+        }
+
+        var definitions = process.Parameters ?? [];
+        var given = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in trigger.Parameters ?? new Dictionary<string, JsonElement>())
+        {
+            var path = $"/parameters/{key}";
+            var definition = definitions.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+            if (definition is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownTriggerParameter,
+                    $"The parameter '{key}' was not found. The process '{process.Name}' has no parameter with that name.",
+                    path);
+                continue;
+            }
+
+            if (!given.TryAdd(definition.Name, key))
+            {
+                report(
+                    DiagnosticCodes.UnknownTriggerParameter,
+                    $"The parameter '{definition.Name}' is already given by '{given[definition.Name]}'.",
+                    path);
+                continue;
+            }
+
+            if (!TryReadProcessParameterValue(definition, value, out _))
+            {
+                report(
+                    DiagnosticCodes.InvalidTriggerParameterValue,
+                    value.ValueKind == JsonValueKind.Null
+                        ? $"The parameter '{definition.Name}' is required, so its value cannot be null."
+                        : $"The value is not a valid {definition.Type} for the parameter '{definition.Name}'.",
+                    path);
+            }
+        }
+
+        foreach (var definition in definitions)
+        {
+            if (!given.ContainsKey(definition.Name))
+            {
+                report(
+                    DiagnosticCodes.MissingTriggerParameter,
+                    $"The parameter '{definition.Name}' is a parameter of the process '{process.Name}', but the trigger does not give it. Give a value.",
+                    "/parameters");
+            }
+        }
+    }
+
     private static DataSourceParameterDefinition? FindParameter(DataSourceResource dataSource, string name) =>
         dataSource.Parameters.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
@@ -363,6 +441,18 @@ internal static class TriggerChecker
         }
 
         return FieldTypes.TryParse(parameter.Type, out var type) && FieldValues.TryRead(type, parameter.Values, element, out value);
+    }
+
+    /// <summary>
+    /// Reads the JSON <paramref name="element"/> as a value of a process parameter's type, in the same
+    /// JSON forms. A process parameter has no optional flag, so null is not a value.
+    /// </summary>
+    private static bool TryReadProcessParameterValue(ProcessParameterDefinition parameter, JsonElement element, out object? value)
+    {
+        value = null;
+        return element.ValueKind != JsonValueKind.Null
+            && FieldTypes.TryParse(parameter.Type, out var type)
+            && FieldValues.TryRead(type, null, element, out value);
     }
 
     private static FieldDefinition? FindField(EntityResource entity, string name) =>
@@ -420,8 +510,9 @@ internal static class TriggerChecker
     {
         var process = findProcess(trigger.Process)
             ?? throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
-        var dataSource = findDataSource(trigger.DataSource!)
-            ?? throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
+        var dataSource = trigger.DataSource is { } dataSourceName
+            ? findDataSource(dataSourceName) ?? throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger))
+            : null;
         if (!CronSchedule.TryParse(trigger.Schedule!, out var schedule, out _) || !TryFindTimeZone(trigger.TimeZone!, out var timeZone))
         {
             throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
@@ -429,15 +520,32 @@ internal static class TriggerChecker
 
         var given = trigger.Parameters ?? new Dictionary<string, JsonElement>();
         var parameters = new Dictionary<string, object?>(StringComparer.Ordinal);
-        foreach (var parameter in dataSource.Parameters)
+        if (dataSource is null)
         {
-            var element = given.First(pair => string.Equals(pair.Key, parameter.Name, StringComparison.OrdinalIgnoreCase)).Value;
-            if (!TryReadParameterValue(parameter, element, out var value))
+            // A scheduled job holds the values of the process's parameters.
+            foreach (var parameter in process.Parameters ?? [])
             {
-                throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
-            }
+                var element = given.First(pair => string.Equals(pair.Key, parameter.Name, StringComparison.OrdinalIgnoreCase)).Value;
+                if (!TryReadProcessParameterValue(parameter, element, out var value))
+                {
+                    throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
+                }
 
-            parameters.Add(parameter.Name, value);
+                parameters.Add(parameter.Name, value);
+            }
+        }
+        else
+        {
+            foreach (var parameter in dataSource.Parameters)
+            {
+                var element = given.First(pair => string.Equals(pair.Key, parameter.Name, StringComparison.OrdinalIgnoreCase)).Value;
+                if (!TryReadParameterValue(parameter, element, out var value))
+                {
+                    throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
+                }
+
+                parameters.Add(parameter.Name, value);
+            }
         }
 
         return new TriggerModel
@@ -452,7 +560,7 @@ internal static class TriggerChecker
             Process = new ProcessReference(process.Id, process.Name),
             Schedule = schedule,
             TimeZone = timeZone,
-            DataSource = new DataSourceReference(dataSource.Id, dataSource.Name),
+            DataSource = dataSource is null ? null : new DataSourceReference(dataSource.Id, dataSource.Name),
             Parameters = parameters,
         };
     }

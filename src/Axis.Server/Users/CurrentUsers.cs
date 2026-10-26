@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Authentication;
 namespace Axis.Server.Users;
 
 /// <summary>
-/// Finds the current user of a request. The record routes, the data source endpoint, process starts,
-/// task routes, the site endpoints and <c>GET /api/me</c> all read the user here. A record route with
+/// Finds the current user of a request. The record routes, the data source endpoint, process starts, process inspection,
+/// task routes, the site endpoints and <c>GET /api/me</c> all read the user here. A service account route with
 /// a bearer token reads the service account from the token alone and never touches the session. Every
 /// other request reads the session.
 /// </summary>

@@ -9,8 +9,9 @@ The design follows [D87](../decisions/d87-tenant-setting-commands-and-key-rotati
 `platform.audit_records` table, `PlatformAuditRecords.WriteAsync` and the records of the commands
 that already exist are built, see [platform audit records](#platform-audit-records). The database
 password rotation, [`tenant rotate-passwords`](#database-passwords), is built. The key rotation is
-built, see [installation key](#installation-key). The other setting commands on this page are
-_(planned for M16)_.
+built, see [installation key](#installation-key). The
+[deployment binding](#deployment-bindings) and [host](#hosts) commands are built too. The sign-in
+settings are _(planned for M16)_.
 
 ## Common rules
 
@@ -19,7 +20,7 @@ _(planned for M16)_.
   hold the tenants, so the command exits with code 2. `platform rekey` is the exception: it works
   under both sources, see [installation key](#installation-key).
 - **Over the schema role.** The commands write over `ConnectionStrings:PlatformSchema`, as
-  `tenant create` does. They need `Platform:SecretKey` to encrypt.
+  `tenant create` does. A command that encrypts needs `Platform:SecretKey`.
 - **Picked up without a restart.** Every change raises the tenant `version`. The server and the
   worker pick it up at their next `Tenancy:RefreshInterval`.
 - **Secrets never on the command line.** A secret value comes from an environment variable or from
@@ -32,17 +33,27 @@ _(planned for M16)_.
 
 ## Deployment bindings
 
-- `tenant binding list <id>` prints each binding's name and kind. It prints the value of a `url`
-  binding, and never the value of a `secret` binding.
+- `tenant binding list <id>` prints a table of each binding's name, kind and value, ordered by
+  name. A `url` binding shows its URL. A `secret` binding shows `(hidden)` when it has a value and
+  `(not set)` when it has none, never the value. It also lists a tenant that is still
+  `provisioning`.
 - `tenant binding set <id> <name> --url <value>` adds or replaces a `url` binding. The value is an
   absolute `http` or `https` URL.
 - `tenant binding set <id> <name> --secret` adds or replaces a `secret` binding. The value comes from
-  `AXIS_BINDING_SECRET`, or from standard input when the variable is not set.
+  `AXIS_BINDING_SECRET`, or from standard input when the variable is not set. The value is stored
+  encrypted and never printed. An empty value exits with code 2. With the variable unset and a
+  terminal for input, the command waits for end of input and shows no prompt.
 - `tenant binding remove <id> <name>` removes a binding. A binding that does not exist exits with
   code 2.
 - Names are unique per tenant, ignoring letter case, as in
   [platform database](storage.md#platform-database).
 - A preview tenant's bindings are set the same way. Its main tenant's bindings stay untouched.
+- Replacing a binding whose name differs only in letter case keeps the stored name.
+- **Settings.** Only `tenant binding set --secret` needs `Platform:SecretKey`. The other commands
+  need `ConnectionStrings:PlatformSchema` and `Tenancy:Source=directory`.
+- **A provisioning tenant.** The commands that change something exit with code 2 for a tenant that
+  is still `provisioning`. A rerun of `tenant create` or `tenant restore` replaces its bindings and
+  hosts, so a change made before then would be lost.
 - **After a restore.** A restored tenant needs its secret bindings set again, and this command does
   it. See [tenant restore](administration.md#tenant-restore).
 
@@ -55,7 +66,7 @@ _(planned for M16)_.
 | `--authority <url>`            | The authority of the tenant's identity provider                                               |
 | `--client-id <id>`             | The OIDC client id                                                                            |
 | `--client-secret`              | Replaces the client secret, from `AXIS_OIDC_CLIENT_SECRET` or standard input                  |
-| `--claim <name>=<claim>`       | A claim name: `UserId`, `DisplayName` or `Roles`                                              |
+| `--claim <name>=<claim>`       | A claim name: `UserId`, `DisplayName`, `Roles`, `Email` or `Locale`                              |
 | `--endpoint-audience <value>`  | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it |
 | `--service-audience <value>`   | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it |
 | `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](security.md#fapi-20-profile)                      |
@@ -74,7 +85,11 @@ _(planned for M16)_.
 - `tenant host remove <id> <host>` removes a host. Removing a tenant's last host exits with code 2.
 - `tenant host move <host> --to <id>` moves a host to another tenant in one transaction. It is the
   last step of restoring over an existing tenant, see
-  [tenant restore](administration.md#tenant-restore).
+  [tenant restore](administration.md#tenant-restore). A move may leave the source tenant with no
+  hosts. Only `tenant host remove` refuses to remove a last host.
+- Every host command exits with code 2 for a tenant that is still `provisioning`, as the binding
+  commands do.
+- A move raises the `version` of both tenants.
 
 ## Database passwords
 
@@ -153,10 +168,12 @@ keys. It can be rotated without signing anyone out.
 - **What writes it.** Every `Axis.Admin` command that acts on a tenant: `tenant create`,
   `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant backup`, `tenant restore`,
   `migrate` and `activate` are built. `tenant backup` writes one because an archive holds a tenant's
-  data. `platform rekey` is built and writes one record for the whole run, with no tenant. The other
-  setting commands on this page are _(planned for M16)_. `tenant list`, `version` and `publisher`
-  write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as
-  writing one record per tenant, one per run or none. A command without a mark fails a test.
+  data. `tenant binding set`, `tenant binding remove`, `tenant host add`, `tenant host remove` and
+  `tenant host move` are built and write one each. `platform rekey` is built and writes one record
+  for the whole run, with no tenant. The other setting commands on this page are
+  _(planned for M16)_. `tenant list`, `tenant binding list`, `version` and `publisher` write none.
+  The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as writing one
+  record per tenant, one per run or none. A command without a mark fails a test.
 - **When.** One record per tenant, when tenant work starts: after the checks of the command and
   before its first change for that tenant. `platform rekey` writes its one record after every value
   has decrypted and before the first update, and `changed` holds the counts. A usage error, a missing setting, an unknown tenant or a
@@ -165,11 +182,16 @@ keys. It can be rotated without signing anyone out.
   are empty, because the command already says what changed. `tenant rotate-passwords` is the
   exception: its record names both roles, `axis_<id>_runtime` and `axis_<id>_schema`, and never a
   password.
+  The binding and host commands differ: each is one small transaction that writes its record and
+  makes its change together, so a record means the change was made. A command that is refused or
+  fails rolls its record back too.
 - **A record that cannot be written.** That tenant stops with an `audit` step, and nothing changes
   for it. The line is `<tenant> audit failed: <message>`, and the command exits `1`. The other
   tenants of `migrate` and `activate` go on. A record that is written prints no line.
 - **A record.** The time, the command, the tenant id, the operating system user and the machine that
   ran it, and the names of what changed, such as a binding name or a setting name. It never holds a
-  secret value.
+  secret value. The binding and host commands write the names as `binding:<name>` and
+  `host:<host>`, so one record can name things of more than one kind. `tenant host move` writes one
+  record, on the target tenant, with `host:<host>` and `from:<source id>`.
 - **Who writes.** Only `Axis.Admin`, over `ConnectionStrings:PlatformSchema`. The read-only role of
   the server and the worker gets no `SELECT` on this table, so neither host reads it.

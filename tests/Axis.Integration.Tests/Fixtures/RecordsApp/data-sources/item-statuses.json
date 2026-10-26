@@ -1,0 +1,22 @@
+{
+  "id": "c59e1722-1fea-4e90-aff5-1fb973121f64",
+  "kind": "dataSource",
+  "name": "ItemStatuses",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "name", "path": "name" },
+    { "name": "status", "path": "status" }
+  ],
+  "parameters": [
+    { "name": "nameFilter", "type": "text" },
+    {
+      "name": "statusFilter",
+      "type": "enum",
+      "values": ["open", "closed"],
+      "valueLabels": { "open": { "textKey": "item.status.open" }, "closed": { "textKey": "item.status.closed" } }
+    }
+  ],
+  "filter": "(nameFilter is null or name == nameFilter) and (statusFilter is null or status == statusFilter)",
+  "sort": "name"
+}

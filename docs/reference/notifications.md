@@ -5,7 +5,8 @@ notifications, user profiles and the mail settings. The conventions of
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-Everything in this file is _(planned for M14)_. The design follows
+The [user profiles](#user-profiles) section is built. Everything else in this file
+is _(planned for M14)_. The design follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
 [D75](../decisions/d75-the-application-time-zone.md). New compile problems are
@@ -117,7 +118,11 @@ sign-in and the last sign-in. A later sign-in updates it.
 
 - The email and locale come from the claims the tenant names in
   `Oidc:Claims:Email` and `Oidc:Claims:Locale`, by default `email` and
-  `locale`. A missing claim leaves the value null.
+  `locale`. A missing claim leaves the value null. Sign-in asks the identity
+  provider for the `email` scope, so providers other than Keycloak put the
+  email in the ID token.
+- A failure to write the profile does not refuse the sign-in. The server logs a
+  warning that does not include the email.
 - The profiles are not a directory. They serve email addresses, locales and the
   user picker of a [reassign](task-deadlines.md#reassign), and no other route
   lists them.

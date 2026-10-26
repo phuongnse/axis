@@ -9,6 +9,7 @@ using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Server.Tenancy;
 using Axis.Server.Tests;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -46,8 +47,9 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.tar");
-        Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
         var scenario = fixture.Scenario;
+        await scenario.SetEmailAndLocaleClaimsAsync(fixture.TenantId, "mail", "lang");
+        Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
         var original = await scenario.RowAsync(fixture.TenantId);
         var originalHosts = await scenario.HostsAsync(fixture.TenantId);
         var newId = scenario.NewTenantId();
@@ -64,6 +66,8 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.Equal([newHost], await scenario.HostsAsync(newId));
         Assert.Equal(original.OidcAuthority, row.OidcAuthority);
         Assert.Equal(original.OidcClientId, row.OidcClientId);
+        Assert.Equal("mail", row.ClaimEmail);
+        Assert.Equal("lang", row.ClaimLocale);
         Assert.NotEqual(original.DatabaseName, row.DatabaseName);
         Assert.Equal(0, await CountSecretBindingValuesAsync(newId));
         Assert.Equal(
@@ -79,7 +83,9 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         }
 
         // The operator sets the secret binding, which the archive never held, and resumes the tenant.
-        await scenario.SetBindingAsync(newId, SecretBinding, binding => binding.SecretValue = AdminScenario.Cipher.Encrypt(newId, TenantSecretFields.Binding(SecretBinding), "restored-token"));
+        var setBinding = await scenario.RunAsync(["tenant", "binding", "set", newId, SecretBinding, "--secret"], input: "restored-token", extra: AdminScenario.Directory);
+        Assert.Equal(0, setBinding.Exit);
+        Assert.Equal([$"{newId} binding ok"], setBinding.Output);
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "resume", newId])).Exit);
         await RefreshAsync(server);
 
@@ -87,6 +93,9 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         {
             Assert.Equal(HttpStatusCode.OK, served.StatusCode);
         }
+
+        var tenant = server.Services.GetRequiredService<ITenantCatalog>().Find(newId);
+        Assert.Equal("restored-token", tenant!.Bindings[SecretBinding].Secret!.Reveal());
 
         foreach (var id in ids)
         {
