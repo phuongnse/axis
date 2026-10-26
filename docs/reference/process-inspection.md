@@ -108,8 +108,8 @@ in any state. The body has these parts:
     can lead to. `on` is always text or `null`. It is the zero-based index of
     a decision branch as text, such as `"0"`, as in the history's `decision`,
     then `"otherwise"` for the fallback branch, the name of a task outcome, or
-    `null` for the `next` of an operation or a timer. An `end` step has none.
-  - A `callConnector`, package and `raiseEvent` step have type `operation`.
+    `null` for the `next` of an operation, a `subProcess` or a timer. An `end` step has none.
+  - A `callConnector`, package, `raiseEvent` and `subProcess` step have type `operation`.
   - `labelKey` is set only for a `task` step.
 - `path` is the history rows of the instance, ordered by `finished_at`, then
   by `id`. Each is
@@ -402,10 +402,14 @@ grant, a required reason and one transaction. The
 [instance detail](#instance-detail) lists the commands the user may take. The
 [process inspector widget](process-inspector-widget.md) shows Cancel, Retry and Resolve.
 
-_(Planned for M14)_ Two more commands, **redeliver** and **discard**, act on a
-dead letter, see [Dead letters](process-events.md#dead-letters). Cancel also
-cancels an instance's running sub-processes, and an instance without a subject
-needs only the grant, see [process flow](process-flow.md).
+Two more commands, **redeliver** and **discard**, act on a dead letter of the
+process with the same `retry` grant, a required reason and an audit record, see
+[Dead letters](process-events.md#routes). The widget's buttons for them are
+_(planned for M14)_.
+
+_(Planned for M14)_ Cancel also cancels an instance's running sub-processes, and
+an instance without a subject needs only the grant, see
+[process flow](process-flow.md).
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances/{id}/retry

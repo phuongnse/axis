@@ -505,6 +505,13 @@
             "configuration": {
               "require-client-assertion": "true"
             }
+          },
+          {
+            "executor": "dpop-bind-enforcer",
+            "configuration": {
+              "auto-configure": "false",
+              "enforce-authorization-code-binding-to-dpop": "false"
+            }
           }
         ]
       }

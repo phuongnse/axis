@@ -4,6 +4,7 @@ using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Evaluation;
+using Axis.Expressions.Typing;
 
 namespace Axis.Configuration.Tests;
 
@@ -1143,6 +1144,22 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "event": "OrderPlaced" }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "fields": {} }""")]
     [InlineData("""{ "name": "submit", "type": "end", "event": "OrderPlaced" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "subject": "customer", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "process": "Child", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "parameters": {}, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "process": "Child" }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "subject": "customer" }""")]
+    [InlineData("""{ "name": "submit", "type": "end", "parameters": {} }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child" }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "not a name", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "subject": "", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "parameters": { "limit": "" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "parameters": { "not a name": "1" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "operation": "updateRecord", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "input": {}, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "branches": [{ "when": "true", "next": "done" }], "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "retry": { "attempts": 2 }, "next": "done" }""")]
     public void A_step_shape_the_schema_refuses_is_a_schema_violation(string step)
     {
         using var folder = Folder(Process("Order", $$"""[{{step}}, { "name": "done", "type": "end" }]""", start: "submit"));
@@ -1470,6 +1487,313 @@ public sealed class ProcessCompilerTests
     {
         Assert.False(IsoDuration.TryParse(text, out var duration));
         Assert.Equal(TimeSpan.Zero, duration);
+    }
+
+    private const string CustomerWelcomeId = "77777777-7777-4777-8777-777777777702";
+    private const string LimitCheckId = "77777777-7777-4777-8777-777777777703";
+
+    [Fact]
+    public void Processes_that_start_each_other_through_sub_process_steps_are_each_reported_at_their_step()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "OrderApproval" """"), start: "run"))
+            .With("processes/order-approval.json", ChildProcess(
+                "OrderApproval", CustomerWelcomeId, """ "entity": "Order" """, SubProcessSteps("""" "process": "orderreview" """")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.SubProcessCycle, "processes/order-approval.json", "/steps/0/process", "Processes 'OrderApproval' → 'OrderReview' → 'OrderApproval' start each other through sub-process steps, so they would never end."),
+                (DiagnosticCodes.SubProcessCycle, "processes/order-review.json", "/steps/0/process", "Processes 'OrderReview' → 'OrderApproval' → 'OrderReview' start each other through sub-process steps, so they would never end."),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message)));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_chain_of_three_processes_that_returns_to_the_first_names_the_whole_chain_at_each_step()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "B" """"), start: "run"))
+            .With("processes/b.json", ChildProcess("B", CustomerWelcomeId, """ "entity": "Order" """, SubProcessSteps("""" "process": "C" """")))
+            .With("processes/c.json", ChildProcess("C", LimitCheckId, """ "entity": "Order" """, SubProcessSteps("""" "process": "OrderReview" """")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                "Processes 'B' → 'C' → 'OrderReview' → 'B' start each other through sub-process steps, so they would never end.",
+                "Processes 'C' → 'OrderReview' → 'B' → 'C' start each other through sub-process steps, so they would never end.",
+                "Processes 'OrderReview' → 'B' → 'C' → 'OrderReview' start each other through sub-process steps, so they would never end.",
+            ],
+            result.Diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCodes.SubProcessCycle).Select(diagnostic => diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_process_that_starts_itself_is_reported_at_its_step()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "OrderReview" """"), start: "run"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.SubProcessCycle, "processes/order-review.json", "/steps/0/process", "Processes 'OrderReview' → 'OrderReview' start each other through sub-process steps, so they would never end."),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_process_that_starts_a_process_in_a_loop_it_is_not_part_of_reports_only_the_steps_in_the_loop()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "B" """"), start: "run"))
+            .With("processes/b.json", ChildProcess("B", CustomerWelcomeId, """ "entity": "Order" """, SubProcessSteps("""" "process": "C" """")))
+            .With("processes/c.json", ChildProcess("C", LimitCheckId, """ "entity": "Order" """, SubProcessSteps("""" "process": "B" """")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [("processes/b.json", "/steps/0/process"), ("processes/c.json", "/steps/0/process")],
+            result.Diagnostics.Select(diagnostic => (diagnostic.File, diagnostic.Path)));
+    }
+
+    [Fact]
+    public void A_sub_process_step_without_a_subject_is_reported_when_the_child_is_over_another_entity()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "CustomerWelcome" """"), start: "run"))
+            .With("processes/customer-welcome.json", ChildProcess("CustomerWelcome", CustomerWelcomeId, """ "entity": "Customer" """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidSubProcessSubject, "processes/order-review.json", "/steps/0",
+                "The process 'CustomerWelcome' runs for a record of 'Customer', and this process for one of 'Order'. Give a 'subject' that names the record."),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_sub_process_step_without_a_subject_is_accepted_when_the_child_is_over_the_same_entity()
+    {
+        using var folder = Folder(Process("order", SubProcessSteps("""" "process": "OrderApproval" """"), start: "run"))
+            .With("processes/order-approval.json", ChildProcess("OrderApproval", CustomerWelcomeId, """ "entity": "Order" """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_sub_process_step_without_a_subject_in_a_process_without_one_is_reported_when_the_child_has_a_subject()
+    {
+        using var folder = Folder(SubjectlessProcess("""[{ "name": "limit", "type": "decimal" }]""", SubProcessSteps("""" "process": "OrderApproval" """"), start: "run"))
+            .With("processes/order-approval.json", ChildProcess("OrderApproval", CustomerWelcomeId, """ "entity": "Order" """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidSubProcessSubject, "/steps/0"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_sub_process_subject_is_compiled_as_a_reference_to_the_childs_entity()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "CustomerWelcome", "subject": "customer" """"), start: "run"))
+            .With("processes/customer-welcome.json", ChildProcess("CustomerWelcome", CustomerWelcomeId, """ "entity": "Customer" """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetProcess("OrderReview", out var process));
+        var step = Assert.IsType<SubProcessStepModel>(process.Steps[0]);
+        Assert.NotNull(step.Subject);
+        Assert.Equal("customer", step.Subject.Expression);
+        Assert.Equal(ExpressionTypeKind.Reference, step.Subject.Check.Type!.Kind);
+        Assert.Equal("Customer", step.Subject.Check.Type.Source);
+        Assert.Empty(step.Parameters);
+    }
+
+    [Theory]
+    [InlineData("amount", ExpressionDiagnosticCodes.ResultTypeMismatch)]
+    [InlineData("nope", ExpressionDiagnosticCodes.UnknownName)]
+    public void A_sub_process_subject_that_does_not_give_a_record_of_the_childs_entity_keeps_its_expression_code(string subject, string code)
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps($$"""" "process": "CustomerWelcome", "subject": "{{subject}}" """"), start: "run"))
+            .With("processes/customer-welcome.json", ChildProcess("CustomerWelcome", CustomerWelcomeId, """ "entity": "Customer" """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "processes/order-review.json", "/steps/0/subject"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_sub_process_subject_for_a_child_without_a_subject_is_reported_at_the_subject()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "LimitCheck", "subject": "customer", "parameters": { "limit": "amount" } """"), start: "run"))
+            .With("processes/limit-check.json", ChildProcess("LimitCheck", LimitCheckId, """ "parameters": [{ "name": "limit", "type": "decimal" }] """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidSubProcessSubject, "/steps/0/subject",
+                "The process 'LimitCheck' has no subject, so the step cannot give a 'subject'. Give its parameters in 'parameters' instead."),
+            (diagnostic.Code, diagnostic.Path, diagnostic.Message));
+    }
+
+    [Fact]
+    public void Parameters_for_a_child_with_a_subject_are_reported_at_the_parameters()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "OrderApproval", "parameters": { "limit": "amount" } """"), start: "run"))
+            .With("processes/order-approval.json", ChildProcess("OrderApproval", CustomerWelcomeId, """ "entity": "Order" """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidSubProcessParameters, "/steps/0/parameters",
+                "The process 'OrderApproval' has a subject, so the step cannot give 'parameters'. Give the record it runs for in 'subject' instead."),
+            (diagnostic.Code, diagnostic.Path, diagnostic.Message));
+    }
+
+    [Theory]
+    [InlineData("{}", "/steps/0/parameters", "The parameter 'limit' is needed by the process 'LimitCheck', but the step does not give it.")]
+    [InlineData("""{ "limit": "amount", "other": "1" }""", "/steps/0/parameters/other", "The parameter 'other' was not found. The process 'LimitCheck' has no parameter with that name.")]
+    [InlineData("""{ "limit": "amount", "LIMIT": "amount" }""", "/steps/0/parameters/LIMIT", "The parameter 'limit' is already given by 'limit' in this step.")]
+    public void A_child_parameter_that_is_missing_unknown_or_repeated_is_reported_at_the_step(string parameters, string path, string message)
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps($$"""" "process": "LimitCheck", "parameters": {{parameters}} """"), start: "run"))
+            .With("processes/limit-check.json", ChildProcess("LimitCheck", LimitCheckId, """ "parameters": [{ "name": "limit", "type": "decimal" }] """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidSubProcessParameters, "processes/order-review.json", path, message),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_missing_child_parameter_is_reported_when_the_step_has_no_parameters_at_all()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "LimitCheck" """"), start: "run"))
+            .With("processes/limit-check.json", ChildProcess("LimitCheck", LimitCheckId, """ "parameters": [{ "name": "limit", "type": "decimal" }] """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidSubProcessParameters, "/steps/0/parameters"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_child_parameter_expression_that_does_not_fit_its_type_keeps_its_expression_code()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "LimitCheck", "parameters": { "limit": "status" } """"), start: "run"))
+            .With("processes/limit-check.json", ChildProcess("LimitCheck", LimitCheckId, """ "parameters": [{ "name": "limit", "type": "decimal" }] """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((ExpressionDiagnosticCodes.ResultTypeMismatch, "/steps/0/parameters/limit"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_sub_process_step_of_a_process_without_a_subject_checks_its_parameters_over_the_parameters()
+    {
+        using var folder = Folder(SubjectlessProcess(
+                """[{ "name": "cap", "type": "decimal" }]""",
+                SubProcessSteps("""" "process": "LimitCheck", "parameters": { "limit": "cap * 2" } """"),
+                start: "run"))
+            .With("processes/limit-check.json", ChildProcess("LimitCheck", LimitCheckId, """ "parameters": [{ "name": "limit", "type": "decimal" }] """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_sub_process_step_that_names_no_process_is_reported_at_the_process()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "Nope", "subject": "nothing", "parameters": { "x": "1" } """"), start: "run"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownSubProcess, "/steps/0/process", "The process 'Nope' was not found. The application has no process with that name."),
+            (diagnostic.Code, diagnostic.Path, diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_sub_process_whose_file_was_not_loaded_is_not_reported_again_at_the_step()
+    {
+        using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "OrderApproval", "parameters": { "x": "1" } """"), start: "run"))
+            .With("processes/order-approval.json", """{ "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "OrderApproval", "formatVersion": 1 }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "processes/order-approval.json"), (diagnostic.Code, diagnostic.File));
+    }
+
+    [Fact]
+    public void A_sub_process_step_over_an_unknown_entity_checks_neither_its_subject_nor_its_parameters_expressions()
+    {
+        using var folder = Folder(Process("Nope", SubProcessSteps("""" "process": "LimitCheck", "parameters": { "limit": "amount" } """"), start: "run"))
+            .With("processes/limit-check.json", ChildProcess("LimitCheck", LimitCheckId, """ "parameters": [{ "name": "limit", "type": "decimal" }] """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.UnknownProcessEntity, "/entity"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_valid_sub_process_step_compiles_into_the_model_with_the_childs_declared_names_and_parameter_order()
+    {
+        using var folder = Folder(Process("Order", """
+                [
+                  { "name": "run", "type": "subProcess", "process": "limitcheck", "parameters": { "LIMIT": "amount * 2", "reference": "status" }, "next": "DONE" },
+                  { "name": "done", "type": "end" }
+                ]
+                """, start: "run"))
+            .With("processes/limit-check.json", ChildProcess(
+                "LimitCheck", LimitCheckId, """ "parameters": [{ "name": "reference", "type": "text" }, { "name": "limit", "type": "decimal" }] """, EndOnly));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetProcess("OrderReview", out var process));
+        var step = Assert.IsType<SubProcessStepModel>(process.Steps[0]);
+        Assert.Equal(("run", Guid.Parse(LimitCheckId), "LimitCheck", "done"), (step.Name, step.ProcessId, step.Process, step.Next));
+        Assert.Null(step.Subject);
+        Assert.Equal(
+            [("reference", "status"), ("limit", "amount * 2")],
+            step.Parameters.Select(parameter => (parameter.Parameter, parameter.Value.Expression)));
+    }
+
+    /// <summary>Steps that start with the sub-process step <c>run</c>, whose properties are <paramref name="properties"/>, written without braces, which leads to the end step <c>done</c>.</summary>
+    private static string SubProcessSteps(string properties) =>
+        $$"""
+        [
+          { "name": "run", "type": "subProcess", {{properties}}, "next": "done" },
+          { "name": "done", "type": "end" }
+        ]
+        """;
+
+    private const string EndOnly = """[{ "name": "done", "type": "end" }]""";
+
+    /// <summary>A process named <paramref name="name"/> with the file's subject <paramref name="subject"/>, either <c>"entity"</c> or <c>"parameters"</c>.</summary>
+    private static string ChildProcess(string name, string id, string subject, string steps)
+    {
+        var start = steps == EndOnly ? "done" : "run";
+        return $$"""
+            { "id": "{{id}}", "kind": "process", "name": "{{name}}", "formatVersion": 1,
+              {{subject}}, "start": "{{start}}", "steps": {{steps}} }
+            """;
     }
 
     private static object? Evaluate(ExpressionModel expression, decimal amount)

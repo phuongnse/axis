@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,7 @@ namespace Axis.Integration.Tests;
 public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string ParPath = "/protocol/openid-connect/ext/par/request";
+    private const string TokenPath = "/protocol/openid-connect/token";
     private const string NoParHost = "nopar.example.test";
 
     // axis-fapi accepts redirects to http://localhost:5206/*, and axis also accepts http://127.0.0.1:5280/*.
@@ -49,7 +51,7 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
     public async Task A_fapi2_tenant_signs_in_through_par_with_a_client_assertion_and_no_client_secret()
     {
         var authority = await keycloak.StartAsync();
-        var (factory, calls, _) = await StartConfigurationHostAsync(authority);
+        var (factory, calls, _, _) = await StartConfigurationHostAsync(authority);
         await using var _ = factory;
         using var client = CreateClient(factory, _fapiAddress);
 
@@ -62,13 +64,19 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
         var fapi = calls["fapi"].Calls;
         var par = Assert.Single(fapi, call => call.Url.EndsWith(ParPath, StringComparison.Ordinal));
         Assert.Equal(HttpMethod.Post, par.Method);
+        Assert.Null(par.Dpop);
         Assert.Equal("S256", par.Form["code_challenge_method"]);
         Assert.Equal(KeycloakFixture.FapiClientId, par.Form["client_id"]);
         Assert.Equal(ClientAssertion.Type, par.Form["client_assertion_type"]);
         Assert.NotEmpty(par.Form["client_assertion"]);
-        var token = Assert.Single(fapi, call => call.Url.EndsWith("/protocol/openid-connect/token", StringComparison.Ordinal));
+        var token = Assert.Single(fapi, call => call.Url.EndsWith(TokenPath, StringComparison.Ordinal));
         Assert.NotEmpty(token.Form["client_assertion"]);
         Assert.NotEqual(par.Form["client_assertion"], token.Form["client_assertion"]);
+        Assert.NotNull(token.Dpop);
+        var proof = new JsonWebToken(token.Dpop);
+        Assert.Equal("dpop+jwt", proof.Typ);
+        Assert.Equal("POST", proof.GetPayloadValue<string>("htm"));
+        Assert.Equal(token.Url, proof.GetPayloadValue<string>("htu"));
         Assert.All(fapi.Where(call => call.Form.Count > 0), call => Assert.DoesNotContain("client_secret", call.Form.Keys));
     }
 
@@ -76,20 +84,42 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
     public async Task A_standard_tenant_signs_in_without_par_and_without_a_client_assertion()
     {
         var authority = await keycloak.StartAsync();
-        var (factory, calls, _) = await StartConfigurationHostAsync(authority);
+        var (factory, calls, _, _) = await StartConfigurationHostAsync(authority);
         await using var _ = factory;
         using var client = CreateClient(factory, _plainAddress);
 
         var callback = await LogInAtKeycloakAsync(client, authority, "binh", _plainAddress, par: false);
-        using var signedIn = await SendAsync(client, callback.PathAndQuery);
+        using var signedIn = await SendAsync(client, WithIssuer(callback, issuer: null).PathAndQuery);
 
         Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
         Assert.Equal("binh", await MeAsync(client));
         var plain = calls["plain"].Calls;
         Assert.DoesNotContain(plain, call => call.Url.EndsWith(ParPath, StringComparison.Ordinal));
         Assert.DoesNotContain(plain, call => call.Form.ContainsKey("client_assertion"));
-        var token = Assert.Single(plain, call => call.Url.EndsWith("/protocol/openid-connect/token", StringComparison.Ordinal));
+        var token = Assert.Single(plain, call => call.Url.EndsWith(TokenPath, StringComparison.Ordinal));
         Assert.Equal(KeycloakFixture.ClientSecret, token.Form["client_secret"]);
+        Assert.Null(token.Dpop);
+    }
+
+    [Theory]
+    [InlineData("https://attacker.example.test/realms/axis")]
+    [InlineData(null)]
+    public async Task A_fapi2_callback_with_a_wrong_or_missing_iss_is_refused_before_the_code_is_redeemed(string? issuer)
+    {
+        var authority = await keycloak.StartAsync();
+        var (factory, calls, _, databases) = await StartConfigurationHostAsync(authority);
+        await using var _ = factory;
+        using var client = CreateClient(factory, _fapiAddress);
+        var callback = await LogInAtKeycloakAsync(client, authority, "anna", _fapiAddress, par: true);
+
+        using var refused = await SendAsync(client, WithIssuer(callback, issuer).PathAndQuery);
+
+        Assert.Equal(HttpStatusCode.Found, refused.StatusCode);
+        Assert.Equal("/?signIn=failed", refused.Headers.Location?.OriginalString);
+        using var me = await SendAsync(client, "/api/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+        Assert.Equal(["invalidIssuer"], await RefusalReasonsAsync(databases["fapi"]));
+        Assert.DoesNotContain(calls["fapi"].Calls, call => call.Url.EndsWith(TokenPath, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -158,7 +188,7 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
     public async Task A_fapi2_tenant_whose_provider_offers_no_par_endpoint_redirects_to_the_failed_page_and_logs_a_warning()
     {
         var authority = await keycloak.StartAsync();
-        var (factory, calls, logs) = await StartConfigurationHostAsync(authority);
+        var (factory, calls, logs, _) = await StartConfigurationHostAsync(authority);
         await using var _ = factory;
         using var client = CreateClient(factory, _fapiAddress);
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/api/auth/sign-in", UriKind.Relative));
@@ -187,9 +217,9 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
 
     /// <summary>
     /// Starts a host with the configuration tenants <c>fapi</c>, <c>plain</c> and <c>nopar</c>, and records each
-    /// tenant's calls to Keycloak.
+    /// tenant's calls to Keycloak. Also returns the schema connection string of each tenant's database.
     /// </summary>
-    private async Task<(WebApplicationFactory<Program> Factory, Dictionary<string, RecordingHandler> Calls, LogCollector Logs)> StartConfigurationHostAsync(Uri authority)
+    private async Task<(WebApplicationFactory<Program> Factory, Dictionary<string, RecordingHandler> Calls, LogCollector Logs, Dictionary<string, string> Databases)> StartConfigurationHostAsync(Uri authority)
     {
         var databases = new Dictionary<string, string>();
         foreach (var id in _tenantIds)
@@ -238,7 +268,40 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
                 }
             });
         });
-        return (factory, calls, logs);
+        return (factory, calls, logs, databases);
+    }
+
+    /// <summary>The reasons of the <c>session.signInRefused</c> records in a tenant database, oldest first.</summary>
+    private static async Task<List<string>> RefusalReasonsAsync(string connectionString)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT details->>'reason' FROM axis.audit_records WHERE action = 'session.signInRefused' ORDER BY occurred_at, id",
+            connection);
+        var reasons = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            reasons.Add(reader.GetString(0));
+        }
+
+        return reasons;
+    }
+
+    /// <summary>The callback address with its <c>iss</c> replaced by <paramref name="issuer"/>, or removed when that is null.</summary>
+    private static Uri WithIssuer(Uri callback, string? issuer)
+    {
+        var parameters = QueryHelpers.ParseQuery(callback.Query)
+            .Where(pair => pair.Key != "iss")
+            .Select(pair => KeyValuePair.Create(pair.Key, (string?)pair.Value.ToString()))
+            .ToList();
+        if (issuer is not null)
+        {
+            parameters.Add(KeyValuePair.Create("iss", (string?)issuer));
+        }
+
+        return new Uri(QueryHelpers.AddQueryString(callback.GetLeftPart(UriPartial.Path), parameters));
     }
 
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory, Uri address) =>
@@ -341,8 +404,8 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
     [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]
     private static partial Regex FormActionPattern();
 
-    /// <summary>One request that the server sent to Keycloak: its method, address and form fields.</summary>
-    private sealed record RecordedCall(HttpMethod Method, string Url, Dictionary<string, string> Form);
+    /// <summary>One request that the server sent to Keycloak: its method, address, form fields and <c>DPoP</c> header.</summary>
+    private sealed record RecordedCall(HttpMethod Method, string Url, Dictionary<string, string> Form, string? Dpop);
 
     /// <summary>
     /// Sends the server's calls to Keycloak and records them. With <paramref name="removePar"/> the provider metadata
@@ -366,7 +429,8 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
                 }
             }
 
-            _calls.Enqueue(new RecordedCall(request.Method, request.RequestUri!.ToString(), form));
+            var dpop = request.Headers.TryGetValues("DPoP", out var proofs) ? proofs.Single() : null;
+            _calls.Enqueue(new RecordedCall(request.Method, request.RequestUri!.ToString(), form, dpop));
             var response = await base.SendAsync(request, cancellationToken);
             if (removePar && request.RequestUri.AbsolutePath.EndsWith(".well-known/openid-configuration", StringComparison.Ordinal))
             {

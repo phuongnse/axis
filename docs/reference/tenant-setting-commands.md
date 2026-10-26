@@ -8,15 +8,18 @@ sections marked _(planned for Mx)_ are not built yet, and Dn refers to [decision
 The design follows [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md). The
 `platform.audit_records` table, `PlatformAuditRecords.WriteAsync` and the records of the commands
 that already exist are built, see [platform audit records](#platform-audit-records). The database
-password rotation, [`tenant rotate-passwords`](#database-passwords), is built. The
-[deployment binding](#deployment-bindings) and [host](#hosts) commands are built too. The sign-in
-settings and the key rotation are _(planned for M16)_.
+password rotation, [`tenant rotate-passwords`](#database-passwords), is built. The key rotation is
+built, see [installation key](#installation-key). The
+[deployment binding](#deployment-bindings) and [host](#hosts) commands are built too. So is
+[`tenant oidc set`](#sign-in-settings), except `--client-key` and `--retire-client-key`. Those two
+options are _(planned for M16)_.
 
 ## Common rules
 
 - **Directory only.** Every command here needs `Tenancy:Source=directory`, because it writes the
   [tenant directory](../architecture.md#tenant-directory). Under `configuration` the host settings
-  hold the tenants, so the command exits with code 2.
+  hold the tenants, so the command exits with code 2. `platform rekey` is the exception: it works
+  under both sources, see [installation key](#installation-key).
 - **Over the schema role.** The commands write over `ConnectionStrings:PlatformSchema`, as
   `tenant create` does. A command that encrypts needs `Platform:SecretKey`.
 - **Picked up without a restart.** Every change raises the tenant `version`. The server and the
@@ -68,14 +71,34 @@ settings and the key rotation are _(planned for M16)_.
 | `--endpoint-audience <value>`  | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it |
 | `--service-audience <value>`   | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it |
 | `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](security.md#fapi-20-profile)                      |
-| `--client-key`                 | Adds a client key for `private_key_jwt`, as a PEM from `AXIS_OIDC_CLIENT_KEY` or standard input |
-| `--retire-client-key <kid>`    | Removes the client key with that key id                                                       |
+| `--client-key`                 | _(planned for M16)_ Adds a client key for `private_key_jwt`, as a PEM from `AXIS_OIDC_CLIENT_KEY` or standard input |
+| `--retire-client-key <kid>`    | _(planned for M16)_ Removes the client key with that key id                                   |
 
-- **Client key rotation.** A tenant holds at most two client keys. The server signs with the newest
+A successful run prints `<id> oidc ok`.
+
+- **The secret.** `--client-secret` takes no value. The secret comes from `AXIS_OIDC_CLIENT_SECRET`,
+  or from the first line of standard input when the variable is not set, as in
+  `printf %s "$SECRET" | tenant oidc set <id> --client-secret`. An empty secret exits with code 2.
+  The secret is stored encrypted and never printed.
+- **Empty values.** An empty `--endpoint-audience` or `--service-audience` removes the audience. A
+  tenant without a service audience refuses service account tokens again after the next refresh. An
+  empty claim, as in `--claim Email=`, removes the stored claim name, so the default claim applies
+  again.
+- **Any status.** The command works on a tenant in any status, including `provisioning` and
+  `suspended`, because sign-in settings need neither the tenant's database nor its roles. It needs
+  `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, and not `Admin:ConnectionString`.
+- **Audit.** One [platform audit record](#platform-audit-records) names every setting the command
+  was given, even when the new value equals the stored one. The names are `authority`, `clientId`,
+  `clientSecret`, `claimUserId`, `claimDisplayName`, `claimRoles`, `claimEmail`, `claimLocale`,
+  `endpointAudience`, `serviceAudience` and `profile`, in that order. A name is never a value.
+- **Client key rotation _(planned for M16)_.** A tenant holds at most two client keys. The server signs with the newest
   and publishes both, so the identity provider can accept either while it changes over. Retiring the
   last key of a `fapi2` tenant exits with code 2.
-- **Checks.** `--profile fapi2` without a client key exits with code 2. A preview tenant has no
-  sign-in settings of its own, so the command exits with code 2 for one.
+- **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, the tenant is unknown, the
+  tenant is a preview tenant, which has no sign-in settings of its own, no setting is given, a claim
+  name or the profile is unknown, `--profile fapi2` is given for a tenant without a client key, the
+  authority is not an absolute `http` or `https` URL, the client id is blank, or the secret is
+  empty. The `version` stays and no audit record is written.
 
 ## Hosts
 
@@ -135,6 +158,28 @@ keys. It can be rotated without signing anyone out.
   code 2. A value that fails to decrypt with both keys stops the command, and nothing changes.
 - **Data protection keys.** Rekey is the one action that updates rows of
   `platform.data_protection_keys`. The server's role still only inserts them.
+- **Both tenancy sources.** `platform rekey` does not read `Tenancy:Source`. The server keeps its
+  data protection keys in the platform database under both sources, so both need the rotation.
+  Under `configuration` the tenant directory is just empty.
+- **Exit codes.** `0` when every value is re-encrypted. `2` when the usage is wrong, a setting is
+  missing or malformed, the platform tables do not exist, `Platform:PreviousSecretKey` is not set
+  (a blank value counts as not set), or a value decrypts with neither key. Then nothing changes and
+  no audit record is written. A message for a value that decrypts with neither key names the tenant
+  and the field, or the key id, and never a value. `1` when the audit record or the update fails,
+  and nothing changes.
+- **Summary line.** `platform rekey ok: <n> tenant secrets, <m> data protection keys`.
+- **Every non-empty value.** Rekey re-encrypts each non-empty value, even one that the new key
+  already encrypts, and skips empty values, such as the client secret of a preview tenant. Running
+  it twice is harmless.
+- **Version.** Rekey raises the `version` of each tenant whose secrets it re-encrypted, so each
+  host loads the new ciphertext at its next `Tenancy:RefreshInterval`. That refresh rebuilds the
+  database pool and the sign-in client of each tenant once.
+- **Locks.** The transaction takes an `EXCLUSIVE` lock on `platform.tenants`,
+  `platform.tenant_bindings` and `platform.data_protection_keys`. Another admin command, and a
+  server that stores a new data protection key, wait for the commit. Readers are not blocked.
+- **Audit record.** One record with no tenant. Its `changed` holds `tenant secrets: <n>` and
+  `data protection keys: <m>`, never a value. It is written after every value has decrypted and
+  before the first update.
 
 ## Platform audit records
 
@@ -142,20 +187,24 @@ keys. It can be rotated without signing anyone out.
   truncate with SQLSTATE `23001`, as it does for the audit table of a tenant database. The table is
   built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record.
 - **What writes it.** Every `Axis.Admin` command that acts on a tenant: `tenant create`,
-  `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant backup`, `tenant restore`,
-  `migrate` and `activate` are built. `tenant backup` writes one because an archive holds a tenant's
-  data. `tenant binding set`, `tenant binding remove`, `tenant host add`, `tenant host remove` and
-  `tenant host move` are built and write one each. The other setting commands and `platform rekey`
-  are _(planned for M16)_. `tenant list`, `tenant binding list`, `version` and `publisher` write
-  none. The dispatcher of `Axis.Admin` reads a table of commands, and each is
-  marked as writing one record per tenant or none. A command without a mark fails a test.
+  `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant oidc set`, `tenant backup`,
+  `tenant restore`, `migrate` and `activate` are built. `tenant backup` writes one because an
+  archive holds a tenant's data. `tenant binding set`, `tenant binding remove`, `tenant host add`,
+  `tenant host remove` and `tenant host move` are built and write one each. `platform rekey` is
+  built and writes one record for the whole run, with no tenant. The other setting commands on this
+  page are _(planned for M16)_. `tenant list`, `tenant binding list`, `version` and `publisher`
+  write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as
+  writing one record per tenant, one per run or none. A command without a mark fails a test.
 - **When.** One record per tenant, when tenant work starts: after the checks of the command and
-  before its first change for that tenant. A usage error, a missing setting, an unknown tenant or a
+  before its first change for that tenant. `platform rekey` writes its one record after every value
+  has decrypted and before the first update, and `changed` holds the counts. A usage error, a missing setting, an unknown tenant or a
   host that another tenant holds writes none, because nothing started. A record means the command
   started work for the tenant, not that the work succeeded. The `changed` names of these commands
-  are empty, because the command already says what changed. `tenant rotate-passwords` is the
-  exception: its record names both roles, `axis_<id>_runtime` and `axis_<id>_schema`, and never a
-  password.
+  are empty, because the command already says what changed. `tenant rotate-passwords` and
+  `tenant oidc set` are the exceptions. The record of `tenant rotate-passwords` names both roles,
+  `axis_<id>_runtime` and `axis_<id>_schema`, and never a password. The record of `tenant oidc set`
+  names the [settings](#sign-in-settings) it was given and never a value. `tenant oidc set` writes
+  its record after its checks and before the change.
   The binding and host commands differ: each is one small transaction that writes its record and
   makes its change together, so a record means the change was made. A command that is refused or
   fails rolls its record back too.

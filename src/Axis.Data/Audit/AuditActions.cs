@@ -45,6 +45,10 @@ public static class AuditActions
 
     public const string OperationCallResolved = "operation.callResolved";
 
+    public const string DeadLetterRedelivered = "deadLetter.redelivered";
+
+    public const string DeadLetterDiscarded = "deadLetter.discarded";
+
     public const string SessionSignedIn = "session.signedIn";
 
     public const string SessionSignedOut = "session.signedOut";

@@ -458,7 +458,7 @@ internal static class ProcessOperatorEndpoints
     /// in one pass, keyed by JSON Pointer into the body. A body that is not a JSON object is one
     /// problem on the whole body.
     /// </summary>
-    private static (string? Reason, SortedDictionary<string, string[]>? Errors) ReadReason(byte[] utf8Body) =>
+    internal static (string? Reason, SortedDictionary<string, string[]>? Errors) ReadReason(byte[] utf8Body) =>
         ReadObject(utf8Body, [ReasonProperty], (properties, errors) => ReadReasonText(properties, errors));
 
     /// <summary>
@@ -658,7 +658,7 @@ internal static class ProcessOperatorEndpoints
         (null, new SortedDictionary<string, string[]>(StringComparer.Ordinal) { [""] = [MalformedBody] });
 
     // Buffered, so a retry that runs again on a new release can read the body again.
-    private static async Task<byte[]> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)
+    internal static async Task<byte[]> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)
     {
         request.EnableBuffering();
         request.Body.Position = 0;

@@ -7,6 +7,7 @@ import { startServer } from '../activate'
 import { pickAction, pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
+import { openFormTab } from '../studio-resources'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -58,6 +59,7 @@ test.describe('Studio edits a process in the process editor', () => {
     const before = await diagnostics(page)
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+    await openFormTab(page)
     await pickAction(
       page.getByRole('combobox', { name: 'Add step', exact: true }),
       'decision',
@@ -93,6 +95,7 @@ test.describe('Studio edits a process in the process editor', () => {
     const original = await readFile(path.join(copy, file), 'utf8')
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+    await openFormTab(page)
     await expect(page.getByTestId('studio-step-8')).toContainText('markRejected')
     const status = page.getByTestId('studio-field-/steps/8/set/status')
     await expect(status.locator('.cm-editor')).toBeVisible()
@@ -117,6 +120,7 @@ test.describe('Studio edits a process in the process editor', () => {
     const beforeDiagnostics = await diagnostics(page)
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+    await openFormTab(page)
     await expect(page.getByTestId('studio-step-3')).toContainText('financeApproval')
     await page.getByTestId('studio-field-/steps/3/dueIn').getByRole('textbox').fill('P5D')
     await pick(page, '/steps/3/outcomes/1/next', 'markRejected')
@@ -137,6 +141,7 @@ test.describe('Studio edits a process in the process editor', () => {
     const id = await processId(page)
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+    await openFormTab(page)
     const card = page.getByTestId('studio-step-4')
     await expect(card).toContainText('markApproved')
     await card.getByRole('button', { name: 'Remove step', exact: true }).click()
@@ -179,6 +184,7 @@ test.describe('Studio edits a process in the process editor', () => {
       await page.getByRole('button', { name: 'Save', exact: true }).click()
 
       await expect(page.getByTestId('studio-saved')).toBeVisible()
+      await page.getByRole('tab', { name: 'Design', exact: true }).click()
       const node = page.getByTestId(`studio-graph-node-${i}`)
       await expect(node).toHaveAttribute('data-marked', 'true')
       await expect(node).toHaveAccessibleName('markRejected · operation · has diagnostics')

@@ -18,6 +18,9 @@ internal static class SignInRefusals
     /// <summary>The callback's state is missing, unreadable or fails the correlation check.</summary>
     public const string InvalidState = "invalidState";
 
+    /// <summary>Under <c>fapi2</c>, the authorization response's <c>iss</c> is missing or is not the tenant's authority.</summary>
+    public const string InvalidIssuer = "invalidIssuer";
+
     /// <summary>The identity provider answered with an error, or refused the code exchange.</summary>
     public const string ProviderError = "providerError";
 
@@ -27,16 +30,23 @@ internal static class SignInRefusals
     /// <param name="providerError">Whether the callback carries an <c>error</c> from the identity provider.</param>
     /// <param name="failure">The failure the OIDC handler reports.</param>
     /// <param name="tokenRejected">Whether the ID token was rejected for a missing user id.</param>
+    /// <param name="issuerRejected">Whether the callback's <c>iss</c> was rejected under <c>fapi2</c>.</param>
     public static string Classify(
         bool stateRead,
         bool otherTenantReadsState,
         bool providerError,
         Exception? failure,
-        bool tokenRejected)
+        bool tokenRejected,
+        bool issuerRejected)
     {
         if (!stateRead)
         {
             return otherTenantReadsState ? OtherTenant : InvalidState;
+        }
+
+        if (issuerRejected)
+        {
+            return InvalidIssuer;
         }
 
         if (providerError || failure is OpenIdConnectProtocolException)

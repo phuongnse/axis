@@ -145,7 +145,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - The cookie is protected with a key ring that every server replica shares.
     The keys are in `platform.data_protection_keys`, encrypted with
     `Platform:SecretKey`, so a session survives a restart and works on every
-    replica. The server fixes the data protection application name to `Axis`,
+    replica. During a key rotation a key that `Platform:PreviousSecretKey`
+    encrypted still decrypts, and `platform rekey` then re-encrypts it, so
+    nobody is signed out. The server fixes the data protection application name to `Axis`,
     so replicas at different paths read the same keys. A key that does not
     decrypt stops the start.
 - **Tenant binding.** A session whose tenant id differs from the tenant
@@ -371,10 +373,9 @@ stay session-only until then.
   `axis-services`. A tenant without it accepts no service account token, and
   neither does a preview tenant, which takes neither audience from its main
   tenant. Under `Tenancy:Source=directory` the setting is the
-  `service_audience` column of `platform.tenants`. `tenant oidc set` will
-  change it _(planned for M16)_, see
-  [tenant setting commands](tenant-setting-commands.md). Until then an operator
-  sets the column by hand.
+  `service_audience` column of `platform.tenants`.
+  [`tenant oidc set --service-audience`](tenant-setting-commands.md#sign-in-settings)
+  changes it.
 - **Routes.** A service account may call:
   - every route of the [record API](record-api.md), record history included;
   - `GET /api/apps/{app}/data-sources/{dataSource}/rows`;
@@ -430,9 +431,8 @@ stay session-only until then.
 It follows [D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant
 can turn on the FAPI 2.0 Security Profile for sign-in and for machine callers.
 The tenant setting, the client key, the startup check, the machine callers, and
-PAR and `private_key_jwt` at sign-in are built. The `iss` check and DPoP at
-sign-in, and the rotation and verification bullets below are _(planned for
-M16)_.
+PAR, `private_key_jwt`, the `iss` check and DPoP at sign-in are built. The
+rotation and verification bullets below are _(planned for M16)_.
 
 - **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
   `standard` when unset. Any other value stops the server's start, naming the
@@ -451,10 +451,26 @@ M16)_.
     `jti`. The server sends no client secret, even when the tenant has one.
     Client keys are EC P-256 keys and the assertion is signed with ES256. RSA
     keys are not supported.
-  - A `standard` tenant is unchanged: no PAR, and a client secret.
-  - _(Planned for M16.)_ The server checks the `iss` parameter of the
-    authorization response against the tenant's `Authority` (RFC 9207).
-  - _(Planned for M16.)_ The token request carries a DPoP proof.
+  - The server checks the `iss` parameter of the authorization response
+    (RFC 9207). It must equal the tenant's `Authority` character for
+    character, after one trailing `/` is removed from the `Authority`. A
+    callback with no `iss`, or a different one, creates no session and writes
+    `session.signInRefused` with the reason `invalidIssuer`. The check runs
+    after the state checks, so a callback with a bad state is still refused as
+    `invalidState` or `otherTenant`. The code is never sent to the token
+    endpoint. An error response from the provider is refused as
+    `providerError`, whatever its `iss`.
+  - The token request carries a DPoP proof (RFC 9449), signed with a new P-256
+    key that is made for each sign-in and thrown away after it. The proof has
+    `typ` `dpop+jwt`, the `htm` `POST` and the token endpoint as `htu`, and
+    holds only the public key. If the provider answers `use_dpop_nonce`, the
+    server sends the request once more, with the nonce in a new proof signed
+    with the same key and with a new client assertion. A second refusal fails
+    the sign-in as `providerError`. The authorization code is not bound to the
+    key, and the PAR request carries no proof. The server keeps no token after
+    sign-in, so the DPoP-bound access token is discarded.
+  - A `standard` tenant is unchanged: no PAR, no `iss` check, no DPoP, and a
+    client secret.
 - **Machine callers under `fapi2`.** Inbound endpoints and service accounts
   accept only access tokens bound to a DPoP key (RFC 9449). A DPoP proof is a
   short signed JWT that the caller makes for each request, so a stolen token is

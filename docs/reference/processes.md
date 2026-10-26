@@ -226,8 +226,11 @@ a payment reference from the sample extension package, see
 ## Steps
 
 M3 has four step types, and the `timer` step is built too. Wait for event and
-sub-process come later. _(Planned for M14)_ `waitEvent` and `subProcess` steps,
-and the `createRecord` and `notify` operations, see [process flow](process-flow.md)
+sub-process come later. The compiler already checks and builds a `subProcess`
+step, but the engine does not run it yet, see
+[Sub-process step](process-flow.md#sub-process-step). _(Planned for M14)_
+`waitEvent` and `subProcess` steps, and the `createRecord` and `notify`
+operations, see [process flow](process-flow.md)
 and [notifications](notifications.md#notify-operation).
 
 - **`decision`.** `branches` is an ordered list. Each branch has a `when`
@@ -358,7 +361,7 @@ reported in one pass. See
   or any task property (`AXC0004`).
 - A timer has `next`, and no `branches`, `otherwise`, `operation`, `set`,
   `connector`, `input`, `output`, `retry`, `event`, `fields` or any task
-  property (`AXC0004`). It has exactly one of `wait` and `until` (`AXC0250` at
+  property (`AXC0004`). It has exactly one of `wait` and `until` (`AXC0254` at
   `/steps/{i}`). A `wait` is a positive fixed-length duration, by the rule of a
   task's `dueIn` (`AXC0084` at `/steps/{i}/wait`). An `until` gives a
   `date-time`, with the same scope as a `when`. A problem is reported at
@@ -726,7 +729,8 @@ database, with history in `axis.__processes_migrations` (see
   `process_instance_id` of the call's instance and the `package_call_id` of
   the call. See [Package operations](process-execution.md#package-operations). An `event.deliver` item delivers one event occurrence to
   the `async` event triggers, see [Event delivery](process-events.md#event-delivery). It has
-  the `event_id` of the occurrence. Every item also has the `trace_id` and
+  the `event_id` of the occurrence, and the `trigger_id` of the one trigger it delivers
+  to when an operator [redelivered](process-events.md#routes) a dead letter. Every item also has the `trace_id` and
   `span_id` of the span whose transaction queued it, or null when no span was
   current. A run starts a new trace with a link to that span, see
   [Telemetry](../architecture.md#telemetry). A rescheduled item keeps them.
@@ -903,10 +907,10 @@ database, with history in `axis.__processes_migrations` (see
 
 ## Limits in M3
 
-- **Loops only through a task.** A process may not contain a cycle that has no
-  `task` step, because it would run for ever. A cycle through a `task` step is
-  allowed, see [Loops](process-flow.md#loops). _(Planned for M14)_ A cycle
-  through a `timer` or `waitEvent` step is allowed too.
+- **Loops only through a waiting step.** A process may not contain a cycle that
+  has no `task` or `timer` step, because it would run for ever. A cycle through
+  a `task` or a `timer` step is allowed, see [Loops](process-flow.md#loops).
+  _(Planned for M14)_ A cycle through a `waitEvent` step is allowed too.
 - **No user check.** The user id that a `user` assignee gives is not checked
   against any list of users. A wrong id creates a task that nobody sees. A
   [reassign](task-deadlines.md#reassign) checks its target against the

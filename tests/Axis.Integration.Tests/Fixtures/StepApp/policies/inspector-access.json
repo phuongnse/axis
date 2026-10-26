@@ -7,6 +7,7 @@
   "grants": [
     { "entity": "Request", "actions": ["read"], "filter": "department is null" },
     { "process": "RoleApprove", "actions": ["inspect", "reassign"] },
+    { "process": "Decide", "actions": ["inspect"] },
     { "process": "Break", "actions": ["inspect"] },
     { "process": "Submit", "actions": ["inspect"] },
     { "process": "Divide", "actions": ["inspect"] },

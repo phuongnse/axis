@@ -342,8 +342,8 @@ flowchart LR
      (`AXC0244`). Without an `entity` it is checked over its `parameters`, see
      [Compile checks](processes.md#compile-checks). Step names are unique ignoring letter case: a later step with a
      name already used is `AXC0069` at `/steps/{i}/name`, naming the first
-     step. `start`, each branch `next`, each `otherwise`, each operation
-     `next`, each task outcome `next` and each task `deadline` `next` must name a
+     step. `start`, each branch `next`, each `otherwise`, each operation and
+     sub-process `next`, each task outcome `next` and each task `deadline` `next` must name a
      step, ignoring letter case, otherwise it is `AXC0070` at that property. A
      transition goes to the first step with its name. A step that cannot be
      reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
@@ -440,7 +440,21 @@ flowchart LR
      without `input` or with `set`, `connector`, `event` or `fields`, an
      `event` or `fields` on any other step, a retry `attempts` outside 1 to 10, a task without
      `label`, `assignee`, `form` or an outcome, and an `end` step with
-     `branches`, `otherwise` or any other property, are `AXC0004`. See
+     `branches`, `otherwise` or any other property, are `AXC0004`. A
+     sub-process step without `process` or `next`, or with a property of
+     another step type, is `AXC0004` too, and so is `process`, `subject` or
+     `parameters` on any other step. A sub-process step's `process` that names
+     no process of the application, ignoring letter case, is `AXC0250` at
+     `/steps/{i}/process`, unless that process file was not loaded because
+     of its own errors, and then its `subject` and `parameters` are not
+     checked. A process that reaches itself through sub-process steps is
+     `AXC0251` at the `process` of each step that closes the loop, naming the
+     chain. A `subject` that is missing, when the child's entity is not the
+     parent's, or given to a child without a subject, is `AXC0252`, and
+     `parameters` given to a child with a subject, or a child parameter that
+     is missing, unknown or repeated, is `AXC0253`. The `subject` and
+     parameter expressions are type-checked with the same scope as a `when`.
+     See [Sub-process step](process-flow.md#sub-process-step) and
      [processes](processes.md#compile-checks).
    - **Policies.** Each `roles` entry of a [policy](roles-and-policies.md) must
      name a declared role, compared exactly, otherwise it is `AXC0090` at
