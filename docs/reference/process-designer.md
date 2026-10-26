@@ -27,11 +27,12 @@ _(planned for M14)_.
   _(built)_.
 - **Palette** _(built)_. It sits at the top of the panel beside the canvas and
   lists the step types and operations that `process.schema.json` defines today:
-  `decision`, `task`, the operations `updateRecord`, `callConnector` and
-  `raiseEvent`, one "Package operation" entry, `subProcess` and `end`. A
-  Vitest test reads the schema and fails when a step type or a built-in
-  operation is missing from the palette. `timer`, `waitEvent`, `createRecord`
-  and `notify` join when the schema defines them, because their steps would
+  `decision`, `task`, the operations `updateRecord`, `callConnector`,
+  `raiseEvent` and `createRecord`, one "Package operation" entry, `subProcess`
+  and `end`. A new `createRecord` step starts with an empty `entity` and an
+  empty `set`. A Vitest test reads the schema and fails when a step type or a
+  built-in operation is missing from the palette. `timer`, `waitEvent` and
+  `notify` join when the schema defines them, because their steps would
   always be invalid before that.
   - The package entry adds an operation step with an empty `operation`, which
     the author types as `<package>/<operation>` in the panel, as the operation
@@ -91,9 +92,13 @@ _(planned for M14)_.
   Remove. Removing the selected step clears the selection. An edit in the
   panel redraws the graph. With no step selected, the panel says "Select a step
   on the canvas."
+- **Property panel (`createRecord`)** _(built)_. The operation picker offers
+  `createRecord`. Its panel has an entity picker and one `set` row for each
+  field of the picked entity, as the `updateRecord` panel has for the subject
+  entity.
 - **Property panel (new step types)** _(planned for M14)_. The new step types
-  and keys get panels too: timer, wait for event, sub-process, `createRecord`,
-  `notify`, and the escalations and deadline of a task.
+  and keys get panels too: timer, wait for event, sub-process, `notify`, and
+  the escalations and deadline of a task.
 - **Undo** _(built)_. The undo and redo of
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)
   cover every edit of a process on all three tabs, with 100 steps, cleared by

@@ -34,6 +34,7 @@ const previews: Record<string, (page: Page) => Locator> = {
   columns: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
   tabs: (page) => page.getByRole('tab', { name: 'Requests', exact: true }),
   section: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
+  states: (page) => page.getByRole('alert').filter({ hasText: 'The records could not be loaded.' }),
   'field-text': (page) => page.getByLabel('Title', { exact: true }),
   'field-integer': (page) => page.getByLabel('Quantity', { exact: true }),
   'field-decimal': (page) => page.getByLabel('Amount', { exact: true }),
@@ -93,6 +94,12 @@ for (const [name, widget] of Object.entries(previews)) {
       const recording = await openHarness(page, `?preview=${name}&mode=${mode}`)
 
       await expect(widget(page)).toBeVisible()
+      if (name === 'states') {
+        // The loading state's request never finishes, so its table stays busy.
+        await expect(
+          page.getByRole('figure', { name: 'Loading', exact: true }).locator('[aria-busy="true"]').first(),
+        ).toBeVisible()
+      }
       await page.waitForLoadState('networkidle')
 
       if (name.startsWith('field-')) {

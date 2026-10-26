@@ -29,10 +29,12 @@ namespace Axis.Integration.Tests;
 /// authentication scheme signs in <c>anna</c>, an employee with every grant of both applications,
 /// and users with fewer grants: <c>binh</c> holds no role, <c>rita</c> is a reader, <c>uma</c>
 /// holds only undeclared role names, <c>fia</c> holds only grants with fields, on items,
-/// tickets and orders and none on departments, and <c>dora</c> holds only a data source grant. <c>fern</c>
+/// tickets and orders and none on departments, plus <c>import</c> on items and tickets and no <c>update</c> on tickets,
+/// and <c>dora</c> holds only a data source grant. <c>fern</c>
 /// and <see cref="SqlTextUser"/> hold the record filters of the <c>filtered</c> role, <c>fred</c>
 /// holds only a read filter that is <c>false</c>, and <c>faye</c> holds a read filter that
-/// overflows for some items and one that matches items of the Finance department.
+/// overflows for some items and one that matches items of the Finance department. <c>eve</c> may read
+/// and export the items that have a status, without some of their fields, and export a grouped data source.
 /// <see cref="Client"/> is signed in as <c>anna</c>.
 /// </summary>
 public sealed class RecordApiFixture : IAsyncLifetime
@@ -157,6 +159,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
                 new TestIdentity("dora", "Dora Data Source", "dsonly"),
                 new TestIdentity("fred", "Fred False", "false-only"),
                 new TestIdentity("faye", "Faye Failing", "failing"),
+                new TestIdentity("eve", "Eve Exporter", "exporter"),
                 new TestIdentity(SqlTextUser, "Mallory", "filtered"));
         });
         _client = _factory.CreateClient().SignedInAs("anna");

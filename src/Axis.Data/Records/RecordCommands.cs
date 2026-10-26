@@ -213,6 +213,97 @@ public static class RecordCommands
     }
 
     /// <summary>
+    /// Creates a record from <paramref name="values"/> the way a record API create does, inside the
+    /// caller's transaction and with no grant check. Each value must fit its field's column, and a
+    /// <c>null</c> for a required field is refused. The fields the values leave out get their
+    /// defaults, and a required field with no value, no default, no formula, no sequence and no
+    /// creator is refused. Each creator field is set to <paramref name="creatorId"/>. Then the
+    /// computed fields are computed, the validations run and the record is inserted with its
+    /// sequence numbers. A value that does not fit, a missing required field, a computed field that
+    /// cannot be computed and a failed validation are <see cref="RecordWriteOutcome.Invalid"/>, keyed
+    /// <c>/values/&lt;field&gt;</c>, and write nothing. Roll the transaction back unless the record
+    /// is <see cref="RecordWriteOutcome.Written"/>, which hands the sequence numbers back.
+    /// </summary>
+    /// <param name="releaseId">The release the caller runs on, which the written record is stamped with.</param>
+    /// <param name="values">Each field to set with its value, as the expression interpreter gives it.</param>
+    /// <param name="creatorId">The id the creator fields are set to.</param>
+    /// <param name="now">The start time of the caller's transaction, which <c>now()</c> gives in a default and a validation.</param>
+    public static async Task<RecordWriteResult> CreateFromAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        EntityModel entity,
+        Guid releaseId,
+        IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
+        string creatorId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(creatorId);
+
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var converted = new List<RecordValue>();
+        foreach (var (field, value) in values)
+        {
+            RecordValue? recordValue = null;
+            var message = value is null && field.Required
+                ? Messages.Required
+                : RecordComputer.ToRecordValue(field, value, out recordValue);
+            if (message is not null)
+            {
+                errors[ValuesPointer + field.Name] = [message];
+            }
+            else
+            {
+                converted.Add(recordValue!);
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: errors);
+        }
+
+        var defaults = RecordDefaults.Apply(entity, converted, now, application.TimeZone);
+        if (defaults.Errors is { } defaultErrors)
+        {
+            return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: defaultErrors);
+        }
+
+        // A record API create refuses a required field it leaves out, and so does this. The fields a
+        // default, a formula, a sequence or the creator fills are not left out.
+        var given = defaults.Values.Select(value => value.Field.Name).ToHashSet(StringComparer.Ordinal);
+        foreach (var field in RecordQueries.Columns(entity).Where(field => field.Required && !field.IsComputed && field.Sequence is null && !field.Creator))
+        {
+            if (field.Default is null && !given.Contains(field.Name))
+            {
+                errors[ValuesPointer + field.Name] = [Messages.Required];
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: errors);
+        }
+
+        var computed = RecordComputer.ComputeCreate(application, entity, RecordCreator.WithCreator(entity, defaults.Values, creatorId), []);
+        if (computed.Errors is { } computeErrors)
+        {
+            return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: computeErrors);
+        }
+
+        if (RecordValidator.ValidateCreate(application, entity, computed.Values, computed.Rows, now) is { } failures)
+        {
+            return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
+        }
+
+        return await CreateAsync(connection, application, entity, releaseId, computed.Values, computed.Rows, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
     /// Locks the row of the record with <paramref name="id"/> until the caller's transaction ends,
     /// so a read after it sees the latest version and a concurrent write waits. Returns
     /// <see langword="false"/> when there is no such record.
@@ -412,9 +503,18 @@ public static class RecordCommands
                 var unique = entity.Fields.FirstOrDefault(field =>
                     field.Unique
                     && string.Equals(exception.ConstraintName, EntityNaming.Unique(table, EntityNaming.Column(field.Name)), StringComparison.Ordinal));
-                return unique is null
+                if (unique is not null)
+                {
+                    return Failure(RecordWriteOutcome.UniqueViolation, pointer + unique.Name, Messages.NotUnique);
+                }
+
+                // A unique index is named by its columns; the error is keyed at its first field.
+                var uniqueIndex = entity.Indexes.FirstOrDefault(index =>
+                    index.Unique
+                    && string.Equals(exception.ConstraintName, EntityNaming.Index(table, [.. index.Fields.Select(EntityNaming.Column)]), StringComparison.Ordinal));
+                return uniqueIndex is null
                     ? new RecordWriteResult(RecordWriteOutcome.SchemaConflict)
-                    : Failure(RecordWriteOutcome.UniqueViolation, pointer + unique.Name, Messages.NotUnique);
+                    : Failure(RecordWriteOutcome.UniqueViolation, pointer + uniqueIndex.Fields[0], Messages.NotUnique);
             // A NOT NULL column the active model does not require, left by a failed activation.
             case PostgresErrorCodes.NotNullViolation:
                 return new RecordWriteResult(RecordWriteOutcome.SchemaConflict);

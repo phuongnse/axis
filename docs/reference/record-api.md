@@ -123,9 +123,10 @@ the records of the entity that match the `search`, or every record without
 one. A list holds only records that match one of the user's read filters,
 and `totalCount` counts only those. A grant without a `filter` matches every
 record. Each reference step of a read filter finds the target record through its
-primary key. No field has an index yet, so a filtered list reads the whole entity
-table. From M15 every reference column and declared index has one, see
-[schema planning](storage.md#schema-planning) _(planned for M15)_.
+primary key. Every reference column and every child table's `owner_id` has an
+index, and so does each index an entity declares, see
+[schema planning](storage.md#schema-planning). A filter on a field no index
+covers reads the whole entity table.
 
 ## Reading values
 
@@ -433,8 +434,10 @@ otherwise the answer is the stale-version `409`. See
   field in another record is a validation problem with status `409`, whose
   `errors` is keyed `/values/<field>`. A unique field of a child row repeats
   a value of any row in the child table, and is keyed
-  `/values/<collection>/<index>/<field>`. The field is found by matching the
-  violated constraint against the names the model declares.
+  `/values/<collection>/<index>/<field>`. A record that repeats the values of
+  a unique index the entity declares is the same `409`, keyed at the first
+  field of the index. The field is found by matching the violated constraint
+  or index against the names the model declares.
 - **`409` for a stale version.** An update whose `version` is not the stored
   one.
 - **`409` for a referenced record.** A delete of a record that another record

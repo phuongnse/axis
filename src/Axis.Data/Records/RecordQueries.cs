@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Naming;
@@ -110,6 +111,44 @@ public static class RecordQueries
         {
             // Class 22 is a data exception: the condition could not be evaluated for some record.
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Streams up to <paramref name="limit"/> records in the order and under the search and condition of
+    /// <see cref="ListAsync"/>, one at a time, so a caller never holds them all. It does not count. A database
+    /// error is thrown as it is, including a data exception (SQLSTATE class 22) that the
+    /// <paramref name="condition"/> raises for some record, which the caller maps.
+    /// </summary>
+    public static async IAsyncEnumerable<Record> ReadAllAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        RecordSort? sort,
+        string? search,
+        RecordCondition? condition,
+        int limit,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+
+        var filtered = !string.IsNullOrEmpty(search) && entity.DisplayField is not null;
+        var statement = ListStatement(entity, sort, filtered, condition);
+        await using var command = new NpgsqlCommand(statement.PageSql, connection);
+        if (filtered)
+        {
+            command.Parameters.Add(SearchParameter(search!));
+        }
+
+        condition?.AddTo(command);
+        command.Parameters.AddWithValue("limit", limit);
+        command.Parameters.AddWithValue("offset", 0L);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            yield return ReadRecord(reader, entity);
         }
     }
 

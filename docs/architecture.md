@@ -40,7 +40,7 @@ flowchart LR
   address, see [health checks](#health-checks).
   It runs work items, and through them
   the `decision`, `task`, `operation`, `subProcess` and `end` steps of process instances.
-  Operation steps include `updateRecord`, `callConnector` calls with their
+  Operation steps include `updateRecord`, `createRecord`, `callConnector` calls with their
   retries and reconciliation, and package operations. `raiseEvent` steps raise
   events. Sub-process steps start a child and resume the parent when it
   completes. Wait for event and timer steps come later. _(Planned

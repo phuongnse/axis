@@ -83,6 +83,8 @@ public static class DiagnosticCodes
     public const string DeleteTriggerWithOtherKinds = "AXC0254";
     public const string DeleteTriggerWithFields = "AXC0255";
     public const string DeleteTriggerProcessWithSubject = "AXC0256";
+    public const string UnknownCreateRecordEntity = "AXC0260";
+    public const string CreateRecordOverChildEntity = "AXC0261";
     public const string UnknownOperation = "AXC0078";
     public const string UnknownSetField = "AXC0079";
     public const string ReadOnlySetField = "AXC0080";
@@ -257,5 +259,8 @@ public static class DiagnosticCodes
     public const string MissingPlaceholderValue = "AXC0271";
     public const string UnusedPlaceholderValue = "AXC0272";
     public const string InvalidPlaceholder = "AXC0273";
-    public const string UnknownApplicationTimeZone = "AXC0274";
+    public const string DuplicateIndex = "AXC0274";
+    public const string UnknownIndexField = "AXC0275";
+    public const string InvalidIndexField = "AXC0276";
+    public const string UnknownApplicationTimeZone = "AXC0277";
 }

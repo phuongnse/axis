@@ -9,6 +9,7 @@ using Axis.Server.Applications;
 using Axis.Server.Authentication;
 using Axis.Server.DataSources;
 using Axis.Server.Endpoints;
+using Axis.Server.Exports;
 using Axis.Server.Health;
 using Axis.Server.Http;
 using Axis.Server.Presentation;
@@ -196,6 +197,8 @@ builder.Services.AddHostedService<StartupReleaseCheck>();
 
 // Studio is off unless folders or an applications path, and an author role, are set, which is the Production default.
 builder.Services.AddSingleton(QueryTimeoutSettings.Load(builder.Configuration));
+builder.Services.AddSingleton(ExportSettings.Load(builder.Configuration));
+builder.Services.AddSingleton(RecordImportSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath));
 
 builder.Services.AddScoped<TenantDatabase>();
@@ -258,6 +261,7 @@ open.MapPresentationEndpoints();
 var sessions = app.MapGroup(string.Empty).WithRateLimit(Partition.Session);
 sessions.MapSiteEndpoints();
 sessions.MapRecordEndpoints();
+sessions.MapRecordImportEndpoints();
 sessions.MapFormStateEndpoints();
 sessions.MapProcessEndpoints();
 sessions.MapProcessInspectionEndpoints();

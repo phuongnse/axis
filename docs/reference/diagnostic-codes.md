@@ -34,7 +34,7 @@ sorted by file and then path.
 | `AXC0013` | A field property does not fit the field's type, or its value is outside what storage accepts. This includes `required` on a computed field, and an `expression` on a `reference`, `references` or `child-collection` field, and `unique` on a `references` field. A `sequence` on a field that is not `text`, is `required`, has an `expression` or belongs to a child entity is reported once, at `/fields/{i}/sequence`. A `min`, `max` or `minLength` on a type that does not take it, that is not a literal of the field's type, that puts `min` above `max` or `minLength` above `maxLength`, or that sits on a field the server sets is reported at the property. |
 | `AXC0014` | A field lacks a property its type needs: `target` on a reference, references or child collection, `values` on an enum. |
 | `AXC0015` | An entity table has a column whose field was removed and that no pending `renameField` or `dropField` migration covers. Reported at `/fields` of the entity file. |
-| `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. |
+| `AXC0016` | A field changed in a way its existing column cannot follow, such as a new type, a shorter `maxLength` or a removed enum value. A unique index added to a table with records is reported at `/indexes/{i}/unique`. |
 | `AXC0017` | An entity provisioned for the application is missing from it and no pending `dropEntity` migration covers it. Reported at `application.json` with an empty path. |
 | `AXC0018` | The entity's `id` is already provisioned for another application. Reported at `/id` of the entity file. |
 | `AXC0019` | The application folder could not be listed: it does not exist, it cannot be opened, or one of its subfolders cannot be opened. Reported with an empty `file` and `path`, as the only diagnostic; nothing in the folder is loaded. |
@@ -96,9 +96,9 @@ sorted by file and then path.
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
 | `AXC0077` | A `form` widget's `form` names no loaded form. Reported at `/widgets/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
-| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector`, `raiseEvent`, `notify` or a package operation written `<package>/<operation>`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
-| `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
-| `AXC0080` | A key of an `updateRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. Reported at `/steps/{i}/set/{field}`. |
+| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector`, `raiseEvent`, `createRecord`, `notify` or a package operation written `<package>/<operation>`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
+| `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a key of a `createRecord` `set` names no field of its `entity`, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
+| `AXC0080` | A key of an `updateRecord` or `createRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. A `createRecord` `set` cannot name a creator field either, as the server sets it to `system`. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0081` | A process task step's `assignee` has both or neither of `user` and `role`. Reported at `/steps/{i}/assignee`. |
 | `AXC0082` | A process task step's `form` names no loaded form, ignoring letter case. Reported at `/steps/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
 | `AXC0083` | A process task step's `form` is over another entity than the process's subject entity. Reported at `/steps/{i}/form`, naming both entities. Not checked when either entity is unknown. |
@@ -258,6 +258,8 @@ sorted by file and then path.
 | `AXC0257` | A `file` field's `maxSize` is below 1 or above the file size limit the compile was given, 25 MB by default. Reported at `/fields/{i}/maxSize`. |
 | `AXC0258` | An entry of a `file` field's `accept` is not a media type `type/subtype` or `type/*`. `*/*` and parameters such as `;charset=` are refused. Reported at `/fields/{i}/accept/{j}`. |
 | `AXC0259` | A `file` field is used where none is allowed: `unique` on it, a data source `sort` or `groupBy` entry that names it, or a seed record that sets it. Reported at the property: `/fields/{i}/unique`, `/sort`, `/aggregate/groupBy/{i}` or `/records/{i}/values/{name}`, below a child row `/records/{i}/values/{collection}/{j}/{name}`. |
+| `AXC0260` | The `entity` of a `createRecord` step names no loaded entity. Reported at `/steps/{i}/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. See [Create record operation](process-flow.md#create-record-operation). |
+| `AXC0261` | The `entity` of a `createRecord` step is a child entity. A step creates a record of a root entity. Reported at `/steps/{i}/entity`, naming the owner. |
 | `AXC0265` | A policy grant has an `export` with no `read`, or an `import` with no `create`, on the same target in the same policy, ignoring letter case. Reported at `/grants/{i}/actions/{j}`. The message names the action, the target and the grant it needs. An action the target's kind does not take is `AXC0091` instead. |
 | `AXC0266` | A `notify` step has an empty `to`. Reported at `/steps/{i}/to`. |
 | `AXC0267` | A recipient of a `notify` step has none or more than one of `user`, `role` and `email`. Reported at `/steps/{i}/to/{j}`. |
@@ -267,4 +269,7 @@ sorted by file and then path.
 | `AXC0271` | A placeholder of a `notify` step's subject or body has no key in `values`, in a locale that has both texts. Reported at `/steps/{i}/message`, naming the locale and the placeholder. |
 | `AXC0272` | A key of a `notify` step's `values` has no placeholder in the subject or the body, in a locale that has both texts. Reported at `/steps/{i}/message`, naming the locale and the key. |
 | `AXC0273` | A text of a `notify` step holds a lone or invalid brace. A placeholder is `{name}` with ASCII letters and digits, and `{{` and `}}` write a brace. Reported at `/steps/{i}/message`, naming the locale, the text key and the offset. |
-| `AXC0274` | An `application` manifest's `timeZone` is not an IANA time zone id known to the machine, or is written in another letter case. Reported at `/timeZone` of `application.json`. |
+| `AXC0274` | An entity declares an index that lists the same fields in the same order as an earlier index, ignoring letter case. Reported at `/indexes/{j}/fields` of the later index, naming the earlier one. |
+| `AXC0275` | A field of an entity's index names no field of the entity, ignoring letter case. Reported at `/indexes/{j}/fields/{k}`. |
+| `AXC0276` | A field of an entity's index has a type an index cannot hold, which today is `child-collection`, `references` or `file`. Reported at `/indexes/{j}/fields/{k}`. |
+| `AXC0277` | An `application` manifest's `timeZone` is not an IANA time zone id known to the machine, or is written in another letter case. Reported at `/timeZone` of `application.json`. |

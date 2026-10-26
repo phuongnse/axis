@@ -7,8 +7,10 @@ of [architecture.md](../architecture.md) apply: sections marked
 _(planned for M15)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
-Everything on this page is _(planned for M15)_, except the grants and the
-policy matrix, which are built.
+Everything on this page is _(planned for M15)_, except the grants, the
+policy matrix, the export routes, and the upload and dry run of a CSV import,
+which are built. The commit, `xlsx` files, `key` matching, references and the
+file cleanup of an import are not.
 
 ## Grants
 
@@ -20,8 +22,8 @@ policy matrix, which are built.
   export only when the user also holds `read`.
 - `import` needs `create`, and a grant with `import` and no `create` on the
   same entity in the same policy is `AXC0265`. An import with a `key` needs
-  `update` as well, and each row is checked against those grants as a record
-  API write would be _(planned for M15)_.
+  `update` as well. Each row is checked against those grants as a record API
+  write would be.
 
 ## Export
 
@@ -32,26 +34,51 @@ policy matrix, which are built.
 
 - **Query.** Each route takes the query of its rows or list route, such as
   parameters, `sort` and `search`, without `page` and `pageSize`. `format` is
-  `csv` or `xlsx`.
+  `csv` or `xlsx`. A missing or unknown `format` is a `400` at `format`, found
+  after the grants.
 - **Same checks.** The session, the grant, the root read filters and the field
   check run as for the rows or list route. A missing `export` grant is a
-  `403`.
-- **Rows.** Every matching row is written, streamed, in the route's order. Past
-  `Data:ExportMaxRows` the export stops and the file ends with no partial row.
-  The response then carries `Axis-Export-Truncated: true`.
-- **Columns.** The first row holds the field names. Grouped data sources write
-  their group fields and measures.
-- **Values.** ISO dates and instants, decimals and money as text with a dot,
-  enum values rather than labels, booleans as `true` and `false`, and a
-  reference as its target's display value. A file is its name. A `references`
-  field is its display values joined by `; `.
-- **Formula cells.** A CSV cell that starts with `=`, `+`, `-`, `@`, a tab or a
-  carriage return gets a leading `'`. Spreadsheet cells are written as typed
-  values, never as formulas.
+  `403`. Read filters hide rows and field lists hide whole columns, exactly as
+  on that route.
+- **Session only.** The routes are for signed-in users. A service account's
+  bearer token is a `401` on them.
+- **Rows.** Every matching row is written in the route's order, up to
+  `Data:ExportMaxRows`. The rows are read from the database one at a time and
+  written to a temporary file, so the server never holds them all in memory.
+  The file is complete before it is sent, so no byte leaves before the row
+  count and the audit record are known. Past `Data:ExportMaxRows` the file
+  stops there with no partial row, and the response carries
+  `Axis-Export-Truncated: true`. A file is sent with `Cache-Control: no-store`
+  and no record id column.
+- **Columns.** The first row holds the field names. An entity export writes
+  the fields the user may read, in declaration order, and leaves out child
+  collections and `references` fields. A `references` field has no storage
+  yet, so it is left out until it has, and then the export adds it. Grouped
+  data sources write their group fields, then their measures.
+- **Values.** ISO dates and instants, integers, decimals and money as text
+  with a dot and every stored digit, enum values rather than labels, booleans
+  as `true` and `false`, and a reference as its target's display value. A
+  reference whose label the user may not see, or whose target has no display
+  value, is the target's record id, which import accepts too. A file is its
+  name. A `references` field's value is its display values joined by `; `.
+- **CSV.** UTF-8 with a byte order mark, so Excel reads non-ASCII text, CRLF
+  line endings and RFC 4180 quoting.
+- **Spreadsheet.** One sheet named `Export`. Numbers are number cells that hold
+  the exact digits, though Excel shows integers above 2^53 rounded. Booleans
+  are boolean cells. Dates, instants and all text are text cells in their ISO
+  form, so a time zone is never lost. No cell is a formula.
+- **Formula cells.** A text-like CSV cell, which is text, an enum value, a
+  reference label or a file name, that starts with `=`, `+`, `-`, `@`, a tab
+  or a carriage return gets a leading `'`. A number cell never does: a number
+  cannot be a formula, and a prefix on `-5` would break its machine form and
+  its re-import.
 - **Timeout.** The query runs under `Data:ExportQueryTimeout`, see
-  [data settings](host-settings.md#data-settings).
-- **Audit.** Each export writes `records.exported` with the data source or
-  entity, the row count and the user. It holds no value.
+  [data settings](host-settings.md#data-settings). A query past it is a `503`
+  and sends no file.
+- **Audit.** Each export writes `records.exported` after the file is complete
+  and before it is sent, in a transaction of its own. An export that fails
+  writes no audit record and sends no file. It holds no value. See
+  [audit records](storage.md#audit-records-and-sequence-counters).
 
 ## Import
 
@@ -61,16 +88,50 @@ policy matrix, which are built.
 | `GET /api/apps/{app}/entities/{entity}/imports/{id}` | `200` with the import's state and errors |
 | `POST /api/apps/{app}/entities/{entity}/imports/{id}/commit` | `202` |
 
-- **Upload.** A CSV (UTF-8) or `xlsx` file, at most `Data:ImportMaxBytes`. A
-  spreadsheet is read from its first sheet. The first row names the fields,
-  matching ignoring letter case. An optional `key` names a unique field.
-- **Dry run.** The worker parses every row and runs each through the record
-  command's checks without storing anything. The import becomes `checked`
+- **Upload.** _(built for CSV)_ The file is the raw request body with
+  `Content-Type: text/csv` and at most `Data:ImportMaxBytes` bytes, UTF-8, not a
+  multipart form. An optional `?key=` names a unique field of the entity, and
+  nothing uses it until commit is built. Only a signed-in user uploads, never
+  a service account. The checks come in order: session `401`, the path `404`,
+  `import` and `create` `403`, `update` `403` when there is a `key`, a `key`
+  that is no unique field `400` at `key`, another content type `415`, and a
+  file over the limit `413`. The answer is `202` with the import, `pending`.
+  An `xlsx` file, read from its first sheet, is _(planned for M15)_.
+- **File format.** UTF-8 with the quoting of RFC 4180: a cell in double quotes
+  may hold commas, line breaks and doubled quotes. A leading byte order mark is
+  skipped. The first row names the fields of the entity's table, matching
+  ignoring letter case. An unknown name, a field named twice, and a child
+  collection are errors.
+- **Cells.** An empty cell leaves the field out, so its default applies or
+  `Required.` is reported. A cell of an integer, decimal or money field that
+  is written as a JSON number is a number, and `true` or `false` in a boolean
+  field is a boolean. Every other cell is text. The record parser then checks
+  the row exactly as it checks a JSON body.
+- **Dry run.** _(built for CSV)_ The worker runs one `records.importCheck` work
+  item per import. It parses every row and runs each through the record
+  command's checks as the user who uploaded the file, without storing
+  anything: parsing, field grants, defaults, computed fields and validations.
+  It writes no record, no audit record and no sequence number. It does not
+  check that a referenced record exists or that a unique value is free, so a
+  `checked` import can still fail at commit. The import becomes `checked`
   with no errors, or `failed` with every error keyed
-  `/rows/{n}/values/{field}`, `n` counting data rows from 1.
+  `/rows/{n}/values/{field}`, `n` counting data rows from 1. A failed import's
+  file is deleted at once.
+- **Other error keys.** A problem of the header is keyed `/columns/{n}`, `n`
+  counting the columns from 1, and a file with no header is keyed `/columns`.
+  A row with the wrong number of cells, or broken quoting, is keyed
+  `/rows/{n}`. More than `Data:ImportMaxRows` data rows fails the dry run at
+  `/rows`. An import whose entity the active release no longer has fails at
+  the empty pointer.
+- **The import.** `GET` answers `id`, `state`, `key`, `errors` and
+  `createdAt`, the errors in row order. It reads the import of the signed-in
+  user only. Any other user, an unknown id and an import of another entity
+  get `404`. The import is stored in `axis.record_imports`, see
+  [storage](storage.md).
 - **Commit.** Only a `checked` import commits. The worker writes every row in
   one transaction, or none, and the import becomes `committed` or `failed`.
-  An import holds at most `Data:ImportMaxRows` rows, 10,000 by default.
+  An import holds at most `Data:ImportMaxRows` rows, 10,000 by default,
+  checked by the dry run.
 - **Each row.** It goes through the record command as the user who uploaded the
   file. Field grants, record filters, validations, defaults, sequences, the
   creator field, computed fields and audit records all apply. With a `key`,

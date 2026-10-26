@@ -889,6 +889,7 @@ to show where a resource is used and what it uses.
 | `connector call` | Process | `/steps/{i}/connector/name` | Connector |
 | `package operation` | Process | `/steps/{i}/operation` | Extension package |
 | `raised event` | Process | `/steps/{i}/event` | Event |
+| `created entity` | Process | `/steps/{i}/entity` | Entity |
 | `policy role` | Policy | `/roles/{i}` | Role |
 | `grant` | Policy | `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process`, `/grants/{i}/endpoint` | Entity, data source, process, endpoint |
 | `event entity` | Event | `/entity` | Entity |

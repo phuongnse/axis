@@ -227,10 +227,11 @@ a payment reference from the sample extension package, see
 M3 has four step types. Wait for event and timer come later. The engine runs
 a `subProcess` step, see [Sub-process step](process-flow.md#sub-process-step).
 Its failure handling and cancel rules are _(planned for M14)_, as are `timer`
-and `waitEvent` steps, the `createRecord` operation, and running the `notify`
+and `waitEvent` steps and running the `notify`
 operation, see [process flow](process-flow.md) and
 [notifications](notifications.md#notify-operation). The compiler already
-checks and builds a `notify` step.
+checks and builds a `notify` step. The `createRecord` operation is built, see
+[Create record operation](process-flow.md#create-record-operation).
 
 - **`decision`.** `branches` is an ordered list. Each branch has a `when`
   expression and a `next` step. The branches are evaluated in order, and the
@@ -322,9 +323,9 @@ reported in one pass. See
   paths through reference fields such as `department.manager.name`. A path takes at most 3 hops
   (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
   See [Scope in a process expression](expressions.md#names-and-references).
-- An operation names `updateRecord`, `callConnector`, `raiseEvent`, `notify`
-  or a package operation written `<package>/<operation>`, matched exactly as
-  a step `type` is (`AXC0078` at `/steps/{i}/operation`).
+- An operation names `updateRecord`, `callConnector`, `raiseEvent`,
+  `createRecord`, `notify` or a package operation written
+  `<package>/<operation>`, matched exactly as a step `type` is (`AXC0078` at `/steps/{i}/operation`).
 - A `notify` step's checks are listed under
   [Notify operation](notifications.md#notify-operation) (`AXC0266` to
   `AXC0273`). The step compiles, but a published process that reaches it
@@ -336,6 +337,11 @@ reported in one pass. See
 - Each `set` expression fits its field's type, with the same scope as a
   `when`. A problem is reported at `/steps/{i}/set/{field}` with its
   expression code, such as `AXC0048` for a value of the wrong type.
+- A `createRecord` step names a loaded root entity in `entity`. An unknown
+  entity is `AXC0260` and a child entity is `AXC0261`, both at
+  `/steps/{i}/entity`. Its `set` keys and values are checked against that
+  entity as above, and a creator field is `AXC0080` too. See
+  [Create record operation](process-flow.md#create-record-operation).
 - A `callConnector` step's checks are listed under
   [Connector calls](process-execution.md#connector-calls) (`AXC0102` to `AXC0109`). A package
   operation step's checks are listed under
@@ -344,22 +350,25 @@ reported in one pass. See
   [Raise event step](process-events.md#raise-event-step) (`AXC0125` to `AXC0128`).
 - An operation has `operation` and `next`, and no `branches` or `otherwise`.
   An `updateRecord` step has a `set` with at least one field, and no
-  `connector`, `input`, `output`, `retry`, `event` or `fields`. A
-  `callConnector` step has `connector` and `input`, and no `set`, `event` or
-  `fields`. A `raiseEvent` step has `event` and `fields`, and no `set`,
-  `connector`, `input`, `output` or `retry`. A `notify` step has `to`,
+  `connector`, `input`, `output`, `retry`, `event`, `entity` or `fields`. A
+  `callConnector` step has `connector` and `input`, and no `set`, `event`,
+  `entity` or `fields`. A `raiseEvent` step has `event` and `fields`, and no
+  `set`, `connector`, `input`, `output`, `retry` or `entity`. A `createRecord`
+  step has `entity` and a `set` with at least one field, and no `connector`,
+  `input`, `output`, `retry`, `event` or `fields`. A `notify` step has `to`,
   `channels` and `message`, and no `set`, `connector`, `input`, `output`,
-  `retry`, `event` or `fields`. A decision has no `operation`,
-  `set`, `connector`, `input`, `output`, `retry`, `event`, `fields`, `to`,
-  `channels`, `message`, `open` or `next`. `to`, `channels`, `message` and
-  `open` are on a `notify` step only. Neither an operation nor a decision has a task's `label`,
+  `retry`, `event`, `entity` or `fields`. A decision has no `operation`,
+  `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`,
+  `fields`, `to`, `channels`, `message`, `open` or `next`. `to`, `channels`,
+  `message` and `open` are on a `notify` step only. Neither an operation nor
+  a decision has a task's `label`,
   `assignee`, `form`, `dueIn` or `outcomes` (`AXC0004`).
 - A task has `label`, `assignee`, `form` and at least one outcome, and no
   `branches`, `otherwise`, `operation`, `set`, `connector`, `input`,
-  `output`, `retry`, `event`, `fields` or `next` (`AXC0004`).
+  `output`, `retry`, `event`, `entity`, `fields` or `next` (`AXC0004`).
 - An `end` step has no `next`, `branches`, `otherwise`, `operation`, `set`,
-  `connector`, `input`, `output`, `retry`, `event`, `fields` or any task
-  property (`AXC0004`).
+  `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` or any
+  task property (`AXC0004`).
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at
   `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). It must
   name a declared [role](roles-and-policies.md), compared
@@ -752,6 +761,9 @@ database, with history in `axis.__processes_migrations` (see
     one entity. Its item also has the `entity_id`, and each claim runs one
     batch of up to 500 rows. See
     [Recomputing computed fields](migrations.md#recomputing-computed-fields).
+  - `records.importCheck` dry-runs one uploaded record import. It has no
+    other id column: the import row names the item in its `work_item_id`. See
+    [Import](import-export.md#import).
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key. The subject is
   null for a process without a subject.

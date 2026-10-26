@@ -23,6 +23,9 @@ public sealed record EntityModel
     /// <summary>The validation rules, in declaration order. Each names its field by the field's declared name.</summary>
     public IReadOnlyList<ValidationModel> Validations { get; init; } = [];
 
+    /// <summary>The indexes the author declares, in declaration order. Each names its fields by their declared names.</summary>
+    public IReadOnlyList<EntityIndexModel> Indexes { get; init; } = [];
+
     /// <summary>Whether any field of the entity is computed.</summary>
     public bool HasComputedFields => Fields.Any(candidate => candidate.IsComputed);
 
