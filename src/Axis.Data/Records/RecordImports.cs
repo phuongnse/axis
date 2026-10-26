@@ -21,6 +21,16 @@ public static class RecordImportStates
     public const string Committed = "committed";
 }
 
+/// <summary>The format of an import file, which picks the reader that reads it.</summary>
+public static class RecordImportFormats
+{
+    /// <summary>UTF-8 text in CSV form.</summary>
+    public const string Csv = "csv";
+
+    /// <summary>An <c>xlsx</c> workbook, read from its first sheet.</summary>
+    public const string Xlsx = "xlsx";
+}
+
 /// <summary>A new import to store: the upload of a file by one person for one entity.</summary>
 public sealed record RecordImport(
     Guid Id,
@@ -31,6 +41,7 @@ public sealed record RecordImport(
     string UploaderName,
     IReadOnlyList<string> UploaderRoles,
     string? Key,
+    string Format,
     byte[] File,
     Guid WorkItemId,
     DateTimeOffset CreatedAt);
@@ -38,7 +49,7 @@ public sealed record RecordImport(
 /// <summary>An import as its uploader reads it. <see cref="Errors"/> is empty unless the import failed.</summary>
 public sealed record RecordImportStatus(Guid Id, string State, string? Key, IReadOnlyDictionary<string, string[]> Errors, DateTimeOffset CreatedAt);
 
-/// <summary>An import as the worker runs its dry run, with the file and the uploader the checks run for.</summary>
+/// <summary>An import as the worker runs its dry run, with the file, its format and the uploader the checks run for.</summary>
 public sealed record RecordImportJob(
     Guid Id,
     Guid ApplicationId,
@@ -47,6 +58,7 @@ public sealed record RecordImportJob(
     string UploaderName,
     IReadOnlyList<string> UploaderRoles,
     string State,
+    string Format,
     byte[]? File);
 
 /// <summary>
@@ -69,8 +81,8 @@ public static class RecordImports
 
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.record_imports (id, tenant_id, application_id, entity_id, uploader_id, uploader_name, uploader_roles, key, state, file, work_item_id, created_at)
-            VALUES (@id, @tenant, @application, @entity, @uploader, @name, @roles, @key, 'pending', @file, @item, @created)
+            INSERT INTO axis.record_imports (id, tenant_id, application_id, entity_id, uploader_id, uploader_name, uploader_roles, key, state, format, file, work_item_id, created_at)
+            VALUES (@id, @tenant, @application, @entity, @uploader, @name, @roles, @key, 'pending', @format, @file, @item, @created)
             """,
             connection,
             transaction);
@@ -82,6 +94,7 @@ public static class RecordImports
         command.Parameters.AddWithValue("name", import.UploaderName);
         command.Parameters.AddWithValue("roles", import.UploaderRoles.ToArray());
         command.Parameters.Add(new NpgsqlParameter("key", NpgsqlDbType.Text) { Value = (object?)import.Key ?? DBNull.Value });
+        command.Parameters.AddWithValue("format", import.Format);
         command.Parameters.Add(new NpgsqlParameter("file", NpgsqlDbType.Bytea) { Value = import.File });
         command.Parameters.AddWithValue("item", import.WorkItemId);
         command.Parameters.AddWithValue("created", import.CreatedAt.ToUniversalTime());
@@ -139,7 +152,7 @@ public static class RecordImports
 
         await using var command = new NpgsqlCommand(
             """
-            SELECT id, application_id, entity_id, uploader_id, uploader_name, uploader_roles, state, file
+            SELECT id, application_id, entity_id, uploader_id, uploader_name, uploader_roles, state, format, file
             FROM axis.record_imports
             WHERE work_item_id = @item
             FOR UPDATE
@@ -161,7 +174,8 @@ public static class RecordImports
             reader.GetString(4),
             reader.GetFieldValue<string[]>(5),
             reader.GetString(6),
-            reader.IsDBNull(7) ? null : reader.GetFieldValue<byte[]>(7));
+            reader.GetString(7),
+            reader.IsDBNull(8) ? null : reader.GetFieldValue<byte[]>(8));
     }
 
     /// <summary>

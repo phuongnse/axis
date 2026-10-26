@@ -1,10 +1,16 @@
 using System.Net;
+using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Server.Tenancy;
 using Axis.Server.Tests;
+using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using static Axis.Integration.Tests.RecordApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -100,6 +106,41 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
         Assert.Equal(TenantSchemaVersion.Current, (await scenario.RowAsync(one)).SchemaVersion);
         Assert.Equal(OldVersion, (await scenario.RowAsync(other)).SchemaVersion);
         Assert.All(result.Output, line => Assert.StartsWith($"{one} ", line, StringComparison.Ordinal));
+
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Migrate_installs_the_pg_trgm_extension_in_a_tenant_database_at_the_previous_schema_version()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
+        var row = await scenario.RowAsync(id);
+        var password = AdminScenario.Cipher.Decrypt(id, TenantSecretFields.SchemaPassword, row.SchemaPassword).Reveal();
+        var connectionString = scenario.TenantConnectionString(id, row.SchemaUser, password);
+        const string count = "SELECT count(*) FROM pg_extension WHERE extname = 'pg_trgm'";
+
+        string old;
+        await using (var context = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connectionString).Options))
+        {
+            var migrations = context.Database.GetMigrations().Order(StringComparer.Ordinal).ToArray();
+            Assert.Equal(TenantSchemaVersion.Current, migrations[^1]);
+            await context.GetService<IMigrator>().MigrateAsync(migrations[^2], CancellationToken);
+            Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(connectionString, count, CancellationToken));
+
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(CancellationToken);
+            old = await TenantSchemaVersion.ReadAsync(connection, CancellationToken);
+        }
+
+        await scenario.SetSchemaVersionAsync(id, old);
+
+        var result = await scenario.RunAsync(["migrate", "--tenant", id]);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal(1L, await PostgreSqlServer.AdminScalarAsync(connectionString, count, CancellationToken));
+        Assert.Equal(TenantSchemaVersion.Current, (await scenario.RowAsync(id)).SchemaVersion);
 
         await scenario.AssertNoSecretsAsync();
     }

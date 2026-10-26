@@ -32,9 +32,9 @@ record history are built.
 - **Sequences:** a `sequence` resource has a format, such as
   `PR-{yyyy}-{n:5}`. See
   [configuration](../reference/resource-files.md#sequences).
-  - The counter restarts each UTC year, but only when the format has
-    `{yyyy}`. The year is UTC
-    [until applications have a time zone](d22-current-time-and-time-zones.md).
+  - The counter restarts each year, but only when the format has `{yyyy}`.
+    The year is UTC unless the application names a time zone, see
+    [D75](d75-the-application-time-zone.md).
   - An entity `text` field names a `sequence`. Its value is assigned on
     create, and clients cannot write it.
   - The counter row is locked and updated in the caller's transaction, so a

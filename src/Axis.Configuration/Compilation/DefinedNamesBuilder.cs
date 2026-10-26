@@ -94,9 +94,14 @@ internal static class DefinedNamesBuilder
 
         foreach (var measure in aggregate.Measures)
         {
-            var type = measure.Function == "count"
-                ? "integer"
-                : fields.Find(field => field.Name == measure.Field)?.Type;
+            var fieldType = fields.Find(field => field.Name == measure.Field)?.Type;
+            var type = measure.Function switch
+            {
+                "count" or "countDistinct" => "integer",
+                "avg" when fieldType is null => null,
+                "avg" => fieldType == "money" ? "money" : "decimal",
+                _ => fieldType,
+            };
             columns.Add(new DefinedColumn(measure.Name, type));
         }
 

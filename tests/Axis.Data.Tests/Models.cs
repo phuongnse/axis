@@ -69,7 +69,7 @@ internal static class Models
                 expression, ExpressionScopes.ForEntity(inputs, childOf: childOf), ExpressionScopes.TypeOf(field)!),
         };
 
-    /// <summary>The catalog after the model's tables were created as planned.</summary>
+    /// <summary>The catalog after the model's tables were created as planned, with the indexes the planner expects.</summary>
     public static CatalogSnapshot Catalog(ApplicationModel model, bool hasRows) =>
         new(model.Entities.Select(entity => new CatalogTable(
             EntityNaming.Table(entity.Id),
@@ -81,9 +81,17 @@ internal static class Models
                     ColumnTypes.Render(field),
                     field.Required,
                     field.Unique,
-                    field.Target is null ? null : EntityNaming.Table(field.Target.Id))),
+                    field.Target is not null ? EntityNaming.Table(field.Target.Id) : field.Type == FieldType.File ? "files" : null)),
             ],
-            hasRows)).ToList());
+            hasRows)
+        {
+            Indexes =
+            [
+                .. EntityIndexes.Expected(entity, EntityNaming.Table(entity.Id), Owner(model, entity) is not null)
+                    .Select(index => new CatalogIndex(index.Name, index.Columns, index.Unique))
+                    .OrderBy(index => index.Name, StringComparer.Ordinal),
+            ],
+        }).ToList());
 
     /// <summary>The owner of a child entity, found from the child collection that names it as the planner does.</summary>
     public static EntityModel? Owner(ApplicationModel model, EntityModel entity) =>

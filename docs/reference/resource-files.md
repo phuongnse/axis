@@ -507,7 +507,8 @@ is `AXC0013`.
 
 ### Types and properties added in M15
 
-These are _(planned for M15)_. They follow
+These are _(planned for M15)_, except [`indexes`](#indexes), which is built.
+They follow
 [D76](../decisions/d76-file-money-and-enum-label-field-types.md),
 [D77](../decisions/d77-indexes-defaults-and-ranges.md),
 [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md) and
@@ -530,10 +531,10 @@ new check is a new compile diagnostic.
   entity is `AXC0040`, and one without a `displayField` is `AXC0030`. A
   `references` field on a child entity is `AXC0041`. It has no column, so a
   data source cannot project it (`AXC0043`), an endpoint cannot map it
-  (`AXC0121`) and a process `updateRecord` cannot set it. Its storage and the
-  record API are still planned, so until they land the record API leaves the
-  field out of record values and a body that sets it is a `400` unknown
-  property.
+  (`AXC0121`) and a process `updateRecord` cannot set it. The record API
+  writes it as an array of record ids and reads it with its labels, see
+  [reading values](record-api.md#reading-values). Its links live in a junction
+  table, see [storage](storage.md#schema-planning).
 - **`valueLabels`.** On an `enum` field, a map from every value to a
   `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
   "priority.low" } }`. It covers every value, and its keys join `AXC0028`. An
@@ -562,11 +563,28 @@ new check is a new compile diagnostic.
 - **`searchable`.** On a `text` field. `search` reads every searchable field,
   and the display field is always searchable. See
   [paging and sorting](record-api.md#paging-and-sorting).
-- **`indexes`.** On the entity, a list of `{ "fields": [ ... ] }` with an
-  optional `"unique": true`. Each field is a root field that is not a
-  `child-collection`, `references` or `file`. Two indexes over the same
-  fields in the same order are a diagnostic. See
-  [schema planning](storage.md#schema-planning).
+
+### Indexes
+
+`indexes` is built. On the entity, it is a list of
+`{ "fields": [ ... ] }` with an optional `"unique": true`. See
+[D77](../decisions/d77-indexes-defaults-and-ranges.md) and
+[schema planning](storage.md#schema-planning).
+
+- **`fields`.** One to 32 distinct field names of the entity, matched
+  ignoring letter case. They are the index columns, in order. An empty list,
+  a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
+- **Field types.** An index holds a field that has a column. A
+  `child-collection`, `references` or `file` field is `AXC0276`. A `references`
+  field has no column, because a junction table holds its links.
+- **Compile diagnostics.** Each is reported in the entity file:
+  - `AXC0274`: an index lists the same fields in the same order as an earlier
+    one, at `/indexes/{j}/fields`.
+  - `AXC0275`: a name in `fields` is no field of the entity, at
+    `/indexes/{j}/fields/{k}`.
+  - `AXC0276`: a field of a type an index cannot hold, at the same path.
+- **Every reference.** Every `reference` field and every child table's
+  `owner_id` is indexed without a declaration.
 
 ## Entity logic
 
@@ -665,8 +683,9 @@ validation calls the rules of its own module, see [modules](modules-and-template
   - It reads only the record's own fields and its child rows, never a
     reference path. It reads the entity's own fields that are not computed.
     Naming a computed field, itself included, is `AXC0046`.
-  - It cannot call `now()`, because its stored value would go stale. A call,
-    also inside an aggregate's item expression, is `AXC0086`.
+  - It cannot call `now()`, `today()` or `toDate`, because its stored value
+    would go stale. A call, also inside an aggregate's item expression, is
+    `AXC0086`.
   - It reads child rows only through an
     [aggregate](expressions.md#aggregates), such as `sum(lineItems, amount)`.
     Inside the item expression, names are the child row's fields, computed
@@ -855,22 +874,19 @@ record create fills a field that names a sequence with the next number.
 }
 ```
 
-- **Tokens.** `{yyyy}` is the four-digit UTC year of the create's transaction
-  time. The local year waits for
-  the [time zone rule](../decisions/d22-current-time-and-time-zones.md).
-  _(Planned for M14)_ It is the year in the
-  [application time zone](#application-time-zone). `{n}` is the number, and
+- **Tokens.** `{yyyy}` is the four-digit year of the create's transaction
+  time in the [application time zone](#application-time-zone), which is `UTC`
+  when the application names none. `{n}` is the number, and
   `{n:k}` is the number zero-padded to `k` digits, with `k` from 1 to 18.
   Every other character is literal.
 - **One number.** The format holds exactly one `{n}` or `{n:k}` token. It
   may hold `{yyyy}`, even more than once, and no other braces. Any other
   format is `AXC0004` at `/format`.
-- **Yearly restart.** The counter restarts each UTC year, but only when the
-  format holds `{yyyy}`. Without a year, a restart would hand out the same
-  number twice. Application time zones wait for the
-  [time zone rule](../decisions/d22-current-time-and-time-zones.md).
-  _(Planned for M14)_ The restart follows the year in the
-  [application time zone](#application-time-zone).
+- **Yearly restart.** The counter restarts each year in the
+  [application time zone](#application-time-zone), but only when the format
+  holds `{yyyy}`. Without a year, a restart would hand out the same number
+  twice. In `Asia/Ho_Chi_Minh`, a record created at 18:00 UTC on 31 December
+  gets the first number of the next year.
 
 An entity `text` field names the sequence in its `sequence` property:
 
@@ -900,8 +916,7 @@ An entity `text` field names the sequence in its `sequence` property:
 
 ## Application time zone
 
-_(Planned for M14.)_ The `application` manifest may name the application's
-time zone, see [D75](../decisions/d75-the-application-time-zone.md):
+The `application` manifest may name the application's time zone, see [D75](../decisions/d75-the-application-time-zone.md):
 
 ```json
 {
@@ -914,14 +929,16 @@ time zone, see [D75](../decisions/d75-the-application-time-zone.md):
 ```
 
 - `timeZone` is optional. It is an IANA time zone id. Without it, the time
-  zone is `UTC`, so an application that names none behaves as before. An
-  unknown id is a new diagnostic at `/timeZone`.
+  zone is `UTC`, so an application that names none behaves as before. An id
+  is known when .NET finds it as an IANA id written with its exact letter
+  case, as for a schedule trigger. An unknown id is `AXC0277` at
+  `/timeZone`. Studio's application form offers `timeZone`.
 - It is part of the release. A change applies to work that runs on the new
   release.
 - **What uses it.** [`today()` and `toDate`](expressions.md#functions), a
-  sequence's [`{yyyy}`](#sequences) and its yearly restart, the dates in
-  [notifications](notifications.md#placeholders), and M15's date buckets of
-  data sources.
+  sequence's [`{yyyy}`](#sequences) and its yearly restart. The dates in
+  [notifications](notifications.md#placeholders) _(planned for M14)_ and M15's
+  date buckets of data sources use it too.
 - **What does not.** `now()` stays an instant. A schedule trigger keeps its own
   `timeZone`. The SPA shows a `date-time` in the browser's time zone, as
   before. Calendar durations such as `P1M` stay `AXC0084`.

@@ -59,6 +59,9 @@ development or E2E server serves a real application without a separate step.
   Above the limit, the entity becomes pending and the worker recomputes the
   rows in batches. See
   [Recomputing computed fields](migrations.md#recomputing-computed-fields).
+  Above the limit, activation also leaves a new non-unique index on a table
+  with more rows to a concurrent build, see
+  [Schema planning](storage.md#schema-planning).
 - **Seeding.** After a folder is activated in a tenant, the step inserts
   every seed record whose id the entity table does not hold yet, so
   restarts never duplicate seeds. Only the id decides: a seed record that was
@@ -320,10 +323,10 @@ the operator sets it with
 ## Data settings
 
 `Data:QueryTimeout`, `Data:ExportQueryTimeout`, `Data:ExportMaxRows`,
-`Data:ImportMaxRows` and `Data:ImportMaxBytes` are built. The rest are
-_(planned for M15)_. The server reads `Data:QueryTimeout`,
-`Data:ExportQueryTimeout`, `Data:ExportMaxRows` and `Data:ImportMaxBytes`, and
-the worker reads `Data:ImportMaxRows`. See
+`Data:ImportMaxRows`, `Data:ImportMaxBytes` and `Files:MaxSize` are built. The
+rest are _(planned for M15)_. The server reads `Data:QueryTimeout`,
+`Data:ExportQueryTimeout`, `Data:ExportMaxRows`, `Data:ImportMaxBytes` and
+`Files:MaxSize`, and the worker reads `Data:ImportMaxRows`. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
@@ -334,7 +337,7 @@ the worker reads `Data:ImportMaxRows`. See
 | `Data:ExportMaxRows` | `100000` | The most data rows one export file holds, an integer from 1 to 2147483646. The file stops there and the response carries `Axis-Export-Truncated: true`. |
 | `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. The worker reads it, and a value that is not an integer of at least 1 stops its start. |
 | `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. A larger upload is a `413`. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
-| `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. A field's `maxSize` cannot exceed it. |
+| `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. An upload is refused with `413` above the smaller of this and the field's `maxSize`. Publish checks a field's `maxSize` against the 25 MB default, not against this setting. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
 
 - **Per transaction.** Each timeout is set with `SET LOCAL`, so it never
   outlives its query's transaction and never reaches a pooled connection's
@@ -346,6 +349,8 @@ the worker reads `Data:ImportMaxRows`. See
   task, process inspection and site list reads have no timeout.
 - **A bad value.** A value that is not a duration of at least one millisecond
   stops the start. A missing value takes its default.
+- **A bad file size.** A `Files:MaxSize` that is not a whole number of bytes,
+  at least 1, stops the start. A missing value takes the default.
 - **Writes.** Record writes, activation and the worker's own statements keep
   their current limits. M16 sets the final values against its SLOs.
 - **Environment.** As environment variables they are `Data__QueryTimeout`

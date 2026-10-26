@@ -33,6 +33,21 @@ public static class CatalogReader
         WHERE n.nspname = @schema AND c.relkind = 'r' AND con.contype IN ('u', 'f') AND array_length(con.conkey, 1) = 1
         """;
 
+    // The indexes whose names start with ix_, which are the ones the planner owns, with their columns in index order
+    // and whether PostgreSQL marks them valid.
+    // The pattern escapes the underscore, which is a wildcard in LIKE.
+    private const string IndexesSql = """
+        SELECT t.relname, i.relname, x.indisunique,
+          ARRAY(SELECT a.attname FROM unnest(x.indkey::int2[]) WITH ORDINALITY k(attnum, ord)
+                JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum ORDER BY k.ord),
+          x.indisvalid
+        FROM pg_index x
+        JOIN pg_class i ON i.oid = x.indexrelid
+        JOIN pg_class t ON t.oid = x.indrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = @schema AND t.relkind = 'r' AND i.relname LIKE 'ix\_%'
+        """;
+
     /// <summary>
     /// Reads every table of the <c>entities</c> schema, in name order, on
     /// <paramref name="connection"/> within <paramref name="transaction"/> when one is given.
@@ -67,6 +82,14 @@ public static class CatalogReader
             .DistinctBy(constraint => (constraint.Table, constraint.Column))
             .ToDictionary(constraint => (constraint.Table, constraint.Column), constraint => constraint.ReferencedTable!);
 
+        var indexes = (await QueryAsync(
+                connection,
+                transaction,
+                IndexesSql,
+                reader => (Table: reader.GetString(0), Index: new CatalogIndex(reader.GetString(1), reader.GetFieldValue<string[]>(3), reader.GetBoolean(2)) { Valid = reader.GetBoolean(4) }),
+                cancellationToken))
+            .ToLookup(row => row.Table, row => row.Index, StringComparer.Ordinal);
+
         var tables = new List<CatalogTable>();
         foreach (var table in tableNames)
         {
@@ -82,7 +105,10 @@ public static class CatalogReader
                         uniqueColumns.Contains((table, column.Name)),
                         referencedTables.GetValueOrDefault((table, column.Name)))),
                 ],
-                hasRows));
+                hasRows)
+            {
+                Indexes = [.. indexes[table].OrderBy(index => index.Name, StringComparer.Ordinal)],
+            });
         }
 
         return new CatalogSnapshot(tables);

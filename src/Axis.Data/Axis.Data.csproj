@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
@@ -10,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Data.Tests" />
     <InternalsVisibleTo Include="Axis.Integration.Tests" />
     <InternalsVisibleTo Include="Axis.Data.Tests" />
     <InternalsVisibleTo Include="Axis.Processes" />

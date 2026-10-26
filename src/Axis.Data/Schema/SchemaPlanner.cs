@@ -10,6 +10,9 @@ namespace Axis.Data.Schema;
 /// <c>dropEntity</c> and <c>fill</c> migrations are applied to the catalog and the records first, and
 /// their commands come first in the plan. A field that a <c>fill</c> covers may become required. Other changes are additive only; anything that could lose or
 /// reject existing data is reported as a diagnostic, and then nothing is planned at all.
+/// The indexes of a table, named with the <c>ix_</c> prefix, follow the release: the planner creates the ones it
+/// lacks or finds invalid and drops the ones it does not declare, and a unique index on a table with rows is reported.
+/// The create of a non-unique index on an existing table with rows is marked as one activation may defer.
 /// </summary>
 public static class SchemaPlanner
 {
@@ -56,10 +59,13 @@ public static class SchemaPlanner
     {
         private readonly ProvisioningRecords _records = migrations.Records;
 
-        // Creates run first, then column changes, then foreign keys, so every referenced table
-        // exists before a foreign key points at it; cycles and self-references need no ordering.
+        // Creates run first, then column changes, then index drops and creates, then foreign keys, so every
+        // referenced table exists before a foreign key points at it; cycles and self-references need no ordering.
+        // An index drop comes before a create, so an index that changes its unique flag keeps its name.
         private readonly List<string> _creates = [];
         private readonly List<string> _alters = [];
+        private readonly List<string> _indexDrops = [];
+        private readonly List<SchemaCommand> _indexCreates = [];
         private readonly List<string> _foreignKeys = [];
         private readonly List<Diagnostic> _diagnostics = [.. migrations.Diagnostics];
         private readonly List<ProvisionedEntity> _newEntities = [];
@@ -127,7 +133,7 @@ public static class SchemaPlanner
                 ? new SchemaPlan(DiagnosticOrder.Sort(_diagnostics), [], [], [])
                 : new SchemaPlan(
                     [],
-                    [.. migrations.Commands, .. _creates.Concat(_alters).Concat(_foreignKeys).Select(sql => new SchemaCommand(sql))],
+                    [.. migrations.Commands, .. _creates.Concat(_alters).Concat(_indexDrops).Select(sql => new SchemaCommand(sql)), .. _indexCreates, .. _foreignKeys.Select(sql => new SchemaCommand(sql))],
                     _newEntities,
                     _newEnumValues)
                 {
@@ -159,7 +165,7 @@ public static class SchemaPlanner
                     var owner = EntityNaming.Quote(EntityNaming.OwnerColumn);
                     var target = EntityNaming.Quote(EntityNaming.TargetColumn);
                     _creates.Add(
-                        $"CREATE TABLE {EntityNaming.QualifiedTable(junction)} ({owner} uuid NOT NULL, {target} uuid NOT NULL, "
+                        $"CREATE TABLE {EntityNaming.QualifiedTable(junction)} ({owner} uuid NOT NULL, {target} uuid NOT NULL, {_positionDefinition}, "
                         + $"CONSTRAINT {EntityNaming.Quote(EntityNaming.PrimaryKey(junction))} PRIMARY KEY ({owner}, {target}))");
                     _alters.Add(
                         $"CREATE INDEX {EntityNaming.Quote(EntityNaming.JunctionIndex(junction, EntityNaming.TargetColumn))} "
@@ -221,6 +227,11 @@ public static class SchemaPlanner
             }
 
             _creates.Add($"CREATE TABLE {EntityNaming.QualifiedTable(table)} ({string.Join(", ", definitions.Concat(constraints))})");
+            foreach (var index in EntityIndexes.Expected(entity, table, childOwner is not null))
+            {
+                _indexCreates.Add(new SchemaCommand(EntityIndexes.CreateSql(table, index)));
+            }
+
             if (childOwner is not null)
             {
                 AddOwnerForeignKey(table, childOwner);
@@ -307,6 +318,51 @@ public static class SchemaPlanner
                         "/fields",
                         entity.Id));
                 }
+            }
+
+            PlanIndexes(entity, table, childOwner is not null);
+        }
+
+        // Creates the expected indexes the table lacks and drops the ix_ indexes the release does not declare. An index
+        // whose unique flag differs, or that is invalid, is dropped and created again. A new unique index cannot be built
+        // over existing rows. The create of a non-unique index on a table with rows is deferrable.
+        private void PlanIndexes(EntityModel entity, CatalogTable table, bool isChild)
+        {
+            var expected = EntityIndexes.Expected(entity, table.Name, isChild);
+            var catalogByName = table.Indexes.ToDictionary(index => index.Name, StringComparer.Ordinal);
+            foreach (var index in expected)
+            {
+                if (catalogByName.TryGetValue(index.Name, out var current) && current.Unique == index.Unique && current.Valid)
+                {
+                    continue;
+                }
+
+                if (index.Unique && table.HasRows)
+                {
+                    _diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.IncompatibleFieldChange,
+                        $"The unique index over {string.Join(", ", index.Columns.Select(column => $"'{column}'"))} cannot be added to a table that already has records.",
+                        entity.File,
+                        $"/indexes/{index.Declared}/unique",
+                        entity.Id));
+                    continue;
+                }
+
+                if (current is not null)
+                {
+                    _indexDrops.Add(EntityIndexes.DropSql(current.Name));
+                }
+
+                _indexCreates.Add(new SchemaCommand(EntityIndexes.CreateSql(table.Name, index))
+                {
+                    DeferrableOn = !index.Unique && table.HasRows ? table.Name : null,
+                });
+            }
+
+            var expectedNames = expected.Select(index => index.Name).ToHashSet(StringComparer.Ordinal);
+            foreach (var index in table.Indexes.Where(index => !expectedNames.Contains(index.Name)))
+            {
+                _indexDrops.Add(EntityIndexes.DropSql(index.Name));
             }
         }
 
@@ -465,6 +521,11 @@ public static class SchemaPlanner
                 }
             }
 
+            if (field.Type == FieldType.File && column.ReferencedTable is null && column.Type == ColumnTypes.Render(field))
+            {
+                AddForeignKey(table.Name, column.Name, field);
+            }
+
             if (isEnum && recordedValues.Count > 0)
             {
                 var removed = recordedValues.Where(value => !field.Values!.Contains(value, StringComparer.Ordinal)).ToList();
@@ -484,6 +545,13 @@ public static class SchemaPlanner
             if (field.Target is { } target)
             {
                 AddForeignKey(table, column, target.Id, "");
+            }
+            else if (field.Type == FieldType.File)
+            {
+                // The column holds the id of an uploaded file, whose row is in a platform table.
+                _foreignKeys.Add(
+                    $"ALTER TABLE {EntityNaming.QualifiedTable(table)} ADD CONSTRAINT {EntityNaming.Quote(EntityNaming.ForeignKey(table, column))} "
+                    + $"FOREIGN KEY ({EntityNaming.Quote(column)}) REFERENCES {EntityNaming.Quote("axis")}.{EntityNaming.Quote("files")} ({EntityNaming.Quote(EntityNaming.IdColumn)})");
             }
         }
 

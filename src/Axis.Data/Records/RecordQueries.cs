@@ -279,7 +279,9 @@ public static class RecordQueries
     /// <paramref name="record"/>, in position order, with one query per collection. The values
     /// keep the entity's field declaration order. A collection whose child entity has reference
     /// fields also adds the row labels, read in the same query, under the collection's name.
-    /// A references field has no value.
+    /// A references field gets its ids in written order as the value, and the label of each id at
+    /// the same position as its labels, with <see langword="null"/> for a target without a display value.
+    /// A file field is read as <c>{ id, name, mediaType, size }</c>, in the row too.
     /// </summary>
     internal static async Task<Record> WithRowsAsync(
         NpgsqlConnection connection,
@@ -292,13 +294,13 @@ public static class RecordQueries
         var labels = new Dictionary<string, JsonNode>(record.Labels, StringComparer.Ordinal);
         foreach (var field in entity.Fields)
         {
-            // A references field has no column yet, so a record carries no value for it.
-            if (!field.HasColumn && field.Type != FieldType.ChildCollection)
+            if (field.Type == FieldType.References)
             {
-                continue;
+                var (ids, setLabels) = await ReadLinksAsync(connection, entity, field, record.Id, cancellationToken);
+                values[field.Name] = ids;
+                labels[field.Name] = setLabels;
             }
-
-            if (field.Type == FieldType.ChildCollection)
+            else if (field.Type == FieldType.ChildCollection)
             {
                 var (rows, rowLabels) = await ReadRowsAsync(connection, application, field, record.Id, cancellationToken);
                 values[field.Name] = rows;
@@ -317,6 +319,45 @@ public static class RecordQueries
     }
 
     /// <summary>
+    /// The ids of a references field in the order they were written, and the display value of each
+    /// target at the same position. A target whose display value is NULL, or an entity without a
+    /// display field, gives <see langword="null"/>.
+    /// </summary>
+    private static async Task<(JsonArray Ids, JsonArray Labels)> ReadLinksAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        FieldModel field,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var junction = EntityNaming.Quote("j");
+        var target = EntityNaming.Quote("t");
+        var display = field.TargetDisplayField is null
+            ? "NULL"
+            : $"{target}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField))}";
+        await using var command = new NpgsqlCommand(
+            $"SELECT {junction}.{EntityNaming.Quote(EntityNaming.TargetColumn)}, {display} "
+            + $"FROM {EntityNaming.QualifiedTable(EntityNaming.Junction(entity.Id, field.Name))} AS {junction} "
+            + $"JOIN {EntityNaming.QualifiedTable(EntityNaming.Table(field.Target!.Id))} AS {target} "
+            + $"ON {target}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {junction}.{EntityNaming.Quote(EntityNaming.TargetColumn)} "
+            + $"WHERE {junction}.{EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner "
+            + $"ORDER BY {junction}.{EntityNaming.Quote(EntityNaming.PositionColumn)}",
+            connection);
+        command.Parameters.AddWithValue("owner", ownerId);
+
+        var ids = new JsonArray();
+        var labels = new JsonArray();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            ids.Add(reader.GetGuid(0).ToString("D"));
+            labels.Add(reader.IsDBNull(1) ? null : reader.GetString(1));
+        }
+
+        return (ids, labels);
+    }
+
+    /// <summary>
     /// The rows of a child collection, and one object of labels per row when the child entity has
     /// reference fields, otherwise <see langword="null"/>. A reference without a label is left out of its row's object.
     /// </summary>
@@ -331,11 +372,13 @@ public static class RecordQueries
             ?? throw new InvalidOperationException("The application has no entity for the child collection.");
         var columns = Columns(child);
         var references = References(child).ToList();
+        var files = Files(child).ToList();
         var alias = EntityNaming.Quote(RowAlias);
         var selected = columns.Select(field =>
             alias + "." + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : ""))
             .Concat(references.Select((field, index) =>
-                $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"));
+                $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"))
+            .Concat(files.Select((_, index) => FileColumns(index)));
         await using var command = new NpgsqlCommand(
             $"SELECT {string.Join(", ", selected)} FROM {Table(child)} AS {alias}{LabelJoins(child, RowAlias)} WHERE {alias}.{EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner ORDER BY {alias}.{EntityNaming.Quote(EntityNaming.PositionColumn)}",
             connection);
@@ -352,6 +395,7 @@ public static class RecordQueries
                 row[columns[ordinal].Name] = reader.IsDBNull(ordinal) ? null : ReadValue(reader, ordinal, columns[ordinal]);
             }
 
+            ReadFiles(reader, columns.Count + references.Count, files, row);
             rows.Add(row);
 
             if (labels is not null)
@@ -378,7 +422,8 @@ public static class RecordQueries
     /// <summary>
     /// The id, the version, then every column field in declaration order, all of the row named
     /// <paramref name="alias"/>; decimals as text so no digit is lost. Then the display field of
-    /// each reference's target, joined by <see cref="LabelJoins"/>.
+    /// each reference's target, then the name, media type and size of each file field's file, both
+    /// joined by <see cref="LabelJoins"/>.
     /// </summary>
     internal static string SelectList(EntityModel entity, string alias)
     {
@@ -390,12 +435,20 @@ public static class RecordQueries
                 row + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : "")),
             .. References(entity).Select((field, index) =>
                 $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"),
+            .. Files(entity).Select((_, index) => FileColumns(index)),
         ]);
+    }
+
+    private static string FileColumns(int index)
+    {
+        var file = EntityNaming.Quote(FileAlias(index));
+        return $"{file}.\"name\", {file}.\"media_type\", {file}.\"size\"";
     }
 
     /// <summary>
     /// One left join per reference field to the target table, aliased by the reference's position,
-    /// so each record's labels come from the same statement. Empty without a reference field.
+    /// so each record's labels come from the same statement. Then one left join per file field to
+    /// <c>axis.files</c>, aliased by the file field's position. Empty without a reference or file field.
     /// </summary>
     internal static string LabelJoins(EntityModel entity, string alias) =>
         string.Concat(References(entity).Select((field, index) =>
@@ -403,12 +456,22 @@ public static class RecordQueries
             var target = EntityNaming.Quote(LabelAlias(index));
             return $" LEFT JOIN {EntityNaming.QualifiedTable(EntityNaming.Table(field.Target!.Id))} AS {target}"
                 + $" ON {target}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {EntityNaming.Quote(alias)}.{EntityNaming.Quote(EntityNaming.Column(field.Name))}";
-        }));
+        }).Concat(Files(entity).Select((field, index) =>
+        {
+            var file = EntityNaming.Quote(FileAlias(index));
+            return $" LEFT JOIN \"axis\".\"files\" AS {file}"
+                + $" ON {file}.\"id\" = {EntityNaming.Quote(alias)}.{EntityNaming.Quote(EntityNaming.Column(field.Name))}";
+        })));
 
     private static string LabelAlias(int index) => $"l{index}";
 
+    private static string FileAlias(int index) => $"fl{index}";
+
     private static IEnumerable<FieldModel> References(EntityModel entity) =>
         Columns(entity).Where(field => field.Type == FieldType.Reference);
+
+    private static IEnumerable<FieldModel> Files(EntityModel entity) =>
+        Columns(entity).Where(field => field.Type == FieldType.File);
 
     /// <summary>
     /// The fields stored in a column of the entity table, in declaration order. A child collection
@@ -441,7 +504,31 @@ public static class RecordQueries
             labelOrdinal++;
         }
 
+        ReadFiles(reader, labelOrdinal, Files(entity).ToList(), values);
         return new Record(reader.GetGuid(0), reader.GetInt64(1), values, labels);
+    }
+
+    /// <summary>
+    /// Replaces the id of each file field in <paramref name="values"/> by <c>{ id, name, mediaType, size }</c>,
+    /// read from three columns each from <paramref name="ordinal"/>. A null file id stays null.
+    /// </summary>
+    private static void ReadFiles(NpgsqlDataReader reader, int ordinal, IReadOnlyList<FieldModel> files, IDictionary<string, JsonNode?> values)
+    {
+        foreach (var field in files)
+        {
+            if (values[field.Name] is { } id)
+            {
+                values[field.Name] = new JsonObject
+                {
+                    ["id"] = id.GetValue<string>(),
+                    ["name"] = reader.GetString(ordinal),
+                    ["mediaType"] = reader.GetString(ordinal + 1),
+                    ["size"] = reader.GetInt64(ordinal + 2),
+                };
+            }
+
+            ordinal += 3;
+        }
     }
 
     internal static JsonValue ReadValue(NpgsqlDataReader reader, int ordinal, FieldModel field) =>
@@ -455,7 +542,7 @@ public static class RecordQueries
             FieldType.Date => JsonValue.Create(reader.GetFieldValue<DateOnly>(ordinal).ToString(DateFormat, CultureInfo.InvariantCulture)),
             // Npgsql reads timestamp with time zone as a UTC DateTime.
             FieldType.DateTime => JsonValue.Create(reader.GetFieldValue<DateTime>(ordinal).ToString(DateTimeFormat, CultureInfo.InvariantCulture)),
-            FieldType.Reference => JsonValue.Create(reader.GetGuid(ordinal).ToString("D")),
+            FieldType.Reference or FieldType.File => JsonValue.Create(reader.GetGuid(ordinal).ToString("D")),
             _ => throw new ArgumentOutOfRangeException(nameof(field), field.Type, "Unknown field type."),
         };
 }

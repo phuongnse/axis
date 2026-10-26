@@ -1,0 +1,11 @@
+{
+  "id": "9b3c7e52-1d84-4a6f-8e07-5c2a9d4b6f13",
+  "kind": "entity",
+  "name": "Bundle",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "products", "type": "references", "target": "Product" }
+  ]
+}

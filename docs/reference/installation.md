@@ -28,6 +28,13 @@ An installation has three hosts:
 An installation also needs a PostgreSQL 18 server and an OIDC provider. Axis
 does not ship either one for production.
 
+Every tenant database needs the `pg_trgm` extension, for
+[search](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
+`tenant create` and `migrate` create it in the `public` schema as the tenant's
+schema role. It is a trusted extension, so they need no superuser. The server
+must ship the contrib modules, as the official `postgres` images do. A managed
+service may need `pg_trgm` on its list of allowed extensions.
+
 ## Images
 
 There are three production images: `axis-server`, `axis-worker` and

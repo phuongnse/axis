@@ -169,7 +169,7 @@ public static class TaskCompletionCommand
             }
 
             var result = await RecordCommands.UpdateAsync(
-                connection, release, entity, task.ReleaseId, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
+                connection, release, entity, task.ReleaseId, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 return result.Outcome == RecordWriteOutcome.StaleVersion
@@ -228,7 +228,7 @@ public static class TaskCompletionCommand
                 entity,
                 previous,
                 updated,
-                saved.Rows.Select(rows => rows.Collection.Name),
+                saved.Rows.Select(rows => rows.Collection.Name).Concat(saved.Links.Select(links => links.Field.Name)),
                 loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                 cancellationToken);
         }

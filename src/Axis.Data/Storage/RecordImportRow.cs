@@ -28,6 +28,9 @@ public sealed class RecordImportRow
     /// <summary><c>pending</c>, <c>checked</c>, <c>failed</c> or <c>committed</c>.</summary>
     public required string State { get; init; }
 
+    /// <summary><c>csv</c> or <c>xlsx</c>, which picks the reader that reads the file.</summary>
+    public required string Format { get; init; }
+
     /// <summary>The uploaded file, or null once a failed dry run has cleared it.</summary>
     public byte[]? File { get; init; }
 

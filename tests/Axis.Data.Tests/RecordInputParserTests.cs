@@ -286,6 +286,29 @@ public sealed class RecordInputParserTests
     }
 
     [Fact]
+    public void A_file_value_parses_as_a_guid_and_a_malformed_one_is_refused_at_the_field()
+    {
+        var entity = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e21"),
+            "Claim",
+            "entities/claim.json",
+            Field("receipt", FieldType.File));
+        var application = Application(entity);
+        var id = Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e22");
+
+        var valid = RecordInputParser.Parse(Encoding.UTF8.GetBytes($$"""{ "values": { "receipt": "{{id:D}}" } }"""), entity, application, RecordOperation.Create);
+        var cleared = RecordInputParser.Parse(Encoding.UTF8.GetBytes("""{ "values": { "receipt": null } }"""), entity, application, RecordOperation.Create);
+        var malformed = RecordInputParser.Parse(Encoding.UTF8.GetBytes("""{ "values": { "receipt": "abc" } }"""), entity, application, RecordOperation.Create);
+
+        Assert.Null(valid.Errors);
+        Assert.Equal(id, Assert.IsType<Guid>(Assert.Single(valid.Input!.Values).Value));
+        Assert.Null(Assert.Single(cleared.Input!.Values).Value);
+        var error = Assert.Single(malformed.Errors!);
+        Assert.Equal("/values/receipt", error.Key);
+        Assert.Equal(["Must be a UUID."], error.Value);
+    }
+
+    [Fact]
     public void Valid_update_body_has_only_the_named_fields_and_the_version()
     {
         var result = Parse("""{ "version": 7, "values": { "status": "Closed", "count": null } }""", RecordOperation.Update);
@@ -299,26 +322,150 @@ public sealed class RecordInputParserTests
             result.Input.Values.Select(value => (value.Field.Name, value.Value)));
     }
 
-    [Fact]
-    public void A_references_field_is_an_unknown_property_until_records_can_store_sets()
-    {
-        var entity = Entity(
-            Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a02"),
-            "Request",
-            "entities/request.json",
-            Field("title", FieldType.Text, required: true),
-            Field("software", FieldType.References, target: _target));
+    private static readonly EntityModel _request = Entity(
+        Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a02"),
+        "Request",
+        "entities/request.json",
+        Field("title", FieldType.Text, required: true),
+        Field("software", FieldType.References, target: _target),
+        Field("tools", FieldType.References, required: true, target: _target));
 
-        var result = RecordInputParser.Parse(
-            Encoding.UTF8.GetBytes("""{ "values": { "title": "Hi", "software": [] } }"""),
-            entity,
-            Application(entity, _target),
+    private static RecordInputResult ParseRequest(string json, RecordOperation operation) =>
+        RecordInputParser.Parse(Encoding.UTF8.GetBytes(json), _request, Application(_request, _target), operation);
+
+    private static string Id(int number) => Guid.Parse($"00000000-0000-0000-0000-{number:D12}").ToString("D");
+
+    [Fact]
+    public void A_references_field_takes_an_array_of_ids_in_written_order()
+    {
+        var result = ParseRequest(
+            $$"""{ "values": { "tools": ["{{Id(3)}}", "{{Id(1)}}"], "title": "Hi", "software": [] } }""",
+            RecordOperation.Create);
+
+        Assert.Null(result.Errors);
+        Assert.NotNull(result.Input);
+        Assert.Equal(["title"], result.Input.Values.Select(value => value.Field.Name));
+        Assert.Equal(["software", "tools"], result.Input.Links.Select(links => links.Field.Name));
+        Assert.Empty(result.Input.Links[0].Ids);
+        Assert.Equal([Guid.Parse(Id(3)), Guid.Parse(Id(1))], result.Input.Links[1].Ids);
+    }
+
+    [Fact]
+    public void A_references_field_that_the_body_leaves_out_is_not_in_the_links()
+    {
+        var result = ParseRequest($$"""{ "values": { "title": "Hi", "tools": ["{{Id(1)}}"] } }""", RecordOperation.Create);
+
+        Assert.Null(result.Errors);
+        Assert.Equal(["tools"], result.Input!.Links.Select(links => links.Field.Name));
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("\"abc\"")]
+    [InlineData("{}")]
+    [InlineData("5")]
+    public void A_references_value_that_is_not_an_array_is_refused(string value)
+    {
+        var result = ParseRequest($$"""{ "values": { "title": "Hi", "tools": ["{{Id(9)}}"], "software": {{value}} } }""", RecordOperation.Create);
+
+        Assert.Null(result.Input);
+        Assert.Equal(["/values/software"], result.Errors!.Keys);
+        Assert.Equal(["Must be an array of record ids."], result.Errors["/values/software"]);
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("null")]
+    [InlineData("\"not-a-uuid\"")]
+    [InlineData("\"00000000000000000000000000000001\"")]
+    public void A_malformed_id_is_refused_at_its_index(string element)
+    {
+        var result = ParseRequest(
+            $$"""{ "values": { "title": "Hi", "tools": ["{{Id(9)}}"], "software": ["{{Id(1)}}", {{element}}] } }""",
             RecordOperation.Create);
 
         Assert.Null(result.Input);
-        Assert.NotNull(result.Errors);
-        Assert.Equal(["/values/software"], result.Errors.Keys);
-        Assert.Equal(["Unknown property."], result.Errors["/values/software"]);
+        Assert.Equal(["/values/software/1"], result.Errors!.Keys);
+        Assert.Equal(["Must be a UUID."], result.Errors["/values/software/1"]);
+    }
+
+    [Fact]
+    public void A_repeated_id_is_refused_at_the_index_of_each_repeat()
+    {
+        var result = ParseRequest(
+            $$"""{ "values": { "title": "Hi", "tools": ["{{Id(9)}}"], "software": ["{{Id(1)}}", "{{Id(2)}}", "{{Id(1)}}", "{{Id(2)}}"] } }""",
+            RecordOperation.Create);
+
+        Assert.Null(result.Input);
+        Assert.Equal(["/values/software/2", "/values/software/3"], result.Errors!.Keys);
+        Assert.All(result.Errors.Values, messages => Assert.Equal(["Duplicate id."], messages));
+    }
+
+    [Fact]
+    public void A_set_of_1000_ids_is_valid_and_1001_are_refused_once_at_the_field()
+    {
+        string Body(int count) =>
+            $$"""{ "values": { "title": "Hi", "tools": ["{{Id(9)}}"], "software": [{{string.Join(", ", Enumerable.Range(1, count).Select(number => $"\"{Id(number)}\""))}}] } }""";
+
+        var valid = ParseRequest(Body(1000), RecordOperation.Create);
+        Assert.Null(valid.Errors);
+        Assert.Equal(1000, valid.Input!.Links.Single(links => links.Field.Name == "software").Ids.Count);
+
+        // A malformed id among them is not reported, because the size check comes first.
+        var tooMany = ParseRequest(Body(1001).Replace(Id(5), "bad", StringComparison.Ordinal), RecordOperation.Create);
+        Assert.Null(tooMany.Input);
+        Assert.Equal(["/values/software"], tooMany.Errors!.Keys);
+        Assert.Equal(["Must hold at most 1000 ids."], tooMany.Errors["/values/software"]);
+    }
+
+    [Theory]
+    [InlineData(RecordOperation.Create)]
+    [InlineData(RecordOperation.Update)]
+    public void A_required_references_field_sent_empty_is_refused(RecordOperation operation)
+    {
+        var version = operation == RecordOperation.Update ? """ "version": 1,""" : "";
+        var result = ParseRequest($$"""{{{version}} "values": { "title": "Hi", "tools": [] } }""", operation);
+
+        Assert.Null(result.Input);
+        Assert.Equal(["/values/tools"], result.Errors!.Keys);
+        Assert.Equal(["Required."], result.Errors["/values/tools"]);
+    }
+
+    [Fact]
+    public void A_required_references_field_that_a_create_leaves_out_is_refused_but_an_update_may()
+    {
+        var create = ParseRequest("""{ "values": { "title": "Hi" } }""", RecordOperation.Create);
+        Assert.Null(create.Input);
+        Assert.Equal(["/values/tools"], create.Errors!.Keys);
+        Assert.Equal(["Required."], create.Errors["/values/tools"]);
+
+        var update = ParseRequest("""{ "version": 1, "values": { "title": "Hi" } }""", RecordOperation.Update);
+        Assert.Null(update.Errors);
+        Assert.Empty(update.Input!.Links);
+    }
+
+    [Fact]
+    public void A_row_has_no_references_field()
+    {
+        var row = Entity(
+            Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a03"),
+            "Row",
+            "entities/row.json",
+            Field("tags", FieldType.References, target: _target));
+        var owner = Entity(
+            Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a04"),
+            "Owner",
+            "entities/owner.json",
+            Field("rows", FieldType.ChildCollection, target: row));
+
+        var result = RecordInputParser.Parse(
+            Encoding.UTF8.GetBytes("""{ "values": { "rows": [{ "tags": [] }] } }"""),
+            owner,
+            Application(owner, row, _target),
+            RecordOperation.Create);
+
+        Assert.Equal(["/values/rows/0/tags"], result.Errors!.Keys);
+        Assert.Equal(["Unknown property."], result.Errors["/values/rows/0/tags"]);
     }
 
     [Fact]

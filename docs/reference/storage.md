@@ -44,8 +44,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     [recompute of computed fields](migrations.md#recomputing-computed-fields). It also owns
     `axis.pending_computed_fields`, the entities whose recompute the worker
     finishes in batches. It also owns `axis.record_imports`, the uploads of
-    [record imports](import-export.md#import) with their file, their state and
-    the errors of their dry run.
+    [record imports](import-export.md#import) with their file, its format
+    (`csv` or `xlsx`), their state and the errors of their dry run.
   - `Axis.Processes` owns `axis.process_instances` (one row per process
     instance), `axis.process_step_history` (one row per step occurrence),
     `axis.process_tasks` (one row per human task),
@@ -69,6 +69,18 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     updates and deletes its rows. The worker deletes the expired rows, and
     `tenant restore` empties the table, see
     [sign-in and the session](security.md#sign-in-and-the-session).
+  - `Axis.Data` also owns `axis.files` and `axis.file_contents`, with history
+    in `axis.__data_migrations`. A row of `axis.files` is the details of one
+    uploaded file of a [file field](file-fields.md#storage-and-clean-up): `id`
+    (the primary key), `application_id`, `entity_id`, `field_path` (the field
+    name, or `collection/field` for a field of a child entity),
+    `owner_record_id` (null until the file is attached), `name`, `media_type`,
+    `size`, `sha256` (`bytea`), `storage_kind` (`database`), `state`
+    (`pending`, `attached` or `deleted`), `uploaded_by` and `uploaded_at`. A
+    row of `axis.file_contents` is the bytes (`content`, `bytea`) of the file
+    with the same `file_id`, and is deleted with it. The server reads, inserts,
+    updates and deletes their rows. A file field's column in the `entities`
+    schema is a `uuid` with a foreign key to `axis.files (id)`.
   - `Axis.Data` also owns `axis.user_profiles`, one row for each user who
     signed in, with the display name, email, locale and the first and last
     sign-in. Each sign-in upserts it through `UserProfiles.UpsertAsync`, see
@@ -117,7 +129,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | Primary key                        | `pk_` + table                                                             | 37         |
   | Unique constraint                  | `uq_` + table + `_` + hash of the column name                             | 54         |
   | Foreign key                        | `fk_` + table + `_` + hash of the column name                             | 54         |
-  | Index _(planned for M15)_          | `ix_` + table + `_` + hash of the column list                             | 54         |
+  | Index                              | `ix_` + table + `_` + hash of the column list                             | 54         |
   | Junction table                     | `m_` + entity `id` + `_` + hash of the field name                         | 51         |
   | Junction foreign key / index       | `fk_` or `ix_` + junction table + `_` + first 8 hex of the hash           | 63         |
 
@@ -157,7 +169,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | `child-collection`               | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns)                |
   | `money`                          | `numeric(p,s)`, as `decimal` with its defaults. The currency is the field's or the `currencyField` column's              |
   | `file` _(planned for M15)_       | `uuid` with a foreign key to `axis.files`. See [file fields](file-fields.md#storage-and-clean-up)                        |
-  | `references` _(planned for M15)_ | No column on the owner table. A junction table holds `owner_id` and `target_id`, see [Schema planning](#schema-planning) |
+  | `references`                     | No column on the owner table. A junction table holds `owner_id`, `target_id` and `position`, see [Schema planning](#schema-planning) |
 
 - **SQL safety.** Every SQL statement for entity data is built by the data
   module from compiled metadata. Identifiers are resolved and quoted by the
@@ -324,7 +336,7 @@ What each database role may do:
 | Objects                                                                                                                                                                                                                                                                                                       | Schema database role                                             | Runtime database role                                             |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `entities` tables                                                                                                                                                                                                                                                                                             | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `record_imports` | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `record_imports`, `files`, `file_contents` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                                                                                       | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                                                                                           | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                                                                                            | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |
@@ -467,7 +479,8 @@ publisher` runs it with the tenant's schema role.
 
 `Axis.Data` compares a compiled application with a snapshot of the tenant
 catalog (entity tables, their columns, types, `NOT NULL`, single-column
-unique constraints, foreign key targets and whether the table has rows) and
+unique constraints, foreign key targets, their `ix_` indexes with whether each
+is valid, and whether the table has rows) and
 with the provisioning records (each provisioned entity with its application
 and table, and each recorded enum value). The records cover the application's
 entities and any entity recorded with one of its entity `id`s, whatever its
@@ -571,7 +584,8 @@ access. It returns diagnostics, SQL statements and the new records to write.
   entity is not planned.
 - **Labels.** A label change produces no statements.
 - **Order.** Every `CREATE TABLE` comes first, then the `ALTER TABLE` column
-  changes, then every `ADD CONSTRAINT ... FOREIGN KEY`, so references between
+  changes, then the `DROP INDEX` and `CREATE INDEX` statements, with the drops
+  first, then every `ADD CONSTRAINT ... FOREIGN KEY`, so references between
   entities, cycles and self-references need no further ordering. Pending
   migration statements run before these additive statements. Then stored
   computed fields are recomputed inline, or marked pending above the inline
@@ -580,34 +594,58 @@ access. It returns diagnostics, SQL statements and the new records to write.
   [Recomputing computed fields](migrations.md#recomputing-computed-fields).
 - **Errors.** When any diagnostic exists, the plan has no statements and no
   new records; nothing is applied.
-- **Indexes** _(planned for M15)_. See
-  [D77](../decisions/d77-indexes-defaults-and-ranges.md).
+- **Indexes.** See [D77](../decisions/d77-indexes-defaults-and-ranges.md).
+  A unique index, an index on an empty table and an index on a table with at
+  most `Activation:InlineRecomputeLimit` rows are built inside the activation
+  transaction. A new non-unique index on a table with more rows is left out:
+  activation commits without it, and `EntityIndexBuilder` creates it later
+  with `CREATE INDEX CONCURRENTLY`, so reads and writes on the table go on.
+  The catalog snapshot reads whether each index is valid. An `ix_` index that
+  PostgreSQL marks `INVALID`, for example after a cancelled concurrent build,
+  counts as missing: activation and the builder drop it and create it again.
+  The builder runs without a transaction, holds the schema lock that
+  activation takes, and uses the schema role. The worker cannot build, because
+  its runtime role cannot create indexes, see
+  [D31](../decisions/d31-separate-database-roles.md). Calling the builder from
+  the hosts is _(planned for M15)_. Until then, a deferred index stays missing.
   - Every `reference` column and every child table's `owner_id` gets an
-    `ix_` index without being declared. So do a junction table's `target_id`
-    and every `searchable` field, whose index is a `pg_trgm` GIN index on
-    `lower()` of the column.
+    `ix_` index without being declared. An existing tenant gets them on its
+    next activation. A junction table's `target_id` index is created with the
+    table. Every `searchable` field, whose index is a `pg_trgm` GIN index on
+    `lower()` of the column, is _(planned for M15)_.
+  - An entity's `indexes` add the declared indexes, with the columns in the
+    order of `fields`. A declared index over one `reference` field has the
+    same name as the automatic index on that field. They are one index, which
+    is unique when the declared one is.
   - The catalog snapshot also reads the `ix_` indexes of each table. The
     planner adds an index the release declares and the table lacks, and drops
-    an `ix_` index the release no longer declares. A drop needs no migration.
-  - A unique index added to a table with rows is `AXC0016`, as for `unique`.
-    It is built inside the activation transaction.
-  - Another new index on a table with at most
-    `Activation:InlineRecomputeLimit` rows is built inside the activation
-    transaction. On a larger table, activation commits without it and the
-    worker builds it with `CREATE INDEX CONCURRENTLY`. An index the build
-    leaves `INVALID` is dropped and built again. Until it is valid, queries
-    work without it.
+    an `ix_` index the release no longer declares. Changing the field list of
+    an index is a drop and a create under the new name. A drop needs no
+    migration.
+  - An index of the same name with another `unique` flag is dropped and
+    created again.
+  - A unique index added to a table with rows is `AXC0016` at
+    `/indexes/{i}/unique`, as for `unique`, even when all of its columns are
+    new in the release. Removing `unique` from an index is allowed.
+  - A `renameField` change renames the `ix_` indexes over the column, so a
+    renamed field keeps its unique index. A `dropField` change drops them
+    with the column, and the planner does not drop them again.
+  - A second record that repeats the values of a unique index is a `409`, as
+    for a `unique` field. See [record API](record-api.md#create-update-and-delete).
 - **Junction tables.** A `references` field gets a junction table with
   `owner_id`, a foreign key to the owner deleted with it, and `target_id`, a
   foreign key to the target that refuses a delete while linked. Its primary
-  key is both columns, and `target_id` has an `ix_` index. A junction table
+  key is both columns, and `target_id` has an `ix_` index. Its `position`
+  holds the zero-based index of the id in the written array, and a read
+  orders by it. A junction table
   whose `target_id` foreign key is missing gets it, and one that points at
   another table than the field's target is `AXC0016` at
   `/fields/{i}/target`. Junction tables are not recorded in
   `provisioned_entities`: the planner finds them in the catalog by the
   `m_` + entity `id` prefix. Removing the field drops nothing and is
-  `AXC0015` at `/fields`, as for a column. The record API does not read or
-  write the links yet. See
+  `AXC0015` at `/fields`, as for a column. The record API writes the whole set
+  of a field in one write and reads it in `position` order. A junction table
+  made before `position` existed is not migrated. See
   [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md).
 
 ## Child tables and computed columns
@@ -733,7 +771,7 @@ schema of the tenant database.
   | ---------------- | --------- | -------------------------------------------------- |
   | `sequence_id`    | `uuid`    | The `sequence` resource `id`                       |
   | `application_id` | `uuid`    | The application `id`                               |
-  | `period`         | `integer` | The UTC year, or 0 when the format has no `{yyyy}` |
+  | `period`         | `integer` | The local year, or 0 when the format has no `{yyyy}` |
   | `last_value`     | `bigint`  | The last number handed out                         |
   - The primary key is `(sequence_id, period)`.
   - For a module sequence, `sequence_id` is the id derived

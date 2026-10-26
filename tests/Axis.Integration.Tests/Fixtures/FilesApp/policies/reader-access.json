@@ -1,0 +1,10 @@
+{
+  "id": "3b7c1d52-4e8a-4f60-9a1b-7d2e5c8f0a08",
+  "kind": "policy",
+  "name": "ReaderAccess",
+  "formatVersion": 1,
+  "roles": ["reader"],
+  "grants": [
+    { "entity": "Claim", "actions": ["read"] }
+  ]
+}

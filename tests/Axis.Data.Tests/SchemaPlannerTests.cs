@@ -63,6 +63,9 @@ public sealed class SchemaPlannerTests
             [
                 $"""CREATE TABLE "entities"."{CustomerTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, "f_name" character varying(200) NOT NULL, "f_lastorder" uuid, CONSTRAINT "pk_{CustomerTable}" PRIMARY KEY ("id"))""",
                 $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, "f_code" character varying(20) NOT NULL, "f_customer" uuid NOT NULL, "f_parent" uuid, "f_total" numeric(18,2), "f_quantity" bigint, "f_paid" boolean, "f_due" date, "f_placedat" timestamp with time zone, "f_notes" text, "f_status" text NOT NULL, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"), CONSTRAINT "{EntityNaming.Unique(OrderTable, "f_code")}" UNIQUE ("f_code"))""",
+                CreateIndex(CustomerTable, "f_lastorder"),
+                CreateIndex(OrderTable, "f_customer"),
+                CreateIndex(OrderTable, "f_parent"),
                 ForeignKey(CustomerTable, "f_lastorder", OrderTable),
                 ForeignKey(OrderTable, "f_customer", CustomerTable),
                 ForeignKey(OrderTable, "f_parent", OrderTable),
@@ -154,9 +157,190 @@ public sealed class SchemaPlannerTests
             [
                 $"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_billto" uuid NOT NULL""",
                 $"""ALTER TABLE "entities"."{OrderTable}" ADD CONSTRAINT "{EntityNaming.Unique(OrderTable, "f_billto")}" UNIQUE ("f_billto")""",
+                CreateIndex(OrderTable, "f_billto"),
                 ForeignKey(OrderTable, "f_billto", CustomerTable),
             ],
             plan.Statements);
+    }
+
+    [Fact]
+    public void Existing_table_gains_the_reference_index_it_lacks()
+    {
+        var model = BaseModel();
+        var catalog = ChangeOrderIndexes(Catalog(model, hasRows: true), _ => []);
+
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([CreateIndex(OrderTable, "f_customer")], plan.Statements);
+    }
+
+    [Fact]
+    public void Existing_table_drops_and_creates_again_an_expected_index_that_is_not_valid()
+    {
+        var model = BaseModel();
+        var catalog = ChangeOrderIndexes(Catalog(model, hasRows: true), indexes => [.. indexes.Select(index => index with { Valid = false })]);
+
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([DropIndex(OrderTable, "f_customer"), CreateIndex(OrderTable, "f_customer")], plan.Statements);
+    }
+
+    [Fact]
+    public void Index_create_on_a_table_with_rows_is_deferrable_and_on_an_empty_table_is_not()
+    {
+        var stored = BaseModel();
+        var changed = DeclareOrderIndexes(stored, new EntityIndexModel(["title"], false));
+
+        var withRows = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+        var empty = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: false), Models.Records(stored));
+        var unique = SchemaPlanner.Plan(
+            DeclareOrderIndexes(stored, new EntityIndexModel(["title"], true)),
+            Catalog(stored, hasRows: false),
+            Models.Records(stored));
+
+        Assert.Equal([OrderTable], withRows.Commands.Select(command => command.DeferrableOn));
+        Assert.Equal([null], empty.Commands.Select(command => command.DeferrableOn));
+        Assert.Equal([null], unique.Commands.Select(command => command.DeferrableOn));
+    }
+
+    [Fact]
+    public void Existing_table_drops_an_ix_index_the_release_does_not_declare()
+    {
+        var model = BaseModel();
+        var stale = new CatalogIndex(EntityNaming.Index(OrderTable, ["f_note"]), ["f_note"], Unique: false);
+        var catalog = ChangeOrderIndexes(Catalog(model, hasRows: true), indexes => [.. indexes, stale]);
+
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([DropIndex(OrderTable, "f_note")], plan.Statements);
+    }
+
+    [Fact]
+    public void Declared_index_is_created_on_a_table_with_rows_and_in_column_order()
+    {
+        var stored = BaseModel();
+        var changed = DeclareOrderIndexes(stored, new EntityIndexModel(["title", "code"], false));
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([CreateIndex(OrderTable, "f_title", "f_code")], plan.Statements);
+    }
+
+    [Fact]
+    public void Declared_index_over_one_reference_merges_with_the_automatic_index()
+    {
+        var model = DeclareOrderIndexes(BaseModel(), new EntityIndexModel(["customer"], true));
+
+        var plan = SchemaPlanner.Plan(model, CatalogSnapshot.Empty, ProvisioningRecords.Empty);
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Single(plan.Statements, statement => statement.StartsWith("CREATE", StringComparison.Ordinal) && statement.Contains("INDEX", StringComparison.Ordinal));
+        Assert.Contains(CreateUniqueIndex(OrderTable, "f_customer"), plan.Statements);
+    }
+
+    [Fact]
+    public void Declared_index_changed_to_unique_on_an_empty_table_is_dropped_and_created_again()
+    {
+        var stored = DeclareOrderIndexes(BaseModel(), new EntityIndexModel(["title"], false));
+        var changed = DeclareOrderIndexes(stored, new EntityIndexModel(["title"], true));
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: false), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([DropIndex(OrderTable, "f_title"), CreateUniqueIndex(OrderTable, "f_title")], plan.Statements);
+    }
+
+    [Fact]
+    public void Declared_index_changed_to_non_unique_is_dropped_and_created_again_even_with_rows()
+    {
+        var stored = DeclareOrderIndexes(BaseModel(), new EntityIndexModel(["title"], true));
+        var changed = DeclareOrderIndexes(stored, new EntityIndexModel(["title"], false));
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([DropIndex(OrderTable, "f_title"), CreateIndex(OrderTable, "f_title")], plan.Statements);
+    }
+
+    [Fact]
+    public void Declared_index_changed_to_unique_on_a_table_with_rows_is_incompatible()
+    {
+        var stored = DeclareOrderIndexes(BaseModel(), new EntityIndexModel(["title"], false));
+        var changed = DeclareOrderIndexes(stored, new EntityIndexModel(["title"], true));
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Equal(
+            [(DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/indexes/0/unique")],
+            plan.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)));
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
+    public void New_unique_index_is_created_on_an_empty_table_and_incompatible_on_a_table_with_rows()
+    {
+        var stored = BaseModel();
+        var changed = DeclareOrderIndexes(stored, new EntityIndexModel(["amount"], false), new EntityIndexModel(["note", "amount"], true));
+
+        var empty = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: false), Models.Records(stored));
+        var withRows = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(empty.Diagnostics);
+        Assert.Equal([CreateIndex(OrderTable, "f_amount"), CreateUniqueIndex(OrderTable, "f_note", "f_amount")], empty.Statements);
+        Assert.Equal(
+            [(DiagnosticCodes.IncompatibleFieldChange, "/indexes/1/unique")],
+            withRows.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+    }
+
+    [Fact]
+    public void Declared_index_with_another_field_list_is_replaced()
+    {
+        var stored = DeclareOrderIndexes(BaseModel(), new EntityIndexModel(["title", "code"], false));
+        var changed = DeclareOrderIndexes(stored, new EntityIndexModel(["title", "note"], false));
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([DropIndex(OrderTable, "f_title", "f_code"), CreateIndex(OrderTable, "f_title", "f_note")], plan.Statements);
+    }
+
+    [Fact]
+    public void Pending_rename_renames_the_indexes_over_the_column_instead_of_creating_them_again()
+    {
+        var stored = DeclareOrderIndexes(BaseModel(), new EntityIndexModel(["title", "code"], true));
+        var renamed = ChangeOrder(stored, fields => [.. fields.Select(field => field.Name == "code" ? field with { Name = "number" } : field)]);
+        renamed = DeclareOrderIndexes(renamed, new EntityIndexModel(["title", "number"], true));
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.RenameField, null, "code", "number", null));
+
+        var plan = SchemaPlanner.Plan(renamed, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var alter = $"ALTER TABLE {EntityNaming.QualifiedTable(OrderTable)}";
+        Assert.Equal(
+            [
+                $"{alter} RENAME COLUMN {Quote("f_code")} TO {Quote("f_number")}",
+                $"{alter} RENAME CONSTRAINT {Quote(EntityNaming.Unique(OrderTable, "f_code"))} TO {Quote(EntityNaming.Unique(OrderTable, "f_number"))}",
+                $"ALTER INDEX \"entities\".{Quote(EntityNaming.Index(OrderTable, ["f_title", "f_code"]))} RENAME TO {Quote(EntityNaming.Index(OrderTable, ["f_title", "f_number"]))}",
+            ],
+            plan.Statements);
+    }
+
+    [Fact]
+    public void Pending_drop_field_plans_no_index_drop_for_the_indexes_the_column_takes_with_it()
+    {
+        var stored = DeclareOrderIndexes(BaseModel(), new EntityIndexModel(["note"], false), new EntityIndexModel(["title", "note"], false));
+        var dropped = ChangeOrder(stored, fields => [.. fields.Where(field => field.Name != "note")]);
+        dropped = DeclareOrderIndexes(dropped);
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.DropField, "note", null, null, null));
+
+        var plan = SchemaPlanner.Plan(dropped, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([$"ALTER TABLE {EntityNaming.QualifiedTable(OrderTable)} DROP COLUMN {Quote("f_note")}"], plan.Statements);
     }
 
     [Fact]
@@ -229,6 +413,59 @@ public sealed class SchemaPlannerTests
 
         Assert.Empty(plan.Diagnostics);
         Assert.Equal([ForeignKey(OrderTable, "f_customer", CustomerTable)], plan.Statements);
+    }
+
+    [Fact]
+    public void File_field_is_a_uuid_column_with_a_foreign_key_to_the_files_table()
+    {
+        var model = BaseModel();
+        var changed = ChangeOrder(model, fields => [.. fields, Field("receipt", FieldType.File)]);
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(
+            [
+                $"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_receipt" uuid""",
+                FileForeignKey(OrderTable, "f_receipt"),
+            ],
+            plan.Statements);
+    }
+
+    [Fact]
+    public void New_table_with_a_file_field_has_a_uuid_column_and_a_foreign_key_to_the_files_table()
+    {
+        var model = ChangeOrder(BaseModel(), fields => [.. fields, Field("receipt", FieldType.File, required: true)]);
+
+        var plan = SchemaPlanner.Plan(model, CatalogSnapshot.Empty, ProvisioningRecords.Empty);
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Contains(plan.Statements, statement => statement.StartsWith($"""CREATE TABLE "entities"."{OrderTable}" """, StringComparison.Ordinal)
+            && statement.Contains("\"f_receipt\" uuid NOT NULL", StringComparison.Ordinal));
+        Assert.Contains(FileForeignKey(OrderTable, "f_receipt"), plan.Statements);
+    }
+
+    [Fact]
+    public void File_column_without_a_foreign_key_gets_one()
+    {
+        var model = ChangeOrder(BaseModel(), fields => [.. fields, Field("receipt", FieldType.File)]);
+        var catalog = ChangeOrderColumns(Catalog(model, hasRows: true), columns => columns.Select(column => column.Name == "f_receipt" ? column with { ReferencedTable = null } : column));
+
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([FileForeignKey(OrderTable, "f_receipt")], plan.Statements);
+    }
+
+    [Fact]
+    public void File_column_with_its_foreign_key_plans_nothing()
+    {
+        var model = ChangeOrder(BaseModel(), fields => [.. fields, Field("receipt", FieldType.File)]);
+
+        var plan = SchemaPlanner.Plan(model, Catalog(model, hasRows: true), Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        AssertNothingPlanned(plan);
     }
 
     [Fact]
@@ -393,6 +630,7 @@ public sealed class SchemaPlannerTests
             [
                 $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, "f_title" character varying(100) NOT NULL, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"))""",
                 $"""CREATE TABLE "entities"."{LineTable}" ("id" uuid NOT NULL, "owner_id" uuid NOT NULL, "position" integer NOT NULL, "f_description" text, "f_quantity" bigint NOT NULL, CONSTRAINT "pk_{LineTable}" PRIMARY KEY ("id"))""",
+                CreateIndex(LineTable, "owner_id"),
                 OwnerForeignKey(LineTable, OrderTable),
             ],
             plan.Statements);
@@ -415,6 +653,7 @@ public sealed class SchemaPlannerTests
         Assert.Equal(
             [
                 $"""CREATE TABLE "entities"."{LineTable}" ("id" uuid NOT NULL, "owner_id" uuid NOT NULL, "position" integer NOT NULL, "f_description" text, "f_quantity" bigint NOT NULL, CONSTRAINT "pk_{LineTable}" PRIMARY KEY ("id"))""",
+                CreateIndex(LineTable, "owner_id"),
                 OwnerForeignKey(LineTable, OrderTable),
             ],
             plan.Statements);
@@ -537,6 +776,7 @@ public sealed class SchemaPlannerTests
                 $"{alter} RENAME CONSTRAINT {Quote(EntityNaming.Unique(OrderTable, "f_code"))} TO {Quote(EntityNaming.Unique(OrderTable, "f_number"))}",
                 $"{alter} RENAME COLUMN {Quote("f_customer")} TO {Quote("f_buyer")}",
                 $"{alter} RENAME CONSTRAINT {Quote(EntityNaming.ForeignKey(OrderTable, "f_customer"))} TO {Quote(EntityNaming.ForeignKey(OrderTable, "f_buyer"))}",
+                $"ALTER INDEX \"entities\".{Quote(EntityNaming.Index(OrderTable, ["f_customer"]))} RENAME TO {Quote(EntityNaming.Index(OrderTable, ["f_buyer"]))}",
                 $"{alter} RENAME COLUMN {Quote("f_status")} TO {Quote("f_state")}",
                 $"{alter} ADD COLUMN {Quote("f_priority")} bigint",
             ],
@@ -784,6 +1024,24 @@ public sealed class SchemaPlannerTests
         Assert.Null(plan.Commands[1].Fill);
     }
 
+    [Theory]
+    [InlineData("Asia/Ho_Chi_Minh")]
+    [InlineData("UTC")]
+    public void Pending_fill_with_today_converts_in_the_applications_time_zone(string zoneId)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+        var stored = BaseModel();
+        var release = ChangeOrder(stored, fields => [.. fields, Field("due", FieldType.Date, required: true)]) with { TimeZone = zone };
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Fill, "due", null, null, "today()"));
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var fill = Assert.Single(plan.Commands, command => command.Fill is not null);
+        Assert.Contains("AT TIME ZONE @f0", fill.Sql, StringComparison.Ordinal);
+        Assert.Equal([new SqlValue("f0", ExpressionTypeKind.Text, zone.Id)], fill.Parameters);
+    }
+
     [Fact]
     public void Pending_fill_of_a_missing_required_enum_column_adds_it_without_not_null_then_fills_it_then_makes_it_not_null()
     {
@@ -1005,6 +1263,21 @@ public sealed class SchemaPlannerTests
     private static string OwnerForeignKey(string table, string ownerTable) =>
         $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, "owner_id")}" FOREIGN KEY ("owner_id") REFERENCES "entities"."{ownerTable}" ("id") ON DELETE CASCADE""";
 
+    private static string CreateIndex(string table, params string[] columns) =>
+        $"""CREATE INDEX "{EntityNaming.Index(table, columns)}" ON "entities"."{table}" ({string.Join(", ", columns.Select(column => $"\"{column}\""))})""";
+
+    private static string CreateUniqueIndex(string table, params string[] columns) =>
+        CreateIndex(table, columns).Replace("CREATE INDEX", "CREATE UNIQUE INDEX", StringComparison.Ordinal);
+
+    private static ApplicationModel DeclareOrderIndexes(ApplicationModel model, params EntityIndexModel[] indexes) =>
+        model with { Entities = [.. model.Entities.Select(entity => entity.Id == _orderId ? entity with { Indexes = indexes } : entity)] };
+
+    private static CatalogSnapshot ChangeOrderIndexes(CatalogSnapshot catalog, Func<IEnumerable<CatalogIndex>, IEnumerable<CatalogIndex>> change) =>
+        new([.. catalog.Tables.Select(table => table.Name == OrderTable ? table with { Indexes = [.. change(table.Indexes)] } : table)]);
+
+    private static string DropIndex(string table, params string[] columns) =>
+        $"DROP INDEX \"entities\".\"{EntityNaming.Index(table, columns)}\"";
+
     [Fact]
     public void A_references_field_plans_a_junction_table_with_its_index_and_foreign_keys_after_every_entity_table()
     {
@@ -1020,7 +1293,7 @@ public sealed class SchemaPlannerTests
             [
                 $"""CREATE TABLE "entities"."{supplierTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, CONSTRAINT "pk_{supplierTable}" PRIMARY KEY ("id"))""",
                 $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"))""",
-                $"""CREATE TABLE "entities"."{junction}" ("owner_id" uuid NOT NULL, "target_id" uuid NOT NULL, CONSTRAINT "pk_{junction}" PRIMARY KEY ("owner_id", "target_id"))""",
+                $"""CREATE TABLE "entities"."{junction}" ("owner_id" uuid NOT NULL, "target_id" uuid NOT NULL, "position" integer NOT NULL, CONSTRAINT "pk_{junction}" PRIMARY KEY ("owner_id", "target_id"))""",
                 $"""CREATE INDEX "{EntityNaming.JunctionIndex(junction, "target_id")}" ON "entities"."{junction}" ("target_id")""",
                 $"""ALTER TABLE "entities"."{junction}" ADD CONSTRAINT "{EntityNaming.JunctionForeignKey(junction, "owner_id")}" FOREIGN KEY ("owner_id") REFERENCES "entities"."{OrderTable}" ("id") ON DELETE CASCADE""",
                 $"""ALTER TABLE "entities"."{junction}" ADD CONSTRAINT "{EntityNaming.JunctionForeignKey(junction, "target_id")}" FOREIGN KEY ("target_id") REFERENCES "entities"."{supplierTable}" ("id")""",
@@ -1055,6 +1328,9 @@ public sealed class SchemaPlannerTests
 
     private static string ForeignKey(string table, string column, string targetTable) =>
         $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, column)}" FOREIGN KEY ("{column}") REFERENCES "entities"."{targetTable}" ("id")""";
+
+    private static string FileForeignKey(string table, string column) =>
+        $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, column)}" FOREIGN KEY ("{column}") REFERENCES "axis"."files" ("id")""";
 
     private static void AssertNothingPlanned(SchemaPlan plan)
     {

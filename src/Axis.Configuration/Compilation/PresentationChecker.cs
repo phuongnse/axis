@@ -1021,7 +1021,7 @@ internal static class PresentationChecker
             {
                 report(
                     DiagnosticCodes.InvalidChartMeasure,
-                    $"The measure '{measure.Name}' is not a number. A chart draws a 'count' or a 'sum', or a 'min' or 'max' of an integer, a decimal or a money field.",
+                    $"The measure '{measure.Name}' is not a number. A chart draws a 'count', a 'countDistinct', a 'sum' or an 'avg', or a 'min' or 'max' of an integer, a decimal or a money field.",
                     $"{path}/measures/{index}/name");
             }
         }
@@ -1036,13 +1036,13 @@ internal static class PresentationChecker
     }
 
     /// <summary>
-    /// Whether a measure is a number. A <c>count</c> and a <c>sum</c> are. A <c>min</c> or <c>max</c> keeps the type of
-    /// its field, so it is a number only over an integer, a decimal or a money field. A field whose path does not resolve is not
-    /// reported again.
+    /// Whether a measure is a number. A <c>count</c>, a <c>countDistinct</c>, a <c>sum</c> and an <c>avg</c> are. A <c>min</c>
+    /// or <c>max</c> keeps the type of its field, so it is a number only over an integer, a decimal or a money field. A field
+    /// whose path does not resolve is not reported again.
     /// </summary>
     private static bool IsNumericMeasure(DataSourceMeasureDefinition measure, DataSourceResource dataSource, Func<string, EntityResource?> findEntity)
     {
-        if (measure.Function is "count" or "sum")
+        if (measure.Function is "count" or "countDistinct" or "sum" or "avg")
         {
             return true;
         }
