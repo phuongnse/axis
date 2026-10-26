@@ -869,7 +869,10 @@ A step that once hung the browser until the test timeout can run through `guardS
 `tests/e2e/hang-guard.ts`. It fails the step after its own limit, and attaches a screenshot and a
 text to the test. The text holds the page URL, the console output, the page errors and the failed
 requests since the step began, the load of the machine and its busiest processes.
-`editInStudio` in `purchase-request-release.spec.ts` uses it with a limit of 60 seconds.
+In `purchase-request-release.spec.ts` it wraps `editInStudio`, the edit of `texts/en.json` through Studio's JSON
+view in the edit-to-rollback journey, and `openStudio`, which opens Studio before a publish. Each has a limit of 60
+seconds. The other journeys in that spec write their changed files through the Studio resource API, without the
+browser.
 
 Every spec imports `test` and `expect` from `tests/e2e/test.ts`. Its `test` has an automatic fixture that
 listens for `securitypolicyviolation` on every page of the test, including pages in browser contexts that the
