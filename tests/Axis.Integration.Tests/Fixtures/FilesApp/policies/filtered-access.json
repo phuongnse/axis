@@ -1,0 +1,10 @@
+{
+  "id": "3b7c1d52-4e8a-4f60-9a1b-7d2e5c8f0a0c",
+  "kind": "policy",
+  "name": "FilteredAccess",
+  "formatVersion": 1,
+  "roles": ["filtered"],
+  "grants": [
+    { "entity": "Claim", "actions": ["read"], "filter": "title == 'Shared'" }
+  ]
+}

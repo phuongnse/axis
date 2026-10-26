@@ -91,6 +91,26 @@ const widgetSchema: JsonSchema = {
   },
 }
 
+// A group entry is a plain name or an object with a bucket, as in the data source schema.
+const groupSchema: JsonSchema = {
+  type: 'object',
+  properties: {
+    groupBy: { type: 'array', items: { $ref: '#/$defs/groupEntry' } },
+  },
+  $defs: {
+    name: { type: 'string' },
+    groupEntry: {
+      oneOf: [
+        { $ref: '#/$defs/name' },
+        {
+          type: 'object',
+          properties: { field: { $ref: '#/$defs/name' }, bucket: { enum: ['day', 'week', 'month', 'year'] } },
+        },
+      ],
+    },
+  },
+}
+
 /** The theme root of the shell: an element that carries the mode the provider chose. */
 function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
@@ -234,5 +254,19 @@ describe.each(['light', 'dark'])('ReferencePicker in %s mode', (mode) => {
     renderForm({ dataSource: 'Orders', parameters: { status: 'a', limit: 'b' } }, true, widgetSchema)
 
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
+  })
+
+  it('edits a name entry of alternatives as a text box and sends an object entry to the JSON view', async () => {
+    const onChange = renderForm({ groupBy: ['status', { field: 'placedOn', bucket: 'month' }] }, true, groupSchema)
+
+    expect(screen.getByRole('textbox', { name: 'groupBy 1' })).toHaveValue('status')
+    expect(screen.getAllByTestId('studio-json-only')).toHaveLength(1)
+    expect(screen.getByTestId('studio-field-/groupBy/1')).toContainElement(screen.getByTestId('studio-json-only'))
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'groupBy 1' }), 'x')
+    expect(onChange).toHaveBeenLastCalledWith('/groupBy/0', 'statusx')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(onChange).toHaveBeenLastCalledWith('/groupBy', ['status', { field: 'placedOn', bucket: 'month' }, ''])
   })
 })

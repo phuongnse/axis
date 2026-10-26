@@ -1058,6 +1058,100 @@ public sealed class DataSourceCompilerTests
     }
 
     [Theory]
+    [InlineData("""{ "field": "number", "bucket": "hour" }""", "/aggregate/groupBy/0/bucket")]
+    [InlineData("""{ "field": "number" }""", "/aggregate/groupBy/0")]
+    [InlineData("5", "/aggregate/groupBy/0")]
+    public void Malformed_group_entry_is_a_schema_violation(string entry, string path)
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            $$""", "aggregate": { "groupBy": [{{entry}}], "measures": [{ "name": "orders", "function": "count" }] } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Path == path);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Bucket_on_a_field_that_is_not_a_date_is_reported_at_the_bucket()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            """, "aggregate": { "groupBy": [{ "field": "number", "bucket": "month" }], "measures": [{ "name": "orders", "function": "count" }] } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownDataSourceGroupField, "data-sources/orders.json", "/aggregate/groupBy/0/bucket"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'number'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Bucket_on_an_unknown_field_is_reported_at_the_field_of_the_entry()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "dueAt", "path": "dueAt" }]""",
+            """, "aggregate": { "groupBy": [{ "field": "missing", "bucket": "day" }], "measures": [{ "name": "orders", "function": "count" }] } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownDataSourceGroupField, "data-sources/orders.json", "/aggregate/groupBy/0/field"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Field_grouped_twice_in_either_form_is_reported_at_the_later_entry()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "dueAt", "path": "dueAt" }]""",
+            """, "aggregate": { "groupBy": ["dueAt", { "field": "dueAt", "bucket": "day" }], "measures": [{ "name": "orders", "function": "count" }] } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownDataSourceGroupField, "data-sources/orders.json", "/aggregate/groupBy/1"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'dueAt'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Bucket_on_a_date_or_date_time_field_is_in_the_model_on_the_group_copy_only()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "dueAt", "path": "dueAt" }, { "name": "since", "path": "customer.since" }]""",
+            """
+            , "aggregate": { "groupBy": [{ "field": "dueAt", "bucket": "week" }, { "field": "since", "bucket": "year" }], "measures": [
+                { "name": "latest", "function": "max", "field": "dueAt" }
+              ] }
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var dataSource = Assert.Single(result.Model!.DataSources);
+        var groups = dataSource.Aggregate!.GroupBy;
+        Assert.Equal([("dueAt", DateBucket.Week, FieldType.Date), ("since", DateBucket.Year, FieldType.Date)], groups.Select(group => (group.Name, group.Bucket!.Value, group.ValueType)));
+        Assert.Null(dataSource.Fields[0].Bucket);
+        Assert.Null(dataSource.Aggregate.Measures[0].Field!.Bucket);
+        Assert.Equal(FieldType.DateTime, dataSource.Aggregate.Measures[0].Field!.ValueType);
+    }
+
+    [Theory]
     [InlineData("""[{ "name": "status", "function": "count" }]""", 0)]
     [InlineData("""[{ "name": "orders", "function": "count" }, { "name": "orders", "function": "sum", "field": "amount" }]""", 1)]
     public void Measure_name_that_is_a_group_field_or_repeats_another_measure_is_reported_at_that_name(string measures, int index)
