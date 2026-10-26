@@ -218,6 +218,60 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_compiles_a_notify_step_back_with_its_values_in_name_order_and_its_open_parameters_in_page_order()
+    {
+        // The stored file sorts the object keys, so the model fixes the order of the values and the parameters itself.
+        var compiled = ApplicationCompiler.Compile(
+        [
+            new ResourceContent("application.json", Manifest),
+            new ResourceContent("entities/ticket.json", """
+                { "id": "11111111-1111-4111-8111-111111111112", "kind": "entity", "name": "Ticket", "formatVersion": 1,
+                  "fields": [ { "name": "title", "type": "text" }, { "name": "code", "type": "text" } ] }
+                """),
+            new ResourceContent("roles/agent.json", """
+                { "id": "44444444-4444-4444-8444-444444444401", "kind": "role", "name": "agent", "formatVersion": 1, "label": { "textKey": "role.agent" } }
+                """),
+            new ResourceContent("texts/en.json", """
+                { "id": "33333333-3333-4333-8333-333333333333", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "role.agent": "Agent", "page.title": "Ticket", "notice.subject": "{title} and {code}", "notice.body": "Code {code}, {{literal}}" } }
+                """),
+            new ResourceContent("pages/ticket-detail.json", """
+                { "id": "55555555-5555-4555-8555-555555555501", "kind": "page", "name": "TicketDetail", "formatVersion": 1,
+                  "title": { "textKey": "page.title" },
+                  "parameters": [ { "name": "zebra", "type": "text" }, { "name": "apple", "type": "text" } ],
+                  "widgets": [ { "type": "taskInbox" } ] }
+                """),
+            new ResourceContent("processes/tell.json", """
+                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "Tell", "formatVersion": 1, "entity": "Ticket",
+                  "start": "tell",
+                  "steps": [
+                    { "name": "tell", "type": "operation", "operation": "notify",
+                      "to": [ { "user": "title" }, { "role": "agent" } ],
+                      "channels": ["inApp"],
+                      "message": { "subject": { "textKey": "notice.subject" }, "body": { "textKey": "notice.body" },
+                                   "values": { "title": "title", "code": "code" } },
+                      "open": { "page": "TicketDetail", "parameters": { "apple": "code", "zebra": "title" } },
+                      "next": "done" },
+                    { "name": "done", "type": "end" }
+                  ] }
+                """),
+        ]);
+        Assert.Empty(compiled.Diagnostics);
+        var release = StoredRelease(compiled);
+
+        var model = ReleaseCompiler.BuildModel(release);
+
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        Assert.True(model.TryGetProcess("tell", out var process));
+        var notify = Assert.IsType<NotifyStepModel>(process.Steps[0]);
+        Assert.Equal(["code", "title"], notify.Values.Select(value => value.Name));
+        Assert.NotNull(notify.Open);
+        Assert.Equal(["zebra", "apple"], notify.Open.Parameters.Select(parameter => parameter.Parameter));
+        Assert.Equal(["inApp"], notify.Channels);
+    }
+
+    [Fact]
     public void Stored_release_with_pins_compiles_back_against_its_own_pins_only()
     {
         var compiled = ApplicationCompiler.Compile(
