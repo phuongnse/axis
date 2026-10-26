@@ -229,6 +229,57 @@ public static class InstanceQueries
         return processIds;
     }
 
+    /// <summary>
+    /// Reads the parent of the instance <paramref name="instanceId"/>, when a sub-process step started it, and the
+    /// sub-processes it started, ordered by creation time then id. Each relative's step is the sub-process step in
+    /// the parent that started the child.
+    /// </summary>
+    public static async Task<InstanceRelatives> RelativesAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        Guid instanceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        InstanceRelative? parent = null;
+        await using (var command = new NpgsqlCommand(
+            """
+            SELECT p.id, p.process_id, c.parent_step, p.state, p.created_at, p.ended_at
+            FROM axis.process_instances AS c JOIN axis.process_instances AS p ON p.id = c.parent_instance_id
+            WHERE c.id = @id AND p.application_id = @application
+            """,
+            connection))
+        {
+            command.Parameters.AddWithValue("id", instanceId);
+            command.Parameters.AddWithValue("application", applicationId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                parent = ReadRelative(reader);
+            }
+        }
+
+        var children = new List<InstanceRelative>();
+        await using (var command = new NpgsqlCommand(
+            """
+            SELECT id, process_id, parent_step, state, created_at, ended_at FROM axis.process_instances
+            WHERE parent_instance_id = @id AND application_id = @application ORDER BY created_at, id
+            """,
+            connection))
+        {
+            command.Parameters.AddWithValue("id", instanceId);
+            command.Parameters.AddWithValue("application", applicationId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                children.Add(ReadRelative(reader));
+            }
+        }
+
+        return new InstanceRelatives(parent, children);
+    }
+
     /// <summary>Reads the step history rows of the instance <paramref name="instanceId"/>, oldest first.</summary>
     public static async Task<IReadOnlyList<ProcessStepHistoryRow>> HistoryAsync(
         NpgsqlConnection connection,
@@ -303,6 +354,15 @@ public static class InstanceQueries
         condition?.AddTo(command);
     }
 
+    private static InstanceRelative ReadRelative(NpgsqlDataReader reader) =>
+        new(
+            reader.GetGuid(0),
+            reader.GetGuid(1),
+            reader.IsDBNull(2) ? "" : reader.GetString(2),
+            reader.GetString(3),
+            reader.GetFieldValue<DateTimeOffset>(4),
+            reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5));
+
     private static ProcessInstanceRow ReadInstance(NpgsqlDataReader reader) =>
         new()
         {
@@ -322,3 +382,12 @@ public static class InstanceQueries
 
 /// <summary>One page of the instances of a process, and the number of them on every page.</summary>
 public sealed record InstanceListPage(IReadOnlyList<ProcessInstanceRow> Items, long TotalCount);
+
+/// <summary>
+/// An instance related to another through a sub-process step. <paramref name="Step"/> is the sub-process step in the
+/// parent that started the child, not the step the instance itself is at.
+/// </summary>
+public sealed record InstanceRelative(Guid Id, Guid ProcessId, string Step, string State, DateTimeOffset CreatedAt, DateTimeOffset? EndedAt);
+
+/// <summary>The parent of an instance, or null for a top-level instance, and the sub-processes the instance started.</summary>
+public sealed record InstanceRelatives(InstanceRelative? Parent, IReadOnlyList<InstanceRelative> Children);
