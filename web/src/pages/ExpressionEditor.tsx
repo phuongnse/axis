@@ -217,7 +217,7 @@ function editorTheme({ colour, radius, type }: ReturnType<typeof designTokensFor
         fontFamily: type.codeFontFamily,
         fontSize: `${type.fontSize}px`,
       },
-      '&.cm-focused': { outline: 'none', borderColor: colour.primary },
+      '&.cm-focused': { outline: `2px solid ${colour.focusRing}` },
       '.cm-content': { caretColor: colour.text, padding: '4px 0' },
       '.cm-scroller': { fontFamily: 'inherit' },
     },

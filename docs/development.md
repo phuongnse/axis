@@ -289,7 +289,7 @@ fixtures, only for the API paths of the fixture application. It needs no server,
 `tests/e2e/specs/design-system.spec.ts` mounts each preview from the bundle in the harness, in both modes,
 and fails on a console error or on a request other than the harness and the bundle. It also checks that
 changing `data-theme` redraws a table, that a mounted form follows `--primary` on the root element and redraws when
-it changes, and that no fixture reaches the server's web root. It checks that a field preview has no Save button and
+it changes, that a validation message follows `--dangerText`, and that no fixture reaches the server's web root. It checks that a field preview has no Save button and
 no history, and it opens the date-time picker and the reference lookup and adds a child collection row.
 
 ## Formatting

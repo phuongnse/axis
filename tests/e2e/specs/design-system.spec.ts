@@ -176,6 +176,23 @@ test("a mounted form uses the page's --primary and redraws when it changes", asy
   expect(recording.errors).toEqual([])
 })
 
+for (const mode of modes) {
+  test(`a form validation message follows the page's --dangerText in ${mode} mode`, async ({ page }) => {
+    const recording = await openHarness(page, `?preview=form&mode=${mode}`)
+    await expect(previews.form(page)).toBeVisible()
+    await page.evaluate(() => document.documentElement.style.setProperty('--dangerText', '#13c2c2'))
+
+    const title = page.getByLabel('Title', { exact: true })
+    await title.fill('Standing desks')
+    await title.press('Tab')
+
+    const message = page.getByText('Another request has this title.', { exact: true })
+    await expect(message).toBeVisible()
+    await expect.poll(() => message.evaluate((element) => getComputedStyle(element).color)).toBe('rgb(19, 194, 194)')
+    expect(recording.errors).toEqual([])
+  })
+}
+
 test('the bundle sets window.Axis with one mount for each preview', async ({ page }) => {
   const recording = await openHarness(page, '')
 
