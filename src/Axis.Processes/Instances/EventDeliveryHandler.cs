@@ -27,7 +27,9 @@ namespace Axis.Processes.Instances;
 /// <see cref="DeliverySettings.Attempts"/> failures it writes an <c>open</c> dead letter and a
 /// <c>deadLettered</c> receipt instead, so the trigger is not tried again. A last transaction
 /// deletes the item. When a trigger failed below the limit it instead makes the item due again
-/// after the shortest backoff among the failed triggers of the pass.
+/// after the shortest backoff among the failed triggers of the pass. An item that names a trigger,
+/// queued by an operator's redeliver of a dead letter, delivers to that trigger alone, and is deleted
+/// when the active release no longer has it.
 /// </summary>
 internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, DeliverySettings settings, ILogger<EventDeliveryHandler> logger) : IDeliveryWorkItemHandler
 {
@@ -163,8 +165,8 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
 
     /// <summary>
     /// Finds the active release of the occurrence's application and its <c>async</c> triggers on the
-    /// event, ignoring letter case. Returns <see langword="null"/> when there is no active release or
-    /// no such trigger.
+    /// event, ignoring letter case. An item that names a trigger keeps that trigger only. Returns
+    /// <see langword="null"/> when there is no active release or no such trigger.
     /// </summary>
     private async Task<EventTriggers?> FindDeliveryAsync(
         ClaimedWorkItem item,
@@ -184,6 +186,15 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
         {
             LogNoActiveRelease(occurrence.Id, occurrence.ApplicationId);
             return null;
+        }
+
+        if (item.TriggerId is { } triggerId)
+        {
+            found = found with { Triggers = [.. found.Triggers.Where(trigger => trigger.Id == triggerId)] };
+            if (found.Triggers.Count == 0)
+            {
+                LogNamedTriggerGone(item.Id, triggerId, occurrence.Id);
+            }
         }
 
         return found.Triggers.Count == 0 ? null : found;
@@ -281,6 +292,9 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
 
     [LoggerMessage(LogLevel.Information, "Event {EventId} was delivered to no trigger: application {ApplicationId} has no active release.")]
     private partial void LogNoActiveRelease(Guid eventId, Guid applicationId);
+
+    [LoggerMessage(LogLevel.Warning, "Event delivery work item {ItemId} names trigger {TriggerId}, which the active release does not have as an async trigger on event {EventId}, so it was discarded.")]
+    private partial void LogNamedTriggerGone(Guid itemId, Guid triggerId, Guid eventId);
 
     [LoggerMessage(LogLevel.Warning, "Event delivery work item {ItemId} for event {EventId} was claimed by another worker, so its writes were rolled back.")]
     private partial void LogLostClaim(Guid itemId, Guid? eventId);

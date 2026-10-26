@@ -311,7 +311,7 @@ agrees it. The answer is:
 { locales: ["en", "vi"],
   entities: [{ id, name, module, fields: [{ name, type, target, values }] }],
   dataSources: [{ id, name, module, parameters: [{ name, type }], columns: [{ name, type }], groupBy }],
-  processes: [{ id, name, steps: [{ name, type, outcomes: [...] }] }],
+  processes: [{ id, name, parameters: [{ name, type }], steps: [{ name, type, outcomes: [...] }] }],
   rules: [{ id, name, module, parameters: [{ name, type }], resultType }],
   connectors: [{ id, name, operations: [{ name }] }],
   events: [{ id, name, fields: [{ name, type }] }],
@@ -340,6 +340,7 @@ agrees it. The answer is:
 - **Order.** Each list holds the module resources first, then the
   application's own in file path order. A step that is not a task has
   `outcomes: []`. Text keys are sorted ordinally.
+- **Process `parameters`.** The parameters of a process without a subject, in file order. It is `[]` for a process with a subject.
 - **Page `parameters`.** The parameters the page declares, in file order. `required` is false when the file leaves it out.
 - **`locales`.** The locales of the folder's text resources.
 - **`texts`.** Each key comes with its text in every locale, and `usedBy`, the
@@ -375,7 +376,7 @@ agrees it. The answer is:
 - **`actions`.** On a target, they are the actions it accepts, in the order
   [roles and policies](roles-and-policies.md) lists them. An
   entity takes `read`, `create`, `update` and `delete`. A data source takes
-  `read`. A process takes `start`, `inspect`, `cancel`, `retry` and `resolve`.
+  `read`. A process takes `start`, `inspect`, `cancel`, `retry`, `resolve` and `reassign`.
   An endpoint takes `invoke`.
 - **Rows and cells.** Each declared role is one row, in the order of the
   `roles` resources. Each row has one cell per column, in column order, empty
@@ -517,7 +518,7 @@ The `{id}` names the saved page.
   ([D66](../decisions/d66-a-visual-form-designer-for-form-resources.md)). The
   answer is `{ widget, diagnostics }`. `widget` has the shape of a `form`
   widget that names this form, see **Form metadata** in
-  [frontend.md](frontend.md): `entity` with all its fields, `form`,
+  [form-widget.md](form-widget.md): `entity` with all its fields, `form`,
   `actions: []`, and an `access` that lists every action and writable field.
   Each section, field and step also carries `path`, such as `/sections/0`,
   `/sections/0/fields/1` and `/steps/0`. It has no expressions, and its

@@ -76,6 +76,7 @@ file.
 | `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker | yes | The read-only platform database role. |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it only at start. The worker never gets it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | server, worker, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
+| `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | server, worker, admin | no | Secret. Set it only during a key rotation, to the old installation key. See [installation key](tenant-setting-commands.md#installation-key). The Helm chart and the Compose example set no value. Add the variable or a secret file yourself. |
 | `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | Optional. The IP addresses of your reverse proxies. See [several server replicas](#several-server-replicas). |
 | `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | Optional. The CIDR ranges of your reverse proxies. |
 | `Admin:ConnectionString` | `Admin__ConnectionString` | admin | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
@@ -228,9 +229,10 @@ sets it, 30 seconds by default.
   machine in front of the server. See
   [forwarded headers](#several-server-replicas). The images hold no `curl`, so the
   example has no container health check. Probe `/health/ready` from the host.
-- **The purchase request sample** needs a purchasing system binding, which no
-  admin command sets, see [open points](#open-points). This guide activates
-  the leave request sample.
+- **The purchase request sample** needs a purchasing system binding, which
+  `tenant binding set` sets, see
+  [deployment bindings](tenant-setting-commands.md#deployment-bindings). This
+  guide activates the leave request sample.
 
 **TLS proxy and a second replica.** The `proxy` profile starts a pinned Caddy
 proxy that ends TLS. The `replicas` profile starts `server-2`, configured like
@@ -457,9 +459,10 @@ Studio folder, with its smoke test, are built.
   `Platform:SecretKey`. A replica with another one fails to start, and the
   error names the setting. The server sets the data protection application name
   to `Axis`, so replicas installed at different paths share the keys. Changing
-  `Platform:SecretKey` on an installation that holds keys means deleting the
-  rows of `platform.data_protection_keys` by hand, which signs everyone out.
-  The first start after this change also signs everyone out once.
+  `Platform:SecretKey` on an installation that holds keys follows the steps of
+  the [installation key](tenant-setting-commands.md#installation-key) rotation,
+  which signs nobody out. The first start after this change also signs
+  everyone out once.
 - **Forwarded headers.** Behind a proxy that ends TLS, the server sees plain
   HTTP. Name your proxies so the server can read the real scheme and host:
 
@@ -518,22 +521,3 @@ These are not decided yet.
   nothing, because there is no tenant to migrate. It writes a note to standard
   error and exits with code 0, so running it first, as the order above does, is
   safe on a first install.
-
-Two former open points are decided in
-[D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md), and are
-not built yet:
-
-- **Deployment bindings.** No admin command sets a tenant's deployment
-  bindings yet, see [administration](administration.md#not-built-yet). So an
-  installation cannot set the purchasing system binding of the purchase request
-  sample through the admin tool alone. `tenant binding set` is
-  _(planned for M16)_, see
-  [deployment bindings](tenant-setting-commands.md#deployment-bindings).
-- **Rotating the installation key.** Axis has no rotation yet. After a leaked
-  `Platform:SecretKey`, every stored secret must be set again by hand. Changing
-  `Platform:SecretKey` also means deleting the rows of
-  `platform.data_protection_keys`, which signs everyone out. See
-  [several server replicas](#several-server-replicas). Rotation with
-  `Platform:PreviousSecretKey` and `platform rekey`, which signs nobody out, is
-  _(planned for M16)_, see
-  [installation key](tenant-setting-commands.md#installation-key).

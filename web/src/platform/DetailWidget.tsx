@@ -206,7 +206,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
                       locale={locale}
                     />
                   ) : (
-                    formatValue(field, value as RecordValue, record.labels, { locale, text: t })
+                    formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)
                   ),
               }
             })}

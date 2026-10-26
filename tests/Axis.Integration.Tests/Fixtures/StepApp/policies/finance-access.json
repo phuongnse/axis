@@ -13,6 +13,7 @@
     },
     { "entity": "Department", "actions": ["read", "create", "update", "delete"] },
     { "process": "Decide", "actions": ["start"] },
+    { "process": "Decide", "actions": ["inspect", "retry"] },
     { "process": "Approve", "actions": ["start"] },
     { "process": "Rework", "actions": ["resolve", "inspect"] }
   ]

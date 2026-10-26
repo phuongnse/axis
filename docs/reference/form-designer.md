@@ -9,8 +9,8 @@ Dn refers to [decisions.md](../decisions.md).
 - **Form designer** _(built)_. The form editor gets a Design tab that
   lays out a form by drag and drop, per
   [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md). It sits
-  next to the Form and JSON tabs. Form is the default tab for now, and the
-  three tabs edit one draft. It reuses the canvas, property panel, undo (100 steps, cleared by
+  next to the Form and JSON tabs. A form opens on it, and the three tabs edit
+  one draft. It reuses the canvas, property panel, undo (100 steps, cleared by
   a reload; built for forms) and `@dnd-kit` drag and drop of the page designer.
   - **Canvas.** It draws the unsaved draft with the site's form widget, in its
     sections and steps. Fields get placeholder values made from the field
@@ -18,8 +18,7 @@ Dn refers to [decisions.md](../decisions.md).
     [the draft page metadata route](authoring.md#draft-page-metadata) 300 ms
     after the last edit. For a form it answers the metadata of a form widget,
     with a `path` on each section, field and step.
-    _Built:_ the Design tab is there, and Form is the default tab. Opening a
-    form on the Design tab by default is _(planned for M14)_. The canvas opens
+    _Built:_ the Design tab is there, and a form opens on it. The canvas opens
     the placeholder record, so
     each field shows a placeholder value, and no request goes to `/api/apps/`.
     Save, Next, Back and Cancel do nothing, because the canvas cancels every

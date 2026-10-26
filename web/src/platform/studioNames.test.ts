@@ -38,6 +38,7 @@ const names = {
     {
       id: '2',
       name: 'Approval',
+      parameters: [{ name: 'Days', type: 'integer' }],
       steps: [
         { name: 'Review', type: 'task', outcomes: ['Approve'] },
         { name: 'Done', type: 'end', outcomes: [] },
@@ -84,6 +85,12 @@ describe('referenceOptions', () => {
   it('lists the steps of the process the draft names', () => {
     const draft = { name: 'Approval', steps: [{ name: 'Review', next: 'Done' }] }
     expect(referenceOptions(names, { part: 'step', of: '/name' }, draft, '/steps/0/next')).toEqual(['Review', 'Done'])
+  })
+
+  it('lists the parameters of the process the draft names', () => {
+    const mark = { part: 'processParameter', of: '/process' } as const
+    expect(referenceOptions(names, mark, { process: 'approval' }, '/parameters/')).toEqual(['Days'])
+    expect(referenceOptions(names, mark, { process: 'Gone' }, '/parameters/')).toEqual([])
   })
 
   it('lists the parameters and the columns of the data source the draft names', () => {
@@ -133,6 +140,13 @@ describe('referenceOptions', () => {
     expect(parameterType(names, mark, draft, '/parameters/Limit', 'Limit')).toBe('integer')
     expect(parameterType(names, mark, draft, '/parameters/gone', 'gone')).toBeUndefined()
     expect(parameterType(names, mark, {}, '/parameters/limit', 'limit')).toBeUndefined()
+  })
+
+  it('finds the type of a process parameter', () => {
+    const draft = { process: 'Approval' }
+    const mark = { part: 'processParameter', of: '/process' } as const
+    expect(parameterType(names, mark, draft, '/parameters/days', 'days')).toBe('integer')
+    expect(parameterType(names, mark, draft, '/parameters/gone', 'gone')).toBeUndefined()
   })
 
   it('lists nothing when the owner is not named', () => {

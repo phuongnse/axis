@@ -1,0 +1,13 @@
+{
+  "id": "19f293aa-e907-424f-ab3f-11a1d8e8133c",
+  "kind": "process",
+  "name": "AssetRemoved",
+  "formatVersion": 1,
+  "parameters": [
+    { "name": "tag", "type": "text" },
+    { "name": "cost", "type": "decimal" },
+    { "name": "quantity", "type": "decimal" }
+  ],
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

@@ -82,6 +82,7 @@ const widget: EntityWidgetMetadata = {
   tasksPath: null,
   process: null,
   instancesPath: null,
+  deadLettersPath: null,
   actions: [],
   rowActions: [],
   toolbarActions: [],
@@ -237,7 +238,6 @@ function renderEditor(onOpen: OpenResource = vi.fn()) {
               resources={[item]}
               path={null}
               diagnosticPaths={[]}
-              onOpenPath={vi.fn()}
               onOpen={onOpen}
               onSaved={vi.fn()}
               onTextsWritten={vi.fn()}

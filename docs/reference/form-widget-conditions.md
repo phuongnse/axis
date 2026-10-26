@@ -3,7 +3,7 @@
 Detailed reference for how the form widget follows the server's form states. The conventions of
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_ are not built yet,
 and Dn refers to [decisions.md](../decisions.md). The rest of the frontend, including the form
-widget, is in [frontend.md](frontend.md).
+widget, is in [form-widget.md](form-widget.md) and [frontend.md](frontend.md).
 
 - **Conditions and steps**. The widget asks the server which fields to
   show, require and lock, and which messages to show. It has no evaluator of
@@ -39,6 +39,13 @@ widget, is in [frontend.md](frontend.md).
     while the user types. A message for a row cell, such as
     `/values/lines/1/quantity`, shows after a save, as it does without the
     answer.
+  - **Defaults.** For a new record the widget fills each empty field that the
+    user has not touched from the `defaults` of an answer, as the form's
+    starting value. A value that the user typed or cleared is kept. The widget
+    does not send an unchanged default, so the save applies it, and clearing
+    a default sends `null`. A saved record and the task page ignore
+    `defaults`. See
+    [D77](../decisions/d77-indexes-defaults-and-ranges.md).
   - **Touched.** A field becomes touched when it loses focus or changes.
   - **Save.** The widget always sends `?form=` with the form's name on
     create, on update and on the save before a `startProcess` action, so
