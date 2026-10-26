@@ -40,7 +40,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
 
         var item = Item(mariaList, userTask);
         Assert.Equal(
-            ["id", "releaseId", "process", "step", "labelKey", "subject", "claimedBy", "dueAt", "createdAt"],
+            ["id", "releaseId", "process", "step", "labelKey", "subject", "claimedBy", "dueAt", "overdue", "createdAt"],
             item.EnumerateObject().Select(property => property.Name));
         Assert.Equal("Approve", item.GetProperty("process").GetString());
         Assert.Equal("approve", item.GetProperty("step").GetString());
@@ -90,7 +90,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
         Assert.Equal(
             [
                 "id", "releaseId", "process", "instanceId", "step", "labelKey", "state", "assignee", "claimedBy", "subject", "form", "outcomes",
-                "dueAt", "createdAt", "completedAt", "completedBy", "outcome",
+                "dueAt", "overdue", "createdAt", "completedAt", "completedBy", "outcome", "commands", "reassignRoles",
             ],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(task, root.GetProperty("id").GetGuid());

@@ -35,7 +35,7 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
         Assert.Equal(
             [
                 "id", "releaseId", "process", "instanceId", "step", "labelKey", "state", "assignee", "claimedBy", "subject", "form", "outcomes",
-                "dueAt", "createdAt", "completedAt", "completedBy", "outcome",
+                "dueAt", "overdue", "createdAt", "completedAt", "completedBy", "outcome", "commands", "reassignRoles",
             ],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(task, root.GetProperty("id").GetGuid());
