@@ -23,7 +23,8 @@ namespace Axis.Server.Processes;
 /// on the process (403), content type (415), then the body (400), which is exactly
 /// <c>{ "reason": "&lt;text&gt;" }</c> with a reason of 1 to 500 characters. An <c>id</c> that is
 /// not a hyphenated UUID is a 404, as is an instance of another process or one whose subject
-/// record the user may not read. Then one transaction runs <see cref="ProcessCancelCommand"/>,
+/// record the user may not read. An instance of a process without a subject has no record, so only the grant
+/// applies to it. Then one transaction runs <see cref="ProcessCancelCommand"/>,
 /// which answers 409, before it looks for the instance, when a <c>read</c> filter of the user reads
 /// a computed field that is being recomputed, 409 for an instance that is not running or waiting, and 409 with the call's id
 /// in <c>callId</c> when a call may have reached the other system. A cancel that is refused
@@ -34,7 +35,7 @@ namespace Axis.Server.Processes;
 /// transaction takes the application's start lock shared first, because the retry makes an instance
 /// active again, and runs <see cref="ProcessRetryCommand"/>. It answers the same 409 for a
 /// <c>read</c> filter on a field that is being recomputed, before it looks for the instance, 409
-/// for an instance that is not failed, 409 when another instance of the process is running or waiting for the record, and
+/// for an instance that is not failed, 409 when another instance of the process is running or waiting for the record, or of a process without a subject at all, and
 /// 409 when an applied migration changed a column that the instance's pinned release uses.
 /// When the active release is no longer the one resolved, the retry runs again from resolution on
 /// the new release, and answers 503 after three attempts. A retry that is refused writes nothing.
@@ -122,18 +123,7 @@ internal static class ProcessOperatorEndpoints
             return InstanceNotFound();
         }
 
-        // No instance of a process without a subject can exist yet.
-        if (model.Entity is not { } subjectEntity)
-        {
-            return InstanceNotFound();
-        }
-
-        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
-        {
-            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
-        }
-
-        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+        var (entity, read) = SubjectAccess(application, user, model);
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var result = await ProcessCancelCommand.CancelAsync(
@@ -244,19 +234,8 @@ internal static class ProcessOperatorEndpoints
             return InstanceNotFound();
         }
 
-        // No instance of a process without a subject can exist yet.
-        if (model.Entity is not { } subjectEntity)
-        {
-            return InstanceNotFound();
-        }
-
-        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
-        {
-            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
-        }
-
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
-        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+        var (entity, read) = SubjectAccess(application, user, model);
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
@@ -295,7 +274,7 @@ internal static class ProcessOperatorEndpoints
                 ProcessRetryOutcome.MigrationChanged => Results.Problem(
                     statusCode: StatusCodes.Status409Conflict,
                     title: "A migration changed a column that the instance's release uses."),
-                _ => ProcessStartEndpoints.AlreadyRunning(),
+                _ => model.Entity is null ? ProcessStartEndpoints.AlreadyRunningWithoutSubject() : ProcessStartEndpoints.AlreadyRunning(),
             };
         }
 
@@ -386,19 +365,8 @@ internal static class ProcessOperatorEndpoints
             return CallNotFound();
         }
 
-        // No instance of a process without a subject can exist yet.
-        if (model.Entity is not { } subjectEntity)
-        {
-            return InstanceNotFound();
-        }
-
-        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
-        {
-            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
-        }
-
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
-        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+        var (entity, read) = SubjectAccess(application, user, model);
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
@@ -666,6 +634,23 @@ internal static class ProcessOperatorEndpoints
         await request.Body.CopyToAsync(body, cancellationToken);
         request.Body.Position = 0;
         return body.ToArray();
+    }
+
+    // A process without a subject has no record to read, so it has no entity and no read access. The command then
+    // checks only the grant that the endpoint has checked.
+    private static (EntityModel? Entity, RecordAccess? Read) SubjectAccess(ApplicationModel application, CurrentUserResponse user, ProcessModel model)
+    {
+        if (model.Entity is not { } subjectEntity)
+        {
+            return (null, null);
+        }
+
+        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
+        }
+
+        return (entity, PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read));
     }
 
     private static IResult InstanceNotFound() => NotFound("No instance of this process exists with this id.");

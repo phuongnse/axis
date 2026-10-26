@@ -1,0 +1,16 @@
+{
+  "id": "5f220942-3baf-443d-ada7-c73e8d57fce1",
+  "kind": "page",
+  "name": "Assets",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.assets.title" },
+  "widgets": [
+    {
+      "type": "table",
+      "entity": "Asset",
+      "rowActions": [
+        { "type": "navigate", "page": "AssetDetail", "label": { "textKey": "assets.open" }, "parameters": { "asset": "id" } }
+      ]
+    }
+  ]
+}

@@ -8,11 +8,20 @@ import {
   InputNumber,
   Radio,
   Select,
+  Switch,
   Table,
   Typography,
+  DatePicker,
 } from 'antd'
+import dayjs from 'dayjs'
 import { lazy, Suspense, useContext } from 'react'
-import { changeFieldType, fieldSettings, fieldTypes, type FieldSetting } from '../platform/entityFields'
+import {
+  changeFieldType,
+  editableSettings,
+  fieldSettings,
+  fieldTypes,
+  type FieldSetting,
+} from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
@@ -31,6 +40,9 @@ type Content = Record<string, unknown>
 /** The settings that the settings column shows, in the order it shows them. `required` and `unique` have columns. */
 const settingColumns: FieldSetting[] = [
   'maxLength',
+  'minLength',
+  'min',
+  'max',
   'precision',
   'scale',
   'maxSize',
@@ -40,8 +52,10 @@ const settingColumns: FieldSetting[] = [
   'values',
   'valueLabels',
   'expression',
+  'default',
   'sequence',
   'creator',
+  'searchable',
   'sensitive',
 ]
 
@@ -152,7 +166,11 @@ function Picker({
  * name, label, type, required, unique and a settings column that shows only the settings the field's type takes,
  * and its validations as rows of an expression, a message key and a field. A field can be added, removed and moved,
  * and a type change drops the settings the new type does not take. A computed field's `expression` and each
- * validation's expression use the expression editor. The designer edits the draft through `onChange`, so a key it
+ * validation's expression use the expression editor, and so does a field's `default`, which has no field in scope.
+ * A field's settings also include `min` and `max` in the type of the field, `minLength` and `searchable`, and they
+ * hide `default`, `min`, `max` and `minLength` next to an `expression`, a `sequence` or `creator`. An Indexes list
+ * under the fields adds, moves and removes the entity's `indexes`, each a list of the entity's fields and a Unique
+ * choice. The designer edits the draft through `onChange`, so a key it
  * does not show, such as `id`, `kind` or an unknown key on a field, stays as it is. Every input has the id
  * `studio-field-<pointer>`, and each row of the table has the id of its field, so a diagnostic opens at its input or
  * at the row of a setting that the row does not show. Clearing an optional value removes its key. With `readOnly`,
@@ -225,6 +243,7 @@ export function EntityDesigner({
         onOriginsChange={onOriginsChange}
         onChange={onChange}
       />
+      <Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} onChange={onChange} />
       <Validations validations={value.validations} fieldNames={fieldNames} readOnly={readOnly} onChange={onChange} />
     </Flex>
   )
@@ -492,17 +511,17 @@ function Settings({
 }) {
   const t = useText()
   const pointer = `/fields/${index}`
-  const taken = fieldSettings(text(field.type))
+  const taken = editableSettings(field)
   const shown = settingColumns.filter((setting) => taken.includes(setting))
 
   const labelOf = (setting: FieldSetting) => t(`shell.studio.entity.${setting}`)
 
-  function number(setting: 'maxLength' | 'precision' | 'scale' | 'maxSize') {
+  function number(setting: 'maxLength' | 'minLength' | 'precision' | 'scale' | 'maxSize') {
     return (
       <InputNumber
         aria-label={labelOf(setting)}
         precision={0}
-        min={setting === 'maxSize' ? 1 : 0}
+        min={setting === 'maxSize' || setting === 'minLength' ? 1 : 0}
         value={typeof field[setting] === 'number' ? field[setting] : null}
         onChange={(next) => onChange(`${pointer}/${setting}`, typeof next === 'number' ? next : undefined)}
       />
@@ -522,6 +541,7 @@ function Settings({
   function input(setting: FieldSetting) {
     switch (setting) {
       case 'maxLength':
+      case 'minLength':
       case 'precision':
       case 'scale':
       case 'maxSize':
@@ -529,6 +549,35 @@ function Settings({
       case 'creator':
       case 'sensitive':
         return flag(setting)
+      case 'searchable':
+        return (
+          <Switch
+            aria-label={labelOf(setting)}
+            checked={field.searchable === true}
+            onChange={(checked) => onChange(`${pointer}/searchable`, checked ? true : undefined)}
+          />
+        )
+      case 'min':
+      case 'max':
+        return (
+          <Limit
+            type={text(field.type)}
+            value={field[setting]}
+            label={labelOf(setting)}
+            onChange={(next) => onChange(`${pointer}/${setting}`, next)}
+          />
+        )
+      case 'default':
+        return (
+          <Expression
+            pointer={`${pointer}/default`}
+            name={labelOf(setting)}
+            value={text(field.default)}
+            required={false}
+            readOnly={readOnly}
+            onChange={onChange}
+          />
+        )
       case 'values':
         return (
           <Select
@@ -606,6 +655,54 @@ function Settings({
         ),
       )}
     </Flex>
+  )
+}
+
+/**
+ * The `min` or `max` of a field, in the format of its type: a number for integer, decimal and money, a date written
+ * `yyyy-MM-dd` and a date-time written as an RFC 3339 UTC string. Clearing it writes undefined.
+ */
+function Limit({
+  type,
+  value,
+  label,
+  onChange,
+}: {
+  type: string
+  value: unknown
+  label: string
+  onChange: (next: number | string | undefined) => void
+}) {
+  if (type === 'date') {
+    return (
+      <DatePicker
+        aria-label={label}
+        value={typeof value === 'string' && dayjs(value).isValid() ? dayjs(value) : null}
+        onChange={(date) => onChange(date ? date.format('YYYY-MM-DD') : undefined)}
+      />
+    )
+  }
+  if (type === 'date-time') {
+    return (
+      <DatePicker
+        aria-label={label}
+        showTime
+        format="YYYY-MM-DD HH:mm:ss"
+        value={typeof value === 'string' && dayjs(value).isValid() ? dayjs(value) : null}
+        // UTC to the second, as an RFC 3339 string.
+        onChange={(date) =>
+          onChange(date ? new Date(date.valueOf()).toISOString().replace(/\.\d{3}Z$/, 'Z') : undefined)
+        }
+      />
+    )
+  }
+  return (
+    <InputNumber
+      aria-label={label}
+      precision={type === 'integer' ? 0 : undefined}
+      value={typeof value === 'number' ? value : null}
+      onChange={(next) => onChange(typeof next === 'number' ? next : undefined)}
+    />
   )
 }
 
@@ -736,6 +833,108 @@ function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Con
         )
       })}
     </Flex>
+  )
+}
+
+/**
+ * The indexes of the entity as rows of a field picker and a Unique choice. The picker offers the fields that have a
+ * column and writes the picked names in order. Every change writes the whole `indexes` array, and an empty list
+ * removes the key.
+ */
+function Indexes({
+  indexes,
+  fields,
+  readOnly,
+  onChange,
+}: {
+  indexes: unknown
+  fields: unknown[]
+  readOnly: boolean
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+
+  if (indexes !== undefined && !Array.isArray(indexes)) {
+    return (
+      <div data-testid="studio-field-/indexes">
+        <JsonOnly />
+      </div>
+    )
+  }
+  const list: unknown[] = indexes ?? []
+  // A child collection, references and file field has no column of its own, so an index cannot name it.
+  const choices = fields.flatMap((field) =>
+    isContent(field) &&
+    typeof field.name === 'string' &&
+    field.name !== '' &&
+    !['child-collection', 'references', 'file'].includes(text(field.type))
+      ? [field.name]
+      : [],
+  )
+
+  function write(next: unknown[]) {
+    onChange('/indexes', next.length === 0 ? undefined : next)
+  }
+
+  function move(index: number, offset: number) {
+    const next = [...list]
+    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
+    write(next)
+  }
+
+  return (
+    <div data-testid="studio-field-/indexes">
+      <Flex vertical gap="small">
+        <Typography.Text strong>{t('shell.studio.entity.indexes')}</Typography.Text>
+        {list.map((index, position) => {
+          const pointer = `/indexes/${position}`
+          const content = isContent(index) ? index : {}
+          return (
+            <Flex key={position} gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
+              <div data-testid={`studio-field-${pointer}/fields`} style={{ flex: 1, minWidth: 240 }}>
+                <div>{t('shell.studio.entity.indexFields')}</div>
+                <Select
+                  mode="multiple"
+                  aria-label={t('shell.studio.entity.indexFields')}
+                  virtual={false}
+                  style={{ width: '100%' }}
+                  value={Array.isArray(content.fields) ? content.fields.filter((item) => typeof item === 'string') : []}
+                  options={choices.map((name) => ({ value: name, label: name }))}
+                  onChange={(next: string[]) => onChange(`${pointer}/fields`, next)}
+                />
+              </div>
+              <div data-testid={`studio-field-${pointer}/unique`}>
+                <Checkbox
+                  aria-label={t('shell.studio.entity.indexUnique')}
+                  checked={content.unique === true}
+                  onChange={(event) => onChange(`${pointer}/unique`, event.target.checked ? true : undefined)}
+                >
+                  {t('shell.studio.entity.indexUnique')}
+                </Checkbox>
+              </div>
+              {readOnly ? null : (
+                <Flex gap="small">
+                  <Button disabled={position === 0} onClick={() => move(position, -1)}>
+                    {t('shell.studio.entity.moveUp')}
+                  </Button>
+                  <Button disabled={position === list.length - 1} onClick={() => move(position, 1)}>
+                    {t('shell.studio.entity.moveDown')}
+                  </Button>
+                  <Button danger onClick={() => write(list.filter((_, other) => other !== position))}>
+                    {t('shell.studio.entity.removeIndex')}
+                  </Button>
+                </Flex>
+              )}
+            </Flex>
+          )
+        })}
+        {readOnly ? null : (
+          <div>
+            <Button onClick={() => write([...list, { fields: [] }])}>{t('shell.studio.entity.addIndex')}</Button>
+          </div>
+        )}
+      </Flex>
+    </div>
   )
 }
 

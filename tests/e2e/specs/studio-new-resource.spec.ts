@@ -5,7 +5,7 @@ import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { startServer } from '../activate'
 import { waitForDialog } from '../dialogs'
-import { pickOption } from '../select'
+import { pickOption, pickOptions } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 import { createResource, openFormTab } from '../studio-resources'
@@ -227,6 +227,54 @@ test.describe('Studio creates a resource from a starter', () => {
       { name: 'departments', type: 'references', target: 'Department' },
       { name: 'lines', type: 'child-collection', target: 'ShipmentLine' },
     ])
+  })
+
+  test('an author sets a default, a minimum, a searchable text field and a unique index in the designer', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+    const entityName = page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name', exact: true })
+
+    await createResource(page, 'entity', 'Backlog')
+    await expect(entityName).toHaveValue('Backlog')
+    await expect(page.getByTestId('studio-resource-details')).toContainText('entities/backlog.json')
+
+    await addField(page, 1, 'stage', 'enum')
+    const values = page.getByTestId('studio-field-/fields/1/values').getByRole('combobox')
+    await values.fill('open')
+    await values.press('Enter')
+    await values.fill('closed')
+    await values.press('Enter')
+    await values.press('Escape')
+    const stageDefault = page.getByTestId('studio-field-/fields/1/default')
+    // The read-only fallback is replaced once CodeMirror loads, so wait for the editor before typing.
+    await expect(stageDefault.locator('.cm-editor')).toBeVisible()
+    await stageDefault.getByRole('textbox').fill("'open'")
+
+    await addField(page, 2, 'count', 'integer')
+    await page.getByTestId('studio-field-/fields/2/min').getByRole('spinbutton').fill('0')
+
+    await addField(page, 3, 'code', 'text')
+    await page.getByTestId('studio-field-/fields/3/searchable').getByRole('switch', { name: 'Searchable', exact: true }).click()
+
+    await page.getByRole('button', { name: 'Add index', exact: true }).click()
+    await pickOptions(page.getByTestId('studio-field-/indexes/0/fields').getByRole('combobox'), ['stage', 'count'])
+    await page.getByTestId('studio-field-/indexes/0/unique').getByRole('checkbox', { name: 'Unique index', exact: true }).check()
+
+    const diagnostics = await save(page)
+    expect(diagnostics.filter((diagnostic) => diagnostic.file === 'entities/backlog.json')).toEqual([])
+    const backlog = JSON.parse(await readFile(path.join(copy, 'entities', 'backlog.json'), 'utf8')) as {
+      fields: Record<string, unknown>[]
+      indexes: unknown[]
+    }
+    expect(backlog.fields).toEqual([
+      { name: 'name', type: 'text' },
+      { name: 'stage', type: 'enum', values: ['open', 'closed'], default: "'open'" },
+      { name: 'count', type: 'integer', min: 0 },
+      { name: 'code', type: 'text', searchable: true },
+    ])
+    expect(backlog.indexes).toEqual([{ fields: ['stage', 'count'], unique: true }])
   })
 
   test('a click on the disabled Create button fails within the action timeout and names the button', async ({ page }) => {

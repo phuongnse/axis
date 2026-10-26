@@ -54,6 +54,13 @@ export async function clearSelect(field: HTMLElement): Promise<void> {
   await userEvent.click(clearButton(field)!)
 }
 
+/** Hovers the date picker in `field` and clicks its clear button. */
+export async function clearPicker(field: HTMLElement): Promise<void> {
+  const picker = field.querySelector<HTMLElement>('.ant-picker')!
+  await userEvent.hover(picker)
+  await userEvent.click(picker.querySelector<HTMLElement>('.ant-picker-clear')!)
+}
+
 /** Removes the tag showing `text` in `field`, or the first tag when no text is given. */
 export async function removeTag(field: HTMLElement, text?: string): Promise<void> {
   const tag = text

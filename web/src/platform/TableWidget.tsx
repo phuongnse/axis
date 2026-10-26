@@ -2,6 +2,7 @@ import { Alert, Button, Dropdown, Flex, Input, Modal, Table, type TableColumnsTy
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useCanvasActions } from './canvasActions'
+import { FileLink } from './FileInput'
 import { FilterBar } from './FilterBar'
 import { formatValue } from './formatValue'
 import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
@@ -10,6 +11,7 @@ import { newIdempotencyKey, startProcess } from './processes'
 import {
   deleteRecord,
   fetchRecords,
+  isFileValue,
   RecordQueryProblem,
   type RecordItem,
   type RecordPage,
@@ -342,12 +344,16 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       key: field.name,
       dataIndex: ['values', field.name],
       title: field.labelKey ? t(field.labelKey) : field.name,
-      // The record API sorts a reference by its id, which is not the label people see.
-      sorter: field.type !== 'reference',
-      sortOrder: field.type === 'reference' ? undefined : sortOrder(field.name),
+      // The record API sorts a reference by its id, which is not the label people see, and cannot sort a file.
+      sorter: field.type !== 'reference' && field.type !== 'file',
+      sortOrder: field.type === 'reference' || field.type === 'file' ? undefined : sortOrder(field.name),
       align: field.type === 'integer' || field.type === 'decimal' || field.type === 'money' ? 'right' : undefined,
       render: (value: RecordValue, record: TableRow) =>
-        formatValue(field, value, record.labels, { locale, text: t }, record.values),
+        field.type === 'file' && 'downloadPath' in field && isFileValue(value) ? (
+          <FileLink field={field} value={value} />
+        ) : (
+          formatValue(field, value, record.labels, { locale, text: t }, record.values)
+        ),
     }))
     const result = [...fieldColumns]
     if (rowActions.length > 0) {

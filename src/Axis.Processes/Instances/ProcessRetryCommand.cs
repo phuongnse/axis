@@ -20,13 +20,19 @@ public enum ProcessRetryOutcome
     /// <summary>The instance is <c>running</c> again on the step that failed, with a work item. The caller commits.</summary>
     Retried,
 
-    /// <summary>The instance does not exist for the process, or its subject record is not readable by the user.</summary>
+    /// <summary>
+    /// The instance does not exist for the process, or its subject record is not readable by the user. An
+    /// instance without a subject has no record to read.
+    /// </summary>
     NotFound,
 
     /// <summary>The instance is not <c>failed</c>.</summary>
     NotFailed,
 
-    /// <summary>Another instance of the process is <c>running</c> or <c>waiting</c> for the same record.</summary>
+    /// <summary>
+    /// Another instance of the process is <c>running</c> or <c>waiting</c> for the same record, or for a process
+    /// without a subject, at all.
+    /// </summary>
     AlreadyRunning,
 
     /// <summary>
@@ -52,10 +58,12 @@ public sealed record ProcessRetryResult(ProcessRetryOutcome Outcome, Guid? Relea
 /// Sends a <c>failed</c> instance back to <c>running</c> on the step that failed, in the caller's
 /// transaction. The user's <c>retry</c> grant and the application's start lock are the caller's.
 /// The instance's subject record must be readable by the user, or the instance does not exist for
-/// them. When a <c>read</c> filter of the user reads a computed field that is being recomputed, the
+/// them. An instance without a subject has no record, so the grant is the only check. When a <c>read</c>
+/// filter of the user reads a computed field that is being recomputed, the
 /// retry is refused first, before the instance is found. The instance keeps its pinned release and its step. It gets the next revision and no end
 /// time, and a <c>process.step</c> work item runs the step again with the record as it is then.
-/// Another <c>running</c> or <c>waiting</c> instance for the same record refuses the retry, which
+/// Another <c>running</c> or <c>waiting</c> instance for the same record, or of the same process when it has no
+/// subject, refuses the retry, which
 /// the explicit check and the unique index on active instances both catch. A migration applied since the
 /// pinned release that changed a column the release uses refuses it too, before anything is written.
 /// A pinned release whose stored content is missing counts as using every column. A history row with
@@ -68,17 +76,17 @@ public static class ProcessRetryCommand
 {
     /// <param name="active">The active release's model, which the user's read filters are evaluated in.</param>
     /// <param name="process">The process of the route. The instance must belong to it.</param>
-    /// <param name="entity">The subject entity of <paramref name="process"/> in <paramref name="active"/>.</param>
-    /// <param name="read">The user's <c>read</c> access to <paramref name="entity"/>.</param>
+    /// <param name="entity">The subject entity of <paramref name="process"/> in <paramref name="active"/>, or null for a process without a subject.</param>
+    /// <param name="read">The user's <c>read</c> access to <paramref name="entity"/>, or null for a process without a subject.</param>
     public static async Task<ProcessRetryResult> RetryAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         string tenantId,
         ApplicationModel active,
         ProcessModel process,
-        EntityModel entity,
+        EntityModel? entity,
         Guid instanceId,
-        RecordAccess read,
+        RecordAccess? read,
         string userId,
         string userName,
         string reason,
@@ -89,13 +97,12 @@ public static class ProcessRetryCommand
         ArgumentNullException.ThrowIfNull(transaction);
         ArgumentNullException.ThrowIfNull(active);
         ArgumentNullException.ThrowIfNull(process);
-        ArgumentNullException.ThrowIfNull(entity);
-        ArgumentNullException.ThrowIfNull(read);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
         // A read filter on a field that is being recomputed decides nothing. It is checked before the instance
         // is found, so it tells nothing about the instance.
-        if (read.Filters is { } pendingFilters
+        if (entity is not null
+            && read?.Filters is { } pendingFilters
             && await RecordCommand.ReadsPendingAsync(connection, transaction, active, entity, pendingFilters, loggerFactory, cancellationToken))
         {
             return new ProcessRetryResult(ProcessRetryOutcome.PendingFilter);
@@ -107,10 +114,14 @@ public static class ProcessRetryCommand
             return new ProcessRetryResult(ProcessRetryOutcome.NotFound);
         }
 
-        if (!read.Granted
-            || (read.Filters is { } filters
-                && await RecordCommand.MatchAsync(connection, transaction, active, entity, instance.SubjectId, filters, userId, loggerFactory, cancellationToken)
-                    is not { Found: true, Matched: true }))
+        // An instance without a subject has no record to read, so only the grant applies. An instance with a
+        // subject is never exempt from the read check, whatever the process's subject is now.
+        if (instance.SubjectId is { } subjectId
+            && (entity is null
+                || read is not { Granted: true }
+                || (read.Filters is { } filters
+                    && await RecordCommand.MatchAsync(connection, transaction, active, entity, subjectId, filters, userId, loggerFactory, cancellationToken)
+                        is not { Found: true, Matched: true })))
         {
             return new ProcessRetryResult(ProcessRetryOutcome.NotFound);
         }
@@ -220,18 +231,11 @@ public static class ProcessRetryCommand
             return null;
         }
 
-        // An instance of a process without a subject has null subject columns. It is not found here until
-        // inspection and operator support for it are built.
-        if (reader.IsDBNull(3))
-        {
-            return null;
-        }
-
         return new LockedInstance(
             reader.GetGuid(0),
             reader.GetGuid(1),
-            reader.GetGuid(2),
-            reader.GetGuid(3),
+            reader.IsDBNull(2) ? null : reader.GetGuid(2),
+            reader.IsDBNull(3) ? null : reader.GetGuid(3),
             reader.GetGuid(4),
             reader.GetString(5),
             reader.GetString(6));
@@ -243,18 +247,25 @@ public static class ProcessRetryCommand
         Guid instanceId,
         CancellationToken cancellationToken)
     {
+        // The subject is compared in two forms, so that the query for a record keeps using the index of active
+        // instances for records.
+        var subjectPredicate = instance.SubjectId is null ? "subject_id IS NULL" : "subject_id = @subject";
         await using var command = new NpgsqlCommand(
-            """
+            $"""
             SELECT EXISTS (
                 SELECT 1 FROM axis.process_instances
-                WHERE application_id = @application AND process_id = @process AND subject_id = @subject
+                WHERE application_id = @application AND process_id = @process AND {subjectPredicate}
                     AND state IN (@running, @waiting) AND id <> @id)
             """,
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("application", instance.ApplicationId);
         command.Parameters.AddWithValue("process", instance.ProcessId);
-        command.Parameters.AddWithValue("subject", instance.SubjectId);
+        if (instance.SubjectId is { } subject)
+        {
+            command.Parameters.AddWithValue("subject", subject);
+        }
+
         command.Parameters.AddWithValue("running", ProcessStarts.Running);
         command.Parameters.AddWithValue("waiting", ProcessStarts.Waiting);
         command.Parameters.AddWithValue("id", instanceId);
@@ -285,8 +296,8 @@ public static class ProcessRetryCommand
     private sealed record LockedInstance(
         Guid ApplicationId,
         Guid ProcessId,
-        Guid SubjectEntityId,
-        Guid SubjectId,
+        Guid? SubjectEntityId,
+        Guid? SubjectId,
         Guid ReleaseId,
         string State,
         string Step);

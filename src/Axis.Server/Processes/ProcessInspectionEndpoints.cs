@@ -274,6 +274,28 @@ internal static class ProcessInspectionEndpoints
             return InstanceNotFound();
         }
 
+        // A parent or sub-process is named only when the user may inspect its process in the active release.
+        // The subject record's read filters do not apply, and no subject id is shown.
+        var relatives = await InstanceQueries.RelativesAsync(connection, application.Manifest.Id, row.Id, cancellationToken);
+        var parentProcess = relatives.Parent is { } relatedParent ? InspectableProcess(application, user.Roles, relatedParent.ProcessId) : null;
+        var parent = relatives.Parent is { } parentRow && parentProcess is not null
+            ? new ProcessInstanceParent(parentRow.Id, parentProcess.Name, parentRow.Step)
+            : null;
+        var subProcesses = new List<ProcessSubProcess>();
+        foreach (var child in relatives.Children)
+        {
+            if (InspectableProcess(application, user.Roles, child.ProcessId) is { } childProcess)
+            {
+                subProcesses.Add(new ProcessSubProcess(
+                    child.Id,
+                    childProcess.Name,
+                    child.Step,
+                    child.State,
+                    child.CreatedAt.UtcDateTime,
+                    child.EndedAt?.UtcDateTime));
+            }
+        }
+
         // The graph is the pinned release's, so a newer release does not change a running instance.
         var pinned = await resolver.GetReleaseModelAsync(row.ReleaseId, cancellationToken);
         var graph = Graph(pinned.Processes.Single(candidate => candidate.Id == model.Id));
@@ -310,6 +332,8 @@ internal static class ProcessInspectionEndpoints
             row.Step,
             row.CreatedAt.UtcDateTime,
             row.EndedAt?.UtcDateTime,
+            parent,
+            subProcesses,
             graph,
             history
                 .Select(entry => new ProcessPathEntry(
@@ -373,6 +397,13 @@ internal static class ProcessInspectionEndpoints
                 .ToList(),
             commands));
     }
+
+    // The process in the active release when it exists and the user may inspect it, otherwise null.
+    private static ProcessModel? InspectableProcess(ApplicationModel application, IReadOnlyCollection<string> roles, Guid processId) =>
+        application.Processes.FirstOrDefault(candidate => candidate.Id == processId) is { } process
+        && PolicyEvaluator.AllowsInspect(application, roles, process)
+            ? process
+            : null;
 
     // The outputs the call's operation declares in the pinned release or the installed package
     // version, or null when either is missing, so that a resolve would fail.
@@ -525,7 +556,8 @@ internal sealed record ProcessInstanceListItem(
 /// <summary>
 /// One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls.
 /// <paramref name="Commands"/> lists the operator commands (<c>retry</c>, <c>cancel</c>) that the user holds the grant for and
-/// that the instance's state and calls allow.
+/// that the instance's state and calls allow. The detail names the parent and the sub-processes whose process the user may
+/// inspect in the active release, with no subject id.
 /// </summary>
 internal sealed record ProcessInstanceDetailResponse(
     Guid Id,
@@ -536,11 +568,19 @@ internal sealed record ProcessInstanceDetailResponse(
     string Step,
     DateTime CreatedAt,
     DateTime? EndedAt,
+    ProcessInstanceParent? Parent,
+    IReadOnlyList<ProcessSubProcess> SubProcesses,
     ProcessGraph Graph,
     IReadOnlyList<ProcessPathEntry> Path,
     IReadOnlyList<ProcessInstanceTask> Tasks,
     IReadOnlyList<ProcessInstanceCall> Calls,
     IReadOnlyList<string> Commands);
+
+/// <summary>The instance that started this one, with the sub-process step in the parent that did so.</summary>
+internal sealed record ProcessInstanceParent(Guid Id, string Process, string Step);
+
+/// <summary>An instance that this one started, with the sub-process step in this instance that did so.</summary>
+internal sealed record ProcessSubProcess(Guid Id, string Process, string Step, string State, DateTime CreatedAt, DateTime? EndedAt);
 
 /// <summary>The steps of a process, in declaration order, and the name of the first.</summary>
 internal sealed record ProcessGraph(string Start, IReadOnlyList<ProcessGraphStep> Steps);

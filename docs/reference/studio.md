@@ -332,57 +332,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     When there is no answer, or the check answers `400` or
     `401`, the last result stays on screen. A `401` does not start sign-in, so
     the draft is kept. The editor never blocks Save.
-- **Entity designer** _(built)_. An `entity` resource opens in a designer on
-  the Form tab in place of the generic form. The JSON tab stays and edits the
-  same draft. See
-  [D54](../decisions/d54-the-entity-designer-and-the-policy-matrix.md).
-  - The header shows the entity's name, its label with a text box per locale,
-    and a display field picker. The picker lists the field names of the draft.
-    It does not show `id`, `kind` or `formatVersion`.
-  - The fields are a table. Its columns are name, label, type, required,
-    unique and a settings column. A field's label is a picker of the existing
-    text keys. The settings column shows only what the row's type takes:
-    `maxLength`, `precision` and `scale`, `values`, `target`, `expression`,
-    `sequence`, `creator` and `sensitive`. The settings follow the
-    [field types](resource-files.md#entity-field-types-and-constraints), so a
-    setting a type does not take cannot be edited.
-  - The type picker also offers `money`, `file` and `references`, and a child
-    entity's fields may be `reference`. A `references` field has the same
-    target picker as a `reference` field. The settings column adds, for a
-    `file`, `maxSize` in bytes and an `accept` list of media types. For a
-    `money` field it adds a choice between a fixed `currency` code and a
-    `currencyField`, picked from the entity's `enum` and `text` fields. The
-    field holds only the one that is chosen: Field writes an empty
-    `currencyField` and removes `currency`, and Fixed code removes
-    `currencyField`. A typed code is turned into upper case. For an `enum` it
-    adds a label picker for each value, which writes `valueLabels`. Removing a
-    value keeps its label, and Validate reports it (`AXC0242`). A test compares
-    the field types and properties of the designer with `entity.schema.json`,
-    so a property that a later issue adds cannot be left out by mistake. See
-    [types and properties added in M15](resource-files.md#types-and-properties-added-in-m15).
-  - _(Planned for M15.)_ The settings column adds `default` in the expression
-    editor, `min`, `max`, `minLength` and `searchable`, which are edited in the
-    JSON tab until then. An Indexes list under the fields adds, orders and
-    removes the entity's `indexes`.
-  - Changing a field's type drops the settings the new type does not take and
-    keeps the rest. It does not add an empty `values` or `target`, and Validate
-    reports the missing setting.
-  - Clearing a field's label, the display field, `maxLength`, `precision`,
-    `scale`, `maxSize`, `accept`, `sequence`, `expression`, the last enum value
-    or the last value label removes the key.
-  - A computed field's `expression` and each validation's expression use the
-    [expression editor](../decisions/d52-reference-pickers-label-texts-and-the-expression-editor.md).
-    A validation also has a message key picker and a field picker, and can be
-    added and removed.
-  - Fields can be added, removed and moved up or down. Each of these replaces
-    the `fields` array.
-  - Every input keeps its `studio-field-<pointer>` id, and each row has the id
-    of its field, so a diagnostic opens at its input, or at the row when the
-    row does not show the setting.
-  - A module entity, such as `departments/Department`, opens in the designer
-    read-only, from the [module resource route](authoring.md#routes). Every input is
-    off, and it has no Add field, Remove, Move, Add validation, Save or Delete
-    button, no JSON tab and no Uses or Used by lists. A label shows its text key.
+- **Entity designer** _(built)_. It is in [the entity designer](entity-designer.md).
 - **Migrations from the designer** _(built)_. The designer compares
   with the entity as Studio loaded it. "Loaded" means as Studio read the
   entity, not the active release. It asks a question for a change to a loaded

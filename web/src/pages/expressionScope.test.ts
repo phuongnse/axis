@@ -53,6 +53,27 @@ describe('expressionScope', () => {
     expect(labels).not.toContain('currentUser()')
   })
 
+  it('offers a field default the rules and functions but no field and no aggregate', () => {
+    const draft = {
+      fields: [
+        { name: 'title', type: 'text' },
+        { name: 'total', type: 'decimal' },
+      ],
+    }
+    const labels = labelsOf(expressionScope('entity', draft, '/fields/1/default', names))
+
+    expect(labels).toContain('departments:IsManager()')
+    expect(labels).toContain('now()')
+    expect(labels).toContain('length()')
+    expect(labels).not.toContain('title')
+    expect(labels).not.toContain('total')
+    for (const aggregate of ['count()', 'sum()', 'avg()', 'min()', 'max()', 'any()', 'all()']) {
+      expect(labels).not.toContain(aggregate)
+    }
+    expect(labelsOf(expressionScope('entity', draft, '/fields/1/default', null))).not.toContain('count()')
+    expect(labelsOf(expressionScope('entity', draft, '/fields/1/expression', names))).toContain('count()')
+  })
+
   it('offers a policy grant filter the grant entity fields and currentUser()', () => {
     const draft = { grants: [{ entity: 'PurchaseRequest', actions: ['read'] }] }
     const labels = labelsOf(expressionScope('policy', draft, '/grants/0/filter', names))

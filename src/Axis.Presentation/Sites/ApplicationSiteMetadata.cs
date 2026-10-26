@@ -371,7 +371,8 @@ public sealed record DataSourceColumnMetadata(
 /// <see cref="MinLength"/> are for text, <see cref="Min"/> and <see cref="Max"/> for integer,
 /// decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal and money, <see cref="Currency"/> and
 /// <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum, <see cref="Target"/> for reference and references, and
-/// <see cref="Fields"/> for child collection.
+/// <see cref="Fields"/> for child collection, and <see cref="MaxSize"/>, <see cref="Accept"/>, <see cref="UploadPath"/> and
+/// <see cref="DownloadPath"/> for file.
 /// </summary>
 /// <param name="Type">The type name as written in entity files, such as <c>date-time</c>.</param>
 /// <param name="Computed">Whether the server computes the value. A client shows it and never sends it.</param>
@@ -383,6 +384,10 @@ public sealed record DataSourceColumnMetadata(
 /// <param name="CurrencyField">The name of the field that holds the currency code of a money field, or null when the field has none.</param>
 /// <param name="Fields">The child entity's fields in declaration order, for a child collection.</param>
 /// <param name="ValueLabelKeys">Maps each enum value to the text key of its label, or is null when the enum has no labels.</param>
+/// <param name="MaxSize">The largest accepted file in bytes, or null when the field sets no limit of its own.</param>
+/// <param name="Accept">The media types a file field accepts, or null when it accepts any.</param>
+/// <param name="UploadPath">The path of the field's upload route, or null when the field has none, as for a field of a module's entity.</param>
+/// <param name="DownloadPath">The path of the application's file download route, to which a client appends a file id.</param>
 public sealed record FieldMetadata(
     string Name,
     string Type,
@@ -402,6 +407,10 @@ public sealed record FieldMetadata(
     int? MinLength,
     IReadOnlyList<string>? Values,
     IReadOnlyDictionary<string, string>? ValueLabelKeys,
+    long? MaxSize,
+    IReadOnlyList<string>? Accept,
+    string? UploadPath,
+    string? DownloadPath,
     ReferenceTarget? Target,
     IReadOnlyList<FieldMetadata>? Fields);
 

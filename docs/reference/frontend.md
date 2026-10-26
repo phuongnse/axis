@@ -281,12 +281,22 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `date-time`), its label key, `required`, `unique`, `computed`, `sequence` and `creator`,
     `maxLength` and `minLength` for text, `min` and `max` for integer, decimal, date and
     date-time, `precision` and `scale` for decimal and money, `currency` (the fixed code) or `currencyField` (the field
-    holding the code) for money, `values` for enum, `valueLabelKeys` for an enum with `valueLabels`, `target` for
-    reference and references, and `fields` for child collection. `min` and `max` are strings in the
+    holding the code) for money, `values` for enum, `valueLabelKeys` for an enum with `valueLabels`, `maxSize`,
+    `accept`, `uploadPath` and `downloadPath` for file, `target` for reference and references, and `fields` for
+    child collection. `min` and `max` are strings in the
     entity file's literal form, such as `"0.5"` or `"2026-01-01"`. A property the field's
     type does not have, or a label the file leaves out, is `null`; it is
     never left out. `valueLabelKeys` maps each enum value to the text key of
     its label, and is `null` when the enum has no labels.
+  - A file field's `maxSize` (bytes) and `accept` (media types) are the
+    entity file's, or `null` when it declares none. `uploadPath` is the path
+    of the field's [upload route](file-fields.md#upload), and for a field of a
+    child entity it names the collection, such as
+    `/api/apps/{app}/entities/{entity}/fields/attachments/file/files`. It is
+    `null` for a field of a module's entity, which has no upload route yet, so
+    the input shows no upload button. `downloadPath` is `/api/apps/{app}/files`,
+    and the SPA appends a file's id to it. The SPA never builds a file URL
+    itself.
   - `computed` is `true` for a [computed field](resource-files.md#entity-logic).
     The server sets its value on every write, so the form shows it read-only
     and never sends it.
@@ -580,9 +590,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     the total is known, a `page` past the last page (at least 1) becomes the
     last page in the same way, so the URL and the pagination agree. With no
     records the last page is 1, so `page` is removed.
-  - **Sorting.** Every column but a reference is sortable. The record API
+  - **Sorting.** Every column but a reference and a file is sortable. The record API
     sorts a reference by the stored id, which does not match the label people
-    see. Repeated clicks on a header sort ascending, then descending, then
+    see, and cannot sort a file. Repeated clicks on a header sort ascending, then descending, then
     not at all.
   - **Values.** Values are formatted for display and never changed:
 
@@ -594,7 +604,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     | `money` | the amount with its currency in the UI locale, such as `$1,250.50` in `en` and `1.250.000 ₫` in `vi`, right-aligned. It shows the field's `scale` in decimal places, or more when the API wrote more, so it never rounds. The currency is `currency`, or the value of `currencyField` in the same row, or of `currencyColumn` in a data source row. Without a code of three letters it shows the number as the API wrote it |
     | `boolean` | a localized yes or no |
     | `reference` | the label from `labels` |
-    | `text`, `enum` | the value. An enum with `valueLabels` shows the label, and a file its name as a download link _(planned for M15, [D76](../decisions/d76-file-money-and-enum-label-field-types.md))_ |
+    | `text`, `enum` | the value. An enum with `valueLabels` shows the label |
+    | `file` | the file's name as a download link to `downloadPath` and the file's id. A data source row holds a file as its bare id, so a data source column shows the id and no link |
     | `null` | an empty cell |
 
   - **Number source text.** The SPA parses record responses with the source

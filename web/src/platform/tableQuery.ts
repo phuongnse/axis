@@ -32,7 +32,7 @@ export interface TableQuery {
 /**
  * Reads `page`, `pageSize`, `sort`, `search` and the values of `parameterNames` from the URL. An invalid value
  * falls back to its default: a `page` that is not a positive integer, a `pageSize` the table does
- * not offer, or a `sort` that names no field or a reference field. `fields` are the table's columns.
+ * not offer, or a `sort` that names no field or a reference or file field. `fields` are the table's columns.
  * A repeated parameter keeps its first value, and an empty value is left out. `search` is read only
  * when the table is `searchable`, and it is not trimmed.
  */
@@ -56,7 +56,9 @@ export function parseTableQuery(
   const pageSize = tablePageSizes(defaultPageSize).find((size) => String(size) === params.get('pageSize'))
   const sort = params.get('sort')
   const sortField = sort?.startsWith('-') ? sort.slice(1) : sort
-  const sortable = fields.some((field) => field.name === sortField && field.type !== 'reference')
+  const sortable = fields.some(
+    (field) => field.name === sortField && field.type !== 'reference' && field.type !== 'file',
+  )
   return {
     page: page !== null && /^[1-9]\d*$/.test(page) ? Number(page) : defaultPage,
     pageSize: pageSize ?? defaultPageSize,

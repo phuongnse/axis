@@ -51,6 +51,7 @@ export type FieldType =
   | 'reference'
   | 'references'
   | 'child-collection'
+  | 'file'
 
 /** The entity a reference or references field points to, its display field and the path of its record API. */
 export interface ReferenceTarget {
@@ -91,6 +92,14 @@ export interface FieldMetadata {
   values: string[] | null
   /** The text key of each enum value's label, by value, or missing or `null` when the enum has no labels. */
   valueLabelKeys?: Record<string, string> | null
+  /** The largest accepted file of a file field in bytes, or missing or `null` when it has no limit of its own. */
+  maxSize?: number | null
+  /** The media types a file field accepts, or missing or `null` when it accepts any. */
+  accept?: string[] | null
+  /** The path of a file field's upload route, or missing or `null` when it has none, as for a field of a module's entity. */
+  uploadPath?: string | null
+  /** The path to which a client appends a file's id to download it, or missing or `null` on a field that is not a file. */
+  downloadPath?: string | null
   target: ReferenceTarget | null
   fields: FieldMetadata[] | null
 }
