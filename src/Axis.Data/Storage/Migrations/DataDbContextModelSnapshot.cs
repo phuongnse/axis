@@ -253,6 +253,13 @@ namespace Axis.Data.Storage.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("file");
 
+                    b.Property<string>("Format")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("csv")
+                        .HasColumnName("format");
+
                     b.Property<string>("Key")
                         .HasColumnType("text")
                         .HasColumnName("key");
@@ -295,6 +302,8 @@ namespace Axis.Data.Storage.Migrations
 
                     b.ToTable("record_imports", "axis", t =>
                         {
+                            t.HasCheckConstraint("ck_record_imports_format", "format IN ('csv', 'xlsx')");
+
                             t.HasCheckConstraint("ck_record_imports_state", "state IN ('pending', 'checked', 'failed', 'committed')");
                         });
                 });
