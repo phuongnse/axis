@@ -317,18 +317,20 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
 
 /**
  * The card of one step of a process, as the Form tab shows it, for the Design tab's side panel. Move up and Move down
- * select the step at its new place, and Remove clears the selection.
+ * select the step at its new place. Remove calls `onRemove`, which owns the removal, the selection and what is said.
  */
 export function ProcessStepPanel({
   value,
   index,
   onChange,
   onSelect,
+  onRemove,
 }: {
   value: Content
   index: number
   onChange: ChangeHandler
   onSelect: (index: number | null) => void
+  onRemove: () => void
 }) {
   const steps = Array.isArray(value.steps) ? value.steps : []
   const step = steps[index]
@@ -344,13 +346,7 @@ export function ProcessStepPanel({
         onChange('/steps', moved(steps, index, offset))
         onSelect(index + offset)
       }}
-      onRemove={() => {
-        onChange(
-          '/steps',
-          steps.filter((_, position) => position !== index),
-        )
-        onSelect(null)
-      }}
+      onRemove={onRemove}
       onChange={onChange}
     />
   )

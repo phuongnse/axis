@@ -43,6 +43,7 @@ public static class RuntimeRoleGrants
         "sequence_counters",
         "computed_field_errors",
         "pending_computed_fields",
+        "sessions",
     };
 
     /// <summary>

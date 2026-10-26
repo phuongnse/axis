@@ -169,3 +169,57 @@ export async function runTaskCommand(
   }
   throw new Error(`Running '${command}' on the task '${id}' of '${tasksPath}' failed with status ${response.status}.`)
 }
+
+/** The body of a reassign: exactly one of `role` and `user`, and the required reason. */
+export type ReassignBody = { role: string; reason: string } | { user: string; reason: string }
+
+/** The task after a reassign, the problem of a 400, or the status the task API refused it with. */
+export type ReassignResult =
+  { ok: true; task: TaskItem } | { ok: false; problem: RecordProblem } | { ok: false; status: number }
+
+/** A user profile as the user picker lists it. */
+export interface UserOption {
+  id: string
+  displayName: string
+}
+
+/**
+ * Reassigns a task to a role or a user. A 400 comes back as the problem, and a 403 or 409 as the
+ * status. A 401 starts sign-in and throws, as any other failure does.
+ */
+export async function reassignTask(tasksPath: string, id: string, body: ReassignBody): Promise<ReassignResult> {
+  const response = await apiFetch(`${tasksPath}/${id}/reassign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (response.ok) {
+    // A task read holds no field values, so plain numbers are safe.
+    return { ok: true, task: JSON.parse(await response.text()) as TaskItem }
+  }
+  if (response.status === 400) {
+    const problem = JSON.parse(await response.text()) as Partial<RecordProblem>
+    return { ok: false, problem: { status: 400, title: problem.title ?? '', errors: problem.errors ?? {} } }
+  }
+  if (response.status === 403 || response.status === 409) {
+    return { ok: false, status: response.status }
+  }
+  throw new Error(`Reassigning the task '${id}' of '${tasksPath}' failed with status ${response.status}.`)
+}
+
+/** The address of the user picker of the application whose task API is at `tasksPath`. */
+export function usersPath(tasksPath: string): string {
+  return tasksPath.replace(/\/tasks$/, '/users')
+}
+
+/**
+ * Lists up to 20 users whose display name contains `search`, or the first 20 for an empty search.
+ * It throws when the answer is not a success.
+ */
+export async function searchUsers(path: string, search: string, signal?: AbortSignal): Promise<UserOption[]> {
+  const response = await apiFetch(`${path}?search=${encodeURIComponent(search)}`, { signal })
+  if (!response.ok) {
+    throw new Error(`Searching the users of '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: UserOption[] }).items
+}

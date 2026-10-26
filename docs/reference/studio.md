@@ -808,19 +808,23 @@ Run and the Test results list, the read-only view of a module entity, and the re
     draft, so an edit in the card, the Form tab or the JSON view redraws the
     graph at once.
   - A node selects its step, and the step's card shows beside the graph. An edge
-    selects the step it leaves, because that card holds the picker of the
-    transition. The selection is not written to the URL, because a path in the
-    URL opens the Form tab.
+    selects itself and the step it leaves, because that card holds the picker of
+    the transition. The selection is not written to the URL, because a path in
+    the URL opens the Form tab.
   - The selected step's node is current, and it has `aria-current`. A path in
     the URL that is `/steps/{i}` or inside it opens the Form tab and also
     selects step `{i}`, so the Design tab shows it on return. The card has Move
     up, Move down and Remove as the Form tab has, and Remove clears the
-    selection. With no step selected, the panel says "Select a step on the
-    canvas."
-  - Nodes are reached with Tab, in step order, and selected with Enter. Each
-    node has a text label with the step's name and type. Edges are reached with
-    the pointer only. A keyboard user reaches each transition through the
-    pickers in the step card.
+    selection. A removal leaves the transitions that named the step, and a
+    hidden live region says "Removed step" with its name. With no step
+    selected, the panel says "Select a step on the canvas."
+  - Edges are reached with Tab before the nodes, because the edges come first
+    in the page, and then nodes in step order. Enter selects a node or an edge.
+    Each node has a text label with the step's name and type. Each edge is named
+    by its two steps and its branch or outcome, such as "financeCheck to
+    markApproved · otherwise". Delete or Backspace in the canvas removes the
+    selected edge's transition, or else the selected step. The pickers in the
+    step card still set each transition.
   - A transition to a step that does not exist draws no edge. The graph never
     invents a node.
   - A step of the open process is marked when a diagnostic of the open resource
