@@ -9,6 +9,7 @@ namespace Axis.Integration.Tests;
 public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) : IClassFixture<ProcessStartFixture>
 {
     private const string Instances = "/api/apps/ProcessApp/processes/Submit/instances";
+    private const string JobInstances = "/api/apps/ProcessApp/processes/NightlyJob/instances";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -148,6 +149,57 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
     }
 
     [Fact]
+    public async Task A_user_with_inspect_lists_an_instance_of_a_process_without_a_subject_with_a_null_subject()
+    {
+        var id = await StartJobAsync();
+
+        using var response = await GetAsync($"{JobInstances}?pageSize=100");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        var item = body.RootElement.GetProperty("items").EnumerateArray().Single(candidate => candidate.GetProperty("id").GetGuid() == id);
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("subjectId").ValueKind);
+        Assert.Equal("running", item.GetProperty("state").GetString());
+
+        using var other = await GetAsync($"{JobInstances}?subject={Guid.NewGuid():D}");
+        using var otherBody = await ReadJsonAsync(other);
+        Assert.Equal(HttpStatusCode.OK, other.StatusCode);
+        Assert.Equal(0, otherBody.RootElement.GetProperty("totalCount").GetInt64());
+    }
+
+    [Fact]
+    public async Task A_user_with_inspect_reads_an_instance_of_a_process_without_a_subject_with_no_commands()
+    {
+        var id = await StartJobAsync();
+
+        using var response = await GetAsync($"{JobInstances}/{id:D}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        var root = body.RootElement;
+        Assert.Equal(id, root.GetProperty("id").GetGuid());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("subjectId").ValueKind);
+        Assert.Equal("NightlyJob", root.GetProperty("process").GetString());
+        Assert.Equal("check", root.GetProperty("graph").GetProperty("start").GetString());
+        Assert.Equal(0, root.GetProperty("commands").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_user_without_inspect_on_a_process_without_a_subject_is_a_403_on_the_list_and_the_detail()
+    {
+        var id = await StartJobAsync();
+        using var olga = fixture.CreateClient().SignedInAs("olga");
+
+        foreach (var path in new[] { JobInstances, $"{JobInstances}/{id:D}" })
+        {
+            using var response = await GetAsync(path, olga);
+
+            using var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
+            Assert.Equal("You have no grant for this action.", problem.RootElement.GetProperty("title").GetString());
+        }
+    }
+
+    [Fact]
     public async Task A_request_with_no_session_is_a_401()
     {
         using var anonymous = fixture.CreateClient();
@@ -216,6 +268,17 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var body = await ReadJsonAsync(response);
         return (body.RootElement.GetProperty("id").GetGuid(), subject);
+    }
+
+    private async Task<Guid> StartJobAsync()
+    {
+        Assert.True(fixture.Model.TryGetProcess("NightlyJob", out var process));
+        await fixture.EndInstancesAsync(process.Id);
+        using var request = Request(HttpMethod.Post, JobInstances, ProcessStartFixture.Host, """{ "parameters": { "days": 3 } }""");
+        using var response = await fixture.Client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        return body.RootElement.GetProperty("id").GetGuid();
     }
 
     private async Task<List<JsonElement>> ListAsync(string query)

@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Administration;
 
-/// <summary>One binding as <c>tenant binding list</c> shows it. A secret's value is never read, only whether it is set.</summary>
+/// <summary>One binding as <c>tenant binding list</c> shows it. A secret's value is never read, only whether it is set. A <c>url</c> or <c>storage</c> binding shows its value.</summary>
 public sealed record TenantBindingView(string Name, string Kind, string? Url, bool HasSecret);
 
 /// <summary>
-/// The rules of <c>tenant binding list</c>, <c>set</c> and <c>remove</c>. Every rule is checked before the first write, and a
+/// The rules of <c>tenant binding list</c>, <c>set</c> and <c>remove</c> for <c>url</c>, <c>secret</c> and <c>storage</c> bindings. Every rule is checked before the first write, and a
 /// change and its platform audit record share one transaction. A message never holds a value.
 /// </summary>
 public static class TenantBindingCommands
@@ -33,7 +33,7 @@ public static class TenantBindingCommands
             .ToListAsync(cancellationToken);
         return [.. rows
             .OrderBy(row => row.Name, StringComparer.Ordinal)
-            .Select(row => new TenantBindingView(row.Name, row.Kind, row.Kind == DeploymentBindingKinds.Url ? row.Url : null, row.HasSecret))];
+            .Select(row => new TenantBindingView(row.Name, row.Kind, row.Kind == DeploymentBindingKinds.Secret ? null : row.Url, row.HasSecret))];
     }
 
     /// <summary>Adds or replaces a <c>url</c> binding. The value is an absolute http or https URL.</summary>
@@ -59,6 +59,31 @@ public static class TenantBindingCommands
         }
 
         return await SetAsync(platform, command, tenantId, name, DeploymentBindingKinds.Url, url, null, cancellationToken);
+    }
+
+    /// <summary>Adds or replaces a <c>storage</c> binding. Its only value is <c>database</c>.</summary>
+    public static async Task<TenantSettingResult> SetStorageAsync(
+        PlatformDbContext platform,
+        string command,
+        string tenantId,
+        string name,
+        string value,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(platform);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return TenantSettingResult.Refused("A binding name must not be blank.");
+        }
+
+        if (value != StorageBindingValues.Database)
+        {
+            return TenantSettingResult.Refused($"The binding '{name}' is a storage binding, and its only value is '{StorageBindingValues.Database}'.");
+        }
+
+        return await SetAsync(platform, command, tenantId, name, DeploymentBindingKinds.Storage, value, null, cancellationToken);
     }
 
     /// <summary>Adds or replaces a <c>secret</c> binding. The value is stored encrypted, bound to the tenant and the binding.</summary>
