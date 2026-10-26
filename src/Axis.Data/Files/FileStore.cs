@@ -13,6 +13,18 @@ public static class FileStore
         VALUES (@id, @application, @entity, @path, NULL, @name, @mediaType, @size, @sha256, 'database', 'pending', @uploadedBy, @uploadedAt)
         """;
 
+    // A file attaches when it is pending and the caller uploaded it for this entity and field path,
+    // or when it is already attached to this record at this path. RETURNING gives the ids that
+    // matched, so each refused id can be told apart. A missing uploader never matches.
+    private const string AttachSql =
+        """
+        UPDATE "axis"."files" AS f SET "state" = 'attached', "owner_record_id" = @record
+        FROM unnest(@ids, @entities, @paths) AS t(id, entity_id, field_path)
+        WHERE f.id = t.id AND f.application_id = @application AND f.entity_id = t.entity_id AND f.field_path = t.field_path
+          AND ((f.state = 'pending' AND f.uploaded_by = @uploader) OR (f.state = 'attached' AND f.owner_record_id = @record))
+        RETURNING f.id
+        """;
+
     private const string InsertContentSql = """INSERT INTO "axis"."file_contents" ("file_id", "content") VALUES (@id, @content)""";
 
     /// <summary>
@@ -53,5 +65,42 @@ public static class FileStore
         }
 
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Attaches each of <paramref name="files"/> to the record <paramref name="recordId"/> in one
+    /// statement of the caller's transaction, and returns the ids that were attached or already
+    /// attached there. A file qualifies when it is <c>pending</c> and <paramref name="uploader"/>
+    /// uploaded it for the same entity and field path, or when it is already attached to this record
+    /// at the same entity and field path. With no <paramref name="uploader"/>, only the second case
+    /// qualifies. An id that is not returned is unknown, foreign, attached elsewhere or for another field.
+    /// </summary>
+    public static async Task<HashSet<Guid>> AttachAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        Guid recordId,
+        string? uploader,
+        IReadOnlyList<(Guid Id, Guid EntityId, string Path)> files,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(files);
+
+        await using var command = new NpgsqlCommand(AttachSql, connection);
+        command.Parameters.AddWithValue("record", recordId);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.Add(new NpgsqlParameter("uploader", NpgsqlDbType.Text) { Value = (object?)uploader ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("ids", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = files.Select(file => file.Id).ToArray() });
+        command.Parameters.Add(new NpgsqlParameter("entities", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = files.Select(file => file.EntityId).ToArray() });
+        command.Parameters.Add(new NpgsqlParameter("paths", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = files.Select(file => file.Path).ToArray() });
+
+        var attached = new HashSet<Guid>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            attached.Add(reader.GetGuid(0));
+        }
+
+        return attached;
     }
 }

@@ -7,10 +7,11 @@ The conventions of [architecture.md](../architecture.md) apply: sections
 marked _(planned for M15)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
-Upload up to the `pending` state, and the storage of a file's details and bytes,
-are _(built)_. Attach, download, replace, remove, the sweep, audit and the SPA
-are _(planned for M15)_. Until attach is built, a record create or update cannot
-set a file field, and a file id in a body fails.
+Upload up to the `pending` state, the storage of a file's details and bytes,
+attach by a record write and the file value in a read are _(built)_. Download,
+replace, remove, the sweep, audit and the SPA are _(planned for M15)_. Inbound
+endpoints, task completion and process steps attach nothing for now, so a file
+id they send that the record does not already hold fails.
 
 ## Field and value
 
@@ -71,10 +72,24 @@ write records.
   download route does not exist yet.
 - **Memory.** The server holds one upload in memory, up to the limit, before
   it writes the file to the database.
-- **Attach** _(planned for M15)_. A create or update that sends the id
-  attaches the file in its transaction. The file must be `pending`, uploaded by the same user, for the
-  same entity and field. Any other id is a `400` at the field's pointer, with
-  the same message whether the id is unknown or belongs to someone else.
+- **Attach** _(built)_. A create or update that sends the id attaches the
+  file in its transaction: the state becomes `attached` and the owner record
+  becomes the root record, also for a field of a child row. The file must be
+  `pending`, uploaded by the same user, for the same entity and field path.
+  - **Kept ids.** An id the record already holds at the same path stays as it
+    is. This covers a resent unchanged field and a kept child row.
+  - **Refusal.** Any other id is a `400` at the field's pointer, such as
+    `/values/receipt` or `/values/attachments/0/file`, with one message, "No
+    uploaded file for this field has this id." The message is the same whether
+    the id is unknown, belongs to another user, is attached elsewhere or was
+    uploaded for another field. A malformed id is "Must be a UUID."
+  - **Repeated id.** An id sent twice in one body is refused at every pointer
+    after the first.
+  - **Other writers.** Inbound endpoints, task completion and process steps
+    pass no uploader, so they attach nothing and refuse any id the record does
+    not already hold.
+  - **Replace and remove.** A file that a write replaces or clears stays
+    `attached` to the record until replace and remove are built.
 
 ## Download
 
