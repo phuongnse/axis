@@ -494,10 +494,12 @@ public sealed class DataSourceCompilerTests
     }
 
     [Theory]
-    // A filter type-checks with the child collections, but no aggregate is in the SQL subset.
+    // A filter type-checks with the child collections, but only any and count are in the SQL subset.
     [InlineData("sum(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("avg(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
-    [InlineData("number != 'x' and count(lines) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("number != 'x' and all(lines, amount > 0)", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("any(lines, lower(description) == 'a')", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("any(lines, number == 'x')", ExpressionDiagnosticCodes.UnknownName)]
     [InlineData("sum(lines, description) > 0", ExpressionDiagnosticCodes.TypeMismatch)]
     [InlineData("lines is null", ExpressionDiagnosticCodes.TypeMismatch)]
     // A path goes only through reference fields, so it cannot go through a child collection.
@@ -518,6 +520,40 @@ public sealed class DataSourceCompilerTests
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((code, "data-sources/invoices.json", "/filter"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("any(lines, amount > 10)")]
+    [InlineData("number != 'x' and count(lines) > 0")]
+    [InlineData("count(lines, amount > 10) >= 2")]
+    [InlineData("any(lines, customer.name == 'Acme')")]
+    [InlineData("any(lines, customer.parent.name == 'Acme')")]
+    [InlineData("any(lines, null)")]
+    public void Filter_with_any_or_count_over_a_child_collection_compiles(string filter)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/customer.json", Customer)
+            .With("entities/line-item.json", """
+                { "id": "33333333-3333-4333-8333-333333333333", "kind": "entity", "name": "LineItem", "formatVersion": 1,
+                  "fields": [
+                    { "name": "description", "type": "text" },
+                    { "name": "amount", "type": "decimal" },
+                    { "name": "customer", "type": "reference", "target": "Customer" }
+                  ] }
+                """)
+            .With("entities/invoice.json", Invoice)
+            .With("data-sources/invoices.json", DataSource(
+                "Invoice",
+                """[{ "name": "number", "path": "number" }]""",
+                $$""", "filter": "{{filter}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetDataSource("Orders", out var dataSource));
+        Assert.NotNull(dataSource.Filter);
     }
 
     [Fact]

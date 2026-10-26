@@ -86,7 +86,10 @@ public static class ExpressionScopes
     /// <summary>
     /// The scope of a data source filter: the root entity's fields, then the parameters. A path
     /// through a reference field resolves to a field of the entity <paramref name="findEntity"/>
-    /// returns for the target's name. The filter can call the named <paramref name="rules"/>.
+    /// returns for the target's name. Each child collection and references field whose entity
+    /// <paramref name="findEntity"/> finds is a collection that <c>any</c> and <c>count</c> can name. Its item
+    /// scope holds that entity's fields, computed ones included, and resolves paths through their
+    /// reference fields. The filter can call the named <paramref name="rules"/>.
     /// </summary>
     public static ExpressionScope ForDataSource(
         IEnumerable<FieldModel> fields,
@@ -98,23 +101,36 @@ public static class ExpressionScopes
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentNullException.ThrowIfNull(findEntity);
+        var all = fields.ToList();
+        ReferenceFieldResolver resolver =
+            (target, name) => findEntity(target) is { } entity && entity.TryGetField(name, out var field) ? TypeOf(field) : null;
         return Build(
             [
-                .. fields.Select(field => (field.Name, TypeOf(field))),
+                .. all.Select(field => (field.Name, TypeOf(field))),
                 .. parameters.Select(parameter => (parameter.Name, ParameterTypeOf(
                     parameter.Name, parameter.Type, parameter.Values, parameter.Target?.Name))),
             ],
             rules,
-            collections: null,
-            (target, name) => findEntity(target) is { } entity && entity.TryGetField(name, out var field) ? TypeOf(field) : null,
+            [
+                .. all
+                    .Where(field => field.Type is FieldType.ChildCollection or FieldType.References && field.Target is not null)
+                    .Select(field => findEntity(field.Target!.Name) is { } item
+                        ? new ExpressionCollection(
+                            field.Name,
+                            item.Name,
+                            Build(item.Fields.Select(itemField => (itemField.Name, TypeOf(itemField))), rules: null, collections: null, resolver))
+                        : null)
+                    .OfType<ExpressionCollection>(),
+            ],
+            resolver,
             modules);
     }
 
     /// <summary>
     /// The scope of a data source filter: the root entity's fields, then the parameters. A path
     /// through a reference field resolves to a field of the entity <paramref name="findEntity"/>
-    /// returns for the target's name. The child collections are in it too, so that the SQL
-    /// translation reports an aggregate as outside the subset. The filter can call the named
+    /// returns for the target's name. The child collections and references fields are in it too, with
+    /// item scopes that resolve paths, as in the public overload. The filter can call the named
     /// <paramref name="rules"/>.
     /// </summary>
     internal static ExpressionScope ForDataSource(
@@ -132,7 +148,7 @@ public static class ExpressionScopes
                     parameter.Name, FieldTypes.Parse(parameter.Type), parameter.Values, parameter.Target))),
             ],
             rules,
-            CollectionsOf(all, findEntity),
+            CollectionsOf(all, findEntity, paths: true),
             ReferenceFieldsOf(findEntity),
             modules);
     }
@@ -253,17 +269,27 @@ public static class ExpressionScopes
     /// <summary>
     /// Each child collection whose child entity is found, with the child's fields, computed ones
     /// included, as its item scope. Each references field whose target is found is one too, unless
-    /// <paramref name="references"/> is false.
+    /// <paramref name="references"/> is false. The item scope resolves paths through reference fields
+    /// when <paramref name="paths"/> is true.
     /// </summary>
     private static List<ExpressionCollection> CollectionsOf(
-        IEnumerable<FieldDefinition> fields, Func<string, EntityResource?> findEntity, bool references = true) =>
+        IEnumerable<FieldDefinition> fields, Func<string, EntityResource?> findEntity, bool references = true, bool paths = false) =>
         [
             .. fields
                 .Where(field => field.Target is not null
                     && (FieldTypes.Parse(field.Type) == FieldType.ChildCollection
                         || (references && FieldTypes.Parse(field.Type) == FieldType.References)))
                 .Select(field => findEntity(field.Target!) is { } child
-                    ? new ExpressionCollection(field.Name, child.Name, ForEntity(child.Fields))
+                    ? new ExpressionCollection(
+                        field.Name,
+                        child.Name,
+                        paths
+                            ? Build(
+                                child.Fields.Select(item => (item.Name, TypeOf(item))),
+                                rules: null,
+                                collections: null,
+                                ReferenceFieldsOf(findEntity))
+                            : ForEntity(child.Fields))
                     : null)
                 .OfType<ExpressionCollection>(),
         ];

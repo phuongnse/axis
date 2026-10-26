@@ -1,0 +1,9 @@
+{
+  "id": "7b2c9f10-3d54-4e8a-b1c6-9a0e5d7f2c31",
+  "kind": "role",
+  "name": "assigned",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.assigned"
+  }
+}

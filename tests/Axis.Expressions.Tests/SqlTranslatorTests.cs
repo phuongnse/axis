@@ -183,13 +183,19 @@ public sealed class SqlTranslatorTests
     [InlineData("dt == date('2026-13-45')", 6, "'2026-13-45' is not a valid date")]
     [InlineData("ts == dateTime('2026-10-08')", 6, "'2026-10-08' is not a valid date-time")]
     [InlineData("b and sum(lines, i) > 0", 6, "Function 'sum'")]
-    [InlineData("COUNT(lines) > 0", 0, "Function 'count'")]
+    [InlineData("SUM(lines, qty) > 0", 0, "Function 'sum'")]
+    [InlineData("avg(lines, qty) > 0", 0, "Function 'avg'")]
+    [InlineData("min(lines, qty) > 0", 0, "Function 'min'")]
+    [InlineData("max(lines, qty) > 0", 0, "Function 'max'")]
+    [InlineData("all(lines, ok)", 0, "Function 'all'")]
+    [InlineData("any(lines, lower(name) == 'a')", 11, "Function 'lower'")]
+    [InlineData("b and count(lines, trim(name) == 'a') > 0", 19, "Function 'trim'")]
     public void Construct_outside_the_subset_is_reported_at_it(string expression, int offset, string named)
     {
         var parsed = ExpressionParser.Parse(expression);
         Assert.True(parsed.Succeeded);
 
-        var result = SqlTranslator.Translate(parsed.Expression, Column);
+        var result = SqlTranslator.Translate(parsed.Expression, Column, collection: Lines);
 
         Assert.False(result.Succeeded);
         Assert.Null(result.Sql);
@@ -215,6 +221,129 @@ public sealed class SqlTranslatorTests
         Assert.True(result.Succeeded, result.Diagnostic?.Message);
         Assert.Equal(["department|manager|name", "i"], paths);
         Assert.Equal("((\"department.manager.name\" IS NOT DISTINCT FROM @f0) AND (\"i\" > @f1))", result.Sql);
+    }
+
+    private static readonly ExpressionScope _itemScope = new(
+        new Dictionary<string, ExpressionType>
+        {
+            ["qty"] = ExpressionType.Integer,
+            ["ok"] = ExpressionType.Boolean,
+            ["name"] = ExpressionType.Text,
+            ["product"] = ExpressionType.Reference("Product"),
+        },
+        referenceFields: (target, name) => target == "Product" && name == "name" ? ExpressionType.Text : null);
+
+    private static readonly ExpressionScope _collectionScope = new(
+        _fields, collections: [new ExpressionCollection("lines", "Line", _itemScope)]);
+
+    private static SqlCollection Lines(string name) =>
+        name == "lines"
+            ? new SqlCollection("\"line\" AS \"a0\"", "\"a0\".\"owner_id\" = \"r\".\"id\"", path => $"\"a0\".\"{string.Join('.', path)}\"")
+            : throw new InvalidOperationException(name);
+
+    public static TheoryData<string, string, (string, ExpressionTypeKind, object)[]> Aggregates => new()
+    {
+        {
+            "any(lines, ok)",
+            "EXISTS (SELECT 1 FROM \"line\" AS \"a0\" WHERE \"a0\".\"owner_id\" = \"r\".\"id\" AND (\"a0\".\"ok\"))",
+            []
+        },
+        { "count(lines) > 1", "((SELECT count(*) FROM \"line\" AS \"a0\" WHERE \"a0\".\"owner_id\" = \"r\".\"id\") > @f0)", [("f0", ExpressionTypeKind.Integer, 1L)] },
+        {
+            "count(lines, qty > 2) >= 2",
+            "((SELECT count(*) FROM \"line\" AS \"a0\" WHERE \"a0\".\"owner_id\" = \"r\".\"id\" AND ((\"a0\".\"qty\" > @f0))) >= @f1)",
+            [("f0", ExpressionTypeKind.Integer, 2L), ("f1", ExpressionTypeKind.Integer, 2L)]
+        },
+        {
+            "any(lines, product.name == 'Desk')",
+            "EXISTS (SELECT 1 FROM \"line\" AS \"a0\" WHERE \"a0\".\"owner_id\" = \"r\".\"id\" AND ((\"a0\".\"product.name\" IS NOT DISTINCT FROM @f0)))",
+            [("f0", ExpressionTypeKind.Text, "Desk")]
+        },
+        // The names outside the aggregate are still the filter's own columns.
+        {
+            "b and any(lines, ok) and i > 0",
+            "((\"b\" AND EXISTS (SELECT 1 FROM \"line\" AS \"a0\" WHERE \"a0\".\"owner_id\" = \"r\".\"id\" AND (\"a0\".\"ok\"))) AND (\"i\" > @f0))",
+            [("f0", ExpressionTypeKind.Integer, 0L)]
+        },
+        // A null condition is never true, so the subquery keeps no row.
+        { "any(lines, null)", "EXISTS (SELECT 1 FROM \"line\" AS \"a0\" WHERE \"a0\".\"owner_id\" = \"r\".\"id\" AND (NULL))", [] },
+    };
+
+    [Theory]
+    [MemberData(nameof(Aggregates))]
+    public void Any_and_count_render_a_subquery_over_the_collections_source(
+        string expression, string expectedSql, (string, ExpressionTypeKind, object)[] expectedParameters)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, _collectionScope, ExpressionType.Boolean);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column, check, collection: Lines);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(expectedSql, result.Sql);
+        Assert.Equal(expectedParameters, result.Parameters.Select(parameter => (parameter.Name, parameter.Kind, parameter.Value)));
+    }
+
+    [Theory]
+    [InlineData("any(lines, ok)", "any")]
+    [InlineData("count(lines) > 1", "count")]
+    public void Any_and_count_are_outside_the_subset_without_a_collection_callback(string expression, string named)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ExpressionDiagnosticCodes.OutsideSqlSubset, result.Diagnostic.Code);
+        Assert.Contains($"Function '{named}'", result.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Path_inside_an_aggregate_is_given_to_the_collections_column_callback_as_its_names()
+    {
+        var parsed = ExpressionParser.Parse("i > 0 and any(lines, product.name == 'Desk' and qty > 1)");
+        Assert.True(parsed.Succeeded);
+        var outer = new List<string>();
+        var inner = new List<string>();
+        var requested = new List<string>();
+
+        var result = SqlTranslator.Translate(
+            parsed.Expression,
+            path =>
+            {
+                outer.Add(string.Join('|', path));
+                return Column(path);
+            },
+            collection: name =>
+            {
+                requested.Add(name);
+                return new SqlCollection("line", "TRUE", path =>
+                {
+                    inner.Add(string.Join('|', path));
+                    return Column(path);
+                });
+            });
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(["i"], outer);
+        Assert.Equal(["lines"], requested);
+        Assert.Equal(["product|name", "qty"], inner);
+    }
+
+    [Fact]
+    public void Aggregate_inside_an_aggregate_is_reported_at_it()
+    {
+        var parsed = ExpressionParser.Parse("any(lines, any(lines, ok))");
+        Assert.True(parsed.Succeeded);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column, collection: Lines);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, 11), (result.Diagnostic.Code, result.Diagnostic.Offset));
+        Assert.Contains("top level", result.Diagnostic.Message, StringComparison.Ordinal);
     }
 
     public static TheoryData<string, string, (string, ExpressionTypeKind, object)[]> RuleCalls => new()
