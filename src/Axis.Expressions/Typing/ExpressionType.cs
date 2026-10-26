@@ -32,6 +32,9 @@ public sealed class ExpressionType : IEquatable<ExpressionType>
 
     public static ExpressionType DateTime { get; } = new(ExpressionTypeKind.DateTime, null, []);
 
+    /// <summary>The type of a file field. Only <c>is null</c> and <c>is not null</c> accept it.</summary>
+    public static ExpressionType File { get; } = new(ExpressionTypeKind.File, null, []);
+
     public ExpressionTypeKind Kind { get; }
 
     /// <summary>For an enum, the field that declares the values. For a reference, the target entity.</summary>
@@ -100,6 +103,7 @@ public sealed class ExpressionType : IEquatable<ExpressionType>
         ExpressionTypeKind.DateTime => "date-time",
         ExpressionTypeKind.Enum => $"enum of '{Source}'",
         ExpressionTypeKind.Reference => $"reference to '{Source}'",
+        ExpressionTypeKind.File => "file",
         _ => Kind.ToString(),
     };
 }

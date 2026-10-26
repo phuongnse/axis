@@ -162,6 +162,7 @@ internal static class StudioExpressionEndpoints
         ExpressionTypeKind.DateTime => "date-time",
         ExpressionTypeKind.Enum => "enum",
         ExpressionTypeKind.Reference => "reference",
+        ExpressionTypeKind.File => "file",
         _ => null,
     };
 }
