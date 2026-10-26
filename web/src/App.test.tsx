@@ -128,6 +128,7 @@ const noteEntity: EntityMetadata = {
 
 const tasksPath = '/api/apps/E2eApp/tasks'
 const instancesPath = '/api/apps/E2eApp/processes/NoteReview/instances'
+const deadLettersPath = '/api/apps/E2eApp/processes/NoteReview/dead-letters'
 
 const noteFields = noteEntity.fields.map((field) => field.name)
 const noteAccess: WidgetAccess = {
@@ -150,6 +151,7 @@ const pages: Record<string, PageMetadata> = {
         tasksPath: null,
         process: null,
         instancesPath: null,
+        deadLettersPath: null,
         actions: [],
         rowActions: [],
         toolbarActions: [
@@ -185,6 +187,7 @@ const pages: Record<string, PageMetadata> = {
         tasksPath: null,
         process: null,
         instancesPath: null,
+        deadLettersPath: null,
         actions: [],
         rowActions: [],
         toolbarActions: [],
@@ -217,6 +220,7 @@ const pages: Record<string, PageMetadata> = {
         tasksPath: null,
         process: null,
         instancesPath: null,
+        deadLettersPath: null,
         actions: [],
         rowActions: [],
         toolbarActions: [],
@@ -241,6 +245,7 @@ const pages: Record<string, PageMetadata> = {
         tasksPath,
         process: null,
         instancesPath: null,
+        deadLettersPath: null,
         actions: [],
         rowActions: [],
         toolbarActions: [],
@@ -265,6 +270,7 @@ const pages: Record<string, PageMetadata> = {
         tasksPath: null,
         process: 'NoteReview',
         instancesPath,
+        deadLettersPath,
         actions: [],
         rowActions: [],
         toolbarActions: [],

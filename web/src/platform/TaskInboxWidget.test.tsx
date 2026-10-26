@@ -20,6 +20,7 @@ const inboxWidget: WidgetMetadata = {
   tasksPath,
   process: null,
   instancesPath: null,
+  deadLettersPath: null,
   actions: [],
   rowActions: [],
   toolbarActions: [],

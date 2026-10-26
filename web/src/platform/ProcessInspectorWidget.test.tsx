@@ -11,6 +11,7 @@ import { TextProvider } from './TextProvider'
 vi.mock('./navigation')
 
 const instancesPath = '/api/apps/E2eApp/processes/NoteReview/instances'
+const deadLettersPath = '/api/apps/E2eApp/processes/NoteReview/dead-letters'
 
 const inspectorWidget: WidgetMetadata = {
   type: 'processInspector',
@@ -20,6 +21,7 @@ const inspectorWidget: WidgetMetadata = {
   tasksPath: null,
   process: 'NoteReview',
   instancesPath,
+  deadLettersPath,
   actions: [],
   rowActions: [],
   toolbarActions: [],
@@ -62,11 +64,70 @@ const instancePage = JSON.stringify({
 
 const catalogs = [{ texts: platformEnglish, fallbackTexts: platformEnglish }]
 
-/** Stubs `fetch` with the instance list and returns the requested URLs. */
-function stubInstances(body = instancePage, status = 200) {
-  const fetchMock = vi.fn(async (_input: string) => new Response(body, { status }))
+const retryableId = '0192f4b0-1a2b-7c3d-8e4f-5a6b7c8d9e01'
+const settledId = '0192f4b0-1a2b-7c3d-8e4f-5a6b7c8d9e02'
+
+// Two open dead letters. The user may take commands on the first only.
+const deadLetterPage = JSON.stringify({
+  items: [
+    {
+      id: retryableId,
+      kind: 'event.deliver',
+      eventId: '0192f4b0-1a2b-7c3d-8e4f-5a6b7c8d9e10',
+      triggerId: null,
+      processInstanceId: null,
+      emailId: null,
+      occurrenceAt: null,
+      attempts: 5,
+      lastError: 'System.InvalidOperationException',
+      state: 'open',
+      reason: null,
+      settledBy: null,
+      createdAt: '2026-10-10T02:05:00Z',
+      settledAt: null,
+      commands: ['redeliver', 'discard'],
+    },
+    {
+      id: settledId,
+      kind: 'trigger.fanOut',
+      eventId: null,
+      triggerId: null,
+      processInstanceId: null,
+      emailId: null,
+      occurrenceAt: null,
+      attempts: 3,
+      lastError: 'Npgsql.NpgsqlException',
+      state: 'open',
+      reason: null,
+      settledBy: null,
+      createdAt: '2026-10-09T02:05:00Z',
+      settledAt: null,
+      commands: [],
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 2,
+})
+
+/**
+ * Stubs `fetch` with the instance list and the dead letter list. It returns the requested
+ * instance list URLs, and `deadLetterRequests` has the requests of the dead letter list.
+ */
+function stubInstances(body = instancePage, status = 200, deadLetters = deadLetterPage) {
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
+    input.startsWith(deadLettersPath)
+      ? new Response(init?.method === 'POST' ? '{}' : deadLetters, { status: 200 })
+      : new Response(body, { status }),
+  )
   vi.stubGlobal('fetch', fetchMock)
-  return () => fetchMock.mock.calls.map(([url]) => url)
+  const deadLetterRequests = () =>
+    fetchMock.mock.calls
+      .filter(([url]) => url.startsWith(deadLettersPath))
+      .map(([url, init]) => ({ url, method: init?.method ?? 'GET', body: init?.body }))
+  return Object.assign(() => fetchMock.mock.calls.map(([url]) => url).filter((url) => url.startsWith(instancesPath)), {
+    deadLetterRequests,
+  })
 }
 
 function CurrentSearch() {
@@ -195,5 +256,93 @@ describe('ProcessInspectorWidget', () => {
     renderWidget()
 
     expect(await screen.findByText('No instances.')).toBeInTheDocument()
+  })
+
+  it('lists the open dead letters and shows the buttons only on rows whose commands hold them', async () => {
+    const requests = stubInstances()
+
+    renderWidget()
+
+    const row = await screen.findByRole('row', { name: /event\.deliver/ })
+    expect(requests.deadLetterRequests()[0]).toEqual({ url: `${deadLettersPath}?state=open`, method: 'GET' })
+    expect(screen.getByRole('heading', { name: 'Dead letters' })).toBeInTheDocument()
+    for (const title of ['Kind', 'Attempts', 'Last error', 'Dead-lettered']) {
+      expect(screen.getByRole('columnheader', { name: title })).toBeInTheDocument()
+    }
+    expect(within(row).getByText('System.InvalidOperationException')).toBeInTheDocument()
+    expect(within(row).getByTestId(`inspector-dead-letter-redeliver-${retryableId}`)).toHaveTextContent('Redeliver')
+    expect(within(row).getByTestId(`inspector-dead-letter-discard-${retryableId}`)).toHaveTextContent('Discard')
+    const other = screen.getByRole('row', { name: /trigger\.fanOut/ })
+    expect(within(other).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId(/^inspector-dead-letter-/)).toHaveLength(2)
+  })
+
+  it('shows the empty text when no dead letter is open', async () => {
+    stubInstances(instancePage, 200, JSON.stringify({ items: [], page: 1, pageSize: 20, totalCount: 0 }))
+
+    renderWidget()
+
+    expect(await screen.findByText('No open dead letters.')).toBeInTheDocument()
+  })
+
+  it('shows an error in the dead letter section only, and keeps the instance list', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fetchMock = vi.fn(async (input: string) =>
+      input.startsWith(deadLettersPath) ? new Response('', { status: 500 }) : new Response(instancePage),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderWidget()
+
+    expect(await screen.findByTestId('inspector-dead-letters-error')).toHaveTextContent(
+      'The dead letters could not be loaded.',
+    )
+    expect(screen.getByRole('row', { name: /managerApproval/ })).toBeInTheDocument()
+  })
+
+  it('redelivers with a reason, closes the dialog and requests the dead letters again', async () => {
+    const requests = stubInstances()
+    const user = userEvent.setup()
+
+    renderWidget()
+
+    await user.click(await screen.findByTestId(`inspector-dead-letter-redeliver-${retryableId}`))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Redeliver', { selector: '.ant-modal-title' })).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText('Reason'), 'The trigger is back')
+    await user.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(requests.deadLetterRequests().map((request) => `${request.method} ${request.url}`)).toEqual([
+        `GET ${deadLettersPath}?state=open`,
+        `POST ${deadLettersPath}/${retryableId}/redeliver`,
+        `GET ${deadLettersPath}?state=open`,
+      ]),
+    )
+    expect(requests.deadLetterRequests()[1].body).toBe('{"reason":"The trigger is back"}')
+  })
+
+  it("shows the server's problem title when a command is refused", async () => {
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return new Response(JSON.stringify({ title: 'The dead letter is not open.' }), { status: 409 })
+      }
+      return new Response(input.startsWith(deadLettersPath) ? deadLetterPage : instancePage)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+
+    renderWidget()
+
+    await user.click(await screen.findByTestId(`inspector-dead-letter-discard-${retryableId}`))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Discard', { selector: '.ant-modal-title' })).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText('Reason'), 'Not needed')
+    await user.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    expect(await within(dialog).findByTestId('inspector-command-error')).toHaveTextContent(
+      'The dead letter is not open.',
+    )
   })
 })

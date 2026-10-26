@@ -404,8 +404,8 @@ grant, a required reason and one transaction. The
 
 Two more commands, **redeliver** and **discard**, act on a dead letter of the
 process with the same `retry` grant, a required reason and an audit record, see
-[Dead letters](process-events.md#routes). The widget's buttons for them are
-_(planned for M14)_.
+[Dead letters](process-events.md#routes). The widget shows Redeliver and
+Discard on each open dead letter whose `commands` list them.
 
 _(Planned for M14)_ Cancel also cancels an instance's running sub-processes, and
 an instance without a subject needs only the grant, see
