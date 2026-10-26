@@ -1,14 +1,15 @@
 import { expect, test } from "../test";
 import type { APIRequest, APIRequestContext, Page } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
+import { waitForDialog } from "../dialogs";
 import { expectChosen, pickOption } from "../select";
 import { sessionFile, useSession, type SampleUser } from "../sessions";
 
 // The service desk sample runs on the same platform as the other samples, with no platform code of its
 // own. Specs run in parallel against one database, so each test looks only for the tickets it creates.
 // Every ticket gets its own title, which is its display field, so the title finds its task. anna and lan
-// are requesters, linh leads the service desk, and khoa and minh are agents in the scenarios. Only khoa
-// is an agent in the development realm.
+// are requesters, linh and nam lead the service desk, and khoa and minh are agents in the scenarios. Only
+// khoa is an agent in the development realm.
 const appPath = "/api/apps/ServiceDesk";
 const recordsPath = `${appPath}/entities/Ticket/records`;
 const tasksPath = `${appPath}/tasks`;
@@ -140,6 +141,75 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
     await page.goto(`/service-desk/ticketform/${id}`);
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), "closed", { timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+});
+
+test("linh claims a triage task so nam no longer lists it, then reassigns it to khoa by name", async ({
+  page,
+  playwright,
+  baseURL,
+}) => {
+  const title = `Zz Reassign ${runId()}`;
+  const id = await asUser(playwright.request, baseURL, "anna", async (anna) => {
+    const created = await createTicket(anna, title);
+    await start(anna, created);
+    return created;
+  });
+  // Both leads list the triage task until one of them claims it.
+  await taskId(playwright.request, baseURL, "nam", id);
+
+  await useSession(page, "linh");
+  await openTask(page, title, "Triage ticket");
+  await page.getByRole("button", { name: "Claim", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Release", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reassign", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Claim", exact: true })).toHaveCount(0);
+
+  // The claim hides the task from the other lead.
+  await useSession(page, "nam");
+  const listed = page.waitForResponse(
+    (response) =>
+      response.url().includes(tasksPath) && response.request().method() === "GET",
+  );
+  await page.goto("/service-desk/mytasks?pageSize=100");
+  expect((await listed).status()).toBe(200);
+  await expect(page.getByRole("row", { name: new RegExp(title) })).toHaveCount(0);
+  await asUser(playwright.request, baseURL, "nam", async (nam) => {
+    const response = await nam.get(`${tasksPath}?pageSize=100`);
+    expect(response.status()).toBe(200);
+    const { items } = (await response.json()) as {
+      items: { subject: { id: string } }[];
+    };
+    expect(items.map((item) => item.subject.id)).not.toContain(id);
+  });
+
+  await useSession(page, "linh");
+  const row = page.getByRole("row", { name: new RegExp(title) });
+  await expect(async () => {
+    await page.goto("/service-desk/mytasks?pageSize=100");
+    await expect(row).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+  await expect(row.getByText("Claimed by you", { exact: true })).toBeVisible();
+  await row.getByRole("link", { name: "Triage ticket", exact: true }).click();
+  await page.getByRole("button", { name: "Reassign", exact: true }).click();
+
+  const dialog = await waitForDialog(page);
+  await dialog.getByRole("radio", { name: "Person", exact: true }).check();
+  await pickOption(dialog.getByRole("combobox"), "Khoa Agent", "Khoa");
+  await dialog.getByLabel("Reason", { exact: true }).fill("Khoa knows this printer.");
+  // The page has a button with the same name, so the click stays in the dialog.
+  await dialog.getByRole("button", { name: "Reassign", exact: true }).click();
+  await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
+
+  // The triage form does not load for khoa, whose ticket grant hides a ticket with no agent. So khoa only finds the task.
+  await useSession(page, "khoa");
+  await expect(async () => {
+    await page.goto("/service-desk/mytasks?pageSize=100");
+    await expect(
+      page
+        .getByRole("row", { name: new RegExp(title) })
+        .getByRole("link", { name: "Triage ticket", exact: true }),
+    ).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
 });
 

@@ -28,6 +28,10 @@
     {
       "dataSource": "OpenTicketsByCategory",
       "actions": ["read"]
+    },
+    {
+      "process": "TicketHandling",
+      "actions": ["reassign"]
     }
   ]
 }
