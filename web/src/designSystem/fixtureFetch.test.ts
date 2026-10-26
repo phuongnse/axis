@@ -53,6 +53,26 @@ describe('installFixtureFetch', () => {
     expect(pageFetch).toHaveBeenCalledOnce()
   })
 
+  test('returns a Response answer as it is', async () => {
+    installFixtureFetch({ '/api/apps/Sample/failing': () => new Response(null, { status: 500 }) }, scopes)
+
+    const response = await window.fetch('/api/apps/Sample/failing')
+
+    expect(response.status).toBe(500)
+  })
+
+  test('keeps the fetch pending when the route never settles', async () => {
+    installFixtureFetch({ '/api/apps/Sample/loading': () => new Promise<never>(() => {}) }, scopes)
+    const settled = Symbol('settled')
+
+    const result = await Promise.race([
+      window.fetch('/api/apps/Sample/loading').then(() => settled),
+      new Promise((resolve) => setTimeout(() => resolve('pending'), 0)),
+    ])
+
+    expect(result).toBe('pending')
+  })
+
   test('answers a scoped path with no fixture with 404 and a console error', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
 
