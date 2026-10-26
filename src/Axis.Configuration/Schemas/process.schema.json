@@ -331,6 +331,7 @@
               "output": false,
               "retry": false,
               "event": false,
+              "entity": false,
               "fields": false,
               "to": false,
               "channels": false,

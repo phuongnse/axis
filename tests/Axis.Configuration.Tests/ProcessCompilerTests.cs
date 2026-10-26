@@ -1249,6 +1249,7 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "timer", "wait": "", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "set": { "status": "'x'" }, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "dueIn": "P3D", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "entity": "Order", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "end", "deadline": { "after": "P1D", "next": "done" } }""")]
     [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "deadline": { "after": "P1D", "next": "done" } }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "after": "P1D" } }""")]
