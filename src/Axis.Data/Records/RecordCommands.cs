@@ -503,9 +503,18 @@ public static class RecordCommands
                 var unique = entity.Fields.FirstOrDefault(field =>
                     field.Unique
                     && string.Equals(exception.ConstraintName, EntityNaming.Unique(table, EntityNaming.Column(field.Name)), StringComparison.Ordinal));
-                return unique is null
+                if (unique is not null)
+                {
+                    return Failure(RecordWriteOutcome.UniqueViolation, pointer + unique.Name, Messages.NotUnique);
+                }
+
+                // A unique index is named by its columns; the error is keyed at its first field.
+                var uniqueIndex = entity.Indexes.FirstOrDefault(index =>
+                    index.Unique
+                    && string.Equals(exception.ConstraintName, EntityNaming.Index(table, [.. index.Fields.Select(EntityNaming.Column)]), StringComparison.Ordinal));
+                return uniqueIndex is null
                     ? new RecordWriteResult(RecordWriteOutcome.SchemaConflict)
-                    : Failure(RecordWriteOutcome.UniqueViolation, pointer + unique.Name, Messages.NotUnique);
+                    : Failure(RecordWriteOutcome.UniqueViolation, pointer + uniqueIndex.Fields[0], Messages.NotUnique);
             // A NOT NULL column the active model does not require, left by a failed activation.
             case PostgresErrorCodes.NotNullViolation:
                 return new RecordWriteResult(RecordWriteOutcome.SchemaConflict);

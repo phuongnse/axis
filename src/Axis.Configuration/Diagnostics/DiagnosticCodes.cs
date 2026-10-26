@@ -259,4 +259,7 @@ public static class DiagnosticCodes
     public const string MissingPlaceholderValue = "AXC0271";
     public const string UnusedPlaceholderValue = "AXC0272";
     public const string InvalidPlaceholder = "AXC0273";
+    public const string DuplicateIndex = "AXC0274";
+    public const string UnknownIndexField = "AXC0275";
+    public const string InvalidIndexField = "AXC0276";
 }
