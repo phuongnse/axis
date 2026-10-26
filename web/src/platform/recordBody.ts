@@ -1,5 +1,5 @@
 import type { CallOutput } from './inspection'
-import type { FieldValue, RecordRow, RecordValue } from './records'
+import { isFileValue, type FieldValue, type RecordRow, type RecordValue } from './records'
 import type { FieldMetadata } from './site'
 
 // The JSON number grammar of RFC 8259.
@@ -56,6 +56,10 @@ function valueText(field: FieldMetadata, value: RecordValue): string {
     isJsonNumber(value)
   ) {
     return value
+  }
+  // A file goes out as its id. The server keeps a file the record holds and attaches an uploaded one.
+  if (field.type === 'file') {
+    return JSON.stringify(isFileValue(value) ? value.id : value)
   }
   return JSON.stringify(value)
 }

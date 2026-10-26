@@ -138,9 +138,11 @@ const texts = {
   'note.title': 'Title',
   'note.done': 'Done',
   'note.category': 'Category',
+  'note.receipt': 'Receipt',
   'note.lines': 'Lines',
   'note.software': 'Software',
   'noteLine.description': 'Description',
+  'noteLine.file': 'File',
   'noteLine.quantity': 'Quantity',
   'noteSections.main': 'Main',
   'noteSections.details': 'Details',
@@ -186,7 +188,48 @@ function renderDetail(widget: EntityWidgetMetadata = noteWidget) {
 
 afterEach(() => vi.unstubAllGlobals())
 
+const fileId = '3c1d5e7f-9a2b-4c4d-8e6f-0a1b2c3d4e5f'
+const receiptField = {
+  ...field('receipt', 'file', 'note.receipt'),
+  downloadPath: '/api/apps/E2eApp/files',
+}
+const receiptWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity!,
+    fields: [
+      field('title', 'text', 'note.title'),
+      receiptField,
+      {
+        ...field('lines', 'child-collection', 'note.lines'),
+        fields: [{ ...field('file', 'file', 'noteLine.file'), downloadPath: '/api/apps/E2eApp/files' }],
+      },
+    ],
+  },
+}
+
 describe('DetailWidget', () => {
+  it('shows a file as a download link, also in a child row', async () => {
+    const file = (id: string, name: string) =>
+      `{"id":"${id}","name":"${name}","mediaType":"application/pdf","size":2048}`
+    stubFetch({
+      status: 200,
+      body: `{"id":"${noteId}","version":1,"values":{"title":"Buy paper","receipt":${file(fileId, 'paper.pdf')},"lines":[{"file":${file('11111111-1111-4111-8111-111111111111', 'line.pdf')}}]},"labels":{}}`,
+    })
+
+    renderDetail(receiptWidget)
+
+    await screen.findByText('Receipt')
+    expect(within(descriptionItem('Receipt')).getByRole('link', { name: 'paper.pdf' })).toHaveAttribute(
+      'href',
+      `/api/apps/E2eApp/files/${fileId}`,
+    )
+    expect(screen.getByRole('link', { name: 'line.pdf' })).toHaveAttribute(
+      'href',
+      '/api/apps/E2eApp/files/11111111-1111-4111-8111-111111111111',
+    )
+  })
+
   it('shows the fields of a form in its titled sections, read-only, and leaves out the others', async () => {
     const requests = stubFetch({ status: 200, body: noteJson('Buy paper') })
 

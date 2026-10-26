@@ -162,6 +162,53 @@ public sealed class ApplicationSitesTests
         }
     }
 
+    [Fact]
+    public void File_fields_carry_their_limits_and_routes_and_a_child_field_names_its_collection()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
+        try
+        {
+            Write(root, "application.json", """{ "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }""");
+            Write(root, "entities/claim-attachment.json", """
+                { "id": "55555555-5555-4555-8555-555555555521", "kind": "entity", "name": "ClaimAttachment", "formatVersion": 1,
+                  "fields": [ { "name": "file", "type": "file" } ] }
+                """);
+            Write(root, "entities/claim.json", """
+                { "id": "55555555-5555-4555-8555-555555555522", "kind": "entity", "name": "Claim", "formatVersion": 1,
+                  "fields": [
+                    { "name": "title", "type": "text" },
+                    { "name": "receipt", "type": "file", "maxSize": 1024, "accept": ["application/pdf"] },
+                    { "name": "attachments", "type": "child-collection", "target": "ClaimAttachment" }
+                  ] }
+                """);
+
+            var result = ApplicationCompiler.Compile(root);
+            Assert.Empty(result.Diagnostics);
+            Assert.NotNull(result.Model);
+
+            var fields = ApplicationSites.DescribeEntity(result.Model, "Claim").Fields.ToDictionary(field => field.Name);
+
+            var receipt = fields["receipt"];
+            Assert.Equal(1024, receipt.MaxSize);
+            Assert.Equal(["application/pdf"], receipt.Accept);
+            Assert.Equal("/api/apps/Sample/entities/Claim/fields/receipt/files", receipt.UploadPath);
+            Assert.Equal("/api/apps/Sample/files", receipt.DownloadPath);
+
+            var child = Assert.Single(fields["attachments"].Fields!);
+            Assert.Equal("/api/apps/Sample/entities/Claim/fields/attachments/file/files", child.UploadPath);
+            Assert.Equal("/api/apps/Sample/files", child.DownloadPath);
+            Assert.Null(child.MaxSize);
+            Assert.Null(child.Accept);
+
+            var title = fields["title"];
+            Assert.Equal((null, null, null, null), (title.MaxSize, title.Accept, title.UploadPath, title.DownloadPath));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static void Write(string root, string relativePath, string content)
     {
         var fullPath = Path.Combine(root, relativePath);

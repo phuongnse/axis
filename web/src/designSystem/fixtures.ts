@@ -63,7 +63,7 @@ function field(name: string, type: FieldType, labelKey: string): FieldMetadata {
 }
 
 /** A field type the design system previews: all but money and references. */
-export type PreviewFieldType = Exclude<FieldType, 'money' | 'references'>
+export type PreviewFieldType = Exclude<FieldType, 'money' | 'references' | 'file'>
 
 /** One field of each type but money and references, which the previews do not draw. The names are the labels' keys without their prefix. */
 export const fields: Record<PreviewFieldType, FieldMetadata> = {

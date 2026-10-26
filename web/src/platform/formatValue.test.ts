@@ -51,6 +51,16 @@ describe('formatValue', () => {
     )
   })
 
+  it('shows a file as its name', () => {
+    const stored = {
+      id: '3c1d5e7f-9a2b-4c4d-8e6f-0a1b2c3d4e5f',
+      name: 'paper.pdf',
+      mediaType: 'application/pdf',
+      size: '2048',
+    }
+    expect(formatValue(field('receipt', 'file'), stored, {}, options)).toBe('paper.pdf')
+  })
+
   it('shows a reference as its label', () => {
     const id = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
     expect(formatValue(field('category', 'reference'), id, { category: 'Finance' }, options)).toBe('Finance')

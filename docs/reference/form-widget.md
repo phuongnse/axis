@@ -78,7 +78,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     | `boolean` | a checkbox |
     | `date` | a date picker. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
     | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
-    | `enum` | a choice of the declared values, as written in the entity file, or their labels with `valueLabels`. A `file` field gets the [file input](file-fields.md#in-the-spa) |
+    | `enum` | a choice of the declared values, as written in the entity file, or their labels with `valueLabels` |
+    | `file` | the [file input](file-fields.md#in-the-spa): the current file's name as a download link, an Upload button and, when the field is not required, a Remove button. A read-only file shows its link only |
     | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
     | `references` | a list of the chosen records' labels in their order, each with a remove button, and an add button that opens the lookup, described under **Set of references** |
     | `child-collection` | a table of its rows, described under **Child collections** |
@@ -135,7 +136,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       Each cell uses the input the form uses for that field type, so number
       text, dates and enums behave as in the rest of the form. A cell
       input's accessible name is the column header and the one-based row
-      number, such as `Quantity 2`. A computed child field's cell is a
+      number, such as `Quantity 2`. A file cell is the file input, and its
+      Upload button is named like `Upload File 2`. A computed child field's cell is a
       read-only text input with the row's value, formatted as a table cell
       shows it.
     - Each row has a remove button. An add button below the table appends a
