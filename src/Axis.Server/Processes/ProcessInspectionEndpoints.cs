@@ -440,7 +440,7 @@ internal static class ProcessInspectionEndpoints
         return false;
     }
 
-    private static ProcessGraph Graph(ProcessModel model) =>
+    internal static ProcessGraph Graph(ProcessModel model) =>
         new(model.Start, model.Steps.Select(GraphStep).ToList());
 
     // A transition's On is text: a decision branch gives its index and the fallback gives "otherwise".
@@ -464,6 +464,7 @@ internal static class ProcessInspectionEndpoints
             CallConnectorStepModel call => Operation(call.Name, call.Next),
             PackageOperationStepModel package => Operation(package.Name, package.Next),
             RaiseEventStepModel raise => Operation(raise.Name, raise.Next),
+            SubProcessStepModel sub => Operation(sub.Name, sub.Next),
             EndStepModel end => new(end.Name, "end", null, []),
             _ => throw new InvalidOperationException($"Unexpected step type {step.GetType().Name}."),
         };

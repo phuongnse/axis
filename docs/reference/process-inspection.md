@@ -109,7 +109,7 @@ in any state. The body has these parts:
     a decision branch as text, such as `"0"`, as in the history's `decision`,
     then `"otherwise"` for the fallback branch, the name of a task outcome, or
     `null` for an operation's `next`. An `end` step has none.
-  - A `callConnector`, package and `raiseEvent` step have type `operation`.
+  - A `callConnector`, package, `raiseEvent` and `subProcess` step have type `operation`.
   - `labelKey` is set only for a `task` step.
 - `path` is the history rows of the instance, ordered by `finished_at`, then
   by `id`. Each is

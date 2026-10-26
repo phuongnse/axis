@@ -225,6 +225,8 @@ a payment reference from the sample extension package, see
 ## Steps
 
 M3 has four step types. Wait for event, timer and sub-process come later.
+The compiler already checks and builds a `subProcess` step, but the engine
+does not run it yet, see [Sub-process step](process-flow.md#sub-process-step).
 _(Planned for M14)_ `timer`, `waitEvent` and `subProcess` steps, and the
 `createRecord` and `notify` operations, see [process flow](process-flow.md)
 and [notifications](notifications.md#notify-operation).
