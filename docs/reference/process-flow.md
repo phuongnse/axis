@@ -29,7 +29,7 @@ A `timer` step waits for a time, then goes on to `next`:
 { "name": "untilDue", "type": "timer", "until": "dueDate", "next": "remind" }
 ```
 
-- It has exactly one of `wait` and `until` (`AXC0261`), and a `next`.
+- It has exactly one of `wait` and `until` (`AXC0266`), and a `next`.
 - `wait` is a positive fixed-length duration, by the rule of a task's `dueIn`
   (`AXC0084`, reported at `/steps/{i}/wait`). The time is the step's
   transaction time plus `wait`.

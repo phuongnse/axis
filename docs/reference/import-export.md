@@ -7,17 +7,21 @@ of [architecture.md](../architecture.md) apply: sections marked
 _(planned for M15)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
-Everything on this page is _(planned for M15)_.
+Everything on this page is _(planned for M15)_, except the grants and the
+policy matrix, which are built.
 
 ## Grants
 
 - An `entity` grant takes `export` and `import`, and a `dataSource` grant
   takes `export`. See [roles and policies](roles-and-policies.md).
 - `export` reaches only what the user's `read` grants reach: the same record
-  filters and the same field lists. A grant with `export` and no `read` is a
-  compile error.
-- `import` needs `create`, and `update` as well for an import with a `key`.
-  Each row is checked against those grants as a record API write would be.
+  filters and the same field lists. A grant with `export` and no `read` on the
+  same target in the same policy is `AXC0265`. The policy evaluator allows an
+  export only when the user also holds `read`.
+- `import` needs `create`, and a grant with `import` and no `create` on the
+  same entity in the same policy is `AXC0265`. An import with a `key` needs
+  `update` as well, and each row is checked against those grants as a record
+  API write would be _(planned for M15)_.
 
 ## Export
 

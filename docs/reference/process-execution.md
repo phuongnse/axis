@@ -705,6 +705,13 @@ The worker also reads the schema version of every tenant again at each poll
 round, and claims no new work for a tenant whose version is not its own. It runs
 that tenant's work again once `migrate` has brought the tenant to its version.
 
+Once a tenant is ready, the worker also deletes the expired rows of its
+`axis.sessions` table, when the tenant becomes ready and then at most every
+5 minutes by its own clock, see
+[sign-in and the session](security.md#sign-in-and-the-session). A database
+without the table yet is skipped. Any other failure is logged as a warning and
+does not hold back the tenant's work items.
+
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Worker:LeaseDuration` | `00:00:30` | How long a claim lasts before another worker can claim the item. |

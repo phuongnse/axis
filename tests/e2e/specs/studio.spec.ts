@@ -273,6 +273,59 @@ test.describe('Studio on a copy of its own', () => {
     }
   })
 
+  test('an author gives a new role read and export on a data source in the policy matrix and finds both in the policy file', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    const roleFile = path.join(copy, 'roles/matrix-exporter.json')
+    const policyFile = path.join(copy, 'policies/matrix-exporter-access.json')
+    await rm(roleFile, { force: true })
+    await rm(policyFile, { force: true })
+
+    try {
+      await writeFile(
+        roleFile,
+        JSON.stringify({
+          id: randomUUID(),
+          kind: 'role',
+          name: 'matrix-exporter',
+          formatVersion: 1,
+          label: { textKey: 'role.employee' },
+        }),
+      )
+      const diagnosticsBefore = await (
+        await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/diagnostics`)
+      ).json()
+
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&view=policies`)
+      await page.getByTestId('studio-matrix-cell-matrix-exporter-dataSource-PurchaseRequestList').click()
+      await page.getByRole('button', { name: 'Add grant', exact: true }).click()
+      const actions = page.getByTestId('studio-matrix-actions')
+      await actions.getByRole('checkbox', { name: 'read', exact: true }).check()
+      await actions.getByRole('checkbox', { name: 'export', exact: true }).check()
+      await expect(actions.getByRole('checkbox', { name: 'import', exact: true })).toHaveCount(0)
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
+      await expect(page.getByTestId('studio-matrix-saved')).toBeVisible()
+
+      const written = JSON.parse(await readFile(policyFile, 'utf8')) as Record<string, unknown>
+      expect(written).toEqual({
+        id: expect.any(String),
+        kind: 'policy',
+        name: 'MatrixExporterAccess',
+        formatVersion: 1,
+        roles: ['matrix-exporter'],
+        grants: [{ dataSource: 'PurchaseRequestList', actions: ['read', 'export'] }],
+      })
+      const diagnosticsAfter = await (
+        await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/diagnostics`)
+      ).json()
+      expect(diagnosticsAfter).toEqual(diagnosticsBefore)
+    } finally {
+      await rm(roleFile, { force: true })
+      await rm(policyFile, { force: true })
+    }
+  })
+
   test('an author saves a resource while the server restarts, and sees the saved version after the reconnect', async ({
     page,
   }) => {

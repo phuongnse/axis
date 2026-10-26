@@ -133,7 +133,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     domain, so the browser refuses it on plain http or from a subdomain. In
     `Development` and `Testing`, which run over plain http, it keeps the name
     `Axis.Session`. The name depends only on the environment.
-  - _(Planned for M16.)_ The worker removes expired rows. `tenant restore`
+  - The worker deletes the expired rows in each tenant it serves. It uses its
+    own clock, runs once when the tenant becomes ready and then at most every
+    5 minutes, and never touches a tenant it does not serve. `tenant restore`
     empties the table, so no session comes back with an archive.
   - In `Development` and `Testing`, which run over plain http, the session
     cookie and the OIDC helper cookies are Secure only on https requests.
@@ -558,8 +560,8 @@ The `role` and `policy` resource files are described in
   the application by its exact name. A value that names no declared role is
   ignored. A user matches a policy when they hold any of its roles.
 - **Grants.** A policy holds grants. Each grant gives actions on one target:
-  `read`, `create`, `update` and `delete` on an entity, `read` on a data
-  source, or `start`, `inspect`, `cancel`, `retry`, `resolve` and `reassign` on a process. `inspect` lists a process's
+  `read`, `create`, `update`, `delete`, `export` and `import` on an entity,
+  `read` and `export` on a data source, or `start`, `inspect`, `cancel`, `retry`, `resolve` and `reassign` on a process. `inspect` lists a process's
   instances, see [process inspection](process-inspection.md#process-inspection).
   `cancel` stops a running or waiting instance, see
   [Cancel](process-inspection.md#cancel). `retry` runs a failed instance

@@ -1,10 +1,30 @@
 import type { StudioMatrixRole, StudioMatrixTarget } from '../platform/studio'
+import type { JsonSchema } from '../platform/studioSchemas'
+
+// The file the server embeds, loaded with the page, so a grant's checkboxes need no loading state.
+const policySchema = Object.values(
+  import.meta.glob<JsonSchema>('../../../src/Axis.Configuration/Schemas/policy.schema.json', {
+    eager: true,
+    import: 'default',
+  }),
+)[0]
 
 const targetKeys = ['entity', 'dataSource', 'process', 'endpoint'] as const
 
 /** The key of a grant that names a target of the given kind. It is the kind itself. */
 export function grantTargetKey(kind: StudioMatrixTarget['kind']): (typeof targetKeys)[number] {
   return kind
+}
+
+/** The actions a grant on a target of the given kind takes, as the policy schema lists them. */
+export function grantActions(schema: JsonSchema, kind: StudioMatrixTarget['kind']): string[] {
+  const values = schema.$defs?.[`${kind}Action`]?.enum
+  return Array.isArray(values) ? values.filter((value): value is string => typeof value === 'string') : []
+}
+
+/** The actions a grant on a target of the given kind takes, from `policy.schema.json`. */
+export function targetActions(kind: StudioMatrixTarget['kind']): string[] {
+  return grantActions(policySchema, kind)
 }
 
 /**
