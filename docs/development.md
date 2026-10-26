@@ -92,7 +92,7 @@ publish requests of Studio. See [D47](decisions/d47-publishing-from-studio.md).
 It serves the tenants `default` and `default-preview`, so it runs preview requests too. It has no port and no health check, and writes `default ready` and `default-preview ready` once the server has migrated each tenant database.
 `docker compose logs server` shows the activation diagnostics,
 `docker compose logs worker` shows the worker output and `docker compose logs publisher` shows the publisher output. `docker compose ps` shows the worker
-healthy once its `/health/ready` passes, and `docker compose up --wait` waits for that. The worker's
+healthy once its `/health/ready` passes, and `docker compose up --wait` waits for that. The server has 5 minutes and the worker 6 minutes to become healthy before `docker compose up --wait` fails. The worker's
 health address `http://127.0.0.1:5208` stays inside its container. The Keycloak admin console login is
 `admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT` and
 `AXIS_PURCHASING_PORT` to change the host ports (5206, 5432, 8080 and 5207). All four ports

@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
 import { after, before, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { describeNotReady, parsePs } from './lib/compose-status.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const project = 'axis-smoke'
@@ -66,14 +67,25 @@ after(() => {
 })
 
 test('the stack runs from source', { timeout }, async () => {
-  const up = compose(['up', '-d', '--build', '--wait'], { stdio: 'inherit' })
+  // The build runs on its own, so a failed build is not reported as a failed start.
+  const build = compose(['build'], { stdio: 'inherit' })
+  if (build.status !== 0) assert.fail(`docker compose build exited with ${build.status}`)
+
+  const up = compose(['up', '-d', '--wait'], { stdio: 'inherit' })
   if (up.status !== 0) {
-    compose(['logs', 'server'], { stdio: 'inherit' })
-    compose(['logs', 'worker'], { stdio: 'inherit' })
-    compose(['logs', 'publisher'], { stdio: 'inherit' })
-    compose(['logs', 'keycloak'], { stdio: 'inherit' })
-    compose(['logs', 'purchasing'], { stdio: 'inherit' })
-    assert.fail(`docker compose up exited with ${up.status}`)
+    const ps = compose(['ps', '--all', '--format', 'json'])
+    const containers = parsePs(ps.stdout ?? '')
+    const lastChecks = {}
+    for (const { Service: service, Name: name, Health: health } of containers) {
+      if (health !== 'unhealthy' && health !== 'starting') continue
+      const inspect = spawnSync('docker', ['inspect', '--format', '{{json .State.Health}}', name], { encoding: 'utf8' })
+      const log = inspect.status === 0 ? (JSON.parse(inspect.stdout).Log ?? []) : []
+      lastChecks[service] = log.at(-1)?.Output ?? ''
+    }
+    for (const service of ['server', 'worker', 'publisher', 'keycloak', 'purchasing', 'postgres']) {
+      compose(['logs', service], { stdio: 'inherit' })
+    }
+    assert.fail(`docker compose up exited with ${up.status}\n${describeNotReady(containers, lastChecks)}`)
   }
 
   // /health is not mapped: it falls through to the SPA page, so only /health/ready proves the server.
@@ -164,11 +176,8 @@ test('the stack runs from source', { timeout }, async () => {
   // `up --wait` returned, so the worker's health check on /health/ready passed.
   const ps = compose(['ps', '--format', 'json', 'worker'])
   assert.equal(ps.status, 0, ps.stderr)
-  // Newer Compose versions print one JSON object per line, older ones an array.
-  const text = ps.stdout.trim()
-  const containers = text.startsWith('[') ? JSON.parse(text) : text.split('\n').map((line) => JSON.parse(line))
   assert.deepEqual(
-    containers.map((container) => container.Health),
+    parsePs(ps.stdout).map((container) => container.Health),
     ['healthy'],
     ps.stdout,
   )
@@ -279,4 +288,21 @@ test('the worker checks /health/ready and publishes no port', () => {
   const { services } = JSON.parse(config.stdout)
   assert.equal(services.worker.ports, undefined)
   assert.match(services.worker.healthcheck.test.join(' '), /\/health\/ready/)
+})
+
+// Compose prints a duration such as `5m0s`.
+const seconds = (duration) =>
+  [...duration.matchAll(/(\d+(?:\.\d+)?)(h|m|s)/g)].reduce(
+    (total, [, value, unit]) => total + Number(value) * { h: 3600, m: 60, s: 1 }[unit],
+    0,
+  )
+
+test('the server has at least 5 minutes to become healthy and the worker more', () => {
+  const config = compose(['config', '--format', 'json'])
+  assert.equal(config.status, 0, config.stderr)
+  const { services } = JSON.parse(config.stdout)
+  const server = seconds(services.server.healthcheck.start_period)
+  const worker = seconds(services.worker.healthcheck.start_period)
+  assert.ok(server >= 300, `the server's start_period is ${server} s`)
+  assert.ok(worker > server, `the worker's start_period is ${worker} s, the server's ${server} s`)
 })
