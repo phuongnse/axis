@@ -38,9 +38,11 @@ internal static partial class AdminCommands
 
     public const string ClientSecretSetting = "AXIS_OIDC_CLIENT_SECRET";
 
+    public const string BindingSecretSetting = "AXIS_BINDING_SECRET";
+
     public const string PathSetting = "PATH";
 
-    private const string Usage =
+    internal const string Usage =
         """
         Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>
                tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...
@@ -52,6 +54,13 @@ internal static partial class AdminCommands
                tenant resume <id>
                tenant rotate-passwords <id>
                tenant list
+               tenant binding list <id>
+               tenant binding set <id> <name> --url <value>
+               tenant binding set <id> <name> --secret
+               tenant binding remove <id> <name>
+               tenant host add <id> <host>
+               tenant host remove <id> <host>
+               tenant host move <host> --to <id>
                publisher
                version
         """;
@@ -62,12 +71,22 @@ internal static partial class AdminCommands
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken) =>
-        RunAsync(args, configuration, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, cancellationToken);
+        RunAsync(args, configuration, TextReader.Null, output, error, cancellationToken);
+
+    public static Task<int> RunAsync(
+        string[] args,
+        IConfiguration configuration,
+        TextReader input,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken) =>
+        RunAsync(args, configuration, input, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, cancellationToken);
 
     // The publisher lease and the test limit are parameters so that tests can use short ones. The product has no setting for them.
     internal static async Task<int> RunAsync(
         string[] args,
         IConfiguration configuration,
+        TextReader input,
         TextWriter output,
         TextWriter error,
         TimeSpan publisherLease,
@@ -76,6 +95,7 @@ internal static partial class AdminCommands
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
 
@@ -86,7 +106,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        return await command.RunAsync(new AdminRun(command, args, configuration, output, error, publisherLease, publisherTestLimit, cancellationToken));
+        return await command.RunAsync(new AdminRun(command, args, configuration, input, output, error, publisherLease, publisherTestLimit, cancellationToken));
     }
 
     /// <summary>
@@ -102,6 +122,12 @@ internal static partial class AdminCommands
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant rotate-passwords", AuditMark.OnePerTenant, run => RotatePasswordsAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant list", AuditMark.None, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant binding list", AuditMark.None, TenantSettings.BindingListAsync),
+        new("tenant binding set", AuditMark.OnePerTenant, TenantSettings.BindingSetAsync),
+        new("tenant binding remove", AuditMark.OnePerTenant, TenantSettings.BindingRemoveAsync),
+        new("tenant host add", AuditMark.OnePerTenant, TenantSettings.HostAddAsync),
+        new("tenant host remove", AuditMark.OnePerTenant, TenantSettings.HostRemoveAsync),
+        new("tenant host move", AuditMark.OnePerTenant, TenantSettings.HostMoveAsync),
         new("migrate", AuditMark.OnePerTenant, run => MigrateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.CancellationToken)),
@@ -1067,7 +1093,7 @@ internal static partial class AdminCommands
     }
 
     /// <summary><c>tenant suspend</c>, <c>resume</c> and <c>list</c> need only the platform database. They decrypt nothing and create no role or database.</summary>
-    private static string? ReadDirectorySettings(IConfiguration configuration, out string problem)
+    internal static string? ReadDirectorySettings(IConfiguration configuration, out string problem)
     {
         problem = "";
         var platform = configuration[PlatformSetting];
@@ -1089,7 +1115,7 @@ internal static partial class AdminCommands
     }
 
     /// <summary>Reads the settings that <c>tenant create</c>, <c>tenant backup</c> and <c>migrate</c> need: the platform database and the key of the tenant secrets.</summary>
-    private static PlatformSettings? ReadPlatformSettings(IConfiguration configuration, out string problem)
+    internal static PlatformSettings? ReadPlatformSettings(IConfiguration configuration, out string problem)
     {
         problem = "";
         var platform = configuration[PlatformSetting];

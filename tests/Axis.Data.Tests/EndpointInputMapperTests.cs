@@ -103,6 +103,29 @@ public sealed class EndpointInputMapperTests
         Assert.Equal(["Unknown property."], parsed.Errors["/values"]);
     }
 
+    [Fact]
+    public void A_required_field_with_a_default_may_be_left_unmapped_but_not_mapped_to_null()
+    {
+        var kind = Field("kind", FieldType.Text, required: true) with
+        {
+            Default = ExpressionModel.Compile("'x'", ExpressionScopes.ForEntity([]), ExpressionScopes.TypeOf(Field("kind", FieldType.Text))!),
+        };
+        var entity = Entity(
+            Guid.Parse("33333333-3333-4333-8333-333333333341"), "Tagged", "entities/tagged.json", Field("title", FieldType.Text), kind);
+        var application = Application(entity);
+        var unmapped = _endpoint with { Values = [Value("title", "name")] };
+        var mapped = _endpoint with { Values = [Value("title", "name"), new EndpointValueModel("kind", ExpressionModel.Compile("name", ExpressionScopes.ForEntity([Field("name", FieldType.Text)]), ExpressionScopes.TypeOf(kind)!), null)] };
+        var input = Parse("""{ "input": { "price": 1 } }""").Input!;
+
+        var left = EndpointInputMapper.Map(application, entity, unmapped, input);
+        var sentNull = EndpointInputMapper.Map(application, entity, mapped, input);
+
+        Assert.Null(left.Errors);
+        Assert.Equal(["title"], left.Values.Select(value => value.Field.Name));
+        Assert.Equal(["/values/kind"], sentNull.Errors!.Keys);
+        Assert.Equal(["Required."], sentNull.Errors["/values/kind"]);
+    }
+
     private static EndpointMapResult Map(string body)
     {
         var parsed = Parse(body);

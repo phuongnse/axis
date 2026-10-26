@@ -196,16 +196,25 @@ Writes go through the record command in `Axis.Processes`, which hosts without
 HTTP also call. The record API maps its outcome to the responses below.
 
 - **Create.** `POST` takes `{ "values": { ... } }`. The record gets a new
-  version 7 UUID as its id and `version` 1. Fields the body leaves out are
-  SQL `NULL`. From M15 a field with a `default` that the body leaves out gets
-  its default, and a body that sends `null` keeps `null`
-  _(planned for M15)_. The response is `201` with the record, and `Location` is
+  version 7 UUID as its id and `version` 1. A field with a `default` that the
+  body leaves out gets its default, and a body that sends `null` keeps `null`.
+  Any other field the body leaves out is SQL `NULL`. A required field with a
+  default may be left out, but sending `null` for it is still a `400`
+  "Required.". `now()` in a default is the start time of the write
+  transaction, the same time the validations and the `record.created` audit
+  record see. A default that fails at run time, such as a division by zero,
+  is a `400` at `/values/<field>` with "Could not be computed.", and nothing
+  is written. The same holds for a record the record command creates as
+  `system`. A field filled from its default is not checked against the
+  user's field grants, because the server sets it. Rows of a child collection
+  get no defaults yet: a field a row leaves out is SQL `NULL`, and its
+  required fields stay required. The response is `201` with the record, and `Location` is
   `/api/apps/{app}/entities/{entity}/records/{id}`. It uses the application
   and entity names from the active model, not the letter case of the request,
   so a record always has one URL. The id is in the lowercase hyphenated form.
 - **Update.** `PATCH` takes `{ "version": n, "values": { ... } }`. Only the
-  fields in `values` change, and fields left out keep their value. `null`
-  clears a field that is not required. An empty `values` only increments
+  fields in `values` change, and fields left out keep their value. An update
+  never applies a `default`. `null` clears a field that is not required. An empty `values` only increments
   `version`. The response is `200` with the record and its new version.
 - **Data change triggers.** A create or update that commits also starts the
   processes of the matching [data change triggers](process-events.md#starts-from-triggers)
@@ -703,8 +712,9 @@ the active release, ignoring letter case.
   as on writes.
 - `touched` lists the fields the user has changed or left. It may be empty.
 
-The draft is the stored record, when there is one, overlaid with `values`.
-Computed fields are calculated on it.
+The draft is the stored record, when there is one, overlaid with `values`. For
+a new record, each field that `values` leaves out first takes its `default`, as
+a create does. Computed fields are calculated on it.
 
 ```json
 {
@@ -713,7 +723,8 @@ Computed fields are calculated on it.
     "status": { "visible": true, "required": false, "readOnly": false },
     "resolution": { "visible": true, "required": true, "readOnly": false }
   },
-  "errors": { "/values/resolution": ["Required."] }
+  "errors": { "/values/resolution": ["Required."] },
+  "defaults": {}
 }
 ```
 
@@ -732,6 +743,22 @@ Computed fields are calculated on it.
 - `errors` holds the parse errors, "Required." for an empty required field, the
   computed-field errors and the entity's validation messages, keyed as on a
   write. It holds only keys of fields that the user touched and may read.
+- `defaults` holds, for a new record, the `default` of each field of the form
+  that the user may read and that `values` leaves out, in form order. The values
+  are in the [value format](#request-bodies-and-values), so a date-time is UTC
+  text and a decimal shows its scale. The conditions and messages above are
+  worked out with them in place, so a form can show what a save would store.
+  - A field that `values` sends, even as `null`, is not in `defaults`. Neither
+    is a field whose value does not fit its type, because the user's text must
+    stay.
+  - A default that gives `null` for an optional field is `null` in `defaults`.
+  - A default that cannot be computed is left out, and its message is in
+    `errors` under the touched-field rule. The other defaults stay in.
+  - A field that is not on the form, or that the user may not read, is not in
+    `defaults`. A save still gives a field that is not on the form its default.
+  - `now()` is the time of this call, not of the save.
+  - It is `{}` for a record id, and on the
+    [task form state](task-api.md) route.
 - A value that does not fit its field, or a computed field that cannot be
   computed, is a message in `errors` of a `200` answer, so that one bad value
   does not stop the other fields from getting their states. A `400` is only for

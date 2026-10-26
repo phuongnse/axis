@@ -315,6 +315,22 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Seed_record_that_leaves_out_a_required_field_with_a_default_is_inserted_with_the_default()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        const string KindField = """{ "name": "kind", "type": "text", "required": true, "maxLength": 20, "default": "'seeded'" }""";
+        using var folder = ApplicationFolder(TitleField, KindField)
+            .With("seeds/notes.json", SeedFile("""{ "title": "First" }""", secondValues: null));
+
+        await using var factory = CreateFactory(a, b, folder.Path, new LogCollector());
+        using var client = factory.CreateClient();
+
+        Assert.Equal(
+            "seeded",
+            await ScalarAsync(a, $"SELECT {EntityNaming.Quote(EntityNaming.Column("kind"))} FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_noteId))} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = '{_firstSeedId}'"));
+    }
+
+    [Fact]
     public async Task Seed_without_sync_ignores_a_changed_file_value()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());

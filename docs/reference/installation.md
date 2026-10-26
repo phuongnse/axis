@@ -228,9 +228,10 @@ sets it, 30 seconds by default.
   machine in front of the server. See
   [forwarded headers](#several-server-replicas). The images hold no `curl`, so the
   example has no container health check. Probe `/health/ready` from the host.
-- **The purchase request sample** needs a purchasing system binding, which no
-  admin command sets, see [open points](#open-points). This guide activates
-  the leave request sample.
+- **The purchase request sample** needs a purchasing system binding, which
+  `tenant binding set` sets, see
+  [deployment bindings](tenant-setting-commands.md#deployment-bindings). This
+  guide activates the leave request sample.
 
 **TLS proxy and a second replica.** The `proxy` profile starts a pinned Caddy
 proxy that ends TLS. The `replicas` profile starts `server-2`, configured like
@@ -519,16 +520,10 @@ These are not decided yet.
   error and exits with code 0, so running it first, as the order above does, is
   safe on a first install.
 
-Two former open points are decided in
-[D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md), and are
+One former open point is decided in
+[D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md), and is
 not built yet:
 
-- **Deployment bindings.** No admin command sets a tenant's deployment
-  bindings yet, see [administration](administration.md#not-built-yet). So an
-  installation cannot set the purchasing system binding of the purchase request
-  sample through the admin tool alone. `tenant binding set` is
-  _(planned for M16)_, see
-  [deployment bindings](tenant-setting-commands.md#deployment-bindings).
 - **Rotating the installation key.** Axis has no rotation yet. After a leaked
   `Platform:SecretKey`, every stored secret must be set again by hand. Changing
   `Platform:SecretKey` also means deleting the rows of

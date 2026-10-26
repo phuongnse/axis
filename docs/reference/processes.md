@@ -9,7 +9,7 @@ work, and the tables. The rest of the process reference is in these files:
   steps, loops, the `createRecord` operation and processes without a subject.
   Loops through a `task` are built, the rest is _(planned for M14)_.
 - [task-deadlines.md](task-deadlines.md): task escalations, deadlines, claim
-  and reassign _(planned for M14)_.
+  and reassign. Claim and reassign are built, the rest is _(planned for M14)_.
 - [notifications.md](notifications.md): the `notify` operation and in-app and
   email notifications _(planned for M14)_.
 - [process-execution.md](process-execution.md): execution, connector calls,
@@ -242,7 +242,7 @@ and [notifications](notifications.md#notify-operation).
     such as `department.manager`. A `role` names a role the user must hold.
     Queues come later. _(Planned for M14)_ A user who holds the role may
     claim the task, see [Claim and release](task-deadlines.md#claim-and-release).
-  - `form` names a [form resource](frontend.md) whose entity is the subject
+  - `form` names a [form resource](form-widget.md) whose entity is the subject
     entity. The task page shows it over the subject record.
   - `dueIn` is optional. It is a positive ISO 8601 duration in whole
     numbers: either weeks, such as `P2W`, or days with an optional time part
@@ -294,7 +294,9 @@ reported in one pass. See
   A process without a subject has no `task`, `updateRecord` or `raiseEvent`
   step and no `output` on a connector or package step (`AXC0246`). Its start
   condition and each `when` see its parameters and the named rules, and no
-  field, path or `id`. A trigger that names such a process is `AXC0247`. The
+  field, path or `id`. A trigger that names such a process is `AXC0247`, except a schedule trigger
+  without a data source, see [Scheduled
+  jobs](process-events.md#scheduled-jobs). The
   start endpoint answers `400` for it until starting these processes is built,
   see [Processes without a
   subject](process-flow.md#processes-without-a-subject).
@@ -374,7 +376,8 @@ reported in one pass. See
 
 ## Start endpoint
 
-A start creates an instance for one subject record:
+A start creates an instance for one subject record. A process without a subject
+takes [parameters instead](#a-process-without-a-subject):
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances
@@ -423,9 +426,13 @@ The `201` has no `Location` header. Reading an instance needs an `inspect`
 grant, which the user who started it may not hold. See the
 [instance detail](process-inspection.md#instance-detail).
 
-A start needs a session, a `start` grant on the process and read access to
-the subject record, as [Authorization](security.md#authorization)
-describes.
+A start needs a session, or a bearer token of a
+[service account](security.md#service-accounts), a `start` grant on the process
+and read access to the subject record, as
+[Authorization](security.md#authorization) describes. A request with a bearer
+token needs no CSRF header, and its caller id is the actor of the
+`process.started` audit record. A bad token is a `401` with
+`WWW-Authenticate: Bearer`.
 
 - **Subject the user may not read.** A subject record the user may not read
   does not exist for them. That is a record outside every filter of their
@@ -435,14 +442,14 @@ describes.
 
 A request is checked in this order, and the first failure is the response:
 
-1. The session, `401`.
+1. The session or the bearer token, `401`.
 2. The application and the process, `404`.
 3. The `start` grant on the process, `403`.
 4. The content type, `415`.
 5. The body, `400`.
 6. The `Idempotency-Key` header, `400`.
 
-A start without the CSRF header is a `403` before any of these checks. Read
+A start by a session without the CSRF header is a `403` before any of these checks. Read
 access to the subject record is checked in the transaction, when the record
 is read.
 
@@ -486,6 +493,43 @@ caller, and its details add the endpoint's name.
   after the record is fixed.
 - Concurrent repeats are serialized by the receipt's unique key, so only one
   of them starts an instance.
+
+### A process without a subject
+
+A [process without a subject](process-flow.md#processes-without-a-subject)
+takes its typed parameters instead of a record id:
+
+```http
+POST /api/apps/{app}/processes/{process}/instances
+Content-Type: application/json
+
+{ "parameters": { "days": 31 } }
+```
+
+The checks run in the order above, and so do the answers. The differences are
+these:
+
+- **`201`.** The body has the same keys, and `subjectId` is `null`. The
+  instance stores the parameter values.
+- **`400` for a body.** The body must be exactly one `parameters` property,
+  and its value must be an object. Anything else is one error keyed
+  `/parameters`.
+- **`400` for a parameter.** Each declared parameter must be given once, by its
+  exact name, letter case included, with a value of its type, read as a record
+  field value of that type is. A missing, unknown, repeated, `null` or
+  mistyped parameter is an error keyed `/parameters/{name}`. All the errors
+  are in one response.
+- **`400` for a start condition.** The `startCondition` is checked over the
+  parameters. A failure is an error keyed `/parameters` that holds the
+  condition's message text key.
+- **`409`.** A `running` or `waiting` instance of the process exists. The title
+  is "A running or waiting instance of this process already exists.".
+- **`403`.** The user needs the `start` grant only. There is no record, so no
+  `read` check runs and there is no policy `409`.
+- **`422`.** The `Idempotency-Key` was used before with other parameter values.
+  The receipt stores a null subject, and the values are compared with those
+  stored on the receipt's instance. Decimals count as equal when they are the
+  same number.
 
 ## Instance states
 
@@ -691,7 +735,8 @@ database, with history in `axis.__processes_migrations` (see
     batch of up to 500 rows. See
     [Recomputing computed fields](migrations.md#recomputing-computed-fields).
 - `axis.process_start_receipts`: the stored `201` response of each
-  `Idempotency-Key`, unique per application, process and key.
+  `Idempotency-Key`, unique per application, process and key. The subject is
+  null for a process without a subject.
 - `axis.endpoint_receipts`: the record and instance of each endpoint call's
   `Idempotency-Key`, unique per application, endpoint, caller and key, with a
   hash of the input. See [Idempotency](inbound-endpoints.md#idempotency).
@@ -845,6 +890,6 @@ database, with history in `axis.__processes_migrations` (see
   through a `timer` or `waitEvent` step is allowed too.
 - **No user check.** The user id that a `user` assignee gives is not checked
   against any list of users. A wrong id creates a task that nobody sees. A
-  reassign in M14 checks its target against the
+  [reassign](task-deadlines.md#reassign) checks its target against the
   [user profiles](notifications.md#user-profiles), but the `user` expression
   stays unchecked.

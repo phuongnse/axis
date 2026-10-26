@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Naming;
@@ -16,11 +15,6 @@ namespace Axis.Data.Records;
 /// </summary>
 public static class PendingComputedReads
 {
-    private const string DateFormat = "yyyy-MM-dd";
-
-    // PostgreSQL stores microseconds, so six fraction digits show every stored value.
-    private const string DateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'";
-
     /// <summary>
     /// Returns <paramref name="record"/> of <paramref name="entity"/> with its pending computed fields
     /// computed by <paramref name="active"/>, the application's active release, inside
@@ -99,7 +93,7 @@ public static class PendingComputedReads
         {
             if (Replaceable(entity, value.Field) is { } field)
             {
-                values[field.Name] = ToJson(value);
+                values[field.Name] = RecordValueJson.ToJson(value);
             }
         }
 
@@ -123,7 +117,7 @@ public static class PendingComputedReads
                 {
                     if (Replaceable(child, value.Field) is { } childField)
                     {
-                        row[childField.Name] = ToJson(value);
+                        row[childField.Name] = RecordValueJson.ToJson(value);
                     }
                 }
 
@@ -140,44 +134,4 @@ public static class PendingComputedReads
     // same name and type, which must be computed there too.
     private static FieldModel? Replaceable(EntityModel own, FieldModel active) =>
         own.TryGetField(active.Name, out var field) && field.IsComputed && field.Type == active.Type ? field : null;
-
-    // The value as RecordQueries.ReadValue gives it for a stored column.
-    private static JsonNode? ToJson(RecordValue value)
-    {
-        if (value.Value is null)
-        {
-            return null;
-        }
-
-        return value.Field.Type switch
-        {
-            FieldType.Text or FieldType.Enum => JsonValue.Create((string)value.Value),
-            FieldType.Integer => JsonValue.Create((long)value.Value),
-            FieldType.Decimal or FieldType.Money => JsonNode.Parse(DecimalText(value.Field, (string)value.Value)),
-            FieldType.Boolean => JsonValue.Create((bool)value.Value),
-            FieldType.Date => JsonValue.Create(((DateOnly)value.Value).ToString(DateFormat, CultureInfo.InvariantCulture)),
-            FieldType.DateTime => JsonValue.Create(((DateTimeOffset)value.Value).UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture)),
-            FieldType.Reference => JsonValue.Create(((Guid)value.Value).ToString("D")),
-            _ => throw new ArgumentOutOfRangeException(nameof(value), value.Field.Type, "A field of this type cannot be computed."),
-        };
-    }
-
-    // A column with a precision shows exactly its scale in fraction digits, as numeric(p,s)::text does. Otherwise
-    // the text stays as computed.
-    private static string DecimalText(FieldModel field, string text)
-    {
-        if (field.Precision is null)
-        {
-            return text;
-        }
-
-        var scale = field.Scale ?? 0;
-        var negative = text.StartsWith('-');
-        var unsigned = negative ? text[1..] : text;
-        var point = unsigned.IndexOf('.', StringComparison.Ordinal);
-        var integer = point < 0 ? unsigned : unsigned[..point];
-        var fraction = (point < 0 ? "" : unsigned[(point + 1)..]).TrimEnd('0').PadRight(scale, '0');
-        var number = scale == 0 ? integer : $"{integer}.{fraction}";
-        return negative && number.Any(character => character is >= '1' and <= '9') ? "-" + number : number;
-    }
 }
