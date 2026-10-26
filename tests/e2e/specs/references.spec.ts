@@ -26,6 +26,15 @@ async function addSoftware(page: Page, name: string, run: string) {
   await expect(dialog).toBeHidden()
 }
 
+// Leaving the form before the save answers aborts the request, so each save waits for its response.
+async function saveAsset(page: Page, id: string) {
+  const saved = page.waitForResponse(
+    (response) => response.url().includes(`/entities/Asset/records/${id}`) && response.request().method() === 'PATCH',
+  )
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  expect((await saved).ok()).toBe(true)
+}
+
 test('two software records are picked on an asset form, shown on its detail, and one is removed', async ({
   page,
   request,
@@ -44,7 +53,7 @@ test('two software records are picked on an asset form, shown on its detail, and
   await addSoftware(page, excel, run)
   const list = page.getByRole('list', { name: 'Software', exact: true })
   await expect(list.getByRole('listitem')).toHaveCount(2)
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await saveAsset(page, asset.id)
 
   await page.goto(`/e2e/assetdetail?asset=${asset.id}`)
   const labels = page.getByTestId('detail-references-software')
@@ -55,7 +64,7 @@ test('two software records are picked on an asset form, shown on its detail, and
   await page.goto(`/e2e/assetform/${asset.id}`)
   await page.getByRole('button', { name: `Remove ${word}`, exact: true }).click()
   await expect(page.getByTestId('references-software-announcement')).toHaveText(`Removed ${word}`)
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await saveAsset(page, asset.id)
 
   await page.goto(`/e2e/assetdetail?asset=${asset.id}`)
   await expect(page.getByTestId('detail-references-software')).toHaveText(excel)
