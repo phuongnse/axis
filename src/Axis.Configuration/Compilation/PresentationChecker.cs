@@ -997,11 +997,11 @@ internal static class PresentationChecker
                 $"The data source '{dataSource.Name}' must have an 'aggregate' with exactly one 'groupBy' field, not {aggregate.GroupBy.Count}. A chart draws its groups.",
                 $"{path}/dataSource");
         }
-        else if (!string.Equals(aggregate.GroupBy[0], widget.Category, StringComparison.OrdinalIgnoreCase))
+        else if (!string.Equals(aggregate.GroupBy[0].Field, widget.Category, StringComparison.OrdinalIgnoreCase))
         {
             report(
                 DiagnosticCodes.ChartDataSourceNotGrouped,
-                $"The category '{widget.Category}' must be the group field '{aggregate.GroupBy[0]}' of the data source '{dataSource.Name}'.",
+                $"The category '{widget.Category}' must be the group field '{aggregate.GroupBy[0].Field}' of the data source '{dataSource.Name}'.",
                 $"{path}/category");
         }
 
