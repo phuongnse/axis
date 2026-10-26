@@ -11,6 +11,8 @@ public static class AuditActions
 
     public const string RecordsImported = "records.imported";
 
+    public const string RecordsExported = "records.exported";
+
     public const string ProcessStarted = "process.started";
 
     public const string ProcessStepCompleted = "process.stepCompleted";

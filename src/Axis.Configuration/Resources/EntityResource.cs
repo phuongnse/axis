@@ -13,4 +13,7 @@ public sealed record EntityResource : Resource
 
     /// <summary>The validation rules, in declaration order. They are checked by <see cref="Compilation.ApplicationCompiler"/>.</summary>
     public IReadOnlyList<ValidationDefinition> Validations { get; init; } = [];
+
+    /// <summary>The indexes the author declares over the entity's fields. They are checked by <see cref="Compilation.ApplicationCompiler"/>.</summary>
+    public IReadOnlyList<IndexDefinition> Indexes { get; init; } = [];
 }

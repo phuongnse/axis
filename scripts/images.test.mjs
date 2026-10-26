@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { buildImage } from './lib/docker-build.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const timeout = 20 * 60 * 1000
@@ -47,13 +48,7 @@ before(
   async () => {
     version = `0.0.0-test.${process.pid}`
     folder = mkdtempSync(join(tmpdir(), 'axis-images-'))
-    for (const target of targets) {
-      const build = docker(
-        ['build', '--target', target, '--build-arg', `AXIS_VERSION=${version}`, '-t', image(target), '.'],
-        { stdio: 'inherit' },
-      )
-      assert.equal(build.status, 0, `docker build --target ${target} exited with ${build.status}`)
-    }
+    for (const target of targets) await buildImage({ target, version, tag: image(target) })
 
     run(['network', 'create', network])
     run([
@@ -76,11 +71,18 @@ before(
     // Check over TCP: the initialization server listens only on the Unix socket, so the check succeeds
     // only after the init scripts have run.
     let ready = false
-    for (let i = 0; i < 60 && !ready; i++) {
+    let running = true
+    for (let i = 0; i < 60 && !ready && running; i++) {
       if (i > 0) await new Promise((resolve) => setTimeout(resolve, 1000))
       ready = docker(['exec', postgres, 'pg_isready', '-h', '127.0.0.1', '-U', 'axis', '-d', 'axis']).status === 0
+      if (!ready) running = docker(['inspect', '-f', '{{.State.Running}}', postgres]).stdout.trim() === 'true'
     }
-    assert.ok(ready, `PostgreSQL was not ready after 60 seconds\n${docker(['logs', postgres]).stderr}`)
+    if (!ready) {
+      const logs = docker(['logs', postgres])
+      assert.fail(
+        `PostgreSQL ${running ? 'was not ready after 60 seconds' : 'stopped'}\n${logs.stdout}${logs.stderr}`,
+      )
+    }
   },
   { timeout },
 )

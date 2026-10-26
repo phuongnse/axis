@@ -530,6 +530,7 @@
   "shell.studio.process.output": "Đầu ra",
   "shell.studio.process.connectorOutput": "Đầu ra của trình kết nối",
   "shell.studio.process.event": "Sự kiện",
+  "shell.studio.process.createEntity": "Thực thể cần tạo",
   "shell.studio.process.eventFields": "Trường của sự kiện",
   "shell.studio.process.eventField": "Trường sự kiện",
   "shell.studio.process.retry": "Thử lại",

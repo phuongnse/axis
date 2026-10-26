@@ -106,6 +106,13 @@ public sealed record OperationStepModel(string Name, string Operation, IReadOnly
 public sealed record RecordAssignmentModel(string Field, ExpressionModel Value);
 
 /// <summary>
+/// A <c>createRecord</c> operation step: it creates a record of <see cref="Entity"/> through the
+/// record create rules, as <c>system</c>, with the values <see cref="Set"/> gives, then moves to
+/// <see cref="Next"/>. The expressions are over the process's subject or parameters.
+/// </summary>
+public sealed record CreateRecordStepModel(string Name, EntityReference Entity, IReadOnlyList<RecordAssignmentModel> Set, string Next) : ProcessStepModel(Name);
+
+/// <summary>
 /// A <c>callConnector</c> operation step: it calls <see cref="Operation"/> of
 /// <see cref="Connector"/>, both by their declared names, with <see cref="Input"/>, writes
 /// <see cref="Output"/> to the subject record, and moves to <see cref="Next"/> when the call

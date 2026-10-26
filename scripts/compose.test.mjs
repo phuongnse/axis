@@ -30,6 +30,9 @@ const freePort = () =>
     })
   })
 
+// tail: the last characters of a command's output, for an assertion message.
+const tail = (text, length = 8000) => (text.length > length ? `…${text.slice(-length)}` : text)
+
 const compose = (args, options = {}) =>
   spawnSync('docker', ['compose', '-p', project, ...args], {
     cwd: root,
@@ -175,6 +178,10 @@ test('the stack runs from source', { timeout }, async () => {
 })
 
 test('a broken application folder stops the server', { timeout }, () => {
+  // The run below must not build: a build log in its output hid the server's output.
+  const build = compose(['build', 'server'], { stdio: 'inherit' })
+  assert.equal(build.status, 0, `docker compose build server exited with ${build.status}`)
+
   // No id and no name: the folder does not compile.
   const folder = mkdtempSync(join(tmpdir(), 'axis-broken-'))
   try {
@@ -183,19 +190,15 @@ test('a broken application folder stops the server', { timeout }, () => {
     chmodSync(folder, 0o755)
     chmodSync(join(folder, 'application.json'), 0o644)
 
-    const run = compose([
-      'run',
-      '--rm',
-      '--no-TTY',
-      '-v',
-      `${folder}:/broken:ro`,
-      '-e',
-      'ActivateOnStartup__0=/broken',
-      'server',
-    ])
-    const output = `${run.stdout}${run.stderr}`
-    assert.notEqual(run.status, 0, output)
-    assert.match(output, /in application folder \/broken for tenant default/, output)
+    const run = compose(
+      ['run', '--rm', '--no-TTY', '-v', `${folder}:/broken:ro`, '-e', 'ActivateOnStartup__0=/broken', 'server'],
+      { maxBuffer: 64 * 1024 * 1024 },
+    )
+    const output = `${tail(run.stdout ?? '')}\n--- stderr ---\n${tail(run.stderr ?? '')}`
+    assert.equal(run.error, undefined, `${run.error}\n${output}`)
+    assert.equal(run.signal, null, `killed by ${run.signal}\n${output}`)
+    assert.ok(typeof run.status === 'number' && run.status !== 0, `exited with ${run.status}\n${output}`)
+    assert.match(`${run.stdout}${run.stderr}`, /in application folder \/broken for tenant default/, output)
   } finally {
     rmSync(folder, { recursive: true, force: true })
   }
