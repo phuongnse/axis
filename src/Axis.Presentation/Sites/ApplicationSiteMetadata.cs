@@ -189,7 +189,7 @@ public sealed record KpiComparisonMetadata(string Measure, string LabelKey);
 /// The entity actions a user may take on a widget's entity, and the fields each write action covers.
 /// This only shapes the UI: the server checks every request.
 /// </summary>
-/// <param name="Actions">The granted entity actions, in the order <c>read</c>, <c>create</c>, <c>update</c>, <c>delete</c>.</param>
+/// <param name="Actions">The granted entity actions, in the order <c>read</c>, <c>create</c>, <c>update</c>, <c>delete</c>, then <c>import</c> on a table over an entity.</param>
 /// <param name="CreateFields">The fields a create may write, in declaration order. Empty without <c>create</c>.</param>
 /// <param name="UpdateFields">The fields an update may write, in declaration order. Empty without <c>update</c>.</param>
 public sealed record WidgetAccess(IReadOnlyList<string> Actions, IReadOnlyList<string> CreateFields, IReadOnlyList<string> UpdateFields);
