@@ -24,11 +24,12 @@ public static class RecordCommands
     /// Inserts a record with version 1, stamped with <paramref name="releaseId"/>, the release that
     /// computed its stored values, holding <paramref name="values"/> and SQL <c>NULL</c> or the
     /// column default for every other field, and the rows of each collection in
-    /// <paramref name="rows"/>. Its id is <paramref name="id"/>, such as a seed record's fixed id,
+    /// <paramref name="rows"/>, and the set of each references field in <paramref name="links"/>.
+    /// Its id is <paramref name="id"/>, such as a seed record's fixed id,
     /// or a new version 7 id when <paramref name="id"/> is not given. Each field that names a
     /// sequence gets the sequence's next number, taken after the reference check so a refused
     /// create returns before it touches a counter. The caller must hold a transaction when
-    /// <paramref name="rows"/> is not empty or the entity has a sequence field, and roll it back
+    /// <paramref name="rows"/> or <paramref name="links"/> is not empty or the entity has a sequence field, and roll it back
     /// unless the record is <see cref="RecordWriteOutcome.Written"/>, which hands the number back.
     /// </summary>
     public static async Task<RecordWriteResult> CreateAsync(
@@ -38,6 +39,7 @@ public static class RecordCommands
         Guid releaseId,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
+        IReadOnlyList<RecordLinks>? links = null,
         Guid? id = null,
         CancellationToken cancellationToken = default)
     {
@@ -46,8 +48,9 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
+        links ??= [];
 
-        if (await FindMissingReferencesAsync(connection, values, rows, cancellationToken) is { } missing)
+        if (await FindMissingReferencesAsync(connection, values, rows, links, cancellationToken) is { } missing)
         {
             return missing;
         }
@@ -74,7 +77,7 @@ public static class RecordCommands
             $"INSERT INTO {RecordQueries.Table(entity)} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", placeholders)}) RETURNING *");
         var result = await WriteAsync(command, entity, cancellationToken)
             ?? throw new InvalidOperationException("The insert returned no row.");
-        return await WriteRowsAsync(connection, application, entity, result, rows, replace: false, cancellationToken);
+        return await WriteRowsAsync(connection, application, entity, result, rows, links, replace: false, cancellationToken);
     }
 
     /// <summary>
@@ -85,9 +88,10 @@ public static class RecordCommands
     /// whose child entity has computed fields, because the rows of a collection that is left out are not
     /// computed again. Otherwise it keeps the stamp when it already is <paramref name="releaseId"/> and
     /// sets it to <c>NULL</c> when it is not, which means the record is not known to be up to date.
+    /// Each references field in <paramref name="links"/> has its whole set replaced.
     /// Fields and collections not named are left untouched;
-    /// no values and no rows only increments the version. The caller must hold a transaction when
-    /// <paramref name="rows"/> is not empty, and roll it back unless the record is
+    /// no values, no rows and no links only increments the version. The caller must hold a transaction when
+    /// <paramref name="rows"/> or <paramref name="links"/> is not empty, and roll it back unless the record is
     /// <see cref="RecordWriteOutcome.Written"/>.
     /// </summary>
     public static async Task<RecordWriteResult> UpdateAsync(
@@ -99,6 +103,7 @@ public static class RecordCommands
         long version,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
+        IReadOnlyList<RecordLinks>? links = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -106,8 +111,9 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
+        links ??= [];
 
-        if (await FindMissingReferencesAsync(connection, values, rows, cancellationToken) is { } missing)
+        if (await FindMissingReferencesAsync(connection, values, rows, links, cancellationToken) is { } missing)
         {
             return missing;
         }
@@ -136,7 +142,7 @@ public static class RecordCommands
             $"UPDATE {table} SET {string.Join(", ", assignments)} WHERE {idColumn} = @id AND {versionColumn} = @version RETURNING *");
         if (await WriteAsync(command, entity, cancellationToken) is { } result)
         {
-            return await WriteRowsAsync(connection, application, entity, result, rows, replace: true, cancellationToken);
+            return await WriteRowsAsync(connection, application, entity, result, rows, links, replace: true, cancellationToken);
         }
 
         // One UPDATE cannot tell an unknown id from a stale version, so the id decides.
@@ -209,7 +215,7 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
         }
 
-        return await UpdateAsync(connection, application, entity, releaseId, stored.Id, stored.Version, computed.Values, computed.Rows, cancellationToken);
+        return await UpdateAsync(connection, application, entity, releaseId, stored.Id, stored.Version, computed.Values, computed.Rows, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -383,7 +389,9 @@ public static class RecordCommands
     /// After the owner's write, inserts the rows of each collection in <paramref name="rows"/> one
     /// statement per row, so a violation is keyed by the row's index. With
     /// <paramref name="replace"/>, the stored rows of each collection are deleted first. Returns the
-    /// record with the rows of every collection, or the first row's violation.
+    /// record with the rows of every collection, or the first row's violation. Then it writes the set
+    /// of each references field in <paramref name="links"/>, with <paramref name="replace"/> after
+    /// deleting the stored set.
     /// </summary>
     private static async Task<RecordWriteResult> WriteRowsAsync(
         NpgsqlConnection connection,
@@ -391,6 +399,7 @@ public static class RecordCommands
         EntityModel entity,
         RecordWriteResult owner,
         IReadOnlyList<RecordRows> rows,
+        IReadOnlyList<RecordLinks> links,
         bool replace,
         CancellationToken cancellationToken)
     {
@@ -442,7 +451,59 @@ public static class RecordCommands
             }
         }
 
+        foreach (var set in links)
+        {
+            if (await WriteLinksAsync(connection, entity, record.Id, set, replace, cancellationToken) is { } failure)
+            {
+                return failure;
+            }
+        }
+
         return owner with { Record = await RecordQueries.WithRowsAsync(connection, application, entity, record, cancellationToken) };
+    }
+
+    /// <summary>
+    /// Writes the set of one references field in the order of its ids, one position each, in one
+    /// statement. With <paramref name="replace"/>, the stored set is deleted first. A target that was
+    /// deleted after the reference check is a missing reference at the field. Returns null when written.
+    /// </summary>
+    private static async Task<RecordWriteResult?> WriteLinksAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        Guid ownerId,
+        RecordLinks links,
+        bool replace,
+        CancellationToken cancellationToken)
+    {
+        var junction = EntityNaming.QualifiedTable(EntityNaming.Junction(entity.Id, links.Field.Name));
+        var ownerColumn = EntityNaming.Quote(EntityNaming.OwnerColumn);
+        if (replace)
+        {
+            await using var delete = new NpgsqlCommand($"DELETE FROM {junction} WHERE {ownerColumn} = @owner", connection);
+            delete.Parameters.AddWithValue("owner", ownerId);
+            await delete.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        if (links.Ids.Count == 0)
+        {
+            return null;
+        }
+
+        await using var insert = new NpgsqlCommand(
+            $"INSERT INTO {junction} ({ownerColumn}, {EntityNaming.Quote(EntityNaming.TargetColumn)}, {EntityNaming.Quote(EntityNaming.PositionColumn)}) "
+            + "SELECT @owner, t.id, (t.ord - 1)::integer FROM unnest(@ids) WITH ORDINALITY AS t(id, ord)",
+            connection);
+        insert.Parameters.AddWithValue("owner", ownerId);
+        insert.Parameters.Add(new NpgsqlParameter("ids", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = links.Ids.ToArray() });
+        try
+        {
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+            return null;
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            return Failure(RecordWriteOutcome.MissingReference, ValuesPointer + links.Field.Name, Messages.MissingReference);
+        }
     }
 
     /// <summary>
@@ -526,12 +587,14 @@ public static class RecordCommands
     /// <summary>
     /// Checks every non-null reference value of the owner and of each row of <paramref name="rows"/>;
     /// returns the errors for those that name no record, keyed by cell, such as
-    /// <c>/values/lines/0/product</c>.
+    /// <c>/values/lines/0/product</c>. Also checks each id of <paramref name="links"/>, keyed by its
+    /// index, such as <c>/values/products/1</c>.
     /// </summary>
     private static async Task<RecordWriteResult?> FindMissingReferencesAsync(
         NpgsqlConnection connection,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
+        IReadOnlyList<RecordLinks> links,
         CancellationToken cancellationToken)
     {
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
@@ -557,7 +620,46 @@ public static class RecordCommands
             }
         }
 
+        foreach (var set in links)
+        {
+            await AddMissingLinksAsync(connection, set, errors, cancellationToken);
+        }
+
         return errors.Count > 0 ? new RecordWriteResult(RecordWriteOutcome.MissingReference, Errors: errors) : null;
+    }
+
+    private static async Task AddMissingLinksAsync(
+        NpgsqlConnection connection,
+        RecordLinks links,
+        SortedDictionary<string, string[]> errors,
+        CancellationToken cancellationToken)
+    {
+        if (links.Ids.Count == 0)
+        {
+            return;
+        }
+
+        var id = EntityNaming.Quote(EntityNaming.IdColumn);
+        await using var command = new NpgsqlCommand(
+            $"SELECT {id} FROM {EntityNaming.QualifiedTable(EntityNaming.Table(links.Field.Target!.Id))} WHERE {id} = ANY(@ids)",
+            connection);
+        command.Parameters.Add(new NpgsqlParameter("ids", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = links.Ids.ToArray() });
+        var found = new HashSet<Guid>();
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                found.Add(reader.GetGuid(0));
+            }
+        }
+
+        for (var index = 0; index < links.Ids.Count; index++)
+        {
+            if (!found.Contains(links.Ids[index]))
+            {
+                errors[string.Create(CultureInfo.InvariantCulture, $"{ValuesPointer}{links.Field.Name}/{index}")] = [Messages.MissingReference];
+            }
+        }
     }
 
     private static async Task<bool> IsMissingReferenceAsync(NpgsqlConnection connection, RecordValue value, CancellationToken cancellationToken) =>

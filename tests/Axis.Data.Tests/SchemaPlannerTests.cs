@@ -1192,7 +1192,7 @@ public sealed class SchemaPlannerTests
             [
                 $"""CREATE TABLE "entities"."{supplierTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, CONSTRAINT "pk_{supplierTable}" PRIMARY KEY ("id"))""",
                 $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"))""",
-                $"""CREATE TABLE "entities"."{junction}" ("owner_id" uuid NOT NULL, "target_id" uuid NOT NULL, CONSTRAINT "pk_{junction}" PRIMARY KEY ("owner_id", "target_id"))""",
+                $"""CREATE TABLE "entities"."{junction}" ("owner_id" uuid NOT NULL, "target_id" uuid NOT NULL, "position" integer NOT NULL, CONSTRAINT "pk_{junction}" PRIMARY KEY ("owner_id", "target_id"))""",
                 $"""CREATE INDEX "{EntityNaming.JunctionIndex(junction, "target_id")}" ON "entities"."{junction}" ("target_id")""",
                 $"""ALTER TABLE "entities"."{junction}" ADD CONSTRAINT "{EntityNaming.JunctionForeignKey(junction, "owner_id")}" FOREIGN KEY ("owner_id") REFERENCES "entities"."{OrderTable}" ("id") ON DELETE CASCADE""",
                 $"""ALTER TABLE "entities"."{junction}" ADD CONSTRAINT "{EntityNaming.JunctionForeignKey(junction, "target_id")}" FOREIGN KEY ("target_id") REFERENCES "entities"."{supplierTable}" ("id")""",

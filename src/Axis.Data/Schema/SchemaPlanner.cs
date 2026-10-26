@@ -164,7 +164,7 @@ public static class SchemaPlanner
                     var owner = EntityNaming.Quote(EntityNaming.OwnerColumn);
                     var target = EntityNaming.Quote(EntityNaming.TargetColumn);
                     _creates.Add(
-                        $"CREATE TABLE {EntityNaming.QualifiedTable(junction)} ({owner} uuid NOT NULL, {target} uuid NOT NULL, "
+                        $"CREATE TABLE {EntityNaming.QualifiedTable(junction)} ({owner} uuid NOT NULL, {target} uuid NOT NULL, {_positionDefinition}, "
                         + $"CONSTRAINT {EntityNaming.Quote(EntityNaming.PrimaryKey(junction))} PRIMARY KEY ({owner}, {target}))");
                     _alters.Add(
                         $"CREATE INDEX {EntityNaming.Quote(EntityNaming.JunctionIndex(junction, EntityNaming.TargetColumn))} "
