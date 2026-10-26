@@ -817,6 +817,7 @@ export function StudioEditor({
                             tab === 'design' ? (
                               <Suspense fallback={null}>
                                 <LazyStudioProcessDesign
+                                  schema={schema}
                                   draft={draft}
                                   diagnosticPaths={diagnosticPaths}
                                   selected={processStep}

@@ -11,7 +11,8 @@ The design follows [D74](../decisions/d74-a-visual-process-designer.md). The
 Design tab, the canvas, the existing step panels, remove, undo, Tab and Enter,
 the diagnostic marks and the live region for removals are _(built)_. The
 palette, the transitions and the live region for adds and transitions are
-_(built)_. The panels of the new step types and the live region for moves are
+_(built)_. The schema-driven type picker and the timer panel are _(built)_. The
+other panels of the new step types and the live region for moves are
 _(planned for M14)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
@@ -96,9 +97,21 @@ _(planned for M14)_.
   `createRecord`. Its panel has an entity picker and one `set` row for each
   field of the picked entity, as the `updateRecord` panel has for the subject
   entity.
-- **Property panel (new step types)** _(planned for M14)_. The new step types
-  and keys get panels too: timer, wait for event, sub-process, `notify`, and
-  the escalations and deadline of a task.
+- **Step type picker** _(built)_. The picker in the card and the Add step
+  choice list every type in `$defs.step.properties.type.enum` of the process
+  schema, including `timer` and `subProcess`. Changing a step's type removes the
+  keys that the schema's conditional for the new type forbids and adds its
+  required keys, empty. Keys the schema allows stay. The conditionals that also
+  test the operation are left to the operation panel. A type with no panel yet
+  shows its keys as "Edit in JSON" markers.
+- **Property panel (timer)** _(built)_. A timer's card has a Wait or Until
+  choice, a duration box for `wait`, an expression editor for `until`, and a
+  Next step picker. Switching removes the other key and puts the chosen key,
+  empty, in its place, and one Undo brings the old key back. A timer with
+  neither key or both opens in Wait.
+- **Property panel (other new step types)** _(planned for M14)_. The other new
+  step types and keys get panels too: wait for event, sub-process, `notify`,
+  and the escalations and deadline of a task.
 - **Undo** _(built)_. The undo and redo of
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)
   cover every edit of a process on all three tabs, with 100 steps, cleared by
