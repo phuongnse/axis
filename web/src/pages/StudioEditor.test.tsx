@@ -12,6 +12,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { chooseOption } from '../test/antd'
+import { buildProcessGraph } from './processGraph'
 import { StudioEditor } from './StudioEditor'
 
 const folder = '/api/studio/apps/Shop'
@@ -810,17 +811,25 @@ describe('StudioEditor for a process', () => {
   })
 
   it.each(['light', 'dark'] as const)(
-    'reaches the nodes with Tab in step order and opens a step with Enter in %s mode',
+    'reaches the edges and then the nodes with Tab and opens a step with Enter in %s mode',
     async (mode) => {
       localStorage.setItem('axis.themeMode', mode)
       stubResource(processItem, processContent)
       renderResource(processItem)
       await screen.findByTestId('studio-graph-node-0', {}, slow)
       expect(document.querySelector('.react-flow')).toHaveClass(mode)
-      // The Design tab is focused first, then its panel, and the nodes come after them.
+      // The Design tab is focused first, then its panel. React Flow puts the edges before the nodes.
       await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
       await userEvent.tab()
       expect(screen.getByRole('tabpanel')).toHaveFocus()
+
+      const edges = document.querySelectorAll('[data-testid^="rf__edge-"]')
+      expect(edges).toHaveLength(buildProcessGraph(processContent, []).transitions.length)
+      for (const edge of edges) {
+        await userEvent.tab()
+        expect(edge).toHaveFocus()
+        expect(edge).toHaveAttribute('tabindex', '0')
+      }
 
       for (const [index, step] of processContent.steps.entries()) {
         await userEvent.tab()
@@ -881,14 +890,120 @@ describe('StudioEditor for a process', () => {
     fireEvent.click(await screen.findByTestId('studio-graph-node-0', {}, slow))
     const edge = () => screen.getByTestId('rf__edge-/steps/0/next')
     const oldTarget = processContent.steps.findIndex((step) => step.name === processContent.steps[0].next)
-    expect(edge()).toHaveAccessibleName(`Edge from 0 to ${oldTarget}`)
+    const oldName = `submit to ${processContent.steps[oldTarget].name} · next`
+    expect(edge()).toHaveAccessibleName(oldName)
 
     const panel = within(screen.getByTestId('studio-process-design'))
     await chooseOption('done', panel.getByTestId('studio-field-/steps/0/next'))
-    expect(edge()).toHaveAccessibleName('Edge from 0 to 9')
+    expect(edge()).toHaveAccessibleName('submit to done · next')
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
-    expect(edge()).toHaveAccessibleName(`Edge from 0 to ${oldTarget}`)
+    expect(edge()).toHaveAccessibleName(oldName)
+  })
+
+  it('removes the selected step with Delete, leaves the transitions that named it, and Undo restores both', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const node = await screen.findByTestId('studio-graph-node-9', {}, slow)
+    expect(node).toHaveAccessibleName('done · end')
+    for (const source of [6, 7, 8]) {
+      expect(screen.getByTestId(`rf__edge-/steps/${source}/next`)).toBeInTheDocument()
+    }
+    fireEvent.click(node)
+    act(() => node.focus())
+    await userEvent.keyboard('{Delete}')
+
+    expect(screen.queryByTestId('studio-graph-node-9')).not.toBeInTheDocument()
+    for (const source of [6, 7, 8]) {
+      expect(screen.queryByTestId(`rf__edge-/steps/${source}/next`)).not.toBeInTheDocument()
+    }
+    expect(screen.getByTestId('studio-process-announcement')).toHaveTextContent('Removed step done')
+    expect(screen.getByText('Select a step on the canvas.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    const named = JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)
+    expect(named.steps).toHaveLength(9)
+    expect(named.steps[6].next).toBe('done')
+    await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(await screen.findByTestId('studio-graph-node-9')).toBeInTheDocument()
+    for (const source of [6, 7, 8]) {
+      expect(screen.getByTestId(`rf__edge-/steps/${source}/next`)).toBeInTheDocument()
+    }
+  })
+
+  it('selects a focused edge with Enter and clears its transition with Delete, announcing it', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const edge = await screen.findByTestId('rf__edge-/steps/2/otherwise', {}, slow)
+    expect(edge).toHaveAttribute('tabindex', '0')
+    expect(edge).toHaveAccessibleName('financeCheck to markApproved · otherwise')
+    act(() => edge.focus())
+    await userEvent.keyboard('{Enter}')
+
+    const design = within(screen.getByTestId('studio-process-design'))
+    expect(screen.getByTestId('rf__edge-/steps/2/otherwise')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('studio-graph-node-2')).toHaveAttribute('aria-current', 'true')
+    expect(design.getByRole('button', { name: 'Remove transition' })).toBeInTheDocument()
+
+    await userEvent.keyboard('{Delete}')
+
+    expect(screen.queryByTestId('rf__edge-/steps/2/otherwise')).not.toBeInTheDocument()
+    expect(screen.getByTestId('studio-graph-node-4')).toBeInTheDocument()
+    expect(within(design.getByTestId('studio-field-/steps/2/otherwise')).queryByText('markApproved')).toBeNull()
+    expect(design.queryByRole('button', { name: 'Remove transition' })).not.toBeInTheDocument()
+    expect(design.getByTestId('studio-step-2')).toBeInTheDocument()
+    expect(design.getByTestId('studio-process-announcement')).toHaveTextContent(
+      'Removed transition financeCheck to markApproved',
+    )
+  })
+
+  it('clears the transition with the Remove transition button, and one Undo restores it', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    fireEvent.click(await screen.findByTestId('rf__edge-/steps/1/outcomes/0', {}, slow))
+    const design = within(screen.getByTestId('studio-process-design'))
+    await userEvent.click(design.getByRole('button', { name: 'Remove transition' }))
+
+    expect(screen.queryByTestId('rf__edge-/steps/1/outcomes/0')).not.toBeInTheDocument()
+    expect(screen.getByTestId('rf__edge-/steps/1/outcomes/1')).toBeInTheDocument()
+    expect(design.getByTestId('studio-process-announcement')).toHaveTextContent(
+      'Removed transition managerApproval to financeCheck · approve',
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByTestId('rf__edge-/steps/1/outcomes/0')).toBeInTheDocument()
+  })
+
+  it('removes the selected step with Delete and announces it', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    const node = await screen.findByTestId('studio-graph-node-8', {}, slow)
+    fireEvent.click(node)
+    act(() => node.focus())
+    const design = within(screen.getByTestId('studio-process-design'))
+    expect(design.queryByRole('button', { name: 'Remove transition' })).not.toBeInTheDocument()
+    await userEvent.keyboard('{Delete}')
+
+    expect(screen.queryByRole('button', { name: 'markRejected · operation' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('studio-graph-node-8')).toHaveAccessibleName('done · end')
+    expect(design.getByTestId('studio-process-announcement')).toHaveTextContent('Removed step markRejected')
+  })
+
+  it('does not remove a step when Delete is pressed outside the canvas', async () => {
+    stubResource(processItem, processContent)
+    renderResource(processItem)
+
+    fireEvent.click(await screen.findByTestId('studio-graph-node-8', {}, slow))
+    const design = within(screen.getByTestId('studio-process-design'))
+    await userEvent.click(design.getByRole('textbox', { name: 'Step name' }))
+    await userEvent.keyboard('{Backspace}{Delete}')
+
+    expect(screen.getByTestId('studio-graph-node-8')).toBeInTheDocument()
+    expect(design.getByTestId('studio-process-announcement')).toHaveTextContent('')
   })
 
   it('marks the node of a step that a diagnostic path names', async () => {
