@@ -1,0 +1,12 @@
+{
+  "id": "5d0c1f7e-3b4a-4c58-9e62-7a1f0d8b2c43",
+  "kind": "dataSource",
+  "name": "ArticleSearch",
+  "formatVersion": 1,
+  "entity": "Article",
+  "fields": [
+    { "name": "title", "path": "title" },
+    { "name": "note", "path": "note" }
+  ],
+  "search": true
+}
