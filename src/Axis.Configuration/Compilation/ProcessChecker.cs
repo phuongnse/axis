@@ -16,9 +16,11 @@ namespace Axis.Configuration.Compilation;
 /// type-check as a boolean over the subject entity's fields, computed ones included, its child
 /// collections, which only aggregates accept, the named rules, and paths through reference fields
 /// of at most 3 hops. An operation step runs <c>updateRecord</c>, <c>callConnector</c>,
-/// <c>raiseEvent</c> or a package operation, named <c>&lt;package&gt;/&lt;operation&gt;</c>. Each field an <c>updateRecord</c> <c>set</c> names is a field of the subject
+/// <c>raiseEvent</c>, <c>createRecord</c> or a package operation, named <c>&lt;package&gt;/&lt;operation&gt;</c>. Each field an <c>updateRecord</c> <c>set</c> names is a field of the subject
 /// entity, named once, that is not computed, numbered by a sequence or a child collection. Each
 /// <c>set</c> expression type-checks against its field's type over the same scope as a condition.
+/// A <c>createRecord</c> step names a loaded root entity, and its <c>set</c> is checked the same
+/// way against that entity, except that a creator field cannot be set either.
 /// A <c>callConnector</c> step names a loaded connector and one of its operations. Its inputs are inputs of the operation,
 /// named once, that cover every required input, and each input expression type-checks against the
 /// input's type over the same scope. Its outputs are outputs of the operation, named once, each
@@ -91,7 +93,7 @@ internal static class ProcessChecker
             if (process.Entity is null)
             {
                 CheckWithoutSubject(
-                    process, rules, modules, findEntity, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, findProcess, unloadedProcessNames, references, Report, diagnostics);
+                    process, rules, modules, findEntity, ownerOf, unloadedEntityNames, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, findProcess, unloadedProcessNames, references, Report, diagnostics);
                 continue;
             }
 
@@ -141,7 +143,7 @@ internal static class ProcessChecker
             }
 
             CheckOperations(
-                process, entity, scope, findEntity, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, references, Report);
+                process, entity, scope, findEntity, ownerOf, unloadedEntityNames, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, references, Report);
 
             CheckSubProcesses(process, entity, scope, findEntity, findProcess, unloadedProcessNames, references, Report);
 
@@ -166,6 +168,8 @@ internal static class ProcessChecker
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules,
         Func<string, EntityResource?> findEntity,
+        Func<string, string?> ownerOf,
+        IReadOnlySet<string> unloadedEntityNames,
         Func<string, ConnectorResource?> findConnector,
         IReadOnlySet<string> unloadedConnectorNames,
         Func<string, EventResource?> findEvent,
@@ -211,7 +215,7 @@ internal static class ProcessChecker
 
         // A step that needs a subject record is skipped, as CheckSubjectSteps has reported it.
         CheckOperations(
-            process, null, scope, _ => null, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, references, report);
+            process, null, scope, findEntity, ownerOf, unloadedEntityNames, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, references, report);
 
         CheckSubProcesses(process, null, scope, findEntity, findProcess, unloadedProcessNames, references, report);
 
@@ -578,12 +582,12 @@ internal static class ProcessChecker
             process.Steps.First(step => string.Equals(step.Name, name, StringComparison.OrdinalIgnoreCase)).Name;
 
         // A checked set names each field once, ignoring letter case.
-        List<RecordAssignmentModel> Assign(IReadOnlyDictionary<string, string> set)
+        List<RecordAssignmentModel> Assign(EntityResource target, IReadOnlyDictionary<string, string> set)
         {
             var values = new Dictionary<string, string>(set, StringComparer.OrdinalIgnoreCase);
             return
             [
-                .. entity!.Fields
+                .. target.Fields
                     .Where(field => values.ContainsKey(field.Name))
                     .Select(field => new RecordAssignmentModel(
                         field.Name,
@@ -710,6 +714,13 @@ internal static class ProcessChecker
                 Resolve(step.Next!));
         }
 
+        // A checked step names a loaded root entity and sets each of its fields at most once.
+        CreateRecordStepModel BuildCreateRecord(ProcessStepDefinition step)
+        {
+            var target = findEntity(step.Entity!)!;
+            return new CreateRecordStepModel(step.Name, new EntityReference(target.Id, target.Name), Assign(target, step.Set!), Resolve(step.Next!));
+        }
+
         return new ProcessModel
         {
             Id = process.Id,
@@ -732,10 +743,11 @@ internal static class ProcessChecker
                     ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.CallConnector => BuildConnectorCall(step),
                     ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.RaiseEvent => BuildRaiseEvent(step),
                     ProcessStepDefinition.OperationStep when step.Operation!.Contains('/', StringComparison.Ordinal) => BuildPackageCall(step),
+                    ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.CreateRecord => BuildCreateRecord(step),
                     ProcessStepDefinition.OperationStep => new OperationStepModel(
                         step.Name,
                         step.Operation!,
-                        Assign(step.Set!),
+                        Assign(entity!, step.Set!),
                         Resolve(step.Next!)),
                     ProcessStepDefinition.SubProcess => BuildSubProcess(step),
                     ProcessStepDefinition.End => new EndStepModel(step.Name),
@@ -1006,11 +1018,12 @@ internal static class ProcessChecker
 
     /// <summary>
     /// Checks each operation step: its operation is <c>updateRecord</c>, <c>callConnector</c>,
-    /// <c>raiseEvent</c> or a package operation, which contains a <c>/</c>, matched exactly as a step
-    /// <c>type</c> is. A connector call is checked by <see cref="CheckConnectorCall"/>, a package
-    /// operation by <see cref="CheckPackageCall"/> and a raised event by <see cref="CheckRaiseEvent"/>. Each <c>set</c> key of an <c>updateRecord</c> names a field
-    /// of <paramref name="entity"/>, ignoring letter case, that no earlier key of the step names and
-    /// that can be set. Its expression then fits the field's type over <paramref name="scope"/>. The
+    /// <c>raiseEvent</c>, <c>createRecord</c> or a package operation, which contains a <c>/</c>,
+    /// matched exactly as a step <c>type</c> is. A connector call is checked by
+    /// <see cref="CheckConnectorCall"/>, a package operation by <see cref="CheckPackageCall"/>, a
+    /// raised event by <see cref="CheckRaiseEvent"/> and a record create by
+    /// <see cref="CheckCreateRecord"/>. Each <c>set</c> key of an <c>updateRecord</c> is checked by
+    /// <see cref="CheckSet"/> against <paramref name="entity"/>. The
     /// <c>set</c> is not checked when the subject entity is unknown. The other properties of an
     /// unknown operation are not checked, as their meaning depends on the operation.
     /// </summary>
@@ -1019,6 +1032,8 @@ internal static class ProcessChecker
         EntityResource? entity,
         ExpressionScope? scope,
         Func<string, EntityResource?> findEntity,
+        Func<string, string?> ownerOf,
+        IReadOnlySet<string> unloadedEntityNames,
         Func<string, ConnectorResource?> findConnector,
         IReadOnlySet<string> unloadedConnectorNames,
         Func<string, EventResource?> findEvent,
@@ -1059,11 +1074,17 @@ internal static class ProcessChecker
                 continue;
             }
 
+            if (string.Equals(step.Operation, ProcessStepDefinition.CreateRecord, StringComparison.Ordinal))
+            {
+                CheckCreateRecord(process, step, index, scope, findEntity, ownerOf, unloadedEntityNames, references, report);
+                continue;
+            }
+
             if (!string.Equals(step.Operation, ProcessStepDefinition.UpdateRecord, StringComparison.Ordinal))
             {
                 report(
                     DiagnosticCodes.UnknownOperation,
-                    $"The operation '{step.Operation}' was not found. The built-in operations are '{ProcessStepDefinition.UpdateRecord}', '{ProcessStepDefinition.CallConnector}' and '{ProcessStepDefinition.RaiseEvent}'. A package operation is written '<package>/<operation>'.",
+                    $"The operation '{step.Operation}' was not found. The built-in operations are '{ProcessStepDefinition.UpdateRecord}', '{ProcessStepDefinition.CallConnector}', '{ProcessStepDefinition.RaiseEvent}' and '{ProcessStepDefinition.CreateRecord}'. A package operation is written '<package>/<operation>'.",
                     $"/steps/{index}/operation");
                 continue;
             }
@@ -1074,41 +1095,109 @@ internal static class ProcessChecker
                 continue;
             }
 
-            // The key that first set each field, by the field's declared name.
-            var setBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (key, expression) in step.Set ?? new Dictionary<string, string>())
+            CheckSet(process, step, index, entity, scope, references, report, create: false);
+        }
+    }
+
+    /// <summary>
+    /// Checks a <c>createRecord</c> step: its <c>entity</c> is a loaded entity that is not a child
+    /// entity, found ignoring letter case. An entity whose file was not loaded because of its own
+    /// errors is not reported again. The <c>set</c> is checked against that entity like the one of
+    /// an <c>updateRecord</c>, and a creator field cannot be set, as the new record's creator is
+    /// <c>system</c>. It is not checked when the entity is unknown or <paramref name="scope"/> is null.
+    /// </summary>
+    private static void CheckCreateRecord(
+        ProcessResource process,
+        ProcessStepDefinition step,
+        int index,
+        ExpressionScope? scope,
+        Func<string, EntityResource?> findEntity,
+        Func<string, string?> ownerOf,
+        IReadOnlySet<string> unloadedEntityNames,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        var path = $"/steps/{index}/entity";
+        if (findEntity(step.Entity!) is not { } target)
+        {
+            if (!unloadedEntityNames.Contains(step.Entity!))
             {
-                var path = $"/steps/{index}/set/{key}";
-                var field = FindField(entity, key);
-                if (field is null)
-                {
-                    report(
-                        DiagnosticCodes.UnknownSetField,
-                        $"The field '{key}' was not found. The entity '{entity.Name}' has no field with that name.",
-                        path);
-                    continue;
-                }
+                report(
+                    DiagnosticCodes.UnknownCreateRecordEntity,
+                    $"The entity '{step.Entity}' was not found. No loaded entity has that name.",
+                    path);
+            }
 
-                if (!setBy.TryAdd(field.Name, key))
-                {
-                    report(
-                        DiagnosticCodes.UnknownSetField,
-                        $"The field '{field.Name}' is already set by '{setBy[field.Name]}' in this step.",
-                        path);
-                    continue;
-                }
+            return;
+        }
 
-                if (ReadOnlyReason(field) is { } reason)
-                {
-                    report(DiagnosticCodes.ReadOnlySetField, $"The field '{field.Name}' {reason}, so an operation cannot set it.", path);
-                    continue;
-                }
+        references.Add(process, path, ReferenceRelations.CreatedEntity, ResourceNode.Of(target));
+        if (ownerOf(target.Name) is { } owner)
+        {
+            // A child row is written only through its owner, so a step cannot create one.
+            report(
+                DiagnosticCodes.CreateRecordOverChildEntity,
+                $"The entity '{target.Name}' is a child entity owned by '{owner}'. A createRecord step creates a record of a root entity.",
+                path);
+        }
 
-                var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field)!, path, references);
-                if (problem is not null)
-                {
-                    report(problem.Code, problem.Message, path);
-                }
+        if (scope is not null)
+        {
+            CheckSet(process, step, index, target, scope, references, report, create: true);
+        }
+    }
+
+    /// <summary>
+    /// Checks each <c>set</c> key of an <c>updateRecord</c> or <c>createRecord</c> step: it names a
+    /// field of <paramref name="target"/>, ignoring letter case, that no earlier key of the step
+    /// names and that can be set. Its expression then fits the field's type over
+    /// <paramref name="scope"/>. A <paramref name="create"/> step cannot set a creator field either.
+    /// </summary>
+    private static void CheckSet(
+        ProcessResource process,
+        ProcessStepDefinition step,
+        int index,
+        EntityResource target,
+        ExpressionScope scope,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report,
+        bool create)
+    {
+        // The key that first set each field, by the field's declared name.
+        var setBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, expression) in step.Set ?? new Dictionary<string, string>())
+        {
+            var path = $"/steps/{index}/set/{key}";
+            var field = FindField(target, key);
+            if (field is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownSetField,
+                    $"The field '{key}' was not found. The entity '{target.Name}' has no field with that name.",
+                    path);
+                continue;
+            }
+
+            if (!setBy.TryAdd(field.Name, key))
+            {
+                report(
+                    DiagnosticCodes.UnknownSetField,
+                    $"The field '{field.Name}' is already set by '{setBy[field.Name]}' in this step.",
+                    path);
+                continue;
+            }
+
+            var reason = ReadOnlyReason(field) ?? (create && field.Creator == true ? "is set to its creator" : null);
+            if (reason is not null)
+            {
+                report(DiagnosticCodes.ReadOnlySetField, $"The field '{field.Name}' {reason}, so an operation cannot set it.", path);
+                continue;
+            }
+
+            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field)!, path, references);
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, path);
             }
         }
     }

@@ -40,7 +40,7 @@ flowchart LR
   address, see [health checks](#health-checks).
   It runs work items, and through them
   the `decision`, `task`, `operation` and `end` steps of process instances.
-  Operation steps include `updateRecord`, `callConnector` calls with their
+  Operation steps include `updateRecord`, `createRecord`, `callConnector` calls with their
   retries and reconciliation, and package operations. `raiseEvent` steps raise
   events. Wait for event, timer and sub-process steps come later. _(Planned
   for M14)_ It runs them, task escalations and deadlines, and email sending,

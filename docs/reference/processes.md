@@ -227,8 +227,10 @@ a payment reference from the sample extension package, see
 M3 has four step types. Wait for event, timer and sub-process come later.
 The compiler already checks and builds a `subProcess` step, but the engine
 does not run it yet, see [Sub-process step](process-flow.md#sub-process-step).
+The `createRecord` operation is built, see
+[Create record operation](process-flow.md#create-record-operation).
 _(Planned for M14)_ `timer`, `waitEvent` and `subProcess` steps, and the
-`createRecord` and `notify` operations, see [process flow](process-flow.md)
+`notify` operation, see [process flow](process-flow.md)
 and [notifications](notifications.md#notify-operation).
 
 - **`decision`.** `branches` is an ordered list. Each branch has a `when`
@@ -321,9 +323,9 @@ reported in one pass. See
   paths through reference fields such as `department.manager.name`. A path takes at most 3 hops
   (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
   See [Scope in a process expression](expressions.md#names-and-references).
-- An operation names `updateRecord`, `callConnector`, `raiseEvent` or a
-  package operation written `<package>/<operation>`, matched exactly as a
-  step `type` is (`AXC0078` at `/steps/{i}/operation`).
+- An operation names `updateRecord`, `callConnector`, `raiseEvent`,
+  `createRecord` or a package operation written `<package>/<operation>`,
+  matched exactly as a step `type` is (`AXC0078` at `/steps/{i}/operation`).
 - Each key of an `updateRecord` `set` names a field of the subject entity,
   ignoring letter case, that no earlier key of the step names (`AXC0079`).
   The field is not computed, not numbered by a sequence and not a child
@@ -331,6 +333,11 @@ reported in one pass. See
 - Each `set` expression fits its field's type, with the same scope as a
   `when`. A problem is reported at `/steps/{i}/set/{field}` with its
   expression code, such as `AXC0048` for a value of the wrong type.
+- A `createRecord` step names a loaded root entity in `entity`. An unknown
+  entity is `AXC0254` and a child entity is `AXC0255`, both at
+  `/steps/{i}/entity`. Its `set` keys and values are checked against that
+  entity as above, and a creator field is `AXC0080` too. See
+  [Create record operation](process-flow.md#create-record-operation).
 - A `callConnector` step's checks are listed under
   [Connector calls](process-execution.md#connector-calls) (`AXC0102` to `AXC0109`). A package
   operation step's checks are listed under
@@ -339,19 +346,21 @@ reported in one pass. See
   [Raise event step](process-events.md#raise-event-step) (`AXC0125` to `AXC0128`).
 - An operation has `operation` and `next`, and no `branches` or `otherwise`.
   An `updateRecord` step has a `set` with at least one field, and no
-  `connector`, `input`, `output`, `retry`, `event` or `fields`. A
-  `callConnector` step has `connector` and `input`, and no `set`, `event` or
-  `fields`. A `raiseEvent` step has `event` and `fields`, and no `set`,
-  `connector`, `input`, `output` or `retry`. A decision has no `operation`,
-  `set`, `connector`, `input`, `output`, `retry`, `event`, `fields` or
-  `next`. Neither an operation nor a decision has a task's `label`,
+  `connector`, `input`, `output`, `retry`, `event`, `entity` or `fields`. A
+  `callConnector` step has `connector` and `input`, and no `set`, `event`,
+  `entity` or `fields`. A `raiseEvent` step has `event` and `fields`, and no
+  `set`, `connector`, `input`, `output`, `retry` or `entity`. A `createRecord`
+  step has `entity` and a `set` with at least one field, and no `connector`,
+  `input`, `output`, `retry`, `event` or `fields`. A decision has no
+  `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`,
+  `entity`, `fields` or `next`. Neither an operation nor a decision has a task's `label`,
   `assignee`, `form`, `dueIn` or `outcomes` (`AXC0004`).
 - A task has `label`, `assignee`, `form` and at least one outcome, and no
   `branches`, `otherwise`, `operation`, `set`, `connector`, `input`,
-  `output`, `retry`, `event`, `fields` or `next` (`AXC0004`).
+  `output`, `retry`, `event`, `entity`, `fields` or `next` (`AXC0004`).
 - An `end` step has no `next`, `branches`, `otherwise`, `operation`, `set`,
-  `connector`, `input`, `output`, `retry`, `event`, `fields` or any task
-  property (`AXC0004`).
+  `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` or any
+  task property (`AXC0004`).
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at
   `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). It must
   name a declared [role](roles-and-policies.md), compared

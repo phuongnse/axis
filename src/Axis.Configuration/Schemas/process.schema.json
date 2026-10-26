@@ -119,6 +119,7 @@
           }
         },
         "event": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "event" },
+        "entity": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "entity" },
         "fields": {
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/name" },
@@ -167,6 +168,7 @@
               "output": false,
               "retry": false,
               "event": false,
+              "entity": false,
               "fields": false,
               "next": false,
               "label": false,
@@ -195,6 +197,7 @@
               "output": false,
               "retry": false,
               "event": false,
+              "entity": false,
               "fields": false,
               "next": false
             }
@@ -233,6 +236,7 @@
               "output": false,
               "retry": false,
               "event": false,
+              "entity": false,
               "fields": false,
               "label": false,
               "assignee": false,
@@ -259,6 +263,7 @@
               "output": false,
               "retry": false,
               "event": false,
+              "entity": false,
               "fields": false,
               "next": false,
               "label": false,
@@ -277,6 +282,16 @@
           },
           "then": {
             "required": ["set"],
+            "properties": { "connector": false, "input": false, "output": false, "retry": false, "event": false, "entity": false, "fields": false }
+          }
+        },
+        {
+          "if": {
+            "required": ["type", "operation"],
+            "properties": { "type": { "const": "operation" }, "operation": { "const": "createRecord" } }
+          },
+          "then": {
+            "required": ["entity", "set"],
             "properties": { "connector": false, "input": false, "output": false, "retry": false, "event": false, "fields": false }
           }
         },
@@ -287,7 +302,7 @@
           },
           "then": {
             "required": ["connector", "input"],
-            "properties": { "set": false, "event": false, "fields": false }
+            "properties": { "set": false, "event": false, "entity": false, "fields": false }
           }
         },
         {
@@ -297,7 +312,7 @@
           },
           "then": {
             "required": ["event", "fields"],
-            "properties": { "set": false, "connector": false, "input": false, "output": false, "retry": false }
+            "properties": { "set": false, "connector": false, "input": false, "output": false, "retry": false, "entity": false }
           }
         },
         {
@@ -307,7 +322,7 @@
           },
           "then": {
             "required": ["input"],
-            "properties": { "set": false, "connector": false, "event": false, "fields": false }
+            "properties": { "set": false, "connector": false, "event": false, "entity": false, "fields": false }
           }
         }
       ]

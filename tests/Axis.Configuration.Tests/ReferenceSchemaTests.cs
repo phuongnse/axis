@@ -53,6 +53,7 @@ public sealed class ReferenceSchemaTests
         (ReferenceRelations.TaskRole, "process", "properties/steps/items/properties/assignee/properties/role", "role"),
         (ReferenceRelations.ConnectorCall, "process", "properties/steps/items/properties/connector/properties/name", "connector"),
         (ReferenceRelations.RaisedEvent, "process", "properties/steps/items/properties/event", "event"),
+        (ReferenceRelations.CreatedEntity, "process", "properties/steps/items/properties/entity", "entity"),
         (ReferenceRelations.PolicyRole, "policy", "properties/roles/items", "role"),
         (ReferenceRelations.Grant, "policy", "properties/grants/items/properties/entity", "entity"),
         (ReferenceRelations.Grant, "policy", "properties/grants/items/properties/dataSource", "dataSource"),

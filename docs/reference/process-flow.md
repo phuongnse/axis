@@ -8,8 +8,9 @@ subject. The process resource and the first four step types are in
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 Everything in this file is _(planned for M14)_, except [Loops](#loops) through
-a `task` and the calls in them, and the compile checks of the
-[sub-process step](#sub-process-step), which are built. The design follows
+a `task` and the calls in them, the compile checks of the
+[sub-process step](#sub-process-step), and the
+[create record operation](#create-record-operation), which are built. The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
@@ -175,20 +176,38 @@ A `createRecord` operation creates a record of another entity:
 }
 ```
 
-- `entity` names a root entity of the application, not a child entity. Each
-  is a new diagnostic.
-- `set` maps fields of that entity to expressions with the scope of a `when`.
-  The checks of an `updateRecord` `set` apply to its keys and types.
+- `entity` names a root entity of the application, not a child entity. An
+  unknown entity is `AXC0254` and a child entity is `AXC0255`, both reported at
+  `/steps/{i}/entity`. Neither is reported when the entity's file failed to
+  load.
+- `set` is required and has at least one field. It maps fields of that entity
+  to expressions with the scope of a `when`. The checks of an `updateRecord`
+  `set` apply to its keys and types: an unknown field is `AXC0079`, a mistyped
+  value is `AXC0048`, and a computed, sequence or child collection field is
+  `AXC0080`. A creator field is `AXC0080` too, because the step sets it to
+  `system`.
 - Process expressions see `id`, the subject record's id, typed as a reference
   to the subject entity.
 - The step creates the record through the record create command, as `system`,
   in the step's transaction. Sequences, computed fields, validations and field
   defaults apply. A creator field gets `system`. A validation failure fails the
-  step.
+  step and leaves no record. The step does not run the actor's grants, as
+  `system` holds none. It shares the in-transaction part of the create path
+  with the record command, so the two do not drift apart.
+- A required field that `set` leaves out and that has no default, formula,
+  sequence or creator fails the step at run time with `Required.`, as a missing
+  required field fails an API create. The compiler does not check for it.
 - It writes the `record.created` audit record with the actor `system`, and data
   change triggers on `create` fire, as for every write through the record
   command.
 - History output: `{ "next", "recordId" }`.
+- A process without a subject may use the step. The engine then takes the start
+  lock and reads the active release itself.
+- In Studio, the operation picker offers `createRecord`. Its panel has an entity
+  picker, which lists every entity because the Studio names do not say which
+  are child entities, and `set` rows keyed by the fields of the picked entity.
+  The step's `entity` is a reference of the relation `created entity`, so
+  renaming the entity updates it and Studio's "used by" lists the process.
 
 ## Processes without a subject
 

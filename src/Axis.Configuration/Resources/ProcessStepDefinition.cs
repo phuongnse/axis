@@ -29,6 +29,9 @@ public sealed record ProcessStepDefinition
     /// <summary>The built-in operation that raises an event about the subject record.</summary>
     public const string RaiseEvent = "raiseEvent";
 
+    /// <summary>The built-in operation that creates a record of another root entity.</summary>
+    public const string CreateRecord = "createRecord";
+
     public required string Name { get; init; }
 
     /// <summary>The step type: <c>decision</c>, <c>task</c>, <c>operation</c>, <c>subProcess</c> or <c>end</c>.</summary>
@@ -40,12 +43,15 @@ public sealed record ProcessStepDefinition
     /// <summary>The step a decision takes when no branch is true, or null for any other step.</summary>
     public string? Otherwise { get; init; }
 
-    /// <summary>The operation an operation step runs, such as <c>updateRecord</c>, <c>callConnector</c> or <c>raiseEvent</c>, or null for any other step.</summary>
+    /// <summary>
+    /// The operation an operation step runs, such as <c>updateRecord</c>, <c>callConnector</c>,
+    /// <c>raiseEvent</c> or <c>createRecord</c>, or null for any other step.
+    /// </summary>
     public string? Operation { get; init; }
 
     /// <summary>
-    /// The fields of the subject record an <c>updateRecord</c> step sets, each to an expression, in file
-    /// order, or null for any other step.
+    /// The fields of the subject record an <c>updateRecord</c> step sets, or of the record a
+    /// <c>createRecord</c> step creates, each to an expression, in file order, or null for any other step.
     /// </summary>
     public IReadOnlyDictionary<string, string>? Set { get; init; }
 
@@ -75,6 +81,9 @@ public sealed record ProcessStepDefinition
     /// file order, or null for any other step.
     /// </summary>
     public IReadOnlyDictionary<string, string>? Fields { get; init; }
+
+    /// <summary>The root entity a <c>createRecord</c> step creates a record of, or null for any other step.</summary>
+    public string? Entity { get; init; }
 
     /// <summary>The name of the process a <c>subProcess</c> step starts, or null for any other step.</summary>
     public string? Process { get; init; }

@@ -117,6 +117,50 @@ public static partial class DataChangeTriggerStarts
     }
 
     /// <summary>
+    /// Starts the create triggers of the active release for a record that a system-side write
+    /// created in <paramref name="transaction"/>. The write used the release <paramref name="writeReleaseId"/>,
+    /// and <paramref name="entity"/> and <paramref name="written"/> come from its model. The
+    /// triggers, the <c>when</c> and the starts use the active release, so when the two differ the
+    /// record is read again with the active model. Returns at once when the active release has no
+    /// such entity or no create trigger on it.
+    /// </summary>
+    public static async Task StartAfterCreateAsync(
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel active,
+        Guid activeReleaseId,
+        Guid writeReleaseId,
+        EntityModel entity,
+        Record written,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(active);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(written);
+
+        if (active.FindEntity(entity.Id) is not { } watched
+            || !active.Triggers.Any(trigger =>
+                trigger.Type == TriggerType.DataChange
+                && trigger.Entity?.Id == watched.Id
+                && trigger.On.HasFlag(DataChangeKinds.Create)))
+        {
+            return;
+        }
+
+        var record = written;
+        if (activeReleaseId != writeReleaseId)
+        {
+            var connection = transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
+            record = await RecordQueries.GetAsync(connection, active, watched, written.Id, cancellationToken)
+                ?? throw new InvalidOperationException($"No record of '{watched.Name}' has the id '{written.Id}'.");
+        }
+
+        await StartAsync(transaction, tenantId, active, activeReleaseId, watched, DataChangeKinds.Create, record, changedFields: null, logger, cancellationToken);
+    }
+
+    /// <summary>
     /// Starts the process of each data change trigger on <paramref name="entity"/> that lists
     /// <paramref name="kind"/> and passes its <c>fields</c>, for the record <paramref name="written"/>
     /// in <paramref name="transaction"/>. <paramref name="changedFields"/> is null for a create,

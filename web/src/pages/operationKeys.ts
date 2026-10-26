@@ -1,17 +1,18 @@
 type Content = Record<string, unknown>
 
-export const builtInOperations = ['updateRecord', 'callConnector', 'raiseEvent']
+export const builtInOperations = ['updateRecord', 'callConnector', 'raiseEvent', 'createRecord']
 
 export const packageChoice = 'package'
 
 /** Every key that an operation step can have besides its name, type and `next`. */
-const operationKeys = ['set', 'connector', 'input', 'output', 'retry', 'event', 'fields']
+const operationKeys = ['set', 'connector', 'input', 'output', 'retry', 'event', 'entity', 'fields']
 
 export const forbiddenByOperation: Record<string, string[]> = {
-  updateRecord: ['connector', 'input', 'output', 'retry', 'event', 'fields'],
-  callConnector: ['set', 'event', 'fields'],
-  raiseEvent: ['set', 'connector', 'input', 'output', 'retry'],
-  [packageChoice]: ['set', 'connector', 'event', 'fields'],
+  updateRecord: ['connector', 'input', 'output', 'retry', 'event', 'entity', 'fields'],
+  callConnector: ['set', 'event', 'entity', 'fields'],
+  raiseEvent: ['set', 'connector', 'input', 'output', 'retry', 'entity'],
+  createRecord: ['connector', 'input', 'output', 'retry', 'event', 'fields'],
+  [packageChoice]: ['set', 'connector', 'event', 'entity', 'fields'],
 }
 
 function text(value: unknown): string {

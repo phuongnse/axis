@@ -17,8 +17,8 @@ triggers, see [Event delivery](#event-delivery). So is the start of each `sync`
 event trigger in the transaction of the `raiseEvent` step, see
 [Raise event step](#raise-event-step). Data change triggers fire on record API
 creates and updates, on an inbound endpoint's record create, on task form
-saves, on `updateRecord` steps, on connector outputs and on package operation
-outputs, see [Starts from triggers](#starts-from-triggers). The worker runs
+saves, on `updateRecord` and `createRecord` steps, on connector outputs and on
+package operation outputs, see [Starts from triggers](#starts-from-triggers). The worker runs
 schedule triggers too, once for each occurrence and for each record of the
 trigger's data source, or once for each occurrence when the trigger has no data
 source, see [Schedules](#schedules) and [Scheduled jobs](#scheduled-jobs).
@@ -164,7 +164,8 @@ raised. For a data change trigger on a record API or inbound endpoint write,
 it is the release the write's request resolved when it began. The write and
 its triggers then use the same model, even when a release activates while the
 request runs. A system-side write, which is a task form save, an
-`updateRecord` step, a connector output or a package operation output, takes
+`updateRecord` step, a `createRecord` step, a connector output or a package
+operation output, takes
 its triggers from the active release at the time of the write, while the write
 itself uses the release the task or instance is pinned to. When the two
 differ, the record is read again with the active release's model before the
@@ -179,7 +180,7 @@ record.
 | --- | --- | --- |
 | Event, `async` | The `event.deliver` transaction, one for each occurrence and trigger | The trigger already handled the occurrence, the `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
-| Data change | The write's transaction: a record API create or update, an inbound endpoint's create, a task form save, an `updateRecord` step, a connector output or a package operation output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
+| Data change | The write's transaction: a record API create or update, an inbound endpoint's create, a task form save, an `updateRecord` step, a `createRecord` step, a connector output or a package operation output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
 | Schedule | The `trigger.fanOut` transaction of one batch, which holds the starts of up to 100 records. Without a data source, the one start of the occurrence | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true. Without a data source: the occurrence was already handled, the process is already running, or the `startCondition` is not true |
 
 A `when` or a `startCondition` is not true when it gives `false` or `null`,
@@ -196,7 +197,8 @@ order of the release, after the record and its `record.created` or
 `record.updated` audit record are written and before the commit. For an
 inbound endpoint call, they run before the endpoint's own start. For an
 `updateRecord` step, a connector output or a package operation output, they run
-after its `record.updated` audit record. For a task form save, they run after
+after its `record.updated` audit record. For a `createRecord` step, they run
+after its `record.created` audit record. For a task form save, they run after
 the `task.completed` audit record, once the task is closed and its instance
 resumes, so the instance of the task's own process is already running. A start that
 fails for any reason but a skip, such as a database error, fails the write,
