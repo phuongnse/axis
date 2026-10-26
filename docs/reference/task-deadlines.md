@@ -15,11 +15,12 @@ the `claimed_by` and `claimed_at` columns are built, and so are release by a
 `reassign` grant and [reassign](#reassign) with its user picker. The
 [overdue](#task-states) rule and the [inbox and task page](#inbox-and-task-page)
 are built: the inbox marks, and Claim, Release and the Reassign dialog on the
-task page. Escalations are _(planned for M14)_.
+task page. The shape of `escalations` and its checks are built, and the compiler
+holds them in the model. Escalation runs are _(planned for M14)_.
 
 ## Escalations and deadline
 
-A task step may add `escalations` _(planned for M14)_ and a `deadline`:
+A task step may add `escalations` and a `deadline`:
 
 ```json
 {
@@ -46,21 +47,25 @@ A task step may add `escalations` _(planned for M14)_ and a `deadline`:
 ```
 
 - **Durations.** Every `after` is a positive fixed-length duration, by the rule
-  of `dueIn` (`AXC0084`, at `/steps/{i}/deadline/after` for the deadline). It
+  of `dueIn` (`AXC0084`, at `/steps/{i}/deadline/after` for the deadline and
+  at `/steps/{i}/escalations/{j}/after` for an escalation). It
   counts from the time of the task step's transaction, the same time `dueIn`
   counts from and the task's `created_at`. In a [test scenario](test-scenarios.md)
   that time follows the scenario's `now`. There are no business hours or
   calendars.
-- **Escalation** _(planned for M14)_. Each has `after` and at least one of `reassign` and
-  `notify`. `reassign` has the shape of `assignee`. `notify` has the shape of
-  the [`notify` operation](notifications.md#notify-operation), without `next`.
-  An escalation does not end the task.
+- **Escalation.** Each has `after` and at least one of `reassign` and
+  `notify`, otherwise `AXC0280` at `/steps/{i}/escalations/{j}`. `reassign` has
+  the shape and the checks of `assignee`, reported under `.../reassign`. `notify`
+  has the shape and the checks of the
+  [`notify` operation](notifications.md#notify-operation), without `next`,
+  reported under `.../notify`. The compiler keeps escalations in file order and
+  does not require them to be in order of `after`. An escalation does not end the
+  task. Running escalations is _(planned for M14)_.
 - **Deadline.** `after` and `next`. `next` names a step of the process
   (`AXC0070` when it names none). It counts as a transition of the step graph,
   checked after the outcomes, so a step that only a deadline leads to is
-  reachable. _(Planned for M14)_ Each
-  escalation's `after` is shorter than the deadline's, otherwise a new
-  diagnostic at that escalation's `/after`.
+  reachable. Each escalation's `after` is shorter than the deadline's,
+  otherwise `AXC0281` at that escalation's `/after`.
 - **Work items.** The task step's transaction queues one `task.deadline` item,
   with the task id and the instance id, due at the step's time plus the
   deadline's `after`. _(Planned for M14)_ It also queues one `task.escalate`
