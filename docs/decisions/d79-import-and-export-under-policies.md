@@ -19,11 +19,13 @@ source grants.
   - A data source and an entity each have an export route that takes the
     query of their rows route and `format=csv` or `format=xlsx`.
   - It runs the same query, grants, read filters and field checks as the rows
-    route, and streams every matching row, up to `Data:ExportMaxRows`.
+    route, and writes every matching row, up to `Data:ExportMaxRows`.
   - Values are written in machine form: ISO dates, decimals as text, enum
     values rather than labels, and the display value of a reference.
-  - A CSV cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return
-    gets a leading `'`, so a spreadsheet never runs it as a formula.
+  - A text-like CSV cell that starts with `=`, `+`, `-`, `@`, a tab or a
+    carriage return gets a leading `'`, so a spreadsheet never runs it as a
+    formula. A number cell never does, because a number cannot be a formula
+    and a prefix would break its machine form.
   - Spreadsheets are written with DocumentFormat.OpenXml, which is MIT
     licensed.
   - Each export writes an audit record `records.exported` with the source, the

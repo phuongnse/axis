@@ -8,6 +8,7 @@ using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
+using Axis.Server.Exports;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
@@ -90,6 +91,9 @@ internal static class RecordEndpoints
             records.MapPost("", CreateAsync);
             records.MapPatch("/{id}", UpdateAsync);
             records.MapDelete("/{id}", DeleteAsync);
+
+            // Only a signed-in user exports, so a service account never reaches it. The literal segment wins over {id}.
+            endpoints.MapGroup(pattern).MapGet("/export", ExportAsync).WithQueryTimeout(QueryTimeoutSettings.Export);
         }
     }
 
@@ -137,8 +141,143 @@ internal static class RecordEndpoints
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
 
-        // A field the user may not read is no sort, and its display field no search, so neither
-        // can probe a hidden value.
+        var order = ReadQuery(sort, search, request, model, fields, errors);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        if (await PendingQueryAsync(connection, database.ReadTransaction, model, order, search, cancellationToken) is { } pendingQuery)
+        {
+            return pendingQuery;
+        }
+
+        var condition = read.Filters is { } filters
+            ? RecordFilters.Condition(application!, model, Expressions(filters), user.Id)
+            : null;
+        if (await RecordQueries.ListAsync(connection, database.ReadTransaction, model, pageNumber, size, order, search, condition, cancellationToken) is not { } result)
+        {
+            // PostgreSQL cannot fail one branch of an OR, so every filter of the list is named.
+            var logger = Logger(loggerFactory);
+            foreach (var filter in read.Filters!)
+            {
+                RecordFilterLog.ListFailed(logger, filter.Policy, filter.Grant, model.Name);
+            }
+
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
+        }
+
+        return Results.Ok(new RecordListResponse([.. result.Items.Select(fields.Visible)], pageNumber, size, result.TotalCount));
+    }
+
+    // An export takes the query of the list without its paging. The grant, the filters and the field
+    // checks are the list's, and the export grant is checked first. The rows are written to a temporary
+    // file, so the file is complete before the audit record and before any byte is sent.
+    private static async Task<IResult> ExportAsync(
+        string app,
+        string entity,
+        string? sort,
+        string? search,
+        string? format,
+        HttpRequest request,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ExportSettings export,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
+        {
+            return Grants.SignInRequired(request.HttpContext);
+        }
+
+        var (application, model, notFound, _) = await ResolveEntityAsync(app, EntityName(request.HttpContext, entity), resolver, cancellationToken);
+        if (model is null)
+        {
+            return notFound!;
+        }
+
+        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
+        if (!PolicyEvaluator.AllowsExport(application!, user.Roles, model) || !read.Granted)
+        {
+            return Grants.Forbidden();
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        if (read.Filters is { } pendingFilters
+            && await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application!, model, pendingFilters, loggerFactory, cancellationToken))
+        {
+            return Grants.PendingFilter();
+        }
+
+        var fields = RecordFieldAccess.Read(application!, user.Roles, model);
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var order = ReadQuery(sort, search, request, model, fields, errors);
+        ExportFile.TryParseFormat(format, errors, out var exportFormat);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        if (await PendingQueryAsync(connection, database.ReadTransaction, model, order, search, cancellationToken) is { } pendingQuery)
+        {
+            return pendingQuery;
+        }
+
+        var condition = read.Filters is { } filters
+            ? RecordFilters.Condition(application!, model, Expressions(filters), user.Id)
+            : null;
+
+        // A child collection and a references field have no column to export.
+        var columns = model.Fields.Where(field => field.HasColumn && fields.CanRead(field.Name)).ToList();
+        string?[] Cells(Record record)
+        {
+            var visible = fields.Visible(record);
+            return [.. columns.Select(column => ExportValues.Format(
+                column.Type, visible.Values.GetValueOrDefault(column.Name), visible.Labels.GetValueOrDefault(column.Name)))];
+        }
+
+        try
+        {
+            return await ExportFile.RunAsync(
+                request.HttpContext,
+                database,
+                connection,
+                exportFormat,
+                model.Name,
+                [.. columns.Select(column => new ExportColumn(column.Name, column.Type))],
+                RecordQueries.ReadAllAsync(connection, model, order, search, condition, export.MaxRows + 1, cancellationToken),
+                Cells,
+                export.MaxRows,
+                (rows, truncated) => new AuditEntry(
+                    user.Id,
+                    AuditActions.RecordsExported,
+                    application!.Manifest.Id,
+                    model.Id,
+                    null,
+                    null,
+                    new JsonObject { ["format"] = exportFormat.Name(), ["rowCount"] = rows, ["truncated"] = truncated },
+                    user.DisplayName),
+                cancellationToken);
+        }
+        catch (PostgresException exception) when (condition is not null && exception.SqlState.StartsWith("22", StringComparison.Ordinal))
+        {
+            // Class 22 is a data exception. PostgreSQL cannot fail one branch of an OR, so every filter is named.
+            var logger = Logger(loggerFactory);
+            foreach (var filter in read.Filters!)
+            {
+                RecordFilterLog.ListFailed(logger, filter.Policy, filter.Grant, model.Name);
+            }
+
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
+        }
+    }
+
+    // A field the user may not read is no sort, and its display field no search, so neither
+    // can probe a hidden value. Every invalid parameter adds an error.
+    private static RecordSort? ReadQuery(
+        string? sort, string? search, HttpRequest request, EntityModel model, RecordFieldAccess fields, SortedDictionary<string, string[]> errors)
+    {
         RecordSort? order = null;
         if (sort is not null && (!RecordSort.TryParse(sort, model, out order) || !fields.CanRead(order.Field.Name)))
         {
@@ -165,47 +304,33 @@ internal static class RecordEndpoints
             }
         }
 
-        if (errors.Count > 0)
+        return order;
+    }
+
+    // A sort or a search on a computed field that is being recomputed would order or match by a stale stored value.
+    private static async Task<IResult?> PendingQueryAsync(
+        NpgsqlConnection connection, NpgsqlTransaction? transaction, EntityModel model, RecordSort? order, string? search, CancellationToken cancellationToken)
+    {
+        var pending = await PendingComputedFields.ReadAsync(connection, transaction, [model.Id], cancellationToken);
+        if (!pending.TryGetValue(model.Id, out var pendingNames))
         {
-            return Results.ValidationProblem(errors);
+            return null;
         }
 
-        // A sort or a search on a computed field that is being recomputed would order or match by a stale stored value.
-        var pending = await PendingComputedFields.ReadAsync(connection, database.ReadTransaction, [model.Id], cancellationToken);
-        if (pending.TryGetValue(model.Id, out var pendingNames))
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        if (order is not null && pendingNames.Contains(order.Field.Name))
         {
-            if (order is not null && pendingNames.Contains(order.Field.Name))
-            {
-                errors["sort"] = [$"The field '{order.Field.Name}' is being recomputed."];
-            }
-
-            if (!string.IsNullOrEmpty(search) && model.DisplayField is { } display && pendingNames.Contains(display))
-            {
-                errors["search"] = [$"The field '{display}' is being recomputed."];
-            }
-
-            if (errors.Count > 0)
-            {
-                return Results.ValidationProblem(errors, statusCode: StatusCodes.Status409Conflict, title: "A field is being recomputed.");
-            }
+            errors["sort"] = [$"The field '{order.Field.Name}' is being recomputed."];
         }
 
-        var condition = read.Filters is { } filters
-            ? RecordFilters.Condition(application!, model, Expressions(filters), user.Id)
+        if (!string.IsNullOrEmpty(search) && model.DisplayField is { } display && pendingNames.Contains(display))
+        {
+            errors["search"] = [$"The field '{display}' is being recomputed."];
+        }
+
+        return errors.Count > 0
+            ? Results.ValidationProblem(errors, statusCode: StatusCodes.Status409Conflict, title: "A field is being recomputed.")
             : null;
-        if (await RecordQueries.ListAsync(connection, database.ReadTransaction, model, pageNumber, size, order, search, condition, cancellationToken) is not { } result)
-        {
-            // PostgreSQL cannot fail one branch of an OR, so every filter of the list is named.
-            var logger = Logger(loggerFactory);
-            foreach (var filter in read.Filters!)
-            {
-                RecordFilterLog.ListFailed(logger, filter.Policy, filter.Grant, model.Name);
-            }
-
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
-        }
-
-        return Results.Ok(new RecordListResponse([.. result.Items.Select(fields.Visible)], pageNumber, size, result.TotalCount));
     }
 
     private static async Task<IResult> GetAsync(

@@ -7,8 +7,8 @@ of [architecture.md](../architecture.md) apply: sections marked
 _(planned for M15)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
-Everything on this page is _(planned for M15)_, except the grants and the
-policy matrix, which are built.
+Everything on this page is _(planned for M15)_, except the grants, the
+policy matrix and the export routes, which are built.
 
 ## Grants
 
@@ -32,26 +32,51 @@ policy matrix, which are built.
 
 - **Query.** Each route takes the query of its rows or list route, such as
   parameters, `sort` and `search`, without `page` and `pageSize`. `format` is
-  `csv` or `xlsx`.
+  `csv` or `xlsx`. A missing or unknown `format` is a `400` at `format`, found
+  after the grants.
 - **Same checks.** The session, the grant, the root read filters and the field
   check run as for the rows or list route. A missing `export` grant is a
-  `403`.
-- **Rows.** Every matching row is written, streamed, in the route's order. Past
-  `Data:ExportMaxRows` the export stops and the file ends with no partial row.
-  The response then carries `Axis-Export-Truncated: true`.
-- **Columns.** The first row holds the field names. Grouped data sources write
-  their group fields and measures.
-- **Values.** ISO dates and instants, decimals and money as text with a dot,
-  enum values rather than labels, booleans as `true` and `false`, and a
-  reference as its target's display value. A file is its name. A `references`
-  field is its display values joined by `; `.
-- **Formula cells.** A CSV cell that starts with `=`, `+`, `-`, `@`, a tab or a
-  carriage return gets a leading `'`. Spreadsheet cells are written as typed
-  values, never as formulas.
+  `403`. Read filters hide rows and field lists hide whole columns, exactly as
+  on that route.
+- **Session only.** The routes are for signed-in users. A service account's
+  bearer token is a `401` on them.
+- **Rows.** Every matching row is written in the route's order, up to
+  `Data:ExportMaxRows`. The rows are read from the database one at a time and
+  written to a temporary file, so the server never holds them all in memory.
+  The file is complete before it is sent, so no byte leaves before the row
+  count and the audit record are known. Past `Data:ExportMaxRows` the file
+  stops there with no partial row, and the response carries
+  `Axis-Export-Truncated: true`. A file is sent with `Cache-Control: no-store`
+  and no record id column.
+- **Columns.** The first row holds the field names. An entity export writes
+  the fields the user may read, in declaration order, and leaves out child
+  collections and `references` fields. A `references` field has no storage
+  yet, so it is left out until it has, and then the export adds it. Grouped
+  data sources write their group fields, then their measures.
+- **Values.** ISO dates and instants, integers, decimals and money as text
+  with a dot and every stored digit, enum values rather than labels, booleans
+  as `true` and `false`, and a reference as its target's display value. A
+  reference whose label the user may not see, or whose target has no display
+  value, is the target's record id, which import accepts too. A file is its
+  name. A `references` field's value is its display values joined by `; `.
+- **CSV.** UTF-8 with a byte order mark, so Excel reads non-ASCII text, CRLF
+  line endings and RFC 4180 quoting.
+- **Spreadsheet.** One sheet named `Export`. Numbers are number cells that hold
+  the exact digits, though Excel shows integers above 2^53 rounded. Booleans
+  are boolean cells. Dates, instants and all text are text cells in their ISO
+  form, so a time zone is never lost. No cell is a formula.
+- **Formula cells.** A text-like CSV cell, which is text, an enum value, a
+  reference label or a file name, that starts with `=`, `+`, `-`, `@`, a tab
+  or a carriage return gets a leading `'`. A number cell never does: a number
+  cannot be a formula, and a prefix on `-5` would break its machine form and
+  its re-import.
 - **Timeout.** The query runs under `Data:ExportQueryTimeout`, see
-  [data settings](host-settings.md#data-settings).
-- **Audit.** Each export writes `records.exported` with the data source or
-  entity, the row count and the user. It holds no value.
+  [data settings](host-settings.md#data-settings). A query past it is a `503`
+  and sends no file.
+- **Audit.** Each export writes `records.exported` after the file is complete
+  and before it is sent, in a transaction of its own. An export that fails
+  writes no audit record and sends no file. It holds no value. See
+  [audit records](storage.md#audit-records-and-sequence-counters).
 
 ## Import
 

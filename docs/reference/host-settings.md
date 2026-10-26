@@ -319,16 +319,16 @@ the operator sets it with
 
 ## Data settings
 
-`Data:QueryTimeout` and `Data:ExportQueryTimeout` are built. The rest are
-_(planned for M15)_. The server reads them. See
+`Data:QueryTimeout`, `Data:ExportQueryTimeout` and `Data:ExportMaxRows` are
+built. The rest are _(planned for M15)_. The server reads them. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Data:QueryTimeout` | `00:00:10` | The `statement_timeout` of every interactive read: record lists, single reads and histories, data source rows, lookups and page reads. A read past it is a `503`. |
-| `Data:ExportQueryTimeout` | `00:01:00` | The `statement_timeout` of an export's query. The server reads and checks it, and no export uses it until exports are built. |
-| `Data:ExportMaxRows` | `100000` | The most rows one export writes. |
+| `Data:ExportQueryTimeout` | `00:01:00` | The `statement_timeout` of an export's query. An export past it is a `503` and sends no file. |
+| `Data:ExportMaxRows` | `100000` | The most data rows one export file holds, an integer from 1 to 2147483646. The file stops there and the response carries `Axis-Export-Truncated: true`. |
 | `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. |
 | `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. |
 | `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. A field's `maxSize` cannot exceed it. |

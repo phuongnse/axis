@@ -696,6 +696,15 @@ schema of the tenant database.
     `{ "deadLetterId", "kind", "triggerId", "eventId", "occurrenceAt", "reason" }`,
     with null for the ids that the kind lacks.
 
+  - **Export actions.** An [export](import-export.md#export) of an entity or a
+    data source writes `records.exported`, with the user as `actor`. The
+    `application_id` is set and `record_id` and `process_instance_id` are null.
+    An entity export sets `entity_id`. A data source export leaves it null and
+    puts the data source's id in the `details`. The `details` are
+    `{ "format", "rowCount", "truncated" }` and, for a data source,
+    `"dataSourceId"`. `format` is `csv` or `xlsx` and `truncated` says whether
+    the file stopped at `Data:ExportMaxRows`. They never hold a field value.
+
   - An index on `(entity_id, record_id, occurred_at desc, id desc)` serves
     the [record history](record-api.md#audit-records-and-history).
   - A `BEFORE UPDATE OR DELETE` row trigger and a `BEFORE TRUNCATE`
