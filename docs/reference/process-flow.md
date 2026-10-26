@@ -235,10 +235,11 @@ A `createRecord` operation creates a record of another entity:
 
 A process may leave out `entity`. It then declares typed `parameters`. The
 compile checks in this section are built, and so are the instance storage,
-running such an instance on the engine and the start endpoint. The other starts
-and inspection described below are _(planned for M14)_. Until inspection is
-built, the instance list is empty, and the instance detail and the operator
-commands answer `404`.
+running such an instance on the engine, the start endpoint and the operator
+commands cancel, retry and resolve, which check only the user's grant. The
+other starts and the instance list and detail described below are _(planned for
+M14)_. Until inspection is built, the instance list is empty and the instance
+detail answers `404`.
 
 ```json
 {

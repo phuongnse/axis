@@ -19,7 +19,10 @@ public enum CallResolveOutcome
     /// <summary>The call is settled and its instance moved on or failed. The caller commits.</summary>
     Resolved,
 
-    /// <summary>The instance does not exist for the process, or its subject record is not readable by the user.</summary>
+    /// <summary>
+    /// The instance does not exist for the process, or its subject record is not readable by the user. An
+    /// instance without a subject has no record to read.
+    /// </summary>
     NotFound,
 
     /// <summary>The call does not exist, or belongs to another instance.</summary>
@@ -55,8 +58,9 @@ public sealed record CallResolveResult(
 
 /// <summary>
 /// Settles an <c>unknown</c> connector or package call by hand, in the caller's transaction. The user's <c>resolve</c> grant
-/// and the application's shared start lock are the caller's. The instance must be readable by the user, or it
-/// does not exist for them, and a <c>read</c> filter that reads a field being recomputed refuses the command
+/// and the application's shared start lock are the caller's. The instance's subject record must be readable by the user, or it
+/// does not exist for them. An instance without a subject has no record, so the grant is the only check and
+/// nothing is written to a record. A <c>read</c> filter that reads a field being recomputed refuses the command
 /// first, as for a retry. The call must belong to the instance, be <c>unknown</c>, and the instance must be
 /// <c>waiting</c> on the call's step. The command looks for a connector call first, then a package call. The
 /// call's pinned release says which connector operation it is, and for a package call it says which package
@@ -81,8 +85,8 @@ public static class CallResolveCommand
     /// <param name="active">The active release's model, which the user's read filters are evaluated in.</param>
     /// <param name="activeReleaseId">The active release's id, which the data change triggers are pinned to.</param>
     /// <param name="process">The process of the route. The instance must belong to it.</param>
-    /// <param name="entity">The subject entity of <paramref name="process"/> in <paramref name="active"/>.</param>
-    /// <param name="read">The user's <c>read</c> access to <paramref name="entity"/>.</param>
+    /// <param name="entity">The subject entity of <paramref name="process"/> in <paramref name="active"/>, or null for a process without a subject.</param>
+    /// <param name="read">The user's <c>read</c> access to <paramref name="entity"/>, or null for a process without a subject.</param>
     /// <param name="succeeded"><see langword="true"/> to settle the call as succeeded, <see langword="false"/> as failed.</param>
     /// <param name="output">The outputs of a succeeded call, keyed by the declared output names, or <see langword="null"/> for none.</param>
     /// <param name="releaseOf">Gives the model of the release a call is pinned to.</param>
@@ -94,10 +98,10 @@ public static class CallResolveCommand
         ApplicationModel active,
         Guid activeReleaseId,
         ProcessModel process,
-        EntityModel entity,
+        EntityModel? entity,
         Guid instanceId,
         Guid callId,
-        RecordAccess read,
+        RecordAccess? read,
         string userId,
         string userName,
         string reason,
@@ -112,15 +116,14 @@ public static class CallResolveCommand
         ArgumentNullException.ThrowIfNull(transaction);
         ArgumentNullException.ThrowIfNull(active);
         ArgumentNullException.ThrowIfNull(process);
-        ArgumentNullException.ThrowIfNull(entity);
-        ArgumentNullException.ThrowIfNull(read);
         ArgumentNullException.ThrowIfNull(releaseOf);
         ArgumentNullException.ThrowIfNull(packages);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
         // A read filter on a field that is being recomputed decides nothing. It is checked before the instance
         // is found, so it tells nothing about the instance.
-        if (read.Filters is { } pendingFilters
+        if (entity is not null
+            && read?.Filters is { } pendingFilters
             && await RecordCommand.ReadsPendingAsync(connection, transaction, active, entity, pendingFilters, loggerFactory, cancellationToken))
         {
             return new CallResolveResult(CallResolveOutcome.PendingFilter);
@@ -132,10 +135,14 @@ public static class CallResolveCommand
             return new CallResolveResult(CallResolveOutcome.NotFound);
         }
 
-        if (!read.Granted
-            || (read.Filters is { } filters
-                && await RecordCommand.MatchAsync(connection, transaction, active, entity, instance.SubjectId, filters, userId, loggerFactory, cancellationToken)
-                    is not { Found: true, Matched: true }))
+        // An instance without a subject has no record to read, so only the grant applies. An instance with a
+        // subject is never exempt from the read check, whatever the process's subject is now.
+        if (instance.SubjectId is { } subjectId
+            && (entity is null
+                || read is not { Granted: true }
+                || (read.Filters is { } filters
+                    && await RecordCommand.MatchAsync(connection, transaction, active, entity, subjectId, filters, userId, loggerFactory, cancellationToken)
+                        is not { Found: true, Matched: true })))
         {
             return new CallResolveResult(CallResolveOutcome.NotFound);
         }
@@ -290,13 +297,21 @@ public static class CallResolveCommand
     {
         var (pinned, subject) = (target.Pinned, target.Subject);
         Record? updated = null;
-        if (values.Count > 0)
+
+        // An instance without a subject has no record to read or write. A step of such a process maps no
+        // outputs, so there are no values either.
+        Record? record = null;
+        if (subject is not null && instance.SubjectId is { } subjectId)
         {
-            // The caller holds the start lock. The row lock makes the read below see the latest version.
-            await RecordCommands.LockAsync(connection, subject, instance.SubjectId, cancellationToken);
+            if (values.Count > 0)
+            {
+                // The caller holds the start lock. The row lock makes the read below see the latest version.
+                await RecordCommands.LockAsync(connection, subject, subjectId, cancellationToken);
+            }
+
+            record = await RecordQueries.GetAsync(connection, pinned, subject, subjectId, cancellationToken);
         }
 
-        var record = await RecordQueries.GetAsync(connection, pinned, subject, instance.SubjectId, cancellationToken);
         var output = new JsonObject
         {
             ["operationId"] = target.Id,
@@ -307,9 +322,9 @@ public static class CallResolveCommand
         AuditEntry? recordAudit = null;
         if (values.Count > 0)
         {
-            if (record is null)
+            if (subject is null || record is null)
             {
-                return Invalid(OutputPointer, $"No record of '{subject.Name}' has the id '{instance.SubjectId}'.");
+                return Invalid(OutputPointer, $"No record of '{subject?.Name}' has the id '{instance.SubjectId}'.");
             }
 
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
@@ -361,7 +376,7 @@ public static class CallResolveCommand
             await AuditRecords.AppendAsync(transaction, recordAudit, cancellationToken);
         }
 
-        if (record is not null && updated is not null)
+        if (subject is not null && record is not null && updated is not null)
         {
             await DataChangeTriggerStarts.StartAfterUpdateAsync(
                 transaction,
@@ -431,17 +446,18 @@ public static class CallResolveCommand
         return new CallResolveResult(CallResolveOutcome.Resolved, State: ProcessStarts.Failed);
     }
 
-    /// <summary>Finds the step, the operation and the subject entity of the call on its pinned release.</summary>
+    /// <summary>Finds the step, the operation and the subject entity, null without a subject, of the call on its pinned release.</summary>
     /// <exception cref="InvalidOperationException">The release lacks one of them.</exception>
-    private static (CallConnectorStepModel Step, ConnectorOperationModel Operation, EntityModel Subject) FindConnectorTarget(
+    private static (CallConnectorStepModel Step, ConnectorOperationModel Operation, EntityModel? Subject) FindConnectorTarget(
         ApplicationModel pinned,
         LockedInstance instance,
         LoadedConnectorCall call)
     {
         var process = pinned.Processes.FirstOrDefault(candidate => candidate.Id == instance.ProcessId)
             ?? throw new InvalidOperationException($"The release has no process '{instance.ProcessId}'.");
-        var subject = pinned.FindEntity(instance.SubjectEntityId)
-            ?? throw new InvalidOperationException($"The release has no entity '{instance.SubjectEntityId}'.");
+        var subject = instance.SubjectEntityId is { } subjectEntityId
+            ? pinned.FindEntity(subjectEntityId) ?? throw new InvalidOperationException($"The release has no entity '{subjectEntityId}'.")
+            : null;
         if (!process.TryGetStep(call.Step, out var found) || found is not CallConnectorStepModel step)
         {
             throw new InvalidOperationException($"The process '{process.Name}' has no callConnector step '{call.Step}'.");
@@ -454,9 +470,9 @@ public static class CallResolveCommand
         return (step, operation, subject);
     }
 
-    /// <summary>Finds the step, the manifest's operation and the subject entity of the package call.</summary>
+    /// <summary>Finds the step, the manifest's operation and the subject entity, null without a subject, of the package call.</summary>
     /// <exception cref="InvalidOperationException">The release lacks the step, or the catalogue lacks the package version or its operation.</exception>
-    private static (PackageOperationStepModel Step, PackageOperation Operation, EntityModel Subject) FindPackageTarget(
+    private static (PackageOperationStepModel Step, PackageOperation Operation, EntityModel? Subject) FindPackageTarget(
         ApplicationModel pinned,
         PackageCatalog packages,
         LockedInstance instance,
@@ -464,8 +480,9 @@ public static class CallResolveCommand
     {
         var process = pinned.Processes.FirstOrDefault(candidate => candidate.Id == instance.ProcessId)
             ?? throw new InvalidOperationException($"The release has no process '{instance.ProcessId}'.");
-        var subject = pinned.FindEntity(instance.SubjectEntityId)
-            ?? throw new InvalidOperationException($"The release has no entity '{instance.SubjectEntityId}'.");
+        var subject = instance.SubjectEntityId is { } subjectEntityId
+            ? pinned.FindEntity(subjectEntityId) ?? throw new InvalidOperationException($"The release has no entity '{subjectEntityId}'.")
+            : null;
         if (!process.TryGetStep(call.Step, out var found) || found is not PackageOperationStepModel step)
         {
             throw new InvalidOperationException($"The process '{process.Name}' has no package operation step '{call.Step}'.");
@@ -488,7 +505,7 @@ public static class CallResolveCommand
         JsonObject? output,
         IReadOnlyList<(string Name, FieldType Type, bool Required)> declared,
         IReadOnlyList<ConnectorOutputModel> mappings,
-        EntityModel subject)
+        EntityModel? subject)
     {
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         var declaredNames = declared.Select(field => field.Name).ToHashSet(StringComparer.Ordinal);
@@ -523,6 +540,12 @@ public static class CallResolveCommand
             var mapping = mappings.FirstOrDefault(candidate => string.Equals(candidate.Output, declaredOutput.Name, StringComparison.OrdinalIgnoreCase));
             if (present && mapping is not null)
             {
+                // A process without a subject cannot map outputs, which AXC0246 refuses.
+                if (subject is null)
+                {
+                    throw new InvalidOperationException($"The output '{mapping.Output}' is mapped, but the instance has no subject.");
+                }
+
                 if (!subject.TryGetField(mapping.Field, out var field))
                 {
                     throw new InvalidOperationException($"The entity '{subject.Name}' has no field '{mapping.Field}'.");
@@ -590,19 +613,12 @@ public static class CallResolveCommand
             return null;
         }
 
-        // An instance of a process without a subject has null subject columns. It is not found here until
-        // inspection and operator support for it are built.
-        if (reader.IsDBNull(3))
-        {
-            return null;
-        }
-
         return new LockedInstance(
             instanceId,
             reader.GetGuid(0),
             reader.GetGuid(1),
-            reader.GetGuid(2),
-            reader.GetGuid(3),
+            reader.IsDBNull(2) ? null : reader.GetGuid(2),
+            reader.IsDBNull(3) ? null : reader.GetGuid(3),
             reader.GetGuid(4),
             reader.GetString(5),
             reader.GetInt64(6),
@@ -637,7 +653,7 @@ public static class CallResolveCommand
         IReadOnlyList<ConnectorOutputModel> Mappings,
         IReadOnlyList<(string Name, FieldType Type, bool Required)> Declared,
         ApplicationModel Pinned,
-        EntityModel Subject,
+        EntityModel? Subject,
         string WorkItemColumn,
         string AuditAction,
         Func<string, CancellationToken, Task> Settle)
@@ -649,8 +665,8 @@ public static class CallResolveCommand
         Guid Id,
         Guid ApplicationId,
         Guid ProcessId,
-        Guid SubjectEntityId,
-        Guid SubjectId,
+        Guid? SubjectEntityId,
+        Guid? SubjectId,
         Guid ReleaseId,
         string State,
         long Revision,
