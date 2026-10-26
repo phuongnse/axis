@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
+import { NotificationBell } from './NotificationBell'
 import type { NavigationItem } from './site'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
@@ -15,6 +16,8 @@ interface ShellProps {
   locales: readonly string[]
   locale: string
   onLocaleChange: (locale: string) => void
+  /** Where the notification bell reads, set on an application site. Without it the header has no bell. */
+  notifications?: { path: string; sitePath: string }
   children: ReactNode
 }
 
@@ -38,11 +41,11 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
 
 /**
  * The layout of every site, the platform site and application sites alike: site title and
- * navigation, account button, locale switch and theme toggle. Ant Design components and dayjs follow the
+ * navigation, notification bell, account button, locale switch and theme toggle. Ant Design components and dayjs follow the
  * locale. Below the phone breakpoint the navigation, locale switch and theme toggle sit in a panel that
  * a Menu button opens and closes.
  */
-export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, children }: ShellProps) {
+export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, notifications, children }: ShellProps) {
   const t = useText()
   const { mode, toggleMode } = useThemeMode()
   const { pathname } = useLocation()
@@ -82,6 +85,10 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, c
     />
   )
 
+  const bell = notifications && (
+    <NotificationBell path={notifications.path} sitePath={notifications.sitePath} locale={locale} />
+  )
+
   const setOpen = (next: boolean) => setOpenOn(next ? { pathname, phone } : null)
 
   function closeOnEscape(event: KeyboardEvent) {
@@ -117,6 +124,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, c
                     {t(titleKey)}
                   </Typography.Text>
                 </div>
+                {bell}
                 <UserMenu />
                 <Button
                   ref={toggle}
@@ -171,6 +179,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, c
                 items={items}
               />
               <Space>
+                {bell}
                 <UserMenu />
                 {localeSwitch}
                 {themeSwitch}

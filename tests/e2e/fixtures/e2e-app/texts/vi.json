@@ -65,6 +65,8 @@
     "noteReview.reject": "Từ chối",
     "noteClose.action": "Đóng ghi chú",
     "noteClose.cannotClose": "Chỉ có thể đóng ghi chú đang mở.",
+    "noteNotify.subject": "Ghi chú {title} đã sẵn sàng",
+    "noteNotify.body": "Mở ghi chú {title} để đọc.",
     "category.label": "Danh mục",
     "category.name": "Tên",
     "pages.assetForm.title": "Tài sản",

@@ -10,6 +10,7 @@ public sealed class NotifyStepCompilerTests
     private const string TicketId = "11111111-1111-4111-8111-111111111111";
     private const string ProcessId = "77777777-7777-4777-8777-777777777701";
     private const string DetailPageId = "55555555-5555-4555-8555-555555555501";
+    private const string AgentId = "11111111-1111-4111-8111-111111111112";
 
     private const string ValidTo = """[ { "user": "requester" }, { "role": "agent" }, { "email": "requester" } ]""";
     private const string ValidChannels = """["inApp"]""";
@@ -59,6 +60,34 @@ public sealed class NotifyStepCompilerTests
         Assert.NotNull(result.Model);
         var notify = Assert.IsType<NotifyStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
         Assert.Equal(["email", "inApp"], notify.Channels);
+    }
+
+    [Theory]
+    [InlineData("secret", "Ticket.secret")]
+    [InlineData("assignee.salary", "Agent.salary")]
+    public void A_value_that_reads_a_sensitive_field_is_reported_at_the_value(string expression, string field)
+    {
+        using var folder = Folder(values: $$"""{ "number": "number", "resolution": "{{expression}}" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.SensitiveNotifyValue, "processes/ticket-notice.json", "/steps/0/message/values/resolution"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains($"'{field}'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_value_that_reads_a_field_that_is_not_sensitive_through_a_reference_path_compiles()
+    {
+        using var folder = Folder(values: """{ "number": "number", "resolution": "assignee.name" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
     }
 
     [Fact]
@@ -341,7 +370,16 @@ public sealed class NotifyStepCompilerTests
                     { "name": "number", "type": "text" },
                     { "name": "resolution", "type": "text" },
                     { "name": "requester", "type": "text" },
-                    { "name": "priority", "type": "integer" }
+                    { "name": "priority", "type": "integer" },
+                    { "name": "secret", "type": "text", "sensitive": true },
+                    { "name": "assignee", "type": "reference", "target": "Agent" }
+                  ] }
+                """)
+            .With("entities/agent.json", $$"""
+                { "id": "{{AgentId}}", "kind": "entity", "name": "Agent", "formatVersion": 1, "displayField": "name",
+                  "fields": [
+                    { "name": "name", "type": "text", "required": true },
+                    { "name": "salary", "type": "decimal", "sensitive": true }
                   ] }
                 """)
             .With("pages/ticket-detail.json", PresentationCompilerTests.Page(

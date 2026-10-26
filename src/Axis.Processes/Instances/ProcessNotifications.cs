@@ -22,8 +22,8 @@ internal static class ProcessNotifications
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.notifications
-                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", open_page, open_parameters, created_at)
-            SELECT @id, @application, @release, recipient.kind, recipient.name, @subject, @body, @values, @page, @parameters, now()
+                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, open_page, open_parameters, created_at)
+            SELECT @id, @application, @release, recipient.kind, recipient.name, @subject, @body, @values, @valueTypes, @page, @parameters, now()
             FROM unnest(@kinds, @recipients) AS recipient(kind, name)
             """,
             transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
@@ -34,6 +34,7 @@ internal static class ProcessNotifications
         command.Parameters.AddWithValue("subject", notification.SubjectKey);
         command.Parameters.AddWithValue("body", notification.BodyKey);
         command.Parameters.Add(new NpgsqlParameter("values", NpgsqlDbType.Jsonb) { Value = notification.Values.ToJsonString() });
+        command.Parameters.Add(new NpgsqlParameter("valueTypes", NpgsqlDbType.Jsonb) { Value = notification.ValueTypes.ToJsonString() });
         command.Parameters.Add(new NpgsqlParameter("page", NpgsqlDbType.Text) { Value = (object?)notification.OpenPage ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("parameters", NpgsqlDbType.Jsonb) { Value = (object?)notification.OpenParameters?.ToJsonString() ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("kinds", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = notification.Recipients.Select(r => r.Kind).ToArray() });
@@ -48,6 +49,7 @@ internal static class ProcessNotifications
 /// <param name="SubjectKey">The text key of the subject.</param>
 /// <param name="BodyKey">The text key of the body.</param>
 /// <param name="Values">The raw evaluated placeholder values, keyed by the placeholders' names.</param>
+/// <param name="ValueTypes">The type name of each value, keyed by the placeholders' names. A value of type null or file has none.</param>
 /// <param name="OpenPage">The declared name of the page the notification opens, or null.</param>
 /// <param name="OpenParameters">The raw evaluated page parameters, keyed by the parameters' declared names, or null when there is no page.</param>
 /// <param name="Recipients">The distinct user and role recipients, each by kind and by user id or role name.</param>
@@ -59,6 +61,7 @@ internal sealed record NewNotification(
     string SubjectKey,
     string BodyKey,
     JsonObject Values,
+    JsonObject ValueTypes,
     string? OpenPage,
     JsonObject? OpenParameters,
     IReadOnlyList<(string Kind, string Recipient)> Recipients,

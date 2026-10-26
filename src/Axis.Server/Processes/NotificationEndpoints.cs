@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
 using Axis.Data.Profiles;
 using Axis.Policy;
@@ -20,8 +21,10 @@ namespace Axis.Server.Processes;
 /// one problem), and for a read the notification id and whether the user sees the notification (404).
 /// A list is newest first. Its subject and body come from the texts of the release each notification was stored with,
 /// in the locale of the user's profile when that release has texts for it, otherwise its first locale in ordinal order.
-/// A placeholder is filled with its stored value as raw text: a string as it is, a number or boolean as JSON writes it,
-/// null as empty text and any other value as JSON. A text key the locale does not have shows as the key itself.
+/// A placeholder is filled with its stored value formatted by <see cref="NotificationValues"/>: numbers in the conventions of
+/// the user's profile locale, or of the chosen texts when the profile has none, a date-time in the time zone of the release the
+/// notification was stored with, a date as its local date, and enum, text and other values as written.
+/// A text key the locale does not have shows as the key itself.
 /// The read routes write a read row for the session user only, never for another user, and answer 204 with no body,
 /// also for a notification that is already read. Read-all marks the notifications the user sees now.
 /// The problem titles never contain text from the request.
@@ -76,18 +79,19 @@ internal static class NotificationEndpoints
             connection, active.Model.Manifest.Id, user.Id, roles, unreadOnly, pageNumber, size, cancellationToken);
 
         var locale = result.Items.Count == 0 ? null : await UserProfiles.FindLocaleAsync(connection, user.Id, cancellationToken);
-        var texts = new Dictionary<Guid, TextResource?>();
+        var releases = new Dictionary<Guid, (ApplicationModel Release, TextResource? Texts)>();
         var items = new List<NotificationListItem>(result.Items.Count);
         foreach (var item in result.Items)
         {
-            if (!texts.TryGetValue(item.ReleaseId, out var resource))
+            if (!releases.TryGetValue(item.ReleaseId, out var stored))
             {
                 var release = await resolver.GetReleaseModelAsync(item.ReleaseId, cancellationToken);
-                resource = NotificationTexts.ChooseTexts(release, locale);
-                texts[item.ReleaseId] = resource;
+                stored = (release, NotificationTexts.ChooseTexts(release, locale));
+                releases[item.ReleaseId] = stored;
             }
 
-            var values = NotificationTexts.ReadValues(item.Values);
+            var (storedRelease, resource) = stored;
+            var values = NotificationValues.Format(item.Values, item.ValueTypes, locale ?? resource?.Locale, storedRelease.TimeZone);
             items.Add(new NotificationListItem(
                 item.Id,
                 item.ReleaseId,

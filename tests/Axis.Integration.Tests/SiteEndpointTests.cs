@@ -37,7 +37,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         using var site = await GetJsonAsync("/api/sites/RECORDS", HostA);
 
         var root = site.RootElement;
-        Assert.Equal(["path", "titleKey", "locales", "navigation"], root.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["path", "titleKey", "locales", "navigation", "notificationsPath"], root.EnumerateObject().Select(property => property.Name));
         Assert.Equal("records", root.GetProperty("path").GetString());
         Assert.Equal("site.title", root.GetProperty("titleKey").GetString());
         var locales = root.GetProperty("locales");
@@ -48,6 +48,16 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
             [("Items", "nav.items"), ("Departments", "nav.departments")],
             root.GetProperty("navigation").EnumerateArray()
                 .Select(entry => (entry.GetProperty("page").GetString(), entry.GetProperty("labelKey").GetString())));
+    }
+
+    [Fact]
+    public async Task Site_gives_the_address_of_the_notification_routes_of_its_application()
+    {
+        using var site = await GetJsonAsync("/api/sites/records", HostA);
+
+        Assert.Equal(
+            $"/api/apps/{fixture.Model.Manifest.Name}/notifications",
+            site.RootElement.GetProperty("notificationsPath").GetString());
     }
 
     [Fact]
