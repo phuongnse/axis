@@ -1,0 +1,11 @@
+{
+  "id": "3b7c1d52-4e8a-4f60-9a1b-7d2e5c8f0a02",
+  "kind": "entity",
+  "name": "Claim",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "title", "type": "text" },
+    { "name": "receipt", "type": "file", "maxSize": 1024, "accept": ["application/pdf", "image/*"] },
+    { "name": "attachments", "type": "child-collection", "target": "ClaimAttachment" }
+  ]
+}

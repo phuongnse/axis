@@ -467,6 +467,69 @@ public sealed class ExpressionInterpreterTests
         Assert.Throws<InvalidOperationException>(() => Evaluate("now()"));
     }
 
+    private static readonly TimeZoneInfo _saigon = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+
+    private static readonly DateTimeOffset _newYearsEveEvening = new(2026, 12, 31, 18, 0, 0, TimeSpan.Zero);
+
+    [Theory]
+    [InlineData("Asia/Ho_Chi_Minh", "2027-01-01")]
+    [InlineData("UTC", "2026-12-31")]
+    [InlineData("America/Los_Angeles", "2026-12-31")]
+    [InlineData("Pacific/Kiritimati", "2027-01-01")]
+    public void Today_is_the_date_of_the_transaction_time_in_the_time_zone(string zone, string date)
+    {
+        var result = EvaluateAt("today()", _newYearsEveEvening, _scope, Values([]), TimeZoneInfo.FindSystemTimeZoneById(zone));
+
+        Assert.Equal(DateOnly.Parse(date, System.Globalization.CultureInfo.InvariantCulture), Assert.IsType<DateOnly>(result.Value));
+    }
+
+    [Theory]
+    [InlineData("Asia/Ho_Chi_Minh", "2027-01-01")]
+    [InlineData("UTC", "2026-12-31")]
+    public void To_date_is_the_date_of_an_instant_in_the_time_zone(string zone, string date)
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(zone);
+        var expected = DateOnly.Parse(date, System.Globalization.CultureInfo.InvariantCulture);
+
+        var literal = EvaluateAt("toDate(dateTime('2026-12-31T18:00:00Z'))", _newYearsEveEvening, _scope, Values([]), timeZone);
+        var offset = EvaluateAt("toDate(dateTime('2027-01-01T01:00:00+07:00'))", _newYearsEveEvening, _scope, Values([]), timeZone);
+        var field = EvaluateAt("toDate(ts) == date('2026-10-08')", _newYearsEveEvening, _scope, Values([]), timeZone);
+
+        Assert.Equal(expected, Assert.IsType<DateOnly>(literal.Value));
+        Assert.Equal(expected, Assert.IsType<DateOnly>(offset.Value));
+        Assert.Equal(true, field.Value);
+    }
+
+    [Fact]
+    public void To_date_of_null_is_null()
+    {
+        Assert.Null(EvaluateAt("toDate(null)", _newYearsEveEvening, _scope, Values([]), _saigon).Value);
+        Assert.Null(EvaluateAt("toDate(ts)", _newYearsEveEvening, _scope, Values([("ts", null)]), _saigon).Value);
+    }
+
+    [Fact]
+    public void Today_and_to_date_work_in_a_rule_body_and_an_aggregate_item()
+    {
+        var stamp = Rule("Stamp", "today()", ExpressionType.Date);
+
+        var inRule = EvaluateAt("Stamp()", _newYearsEveEvening, new ExpressionScope(_fields, [stamp]), Values([]), _saigon);
+
+        Assert.Equal(new DateOnly(2027, 1, 1), inRule.Value);
+    }
+
+    [Fact]
+    public void Today_and_to_date_without_the_time_zone_are_a_bug_to_evaluate()
+    {
+        Assert.Throws<InvalidOperationException>(() => EvaluateAt("today()", _newYearsEveEvening, _scope, Values([])));
+        Assert.Throws<InvalidOperationException>(() => EvaluateAt("toDate(now())", _newYearsEveEvening, _scope, Values([])));
+    }
+
+    [Fact]
+    public void Today_without_the_caller_time_is_a_bug_to_evaluate()
+    {
+        Assert.Throws<InvalidOperationException>(() => Evaluate("today()"));
+    }
+
     public static TheoryData<string, bool> Corpus
     {
         get
@@ -530,6 +593,7 @@ public sealed class ExpressionInterpreterTests
     [InlineData("sum(lines, qty)", 0L)]
     [InlineData("min(lines, qty)", null)]
     [InlineData("max(lines, amount)", null)]
+    [InlineData("avg(lines, qty)", null)]
     [InlineData("any(lines, ok)", false)]
     [InlineData("all(lines, ok)", true)]
     public void An_aggregate_over_an_empty_list_gives_its_empty_value(string text, object? expected)
@@ -616,6 +680,33 @@ public sealed class ExpressionInterpreterTests
         Assert.Equal(0m, EvaluateOver("sum(lines, amount)", lines).Value);
         Assert.Null(EvaluateOver("min(lines, qty)", lines).Value);
         Assert.Null(EvaluateOver("max(lines, amount)", lines).Value);
+    }
+
+    [Fact]
+    public void Avg_skips_null_items_and_gives_a_decimal_rounded_to_6_digits()
+    {
+        Assert.Equal(2.5m, Assert.IsType<decimal>(EvaluateOver("avg(lines, qty)", Rows((2L, null, null), (3L, null, null))).Value));
+
+        var lines = Rows((2L, 1.5m, true), (null, null, null), (3L, 0.25m, false), (1L, null, null));
+        Assert.Equal(2m, Assert.IsType<decimal>(EvaluateOver("avg(lines, qty)", lines).Value));
+        Assert.Equal(0.875m, Assert.IsType<decimal>(EvaluateOver("avg(lines, amount)", lines).Value));
+
+        var thirds = Rows((1L, null, null), (0L, null, null), (0L, null, null));
+        Assert.Equal(0.333333m, Assert.IsType<decimal>(EvaluateOver("avg(lines, qty)", thirds).Value));
+
+        var allNull = Rows((null, null, null), (null, null, null));
+        Assert.Null(EvaluateOver("avg(lines, qty)", allNull).Value);
+        Assert.Null(EvaluateOver("avg(lines, amount)", allNull).Value);
+    }
+
+    [Fact]
+    public void An_avg_whose_total_overflows_a_decimal_is_a_run_time_error_that_names_avg()
+    {
+        var result = EvaluateOver("avg(lines, amount)", Rows((null, decimal.MaxValue, null), (null, decimal.MaxValue, null)));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ExpressionRuntimeErrorKind.DecimalOverflow, result.Error?.Kind);
+        Assert.StartsWith("The result of 'avg' cannot be held exactly as a decimal", result.Error?.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -829,13 +920,14 @@ public sealed class ExpressionInterpreterTests
     }
 
     /// <summary>Evaluates <paramref name="text"/> over <paramref name="scope"/>, with <paramref name="now"/> as the time of <c>now()</c>.</summary>
-    private static ExpressionEvaluationResult EvaluateAt(string text, DateTimeOffset now, ExpressionScope scope, ExpressionValues values)
+    private static ExpressionEvaluationResult EvaluateAt(
+        string text, DateTimeOffset now, ExpressionScope scope, ExpressionValues values, TimeZoneInfo? timeZone = null)
     {
         var parsed = ExpressionParser.Parse(text);
         Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
         var checkedType = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Null);
         Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
-        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, values, now: now);
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, values, now: now, timeZone: timeZone);
     }
 
     /// <summary>Evaluates <paramref name="text"/> over a record whose collection <c>lines</c> holds <paramref name="lines"/>.</summary>

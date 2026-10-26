@@ -144,7 +144,7 @@ covers reads the whole entity table.
 | `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
 | `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](#child-rows-computed-fields-and-validations) |
 | `money` | A number written as for `decimal`. The currency is the field's, or the value of its `currencyField` |
-| `file` _(planned for M15)_ | An object `{ "id", "name", "mediaType", "size" }`. See [file fields](file-fields.md#field-and-value) |
+| `file` | An object `{ "id", "name", "mediaType", "size" }`, or `null`, also in child rows and in list responses. See [file fields](file-fields.md#field-and-value) |
 | `references` | An array of record ids, in the order they were written. Its labels are an array in the same order in `labels`. List responses leave it out, as for a child collection |
 
 ## Paging and sorting
@@ -552,7 +552,7 @@ is not a `text`. A wrong JSON type or a value outside its bounds is an error at
 | `enum` | A string equal to one of `values`, compared ordinally | `string` |
 | `reference` | A string in the hyphenated 8-4-4-4-12 hex form, in either letter case; whether the record exists is checked when it is written | `Guid` |
 | `money` | A number, checked as for `decimal` with the field's `precision` and `scale` | `string`, as for `decimal` |
-| `file` _(planned for M15)_ | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field, see [file fields](file-fields.md#upload) | `Guid` |
+| `file` | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field path, or already attached to this record at that path, see [file fields](file-fields.md#upload) | `Guid` |
 | `references` | An array of distinct record ids, at most 1,000. The whole set replaces the stored one | `Guid[]` |
 
 A value outside a field's limits is an error at the field's pointer, as for

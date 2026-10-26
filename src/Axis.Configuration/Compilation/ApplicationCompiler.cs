@@ -242,12 +242,22 @@ public static partial class ApplicationCompiler
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
+        var timeZone = TimeZoneInfo.Utc;
         var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics, references);
             (modules, moduleFiles, moduleResources) = ModuleChecker.Check(manifest, installedModules, diagnostics, references);
             declaredPackageIds = new HashSet<string>(manifest.Packages.Select(package => package.Id), StringComparer.Ordinal);
+            if (manifest.TimeZone is { } timeZoneId && !IanaTimeZones.TryFind(timeZoneId, out timeZone))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.UnknownApplicationTimeZone,
+                    $"The time zone '{timeZoneId}' is not known. Use an IANA id such as 'Asia/Ho_Chi_Minh', written with its exact letter case.",
+                    manifest.File,
+                    "/timeZone",
+                    manifest.Id));
+            }
         }
 
         // A pinned module's entities, sequences, seeds, events, data sources and forms come before the application's own, so a
@@ -592,6 +602,7 @@ public static partial class ApplicationCompiler
         var model = new ApplicationModel
         {
             Manifest = loaded.Application,
+            TimeZone = timeZone,
             Entities = entities,
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
@@ -1962,9 +1973,9 @@ public static partial class ApplicationCompiler
 
     /// <summary>
     /// The problem of a measure and its path below the measure, or null when it is valid.
-    /// <c>count</c> takes no field. <c>sum</c>, <c>min</c> and <c>max</c> need a projected field:
-    /// <c>sum</c> of an integer or a decimal, <c>min</c> and <c>max</c> of an integer, a decimal, a
-    /// date or a date-time, and <c>sum</c>, <c>min</c> and <c>max</c> also of a money field. A
+    /// <c>count</c> takes no field. Every other function needs a projected field: <c>sum</c> and <c>avg</c>
+    /// of an integer, a decimal or a money field, <c>min</c> and <c>max</c> of an integer, a decimal, a
+    /// money field, a date or a date-time, and <c>countDistinct</c> of any field except a file. A
     /// projected field with an invalid path is not reported again.
     /// </summary>
     private static (string Message, string Path)? CheckMeasure(
@@ -1992,26 +2003,30 @@ public static partial class ApplicationCompiler
         }
 
         var type = FieldTypes.Parse(field.Type);
-        var accepted = function == AggregateFunction.Sum
-            ? type == FieldType.Integer || FieldTypes.HoldsDecimal(type)
-            : type == FieldType.Integer || FieldTypes.HoldsDecimal(type) || type is FieldType.Date or FieldType.DateTime;
+        var accepted = function switch
+        {
+            AggregateFunction.Sum or AggregateFunction.Avg => type == FieldType.Integer || FieldTypes.HoldsDecimal(type),
+            AggregateFunction.CountDistinct => type != FieldType.File,
+            _ => type == FieldType.Integer || FieldTypes.HoldsDecimal(type) || type is FieldType.Date or FieldType.DateTime,
+        };
         return accepted
             ? null
             : (
                 $"The measure function '{measure.Function}' cannot take the {field.Type} field '{name}'. "
-                    + "'sum' takes an integer, a decimal or a money field. 'min' and 'max' take an integer, a decimal, a money field, a date or a date-time.",
+                    + "'sum' and 'avg' take an integer, a decimal or a money field. 'min' and 'max' take an integer, a decimal, a money field, a date or a date-time. "
+                    + "'countDistinct' takes any field except a file.",
                 "/field");
     }
 
     /// <summary>
-    /// The functions that add or compare amounts, so a money field with a <c>currencyField</c> must
-    /// be grouped by that currency.
+    /// The functions that add, average or compare amounts, so a money field with a <c>currencyField</c>
+    /// must be grouped by that currency. A <c>countDistinct</c> counts values and mixes no currencies.
     /// </summary>
     private static readonly HashSet<AggregateFunction> _currencyMixingFunctions =
-        [AggregateFunction.Sum, AggregateFunction.Min, AggregateFunction.Max];
+        [AggregateFunction.Sum, AggregateFunction.Avg, AggregateFunction.Min, AggregateFunction.Max];
 
     /// <summary>
-    /// The message of a <c>sum</c>, <c>min</c> or <c>max</c> over a money field with a
+    /// The message of a <c>sum</c>, <c>avg</c>, <c>min</c> or <c>max</c> over a money field with a
     /// <c>currencyField</c> when no group field reaches that currency field on the same record,
     /// through the same reference fields. Null when the measure needs no currency group, or when the
     /// currency field is itself invalid, which <see cref="CheckMoney"/> already reports.
@@ -2047,7 +2062,7 @@ public static partial class ApplicationCompiler
         }
 
         var prefix = string.Concat(hops.Take(hops.Count - 1).Select(hop => hop.Name + "."));
-        return $"The measure '{measure.Name}' adds or compares the money field '{name}', whose currency comes from '{currencyFieldName}'. "
+        return $"The measure '{measure.Name}' adds, averages or compares the money field '{name}', whose currency comes from '{currencyFieldName}'. "
             + $"Group by a projected field with the path '{prefix}{currencyFieldName}' so that each total has one currency.";
     }
 
@@ -2077,7 +2092,9 @@ public static partial class ApplicationCompiler
             "sum" => AggregateFunction.Sum,
             "min" => AggregateFunction.Min,
             "max" => AggregateFunction.Max,
-            _ => throw new ArgumentOutOfRangeException(nameof(function), function, "The JSON Schema allows only count, sum, min and max."),
+            "avg" => AggregateFunction.Avg,
+            "countDistinct" => AggregateFunction.CountDistinct,
+            _ => throw new ArgumentOutOfRangeException(nameof(function), function, "The JSON Schema allows only count, sum, min, max, avg and countDistinct."),
         };
 
     /// <summary>

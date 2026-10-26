@@ -128,6 +128,7 @@ describe('expressionScope', () => {
 
     expect(options.every((option) => option.type === 'function')).toBe(true)
     expect(labelsOf(options)).toContain('count()')
+    expect(labelsOf(options)).toContain('avg()')
     expect(labelsOf(options)).toContain('currentUser()')
   })
 
@@ -136,6 +137,13 @@ describe('expressionScope', () => {
 
     expect(options.find((option) => option.label === 'now()')?.cursorInside).toBe(false)
     expect(options.find((option) => option.label === 'length()')?.cursorInside).toBe(true)
+  })
+
+  it('offers today() with the cursor after the brackets and toDate() with it inside', () => {
+    const options = expressionScope('entity', {}, '/validations/0/expression', names)
+
+    expect(options.find((option) => option.label === 'today()')?.cursorInside).toBe(false)
+    expect(options.find((option) => option.label === 'toDate()')?.cursorInside).toBe(true)
   })
 
   it('ignores a draft that is malformed', () => {

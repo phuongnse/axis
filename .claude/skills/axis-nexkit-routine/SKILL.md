@@ -46,7 +46,9 @@ branch, and comment `/nexkit review`.
 
 ## Hand-made changes
 
-When the latest plan says the change is in paths NexKit may not change:
+When the latest plan says the change is in paths NexKit may not change, under
+*Needs a hand-made change*, or a `/nexkit go` or fix round stopped as blocked
+because its change needs those paths:
 
 1. Make the change on the designated branch, exactly as the plan says.
 2. Run at least the plan's check commands, `node scripts/check-links.mjs` and

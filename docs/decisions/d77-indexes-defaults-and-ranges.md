@@ -10,6 +10,10 @@ endpoint, and the form widget shows them on a new record. The Studio designer is
 [entity field types](../reference/resource-files.md#entity-field-types-and-constraints)
 and [schema planning](../reference/storage.md#schema-planning).
 
+The points of "Building an index" are built in the data module: activation
+defers the index, and `EntityIndexBuilder` builds it. The server and admin
+hosts do not call the builder yet, which is _(planned for M15)_.
+
 - **Indexes the platform adds:**
   - Every `reference` column and every child table's `owner_id` gets an
     index. No author declares these, because a reference without one makes

@@ -4,12 +4,6 @@ using System.Text;
 namespace Axis.Data.Records;
 
 /// <summary>
-/// One data row of an import file. <see cref="Number"/> counts the data rows from 1, so the header is not
-/// counted. A row that could not be read has no <see cref="Cells"/> and says why in <see cref="Error"/>.
-/// </summary>
-public sealed record RecordImportCsvRow(int Number, IReadOnlyList<string>? Cells, string? Error);
-
-/// <summary>
 /// Reads an import file: UTF-8 text in CSV form with the quoting of RFC 4180. A cell in double quotes may hold
 /// commas, line breaks (CRLF or LF) and doubled quotes, which stand for one quote. A leading byte order mark is
 /// skipped, a row ends at CRLF, LF or CR, and the line break that ends the last row is no row. The first row is
@@ -18,7 +12,7 @@ public sealed record RecordImportCsvRow(int Number, IReadOnlyList<string>? Cells
 /// closing quote, a quote that is never closed, and a wrong number of cells. A reader holds only the file and
 /// the position of the next row.
 /// </summary>
-public sealed class RecordImportCsv
+public sealed class RecordImportCsv : IRecordImportFile
 {
     private static readonly UTF8Encoding _strict = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
@@ -64,7 +58,7 @@ public sealed class RecordImportCsv
     /// is returned with the error, and reading goes on with the next row, except after a quote that is never
     /// closed, which takes the rest of the file as its last row.
     /// </summary>
-    public IEnumerable<RecordImportCsvRow> Rows()
+    public IEnumerable<RecordImportFileRow> Rows()
     {
         if (Header is not { } header)
         {
@@ -77,15 +71,15 @@ public sealed class RecordImportCsv
             _number++;
             if (row.Error is not null)
             {
-                yield return new RecordImportCsvRow(_number, null, row.Error);
+                yield return new RecordImportFileRow(_number, null, row.Error);
             }
             else if (row.Cells!.Count != header.Count)
             {
-                yield return new RecordImportCsvRow(_number, null, $"Has {row.Cells.Count} cells, but the header has {header.Count}.");
+                yield return new RecordImportFileRow(_number, null, $"Has {row.Cells.Count} cells, but the header has {header.Count}.");
             }
             else
             {
-                yield return new RecordImportCsvRow(_number, row.Cells, null);
+                yield return new RecordImportFileRow(_number, row.Cells, null);
             }
         }
     }

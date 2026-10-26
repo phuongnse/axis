@@ -1,0 +1,10 @@
+{
+  "id": "3b7c1d52-4e8a-4f60-9a1b-7d2e5c8f0a03",
+  "kind": "entity",
+  "name": "ClaimAttachment",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "file", "type": "file" },
+    { "name": "note", "type": "text" }
+  ]
+}

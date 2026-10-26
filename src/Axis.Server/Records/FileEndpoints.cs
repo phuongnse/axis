@@ -1,0 +1,279 @@
+using System.Security.Cryptography;
+using Axis.Configuration.Model;
+using Axis.Data.Files;
+using Axis.Policy;
+using Axis.Processes.Records;
+using Axis.Server.Applications;
+using Axis.Server.Authentication;
+using Axis.Server.Files;
+using Axis.Server.Http;
+using Axis.Server.Tenancy;
+using Axis.Server.Users;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Net.Http.Headers;
+
+namespace Axis.Server.Records;
+
+/// <summary>
+/// The upload route of a file field, <c>POST /api/apps/{app}/entities/{entity}/fields/{field}/files</c>, and
+/// <c>.../fields/{collection}/{field}/files</c> for a field of a child entity. It takes one
+/// <c>multipart/form-data</c> part named <c>file</c>, and answers 201 with the id, name, media type and size of the
+/// stored file. The file is stored as <c>pending</c>, owned by the session user, the entity and the field path. It
+/// belongs to no record until a record write attaches it. Service accounts may upload, as they may write records.
+/// A request is checked in order: session or bearer token (401), then the path, where an unknown entity, an unknown
+/// field and a field that is no file field are 404, then the user's grant (403), then the request content type
+/// (415), and then the body. The grant is a <c>create</c> or <c>update</c> grant on the entity whose <c>fields</c>
+/// cover the field. For a child field it must cover the owner's child collection field. Record filters are not
+/// read, because an upload has no record yet.
+/// A body is checked in order: a missing, extra or malformed part, a part without a file name and an empty file
+/// are 400, a media type that the field's <c>accept</c> refuses is 415, a file over the field's <c>maxSize</c> or
+/// the host's <c>Files:MaxSize</c> is 413 as soon as the limit is passed, and a file that starts like an
+/// executable, or does not start as its declared PDF, PNG, JPEG, GIF, WebP or ZIP type does, is 415. A part
+/// without a content type is stored as <c>application/octet-stream</c>, and the parameters of a media type are dropped.
+/// The stored name is the last path segment of the file name, without control characters, cut to 255 characters.
+/// The problem titles never contain text from the request.
+/// </summary>
+internal static class FileEndpoints
+{
+    private const int MaxNameLength = 255;
+    private const int ChunkSize = 81920;
+    private const long RequestSizeMargin = 1_048_576;
+    private const string OctetStream = "application/octet-stream";
+
+    public static void MapFileEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var settings = endpoints.ServiceProvider.GetRequiredService<FileSettings>();
+
+        // The request carries the multipart framing too, so the body limit is a little above the file limit.
+        // The route does not bind IFormFile, so no antiforgery metadata is added.
+        foreach (var pattern in new[]
+        {
+            "/api/apps/{app}/entities/{entity}/fields/{field}/files",
+            "/api/apps/{app}/entities/{entity}/fields/{collection}/{field}/files",
+        })
+        {
+            endpoints.MapPost(pattern, UploadAsync)
+                .WithMetadata(ServiceAccountRoute.Instance)
+                .WithMetadata(new RequestSizeLimitAttribute(settings.MaxSize + RequestSizeMargin));
+        }
+    }
+
+    private static async Task<IResult> UploadAsync(
+        string app,
+        string entity,
+        string? collection,
+        string field,
+        HttpRequest request,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        FileSettings settings,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
+        {
+            return Grants.SignInRequired(request.HttpContext);
+        }
+
+        var (application, model, notFound, _) = await RecordEndpoints.ResolveEntityAsync(app, entity, resolver, cancellationToken);
+        if (model is null)
+        {
+            return notFound!;
+        }
+
+        if (FindFileField(application!, model, collection, field) is not { } target)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The entity has no file field with this name.");
+        }
+
+        // A child collection is one field to the record write check, so it is the one the grant must cover.
+        if (!RecordFieldAccess.CanWrite(application!, user.Roles, model, collection is null ? target.Field.Name : target.Owner!.Name))
+        {
+            return Grants.Forbidden();
+        }
+
+        // A slow upload holds no pooled connection while its body arrives.
+        await database.ReleaseConnectionAsync();
+
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var contentType)
+            || !contentType.MediaType.Equals("multipart/form-data", StringComparison.OrdinalIgnoreCase)
+            || HeaderUtilities.RemoveQuotes(contentType.Boundary).Length == 0)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The request body must be multipart/form-data.");
+        }
+
+        var limit = Math.Min(target.Field.MaxSize ?? settings.MaxSize, settings.MaxSize);
+        var upload = await ReadPartAsync(request, HeaderUtilities.RemoveQuotes(contentType.Boundary).ToString(), target.Field, limit, cancellationToken);
+        if (upload.Failure is { } failure)
+        {
+            return failure;
+        }
+
+        var id = Guid.CreateVersion7();
+        var file = new PendingFile(
+            id,
+            application!.Manifest.Id,
+            target.Entity.Id,
+            target.Path,
+            upload.Name!,
+            upload.MediaType!,
+            upload.Content.Length,
+            upload.Sha256!,
+            user.Id,
+            DateTimeOffset.UtcNow);
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await FileStore.InsertPendingAsync(connection, file, upload.Content, cancellationToken);
+        return Results.Json(new FileUploadResponse(id, file.Name, file.MediaType, file.Size), statusCode: StatusCodes.Status201Created);
+    }
+
+    // The file field of the route and the entity that declares it. A child field is declared by the child entity of
+    // the owner's child collection field, and its path holds the collection name too.
+    private static (FieldModel Field, EntityModel Entity, FieldModel? Owner, string Path)? FindFileField(
+        ApplicationModel application,
+        EntityModel owner,
+        string? collection,
+        string name)
+    {
+        if (collection is null)
+        {
+            return owner.TryGetField(name, out var field) && field.Type == FieldType.File
+                ? (field, owner, null, field.Name)
+                : null;
+        }
+
+        if (!owner.TryGetField(collection, out var collectionField)
+            || collectionField.Type != FieldType.ChildCollection
+            || application.FindEntity(collectionField.Target!.Id) is not { } child
+            || !child.TryGetField(name, out var childField)
+            || childField.Type != FieldType.File)
+        {
+            return null;
+        }
+
+        return (childField, child, collectionField, $"{collectionField.Name}/{childField.Name}");
+    }
+
+    // Reads the one part and checks it, so a failure holds the response and nothing is stored.
+    private static async Task<UploadedPart> ReadPartAsync(
+        HttpRequest request,
+        string boundary,
+        FieldModel field,
+        long limit,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var reader = new MultipartReader(boundary, request.Body);
+            if (await reader.ReadNextSectionAsync(cancellationToken) is not { } section
+                || !ContentDispositionHeaderValue.TryParse(section.ContentDisposition, out var disposition)
+                || !string.Equals(HeaderUtilities.RemoveQuotes(disposition.Name).Value, "file", StringComparison.Ordinal)
+                || CleanName(disposition) is not { } name)
+            {
+                return UploadedPart.Fail(BadPart("The request must hold one part named file, with a file name."));
+            }
+
+            if (MediaType(section.ContentType) is not { } mediaType || !Accepts(field.Accept, mediaType))
+            {
+                return UploadedPart.Fail(Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The file's media type is not accepted."));
+            }
+
+            using var content = new MemoryStream();
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            var buffer = new byte[ChunkSize];
+            int read;
+            while ((read = await section.Body.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                if (content.Length + read > limit)
+                {
+                    return UploadedPart.Fail(TooLarge());
+                }
+
+                content.Write(buffer, 0, read);
+                hash.AppendData(buffer, 0, read);
+            }
+
+            if (content.Length == 0)
+            {
+                return UploadedPart.Fail(BadPart("The file is empty."));
+            }
+
+            content.TryGetBuffer(out var bytes);
+            var head = bytes.AsSpan(0, (int)Math.Min(content.Length, FileSignatures.HeadLength));
+            if (FileSignatures.IsExecutable(head) || !FileSignatures.Matches(mediaType, head))
+            {
+                return UploadedPart.Fail(Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The file's content does not match an allowed type."));
+            }
+
+            if (await reader.ReadNextSectionAsync(cancellationToken) is not null)
+            {
+                return UploadedPart.Fail(BadPart("The request must hold one part named file, with a file name."));
+            }
+
+            return new UploadedPart(null, name, mediaType, bytes.AsMemory(0, (int)content.Length), hash.GetHashAndReset());
+        }
+        catch (BadHttpRequestException exception) when (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
+        {
+            return UploadedPart.Fail(TooLarge());
+        }
+        catch (InvalidDataException)
+        {
+            return UploadedPart.Fail(BadPart("The request body is not valid multipart/form-data."));
+        }
+    }
+
+    private static IResult BadPart(string message) =>
+        Results.ValidationProblem(new Dictionary<string, string[]> { ["file"] = [message] });
+
+    private static IResult TooLarge() =>
+        Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "The file is larger than the limit for this field.");
+
+    // The last path segment of the file name, with no control characters and at most 255 characters, or null for no name.
+    private static string? CleanName(ContentDispositionHeaderValue disposition)
+    {
+        var raw = disposition.FileNameStar.HasValue ? disposition.FileNameStar : disposition.FileName;
+        if (!raw.HasValue)
+        {
+            return null;
+        }
+
+        var text = HeaderUtilities.RemoveQuotes(raw).Value!;
+        var name = new string(text[(text.LastIndexOfAny(['/', '\\']) + 1)..].Where(character => !char.IsControl(character)).ToArray()).Trim();
+        if (name.Length > MaxNameLength)
+        {
+            // Never cut between the two halves of a surrogate pair.
+            var length = char.IsHighSurrogate(name[MaxNameLength - 1]) ? MaxNameLength - 1 : MaxNameLength;
+            name = name[..length];
+        }
+
+        return name.Length == 0 ? null : name;
+    }
+
+    // The bare, lower-case media type of the part's content type, application/octet-stream when it has none, or null when it is no media type.
+    private static string? MediaType(string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            return OctetStream;
+        }
+
+        return MediaTypeHeaderValue.TryParse(contentType, out var parsed) && parsed.MediaType.HasValue && !parsed.MatchesAllTypes
+            ? parsed.MediaType.Value!.ToLowerInvariant()
+            : null;
+    }
+
+    // An entry is a media type, or a type with a subtype wildcard such as image/*.
+    private static bool Accepts(IReadOnlyList<string>? accept, string mediaType) =>
+        accept is null
+        || accept.Any(entry => entry.EndsWith("/*", StringComparison.Ordinal)
+            ? mediaType.StartsWith(entry[..^1], StringComparison.OrdinalIgnoreCase)
+            : mediaType.Equals(entry, StringComparison.OrdinalIgnoreCase));
+
+    private sealed record UploadedPart(IResult? Failure, string? Name, string? MediaType, ReadOnlyMemory<byte> Content, byte[]? Sha256)
+    {
+        public static UploadedPart Fail(IResult failure) => new(failure, null, null, default, null);
+    }
+}
+
+/// <summary>The answer of a stored upload.</summary>
+internal sealed record FileUploadResponse(Guid Id, string Name, string MediaType, long Size);
