@@ -226,7 +226,9 @@ instance detail and the operator commands answer `404`.
   `updateRecord`, `raiseEvent` and the outputs. The compiler reports no other
   problem in such a step.
 - **Triggers and other starts by name.** An event, data change or schedule
-  trigger that names a process without a subject is `AXC0247`. An endpoint, a
+  trigger that names a process without a subject is `AXC0247`, except a
+  schedule trigger without a data source, which must name one (`AXC0249`
+  otherwise). An endpoint, a
   page `startProcess` action and a scenario step that name one are reported
   with their usual codes for a process over another entity: `AXC0117`,
   `AXC0088` and `AXC0184`.
