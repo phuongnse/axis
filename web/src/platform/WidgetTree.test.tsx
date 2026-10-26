@@ -70,6 +70,8 @@ const texts = {
   'shell.tasks.task': 'Task',
   'shell.tasks.subject': 'Record',
   'shell.tasks.dueAt': 'Due',
+  'shell.tasks.overdue': 'Overdue',
+  'shell.tasks.claimedByYou': 'Claimed by you',
   'shell.tasks.empty': 'No open tasks.',
   'shell.tasks.loadFailed': 'The tasks could not be loaded.',
   'note.title': 'Title',
