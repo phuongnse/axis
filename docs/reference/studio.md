@@ -427,7 +427,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     read-only, with a message.
   - Only the actions a target takes can be chosen. An entity takes `read`,
     `create`, `update` and `delete`. A data source takes `read`. A process
-    takes `start`, `inspect`, `cancel`, `retry` and `resolve`. An endpoint
+    takes `start`, `inspect`, `cancel`, `retry`, `resolve` and `reassign`. An endpoint
     takes `invoke`. Filter and fields are only on entity grants. An entity
     also takes `export` and `import`, and a data source `export`
     _(planned for M15)_.
