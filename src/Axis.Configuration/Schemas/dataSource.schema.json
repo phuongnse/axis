@@ -29,7 +29,8 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 100
-    }
+    },
+    "search": { "type": "boolean" }
   },
   "$defs": {
     "id": {

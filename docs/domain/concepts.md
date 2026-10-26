@@ -123,7 +123,7 @@ Later field flags:
 - sub-process (M14)
 
 See [processes](../reference/processes.md#steps) and, for the M14 steps,
-loops through a waiting step and the `createRecord` and `notify` operations,
+loops through a waiting step, the `createRecord` operation and the email of the `notify` operation,
 [process flow](../reference/process-flow.md) *(planned for M14)*.
 
 ## Triggers and integration

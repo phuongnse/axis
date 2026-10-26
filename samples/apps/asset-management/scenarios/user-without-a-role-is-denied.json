@@ -1,0 +1,50 @@
+{
+  "id": "5da13acf-ce8a-4b75-ba36-f25524b41329",
+  "kind": "scenario",
+  "name": "UserWithoutARoleIsDenied",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "quan": [
+      "asset-manager"
+    ],
+    "nobody": []
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "quan",
+      "save": "asset",
+      "values": {
+        "name": "Laptop of Lan",
+        "holder": "lan"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "nobody",
+      "values": {
+        "name": "Own laptop"
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "updateRecord",
+      "record": "asset",
+      "as": "nobody",
+      "values": {
+        "name": "x"
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "expectRecord",
+      "record": "asset",
+      "values": {
+        "name": "Laptop of Lan"
+      }
+    }
+  ]
+}

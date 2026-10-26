@@ -41,7 +41,7 @@ and the Helm chart, and behind any proxy.
 - **Under `scripts/dev.sh`.** Vite serves the SPA page on port 5173 without the policy, so only the
   API answers it proxies carry the headers. A violation then shows up only in the E2E run, Docker
   Compose or the Helm chart.
-- **Later routes.** A file download keeps to this policy and adds `Content-Disposition: attachment`.
+- **File download.** A file download keeps to this policy and adds `Content-Disposition: attachment`.
   A custom widget bundle is served from the server's own origin and calls no `eval`.
 - **Tests.** Integration tests check the headers on the SPA page, a static file, an API response, a
   `401` and the `404` for an unknown host. They check that HSTS is missing on plain http and in

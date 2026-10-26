@@ -1,0 +1,23 @@
+{
+  "id": "29ce9d5b-ac14-4b92-89a2-129612f2649a",
+  "kind": "dataSource",
+  "name": "WarrantiesEndingSoon",
+  "formatVersion": 1,
+  "entity": "Asset",
+  "fields": [
+    {
+      "name": "warrantyEnd",
+      "path": "warrantyEnd"
+    }
+  ],
+  "filter": "warrantyEnd >= today() and warrantyEnd <= addDays(today(), 30)",
+  "aggregate": {
+    "groupBy": [],
+    "measures": [
+      {
+        "name": "endingCount",
+        "function": "count"
+      }
+    ]
+  }
+}

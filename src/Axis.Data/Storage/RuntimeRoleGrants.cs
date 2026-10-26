@@ -32,6 +32,8 @@ public static class RuntimeRoleGrants
         "package_calls",
         "process_call_attempts",
         "events",
+        "notifications",
+        "notification_reads",
         "endpoint_receipts",
         "process_start_receipts",
         "trigger_schedules",

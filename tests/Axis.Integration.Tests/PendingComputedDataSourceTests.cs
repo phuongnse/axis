@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// While a computed field is pending, a data source refuses a query that would decide from its stale stored
-/// value: a sort, a filter, a group field or a measure that reads it, and a read filter of the user that reads it.
+/// value: a sort, a filter, a group field, a measure or a search that reads it, and a read filter of the user that reads it.
 /// A data source that only projects it shows the stored value. Each test adds a computed field in release R1,
 /// which is computed inline, and changes its expression in release R2, which activation leaves pending.
 /// After the worker runs the backfill, the same requests succeed.
@@ -76,6 +76,20 @@ public sealed class PendingComputedDataSourceTests(TaskApiFixture fixture) : ICl
               "entity": "Request",
               "fields": [{ "name": "title", "path": "title" }],
               "filter": "department.tag is not null"
+            }
+            """,
+        ["data-sources/department-tag-search.json"] = """
+            {
+              "id": "2f6b8c1e-4a7d-4e59-9c3b-5d0a8e7f1b64",
+              "kind": "dataSource",
+              "name": "DepartmentTagSearch",
+              "formatVersion": 1,
+              "entity": "Request",
+              "fields": [
+                { "name": "title", "path": "title" },
+                { "name": "departmentTag", "path": "department.tag" }
+              ],
+              "search": true
             }
             """,
     };
@@ -170,6 +184,33 @@ public sealed class PendingComputedDataSourceTests(TaskApiFixture fixture) : ICl
     }
 
     [Fact]
+    public async Task A_search_that_matches_a_pending_field_through_a_reference_is_409_with_an_error_at_search_and_succeeds_after_the_backfill()
+    {
+        var department = await fixture.InsertDepartmentAsync(TenantB, "Lan");
+        var request = await fixture.InsertRequestAsync(TenantB, department, divisor: 7);
+        await ActivateAsync(TenantB, TaggedDepartment("manager"), TaggedDepartment("name"));
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var refused = await SendAsync(maria, "DepartmentTagSearch", TenantB, "?search=x");
+
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        using var problem = await ReadAsync(refused);
+        Assert.Equal("A field is being recomputed.", problem.RootElement.GetProperty("title").GetString());
+        var errors = problem.RootElement.GetProperty("errors");
+        Assert.Equal(["search"], errors.EnumerateObject().Select(error => error.Name));
+        Assert.Contains("departmentTag", errors.GetProperty("search")[0].GetString(), StringComparison.Ordinal);
+
+        // The same data source without a search only projects the stored value.
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(maria, "DepartmentTagSearch", TenantB)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(maria, "DepartmentTagSearch", TenantB, "?search=")).StatusCode);
+
+        await BackfillAsync(TenantB);
+
+        using var rows = await ReadAsync(await SendAsync(maria, "DepartmentTagSearch", TenantB, "?search=x"));
+        Assert.DoesNotContain(rows.RootElement.GetProperty("items").EnumerateArray(), row => row.GetProperty("id").GetGuid() == request);
+    }
+
+    [Fact]
     public async Task A_user_whose_read_filter_reads_a_pending_field_gets_the_policy_409_with_no_errors_even_for_an_invalid_sort_and_another_user_gets_200()
     {
         var id = await fixture.InsertRequestAsync(TenantA, null, divisor: 7);
@@ -222,7 +263,7 @@ public sealed class PendingComputedDataSourceTests(TaskApiFixture fixture) : ICl
         (path, content) => path == Path.Combine("entities", "department.json")
             ? content.Replace(
                 "\"fields\": [",
-                $"\"fields\": [\n    {{ \"name\": \"tag\", \"type\": \"text\", \"expression\": \"{expression}\" }},",
+                $"\"fields\": [\n    {{ \"name\": \"tag\", \"type\": \"text\", \"searchable\": true, \"expression\": \"{expression}\" }},",
                 StringComparison.Ordinal)
             : content;
 
@@ -238,7 +279,10 @@ public sealed class PendingComputedDataSourceTests(TaskApiFixture fixture) : ICl
                     { "dataSource": "DoubledRequests", "actions": ["read"] },
                     { "dataSource": "DoubledCount", "actions": ["read"] },
                     """
-                : """{ "dataSource": "DepartmentTaggedRequests", "actions": ["read"] },""";
+                : """
+                    { "dataSource": "DepartmentTaggedRequests", "actions": ["read"] },
+                    { "dataSource": "DepartmentTagSearch", "actions": ["read"] },
+                    """;
             return path switch
             {
                 _ when path == Path.Combine("policies", "finance-access.json") => content.Replace(

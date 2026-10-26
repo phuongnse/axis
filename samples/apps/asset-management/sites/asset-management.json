@@ -1,0 +1,32 @@
+{
+  "id": "3413e598-e731-4e4c-96e5-7276549d1f39",
+  "kind": "site",
+  "name": "AssetManagement",
+  "formatVersion": 1,
+  "path": "asset-management",
+  "title": {
+    "textKey": "site.title"
+  },
+  "locales": {
+    "default": "en",
+    "fallback": "en",
+    "available": [
+      "en",
+      "vi"
+    ]
+  },
+  "navigation": [
+    {
+      "page": "Assets",
+      "label": {
+        "textKey": "nav.assets"
+      }
+    },
+    {
+      "page": "Dashboard",
+      "label": {
+        "textKey": "nav.dashboard"
+      }
+    }
+  ]
+}

@@ -42,7 +42,9 @@ public static class DataSourceQueries
     /// declared parameter, in declaration order. <paramref name="application"/> resolves the paths
     /// in the filter. When <paramref name="condition"/> is given, a root row passes only when it
     /// also matches it, in both statements and before any grouping, so the rows, the count and
-    /// every measure cover only those root records. A page past the last one has no items. Returns
+    /// every measure cover only those root records. When <paramref name="search"/> is not empty and the
+    /// data source has search fields, a root row passes only when one of them contains it, ignoring
+    /// letter case, also before any grouping. A page past the last one has no items. Returns
     /// <see langword="null"/> when the database rejects the filter or the condition for these rows
     /// with a data exception (SQLSTATE class 22), such as an integer overflow or a date out of
     /// range. Any other database error is thrown.
@@ -61,6 +63,7 @@ public static class DataSourceQueries
         DataSourceSort? sort,
         IReadOnlyList<DataSourceParameterValue> parameters,
         RecordCondition? condition = null,
+        string? search = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -70,7 +73,8 @@ public static class DataSourceQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
-        var statement = Statement(application, dataSource, sort, condition);
+        var searching = !string.IsNullOrEmpty(search) && dataSource.SearchFields.Count > 0;
+        var statement = Statement(application, dataSource, sort, condition, searching);
         try
         {
             long? totalCount = null;
@@ -86,6 +90,11 @@ public static class DataSourceQueries
                 AddParameters(count, parameters);
                 AddTimeZone(count, statement);
                 condition?.AddTo(count);
+                if (searching)
+                {
+                    count.Parameters.Add(RecordQueries.SearchParameter(search!));
+                }
+
                 totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
                 if (transaction is not null)
                 {
@@ -104,6 +113,11 @@ public static class DataSourceQueries
             AddParameters(command, parameters);
             AddTimeZone(command, statement);
             condition?.AddTo(command);
+            if (searching)
+            {
+                command.Parameters.Add(RecordQueries.SearchParameter(search!));
+            }
+
             command.Parameters.AddWithValue("limit", pageSize);
             command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
@@ -220,12 +234,13 @@ public static class DataSourceQueries
     /// filter, then of each measure filter. A measure filter is translated once, and the select list
     /// and the sort both use its SQL. The page statement ends with <c>LIMIT @limit OFFSET @offset</c>. Both put the
     /// filter and <paramref name="condition"/>, joined with <c>AND</c>, in one <c>WHERE</c> clause
-    /// over the root row before any grouping. Neither holds a value from a filter, a parameter
-    /// or the condition: each is a parameter that the caller adds. The count statement names no
-    /// measure filter, so it ignores their values.
+    /// over the root row before any grouping. When <paramref name="search"/> is set, they also hold
+    /// one term per search field, joined with <c>OR</c>, that matches <c>@search</c>. Neither holds a
+    /// value from a filter, a parameter, the condition or the search: each is a parameter that the caller adds.
+    /// The count statement names no measure filter, so it ignores their values.
     /// </summary>
     internal static DataSourceStatement Statement(
-        ApplicationModel application, DataSourceModel dataSource, DataSourceSort? sort, RecordCondition? condition)
+        ApplicationModel application, DataSourceModel dataSource, DataSourceSort? sort, RecordCondition? condition, bool search = false)
     {
         var table = EntityNaming.QualifiedTable(EntityNaming.Table(dataSource.Entity.Id));
         var row = EntityNaming.Quote(RowAlias);
@@ -263,7 +278,12 @@ public static class DataSourceQueries
         var (filter, filterValues) = dataSource.Filter is { } dataSourceFilter
             ? Translate(application, dataSource, dataSourceFilter, joins, "f")
             : (null, []);
-        string[] conditions = [.. new[] { filter, condition?.Sql }.OfType<string>()];
+
+        // The search joins its paths here, before the joins are read below.
+        var searched = search
+            ? $"({string.Join(" OR ", dataSource.SearchFields.Select(field => RecordQueries.SearchTerm(joins.ColumnOf(field.Path))))})"
+            : null;
+        string[] conditions = [.. new[] { filter, condition?.Sql, searched }.OfType<string>()];
         var where = conditions.Length == 0 ? "" : $" WHERE {string.Join(" AND ", conditions)}";
         var from = $"{table} AS {row}{joins.Sql}{where}";
 

@@ -27,7 +27,7 @@ public sealed class DevelopmentStudioFoldersTests
     }
 
     [Fact]
-    public async Task Author_lists_the_purchase_request_leave_request_and_service_desk_applications_under_the_development_settings()
+    public async Task Author_lists_the_purchase_request_leave_request_service_desk_and_asset_management_applications_under_the_development_settings()
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient().SignedInAs("hoa");
@@ -40,7 +40,7 @@ public sealed class DevelopmentStudioFoldersTests
             .Select(item => item.GetProperty("name").GetString())
             .Order(StringComparer.Ordinal)
             .ToList();
-        Assert.Equal(["LeaveRequests", "PurchaseRequests", "ServiceDesk"], names);
+        Assert.Equal(["AssetManagement", "LeaveRequests", "PurchaseRequests", "ServiceDesk"], names);
     }
 
     [Fact]

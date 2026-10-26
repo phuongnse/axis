@@ -67,7 +67,7 @@ public sealed record TenantOidc(
 public sealed record TenantClientKey(string KeyId, SecretValue PrivateKey);
 
 /// <summary>
-/// One deployment binding. A <c>url</c> binding has <see cref="Url"/>, as written, and a <c>secret</c> binding has
-/// <see cref="Secret"/>.
+/// One deployment binding. A <c>url</c> binding has <see cref="Url"/>, as written, a <c>storage</c> binding has its
+/// value in <see cref="Url"/>, and a <c>secret</c> binding has <see cref="Secret"/>.
 /// </summary>
 public sealed record TenantBinding(string Kind, string? Url, SecretValue? Secret);
