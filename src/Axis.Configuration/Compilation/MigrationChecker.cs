@@ -134,12 +134,12 @@ internal static class MigrationChecker
             .ToList();
 
         // A dropEntity makes the entity unknown from there back. A loaded entity is the start of the
-        // backward pass. Child collections are not fields here.
+        // backward pass. Child collections and references fields are not fields here.
         Dictionary<string, FieldDefinition?>? state = null;
         if (entity is not null)
         {
             state = new Dictionary<string, FieldDefinition?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var field in entity.Fields.Where(field => FieldTypes.Parse(field.Type) != FieldType.ChildCollection))
+            foreach (var field in entity.Fields.Where(field => FieldTypes.Parse(field.Type) is not (FieldType.ChildCollection or FieldType.References)))
             {
                 state.TryAdd(field.Name, field);
             }
@@ -180,7 +180,7 @@ internal static class MigrationChecker
                 missingAfter = true;
                 Report(
                     DiagnosticCodes.MigrationFieldNotInEntity,
-                    $"The field '{change.Field}' is not a field of the entity '{migration.Entity}' in this release. A child collection is not a field here.",
+                    $"The field '{change.Field}' is not a field of the entity '{migration.Entity}' in this release. A child collection or a references field is not a field here.",
                     $"/changes/{index}/field");
             }
 

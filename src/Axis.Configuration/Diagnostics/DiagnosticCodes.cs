@@ -248,7 +248,8 @@ public static class DiagnosticCodes
     public const string InvalidFileMaxSize = "AXC0257";
     public const string InvalidFileAccept = "AXC0258";
     public const string FileFieldNotAllowed = "AXC0259";
-    public const string DuplicateIndex = "AXC0262";
-    public const string UnknownIndexField = "AXC0263";
-    public const string InvalidIndexField = "AXC0264";
+    public const string ActionWithoutRequiredGrant = "AXC0265";
+    public const string DuplicateIndex = "AXC0266";
+    public const string UnknownIndexField = "AXC0267";
+    public const string InvalidIndexField = "AXC0268";
 }
