@@ -54,13 +54,15 @@ sends it, see [Staging and the call](#staging-and-the-call). A package
 operation step stages its call, and a `package.call` item runs it, see
 [Staging a package call](#staging-a-package-call). A `raiseEvent`
 operation step stores its event, see [Raise event step](process-events.md#raise-event-step).
+A `notify` operation step stores its in-app notification, see
+[Notify operation](notifications.md#notify-operation).
 A `task.deadline` item expires the task of a task step that has a `deadline`,
 see [task deadlines](task-deadlines.md#escalations-and-deadline).
 A `subProcess` step starts its child and waits, and a `process.resume` item
 resumes the parent when the child completes, see
 [Sub-process step](process-flow.md#sub-process-step).
-_(Planned for M14)_ The worker also runs `timer` and `waitEvent` steps and the
-`createRecord` and `notify` operations, with the work item kinds
+_(Planned for M14)_ The worker also runs `timer` and `waitEvent` steps, the
+`createRecord` operation and the email of a `notify` operation, with the work item kinds
 `process.timer`, `task.escalate` and `notification.email`, see [process flow](process-flow.md),
 [task deadlines](task-deadlines.md) and [notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
@@ -73,13 +75,13 @@ one transaction:
 3. It reads the subject record and runs the step. An `updateRecord`
    operation first locks the subject record's row, so it reads the latest
    stored version, and a user's write of the same record waits until the
-   step's transaction ends. A `callConnector` or `raiseEvent` step only
+   step's transaction ends. A `callConnector`, `raiseEvent` or `notify` step only
    reads the record, so it takes no lock.
    Every read of the subject record computes a
    [pending field](migrations.md#recomputing-computed-fields) with the active
    release and does not store the result. That covers decisions, `set`
-   expressions, connector and package inputs, `raiseEvent` fields and task
-   assignees. A run-time error reads `null`. An instance pinned to an older
+   expressions, connector and package inputs, `raiseEvent` fields, `notify`
+   recipients and values, and task assignees. A run-time error reads `null`. An instance pinned to an older
    release reads the same way, but a computed value replaces the stored one
    only when the field has the same name and type in both releases. An
    `updateRecord` step evaluates its `set` expressions on the computed values
@@ -102,6 +104,12 @@ one transaction:
    - A **`raiseEvent`** operation evaluates each `fields` expression on the
      record. A payload field that gives `null` is stored as `null`. The
      instance stays `running` on its `next` step.
+   - A **`notify`** operation evaluates its `user` recipients, its `values`
+     and the parameters of its `open` page on the record, even when `channels`
+     has only `email`. A `user` that gives `null` or blank text has no
+     recipient. A run-time error in any of them fails the step. The instance
+     stays `running` on its `next` step. A process without a subject may
+     notify.
    - A **task** evaluates its assignee. A `user` expression gives the user id,
      and one that gives `null`, blank text or a run-time error fails the step.
      A `role` is the role name. The instance becomes `waiting` on the task
@@ -133,6 +141,12 @@ one transaction:
    A `raiseEvent` step then inserts its occurrence into `axis.events`, see
    [Raise event step](process-events.md#raise-event-step).
 
+   A `notify` step with the `inApp` channel then inserts one row into
+   `axis.notifications` for each distinct `user` and `role` recipient, all
+   with one new notification id, see
+   [In-app notifications](notifications.md#in-app-notifications). It inserts
+   none when it has no recipient. The `email` channel stores nothing yet.
+
    An `updateRecord` operation then writes the values the way a record
    update does. Each value must fit its field, and a `null` for a required
    field is refused. Computed fields are recomputed, validations run, and the
@@ -144,16 +158,16 @@ one transaction:
      subject record, with the instance id. Its details are
      `{ "version", "fields" }`, as the
      [record API](record-api.md#audit-records-and-history) writes them.
-   - A decision, an `updateRecord` operation and a `raiseEvent` operation
-     write `process.stepCompleted` with details `{ "step", "next" }`.
+   - A decision, an `updateRecord` operation, a `raiseEvent` operation and a
+     `notify` operation write `process.stepCompleted` with details `{ "step", "next" }`.
    - A task step writes `task.created` with details `{ "step", "taskId" }`.
    - A `callConnector` step writes `connector.callStaged` with details
      `{ "step", "connector", "operation", "operationId" }`.
    - A package operation step writes `operation.staged` with details
      `{ "step", "package", "version", "operation", "operationId" }`.
    - An end step writes `process.completed` with details `{ "step" }`.
-7. A decision, an `updateRecord` operation and a `raiseEvent` operation
-   insert the work item of the next step. A task step inserts none, because
+7. A decision, an `updateRecord` operation, a `raiseEvent` operation and a
+   `notify` operation insert the work item of the next step. A task step inserts none, because
    the instance waits for the task. A `callConnector` step inserts a
    `connector.call` item for its call instead, and a package operation step
    inserts a `package.call` item.
@@ -161,7 +175,7 @@ one transaction:
 Any exception in the step, such as a `when` that divides by zero, a missing
 subject record, a record write that a validation refuses or a task assignee
 that gives no user, rolls all of it back. So the record keeps its values and
-version, and no task, connector call, package call or event occurrence is stored. The
+version, and no task, connector call, package call, event occurrence or notification is stored. The
 error of a refused write names each field pointer and message, such as
 `The record update was rejected: /values/amount: request.amountNegative`. A
 following transaction then sets the instance to `failed` with its `ended_at`
