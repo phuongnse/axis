@@ -330,11 +330,13 @@ agrees it. The answer is:
 - **`columns`.** A plain data source lists its fields in order. A column's
   `type` is the type of the field at the end of its path, or null when the path
   does not resolve. A grouped data source lists its group fields in `groupBy`
-  order, then its measures, as a grouped row holds them. See
+  order, then its measures, as a grouped row holds them. A group field with a
+  `bucket` is listed by its field name and has the type `date`. See
   [data sources](data-sources.md#aggregates). A `count` measure is an `integer`.
   Any other measure has the type of the field it measures, even when that field
   is not a group field.
-- **`groupBy`.** The group field list of a grouped data source. It is `[]` for
+- **`groupBy`.** The group field names of a grouped data source, in order,
+  whether or not an entry has a `bucket`. It is `[]` for
   one total row, and null for a plain data source. A group field that names no
   field is still listed as a column, with a null type.
 - **Order.** Each list holds the module resources first, then the

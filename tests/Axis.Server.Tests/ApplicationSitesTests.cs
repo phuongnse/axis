@@ -25,6 +25,41 @@ public sealed class ApplicationSitesTests
     }
 
     [Fact]
+    public void Bucketed_group_column_is_a_date_whatever_its_field_is()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
+        try
+        {
+            Write(root, "application.json", """{ "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }""");
+            Write(root, "entities/ticket.json", """
+                { "id": "55555555-5555-4555-8555-555555555503", "kind": "entity", "name": "Ticket", "formatVersion": 1,
+                  "fields": [ { "name": "openedAt", "type": "date-time" }, { "name": "status", "type": "text" } ] }
+                """);
+            Write(root, "data-sources/tickets-by-month.json", """
+                { "id": "99999999-9999-4999-8999-999999999993", "kind": "dataSource", "name": "TicketsByMonth", "formatVersion": 1, "entity": "Ticket",
+                  "fields": [ { "name": "openedAt", "path": "openedAt" }, { "name": "status", "path": "status" } ],
+                  "aggregate": { "groupBy": [{ "field": "openedAt", "bucket": "month" }, "status"], "measures": [
+                    { "name": "tickets", "function": "count" },
+                    { "name": "latest", "function": "max", "field": "openedAt" } ] } }
+                """);
+
+            var result = ApplicationCompiler.Compile(root);
+            Assert.Empty(result.Diagnostics);
+            Assert.NotNull(result.Model);
+
+            var columns = ApplicationSites.DescribeDataSource(result.Model, "TicketsByMonth").Columns;
+
+            Assert.Equal(
+                [("openedAt", "date"), ("status", "text"), ("tickets", "integer"), ("latest", "date-time")],
+                columns.Select(column => (column.Name, column.Type)));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Money_measures_are_typed_money_and_name_their_fixed_currency_or_the_currency_group_column()
     {
         var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");

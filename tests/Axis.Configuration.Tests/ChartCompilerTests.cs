@@ -64,6 +64,18 @@ public sealed class ChartCompilerTests
     }
 
     [Fact]
+    public void Chart_accepts_a_bucketed_group_field_as_its_category()
+    {
+        using var folder = Folder(Chart(dataSource: "MonthlyStats", category: "placedOn"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var chart = Assert.Single(Assert.Single(result.Model!.Pages, page => page.Name == "Orders").Widgets).Chart!;
+        Assert.Equal("placedOn", chart.Category);
+    }
+
+    [Fact]
     public void Chart_keeps_its_measures_in_file_order()
     {
         using var folder = Folder(Valid);
@@ -436,6 +448,11 @@ public sealed class ChartCompilerTests
                     { "name": "minTotal", "function": "min", "field": "total" },
                     { "name": "firstPlaced", "function": "min", "field": "placedOn" },
                     { "name": "lastPlaced", "function": "max", "field": "placedOn" } ] } }
+                """)
+            .With("data-sources/monthly-stats.json", """
+                { "id": "77777777-7777-4777-8777-777777777778", "kind": "dataSource", "name": "MonthlyStats", "formatVersion": 1, "entity": "Order",
+                  "fields": [ { "name": "placedOn", "path": "placedOn" } ],
+                  "aggregate": { "groupBy": [ { "field": "placedOn", "bucket": "month" } ], "measures": [ { "name": "orders", "function": "count" } ] } }
                 """)
             .With("data-sources/filtered-stats.json", """
                 { "id": "77777777-7777-4777-8777-777777777774", "kind": "dataSource", "name": "FilteredStats", "formatVersion": 1, "entity": "Order",

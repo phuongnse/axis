@@ -76,7 +76,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
     arrays with add and remove. `id`, `kind` and fixed values such as
     `formatVersion` are read-only. Labels are the property names as written in
     the schema, without translation. A part the form cannot show, such as
-    `oneOf`, `anyOf` or a map, points to the JSON view. A map whose keys carry a
+    `anyOf` or a map, points to the JSON view. A `oneOf` whose current value is
+    text, or empty, shows its text alternative, such as a `groupBy` name. A `oneOf` with an
+    object value, such as a `groupBy` entry with a `bucket`, points to the JSON view. A map whose keys carry a
     reference mark is the exception, see **Reference pickers** below. A text resource's
     `texts` map shows in the Text editor, see **Editors by kind** below. An
     `allOf` whose items hold only `if`, `then` and `else` shows its
