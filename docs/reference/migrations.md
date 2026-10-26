@@ -399,7 +399,7 @@ Migrations run forward only.
   fan-out. Operator
   [retry](process-inspection.md#retry) and [resolve](process-inspection.md#resolve) take it
   too. A record API create or update always takes it, because the new
-  release may add triggers. A record API delete takes it too, so it orders with a migrating activation. An
+  release may add triggers. A record API delete takes it too, because the new release may add delete triggers. An
   activation with a pending migration takes the same lock exclusively, using
   `pg_advisory_xact_lock`, and holds it to commit. It waits for open starts
   and holds new ones until commit. A start either commits before the

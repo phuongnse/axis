@@ -297,7 +297,9 @@ loads, is checked and is part of the release. The worker delivers each raised ev
 [Raise event step](process-events.md#raise-event-step). Data change triggers start their
 processes in the transaction of a record API create or update, of an inbound endpoint's
 create, of a task form save, of an `updateRecord` step, of a connector output and of a package
-operation output, see [Starts from triggers](process-events.md#starts-from-triggers). The schedule
+operation output, see [Starts from triggers](process-events.md#starts-from-triggers). A delete
+trigger starts its process in the transaction of a record API delete, see
+[Delete triggers](process-events.md#delete-triggers). The schedule
 `trigger` resource and its compile checks are built: a schedule trigger file loads, is checked
 and is part of the release. The worker runs schedule triggers, see
 [Schedules](process-events.md#schedules).
@@ -351,9 +353,9 @@ Every trigger file has `"kind": "trigger"`. Its trigger kind goes in `type`:
 `event`, `dataChange` or `schedule`. `kind` stays the resource kind, as with
 steps, fields and widgets, see [processes](processes.md#resource-shape).
 Every trigger names the `process` it starts, and each start is for one record
-of the process's subject entity. _(Planned for M14)_ A schedule trigger
-without a data source and a delete trigger start a process without a subject,
-see [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
+of the process's subject entity. A schedule trigger without a data source and
+a delete trigger start a process without a subject, see
+[D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
 
 **Event trigger.** It starts `NoteReview` for each closed note of priority 3
 or more, in `triggers/review-closed-notes.json`:
@@ -402,11 +404,12 @@ when its `amount` changes, and the amount is 1000 or more, in
 
 - `entity` names the entity whose records are watched. It is the process's
   subject entity.
-- `on` is a non-empty, unique list of `create` and `update`. `delete` comes later,
-  because a deleted record cannot be a subject. _(Planned for M14)_ `delete`,
-  listed alone, starts a process without a subject, with `parameters` mapped
-  from the record before the delete, see
-  [Delete triggers](process-events.md#delete-triggers).
+- `on` is a non-empty, unique list of `create`, `update` and `delete`. `delete`
+  is listed alone. It starts a process without a subject, because a deleted
+  record cannot be a subject. Its `parameters` map each process parameter to an
+  expression over the record before the delete, see
+  [Delete triggers](process-events.md#delete-triggers). A data change trigger
+  that does not list `delete` has no `parameters`.
 - `fields` is optional. If present, it is a non-empty, unique list. On an
   update, the trigger fires only when one of the named fields changed. A
   create always passes it.
@@ -491,16 +494,19 @@ and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
 `mode` on a schedule trigger and the properties of other types are `AXC0004`.
 
 - The `process` exists and has a subject. A trigger that names a process
-  without a subject is `AXC0247`, whatever the trigger type, until a delete
-  trigger is built. The exception is a schedule trigger without a data source,
-  which must name a process without a subject, otherwise it is `AXC0249`.
+  without a subject is `AXC0247`, whatever the trigger type. The exceptions are
+  a schedule trigger without a data source, which must name a process without
+  a subject, otherwise it is `AXC0249`, and a delete trigger, which must too,
+  otherwise it is `AXC0256`.
 - The subject entity matches. The event's entity, the `entity`, or the data
   source's root entity is the process's subject entity.
 - The `event` exists.
 - An event trigger's `when` sees only the payload fields and gives a boolean.
 - A data change trigger's `when` has the scope of a process expression over
   the new record, and gives a boolean.
-- `on` is non-empty and holds only `create` and `update`.
+- `on` is non-empty and holds only `create`, `update` and `delete`. A delete
+  trigger lists `delete` alone, otherwise it is `AXC0254`, and it has no
+  `fields`, otherwise it is `AXC0255`.
 - Each name in `fields` names a field of the entity that is not computed.
 - `mode` is `async` or `sync`.
 - `schedule` is a valid cron expression.
@@ -508,6 +514,9 @@ and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
 - The `dataSource`, when given, exists and is not grouped.
 - Each `parameters` key names a declared parameter of the data source, or of
   the process when there is no `dataSource`, with a literal value of its type.
+  On a delete trigger, each key names a parameter of the process, with an
+  expression over the deleted record of its type, and every process parameter
+  is given.
 - Each `type` has only its own properties.
 
 ## Inbound endpoints
