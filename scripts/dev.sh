@@ -200,6 +200,8 @@ stop() {
 }
 
 cleanup() {
+  # A failure here must not replace the exit code. A stopping prefixer can write a marker into the state folder.
+  set +e
   stop
   rm -rf "$state"
 }
@@ -242,7 +244,8 @@ start_server() {
     exec env ${server_env[@]+"${server_env[@]}"} dotnet watch --non-interactive -- --urls "http://localhost:$server_port") \
     </dev/null > >(prefix server "$state/server-exited-$generation") 2>&1 &
   server=$!
-  disown "$server"
+  # A stop signal can end a job before it is disowned. Then disown fails, and that must not end the script.
+  disown "$server" 2>/dev/null || true
 }
 
 watched="$(fingerprint)"
@@ -252,7 +255,7 @@ start_server
   exec node_modules/.bin/vite --port "$web_port" --strictPort) \
   </dev/null > >(prefix web) 2>&1 &
 web=$!
-disown "$web"
+disown "$web" 2>/dev/null || true
 
 log "Server on http://localhost:$server_port, preview on http://preview.localhost:$server_port, SPA on http://localhost:$web_port (preview on http://preview.localhost:$web_port), Keycloak on http://localhost:$keycloak_port, purchasing system stub on http://localhost:$purchasing_port. Press Ctrl+C to stop."
 
@@ -309,7 +312,7 @@ while :; do
       exec env ${worker_env[@]+"${worker_env[@]}"} dotnet watch --non-interactive) \
       </dev/null > >(prefix worker) 2>&1 &
     worker=$!
-    disown "$worker"
+    disown "$worker" 2>/dev/null || true
   fi
   # The publisher waits for the migrations too, and is not restarted with the server. Its settings are
   # set in this subshell only: the schema role is for its steps, and the runtime role is for seeding.
@@ -334,7 +337,7 @@ while :; do
       dotnet src/Axis.Admin/bin/Debug/net10.0/Axis.Admin.dll publisher) \
       </dev/null > >(prefix publisher) 2>&1 &
     publisher=$!
-    disown "$publisher"
+    disown "$publisher" 2>/dev/null || true
   fi
   sleep 1 || true
 done

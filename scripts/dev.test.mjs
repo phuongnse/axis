@@ -321,7 +321,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.ok(procs.some((p) => /Axis\.Admin/.test(p.command)), `No publisher process in:\n${JSON.stringify(procs)}`)
 
     interrupt(run)
-    assert.equal(await exitsWithin(run, 60_000), 130)
+    assert.equal(await exitsWithin(run, 60_000), 130, `${run.stdout}\n${run.stderr}`)
     await sleep(500)
     for (const p of procs) assert.equal(isAlive(p.pid), false, `Still running: ${p.command}`)
 
@@ -351,8 +351,9 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
         interrupt(run)
       }
     })
-    assert.equal(await exitsWithin(run, 60_000), 130)
+    assert.equal(await exitsWithin(run, 60_000), 130, `${run.stdout}\n${run.stderr}`)
     assert.ok(sent, run.stdout)
+    assert.match(run.stdout, /\[dev\] Stopping/)
     await sleep(500)
     assert.deepEqual(
       copyProcs().filter((p) => processPattern.test(p.command)),
@@ -387,7 +388,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       fs.writeFileSync(file, original)
     }
     interrupt(run)
-    assert.equal(await exitsWithin(run, 60_000), 130)
+    assert.equal(await exitsWithin(run, 60_000), 130, `${run.stdout}\n${run.stderr}`)
   })
 
   it('restarts only the server when application configuration changes', async () => {
