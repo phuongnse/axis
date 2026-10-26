@@ -2,11 +2,12 @@ import type { DndContextProps } from '@dnd-kit/core'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { setAt } from '../platform/jsonPatch'
 import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
+import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { paletteEntries } from './processPalette'
@@ -53,6 +54,12 @@ const names = {
 
 type Steps = Record<string, unknown>[]
 
+let schema: JsonSchema
+
+beforeAll(async () => {
+  schema = (await loadKindSchema('process'))!
+})
+
 /** Applies each change to the draft, as the Studio editor does, and records the changes and the selections. */
 function renderDesign(start: number | null) {
   const calls = { changes: [] as [string, unknown][], selected: [] as (number | null)[] }
@@ -64,6 +71,7 @@ function renderDesign(start: number | null) {
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioNamesContext.Provider value={names}>
             <StudioProcessDesign
+              schema={schema}
               draft={draft}
               diagnosticPaths={[]}
               selected={selected}

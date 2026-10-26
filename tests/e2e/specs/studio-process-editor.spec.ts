@@ -338,4 +338,50 @@ test.describe('Studio edits a process in the process editor', () => {
       await writeFile(target, original)
     }
   })
+
+  test('an author adds a timer on the Form tab without the JSON view, wires it and saves without a new diagnostic', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    const id = await processId(page)
+    const target = path.join(copy, file)
+    const original = await readFile(target, 'utf8')
+
+    try {
+      // The earlier journeys changed the copy, so the steps are found by name.
+      const content = JSON.parse(original) as { steps: { name: string }[] }
+      const added = content.steps.length
+      const rejected = content.steps.findIndex((step) => step.name === 'markRejected')
+      expect(rejected).toBeGreaterThanOrEqual(0)
+      const before = await diagnostics(page)
+
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+      await openFormTab(page)
+      await pickAction(
+        page.getByRole('combobox', { name: 'Add step', exact: true }),
+        'timer',
+        page.getByTestId(`studio-step-${added}`),
+      )
+      const card = page.getByTestId(`studio-step-${added}`)
+      await card.getByRole('textbox', { name: 'Step name', exact: true }).fill('coolDown')
+      await expect(card.getByRole('radio', { name: 'Wait', exact: true })).toBeChecked()
+      await card.getByRole('textbox', { name: 'Duration', exact: true }).fill('PT4H')
+      await pick(page, `/steps/${added}/next`, 'done')
+      await pick(page, `/steps/${rejected}/next`, 'coolDown')
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+      await expect(page.getByTestId('studio-saved')).toBeVisible()
+      expect(await diagnostics(page)).toEqual(before)
+      const saved = JSON.parse(await readFile(target, 'utf8')) as { steps: Record<string, unknown>[] }
+      expect(saved.steps.find((step) => step.name === 'markRejected')?.next).toBe('coolDown')
+      expect(saved.steps.find((step) => step.name === 'coolDown')).toEqual({
+        name: 'coolDown',
+        type: 'timer',
+        wait: 'PT4H',
+        next: 'done',
+      })
+    } finally {
+      await writeFile(target, original)
+    }
+  })
 })

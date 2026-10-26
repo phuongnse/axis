@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEffect, useState, type ReactNode } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,7 +10,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, selectRoot } from '../test/antd'
+import { chooseOption, openDropdown, optionTexts, selectRoot } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { ProcessEditor } from './ProcessEditor'
 
@@ -56,6 +56,7 @@ const process = {
       otherwise: 'missing',
     },
     { name: 'done', type: 'end' },
+    { name: 'pause', type: 'timer', wait: 'PT1H', next: 'done' },
   ],
 }
 
@@ -326,5 +327,101 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect(within(end).getByRole('textbox', { name: 'Step name' })).toHaveValue('done')
     expect(within(end).queryByTestId('studio-json-only')).toBeNull()
     expect(within(end).queryByRole('combobox', { name: 'Next step' })).toBeNull()
+  })
+
+  it('offers every step type of the process schema in the type picker and the Add step choice', async () => {
+    const types = schema.$defs!.step.properties!.type.enum
+    renderEditor()
+
+    await userEvent.click(within(screen.getByTestId('studio-field-/steps/0/type')).getByRole('combobox'))
+    expect(optionTexts(await openDropdown())).toEqual(types)
+    await userEvent.keyboard('{Escape}')
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Add step' }))
+    const dropdown = await waitFor(() => {
+      const open = [...document.querySelectorAll<HTMLElement>('.ant-select-dropdown')].find(
+        (candidate) => !candidate.classList.contains('ant-select-dropdown-hidden') && optionTexts(candidate).length > 0,
+      )
+      expect(open).toBeDefined()
+      return open!
+    })
+    expect(types).toContain('timer')
+    expect(types).toContain('subProcess')
+    expect(optionTexts(dropdown)).toEqual(types)
+  })
+
+  it('changes a task to a timer by removing the keys the schema forbids and adding the required keys', async () => {
+    const latest = renderEditor()
+
+    await chooseOption('timer', screen.getByTestId('studio-field-/steps/1/type'))
+
+    expect(stepOf(latest, 1)).toEqual({ name: 'managerApproval', type: 'timer', hint: 1, wait: '', next: '' })
+  })
+
+  it('shows the keys of a step type without a panel as markers for the JSON view', async () => {
+    const latest = renderEditor()
+
+    await chooseOption('subProcess', screen.getByTestId('studio-field-/steps/3/type'))
+
+    expect(stepOf(latest, 3)).toEqual({ name: 'done', type: 'subProcess', process: '', next: '' })
+    const card = screen.getByTestId('studio-step-3')
+    expect(within(card).getByTestId('studio-field-/steps/3/process')).toBeVisible()
+    expect(within(card).getByTestId('studio-field-/steps/3/next')).toBeVisible()
+    expect(within(card).getAllByTestId('studio-json-only')).toHaveLength(2)
+  })
+
+  it('edits a timer through its own fields and switches between Wait and Until', async () => {
+    const latest = renderEditor()
+    const card = screen.getByTestId('studio-step-4')
+    // The radio input of a button group has no pointer events, so the click goes to its label.
+    const switchTo = (name: string) => userEvent.click(within(card).getByRole('radio', { name }).closest('label')!)
+
+    expect(within(card).getByRole('radio', { name: 'Wait' })).toBeChecked()
+    expect(within(card).getByRole('textbox', { name: 'Duration' })).toHaveValue('PT1H')
+    await userEvent.type(within(card).getByRole('textbox', { name: 'Duration' }), '2')
+    expect(stepOf(latest, 4).wait).toBe('PT1H2')
+    await userEvent.clear(within(card).getByRole('textbox', { name: 'Duration' }))
+    expect(stepOf(latest, 4).wait).toBe('')
+    await userEvent.type(within(card).getByRole('textbox', { name: 'Duration' }), 'PT2H')
+    await chooseOption('financeCheck', screen.getByTestId('studio-field-/steps/4/next'))
+    expect(stepOf(latest, 4)).toEqual({ name: 'pause', type: 'timer', wait: 'PT2H', next: 'financeCheck' })
+
+    await switchTo('Until')
+    expect(stepOf(latest, 4)).toEqual({ name: 'pause', type: 'timer', until: '', next: 'financeCheck' })
+    expect(Object.keys(stepOf(latest, 4))).toEqual(['name', 'type', 'until', 'next'])
+    expect(screen.queryByTestId('studio-field-/steps/4/wait')).toBeNull()
+    await userEvent.type(within(screen.getByTestId('studio-field-/steps/4/until')).getByRole('textbox'), 'dueDate')
+    expect(stepOf(latest, 4).until).toBe('dueDate')
+
+    await switchTo('Wait')
+    expect(stepOf(latest, 4)).toEqual({ name: 'pause', type: 'timer', wait: '', next: 'financeCheck' })
+    expect(stepOf(latest, 4)).not.toHaveProperty('until')
+    expect(screen.queryByTestId('studio-field-/steps/4/until')).toBeNull()
+  })
+
+  it('opens a timer with only until in Until mode and keeps the value of a key that a switch finds', async () => {
+    const latest = renderEditor({
+      ...process,
+      steps: [
+        { name: 'a', type: 'timer', until: 'dueDate', next: 'b' },
+        { name: 'b', type: 'timer', wait: 'PT1H', until: 'x', next: 'a' },
+        { name: 'c', type: 'timer', next: 'a' },
+      ],
+    })
+
+    expect(within(screen.getByTestId('studio-step-0')).getByRole('radio', { name: 'Until' })).toBeChecked()
+    expect(within(screen.getByTestId('studio-step-1')).getByRole('radio', { name: 'Wait' })).toBeChecked()
+    expect(within(screen.getByTestId('studio-step-2')).getByRole('radio', { name: 'Wait' })).toBeChecked()
+
+    await userEvent.click(
+      within(screen.getByTestId('studio-step-1')).getByRole('radio', { name: 'Until' }).closest('label')!,
+    )
+    expect(stepOf(latest, 1)).toEqual({ name: 'b', type: 'timer', until: 'x', next: 'a' })
+  })
+
+  it('shows the expression editor for until when the draft can check expressions', async () => {
+    renderEditor({ ...process, steps: [{ name: 'a', type: 'timer', until: 'dueDate', next: 'a' }] }, true)
+
+    expect(await screen.findByRole('group', { name: 'Time' })).toBeVisible()
   })
 })

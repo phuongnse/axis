@@ -8,6 +8,7 @@ import { expressionScope } from './expressionScope'
 import { OperationPanel } from './OperationPanel'
 import { operationJsonOnlyKeys } from './operationKeys'
 import { requiredStepKeys } from './processPalette'
+import { stepTypes, withType } from './processStepSchema'
 import { ReferencePicker } from './ReferencePicker'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
 
@@ -15,64 +16,10 @@ const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 type Content = Record<string, unknown>
 
-const stepTypes = ['decision', 'task', 'operation', 'end']
+/** The step types that have a panel. The keys of any other type show as markers for the JSON view. */
+const panelTypes = new Set(['decision', 'task', 'operation', 'timer', 'end'])
 
 const parameterTypes = ['text', 'integer', 'decimal', 'boolean', 'date', 'date-time']
-
-/** The keys a step type forbids, from the first four conditionals of the process schema. */
-const forbiddenStepKeys: Record<string, string[]> = {
-  decision: [
-    'operation',
-    'set',
-    'connector',
-    'input',
-    'output',
-    'retry',
-    'event',
-    'entity',
-    'fields',
-    'next',
-    'label',
-    'assignee',
-    'form',
-    'dueIn',
-    'outcomes',
-  ],
-  task: [
-    'branches',
-    'otherwise',
-    'operation',
-    'set',
-    'connector',
-    'input',
-    'output',
-    'retry',
-    'event',
-    'entity',
-    'fields',
-    'next',
-  ],
-  operation: ['branches', 'otherwise', 'label', 'assignee', 'form', 'dueIn', 'outcomes'],
-  end: [
-    'branches',
-    'otherwise',
-    'operation',
-    'set',
-    'connector',
-    'input',
-    'output',
-    'retry',
-    'event',
-    'entity',
-    'fields',
-    'next',
-    'label',
-    'assignee',
-    'form',
-    'dueIn',
-    'outcomes',
-  ],
-}
 
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -80,24 +27,6 @@ function isContent(value: unknown): value is Content {
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value : ''
-}
-
-/** The step with its type changed: the new type's forbidden keys go and its required keys are added empty. */
-function withType(step: Content, type: string): Content {
-  const forbidden = new Set(forbiddenStepKeys[type])
-  const next: Content = {}
-  for (const [key, value] of Object.entries(step)) {
-    if (!forbidden.has(key)) {
-      next[key] = value
-    }
-  }
-  next.type = type
-  for (const [key, initial] of Object.entries(structuredClone(requiredStepKeys[type]))) {
-    if (next[key] === undefined) {
-      next[key] = initial
-    }
-  }
-  return next
 }
 
 /**
@@ -182,6 +111,7 @@ export function ProcessEditor({
           {steps.map((step, index) => (
             <Step
               key={index}
+              schema={schema}
               index={index}
               step={isContent(step) ? step : {}}
               entity={text(value.entity)}
@@ -204,7 +134,7 @@ export function ProcessEditor({
               style={{ minWidth: 240 }}
               virtual={false}
               value={null}
-              options={stepTypes.map((type) => ({ value: type, label: type }))}
+              options={stepTypes(schema).map((type) => ({ value: type, label: type }))}
               onChange={(type: string) =>
                 onChange('/steps', [...steps, { name: '', type, ...structuredClone(requiredStepKeys[type]) }])
               }
@@ -313,12 +243,14 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
  * select the step at its new place. Remove calls `onRemove`, which owns the removal, the selection and what is said.
  */
 export function ProcessStepPanel({
+  schema,
   value,
   index,
   onChange,
   onSelect,
   onRemove,
 }: {
+  schema: JsonSchema
   value: Content
   index: number
   onChange: ChangeHandler
@@ -330,6 +262,7 @@ export function ProcessStepPanel({
 
   return (
     <Step
+      schema={schema}
       index={index}
       step={isContent(step) ? step : {}}
       entity={text(value.entity)}
@@ -346,6 +279,7 @@ export function ProcessStepPanel({
 }
 
 function Step({
+  schema,
   index,
   step,
   entity,
@@ -355,6 +289,7 @@ function Step({
   onRemove,
   onChange,
 }: {
+  schema: JsonSchema
   index: number
   step: Content
   entity: string
@@ -404,8 +339,8 @@ function Step({
               style={{ minWidth: 240 }}
               virtual={false}
               value={type}
-              options={stepTypes.map((option) => ({ value: option, label: option }))}
-              onChange={(next: string) => onChange(pointer, withType(step, next))}
+              options={stepTypes(schema).map((option) => ({ value: option, label: option }))}
+              onChange={(next: string) => onChange(pointer, withType(step, next, schema))}
             />
           </div>
           {type === 'decision' && <Decision pointer={pointer} step={step} names={names} onChange={onChange} />}
@@ -423,6 +358,13 @@ function Step({
             </>
           )}
           {type === 'task' && <Task pointer={pointer} step={step} names={names} onChange={onChange} />}
+          {type === 'timer' && <Timer pointer={pointer} step={step} names={names} onChange={onChange} />}
+          {type !== undefined && !panelTypes.has(type) && (
+            <JsonOnlyKeys
+              pointer={pointer}
+              keys={Object.keys(step).filter((key) => key !== 'name' && key !== 'type')}
+            />
+          )}
         </Flex>
       </Card>
     </div>
@@ -620,6 +562,92 @@ function Task({
         />
       </div>
       <Outcomes pointer={pointer} step={step} names={names} onChange={onChange} />
+    </>
+  )
+}
+
+/**
+ * The panel of a timer: Wait for a duration or Until a time, and the next step. A switch replaces the other key in
+ * place with the chosen key, which keeps a value it already holds. A timer with neither key or both opens in Wait.
+ */
+function Timer({
+  pointer,
+  step,
+  names,
+  onChange,
+}: {
+  pointer: string
+  step: Content
+  names: string[]
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const mode = step.until !== undefined && step.wait === undefined ? 'until' : 'wait'
+
+  function switchTo(chosen: 'wait' | 'until') {
+    const other = chosen === 'wait' ? 'until' : 'wait'
+    const next: [string, unknown][] = []
+    let placed = false
+    for (const [key, value] of Object.entries(step)) {
+      if (key === other && !placed) {
+        next.push([chosen, text(step[chosen])])
+        placed = true
+      } else if (key !== other && key !== chosen) {
+        next.push([key, value])
+      }
+    }
+    if (!placed) {
+      next.push([chosen, ''])
+    }
+    onChange(pointer, Object.fromEntries(next))
+  }
+
+  return (
+    <>
+      <div data-testid={`studio-field-${pointer}/timer`}>
+        <Flex vertical gap="small">
+          <Typography.Text strong>{t('shell.studio.process.timerMode')}</Typography.Text>
+          <Radio.Group
+            // A name of its own per step keeps the radios of two timers from joining one group.
+            name={`timer-mode-${pointer}`}
+            optionType="button"
+            aria-label={t('shell.studio.process.timerMode')}
+            value={mode}
+            options={[
+              { value: 'wait', label: t('shell.studio.process.timerWait') },
+              { value: 'until', label: t('shell.studio.process.timerUntil') },
+            ]}
+            onChange={(event) => switchTo(event.target.value)}
+          />
+          {mode === 'wait' ? (
+            <div data-testid={`studio-field-${pointer}/wait`}>
+              <div>{t('shell.studio.process.waitFor')}</div>
+              <Input
+                aria-label={t('shell.studio.process.waitFor')}
+                value={text(step.wait)}
+                onChange={(event) => onChange(`${pointer}/wait`, event.target.value)}
+              />
+            </div>
+          ) : (
+            <div data-testid={`studio-field-${pointer}/until`}>
+              <div>{t('shell.studio.process.untilTime')}</div>
+              <Expression
+                pointer={`${pointer}/until`}
+                name={t('shell.studio.process.untilTime')}
+                value={text(step.until)}
+                onChange={onChange}
+              />
+            </div>
+          )}
+        </Flex>
+      </div>
+      <Transition
+        pointer={`${pointer}/next`}
+        label={t('shell.studio.process.next')}
+        value={step.next}
+        names={names}
+        onChange={onChange}
+      />
     </>
   )
 }
