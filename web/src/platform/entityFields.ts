@@ -8,7 +8,10 @@ export const fieldTypes = [
   'date-time',
   'enum',
   'reference',
+  'references',
   'child-collection',
+  'money',
+  'file',
 ] as const
 
 export type FieldType = (typeof fieldTypes)[number]
@@ -20,8 +23,13 @@ export const fieldSettingNames = [
   'maxLength',
   'precision',
   'scale',
+  'maxSize',
+  'accept',
   'target',
+  'currency',
+  'currencyField',
   'values',
+  'valueLabels',
   'expression',
   'sequence',
   'creator',
@@ -38,9 +46,24 @@ export const fieldTypeSettings: Record<FieldType, FieldSetting[]> = {
   boolean: ['required', 'unique', 'expression', 'sensitive'],
   date: ['required', 'unique', 'expression', 'sensitive'],
   'date-time': ['required', 'unique', 'expression', 'sensitive'],
-  enum: ['required', 'unique', 'values', 'expression', 'sensitive'],
+  enum: ['required', 'unique', 'values', 'valueLabels', 'expression', 'sensitive'],
   reference: ['required', 'unique', 'target', 'sensitive'],
+  references: ['required', 'target', 'sensitive'],
   'child-collection': ['target'],
+  money: ['required', 'unique', 'precision', 'scale', 'currency', 'currencyField', 'expression', 'sensitive'],
+  file: ['required', 'maxSize', 'accept', 'sensitive'],
+}
+
+/** The field keys of `entity.schema.json` that are not settings, and where each is edited. */
+export const fieldKeysEditedElsewhere: Record<string, string> = {
+  name: 'the name column',
+  type: 'the type column',
+  label: 'the label column',
+  minLength: 'the JSON tab, until the designer adds it (D77)',
+  min: 'the JSON tab, until the designer adds it (D77)',
+  max: 'the JSON tab, until the designer adds it (D77)',
+  default: 'the JSON tab, until the designer adds it (D77)',
+  searchable: 'the JSON tab, until the designer adds it (D80)',
 }
 
 /** The settings a field type takes. An unknown type takes none. */
