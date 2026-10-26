@@ -446,16 +446,14 @@ public static class DataSourceQueries
         var select = string.Join(", ", [
             .. aggregate.GroupBy.Select((field, index) =>
                 groupColumns[index] + (FieldTypes.HoldsDecimal(field.Field.Type) ? "::text" : "")),
-            .. aggregate.Measures.Select(measure =>
-                Aggregate(measure, joins)
-                + (measure.Function == AggregateFunction.Sum || measure.Field is { } measureField && FieldTypes.HoldsDecimal(measureField.Field.Type) ? "::text" : "")),
+            .. aggregate.Measures.Select(measure => Aggregate(measure, joins) + (IsWrittenAsText(measure) ? "::text" : "")),
             .. labelColumns,
         ]);
         string[] grouping = [.. groupColumns, .. labelColumns];
         return (select, grouping.Length == 0 ? "" : $" GROUP BY {string.Join(", ", grouping)}");
     }
 
-    /// <summary>The aggregate of a measure. A sum, min or max over only <c>NULL</c> values is <c>NULL</c>.</summary>
+    /// <summary>The aggregate of a measure. A sum, min, max or avg over only <c>NULL</c> values is <c>NULL</c>.</summary>
     private static string Aggregate(DataSourceMeasureModel measure, Joins joins) =>
         measure.Function switch
         {
@@ -463,8 +461,19 @@ public static class DataSourceQueries
             AggregateFunction.Sum => $"sum({joins.ColumnOf(measure.Field!.Path)})",
             AggregateFunction.Min => $"min({joins.ColumnOf(measure.Field!.Path)})",
             AggregateFunction.Max => $"max({joins.ColumnOf(measure.Field!.Path)})",
+            AggregateFunction.Avg => $"round(avg({joins.ColumnOf(measure.Field!.Path)}), {AvgScale(measure.Field!.Field)})",
+            AggregateFunction.CountDistinct => $"count(DISTINCT {joins.ColumnOf(measure.Field!.Path)})",
             _ => throw new ArgumentOutOfRangeException(nameof(measure), measure.Function, "Unknown aggregate function."),
         };
+
+    // A sum sent as text keeps its digits exactly, and so does a min or max of a decimal field.
+    private static bool IsWrittenAsText(DataSourceMeasureModel measure) =>
+        measure.Function is AggregateFunction.Sum or AggregateFunction.Avg
+        || (measure.Function is AggregateFunction.Min or AggregateFunction.Max && FieldTypes.HoldsDecimal(measure.Field!.Field.Type));
+
+    // An integer or an unbounded decimal keeps 6 digits. A decimal with a precision keeps 0 unless it has a scale.
+    private static int AvgScale(FieldModel field) =>
+        field.Type == FieldType.Integer ? 6 : field.Scale ?? (field.Precision is null ? 6 : 0);
 
     private static DataSourceRow ReadGroupedRow(NpgsqlDataReader reader, DataSourceAggregateModel aggregate)
     {
@@ -482,9 +491,9 @@ public static class DataSourceQueries
                 ? null
                 : measure.Function switch
                 {
-                    AggregateFunction.Count => JsonValue.Create(reader.GetInt64(ordinal)),
-                    // The sum's number text is written as is, like a decimal.
-                    AggregateFunction.Sum => (JsonValue)JsonNode.Parse(reader.GetString(ordinal))!,
+                    AggregateFunction.Count or AggregateFunction.CountDistinct => JsonValue.Create(reader.GetInt64(ordinal)),
+                    // The sum's and average's number text is written as is, like a decimal.
+                    AggregateFunction.Sum or AggregateFunction.Avg => (JsonValue)JsonNode.Parse(reader.GetString(ordinal))!,
                     _ => RecordQueries.ReadValue(reader, ordinal, measure.Field!.Field),
                 };
             ordinal++;
