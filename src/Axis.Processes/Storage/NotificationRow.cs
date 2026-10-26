@@ -28,6 +28,13 @@ public sealed class NotificationRow
     /// <summary>The raw evaluated placeholder values as JSON text, keyed by the placeholders' names. They are formatted when read.</summary>
     public required string Values { get; init; }
 
+    /// <summary>
+    /// The type of each value as JSON text, keyed by the placeholders' names: <c>text</c>, <c>integer</c>, <c>decimal</c>,
+    /// <c>boolean</c>, <c>date</c>, <c>date-time</c>, <c>enum</c> or <c>reference</c>. A value of any other type has no
+    /// entry, and neither does a value of a notification stored before the types were kept. The types tell a date from text when the values are formatted.
+    /// </summary>
+    public string ValueTypes { get; init; } = "{}";
+
     /// <summary>The declared name of the page the notification opens, or null.</summary>
     public string? OpenPage { get; init; }
 

@@ -22,7 +22,7 @@ public static class NotificationQueries
         $"""
         WITH visible AS (
             SELECT DISTINCT ON (n.id)
-                n.id, n.release_id, n.subject_key, n.body_key, n."values"::text AS "values", n.open_page,
+                n.id, n.release_id, n.subject_key, n.body_key, n."values"::text AS "values", n.value_types::text AS value_types, n.open_page,
                 n.open_parameters::text AS open_parameters, n.created_at,
                 EXISTS (SELECT 1 FROM axis.notification_reads r WHERE r.notification_id = n.id AND r.user_id = @user) AS is_read
             FROM axis.notifications n
@@ -40,7 +40,7 @@ public static class NotificationQueries
     private const string PageSql =
         $"""
         {VisibleCte}
-        SELECT id, release_id, subject_key, body_key, "values", open_page, open_parameters, created_at, is_read
+        SELECT id, release_id, subject_key, body_key, "values", value_types, open_page, open_parameters, created_at, is_read
         FROM visible
         WHERE NOT @unread OR NOT is_read
         ORDER BY created_at DESC, id DESC
@@ -116,10 +116,11 @@ public static class NotificationQueries
                 reader.GetString(2),
                 reader.GetString(3),
                 reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.GetString(5),
                 reader.IsDBNull(6) ? null : reader.GetString(6),
-                reader.GetFieldValue<DateTimeOffset>(7),
-                reader.GetBoolean(8)));
+                reader.IsDBNull(7) ? null : reader.GetString(7),
+                reader.GetFieldValue<DateTimeOffset>(8),
+                reader.GetBoolean(9)));
         }
 
         return new NotificationPage(items, totalCount, unreadCount);
@@ -184,6 +185,7 @@ public sealed record NotificationPage(IReadOnlyList<NotificationItem> Items, lon
 /// <param name="SubjectKey">The text key of the subject.</param>
 /// <param name="BodyKey">The text key of the body.</param>
 /// <param name="Values">The raw placeholder values, a JSON object.</param>
+/// <param name="ValueTypes">The type name of each value, a JSON object keyed like <paramref name="Values"/>. It is empty for a notification stored before the types were kept.</param>
 /// <param name="OpenPage">The declared name of the page to open, or null.</param>
 /// <param name="OpenParameters">The raw page parameters, a JSON object, or null when there is no page.</param>
 /// <param name="CreatedAt">When the notification was stored.</param>
@@ -194,6 +196,7 @@ public sealed record NotificationItem(
     string SubjectKey,
     string BodyKey,
     string Values,
+    string ValueTypes,
     string? OpenPage,
     string? OpenParameters,
     DateTimeOffset CreatedAt,

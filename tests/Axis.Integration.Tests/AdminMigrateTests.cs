@@ -10,7 +10,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
-using Npgsql;
 using static Axis.Integration.Tests.RecordApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -121,17 +120,16 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
         var connectionString = scenario.TenantConnectionString(id, row.SchemaUser, password);
         const string count = "SELECT count(*) FROM pg_extension WHERE extname = 'pg_trgm'";
 
+        // The migration before the trigram one, picked by name: a later migration of any context changes nothing here.
         string old;
         await using (var context = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connectionString).Options))
         {
             var migrations = context.Database.GetMigrations().Order(StringComparer.Ordinal).ToArray();
-            Assert.Equal(TenantSchemaVersion.Current, migrations[^1]);
-            await context.GetService<IMigrator>().MigrateAsync(migrations[^2], CancellationToken);
+            var trigram = Array.FindIndex(migrations, migration => migration.EndsWith("_AddTrigramExtension", StringComparison.Ordinal));
+            Assert.True(trigram > 0, "The data context has no migration before AddTrigramExtension.");
+            old = migrations[trigram - 1];
+            await context.GetService<IMigrator>().MigrateAsync(old, CancellationToken);
             Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(connectionString, count, CancellationToken));
-
-            await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync(CancellationToken);
-            old = await TenantSchemaVersion.ReadAsync(connection, CancellationToken);
         }
 
         await scenario.SetSchemaVersionAsync(id, old);

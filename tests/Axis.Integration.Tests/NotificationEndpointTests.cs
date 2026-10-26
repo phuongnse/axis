@@ -47,6 +47,48 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
     }
 
     [Fact]
+    public async Task Values_show_in_the_profile_locale_and_a_date_time_in_the_time_zone_of_the_stored_release()
+    {
+        await ClearAsync();
+        var releaseId = await fixture.ActivateEditedAsync(TenantA, (path, content) =>
+            path == "application.json"
+                ? content.Replace("\"formatVersion\": 1", "\"formatVersion\": 1, \"timeZone\": \"Asia/Ho_Chi_Minh\"", StringComparison.Ordinal)
+                : content);
+        await fixture.InsertProfileAsync(TenantA, "maria", "Maria", "vi");
+        await fixture.InsertProfileAsync(TenantA, "fiona", "Fiona", "en");
+        var id = Guid.NewGuid();
+        foreach (var user in new[] { "maria", "fiona" })
+        {
+            await fixture.ExecuteAsync(
+                TenantA,
+                """
+                INSERT INTO axis.notifications
+                    (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, created_at)
+                VALUES (@id, @application, @release, 'user', @user, 'request.notice.subject', 'request.notice.body',
+                        @values::jsonb, @types::jsonb, now())
+                """,
+                ("id", id),
+                ("application", fixture.Model.Manifest.Id),
+                ("release", releaseId),
+                ("user", user),
+                ("values", """{"title":"2026-12-31T18:00:00.000000Z","amount":1234.5}"""),
+                ("types", """{"title":"date-time","amount":"decimal"}"""));
+        }
+
+        foreach (var (user, subject, body) in new[]
+        {
+            ("maria", "Request 01/01/2027 01:00", "Amount 1.234,5."),
+            ("fiona", "Request Jan 1, 2027, 1:00 AM", "Amount 1,234.5."),
+        })
+        {
+            using var client = fixture.CreateClient().SignedInAs(user);
+            using var list = await GetJsonAsync(client, Notifications);
+            var item = Assert.Single(list.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal((subject, body), (item.GetProperty("subject").GetString(), item.GetProperty("body").GetString()));
+        }
+    }
+
+    [Fact]
     public async Task A_notification_shows_the_page_it_opens_and_a_missing_text_key_shows_as_the_key()
     {
         await ClearAsync();

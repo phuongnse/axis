@@ -8,6 +8,7 @@ using Axis.Core.Telemetry;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Expressions.Evaluation;
+using Axis.Expressions.Typing;
 using Axis.Processes.Work;
 using Microsoft.Extensions.Logging;
 
@@ -1112,6 +1113,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         }
 
         var values = new JsonObject();
+        var valueTypes = new JsonObject();
         foreach (var value in step.Values)
         {
             var result = await evaluate(value.Value);
@@ -1121,6 +1123,10 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             }
 
             values[value.Name] = ToJson(result.Value, $"value '{value.Name}'", step, instance, input);
+            if (ValueTypeName(value.Value.Check.Type!.Kind) is { } typeName)
+            {
+                valueTypes[value.Name] = typeName;
+            }
         }
 
         JsonObject? openParameters = null;
@@ -1146,10 +1152,26 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             step.Subject.TextKey,
             step.Body.TextKey,
             values,
+            valueTypes,
             step.Open?.Page.Name,
             openParameters,
             [.. recipients.Distinct()]);
     }
+
+    /// <summary>The name that a notification stores for a value of <paramref name="kind"/>, or null when it stores none.</summary>
+    private static string? ValueTypeName(ExpressionTypeKind kind) =>
+        kind switch
+        {
+            ExpressionTypeKind.Text => "text",
+            ExpressionTypeKind.Integer => "integer",
+            ExpressionTypeKind.Decimal => "decimal",
+            ExpressionTypeKind.Boolean => "boolean",
+            ExpressionTypeKind.Date => "date",
+            ExpressionTypeKind.DateTime => "date-time",
+            ExpressionTypeKind.Enum => "enum",
+            ExpressionTypeKind.Reference => "reference",
+            _ => null,
+        };
 
     /// <summary>
     /// A value an expression gave, in the record API's JSON form. <paramref name="name"/> names

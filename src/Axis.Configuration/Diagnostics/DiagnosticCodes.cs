@@ -267,4 +267,5 @@ public static class DiagnosticCodes
     public const string DataSourceSearchWithoutField = "AXC0279";
     public const string EscalationWithoutAction = "AXC0280";
     public const string EscalationNotBeforeDeadline = "AXC0281";
+    public const string SensitiveNotifyValue = "AXC0282";
 }

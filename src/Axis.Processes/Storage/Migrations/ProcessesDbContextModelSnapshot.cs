@@ -376,6 +376,13 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("subject_key");
 
+                    b.Property<string>("ValueTypes")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("value_types")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.Property<string>("Values")
                         .IsRequired()
                         .HasColumnType("jsonb")

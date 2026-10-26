@@ -127,6 +127,29 @@ public sealed class TaskEscalationCompilerTests
     }
 
     [Fact]
+    public void A_value_that_reads_a_sensitive_field_in_an_escalation_notify_is_reported_at_that_value()
+    {
+        var notify = ValidNotify.Replace("\"number\": \"number\"", "\"number\": \"requester\"", StringComparison.Ordinal);
+        using var folder = Folder($$"""[ { "after": "PT4H", "notify": {{notify}} } ]""")
+            .With("entities/ticket.json", $$"""
+                { "id": "{{TicketId}}", "kind": "entity", "name": "Ticket", "formatVersion": 1,
+                  "fields": [
+                    { "name": "number", "type": "text" },
+                    { "name": "requester", "type": "text", "sensitive": true }
+                  ] }
+                """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.SensitiveNotifyValue, "processes/ticket-task.json", "/steps/0/escalations/0/notify/message/values/number"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("Ticket.requester", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void A_placeholder_without_a_value_in_an_escalation_notify_is_reported_at_its_message()
     {
         var notify = ValidNotify.Replace(""", "values": { "number": "number" }""", "", StringComparison.Ordinal);

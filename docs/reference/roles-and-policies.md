@@ -339,3 +339,7 @@ user:
   of its child entity is sensitive.
 - **Two releases.** A field counts as sensitive when the release an instance is
   pinned to or the active release marks it.
+- **Notifications.** A `values` expression of a `notify` step may not read a
+  sensitive field, directly or through a path. It is
+  [`AXC0282`](notifications.md#placeholders), because a notification stores its
+  values and shows them to every recipient.
