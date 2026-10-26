@@ -58,9 +58,10 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     or `pie`. A `pie` has exactly one measure (`AXC0241`). A data source
     without exactly one `groupBy` field, or a `category` that is not that
     field, is `AXC0240`. A measure that the data source lacks, or that is not a
-    number, is `AXC0241`. A measure is a number when it is a `count` or a `sum`,
-    or a `min` or `max` over an integer, a decimal or a money field, because `min` and `max`
-    keep the type of their field and a chart cannot plot a date. The `title`
+    number, is `AXC0241`. A measure is a number when it is a `count`, a
+    `countDistinct`, a `sum` or an `avg`, or a `min` or `max` over an integer,
+    a decimal or a money field, because `min` and `max` keep the type of their
+    field and a chart cannot plot a date. The `title`
     and the measure labels join `AXC0028`. A chart has no `entity`, `form` or
     `actions` (`AXC0060`). Configuration names no chart library and no library
     option. The page schema requires `dataSource`, `kind`, `category`,

@@ -493,7 +493,7 @@ public sealed class DataSourceCompilerTests
     [InlineData(""", "parameters": [{ "name": "p", "type": "child-collection" }] """, "/parameters/0/type")]
     [InlineData(""", "aggregate": { "groupBy": ["number"] } """, "/aggregate")]
     [InlineData(""", "aggregate": { "groupBy": ["number"], "measures": [] } """, "/aggregate/measures")]
-    [InlineData(""", "aggregate": { "groupBy": ["number"], "measures": [{ "name": "a", "function": "avg", "field": "number" }] } """, "/aggregate/measures/0/function")]
+    [InlineData(""", "aggregate": { "groupBy": ["number"], "measures": [{ "name": "a", "function": "median", "field": "number" }] } """, "/aggregate/measures/0/function")]
     [InlineData(""", "aggregate": { "groupBy": ["number", "number"], "measures": [{ "name": "n", "function": "count" }] } """, "/aggregate/groupBy")]
     [InlineData(""", "pageSize": 101 """, "/pageSize")]
     [InlineData(""", "pageSize": 0 """, "/pageSize")]
@@ -799,6 +799,8 @@ public sealed class DataSourceCompilerTests
     [InlineData("""{ "name": "m", "function": "min", "field": "paid" }""", "'min' cannot take the boolean field 'paid'")]
     [InlineData("""{ "name": "m", "function": "max", "field": "status" }""", "'max' cannot take the enum field 'status'")]
     [InlineData("""{ "name": "m", "function": "max", "field": "customer" }""", "'max' cannot take the reference field 'customer'")]
+    [InlineData("""{ "name": "m", "function": "avg", "field": "number" }""", "'avg' cannot take the text field 'number'")]
+    [InlineData("""{ "name": "m", "function": "countDistinct", "field": "receipt" }""", "'countDistinct' cannot take the file field 'receipt'")]
     [InlineData("""{ "name": "m", "function": "sum", "field": "Amount" }""", "'Amount' must name a projected field")]
     [InlineData("""{ "name": "m", "function": "min", "field": "missing" }""", "'missing' must name a projected field")]
     public void Measure_field_of_the_wrong_type_or_not_projected_is_reported_at_its_field(string measure, string message)
@@ -820,6 +822,8 @@ public sealed class DataSourceCompilerTests
     [InlineData("""{ "name": "m", "function": "count", "field": "amount" }""", "'count' counts rows and takes no 'field'")]
     [InlineData("""{ "name": "m", "function": "sum" }""", "'sum' needs a 'field'")]
     [InlineData("""{ "name": "m", "function": "max" }""", "'max' needs a 'field'")]
+    [InlineData("""{ "name": "m", "function": "avg" }""", "'avg' needs a 'field'")]
+    [InlineData("""{ "name": "m", "function": "countDistinct" }""", "'countDistinct' needs a 'field'")]
     public void Count_with_a_field_or_another_function_without_one_is_reported_at_the_measure(string measure, string message)
     {
         using var folder = Folder().With("data-sources/orders.json", Grouped(measure));
@@ -832,6 +836,21 @@ public sealed class DataSourceCompilerTests
             (diagnostic.Code, diagnostic.Path));
         Assert.Contains(message, diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("status")]
+    [InlineData("paid")]
+    [InlineData("since")]
+    [InlineData("customer")]
+    public void Count_distinct_takes_any_field_except_a_file(string field)
+    {
+        using var folder = Folder().With("data-sources/orders.json", Grouped($$"""{ "name": "m", "function": "countDistinct", "field": "{{field}}" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
     }
 
     [Theory]
@@ -912,16 +931,17 @@ public sealed class DataSourceCompilerTests
     }
 
     [Fact]
-    public void Money_measure_over_a_currency_field_needs_the_currency_group_for_every_function_except_count()
+    public void Money_measure_over_a_currency_field_needs_the_currency_group_for_every_function_except_count_and_count_distinct()
     {
         var functions = MeasureFunctions();
         Assert.Contains("sum", functions);
+        Assert.Contains("avg", functions);
         Assert.Contains("min", functions);
         Assert.Contains("max", functions);
 
         foreach (var function in functions)
         {
-            var measure = function is "count" or "countDistinct"
+            var measure = function == "count"
                 ? $$"""{ "name": "m", "function": "{{function}}" }"""
                 : $$"""{ "name": "m", "function": "{{function}}", "field": "amount" }""";
             var needsGroup = function is not ("count" or "countDistinct");
@@ -949,6 +969,7 @@ public sealed class DataSourceCompilerTests
 
     [Theory]
     [InlineData("sum")]
+    [InlineData("avg")]
     [InlineData("min")]
     [InlineData("max")]
     public void Money_measure_over_a_fixed_currency_field_needs_no_currency_group(string function)
@@ -1024,12 +1045,12 @@ public sealed class DataSourceCompilerTests
 
     /// <summary>
     /// A data source grouped by <c>status</c> whose measures are a count, then <paramref name="measure"/>,
-    /// over every scalar kind: text, decimal, enum, reference, boolean and date.
+    /// over every kind of field: text, decimal, enum, reference, boolean, date and file.
     /// </summary>
     private static string Grouped(string measure) =>
         DataSource(
             "Order",
-            """[{ "name": "number", "path": "number" }, { "name": "amount", "path": "amount" }, { "name": "status", "path": "status" }, { "name": "customer", "path": "customer" }, { "name": "paid", "path": "paid" }, { "name": "since", "path": "customer.since" }]""",
+            """[{ "name": "number", "path": "number" }, { "name": "amount", "path": "amount" }, { "name": "status", "path": "status" }, { "name": "customer", "path": "customer" }, { "name": "paid", "path": "paid" }, { "name": "since", "path": "customer.since" }, { "name": "receipt", "path": "receipt" }]""",
             $$""", "aggregate": { "groupBy": ["status"], "measures": [{ "name": "orders", "function": "count" }, {{measure}}] } """);
 
     private const string IsLarge = """
