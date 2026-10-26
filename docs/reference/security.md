@@ -558,8 +558,8 @@ The `role` and `policy` resource files are described in
   the application by its exact name. A value that names no declared role is
   ignored. A user matches a policy when they hold any of its roles.
 - **Grants.** A policy holds grants. Each grant gives actions on one target:
-  `read`, `create`, `update` and `delete` on an entity, `read` on a data
-  source, or `start`, `inspect`, `cancel`, `retry`, `resolve` and `reassign` on a process. `inspect` lists a process's
+  `read`, `create`, `update`, `delete`, `export` and `import` on an entity,
+  `read` and `export` on a data source, or `start`, `inspect`, `cancel`, `retry`, `resolve` and `reassign` on a process. `inspect` lists a process's
   instances, see [process inspection](process-inspection.md#process-inspection).
   `cancel` stops a running or waiting instance, see
   [Cancel](process-inspection.md#cancel). `retry` runs a failed instance
