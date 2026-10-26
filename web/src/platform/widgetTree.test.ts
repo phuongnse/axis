@@ -11,6 +11,7 @@ function leaf(type: WidgetMetadata['type'], process: string | null = null): Widg
     tasksPath: null,
     process,
     instancesPath: null,
+    deadLettersPath: null,
     actions: [],
     rowActions: [],
     toolbarActions: [],

@@ -226,6 +226,9 @@ HTTP also call. The record API maps its outcome to the responses below.
   version. The response is `204` with no body. A record that another record
   references through a `reference` field is kept, and the response is `409`.
   So is a record that is the subject of a running or waiting process instance.
+  A delete that commits also starts the processes of the matching
+  [delete triggers](process-events.md#delete-triggers) in the same transaction,
+  as `system`. A delete that is refused starts none.
 - **Content type.** Both need `Content-Type: application/json`. The media
   type matches ignoring letter case. The only allowed parameter is `charset`
   with the value `utf-8`, in any letter case. A cross-site page can send a
@@ -447,13 +450,12 @@ otherwise the answer is the stale-version `409`. See
   filters, so a user who cannot reach the record never learns about its
   processes. It runs under the [start lock](processes.md#releases-and-running-work)
   and the record's row lock, so a start and a delete of the same record
-  cannot both succeed. A delete never answers `503`, because it pins no
-  release.
+  cannot both succeed.
 - **`409` for a schema conflict.** The table has a constraint the active model
   does not declare, such as a `NOT NULL` column left by an activation that
   failed after provisioning committed. The title is fixed, and the response
   never names a table, column or constraint.
-- **`503` for a changed release.** Create and update only. The application's
+- **`503` for a changed release.** Create, update and delete. The application's
   active release changed on each of three attempts, found under the
   [start lock](processes.md#releases-and-running-work). The server already ran
   the request again on the new release each time. Nothing was written, and the

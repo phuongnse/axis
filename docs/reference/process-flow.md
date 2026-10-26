@@ -8,8 +8,8 @@ subject. The process resource and the first four step types are in
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 Everything in this file is _(planned for M14)_, except [Loops](#loops) through
-a `task` and the calls in them, and the compile checks of the
-[sub-process step](#sub-process-step), which are built. The design follows
+a `task` and the calls in them, and the [sub-process step](#sub-process-step),
+which are built. The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
@@ -97,10 +97,10 @@ A `subProcess` step starts another process and waits until it ends:
 { "name": "fulfil", "type": "subProcess", "process": "OrderFulfilment", "subject": "order", "next": "close" }
 ```
 
-- **Compile checks are built, the run is not.** The compiler checks and builds
-  the step, and the instance detail graph shows it as an `operation` step. An
-  instance that reaches it still fails with the engine's error for a step it
-  cannot run, until the engine part is built.
+- **Built.** The compiler checks and builds the
+  step, and the engine runs it: Start, Cannot start, End, Failure, Cancel and
+  the history output below are built. The instance detail graph shows the step as an
+  `operation` step.
 - `process` names a process of the same application, ignoring letter case,
   otherwise it is `AXC0250` at `/steps/{i}/process`. A process may not reach
   itself through sub-process steps, directly or through others. Each step that
@@ -126,18 +126,31 @@ A `subProcess` step starts another process and waits until it ends:
   `system`, and sets the parent `waiting`. The child is pinned to the
   parent's release, not the active one. Its instance row holds
   `parent_instance_id` and `parent_step`. The `process.started` audit record
-  adds `"parentInstanceId"`.
-- **Cannot start.** A child that already runs for that record, or whose
-  `startCondition` is not true, fails the parent's step with a fixed error.
+  adds `"parentInstanceId"`. The parent's waiting step writes no audit record
+  of its own: the child's `process.started` record stands for it.
+- **Cannot start.** A child that already runs for that record, whose
+  `startCondition` is not true, or whose record is missing, fails the parent's
+  step with a fixed error that names the step and the child process, never a
+  value.
 - **End.** A child that completes queues a `process.resume` item for its
-  parent. The item resumes the parent at `next`, by the revision check.
-- **Failure.** A child that fails leaves the parent `waiting`. The inspector
-  shows the failed child under the parent, and an operator retries the child.
-  A cancelled child fails the parent's step.
+  parent. The item resumes the parent at `next`, by the revision check, and
+  writes the `process.stepCompleted` audit record as `system`. An item for a
+  parent that is not waiting on that child is logged and discarded.
+- **Failure.** A child that fails leaves the parent `waiting`, and an operator
+  retries the child. When the retried child completes, the `process.resume`
+  item resumes the parent at `next`. _(Planned for M14)_ The inspector shows
+  the failed child under the parent. A cancelled child fails the parent's step
+  when the parent is `waiting` on that step for this child. The error is
+  fixed, `The sub-process of the step '{step}' was cancelled.`, and the
+  history row's output is `{ "childInstanceId" }`. The audit record
+  `process.failed` is written as `system`.
 - **Cancel.** Cancelling the parent cancels its `running` and `waiting`
-  children, in the same transaction.
+  children, in the same transaction, see
+  [Cancel](process-inspection.md#cancel). The parent ends `cancelled`, not
+  `failed`.
 - History output: `{ "state": "waiting", "childInstanceId" }`, then
-  `{ "next", "childInstanceId" }`.
+  `{ "next", "childInstanceId" }`, or `{ "childInstanceId" }` with the error
+  when a cancelled child fails the step.
 
 ## Loops
 

@@ -116,7 +116,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// source. <see cref="Form"/> is set only on a form widget that names a form; <see cref="Entity"/>
 /// is then the form's entity, with every field the user may read, so a client knows the type of each
 /// field the form shows. <see cref="TasksPath"/> is set only on a task inbox, which has no entity or data source.
-/// <see cref="Process"/> and <see cref="InstancesPath"/> are set only on a process inspector, which has no entity or data source either.
+/// <see cref="Process"/>, <see cref="InstancesPath"/> and <see cref="DeadLettersPath"/> are set only on a process inspector, which has no entity or data source either.
 /// <see cref="Actions"/> is empty on every widget but a form or detail widget that declares actions.
 /// <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table that declares them.
 /// <see cref="Parameters"/> is empty on every widget but a table over a data source that binds page parameters.
@@ -128,6 +128,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <param name="TasksPath">The path of the application's task API, which lists the signed-in user's open tasks.</param>
 /// <param name="Process">The process an inspector inspects, by its declared name.</param>
 /// <param name="InstancesPath">The path of the process's instance list endpoint, so a client never builds it.</param>
+/// <param name="DeadLettersPath">The path of the process's dead letter list endpoint, so a client never builds it.</param>
 /// <param name="Actions">The <c>startProcess</c> and <c>navigate</c> actions of a form widget, in page file order.</param>
 /// <param name="RowActions">The <c>startProcess</c> and <c>navigate</c> actions of a table widget on each row, in page file order.</param>
 /// <param name="ToolbarActions">The <c>navigate</c> actions of a table widget above its rows, in page file order.</param>
@@ -146,6 +147,7 @@ public sealed record WidgetMetadata(
     string? TasksPath,
     string? Process,
     string? InstancesPath,
+    string? DeadLettersPath,
     IReadOnlyList<ActionMetadata> Actions,
     IReadOnlyList<ActionMetadata> RowActions,
     IReadOnlyList<ActionMetadata> ToolbarActions,
