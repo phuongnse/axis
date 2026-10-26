@@ -52,7 +52,7 @@ Everything in this file is _(planned for M14)_. The design follows
 - **Diagnostics.** Marks work as on the graph: a marked node has an
   error-coloured border, "has diagnostics" in its text label, and
   `data-marked`.
-- **Carried over from M13.** Pages and forms open on their Design tabs, a form
-  section moves to another step by a drop on the step switch, and the form
-  designer removes a section or a step. See [studio.md](studio.md) and
-  [form-designer.md](form-designer.md).
+- **Carried over from M13.** Pages and forms open on their Design tabs _(built)_.
+  A form section moves to another step by a drop on the step switch, and the
+  form designer removes a section or a step _(planned for M14)_. See
+  [studio.md](studio.md) and [form-designer.md](form-designer.md).

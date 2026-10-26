@@ -53,6 +53,7 @@ internal static partial class AdminCommands
                tenant suspend <id>
                tenant resume <id>
                tenant rotate-passwords <id>
+               tenant oidc set <id> [--authority <url>] [--client-id <id>] [--client-secret] [--claim <name>=<claim>]... [--endpoint-audience <value>] [--service-audience <value>] [--profile standard|fapi2]
                tenant list
                tenant binding list <id>
                tenant binding set <id> <name> --url <value>
@@ -122,6 +123,7 @@ internal static partial class AdminCommands
         new("tenant suspend", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant rotate-passwords", AuditMark.OnePerTenant, run => RotatePasswordsAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant oidc set", AuditMark.OnePerTenant, run => OidcSetAsync(run.Command.Name, run.Args, run.Configuration, run.Input, run.Output, run.Error, run.CancellationToken)),
         new("tenant list", AuditMark.None, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant binding list", AuditMark.None, TenantSettings.BindingListAsync),
         new("tenant binding set", AuditMark.OnePerTenant, TenantSettings.BindingSetAsync),
@@ -410,6 +412,162 @@ internal static partial class AdminCommands
             output.WriteLine($"{id} {step} failed: {TenantDatabaseSteps.Safe(exception)}");
             return false;
         }
+    }
+
+    /// <summary>
+    /// <c>tenant oidc set</c>. This only parses, reads the secret and prints. The rules are in <see cref="TenantSignInSettings"/>,
+    /// which refuses before it writes the audit record. The secret comes from <see cref="ClientSecretSetting"/> or the first line
+    /// of standard input, never from an argument, and no message echoes an argument.
+    /// </summary>
+    private static async Task<int> OidcSetAsync(
+        string command,
+        string[] args,
+        IConfiguration configuration,
+        TextReader input,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var request = ParseOidcSet(args);
+        if (request is null)
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        TenancySource source;
+        try
+        {
+            source = TenancySettings.Source(configuration);
+        }
+        catch (InvalidOperationException)
+        {
+            error.WriteLine($"The setting {TenancySettings.SourceSetting} must be 'configuration' or 'directory'.");
+            return 2;
+        }
+
+        if (source != TenancySource.Directory)
+        {
+            error.WriteLine("This command needs Tenancy:Source=directory.");
+            return 2;
+        }
+
+        var settings = ReadPlatformSettings(configuration, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        var id = request.Id;
+        try
+        {
+            var tablesProblem = await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+            if (tablesProblem is not null)
+            {
+                error.WriteLine(tablesProblem);
+                return 2;
+            }
+
+            var change = request.Change;
+            if (request.WithClientSecret)
+            {
+                var variable = configuration[ClientSecretSetting];
+                var secret = string.IsNullOrEmpty(variable) ? (await input.ReadLineAsync(cancellationToken))?.TrimEnd('\r') : variable;
+                change = change with { ClientSecret = secret ?? "" };
+            }
+
+            var result = await TenantSignInSettings.SetAsync(settings.Cipher, settings.PlatformConnectionString, command, id, change, cancellationToken);
+            switch (result.Outcome)
+            {
+                case TenantSignInOutcome.Refused:
+                    error.WriteLine(result.Refusal);
+                    return 2;
+                case TenantSignInOutcome.AuditFailed:
+                    // A save failure wraps the database error, whose message is the one that helps the operator.
+                    var cause = result.AuditError is DbUpdateException { InnerException: { } inner } ? inner : result.AuditError!;
+                    output.WriteLine($"{id} audit failed: {TenantDatabaseSteps.Safe(cause)}");
+                    return 1;
+                default:
+                    output.WriteLine($"{id} oidc ok");
+                    return 0;
+            }
+        }
+        catch (Exception exception) when (exception is NpgsqlException or DbUpdateException or InvalidOperationException or OperationCanceledException)
+        {
+            var cause = exception is DbUpdateException { InnerException: { } inner } ? inner : exception;
+            output.WriteLine($"{id} oidc failed: {TenantDatabaseSteps.Safe(cause)}");
+            return 1;
+        }
+    }
+
+    private static OidcSetRequest? ParseOidcSet(string[] args)
+    {
+        if (args.Length < 4 || args[3].StartsWith("--", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var claims = new List<KeyValuePair<string, string>>();
+        var withSecret = false;
+        string? authority = null;
+        string? clientId = null;
+        string? endpointAudience = null;
+        string? serviceAudience = null;
+        string? profile = null;
+        for (var i = 4; i < args.Length; i++)
+        {
+            if (args[i] == "--client-secret")
+            {
+                if (withSecret)
+                {
+                    return null;
+                }
+
+                withSecret = true;
+                continue;
+            }
+
+            // A value may be empty, which removes an audience or a claim name, but never starts with a second option.
+            if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var value = args[++i];
+            switch (args[i - 1])
+            {
+                case "--authority" when authority is null:
+                    authority = value;
+                    break;
+                case "--client-id" when clientId is null:
+                    clientId = value;
+                    break;
+                case "--endpoint-audience" when endpointAudience is null:
+                    endpointAudience = value;
+                    break;
+                case "--service-audience" when serviceAudience is null:
+                    serviceAudience = value;
+                    break;
+                case "--profile" when profile is null:
+                    profile = value;
+                    break;
+                case "--claim":
+                    // The usage text never echoes an argument, so a claim name is never printed.
+                    var separator = value.IndexOf('=', StringComparison.Ordinal);
+                    if (separator <= 0)
+                    {
+                        return null;
+                    }
+
+                    claims.Add(new(value[..separator], value[(separator + 1)..]));
+                    break;
+                default:
+                    return null;
+            }
+        }
+
+        return new OidcSetRequest(args[3], withSecret, new TenantSignInChange(authority, clientId, null, claims, endpointAudience, serviceAudience, profile));
     }
 
     private static async Task<int> BackupAsync(
@@ -1482,6 +1640,9 @@ internal sealed record TenantCreateRequest(
     string? OidcClientId,
     string? PreviewOf,
     IReadOnlyList<KeyValuePair<string, string>> Bindings);
+
+/// <summary><c>tenant oidc set</c>. <paramref name="WithClientSecret"/> says that the secret is to be read, and <paramref name="Change"/> does not hold it yet.</summary>
+internal sealed record OidcSetRequest(string Id, bool WithClientSecret, TenantSignInChange Change);
 
 internal sealed record MigrateRequest(string? Tenant, int Parallel);
 

@@ -1,5 +1,5 @@
 import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
-import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   applyAnswers,
   fieldQuestions,
@@ -128,6 +128,13 @@ function isJsonOnlyField(field: HTMLElement): boolean {
   return field.querySelector(':scope > [data-testid="studio-json-only"]') !== null
 }
 
+function Drawn({ onDrawn, children }: { onDrawn: (drawn: boolean) => void; children: ReactNode }) {
+  useEffect(() => {
+    onDrawn(true)
+  }, [onDrawn])
+  return children
+}
+
 /**
  * The editor of one resource. A form built from the kind's JSON Schema and a JSON view edit one draft. Save sends
  * only the difference from what was loaded, as a JSON Patch with the loaded version. A `409` keeps the draft and
@@ -148,7 +155,7 @@ function isJsonOnlyField(field: HTMLElement): boolean {
  * A form's Design tab shows a Used on list above its canvas, with the pages and process steps that use the form, and an entry calls `onOpen`.
  * Beside the canvas it has a palette of the entity's fields that no section lists and an outline of the draft's steps, sections and fields.
  * Its code loads when the tab first opens.
- * Form stays the tab that opens first. A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
+ * A page or a form opens on its Design tab, and every other kind opens on Form. A path switches to the Form tab, or to JSON when the form cannot show it. A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
  * calls `onOpenPath`. A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
  * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
  * of a field of its entity and an expression. When the server does not answer, the draft stays, and the resource loads
@@ -198,7 +205,17 @@ export function StudioEditor({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
-  const [tab, setTab] = useState<'design' | 'form' | 'json'>('form')
+  const [tab, setTab] = useState<'design' | 'form' | 'json'>(
+    item.kind === 'page' || item.kind === 'form' ? 'design' : 'form',
+  )
+  const [formDrawn, setFormDrawn] = useState(false)
+  const [seenPath, setSeenPath] = useState<string | null>(null)
+  if (path !== seenPath) {
+    setSeenPath(path)
+    if (path !== null) {
+      setTab('form')
+    }
+  }
   const [widgetPath, setWidgetPath] = useState('/widgets/0')
   const [formPath, setFormPath] = useState<string | null>(null)
   const [seedEntity, setSeedEntity] = useState<SeedEntity>()
@@ -488,6 +505,10 @@ export function StudioEditor({
     if (!isLoaded || !formReady || !rootRef.current || handledPath.current === path) {
       return
     }
+    // Ant Design draws a tab's content after the tab becomes active, so the field is looked up once Form has drawn.
+    if (tab !== 'form' || !formDrawn) {
+      return
+    }
     handledPath.current = path
     const field = fieldElement(rootRef.current, path)
     if (field === undefined || isJsonOnlyField(field)) {
@@ -495,8 +516,7 @@ export function StudioEditor({
       return
     }
     pendingField.current = field
-    setTab('form')
-  }, [isLoaded, formReady, path])
+  }, [isLoaded, formReady, path, tab, formDrawn])
 
   useEffect(() => {
     if (tab === 'form' && pendingField.current) {
@@ -796,64 +816,68 @@ export function StudioEditor({
               {
                 key: 'form',
                 label: t('shell.studio.form'),
-                children: seedSchema ? (
-                  <Flex vertical gap="middle">
-                    <SchemaForm schema={seedSchema} value={draft} onChange={change} />
-                    <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={update} />
-                  </Flex>
-                ) : item.kind === 'scenario' ? (
-                  <ScenarioEditor value={draft} onChange={update} />
-                ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
-                  <TextTable
-                    columns={resources
-                      .filter((resource) => resource.kind === 'text')
-                      .map((resource) =>
-                        resource.id === item.id
-                          ? {
-                              id: item.id,
-                              locale: String(loaded.content.locale),
-                              texts: draft.texts as Record<string, unknown>,
-                              editable: true,
-                            }
-                          : otherTexts.find((column) => column.id === resource.id),
-                      )
-                      .filter((column): column is TextColumn => column !== undefined)}
-                    onChange={update}
-                    onAdd={addTextKey}
-                  />
-                ) : item.kind === 'entity' && schema ? (
-                  <EntityDesigner
-                    value={draft}
-                    onChange={change}
-                    origins={origins}
-                    warnings={fieldWarnings(loaded.content, draft, origins)}
-                    onOriginsChange={(next, removed) => {
-                      setOrigins(next)
-                      if (removed) {
-                        touch(removed)
-                      }
-                    }}
-                  />
-                ) : item.kind === 'connector' && schema ? (
-                  <ConnectorEditor value={draft} onChange={change} />
-                ) : processSchema ? (
-                  <ProcessEditor schema={processSchema} value={draft} onChange={change} />
-                ) : item.kind === 'page' && schema ? (
-                  <PageEditor value={draft} onChange={change} selected={widgetPath} onSelect={setWidgetPath} />
-                ) : endpointSchema ? (
-                  <Flex vertical gap="middle">
-                    <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
-                    <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
-                  </Flex>
-                ) : formSchema ? (
-                  <Flex vertical gap="middle">
-                    <SchemaForm schema={formSchema} value={draft} onChange={change} />
-                    <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
-                  </Flex>
-                ) : schema ? (
-                  <SchemaForm schema={schema} value={draft} onChange={change} />
-                ) : (
-                  <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
+                children: (
+                  <Drawn onDrawn={setFormDrawn}>
+                    {seedSchema ? (
+                      <Flex vertical gap="middle">
+                        <SchemaForm schema={seedSchema} value={draft} onChange={change} />
+                        <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={update} />
+                      </Flex>
+                    ) : item.kind === 'scenario' ? (
+                      <ScenarioEditor value={draft} onChange={update} />
+                    ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
+                      <TextTable
+                        columns={resources
+                          .filter((resource) => resource.kind === 'text')
+                          .map((resource) =>
+                            resource.id === item.id
+                              ? {
+                                  id: item.id,
+                                  locale: String(loaded.content.locale),
+                                  texts: draft.texts as Record<string, unknown>,
+                                  editable: true,
+                                }
+                              : otherTexts.find((column) => column.id === resource.id),
+                          )
+                          .filter((column): column is TextColumn => column !== undefined)}
+                        onChange={update}
+                        onAdd={addTextKey}
+                      />
+                    ) : item.kind === 'entity' && schema ? (
+                      <EntityDesigner
+                        value={draft}
+                        onChange={change}
+                        origins={origins}
+                        warnings={fieldWarnings(loaded.content, draft, origins)}
+                        onOriginsChange={(next, removed) => {
+                          setOrigins(next)
+                          if (removed) {
+                            touch(removed)
+                          }
+                        }}
+                      />
+                    ) : item.kind === 'connector' && schema ? (
+                      <ConnectorEditor value={draft} onChange={change} />
+                    ) : processSchema ? (
+                      <ProcessEditor schema={processSchema} value={draft} onChange={change} />
+                    ) : item.kind === 'page' && schema ? (
+                      <PageEditor value={draft} onChange={change} selected={widgetPath} onSelect={setWidgetPath} />
+                    ) : endpointSchema ? (
+                      <Flex vertical gap="middle">
+                        <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
+                        <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
+                      </Flex>
+                    ) : formSchema ? (
+                      <Flex vertical gap="middle">
+                        <SchemaForm schema={formSchema} value={draft} onChange={change} />
+                        <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
+                      </Flex>
+                    ) : schema ? (
+                      <SchemaForm schema={schema} value={draft} onChange={change} />
+                    ) : (
+                      <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
+                    )}
+                  </Drawn>
                 ),
               },
               {
