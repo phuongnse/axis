@@ -1200,13 +1200,15 @@ describe('FormWidget', () => {
       it('ignores the defaults of a saved record', async () => {
         stateAnswers = [withDefaults('{"priority":3,"status":"open"}')]
         stubFetch({ status: 200, body: sectionsJson(1) })
-        renderWithTimers(noteId)
+        const user = renderWithTimers(noteId)
         await waitFor(() => expect(stateRequests()).toHaveLength(1))
 
         await waitFor(() => expect(screen.getByLabelText('Priority')).toHaveValue('7'))
         await act(() => vi.advanceTimersByTimeAsync(50))
         expect(screen.getByLabelText('Priority')).toHaveValue('7')
-        expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue('')
+        await user.click(screen.getByRole('combobox', { name: 'Status' }))
+        const listbox = await screen.findByRole('listbox')
+        expect(within(listbox).getByRole('option', { name: 'open' })).toHaveAttribute('aria-selected', 'false')
       })
     })
 
