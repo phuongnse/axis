@@ -1,0 +1,12 @@
+{
+  "id": "bd01c468-b5d1-4369-b714-cd86edc3d508",
+  "kind": "entity",
+  "name": "Asset",
+  "formatVersion": 1,
+  "label": { "textKey": "asset.label" },
+  "displayField": "name",
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 100, "label": { "textKey": "asset.name" } },
+    { "name": "software", "type": "references", "target": "Software", "label": { "textKey": "asset.software" } }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "bf75b3cd-6ff9-4fc0-a589-e0eafbe9b58a",
+  "kind": "entity",
+  "name": "Software",
+  "formatVersion": 1,
+  "label": { "textKey": "software.label" },
+  "displayField": "name",
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 100, "label": { "textKey": "software.name" } }
+  ]
+}

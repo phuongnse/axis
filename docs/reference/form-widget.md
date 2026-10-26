@@ -80,6 +80,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
     | `enum` | a choice of the declared values, as written in the entity file, or their labels with `valueLabels`. A `file` field gets the [file input](file-fields.md#in-the-spa) |
     | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
+    | `references` | a list of the chosen records' labels in their order, each with a remove button, and an add button that opens the lookup, described under **Set of references** |
     | `child-collection` | a table of its rows, described under **Child collections** |
     | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
 
@@ -102,6 +103,32 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     `labels`. A picked record's display field value replaces it at once. A
     changed reference is sent as the record id, and a cleared one as `null`.
     Picking the record that was already set leaves the field unchanged.
+  - **Set of references.** A `references` field shows the labels of its
+    chosen records in their order, as a list named after the field's label.
+    A label that is missing or null shows the record id instead, because the
+    record API returns no label when the user may not read the target's display
+    field.
+    - Each item has a remove button, named `Remove` and the item's label. The
+      add button, named `Add` and the field's label, opens the same lookup as
+      a `reference`, with its paging and search. Picking a row appends that
+      record and closes the dialog. Picking a record that is in the set
+      already leaves the set unchanged. A set is reordered by removing records
+      and adding them again.
+    - A polite live region announces `Added <label>` or `Removed <label>`, so
+      a screen reader hears each change. Every control is a button, so the
+      list is used with the keyboard, and removing a record moves focus to the
+      add button.
+    - When the set changed, the form sends the whole array of ids in the shown
+      order, as [record-api.md](record-api.md#record-shape) describes. A set is
+      compared with the one the form started from, id by id and in order, so
+      an unchanged set is left out of the body. A new record starts with an
+      empty set, and an empty set that was never changed stays out of the
+      create body.
+    - A required set that is empty gets the server's message on the field.
+      The form does not check the limit of 1,000 ids, and the server's message
+      shows on the field.
+    - A set that the form makes read-only shows its labels joined by a comma
+      in a read-only text input, with no add or remove button.
   - **Child collections.** A child collection field shows its rows as a
     table under the field's label.
     - There is one column per child field, headed by its label or its name.
@@ -127,7 +154,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **Changed fields.** The form sends only the fields whose value differs
     from the value it started from. It never sends a computed, sequence, creator
     or read-only field, nor a field its form does not show. A new record starts with every field
-    `null` and every child collection empty, so an untouched field stays out of a create and the server
+    `null` and every child collection and set of references empty, so an untouched field stays out of a create and the server
     decides what is required. An edit also sends the `version` it read. An
     emptied text or number input is sent as `null`.
   - **Number text.** The body is written by hand, so an integer, decimal or money

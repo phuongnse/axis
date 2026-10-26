@@ -1,4 +1,4 @@
-import type { RecordValue, RowLabels } from './records'
+import type { FieldLabel, FieldValue, RecordValue } from './records'
 import { isJsonNumber } from './recordBody'
 import type { FieldMetadata } from './site'
 
@@ -60,6 +60,16 @@ function moneyText(field: Formatted, text: string, locale: string, row?: Record<
 }
 
 /**
+ * The labels of a references field's ids, in order. An id shows as itself where its label is missing
+ * or null, because the user may not read the target's display field.
+ */
+export function referencesLabels(value: FieldValue | undefined, label: FieldLabel | undefined): string[] {
+  const ids = Array.isArray(value) ? (value as string[]) : []
+  const labels: unknown[] = Array.isArray(label) ? label : []
+  return ids.map((id, index) => (typeof labels[index] === 'string' ? labels[index] : id))
+}
+
+/**
  * Formats a record value for display. Formatting never changes the value: numbers show exactly as
  * the API wrote them, a money amount adds its currency, and a reference shows the label of the record
  * it points to. `row` is the values of the record or row, where a money amount reads its currency.
@@ -67,7 +77,7 @@ function moneyText(field: Formatted, text: string, locale: string, row?: Record<
 export function formatValue(
   field: Formatted,
   value: RecordValue,
-  labels: Record<string, string | RowLabels[]>,
+  labels: Record<string, FieldLabel>,
   options: FormatOptions,
   row?: Record<string, unknown>,
 ): string {

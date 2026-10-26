@@ -62,10 +62,10 @@ function field(name: string, type: FieldType, labelKey: string): FieldMetadata {
   }
 }
 
-/** A field type the design system previews: all but money. */
-export type PreviewFieldType = Exclude<FieldType, 'money'>
+/** A field type the design system previews: all but money and references. */
+export type PreviewFieldType = Exclude<FieldType, 'money' | 'references'>
 
-/** One field of each type but money, which the previews do not draw. The names are the labels' keys without their prefix. */
+/** One field of each type but money and references, which the previews do not draw. The names are the labels' keys without their prefix. */
 export const fields: Record<PreviewFieldType, FieldMetadata> = {
   text: { ...field('title', 'text', 'request.title'), maxLength: 200 },
   integer: field('quantity', 'integer', 'request.quantity'),

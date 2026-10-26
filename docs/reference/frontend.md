@@ -273,14 +273,16 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     ```
   - `entity` is the widget's entity: its name, its label key, its display
     field, the path of its record API in `recordsPath`, and its fields in
-    declaration order. A `child-collection` field is listed too. Tables show
-    no column for it, and forms show its rows.
+    declaration order. A `child-collection` field and a `references` field are
+    listed too. Tables show no column for either. Forms show a child
+    collection's rows and a `references` field's records as a list, and a
+    detail shows a `references` field's labels.
   - Each field has its name, its `type` as written in entity files (such as
     `date-time`), its label key, `required`, `unique`, `computed`, `sequence` and `creator`,
     `maxLength` and `minLength` for text, `min` and `max` for integer, decimal, date and
     date-time, `precision` and `scale` for decimal and money, `currency` (the fixed code) or `currencyField` (the field
     holding the code) for money, `values` for enum, `valueLabelKeys` for an enum with `valueLabels`, `target` for
-    reference, and `fields` for child collection. `min` and `max` are strings in the
+    reference and references, and `fields` for child collection. `min` and `max` are strings in the
     entity file's literal form, such as `"0.5"` or `"2026-01-01"`. A property the field's
     type does not have, or a label the file leaves out, is `null`; it is
     never left out. `valueLabelKeys` maps each enum value to the text key of
@@ -297,7 +299,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     sends it.
   - `target` names the referenced entity, its display field and the path of
     its record API, so the SPA never builds a record URL itself. It is only
-    for a reference. A child collection's `target` is `null`, because a child
+    for a reference and a references field. A child collection's `target` is `null`, because a child
     entity has no record API of its own.
   - `fields` lists a child collection's child entity fields in declaration
     order, each in the same shape as an entity field. The form builds the
@@ -452,7 +454,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   shared Ant Design table.
   - **Columns.** There is one column per field, in declaration order. The
     header is the field's label, or the field name when it has no label. A
-    child collection has no column.
+    child collection and a `references` field have no column.
   - **URL state.** Paging and sorting live in the URL as the record API's own
     `page`, `pageSize` and `sort` (`-` and the field name for descending), so
     reload, sharing and the back button keep them. The widget writes them
