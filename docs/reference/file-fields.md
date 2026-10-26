@@ -9,7 +9,7 @@ marked _(planned for M15)_ are not built yet, and Dn refers to
 
 Upload up to the `pending` state, the storage of a file's details and bytes,
 attach by a record write, the file value in a read, replace and remove, and
-audit, download and the sweep are _(built)_. The SPA is _(planned for M15)_. Inbound
+audit, download, the sweep and the SPA are _(built)_. Inbound
 endpoints, task completion and process steps attach nothing for now, so a file
 id they send that the record does not already hold fails.
 
@@ -153,10 +153,37 @@ service account may download, as they may read records.
 
 ## In the SPA
 
-This is _(planned for M15)_.
+This is _(built)_.
 
-- A form shows a file input: the current file's name as a download link, an
-  upload button and, when the field is not required, a remove button. The
-  upload starts when the user picks a file, and the save sends the id.
-- A table cell and a detail show the file name as a download link.
+- **Metadata.** A file field in the page metadata carries `maxSize`, `accept`,
+  `uploadPath` and `downloadPath`, see the
+  [frontend reference](frontend.md). The SPA never
+  builds a file URL itself. `uploadPath` is `null` for a field of a module's
+  entity, and the input then shows no Upload button.
+- **Form.** A form shows a file input: the current file's name as a download
+  link, an Upload button and, when the field is not required, a Remove button.
+  The upload starts when the user picks a file. The save sends the file's id, or
+  `null` after a remove. A file that was not changed is not sent. A file field
+  of a child row works the same and uploads to its own route.
+- **Refused upload.** A refused upload shows its message under the input. A
+  `413` shows that the file is too large, a `415` that its type is not
+  accepted, and any other failure that the upload failed. The texts are
+  platform texts chosen by the status code, not the server's problem title. A
+  file larger than `maxSize` is refused in the browser with the message of a
+  `413`, and is not uploaded. `accept` only filters the file picker, and the
+  server decides the type.
+- **Table, detail and read-only child rows.** They show the file's name as a
+  download link. A file column cannot be sorted.
+- **Keyboard and screen readers.** The Upload and Remove buttons are reached
+  and used with the keyboard. The Upload button is named like `Upload Receipt`
+  and the Remove button like `Remove Receipt`. A polite live region announces
+  each uploaded or removed file, and an upload error has `role="alert"`. After
+  a remove, focus moves to the Upload button.
+- **Limits.**
+  - A data source row holds a file as its bare id, so a data source column
+    shows the id and no link.
+  - A task page uses the same form, so it shows the Upload button too. Task
+    completion attaches no file for now, so saving a newly uploaded file there
+    is refused with the server's message on the field.
+  - A save while an upload runs sends the value from before the upload.
 - Studio's entity designer edits `maxSize` and `accept` _(built)_.

@@ -202,7 +202,8 @@ public static class ApplicationSites
     }
 
     // Without a user to shape it, access lists every entity action and every field. A kpi reads a total
-    // row of its data source, not records, and a chart reads its groups, so neither has any.
+    // row of its data source, not records, and a chart reads its groups, so neither has any. A table
+    // over an entity lists import last.
     private static WidgetAccess? FullAccess(ApplicationModel application, WidgetModel widget)
     {
         if (widget.Type is WidgetType.Kpi or WidgetType.Chart || WidgetEntity(application, widget) is not { } entity)
@@ -211,7 +212,10 @@ public static class ApplicationSites
         }
 
         IReadOnlyList<string> fields = [.. entity.Fields.Select(field => field.Name)];
-        return new WidgetAccess(["read", "create", "update", "delete"], fields, fields);
+        IReadOnlyList<string> actions = widget.Type == WidgetType.Table && widget.Entity is not null
+            ? ["read", "create", "update", "delete", "import"]
+            : ["read", "create", "update", "delete"];
+        return new WidgetAccess(actions, fields, fields);
     }
 
     /// <summary>
@@ -292,7 +296,7 @@ public static class ApplicationSites
             entity.Label?.TextKey,
             entity.DisplayField,
             RecordsPath(application, entity.Name),
-            [.. entity.Fields.Select(field => Field(application, field))]);
+            [.. entity.Fields.Select(field => Field(application, field, UploadBase(application, entity.Name)))]);
     }
 
     /// <summary>
@@ -394,7 +398,11 @@ public static class ApplicationSites
         return new ReferenceTarget(entity.Name, entity.DisplayField, RecordsPath(application, entity.Name));
     }
 
-    private static FieldMetadata Field(ApplicationModel application, FieldModel field) =>
+    // An entity of a module is named {module}/{entity} and has no upload route yet.
+    private static string? UploadBase(ApplicationModel application, string entityName) =>
+        entityName.Contains('/', StringComparison.Ordinal) ? null : $"/api/apps/{application.Manifest.Name}/entities/{entityName}/fields";
+
+    private static FieldMetadata Field(ApplicationModel application, FieldModel field, string? uploadBase) =>
         new(
             field.Name,
             FieldTypes.Name(field.Type),
@@ -414,10 +422,14 @@ public static class ApplicationSites
             field.MinLength,
             field.Values,
             LabelKeys(field.Values, field.ValueLabels),
+            field.Type == FieldType.File ? field.MaxSize : null,
+            field.Type == FieldType.File ? field.Accept : null,
+            field.Type == FieldType.File && uploadBase is not null ? $"{uploadBase}/{field.Name}/files" : null,
+            field.Type == FieldType.File ? $"/api/apps/{application.Manifest.Name}/files" : null,
             field.Type is FieldType.Reference or FieldType.References
                 ? new ReferenceTarget(field.Target!.Name, field.TargetDisplayField, RecordsPath(application, field.Target.Name))
                 : null,
-            field.Type == FieldType.ChildCollection ? ChildFields(application, field) : null);
+            field.Type == FieldType.ChildCollection ? ChildFields(application, field, uploadBase) : null);
 
     // Keys follow the enum's values, so the JSON order is stable and matches the choice order.
     private static Dictionary<string, string>? LabelKeys(IReadOnlyList<string>? values, IReadOnlyDictionary<string, TextReference>? labels) =>
@@ -426,11 +438,12 @@ public static class ApplicationSites
             : values.Where(labels.ContainsKey).ToDictionary(value => value, value => labels[value].TextKey, StringComparer.Ordinal);
 
     // A child entity has no child collection fields, so this goes one level deep.
-    private static FieldMetadata[] ChildFields(ApplicationModel application, FieldModel collection)
+    private static FieldMetadata[] ChildFields(ApplicationModel application, FieldModel collection, string? uploadBase)
     {
         var child = application.FindEntity(collection.Target!.Id)
             ?? throw new InvalidOperationException("The application has no entity for the child collection.");
-        return [.. child.Fields.Select(field => Field(application, field))];
+        var childBase = uploadBase is null ? null : $"{uploadBase}/{collection.Name}";
+        return [.. child.Fields.Select(field => Field(application, field, childBase))];
     }
 
     private static string RecordsPath(ApplicationModel application, string entityName) =>

@@ -51,6 +51,7 @@ export type FieldType =
   | 'reference'
   | 'references'
   | 'child-collection'
+  | 'file'
 
 /** The entity a reference or references field points to, its display field and the path of its record API. */
 export interface ReferenceTarget {
@@ -91,6 +92,14 @@ export interface FieldMetadata {
   values: string[] | null
   /** The text key of each enum value's label, by value, or missing or `null` when the enum has no labels. */
   valueLabelKeys?: Record<string, string> | null
+  /** The largest accepted file of a file field in bytes, or missing or `null` when it has no limit of its own. */
+  maxSize?: number | null
+  /** The media types a file field accepts, or missing or `null` when it accepts any. */
+  accept?: string[] | null
+  /** The path of a file field's upload route, or missing or `null` when it has none, as for a field of a module's entity. */
+  uploadPath?: string | null
+  /** The path to which a client appends a file's id to download it, or missing or `null` on a field that is not a file. */
+  downloadPath?: string | null
   target: ReferenceTarget | null
   fields: FieldMetadata[] | null
 }
@@ -239,12 +248,13 @@ export type RowAction = WidgetAction | DeleteAction
 /**
  * What the signed-in user may do with a table or form widget's entity, or with the root entity of
  * its data source. `actions` lists the granted entity actions in the order `read`, `create`,
- * `update`, `delete`. `createFields` and `updateFields` list the fields a create and an update may
- * write, in declaration order, and are `[]` when the action is not granted. This only shapes the UI:
- * the server checks every request.
+ * `update`, `delete`, then `import` on a table over an entity, for a user with `import` and `create`.
+ * `createFields` and `updateFields` list the fields a create and an update may write, in
+ * declaration order, and are `[]` when the action is not granted. This only shapes the UI: the
+ * server checks every request.
  */
 export interface WidgetAccess {
-  actions: ('read' | 'create' | 'update' | 'delete')[]
+  actions: ('read' | 'create' | 'update' | 'delete' | 'export' | 'import')[]
   createFields: string[]
   updateFields: string[]
 }

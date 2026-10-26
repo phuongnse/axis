@@ -4,7 +4,20 @@ import { apiFetch } from './api'
  * A value of a record as the SPA holds it. Integers and decimals keep their JSON source text, so
  * they are strings.
  */
-export type RecordValue = string | boolean | null
+export type RecordValue = string | boolean | FileValue | null
+
+/** The stored file of a file field. `size` is the source text of the number, as every number of a record is. */
+export interface FileValue {
+  id: string
+  name: string
+  mediaType: string
+  size: string
+}
+
+/** Whether a record value is a file field's stored file. */
+export function isFileValue(value: unknown): value is FileValue {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && 'id' in value && 'name' in value
+}
 
 /** One row of a child collection: its child fields' values. */
 export type RecordRow = Record<string, RecordValue>

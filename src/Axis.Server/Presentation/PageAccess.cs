@@ -92,7 +92,7 @@ internal static class PageAccess
             Actions = ShapeActions(application, roles, entity, described.Actions, widget.Actions),
             RowActions = ShapeActions(application, roles, entity, described.RowActions, widget.RowActions),
             ToolbarActions = ShapeActions(application, roles, entity, described.ToolbarActions, widget.ToolbarActions),
-            Access = widget.Type is WidgetType.Kpi or WidgetType.Chart || entity is null ? null : Access(application, roles, entity),
+            Access = widget.Type is WidgetType.Kpi or WidgetType.Chart || entity is null ? null : Access(application, roles, widget, entity),
             Kpi = described.Kpi is { Navigate: { } navigate } kpi && !Allows(application, roles, null, navigate) ? kpi with { Navigate = null } : described.Kpi,
         };
     }
@@ -179,11 +179,14 @@ internal static class PageAccess
             || PolicyEvaluator.Access(application, roles, entity, PolicyAction.Read).Granted;
     }
 
-    private static WidgetAccess Access(ApplicationModel application, IReadOnlyList<string> roles, EntityModel entity) =>
+    // A table over an entity ends its actions with import, for roles that may import and create. A
+    // form, a detail and a table over a data source have no import.
+    private static WidgetAccess Access(ApplicationModel application, IReadOnlyList<string> roles, WidgetModel widget, EntityModel entity) =>
         new(
             [.. _entityActions
                 .Where(entry => PolicyEvaluator.Access(application, roles, entity, entry.Action).Granted)
-                .Select(entry => entry.Name)],
+                .Select(entry => entry.Name)
+                .Concat(widget.Type == WidgetType.Table && widget.Entity is not null && PolicyEvaluator.AllowsImport(application, roles, entity) ? ["import"] : [])],
             Writable(application, roles, entity, PolicyAction.Create),
             Writable(application, roles, entity, PolicyAction.Update));
 

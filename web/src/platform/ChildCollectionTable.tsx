@@ -2,8 +2,16 @@ import { Button, ConfigProvider, Flex, Form, Input, Space, Table, type TableColu
 import { useMemo, useRef, useState } from 'react'
 import { compactFormTheme } from './antTheme'
 import { FieldInput } from './FieldInput'
+import { FileLink } from './FileInput'
 import { formatValue, moneyCurrency } from './formatValue'
-import type { RecordItem, RecordRow, RecordValue, RowLabels } from './records'
+import {
+  isFileValue,
+  type FileValue,
+  type RecordItem,
+  type RecordRow,
+  type RecordValue,
+  type RowLabels,
+} from './records'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
@@ -110,7 +118,11 @@ export function ChildCollectionTable({
                 )
               }
             >
-              {readOnly || child.computed ? (
+              {(readOnly || child.computed) && child.type === 'file' ? (
+                isFileValue(row[child.name]) ? (
+                  <FileLink field={child} value={row[child.name] as FileValue} />
+                ) : null
+              ) : readOnly || child.computed ? (
                 <Input
                   readOnly
                   aria-label={`${label} ${index + 1}`}

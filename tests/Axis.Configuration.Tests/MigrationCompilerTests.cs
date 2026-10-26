@@ -124,6 +124,21 @@ public sealed class MigrationCompilerTests
         Assert.Contains("Function 'upper' is not translated to SQL", diagnostic.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("fill")]
+    [InlineData("convert")]
+    public void An_aggregate_in_an_untyped_migration_value_is_reported_at_its_value(string type)
+    {
+        using var folder = Folder().With("migrations/a.json", Migration("CountLines", FirstId, "Note", $$"""
+            [{ "type": "{{type}}", "field": "gone", "value": "count(lines) > 0" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics, d => d.Code == "AXC0053");
+        Assert.Equal("/changes/0/value", diagnostic.Path);
+    }
+
     [Fact]
     public void A_convert_that_reads_its_own_field_is_still_checked_against_the_subset()
     {

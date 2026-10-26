@@ -26,7 +26,7 @@ async function addSoftware(page: Page, name: string, run: string) {
   await expect(dialog).toBeHidden()
 }
 
-// Leaving the form before the save answers aborts the request, so each save waits for its response.
+/** Clicks Save and waits until the server has answered the update, so the next page loads the saved record. */
 async function saveAsset(page: Page, id: string) {
   const saved = page.waitForResponse(
     (response) => response.url().includes(`/entities/Asset/records/${id}`) && response.request().method() === 'PATCH',

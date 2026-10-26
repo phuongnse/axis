@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Tests;
+using Axis.Expressions.Diagnostics;
 using Axis.Server.Tests;
 using Json.Pointer;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -102,6 +103,27 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
 
         Assert.Equal("enum", answer.RootElement.GetProperty("type").GetString());
         Assert.Equal(0, answer.RootElement.GetProperty("diagnostics").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_default_has_no_record_in_scope_so_a_field_name_answers_the_unknown_name_code_and_a_literal_answers_its_type()
+    {
+        const string File = "entities/purchase-request.json";
+        // The title field is text and has no expression, sequence or creator, and it has no default in the file.
+        const string Path = "/fields/1/default";
+        var id = await _studio.IdOfAsync(File);
+        var before = Hash(File);
+
+        using var name = await _studio.CheckAsync(id, Path, "requester");
+        Assert.Equal(JsonValueKind.Null, name.RootElement.GetProperty("type").ValueKind);
+        var unknown = Assert.Single(name.RootElement.GetProperty("diagnostics").EnumerateArray());
+        Assert.Equal(ExpressionDiagnosticCodes.UnknownName, unknown.GetProperty("code").GetString());
+
+        using var literal = await _studio.CheckAsync(id, Path, "'untitled'");
+        Assert.Equal("text", literal.RootElement.GetProperty("type").GetString());
+        Assert.Equal(0, literal.RootElement.GetProperty("diagnostics").GetArrayLength());
+
+        Assert.Equal(before, Hash(File));
     }
 
     [Fact]

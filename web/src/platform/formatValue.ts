@@ -1,4 +1,4 @@
-import type { FieldLabel, FieldValue, RecordValue } from './records'
+import { isFileValue, type FieldLabel, type FieldValue, type RecordValue } from './records'
 import { isJsonNumber } from './recordBody'
 import type { FieldMetadata } from './site'
 
@@ -92,6 +92,8 @@ export function formatValue(
       return moneyText(field, String(value), locale, row)
     case 'enum':
       return enumLabel(field, String(value), text)
+    case 'file':
+      return isFileValue(value) ? value.name : String(value)
     case 'reference': {
       const label = labels[field.name]
       return typeof label === 'string' ? label : String(value)

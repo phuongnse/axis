@@ -15,7 +15,10 @@ public enum ProcessCancelOutcome
     /// <summary>The instance, its open tasks and its pending calls are cancelled. The caller commits.</summary>
     Cancelled,
 
-    /// <summary>The instance does not exist for the process, or its subject record is not readable by the user.</summary>
+    /// <summary>
+    /// The instance does not exist for the process, or its subject record is not readable by the user. An
+    /// instance without a subject has no record to read.
+    /// </summary>
     NotFound,
 
     /// <summary>The instance is not <c>running</c> or <c>waiting</c>.</summary>
@@ -44,7 +47,8 @@ public sealed record ProcessCancelResult(
 /// <summary>
 /// Cancels a <c>running</c> or <c>waiting</c> instance, and its running or waiting sub-processes, in the
 /// caller's transaction. The user's <c>cancel</c> grant is the caller's check. The instance's subject
-/// record must be readable by the user, or the instance does not exist for them. When a <c>read</c>
+/// record must be readable by the user, or the instance does not exist for them. An instance without a
+/// subject has no record, so the grant is the only check. When a <c>read</c>
 /// filter of the user reads a computed field that is being recomputed, the cancel is refused first,
 /// before the instance is found.
 /// The statements run in one order. An instance that has a parent locks the parent row first, so a
@@ -68,16 +72,16 @@ public static class ProcessCancelCommand
 {
     /// <param name="active">The active release's model, which the user's read filters are evaluated in.</param>
     /// <param name="process">The process of the route. The instance must belong to it.</param>
-    /// <param name="entity">The subject entity of <paramref name="process"/> in <paramref name="active"/>.</param>
-    /// <param name="read">The user's <c>read</c> access to <paramref name="entity"/>.</param>
+    /// <param name="entity">The subject entity of <paramref name="process"/> in <paramref name="active"/>, or null for a process without a subject.</param>
+    /// <param name="read">The user's <c>read</c> access to <paramref name="entity"/>, or null for a process without a subject.</param>
     public static async Task<ProcessCancelResult> CancelAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         ApplicationModel active,
         ProcessModel process,
-        EntityModel entity,
+        EntityModel? entity,
         Guid instanceId,
-        RecordAccess read,
+        RecordAccess? read,
         string userId,
         string userName,
         string reason,
@@ -88,13 +92,12 @@ public static class ProcessCancelCommand
         ArgumentNullException.ThrowIfNull(transaction);
         ArgumentNullException.ThrowIfNull(active);
         ArgumentNullException.ThrowIfNull(process);
-        ArgumentNullException.ThrowIfNull(entity);
-        ArgumentNullException.ThrowIfNull(read);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
         // A read filter on a field that is being recomputed decides nothing. It is checked before any row is
         // locked, and before the instance is looked up, so it tells nothing about the instance.
-        if (read.Filters is { } pendingFilters
+        if (entity is not null
+            && read?.Filters is { } pendingFilters
             && await RecordCommand.ReadsPendingAsync(connection, transaction, active, entity, pendingFilters, loggerFactory, cancellationToken))
         {
             return new ProcessCancelResult(ProcessCancelOutcome.PendingFilter);
@@ -109,17 +112,19 @@ public static class ProcessCancelCommand
 
         var instance = await LockInstanceAsync(transaction, instanceId, cancellationToken);
 
-        // An instance of a process without a subject is not found here until inspection and operator
-        // support for it are built. The cascade still cancels such a child.
-        if (instance is not { SubjectId: { } subjectId } || instance.ApplicationId != active.Manifest.Id || instance.ProcessId != process.Id)
+        if (instance is null || instance.ApplicationId != active.Manifest.Id || instance.ProcessId != process.Id)
         {
             return new ProcessCancelResult(ProcessCancelOutcome.NotFound);
         }
 
-        if (!read.Granted
-            || (read.Filters is { } filters
-                && await RecordCommand.MatchAsync(connection, transaction, active, entity, subjectId, filters, userId, loggerFactory, cancellationToken)
-                    is not { Found: true, Matched: true }))
+        // An instance without a subject has no record to read, so only the grant applies. An instance with a
+        // subject is never exempt from the read check, whatever the process's subject is now.
+        if (instance.SubjectId is { } subjectId
+            && (entity is null
+                || read is not { Granted: true }
+                || (read.Filters is { } filters
+                    && await RecordCommand.MatchAsync(connection, transaction, active, entity, subjectId, filters, userId, loggerFactory, cancellationToken)
+                        is not { Found: true, Matched: true })))
         {
             return new ProcessCancelResult(ProcessCancelOutcome.NotFound);
         }

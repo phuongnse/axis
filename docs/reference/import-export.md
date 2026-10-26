@@ -8,8 +8,8 @@ _(planned for M15)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
 Everything on this page is _(planned for M15)_, except the grants, the
-policy matrix, the export routes, and the upload, dry run and commit of a CSV
-or `xlsx` import, which are built. A commit only creates records. `key`
+policy matrix, the export routes, the upload, dry run and commit of a CSV
+or `xlsx` import, and the Import button in the SPA, which are built. A commit only creates records. `key`
 matching and the file cleanup of an import are not built.
 
 ## Grants
@@ -196,7 +196,7 @@ matching and the file cleanup of an import are not built.
 - A table whose user holds `export` shows an Export button with CSV and Excel.
   It exports the table's data source or entity with the table's current
   parameters, sort and search.
-- An entity table whose user holds `import` shows an Import button. It
+- _(built)_ An entity table whose user holds `import` shows an Import button. It
   uploads the file, waits for the dry run, lists its errors, and commits when
   there are none.
 - Studio's policy matrix shows the `export` and `import` actions.

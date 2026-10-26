@@ -95,14 +95,33 @@ public sealed class ReferencesFieldCompilerTests
         Assert.Contains("references field", diagnostic.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("any(software, name == 'Office')")]
+    [InlineData("count(software) > 1")]
+    [InlineData("count(software, name == 'Office') >= 2")]
+    public void Data_source_filter_can_use_any_and_count_over_a_references_field(string filter)
+    {
+        using var folder = Folder(Software)
+            .With("data-sources/requests.json", $$"""
+                { "id": "55555555-5555-4555-8555-555555555555", "kind": "dataSource", "name": "Requests", "formatVersion": 1,
+                  "entity": "Request", "fields": [{ "name": "title", "path": "title" }],
+                  "filter": "{{filter}}" }
+                """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
     [Fact]
-    public void Data_source_filter_refuses_an_aggregate_over_a_references_field()
+    public void Data_source_filter_still_refuses_the_other_aggregates_over_a_references_field()
     {
         using var folder = Folder(Software)
             .With("data-sources/requests.json", """
                 { "id": "55555555-5555-4555-8555-555555555555", "kind": "dataSource", "name": "Requests", "formatVersion": 1,
                   "entity": "Request", "fields": [{ "name": "title", "path": "title" }],
-                  "filter": "any(software, name == 'Office')" }
+                  "filter": "all(software, name == 'Office')" }
                 """);
 
         var result = ApplicationCompiler.Compile(folder.Path);

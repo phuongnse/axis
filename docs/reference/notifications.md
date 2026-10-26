@@ -7,9 +7,9 @@ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The [user profiles](#user-profiles) section, the compile checks of the notify
 operation and of placeholders, the run of the notify step and the storage of
-in-app notifications and the routes that list them and mark them read are built.
-The bell, retention and email are _(planned for M14)_, as is everything else in
-this file that says so. The design follows
+in-app notifications, the routes that list them and mark them read, and their
+retention are built. The bell and email are _(planned for M14)_, as is
+everything else in this file that says so. The design follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
 [D75](../decisions/d75-the-application-time-zone.md). New compile problems are
@@ -130,8 +130,11 @@ A text value may hold named placeholders, such as
     user does not see, or that does not exist, is a 404.
   - Nobody deletes a notification. The routes need a session (401), and the
     POSTs follow the CSRF rule.
-- **Kept for.** `Notifications:RetentionDays`, default 90. The worker deletes
-  older rows once a day.
+- **Kept for.** `Notifications:RetentionDays`, default 90, a whole number of at
+  least 1. The worker reads and checks it at start. It deletes the notifications
+  whose `created_at` is older than that by its own clock, with their
+  `axis.notification_reads` rows in one transaction, when the tenant becomes
+  ready and then every 24 hours.
 - **Site shell.** A bell in the site header shows the unread count. It opens
   the list. A row opens its page, if it has one, and marks it read.
 
@@ -184,7 +187,7 @@ sign-in and the last sign-in. A later sign-in updates it.
 | `Email:Smtp:UserName` | none | The SMTP user. |
 | `Email:Smtp:Password` | none | The SMTP password, from the environment. |
 | `Email:From` | none | The sender address. Required when a host is set. |
-| `Notifications:RetentionDays` | `90` | How long in-app notifications are kept. |
+| `Notifications:RetentionDays` | `90` | How long in-app notifications are kept. A value that is not a whole number of at least 1 stops the worker at start. |
 
 A tenant may override `Email` in its `Tenants` block, or in the tenant
 directory under `Tenancy:Source=directory`, where the password is encrypted as

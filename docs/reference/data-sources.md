@@ -115,7 +115,10 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   the parameters as plain names, ignoring letter case, and paths through
   `reference` fields such as `department.name`, with at most 3 hops. A path
   starts at a field, never at a parameter, because a reference parameter is
-  an id and not a row. It can call named
+  an id and not a row. `any(list, condition)`, `count(list)` and
+  `count(list, condition)` test a child collection or a `references` field of
+  the root entity, such as `any(lines, product.name == 'Desk')`, and each is a
+  subquery, so a row is never repeated. It can call named
   [rules](resource-files.md#resource-file-shape), and its SQL inlines each
   rule's expression in place of the call. With every rule inlined, the filter
   may have at most 2,000 syntax nodes. It uses the syntax of
@@ -263,8 +266,8 @@ see the Data sources bullet of the Resolve step in
   a `.`, `AXC0047` for a `.` after a field that is not a `reference` or after
   a parameter, `AXC0058` for a path of more than 3 hops and `AXC0053` for
   anything outside the SQL subset, such as an
-  [aggregate](expressions.md#aggregates) over a child collection or a call to
-  a rule whose expression uses `lower`.
+  [aggregate](expressions.md#aggregates) over a child collection other than
+  `any` and `count`, or a call to a rule whose expression uses `lower`.
 - An enum parameter compares with an enum field only when every value in the
   parameter's `values` is also in the field's `values`. Otherwise the filter
   is `AXC0047`. See [Types](expressions.md#types).
@@ -346,8 +349,8 @@ grants, the record filters, the fields and the joined targets are built.
   target. The path also shows which record is referenced, so the stricter
   rule cannot leak. There are no partial rows, so authors make one data
   source per audience.
-- **Joined targets.** The record filters of a target that a path joins do not
-  apply. A label in `labels` shows when the user may read the target's display
+- **Joined targets.** The record filters of a target that a path joins, or
+  that `any` or `count` reads through a `references` field, do not apply. A label in `labels` shows when the user may read the target's display
   field, as for the record API's [labels](record-api.md#record-shape).
 - **Limit.** The all-or-nothing rule covers only projected and aggregated
   fields. A data source `filter` or a parameter can still compare a field the
@@ -387,8 +390,9 @@ grants, the record filters, the fields and the joined targets are built.
   with the `409` in [Errors](#errors) when its `sort`, its default `sort`,
   its `filter`, its `groupBy` field, its measure or a measure `filter` reads
   a pending field, or a searched field of a given `search` is a pending field.
-  That includes a path through references and a filter that
-  inlines a rule, and a `count` whose `filter` reads one. The
+  That includes a path through references, a filter that inlines a rule, a
+  `count` whose `filter` reads one and a field of a child row or a linked
+  record that `any` or `count` reads. The
   record API computes the pending field on a single read.
 - **Order.** Ties are broken by the root `id` ascending, or by the group
   fields in `groupBy` order, each ascending, when the data source is

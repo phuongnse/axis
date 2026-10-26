@@ -754,16 +754,25 @@ uploaded more than 24 hours ago, see
 the files table yet is skipped. Any other failure is logged as a warning and
 does not hold back the tenant's work items.
 
+The worker also deletes the in-app notifications of each ready tenant that are
+older than `Notifications:RetentionDays`, with their read rows in one
+transaction, see [in-app notifications](notifications.md#in-app-notifications).
+It runs when the tenant becomes ready and then every 24 hours by its own clock,
+with its own timer. A database without the notification tables yet is skipped.
+Any other failure is logged as a warning and does not hold back the tenant's
+work items.
+
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Worker:LeaseDuration` | `00:00:30` | How long a claim lasts before another worker can claim the item. |
 | `Worker:PollInterval` | `00:00:01` | How long the worker waits before it polls again when it found no work. |
 | `Worker:MetricsInterval` | `00:00:30` | How often the worker reads each tenant database for the [due work item and pending computed field gauges](#worker-metrics). It must be positive. |
 | `Worker:DeliveryAttempts` | `5` | Failures of a delivery before it becomes a [dead letter](process-events.md#dead-letters). It must be at least 1. |
+| `Notifications:RetentionDays` | `90` | How many days the worker keeps [in-app notifications](notifications.md#in-app-notifications). It must be an integer of at least 1. |
 | `Health:Urls` | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else. |
 
 As environment variables they are `Worker__LeaseDuration`,
-`Worker__PollInterval`, `Worker__MetricsInterval`, `Worker__DeliveryAttempts` and `Health__Urls`. What the health endpoints answer is
+`Worker__PollInterval`, `Worker__MetricsInterval`, `Worker__DeliveryAttempts`, `Notifications__RetentionDays` and `Health__Urls`. What the health endpoints answer is
 in [health checks](../architecture.md#health-checks).
 
 The server migrates the tenant databases, and the worker does not. Before it

@@ -15,7 +15,9 @@ namespace Axis.Data.Records;
 /// <c>@currentUser</c>, bound as text to the user's id. So no value is ever part of the SQL text.
 /// A bare name is a column of the row aliased <see cref="RecordQueries.RowAlias"/>, and a path
 /// through reference fields is one scalar subquery per step, so a null reference gives a null
-/// value and the row stays one row.
+/// value and the row stays one row. <c>any</c> and <c>count</c> over a child collection or a
+/// references field are subqueries on the child table, or on the junction table joined to the
+/// linked entity's table, tied to the row's id.
 /// </summary>
 public static class RecordFilters
 {
@@ -38,7 +40,7 @@ public static class RecordFilters
             return new RecordCondition("FALSE", [], userId);
         }
 
-        var subqueries = 0;
+        var aliases = new AliasCounter();
         var conditions = new List<string>(filters.Count);
         var values = new List<SqlValue>();
         for (var index = 0; index < filters.Count; index++)
@@ -46,10 +48,16 @@ public static class RecordFilters
             var filter = filters[index];
             var translated = SqlTranslator.Translate(
                 filter.Syntax,
-                names => Column(application, entity, names, ref subqueries),
+                names => Column(application, entity, RecordQueries.RowAlias, names, aliases),
                 filter.Check,
                 $"g{index.ToString(CultureInfo.InvariantCulture)}f",
-                application.TimeZone);
+                application.TimeZone,
+                name => Collection(
+                    application,
+                    entity,
+                    name,
+                    $"{EntityNaming.Quote(RecordQueries.RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}",
+                    aliases));
             if (!translated.Succeeded)
             {
                 throw new InvalidOperationException($"The compiler let through a policy filter outside the SQL subset: {translated.Diagnostic.Message}");
@@ -165,33 +173,36 @@ public static class RecordFilters
         ArgumentNullException.ThrowIfNull(filter);
 
         var read = new List<(EntityModel, string)>();
-        var translated = SqlTranslator.Translate(
-            filter.Syntax,
-            names =>
+        string Read(EntityModel start, IReadOnlyList<string> names)
+        {
+            var current = start;
+            for (var index = 0; index < names.Count; index++)
             {
-                var current = entity;
-                for (var index = 0; index < names.Count; index++)
+                if (!current.TryGetField(names[index], out var field))
                 {
-                    if (!current.TryGetField(names[index], out var field))
-                    {
-                        throw new InvalidOperationException(
-                            $"The compiler let through the policy filter path '{string.Join('.', names)}' that does not resolve.");
-                    }
-
-                    read.Add((current, field.Name));
-                    if (index < names.Count - 1)
-                    {
-                        current = field.Target is { } target && application.FindEntity(target.Id) is { } next
-                            ? next
-                            : throw new InvalidOperationException(
-                                $"The compiler let through the policy filter path '{string.Join('.', names)}' that does not resolve.");
-                    }
+                    throw new InvalidOperationException(
+                        $"The compiler let through the policy filter path '{string.Join('.', names)}' that does not resolve.");
                 }
 
-                return "NULL";
-            },
+                read.Add((current, field.Name));
+                if (index < names.Count - 1)
+                {
+                    current = field.Target is { } target && application.FindEntity(target.Id) is { } next
+                        ? next
+                        : throw new InvalidOperationException(
+                            $"The compiler let through the policy filter path '{string.Join('.', names)}' that does not resolve.");
+                }
+            }
+
+            return "NULL";
+        }
+
+        var translated = SqlTranslator.Translate(
+            filter.Syntax,
+            names => Read(entity, names),
             filter.Check,
-            "g0f");
+            "g0f",
+            collection: name => new SqlCollection("NULL", "TRUE", names => Read(ItemEntity(application, entity, name), names)));
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The compiler let through a policy filter outside the SQL subset: {translated.Diagnostic.Message}");
@@ -209,14 +220,16 @@ public static class RecordFilters
     }
 
     /// <summary>
-    /// The SQL of the column a filter path names. A bare name is a column of the row, and each
-    /// reference step before the last field is a scalar subquery on the target's id, aliased
-    /// <c>s0</c>, <c>s1</c>, … so every alias in the statement is unique.
+    /// The SQL of the column a filter path names, starting at the row of <paramref name="entity"/>
+    /// aliased <paramref name="alias"/>. A bare name is a column of the row, and each reference step
+    /// before the last field is a scalar subquery on the target's id, aliased <c>s0</c>, <c>s1</c>, …
+    /// so every alias in the statement is unique.
     /// </summary>
-    private static string Column(ApplicationModel application, EntityModel entity, IReadOnlyList<string> names, ref int subqueries)
+    internal static string Column(
+        ApplicationModel application, EntityModel entity, string alias, IReadOnlyList<string> names, AliasCounter aliases)
     {
         var current = entity;
-        var sql = EntityNaming.Quote(RecordQueries.RowAlias);
+        var sql = EntityNaming.Quote(alias);
         for (var index = 0; index < names.Count; index++)
         {
             if (!current.TryGetField(names[index], out var field) || !field.HasColumn)
@@ -232,8 +245,8 @@ public static class RecordFilters
             }
             else
             {
-                var alias = EntityNaming.Quote($"s{subqueries++}");
-                sql = $"(SELECT {alias}.{column} FROM {RecordQueries.Table(current)} AS {alias} WHERE {alias}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {sql})";
+                var subquery = EntityNaming.Quote($"s{aliases.Next()}");
+                sql = $"(SELECT {subquery}.{column} FROM {RecordQueries.Table(current)} AS {subquery} WHERE {subquery}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {sql})";
             }
 
             if (index < names.Count - 1)
@@ -247,6 +260,57 @@ public static class RecordFilters
 
         return sql;
     }
+
+    /// <summary>
+    /// The SQL source of the child collection or references field <paramref name="name"/> of
+    /// <paramref name="owner"/>, for <c>any</c> and <c>count</c>. A child collection reads the child
+    /// table, and a references field reads its junction table joined to the linked entity's table.
+    /// Its rows belong to the row whose id is <paramref name="ownerIdSql"/>. The item columns start at
+    /// the child row, or at the linked record. A path inside the condition is a scalar subquery, as
+    /// in <see cref="Column"/>. The aliases <c>a</c><i>n</i> and <c>a</c><i>n</i><c>t</c> come from
+    /// <paramref name="aliases"/>.
+    /// </summary>
+    internal static SqlCollection Collection(
+        ApplicationModel application, EntityModel owner, string name, string ownerIdSql, AliasCounter aliases)
+    {
+        var item = ItemEntity(application, owner, name);
+        var field = owner.Fields.First(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+        var number = aliases.Next();
+        var alias = EntityNaming.Quote($"a{number}");
+        var ownerMatch = $"{alias}.{EntityNaming.Quote(EntityNaming.OwnerColumn)} = {ownerIdSql}";
+        if (field.Type == FieldType.ChildCollection)
+        {
+            return new SqlCollection(
+                $"{RecordQueries.Table(item)} AS {alias}",
+                ownerMatch,
+                names => Column(application, item, $"a{number}", names, aliases));
+        }
+
+        var linked = EntityNaming.Quote($"a{number}t");
+        var junction = EntityNaming.QualifiedTable(EntityNaming.Junction(owner.Id, field.Name));
+        return new SqlCollection(
+            $"{junction} AS {alias} JOIN {RecordQueries.Table(item)} AS {linked} "
+            + $"ON {linked}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {alias}.{EntityNaming.Quote(EntityNaming.TargetColumn)}",
+            ownerMatch,
+            names => Column(application, item, $"a{number}t", names, aliases));
+    }
+
+    /// <summary>The child entity of the child collection, or the target entity of the references field, <paramref name="name"/> of <paramref name="owner"/>.</summary>
+    internal static EntityModel ItemEntity(ApplicationModel application, EntityModel owner, string name) =>
+        owner.TryGetField(name, out var field)
+        && field.Type is FieldType.ChildCollection or FieldType.References
+        && field.Target is { } target
+        && application.FindEntity(target.Id) is { } item
+            ? item
+            : throw new InvalidOperationException($"The compiler let through the policy filter list '{name}' that does not resolve.");
+}
+
+/// <summary>Numbers the aliases of the subqueries of one translation, so each is unique in the statement.</summary>
+internal sealed class AliasCounter
+{
+    private int _next;
+
+    public int Next() => _next++;
 }
 
 /// <summary>

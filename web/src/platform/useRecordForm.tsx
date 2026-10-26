@@ -2,11 +2,21 @@ import { Button, Form, Input, Space, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
+import { FileInput, FileLink } from './FileInput'
 import { FormCanvasContext } from './formCanvas'
 import { fetchFormState, type FormStateAnswer } from './formState'
 import { formatValue, moneyCurrency, referencesLabels } from './formatValue'
 import { buildFormStateBody } from './recordBody'
-import type { FieldLabel, FieldValue, RecordItem, RecordProblem, RecordRow, RecordValue, RowLabels } from './records'
+import {
+  isFileValue,
+  type FieldLabel,
+  type FieldValue,
+  type RecordItem,
+  type RecordProblem,
+  type RecordRow,
+  type RecordValue,
+  type RowLabels,
+} from './records'
 import { ReferenceLookup } from './ReferenceLookup'
 import { ReferencesInput } from './ReferencesInput'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
@@ -399,6 +409,9 @@ export function useRecordForm(
       if (field.type === 'references') {
         return <Input id={id} readOnly value={referencesLabels(value, labels[field.name]).join(', ')} />
       }
+      if (field.type === 'file') {
+        return isFileValue(value) ? <FileLink field={field} value={value} /> : null
+      }
       // The server sets the value on save, so it is shown as a table cell shows it.
       return (
         <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t }, values)} />
@@ -427,6 +440,16 @@ export function useRecordForm(
               set(field.name, ids)
               setLabels((previous) => ({ ...previous, [field.name]: idLabels }))
             }}
+          />
+        )
+      case 'file':
+        return (
+          <FileInput
+            field={field}
+            id={id}
+            value={isFileValue(value) ? value : null}
+            label={labelOf(field)}
+            onChange={(next) => set(field.name, next)}
           />
         )
       case 'child-collection':

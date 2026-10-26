@@ -98,13 +98,13 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
             ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "child-collection", "reference", "decimal"],
             fieldList.Select(field => field.GetProperty("type").GetString()));
         Assert.All(fieldList, field => Assert.Equal(
-            ["name", "type", "labelKey", "required", "unique", "computed", "sequence", "creator", "maxLength", "precision", "scale", "currency", "currencyField", "min", "max", "minLength", "values", "valueLabelKeys", "target", "fields"],
+            ["name", "type", "labelKey", "required", "unique", "computed", "sequence", "creator", "maxLength", "precision", "scale", "currency", "currencyField", "min", "max", "minLength", "values", "valueLabelKeys", "maxSize", "accept", "uploadPath", "downloadPath", "target", "fields"],
             field.EnumerateObject().Select(property => property.Name)));
 
         var fields = fieldList.ToDictionary(field => field.GetProperty("name").GetString()!);
 
         Assert.Equal(
-            """{"name":"name","type":"text","labelKey":null,"required":true,"unique":false,"computed":false,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"target":null,"fields":null}""",
+            """{"name":"name","type":"text","labelKey":null,"required":true,"unique":false,"computed":false,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null}""",
             fields["name"].GetRawText());
         Assert.Equal(20, fields["price"].GetProperty("precision").GetInt32());
         Assert.Equal(2, fields["price"].GetProperty("scale").GetInt32());
@@ -117,14 +117,14 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
 
         // A computed field is marked, so the form shows it read-only and never sends it.
         Assert.Equal(
-            """{"name":"total","type":"decimal","labelKey":null,"required":false,"unique":false,"computed":true,"sequence":false,"creator":false,"maxLength":null,"precision":20,"scale":2,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"target":null,"fields":null}""",
+            """{"name":"total","type":"decimal","labelKey":null,"required":false,"unique":false,"computed":true,"sequence":false,"creator":false,"maxLength":null,"precision":20,"scale":2,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null}""",
             fields["total"].GetRawText());
         Assert.All(fieldList.Where(field => field.GetProperty("name").GetString() != "total"), field =>
             Assert.False(field.GetProperty("computed").GetBoolean()));
 
         // A child collection carries its child entity's fields, and no target: a child has no record API.
         Assert.Equal(
-            """{"name":"parts","type":"child-collection","labelKey":null,"required":false,"unique":false,"computed":false,"sequence":false,"creator":false,"maxLength":null,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"target":null,"fields":[{"name":"name","type":"text","labelKey":null,"required":false,"unique":true,"computed":false,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"target":null,"fields":null},{"name":"code","type":"text","labelKey":null,"required":false,"unique":false,"computed":true,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"target":null,"fields":null}]}""",
+            """{"name":"parts","type":"child-collection","labelKey":null,"required":false,"unique":false,"computed":false,"sequence":false,"creator":false,"maxLength":null,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":[{"name":"name","type":"text","labelKey":null,"required":false,"unique":true,"computed":false,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null},{"name":"code","type":"text","labelKey":null,"required":false,"unique":false,"computed":true,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null}]}""",
             fields["parts"].GetRawText());
         Assert.All(fieldList.Where(field => field.GetProperty("name").GetString() != "parts"), field =>
             Assert.Equal(JsonValueKind.Null, field.GetProperty("fields").ValueKind));
@@ -316,6 +316,27 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
             """{"actions":["read","create","update"],"createFields":["name","quantity"],"updateFields":["name","quantity"]}""",
             Assert.Single(fieldedPage.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("access").GetRawText());
     }
+
+    [Fact]
+    public async Task Access_lists_import_last_on_an_entity_table_for_a_user_who_holds_it()
+    {
+        using var employee = fixture.CreateClient().SignedInAs("anna");
+        using var reader = fixture.CreateClient().SignedInAs("rita");
+
+        using var table = await GetJsonAsync(employee, "/api/sites/records/pages/items", HostA);
+        using var form = await GetJsonAsync(employee, "/api/sites/records/pages/itemform", HostA);
+        using var dataSourceTable = await GetJsonAsync(employee, "/api/sites/records/pages/itemsbydepartment", HostA);
+        using var readerTable = await GetJsonAsync(reader, "/api/sites/records/pages/items", HostA);
+
+        Assert.Equal(["read", "create", "update", "delete", "import"], AccessActions(table));
+        Assert.Equal(["read", "create", "update", "delete"], AccessActions(form));
+        Assert.Equal(["read", "create", "update", "delete"], AccessActions(dataSourceTable));
+        Assert.Equal(["read"], AccessActions(readerTable));
+    }
+
+    private static string[] AccessActions(JsonDocument page) =>
+        [.. Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList())
+            .GetProperty("access").GetProperty("actions").EnumerateArray().Select(action => action.GetString()!)];
 
     [Theory]
     [InlineData("items")]

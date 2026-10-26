@@ -46,6 +46,8 @@ function value(field: Typed, n: number): FieldValue {
       return referenceId
     case 'references':
       return [referenceId]
+    case 'file':
+      return { id: referenceId, name: 'sample.pdf', mediaType: 'application/pdf', size: '1024' }
     case 'child-collection':
       return Array.from({ length: childRowCount }, (_, row) => values(field.fields ?? [], row + 1) as RecordRow)
   }

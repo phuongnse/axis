@@ -305,9 +305,7 @@ internal static class ProcessStartEndpoints
             await transaction.RollbackAsync(cancellationToken);
             return started.Outcome == ProcessStartOutcome.ConditionFailed
                 ? Results.ValidationProblem(new Dictionary<string, string[]> { [ParametersPointer] = [started.TextKey!] })
-                : Results.Problem(
-                    statusCode: StatusCodes.Status409Conflict,
-                    title: "A running or waiting instance of this process already exists.");
+                : AlreadyRunningWithoutSubject();
         }
 
         await transaction.CommitAsync(cancellationToken);
@@ -489,6 +487,12 @@ internal static class ProcessStartEndpoints
         Results.Problem(
             statusCode: StatusCodes.Status409Conflict,
             title: "A running or waiting instance of this process already exists for this record.");
+
+    /// <summary>The problem of a start or retry that found an instance already running or waiting for a process without a subject.</summary>
+    internal static IResult AlreadyRunningWithoutSubject() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            title: "A running or waiting instance of this process already exists.");
 
     private static IResult SubjectProblem(string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { [SubjectIdPointer] = [message] });
