@@ -34,6 +34,15 @@ namespace Axis.Server.Records;
 /// without a content type is stored as <c>application/octet-stream</c>, and the parameters of a media type are dropped.
 /// The stored name is the last path segment of the file name, without control characters, cut to 255 characters.
 /// The problem titles never contain text from the request.
+/// The download route, <c>GET /api/apps/{app}/files/{id}</c>, sends the bytes of an attached file to a session user
+/// or a service account that could read the field on the owner record. A request is checked in order: session or
+/// bearer token (401), then the application (404), and then the file. A file of a child row goes through its owner
+/// record, and the user's read grant must cover the owner's child collection field. Every failure after sign-in is
+/// one 404: no read grant on the owner, a record filter that excludes it or reads a computed field that is being
+/// recomputed, a field the user may not read, a file that is not <c>attached</c>, a file of another application,
+/// an unknown id and a malformed id. The answer is an attachment with the stored media type and file name, and the
+/// security headers of every API answer add <c>nosniff</c>. The bytes are read into memory under the interactive
+/// query timeout before they are sent.
 /// </summary>
 internal static class FileEndpoints
 {
@@ -58,6 +67,107 @@ internal static class FileEndpoints
                 .WithMetadata(ServiceAccountRoute.Instance)
                 .WithMetadata(new RequestSizeLimitAttribute(settings.MaxSize + RequestSizeMargin));
         }
+
+        endpoints.MapGet("/api/apps/{app}/files/{id}", DownloadAsync)
+            .WithMetadata(ServiceAccountRoute.Instance)
+            .WithQueryTimeout(QueryTimeoutSettings.Interactive);
+    }
+
+    private static async Task<IResult> DownloadAsync(
+        string app,
+        string id,
+        HttpContext httpContext,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired(httpContext);
+        }
+
+        if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No application is active under this name.");
+        }
+
+        // Only the hyphenated form names a file, as for a record.
+        if (!Guid.TryParseExact(id, "D", out var fileId) || id.Length != 36)
+        {
+            return FileNotFound();
+        }
+
+        var application = active.Model;
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        if (await FileStore.FindAttachedAsync(connection, database.ReadTransaction, application.Manifest.Id, fileId, cancellationToken) is not { } file
+            || FileOwner(application, file.EntityId, file.FieldPath) is not { } target)
+        {
+            return FileNotFound();
+        }
+
+        var (owner, field) = target;
+
+        var read = PolicyEvaluator.Access(application, user.Roles, owner, PolicyAction.Read);
+        if (!read.Granted || !RecordFieldAccess.Read(application, user.Roles, owner).CanRead(field))
+        {
+            return FileNotFound();
+        }
+
+        // The entity is known only now, so a pending filter is a 404 too: a 409 would show that the file exists.
+        if (read.Filters is { } filters
+            && (await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application, owner, filters, loggerFactory, cancellationToken)
+                || await RecordCommand.MatchAsync(connection, database.ReadTransaction, application, owner, file.OwnerRecordId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true }))
+        {
+            return FileNotFound();
+        }
+
+        if (await FileStore.ReadContentAsync(connection, database.ReadTransaction, file.Id, cancellationToken) is not { } content)
+        {
+            return FileNotFound();
+        }
+
+        // The file name goes in Content-Disposition: attachment, so a browser never shows the file in the application's origin.
+        return Results.File(content, file.MediaType, file.Name);
+    }
+
+    private static IResult FileNotFound() =>
+        Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No file has this id.");
+
+    // The entity whose record owns the file, and the field of it that a read must cover: the file field itself, or
+    // the child collection field for a file in a child row. Null when the path no longer names a file field.
+    private static (EntityModel Owner, string Field)? FileOwner(ApplicationModel application, Guid entityId, string path)
+    {
+        if (application.FindEntity(entityId) is not { } entity)
+        {
+            return null;
+        }
+
+        var separator = path.IndexOf('/', StringComparison.Ordinal);
+        var name = separator < 0 ? path : path[(separator + 1)..];
+        if (!entity.TryGetField(name, out var field) || field.Type != FieldType.File)
+        {
+            return null;
+        }
+
+        if (separator < 0)
+        {
+            return application.IsChildEntity(entity) ? null : (entity, path);
+        }
+
+        // A child entity has exactly one owner entity.
+        var collection = path[..separator];
+        foreach (var candidate in application.Entities)
+        {
+            if (candidate.TryGetField(collection, out var collectionField)
+                && collectionField.Type == FieldType.ChildCollection
+                && collectionField.Target?.Id == entity.Id)
+            {
+                return (candidate, collection);
+            }
+        }
+
+        return null;
     }
 
     private static async Task<IResult> UploadAsync(

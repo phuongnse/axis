@@ -41,9 +41,10 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   `Tenancy:Source=directory`, the server reads the values from the
   [tenant directory](../architecture.md#tenant-directory) instead, and `secret`
   values are stored encrypted and decrypted when resolved. Under `directory`
-  the worker reads them from the directory too. The directory cannot hold a
-  `storage` binding yet: its table allows only `url` and `secret`, and the
-  admin commands set only those kinds.
+  the worker reads them from the directory too. The directory holds a `storage`
+  binding as well, with its value in the `url` column. It is set with
+  [`tenant binding set <id> <name> --storage database`](tenant-setting-commands.md#deployment-bindings),
+  and reading the directory fails when its value is not `database`.
 - **Secrets from the environment.** A secret's value is set with an
   environment variable, such as
   `Tenants__default__Bindings__PurchasingSystemToken__Value`. A command-line
@@ -98,9 +99,8 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   application without `fileStorage` uses the tenant database too, and its
   activation needs no binding. Activating a release whose `fileStorage`
   binding is missing, or has another kind, fails with `AXC0100`. Other storage
-  comes later. Under `Tenancy:Source=directory`, an application that names
-  `fileStorage` cannot be activated yet, because the directory cannot hold a
-  `storage` binding. See [the application manifest](resource-files.md#file-storage),
+  comes later. Under `Tenancy:Source=directory`, the `fileStorage` binding is a
+  `storage` binding of the tenant directory, and its value is `database`. See [the application manifest](resource-files.md#file-storage),
   [file fields](file-fields.md#storage-and-clean-up) and
   [D76](../decisions/d76-file-money-and-enum-label-field-types.md).
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it

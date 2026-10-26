@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Text.Json;
 using Axis.Configuration.Packages;
 using Axis.Processes.Storage;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -312,7 +313,7 @@ internal sealed class TenantRestore : IAsyncDisposable
         && manifest.Directory is { OidcAuthority: not null, OidcClientId: not null, Bindings: not null }
         && manifest.Packages is not null
         && manifest.Packages.All(package => package is { Id: not null, Version: not null })
-        && manifest.Directory.Bindings.All(binding => binding is { Name: not null, Kind: "url" or "secret" } && (binding.Kind != "url" || binding.Url is not null))
+        && manifest.Directory.Bindings.All(binding => binding is { Name: not null, Kind: "url" or "secret" or "storage" } && (binding.Kind != "url" || binding.Url is not null) && (binding.Kind != "storage" || binding.Url == StorageBindingValues.Database))
         && manifest.Directory.Bindings.Select(binding => binding.Name.ToLowerInvariant()).Distinct().Count() == manifest.Directory.Bindings.Count;
 
     // Returns the exit code that ends the command, or null to go on.
@@ -377,13 +378,13 @@ internal sealed class TenantRestore : IAsyncDisposable
             _row.ServiceAudience = directory.ServiceAudience;
             _platform.TenantHosts.AddRange(hosts.Select(host => new TenantHostRow { TenantId = _id, Host = host }));
 
-            // A secret binding comes back by name and kind only: the archive holds no value.
+            // A secret binding comes back by name and kind only: the archive holds no value. A url or storage binding comes back with its value.
             _platform.TenantBindings.AddRange(directory.Bindings.Select(binding => new TenantBindingRow
             {
                 TenantId = _id,
                 Name = binding.Name,
                 Kind = binding.Kind,
-                Url = binding.Kind == "url" ? binding.Url : null,
+                Url = binding.Kind == "secret" ? null : binding.Url,
                 SecretValue = null,
             }));
             await _platform.SaveChangesAsync(_cancellationToken);

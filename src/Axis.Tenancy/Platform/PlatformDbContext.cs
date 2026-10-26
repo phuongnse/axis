@@ -98,7 +98,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
         {
             binding.ToTable("tenant_bindings", table => table.HasCheckConstraint(
                 "ck_tenant_bindings_kind",
-                "kind IN ('url', 'secret')"));
+                "kind IN ('url', 'secret', 'storage')"));
             binding.HasKey(b => new { b.TenantId, b.Name }).HasName("pk_tenant_bindings");
             binding.Property(b => b.TenantId).HasColumnName("tenant_id");
             binding.Property(b => b.Name).HasColumnName("name");

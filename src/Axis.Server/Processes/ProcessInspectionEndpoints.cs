@@ -7,6 +7,7 @@ using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Processes.Records;
+using Axis.Processes.Storage;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
@@ -42,6 +43,13 @@ namespace Axis.Server.Processes;
 /// subject record the user may not read or that no longer exists are one 404. A read filter that
 /// fails at run time for the subject record does not match, so it is a 404 too. The detail writes
 /// no audit record.
+/// </para>
+/// <para>
+/// A process without a subject has no record to read. Its instances are listed and read with the
+/// <c>inspect</c> grant alone: <c>subjectId</c> is null, a <c>subject</c> filter matches nothing, and
+/// no read grant, read filter or pending field applies. The detail of such an instance has no
+/// <c>commands</c> and no resolvable call, because the operator commands do not serve it yet, and a
+/// stored call input is always hidden.
 /// </para>
 /// </summary>
 internal static class ProcessInspectionEndpoints
@@ -121,10 +129,20 @@ internal static class ProcessInspectionEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        // No instance of a process without a subject can exist yet.
+        // An instance of a process without a subject has no record to read, so the inspect grant is enough.
         if (model.Entity is not { } subjectEntity)
         {
-            return Results.Ok(new ProcessInstanceListResponse([], pageNumber, size, 0));
+            var withoutSubject = await InstanceQueries.ListWithoutSubjectAsync(
+                await database.GetConnectionAsync(cancellationToken),
+                application.Manifest.Id,
+                model.Id,
+                state,
+                subjectId,
+                pageNumber,
+                size,
+                cancellationToken);
+            return Results.Ok(new ProcessInstanceListResponse(
+                withoutSubject.Items.Select(ListItem).ToList(), pageNumber, size, withoutSubject.TotalCount));
         }
 
         if (!application.TryGetEntity(subjectEntity.Name, out var entity))
@@ -162,19 +180,18 @@ internal static class ProcessInspectionEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
         }
 
-        // The list filters by the subject entity, so every instance has a subject.
-        var items = result.Items
-            .Select(instance => new ProcessInstanceListItem(
-                instance.Id,
-                instance.SubjectId!.Value,
-                instance.State,
-                instance.Step,
-                instance.ReleaseId,
-                instance.CreatedAt.UtcDateTime,
-                instance.EndedAt?.UtcDateTime))
-            .ToList();
-        return Results.Ok(new ProcessInstanceListResponse(items, pageNumber, size, result.TotalCount));
+        return Results.Ok(new ProcessInstanceListResponse(result.Items.Select(ListItem).ToList(), pageNumber, size, result.TotalCount));
     }
+
+    private static ProcessInstanceListItem ListItem(ProcessInstanceRow instance) =>
+        new(
+            instance.Id,
+            instance.SubjectId,
+            instance.State,
+            instance.Step,
+            instance.ReleaseId,
+            instance.CreatedAt.UtcDateTime,
+            instance.EndedAt?.UtcDateTime);
 
     private static async Task<IResult> GetAsync(
         string app,
@@ -213,40 +230,46 @@ internal static class ProcessInspectionEndpoints
             return InstanceNotFound();
         }
 
-        // No instance of a process without a subject can exist yet.
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        EntityModel? entity = null;
+        ProcessInstanceRow? row;
         if (model.Entity is not { } subjectEntity)
         {
-            return InstanceNotFound();
+            // An instance of a process without a subject has no record to read, so the inspect grant is enough.
+            row = await InstanceQueries.FindWithoutSubjectAsync(connection, application.Manifest.Id, model.Id, instanceId, cancellationToken);
         }
-
-        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
+        else
         {
-            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
+            if (!application.TryGetEntity(subjectEntity.Name, out entity))
+            {
+                throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
+            }
+
+            // An instance whose record the user may not read does not exist for them.
+            var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+            if (!read.Granted)
+            {
+                return InstanceNotFound();
+            }
+
+            if (read.Filters is { } pendingFilters
+                && await RecordCommand.ReadsPendingAsync(connection, null, application, entity, pendingFilters, loggerFactory, cancellationToken))
+            {
+                return Grants.PendingFilter();
+            }
+
+            row = await InstanceQueries.FindAsync(connection, application.Manifest.Id, model.Id, entity, instanceId, cancellationToken);
+
+            // FindAsync filters by the subject entity, so the instance has a subject.
+            if (row is not null
+                && read.Filters is { } filters
+                && await RecordCommand.MatchAsync(connection, null, application, entity, row.SubjectId!.Value, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+            {
+                row = null;
+            }
         }
 
-        // An instance whose record the user may not read does not exist for them.
-        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
-        if (!read.Granted)
-        {
-            return InstanceNotFound();
-        }
-
-        var connection = await database.GetConnectionAsync(cancellationToken);
-        if (read.Filters is { } pendingFilters
-            && await RecordCommand.ReadsPendingAsync(connection, null, application, entity, pendingFilters, loggerFactory, cancellationToken))
-        {
-            return Grants.PendingFilter();
-        }
-
-        if (await InstanceQueries.FindAsync(connection, application.Manifest.Id, model.Id, entity, instanceId, cancellationToken) is not { } row)
-        {
-            return InstanceNotFound();
-        }
-
-        // FindAsync filters by the subject entity, so the instance has a subject.
-        var subjectId = row.SubjectId!.Value;
-        if (read.Filters is { } filters
-            && await RecordCommand.MatchAsync(connection, null, application, entity, subjectId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+        if (row is null)
         {
             return InstanceNotFound();
         }
@@ -259,15 +282,19 @@ internal static class ProcessInspectionEndpoints
         var calls = await CallQueries.ListByInstanceAsync(connection, row.Id, cancellationToken);
         var mappings = new Dictionary<string, IReadOnlySet<MappedField>?>(StringComparer.Ordinal);
         var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == model.Id);
-        var pinnedSubject = pinned.FindEntity(entity.Id);
-        var allowsResolve = PolicyEvaluator.AllowsResolve(application, user.Roles, model);
+        var pinnedSubject = entity is null ? null : pinned.FindEntity(entity.Id);
+
+        // The operator commands do not serve an instance without a subject yet, so the detail
+        // offers none of them and no call is resolvable.
+        var allowsResolve = entity is not null && PolicyEvaluator.AllowsResolve(application, user.Roles, model);
         var commands = new List<string>();
-        if (row.State == ProcessStarts.Failed && PolicyEvaluator.AllowsRetry(application, user.Roles, model))
+        if (entity is not null && row.State == ProcessStarts.Failed && PolicyEvaluator.AllowsRetry(application, user.Roles, model))
         {
             commands.Add("retry");
         }
 
-        if (row.State is ProcessStarts.Running or ProcessStarts.Waiting
+        if (entity is not null
+            && row.State is ProcessStarts.Running or ProcessStarts.Waiting
             && !calls.Any(call => call.State is ConnectorCalls.Sending or ConnectorCalls.Unknown)
             && PolicyEvaluator.AllowsCancel(application, user.Roles, model))
         {
@@ -277,7 +304,7 @@ internal static class ProcessInspectionEndpoints
         return Results.Ok(new ProcessInstanceDetailResponse(
             row.Id,
             model.Name,
-            subjectId,
+            row.SubjectId,
             row.ReleaseId,
             row.State,
             row.Step,
@@ -488,7 +515,7 @@ internal sealed record ProcessInstanceListResponse(IReadOnlyList<ProcessInstance
 /// <summary>An instance in the list of a process's instances.</summary>
 internal sealed record ProcessInstanceListItem(
     Guid Id,
-    Guid SubjectId,
+    Guid? SubjectId,
     string State,
     string Step,
     Guid ReleaseId,
@@ -503,7 +530,7 @@ internal sealed record ProcessInstanceListItem(
 internal sealed record ProcessInstanceDetailResponse(
     Guid Id,
     string Process,
-    Guid SubjectId,
+    Guid? SubjectId,
     Guid ReleaseId,
     string State,
     string Step,

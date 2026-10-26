@@ -235,10 +235,10 @@ A `createRecord` operation creates a record of another entity:
 
 A process may leave out `entity`. It then declares typed `parameters`. The
 compile checks in this section are built, and so are the instance storage,
-running such an instance on the engine and the start endpoint. The other starts
-and inspection described below are _(planned for M14)_. Until inspection is
-built, the instance list is empty, and the instance detail and the operator
-commands answer `404`.
+running such an instance on the engine, the start endpoint and the inspection
+list and detail. The other starts and the operator commands described below are
+_(planned for M14)_. Until the operator commands are built, they answer `404`
+for such an instance.
 
 ```json
 {
@@ -307,5 +307,7 @@ commands answer `404`.
   trigger](process-events.md#delete-triggers) and a sub-process step give the
   parameters. A start that finds the process running is skipped, as for a
   record.
-- **Inspection.** The instance list and detail show "no subject". Inspecting,
-  retrying, cancelling and resolving need only the grant.
+- **Inspection.** The instance list and detail return `subjectId: null` and need
+  only the `inspect` grant. The detail lists no commands, and a stored call
+  input is hidden. Retrying, cancelling and resolving need only the grant
+  _(planned for M14)_.
