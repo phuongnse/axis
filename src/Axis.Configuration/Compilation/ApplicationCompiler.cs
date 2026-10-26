@@ -1734,8 +1734,8 @@ public static partial class ApplicationCompiler
     /// names a projected field that does not end at a reference. An entity that is a child entity
     /// is reported at <c>/entity</c>, naming its owner. Entity and field names
     /// resolve ignoring letter case; projected names compare exactly, as the query <c>sort</c> does.
-    /// Each parameter name differs from the entity's fields, from <c>page</c>, <c>pageSize</c> and
-    /// <c>sort</c> and from earlier parameters, ignoring letter case. Its type properties and label
+    /// Each parameter name differs from the entity's fields, from <c>page</c>, <c>pageSize</c>,
+    /// <c>sort</c> and <c>search</c> and from earlier parameters, ignoring letter case. Its type properties and label
     /// are checked as an entity field's. The <c>filter</c> parses, type-checks as a boolean over the
     /// entity's fields, the parameters, paths through reference fields and the named rules, and
     /// translates to SQL, with each rule call inlined. Its child collections are in the type check's scope, so an aggregate
@@ -1744,7 +1744,9 @@ public static partial class ApplicationCompiler
     /// has a diagnostic. An <c>aggregate</c> groups by projected names, its measure names differ
     /// from the group fields and from each other, and each measure is valid as
     /// <see cref="CheckMeasure"/> describes. A grouped data source's sort names a group field that
-    /// is not a reference, or a measure. No group field or sort names a file field.
+    /// is not a reference, or a measure. No group field or sort names a file field. A data source with
+    /// <c>search</c> projects at least one field that <see cref="IsSearched"/> accepts, unless a projected path
+    /// is already reported.
     /// </summary>
     private static void CheckDataSources(
         ApplicationLoadResult loaded,
@@ -1792,6 +1794,8 @@ public static partial class ApplicationCompiler
 
             var fieldsByName = new Dictionary<string, FieldDefinition?>(StringComparer.Ordinal);
             var hopsByName = new Dictionary<string, IReadOnlyList<FieldDefinition>>(StringComparer.Ordinal);
+            var searchable = false;
+            var unresolvedPath = false;
             for (var index = 0; index < dataSource.Fields.Count; index++)
             {
                 var projected = dataSource.Fields[index];
@@ -1808,6 +1812,11 @@ public static partial class ApplicationCompiler
                 if (field is not null)
                 {
                     hopsByName.TryAdd(projected.Name, hops);
+                    searchable |= IsSearched(hops, entity);
+                }
+                else
+                {
+                    unresolvedPath = true;
                 }
 
                 if (!fieldsByName.TryAdd(projected.Name, field))
@@ -1822,6 +1831,15 @@ public static partial class ApplicationCompiler
                 {
                     Report(DiagnosticCodes.InvalidDataSourceFieldPath, pathProblem, $"/fields/{index}/path");
                 }
+            }
+
+            // A broken path may have been the searchable one, so it is the only diagnostic then.
+            if (dataSource.Search == true && !unresolvedPath && !searchable)
+            {
+                Report(
+                    DiagnosticCodes.DataSourceSearchWithoutField,
+                    "The data source takes a search, but no projected field is searchable. Project a field marked 'searchable', or the entity's display field directly.",
+                    "/search");
             }
 
             // Group field names compare exactly, as projected names do. An unknown one is still kept,
@@ -1912,7 +1930,7 @@ public static partial class ApplicationCompiler
             }
 
             var countBeforeParameters = diagnostics.Count;
-            var parameterNames = new HashSet<string>(["page", "pageSize", "sort"], StringComparer.OrdinalIgnoreCase);
+            var parameterNames = new HashSet<string>(["page", "pageSize", "sort", "search"], StringComparer.OrdinalIgnoreCase);
             for (var index = 0; index < dataSource.Parameters.Count; index++)
             {
                 var parameter = dataSource.Parameters[index];
@@ -1928,7 +1946,7 @@ public static partial class ApplicationCompiler
                 {
                     Report(
                         DiagnosticCodes.InvalidDataSourceParameterName,
-                        $"The parameter name '{parameter.Name}' is reserved or already used by an earlier parameter. 'page', 'pageSize' and 'sort' are reserved, ignoring letter case.",
+                        $"The parameter name '{parameter.Name}' is reserved or already used by an earlier parameter. 'page', 'pageSize', 'sort' and 'search' are reserved, ignoring letter case.",
                         $"{path}/name");
                 }
 
@@ -2558,6 +2576,15 @@ public static partial class ApplicationCompiler
     }
 
     /// <summary>
+    /// Whether a data source's search matches a projected path: it ends at a <c>searchable</c> text field,
+    /// or it is the root's display field projected directly.
+    /// </summary>
+    private static bool IsSearched(IReadOnlyList<FieldDefinition> hops, EntityResource entity) =>
+        FieldTypes.Parse(hops[^1].Type) == FieldType.Text
+        && (hops[^1].Searchable == true
+            || (hops.Count == 1 && string.Equals(hops[0].Name, entity.DisplayField, StringComparison.OrdinalIgnoreCase)));
+
+    /// <summary>
     /// Builds a checked data source over the built entities, so each projected path is a list of the
     /// entities' own field models, and its filter is compiled against the built entity's fields, the
     /// parameters, paths through reference fields and the named rules.
@@ -2600,6 +2627,16 @@ public static partial class ApplicationCompiler
         DataSourceFieldModel Projected(string name) =>
             fields.First(field => string.Equals(field.Name, name, StringComparison.Ordinal));
 
+        // The compile check has accepted this data source's search, so a field matches by the same rule.
+        var searchFields = dataSource.Search == true
+            ? fields
+                .Where(field => field.Field.Type == FieldType.Text
+                    && (field.Field.Searchable
+                        || (field.Path.Count == 1 && string.Equals(field.Field.Name, entity.DisplayField, StringComparison.OrdinalIgnoreCase))))
+                .DistinctBy(field => string.Join('.', field.Path.Select(step => step.Name)), StringComparer.Ordinal)
+                .ToList()
+            : [];
+
         return new DataSourceModel
         {
             Id = dataSource.Id,
@@ -2623,6 +2660,8 @@ public static partial class ApplicationCompiler
                 : null,
             Sort = dataSource.Sort is { } sort ? new DataSourceSortModel(descending ? sort[1..] : sort, descending) : null,
             PageSize = dataSource.PageSize ?? DataSourceModel.DefaultPageSize,
+            Search = dataSource.Search == true,
+            SearchFields = searchFields,
         };
     }
 

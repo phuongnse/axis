@@ -33,4 +33,10 @@ public sealed record DataSourceResource : Resource
 
     /// <summary>The default page size, from 1 to 100.</summary>
     public int? PageSize { get; init; }
+
+    /// <summary>
+    /// Whether the rows route takes <c>search</c>. It matches the projected fields that end at a
+    /// <c>searchable</c> text field, and the root's display field when it is projected directly.
+    /// </summary>
+    public bool? Search { get; init; }
 }

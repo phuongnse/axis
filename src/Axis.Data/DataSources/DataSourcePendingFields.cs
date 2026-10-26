@@ -7,14 +7,16 @@ namespace Axis.Data.DataSources;
 /// <summary>
 /// Finds the fields a data source query would decide from while they are being recomputed. A sort, a
 /// group field, a measure or a filter that reads a pending computed field would order, group, sum or
-/// select by a stale stored value. A projected field is not checked, because it shows its stored value.
+/// select by a stale stored value. So does a search that matches a pending field. A projected field is
+/// not checked, because it shows its stored value.
 /// </summary>
 public static class DataSourcePendingFields
 {
     /// <summary>
     /// Returns an error message for each part of the query that reads a pending field, keyed
-    /// <c>sort</c>, <c>filter</c> or <c>aggregate</c>, or an empty dictionary when none does. The
-    /// <paramref name="sort"/> is the order the request uses. A path through reference fields reads a
+    /// <c>sort</c>, <c>filter</c>, <c>aggregate</c> or <c>search</c>, or an empty dictionary when none does. The
+    /// <paramref name="sort"/> is the order the request uses. When <paramref name="search"/> is true,
+    /// each search field of the data source is read. A path through reference fields reads a
     /// field of each entity on it, and the filter includes the body of every rule it calls. The messages
     /// name the field, never a value.
     /// </summary>
@@ -24,6 +26,7 @@ public static class DataSourcePendingFields
         ApplicationModel application,
         DataSourceModel dataSource,
         DataSourceSort? sort,
+        bool search,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -32,7 +35,16 @@ public static class DataSourcePendingFields
 
         var sorted = new List<(Guid EntityId, string Field, string Name)>();
         var aggregated = new List<(Guid EntityId, string Field, string Name)>();
+        var searched = new List<(Guid EntityId, string Field, string Name)>();
         var filtered = DataSourceQueries.FilterFieldsRead(application, dataSource);
+
+        if (search)
+        {
+            foreach (var field in dataSource.SearchFields)
+            {
+                AddPath(dataSource, field, searched, field.Name);
+            }
+        }
 
         if (sort is not null)
         {
@@ -59,7 +71,7 @@ public static class DataSourcePendingFields
             }
         }
 
-        var entityIds = sorted.Concat(aggregated).Select(read => read.EntityId)
+        var entityIds = sorted.Concat(aggregated).Concat(searched).Select(read => read.EntityId)
             .Concat(filtered.Select(read => read.EntityId))
             .Distinct()
             .ToList();
@@ -73,6 +85,7 @@ public static class DataSourcePendingFields
         Collect(errors, "sort", sorted, pending);
         Collect(errors, "filter", filtered.Select(read => (read.EntityId, read.Field, Name: read.Path)), pending);
         Collect(errors, "aggregate", aggregated, pending);
+        Collect(errors, "search", searched, pending);
         return errors;
     }
 

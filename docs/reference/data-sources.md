@@ -4,10 +4,10 @@ Detailed reference for data sources: the resource shape, the compile checks,
 the read endpoint, the response and the errors. Parts of this file are built:
 
 - the `dataSource` resource with `entity`, `fields` whose `path` may go
-  through `reference` fields, `parameters`, `filter`, `aggregate`, `sort`
-  and `pageSize`
-- the read endpoint with `page`, `pageSize`, `sort` and the data source
-  parameters, for plain and grouped data sources
+  through `reference` fields, `parameters`, `filter`, `aggregate`, `sort`,
+  `pageSize` and `search`
+- the read endpoint with `page`, `pageSize`, `sort`, `search` and the data
+  source parameters, for plain and grouped data sources
 - `labels` for projected `reference` fields
 - the `table` widget binding, with the data source's schema in page metadata,
   its columns, paging and sorting
@@ -125,6 +125,10 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   `-` and a name for descending order. Without it, rows are ordered by the
   tie-break below.
 - **`pageSize`.** The default page size, from 1 to 100. It defaults to 20.
+- **`search`.** `true` lets the rows route take `search`, see
+  [Query parameters](#query-parameters). Without it, or with `false`, the
+  route refuses `search`. At least one projected field must be searched, see
+  [Compile checks](#compile-checks).
 
 ### Aggregates
 
@@ -186,9 +190,6 @@ These are _(planned for M15)_. See
   [D75](../decisions/d75-the-application-time-zone.md).
 - **Enum labels and files.** Rows hold enum values, and page metadata gives
   their labels. A `file` field cannot be a group field or a measure field.
-- **Search.** `"search": true` lets the rows route take `search`, matched
-  against the projected fields that are `searchable` or the root's display
-  field, as the [record API](record-api.md#paging-and-sorting) matches.
 - **Export.** A data source can be exported to CSV or a spreadsheet, see
   [import and export](import-export.md#export).
 
@@ -211,10 +212,16 @@ see the Data sources bullet of the Resolve step in
 - `sort` names a projected field whose path does not end at a `reference`
   (`AXC0045`).
 - `pageSize` is from 1 to 100. The JSON Schema checks it (`AXC0004`).
+- A data source with `"search": true` projects at least one searched field:
+  a field whose path ends at a `searchable` text field, or the root's display
+  field projected directly. Otherwise it is `AXC0278` at `/search`. It is not
+  reported while a projected path is already `AXC0043`, because the broken
+  path may have been the searchable one. The display field of a reference's
+  target counts only when it is `searchable`.
 - A parameter name differs from every field of the root entity, because the
   filter reads both as plain names. Parameter names are unique, and `page`,
-  `pageSize` and `sort` are reserved. All three compare ignoring letter case,
-  so `Page` and `SORT` are reserved too. A bad name is `AXC0054` at
+  `pageSize`, `sort` and `search` are reserved. All four compare ignoring
+  letter case, so `Page` and `SORT` are reserved too. A bad name is `AXC0054` at
   `/parameters/{i}/name`.
 - A parameter's type is valid for its properties, as for entity fields, with
   the same codes at `/parameters/{i}/...`: `AXC0013` for a property its type
@@ -269,7 +276,7 @@ see the Data sources bullet of the Resolve step in
 
 | Method and path | Response |
 | --- | --- |
-| `GET /api/apps/{app}/data-sources/{dataSource}/rows?page=&pageSize=&sort=` | `200` with one page of rows |
+| `GET /api/apps/{app}/data-sources/{dataSource}/rows?page=&pageSize=&sort=&search=` | `200` with one page of rows |
 
 The endpoint is read-only, and only `GET` is routed. `{app}` is the name of an
 active release, and `{dataSource}` a data source in that release. Both match
@@ -328,6 +335,16 @@ grants, the record filters, the fields and the joined targets are built.
   `fields`, or a group field or measure when the data source is grouped. It
   matches exactly, so letter case matters. A `sort` cannot name a projected
   field whose path ends at a `reference`.
+- **`search`.** It needs `"search": true`. It keeps only the rows where a
+  searched field contains the text, ignoring letter case, and follows the
+  [record API's rules](record-api.md#paging-and-sorting): given at most once,
+  at most 200 characters, no U+0000, and an empty value means no search. The
+  searched fields are the projected fields whose path ends at a `searchable`
+  text field, and the root's display field when it is projected directly. On
+  a grouped data source the search filters the root records before grouping,
+  so groups, counts and measures cover only matching records. Without the
+  option, a non-empty or repeated `search` is a `400`, and an empty one is
+  ignored.
 - **Data source parameters.** They are query parameters under their declared
   names. The names match exactly, so a declared name in another letter case
   is an unknown parameter.
@@ -340,7 +357,8 @@ grants, the record filters, the fields and the joined targets are built.
   projected [pending field](migrations.md#recomputing-computed-fields) shows its
   stored value, which may come from an older expression. A query is refused
   with the `409` in [Errors](#errors) when its `sort`, its default `sort`,
-  its `filter` or its `groupBy` field or measure reads a pending field. That
+  its `filter`, its `groupBy` field or measure, or a searched field of a
+  given `search` is a pending field. That
   includes a path through references and a filter that inlines a rule. The
   record API computes the pending field on a single read.
 - **Order.** Ties are broken by the root `id` ascending, or by the group
@@ -438,8 +456,8 @@ A request is checked in this order, and the first failure is the response:
 the session, then the path, then the grants, then the query, then the
 database. The readable fields are checked with the grants. A root read filter
 that reads a pending field is checked right after the grants, before the
-query. The pending fields of the `sort`, `filter` and `aggregate` are checked
-after the query and before the database.
+query. The pending fields of the `sort`, `filter`, `aggregate` and `search` are
+checked after the query and before the database.
 
 - **`401`.** A request without a session, or with a session from another
   tenant. A request with a bearer token that fails the checks of
@@ -454,13 +472,15 @@ after the query and before the database.
   and an unknown data source. The path is resolved before the query is
   checked, so a path that names nothing is a 404 whatever its query.
 - **`400` for the query.** A validation problem whose `errors` is keyed
-  `page`, `pageSize`, `sort` and the parameter names. It covers a bad value, a
-  missing required value and a repeated parameter. Every invalid parameter is
+  `page`, `pageSize`, `sort`, `search` and the parameter names. It covers a
+  bad value, a missing required value, a repeated parameter and a `search` on
+  a data source without the option. Every invalid parameter is
   reported in the same response.
 - **`409` for a pending field.** The `sort`, default
   `sort`, `filter`, `groupBy` field or measure reads a field that is being
-  recomputed. The title is fixed: "A field is being recomputed." `errors` is
-  keyed `sort`, `filter` or `aggregate`, with a message that names the field.
+  recomputed, or a given `search` matches one. The title is fixed: "A field is
+  being recomputed." `errors` is keyed `sort`, `filter`, `aggregate` or
+  `search`, with a message that names the field.
   The request is valid, so this is a state conflict, not a `400`. A sum over
   stale totals would be the same silent failure.
 - **`409` for a policy that reads a pending field.** A root

@@ -49,6 +49,16 @@ public sealed record DataSourceModel
 
     public int PageSize { get; init; } = DefaultPageSize;
 
+    /// <summary>Whether the rows route takes <c>search</c>.</summary>
+    public bool Search { get; init; }
+
+    /// <summary>
+    /// The projected fields the search matches, one per distinct path: those that end at a
+    /// <c>searchable</c> text field, and the root's display field when it is projected directly.
+    /// Empty when <see cref="Search"/> is false.
+    /// </summary>
+    public IReadOnlyList<DataSourceFieldModel> SearchFields { get; init; } = [];
+
     /// <summary>Finds a projected field by name. The name matches exactly, as the query <c>sort</c> does.</summary>
     public bool TryGetField(string name, [NotNullWhen(true)] out DataSourceFieldModel? field)
     {
