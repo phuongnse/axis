@@ -29,7 +29,7 @@ public static class ProcessStarter
     /// <param name="subject">The subject record as read in this transaction, or null to read it here.</param>
     /// <param name="actorName">The actor's display name, or null for <c>system</c>.</param>
     /// <param name="details">More audit details, such as the endpoint's name, added after <c>processId</c> and <c>releaseId</c>.</param>
-    public static async Task<ProcessStartResult> StartAsync(
+    public static Task<ProcessStartResult> StartAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         string tenantId,
@@ -43,6 +43,60 @@ public static class ProcessStarter
         string actorId,
         string? actorName,
         JsonObject? details,
+        CancellationToken cancellationToken) =>
+        StartOnSubjectAsync(
+            connection, transaction, tenantId, application, releaseId, process, entity, subjectId, subject, instanceId, actorId, actorName, details, null, cancellationToken);
+
+    /// <summary>
+    /// Starts the instance of a child process for a <c>subProcess</c> step, as <c>system</c> and
+    /// pinned to <paramref name="releaseId"/>, the release the parent is pinned to. The start condition
+    /// is checked as for any start, and <c>process.started</c> adds <c>parentInstanceId</c>. The caller
+    /// holds the application's start lock. A child with a subject passes <paramref name="entity"/>,
+    /// <paramref name="subjectId"/> and <paramref name="subject"/> as <see cref="StartAsync"/> takes them. A
+    /// child without one passes <paramref name="parameters"/> as <see cref="StartWithParametersAsync"/> does.
+    /// </summary>
+    /// <param name="parentInstanceId">The instance of the step that starts the child.</param>
+    /// <param name="parentStep">The declared name of that step.</param>
+    internal static Task<ProcessStartResult> StartChildAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel application,
+        Guid releaseId,
+        ProcessModel process,
+        EntityModel? entity,
+        Guid? subjectId,
+        Record? subject,
+        JsonObject? parameters,
+        Guid instanceId,
+        Guid parentInstanceId,
+        string parentStep,
+        CancellationToken cancellationToken)
+    {
+        var details = new JsonObject { ["parentInstanceId"] = parentInstanceId };
+        var parent = (parentInstanceId, parentStep);
+        return entity is not null
+            ? StartOnSubjectAsync(
+                connection, transaction, tenantId, application, releaseId, process, entity, subjectId!.Value, subject, instanceId, AuditActors.System, null, details, parent, cancellationToken)
+            : StartOnParametersAsync(
+                connection, transaction, tenantId, application, releaseId, process, parameters!, instanceId, AuditActors.System, null, details, parent, cancellationToken);
+    }
+
+    private static async Task<ProcessStartResult> StartOnSubjectAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel application,
+        Guid releaseId,
+        ProcessModel process,
+        EntityModel entity,
+        Guid subjectId,
+        Record? subject,
+        Guid instanceId,
+        string actorId,
+        string? actorName,
+        JsonObject? details,
+        (Guid InstanceId, string Step)? parent,
         CancellationToken cancellationToken)
     {
         // Only true passes: false, null and a run-time error all fail the start. now() is this
@@ -71,6 +125,8 @@ public static class ProcessStarter
             State = ProcessStarts.Running,
             Revision = 1,
             Step = process.Start,
+            ParentInstanceId = parent?.InstanceId,
+            ParentStep = parent?.Step,
         };
         return await InsertAsync(connection, transaction, tenantId, application, releaseId, process, instance, actorId, actorName, details, cancellationToken);
     }
@@ -85,7 +141,7 @@ public static class ProcessStarter
     /// <param name="actorName">The actor's display name, or null for <c>system</c>.</param>
     /// <param name="details">More audit details, added after <c>processId</c> and <c>releaseId</c>.</param>
     /// <exception cref="ArgumentException">The process has a subject entity.</exception>
-    public static async Task<ProcessStartResult> StartWithParametersAsync(
+    public static Task<ProcessStartResult> StartWithParametersAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         string tenantId,
@@ -97,6 +153,23 @@ public static class ProcessStarter
         string actorId,
         string? actorName,
         JsonObject? details,
+        CancellationToken cancellationToken) =>
+        StartOnParametersAsync(
+            connection, transaction, tenantId, application, releaseId, process, parameters, instanceId, actorId, actorName, details, null, cancellationToken);
+
+    private static async Task<ProcessStartResult> StartOnParametersAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel application,
+        Guid releaseId,
+        ProcessModel process,
+        JsonObject parameters,
+        Guid instanceId,
+        string actorId,
+        string? actorName,
+        JsonObject? details,
+        (Guid InstanceId, string Step)? parent,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(process);
@@ -128,6 +201,8 @@ public static class ProcessStarter
             Revision = 1,
             Step = process.Start,
             Parameters = parameters.ToJsonString(),
+            ParentInstanceId = parent?.InstanceId,
+            ParentStep = parent?.Step,
         };
         return await InsertAsync(connection, transaction, tenantId, application, releaseId, process, instance, actorId, actorName, details, cancellationToken);
     }
