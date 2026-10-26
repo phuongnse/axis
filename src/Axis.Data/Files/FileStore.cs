@@ -33,6 +33,19 @@ public static class FileStore
           AND "field_path" = ANY(@paths) AND NOT ("id" = ANY(@kept))
         """;
 
+    private const string FindAttachedSql =
+        """
+        SELECT "entity_id", "field_path", "owner_record_id", "name", "media_type" FROM "axis"."files"
+        WHERE "id" = @id AND "application_id" = @application AND "state" = 'attached'
+        """;
+
+    // Joined to the file, so a file that was deleted after it was found gives no bytes.
+    private const string ReadContentSql =
+        """
+        SELECT c."content" FROM "axis"."file_contents" c JOIN "axis"."files" f ON f."id" = c."file_id"
+        WHERE c."file_id" = @id AND f."state" = 'attached'
+        """;
+
     private const string InsertContentSql = """INSERT INTO "axis"."file_contents" ("file_id", "content") VALUES (@id, @content)""";
 
     /// <summary>
@@ -141,5 +154,45 @@ public static class FileStore
         command.Parameters.Add(new NpgsqlParameter("paths", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = paths.ToArray() });
         command.Parameters.Add(new NpgsqlParameter("kept", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = kept.ToArray() });
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// The file with <paramref name="id"/> in the application <paramref name="applicationId"/>, or
+    /// <see langword="null"/> when it is unknown, belongs to another application or is not <c>attached</c>.
+    /// Runs in <paramref name="transaction"/> when it is not <see langword="null"/>.
+    /// </summary>
+    public static async Task<AttachedFile?> FindAttachedAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        Guid applicationId,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(FindAttachedSql, connection, transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("application", applicationId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new AttachedFile(id, reader.GetGuid(0), reader.GetString(1), reader.GetGuid(2), reader.GetString(3), reader.GetString(4))
+            : null;
+    }
+
+    /// <summary>
+    /// The bytes of the <c>attached</c> file with <paramref name="id"/>, or <see langword="null"/> when it is
+    /// unknown or no longer attached. Runs in <paramref name="transaction"/> when it is not <see langword="null"/>.
+    /// </summary>
+    public static async Task<byte[]?> ReadContentAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(ReadContentSql, connection, transaction);
+        command.Parameters.AddWithValue("id", id);
+        return await command.ExecuteScalarAsync(cancellationToken) as byte[];
     }
 }

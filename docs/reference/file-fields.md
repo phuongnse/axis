@@ -9,7 +9,7 @@ marked _(planned for M15)_ are not built yet, and Dn refers to
 
 Upload up to the `pending` state, the storage of a file's details and bytes,
 attach by a record write, the file value in a read, replace and remove, and
-audit are _(built)_. Download, the sweep and the SPA are _(planned for M15)_. Inbound
+audit and download are _(built)_. The sweep and the SPA are _(planned for M15)_. Inbound
 endpoints, task completion and process steps attach nothing for now, so a file
 id they send that the record does not already hold fails.
 
@@ -68,8 +68,8 @@ write records.
   does, or it is a `415`. Other types are checked only for an executable start.
 - **Pending.** The file is stored as `pending`, owned by the user, the entity
   and the field path (`receipt`, or `attachments/file` for a child field).
-  Nothing points to it yet. The response has no `Location` header, because the
-  download route does not exist yet.
+  Nothing points to it yet. The response has no `Location` header, because a
+  pending file cannot be downloaded.
 - **Memory.** The server holds one upload in memory, up to the limit, before
   it writes the file to the database.
 - **Attach** _(built)_. A create or update that sends the id attaches the
@@ -92,22 +92,31 @@ write records.
     is `deleted`, see [storage and clean-up](#storage-and-clean-up). Its id is
     refused like any other unknown id, so it cannot be attached again.
 
-## Download
+## Download _(built)_
 
-This is _(planned for M15)_.
+`GET /api/apps/{app}/files/{id}` answers the bytes. A session user and a
+service account may download, as they may read records.
 
-`GET /api/apps/{app}/files/{id}` answers the bytes.
-
-- **Checks.** The server finds the file's owner record and checks the user's
-  `read` grant, the record filters and that the user may read the field, as a
-  read of the record would. Any failure, an unknown id and a file that is not
-  `attached` are all `404`.
+- **Checks.** A request without a session or token is a `401`, as on every
+  record route. After that the server finds the file's owner record and checks
+  the user's `read` grant, the record filters and that the user may read the
+  field, as a read of the record would. Any failure, an unknown or malformed
+  id, a file of another application and a file that is not `attached` are all
+  the same `404`, so the answer never tells whether a file exists.
+- **Pending filter.** A read filter that uses a computed field that is being
+  recomputed is a `404` too, not the `409` that a record read gives, because a
+  `409` would show that the file exists.
 - **Headers.** `Content-Type` is the stored media type,
   `Content-Disposition: attachment` with the file name, and
   `X-Content-Type-Options: nosniff`. A browser never shows a file inline, so
   an uploaded HTML or SVG file cannot run in the application's origin.
 - **Child rows.** A child row has no id of its own, so a download always goes
-  by file id.
+  by file id. It goes through the owner record, and the user's `read` grant
+  must cover the owner's child collection field, such as `attachments`.
+- **Memory.** The server reads the whole file into memory under the
+  interactive query timeout, then sends it. It does not stream from the
+  database. Many large downloads at once raise memory use, up to
+  `Files:MaxSize` each.
 
 ## Storage and clean-up
 
