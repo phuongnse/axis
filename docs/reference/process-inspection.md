@@ -439,8 +439,8 @@ process with the same `retry` grant, a required reason and an audit record, see
 Discard on each open dead letter whose `commands` list them.
 
 Cancel also cancels an instance's running and waiting sub-processes, see
-[Cancel](#cancel). _(Planned for M14)_ An instance without a subject needs only
-the grant, see [process flow](process-flow.md).
+[Cancel](#cancel). An instance without a subject needs only the grant, see
+[processes without a subject](process-flow.md#processes-without-a-subject).
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances/{id}/retry
@@ -479,7 +479,10 @@ Each is checked
 on its own, and none implies another. The subject record must also be readable
 by the user, by the same rule as a start. A subject record the user may not
 read makes the instance an unknown instance, `404`, so the user cannot tell the
-two apart. Every request is also checked on the server, whatever the widget
+two apart. An instance without a subject has no record, so the grant is the
+only check. No `read` check runs and there is no policy `409` for a pending
+field. The check depends on the stored instance, so an instance with a subject
+is never exempt from the read check. Every request is also checked on the server, whatever the widget
 shows. _(planned for M17)_ In the [operator console](operator-console.md), the
 operator role stands in for these grants.
 
@@ -498,7 +501,8 @@ One transaction does this:
    command runs again on the new release. After three changes it answers `503`.
 2. It locks the instance and requires it to be `failed`, otherwise `409`.
 3. It requires that no other `running` or `waiting` instance exists for the
-   process and the subject record, otherwise `409`.
+   process and the subject record, otherwise `409`. For a process without a
+   subject, no other instance of the process may be `running` or `waiting`.
 4. It requires that no applied `renameField`, `dropField`, `dropEntity` or
    `convert` migration changed a column that the pinned release uses,
    otherwise `409`. It uses the same has-the-column test as `AXC0178`, see
@@ -521,7 +525,8 @@ One transaction does this:
 6. It inserts a `process.step` work item for the step.
 7. It writes a history row for the step, at the revision the instance had when
    it failed. Its output is `{ "command": "retry" }`.
-8. It writes the audit record `process.retried` for the subject record, with
+8. It writes the audit record `process.retried` for the subject record, or with
+   no record for an instance without a subject, with
    details `{ "step", "reason" }`. The actor is the user with their display
    name.
 
@@ -581,7 +586,7 @@ One transaction does this:
 9. It writes a history row for the step of each, at the revision it had. Its
    output is `{ "command": "cancel" }`.
 10. It writes the audit record `process.cancelled` for the subject record of
-    each, with details `{ "step", "reason", "taskIds", "operationIds" }`. The
+    each, or with no record for an instance without a subject, with details `{ "step", "reason", "taskIds", "operationIds" }`. The
     two lists name the tasks and calls it cancelled. The actor is the user and
     the reason is the same for every instance.
 
@@ -631,6 +636,8 @@ One transaction does this:
    fields to the subject record with the record update rules, as a successful
    outcome does. An `output` that does not fit, or a write that the record
    refuses, is a `400`. Nothing changes and the call stays `unknown`.
+   An instance without a subject has no record, so a `succeeded` resolve only
+   checks `output` and writes no record. Its step maps no outputs.
    - It sets the call to `succeeded`. A package call clears its stored input,
      and a connector call keeps it, see [Call input kept](#call-input-kept).
    - It sets the instance to `running` on `next`, with the next revision.
@@ -733,6 +740,7 @@ and then the `409` checks.
   | --- | --- |
   | Retry | The instance is not `failed`. The title is "The instance is not failed.". |
   | Retry | Another instance of the process is `running` or `waiting` for the record. A start that commits first on the unique index gives the same answer. The title is the start endpoint's: "A running or waiting instance of this process already exists for this record.". |
+  | Retry | Another instance of a process without a subject is `running` or `waiting`. The title is "A running or waiting instance of this process already exists.". |
   | Retry | An applied migration renamed, dropped or converted a column that the pinned release uses. The title is "A migration changed a column that the instance's release uses.". |
   | Cancel | The instance is not `running` or `waiting`. The title is "The instance is not running or waiting.". |
   | Cancel | A call of the instance is `sending` or `unknown`. The problem names the call in a `callId` member. The title is "A call of this instance may have reached the other system. It must settle or be resolved first.". |
