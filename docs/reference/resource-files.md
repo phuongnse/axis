@@ -256,6 +256,8 @@ A `seed` holds records with fixed ids for one entity:
   [Startup activation](host-settings.md#startup-activation)).
 - `values` has the shape of the `values` of a record API create body (see
   [Request bodies and values](record-api.md#request-bodies-and-values)).
+  A seed cannot set a `file` field, in a record or in a child row
+  _(planned for M15)_ (`AXC0259`).
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
@@ -514,7 +516,12 @@ new check is a new compile diagnostic.
 
 - **`file`.** One file, with optional `maxSize` and `accept`. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. See
-  [file fields](file-fields.md).
+  [file fields](file-fields.md). The compiler reports a `maxSize` below 1 or
+  above the file size limit (`AXC0257`), an `accept` entry that is not
+  `type/subtype` or `type/*` (`AXC0258`), and `unique` on the field
+  (`AXC0259`). `maxSize` or `accept` on another type, and `expression` on a
+  `file`, are `AXC0013`. In an expression a file allows only `is null` and
+  `is not null`.
 - **`references`.** A set of records of `target`, at most 1,000. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. Its
   expression type is `list<Target>`.
@@ -896,7 +903,7 @@ The `application` manifest may name the application's time zone, see [D75](../de
 - `timeZone` is optional. It is an IANA time zone id. Without it, the time
   zone is `UTC`, so an application that names none behaves as before. An id
   is known when .NET finds it as an IANA id written with its exact letter
-  case, as for a schedule trigger. An unknown id is `AXC0257` at
+  case, as for a schedule trigger. An unknown id is `AXC0260` at
   `/timeZone`. Studio's application form offers `timeZone`.
 - It is part of the release. A change applies to work that runs on the new
   release.

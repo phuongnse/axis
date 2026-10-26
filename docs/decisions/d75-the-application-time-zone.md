@@ -12,7 +12,7 @@ It settles the time zone rule that
 - **Manifest key:** the `application` manifest gets an optional `timeZone`, an
   IANA time zone id such as `Asia/Ho_Chi_Minh`. Without it, the time zone is
   `UTC`, so applications that exist today behave as before. An unknown id is a
-  new diagnostic, `AXC0257`.
+  new diagnostic, `AXC0260`.
 - **What uses it:**
   - `today()` gives the date in the application's time zone at the
     transaction's time. `toDate(date-time)` takes the calendar date of an

@@ -14,8 +14,8 @@ The design follows
 the `claimed_by` and `claimed_at` columns are built, and so are release by a
 `reassign` grant and [reassign](#reassign) with its user picker. The
 [overdue](#task-states) rule and the [inbox and task page](#inbox-and-task-page)
-are built, except Reassign: the inbox marks, and Claim and Release on the task
-page. Escalations and the Reassign dialog are _(planned for M14)_.
+are built: the inbox marks, and Claim, Release and the Reassign dialog on the
+task page. Escalations are _(planned for M14)_.
 
 ## Escalations and deadline
 
@@ -223,6 +223,21 @@ fields.
   `commands` lists them, and shows the task the route returns. A `403` or `409`
   shows a message and loads the task again.
 - An `expired` task shows that its deadline passed, with no form or buttons.
-- _(Planned for M14)_ The task page shows **Reassign** to a user with the
-  grant. Reassign opens a dialog with a role list, the user picker and the
-  reason.
+- The task page shows **Reassign** when `commands` lists it. It opens a dialog
+  that works from the keyboard. The user chooses a role or a person, and types
+  a required reason of at most 500 characters.
+  - The role list is `reassignRoles`, each shown by its label, or by its name
+    when `labelKey` is `null`.
+  - The person picker lists the first 20 people when it opens and asks the
+    [user picker](#reassign) again as the user types. It shows each display name.
+    The page takes its address from the inbox's `tasksPath`, by replacing the
+    trailing `/tasks` with `/users`. If the picker cannot load, its list stays
+    empty and choosing a role still works.
+  - On success the page goes to the inbox page's plain address.
+  - A `400` shows each message under the role, person or reason field its
+    pointer names, and a problem keyed `""` above the form. The dialog stays
+    open.
+  - A `403` or `409` closes the dialog, loads the task again and shows the same
+    message as Claim and Release.
+  - Any other failure shows a generic message in the dialog and keeps what the
+    user typed.

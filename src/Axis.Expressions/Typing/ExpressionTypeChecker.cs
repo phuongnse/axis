@@ -60,7 +60,16 @@ public static class ExpressionTypeChecker
         }
     }
 
-    private static ExpressionType Infer(ExpressionNode node, Context context) => node switch
+    /// <summary>The type of <paramref name="node"/>. A file is refused, because only a null check accepts one.</summary>
+    private static ExpressionType Infer(ExpressionNode node, Context context)
+    {
+        var type = InferAny(node, context);
+        return type.Kind == ExpressionTypeKind.File
+            ? throw Fail(ExpressionDiagnosticCodes.TypeMismatch, "A file allows only 'is null' and 'is not null'", node.Offset)
+            : type;
+    }
+
+    private static ExpressionType InferAny(ExpressionNode node, Context context) => node switch
     {
         IntegerLiteral => ExpressionType.Integer,
         DecimalLiteral => ExpressionType.Decimal,
@@ -511,7 +520,7 @@ public static class ExpressionTypeChecker
 
     private static ExpressionType InferIsNull(IsNullNode isNull, Context context)
     {
-        Infer(isNull.Operand, context);
+        InferAny(isNull.Operand, context);
         return ExpressionType.Boolean;
     }
 
