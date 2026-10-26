@@ -70,6 +70,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   // The dialog fades out after a choice, and a drag that starts under it does not reach the canvas.
   async function chooseBinding(page: Page, type: string) {
+    await waitForDialog(page)
     await page.getByTestId(`studio-binding-${type}`).click()
     await expect(page.getByTestId('studio-binding-choice')).toBeHidden()
   }
