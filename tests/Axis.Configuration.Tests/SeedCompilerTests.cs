@@ -68,6 +68,60 @@ public sealed class SeedCompilerTests
     }
 
     [Fact]
+    public void Seed_record_that_sets_a_file_field_is_reported_at_that_value()
+    {
+        using var folder = FileFolder().With("seeds/orders.json", Seed(
+            "Orders",
+            "77777777-7777-4777-8777-777777777771",
+            "Order",
+            Record(FirstRecordId, """{ "number": "A-1" }"""),
+            Record(SecondRecordId, """{ "number": "A-2", "Receipt": null }""")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.FileFieldNotAllowed, "seeds/orders.json", "/records/1/values/Receipt"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'receipt'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal(Guid.Parse("77777777-7777-4777-8777-777777777771"), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Seed_record_that_sets_a_file_field_of_a_child_row_is_reported_at_that_value()
+    {
+        using var folder = FileFolder().With("seeds/orders.json", Seed(
+            "Orders",
+            "77777777-7777-4777-8777-777777777771",
+            "Order",
+            Record(FirstRecordId, """{ "number": "A-1", "lines": [{ "description": "x" }, { "description": "y", "photo": "abc" }] }""")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.FileFieldNotAllowed, "seeds/orders.json", "/records/0/values/lines/1/photo"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Seed_record_that_leaves_file_fields_out_compiles()
+    {
+        using var folder = FileFolder().With("seeds/orders.json", Seed(
+            "Orders",
+            "77777777-7777-4777-8777-777777777771",
+            "Order",
+            Record(FirstRecordId, """{ "number": "A-1", "lines": [{ "description": "x" }] }""")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
     public void Seed_over_an_unknown_entity_is_reported_at_its_entity()
     {
         using var folder = Folder().With("seeds/orders.json", Seed(
@@ -173,6 +227,23 @@ public sealed class SeedCompilerTests
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
             .With("entities/order.json", PresentationCompilerTests.Order);
+
+    /// <summary>An order with a file field and a child collection whose rows have a file field.</summary>
+    private static TemporaryFolder FileFolder() =>
+        new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/order.json", """
+                { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1,
+                  "fields": [
+                    { "name": "number", "type": "text", "required": true },
+                    { "name": "receipt", "type": "file" },
+                    { "name": "lines", "type": "child-collection", "target": "OrderLine" }
+                  ] }
+                """)
+            .With("entities/order-line.json", """
+                { "id": "22222222-2222-4222-8222-222222222222", "kind": "entity", "name": "OrderLine", "formatVersion": 1,
+                  "fields": [ { "name": "description", "type": "text" }, { "name": "photo", "type": "file" } ] }
+                """);
 
     private static string Seed(string name, string id, string entity, params string[] records) =>
         $$"""{ "id": "{{id}}", "kind": "seed", "name": "{{name}}", "formatVersion": 1, "entity": "{{entity}}", "records": [{{string.Join(", ", records)}}] }""";

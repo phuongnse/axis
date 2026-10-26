@@ -1,6 +1,6 @@
 import type { ChartKind } from '../platform/chartOption'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
-import type { InstancePage } from '../platform/inspection'
+import type { DeadLetterPage, InstancePage } from '../platform/inspection'
 import type {
   DataSourceMetadata,
   EntityMetadata,
@@ -25,6 +25,7 @@ const categoriesPath = `${apiPath}/entities/Category/records`
 const formStatePath = `${apiPath}/forms/RequestForm/state`
 const tasksPath = `${apiPath}/tasks`
 const instancesPath = `${apiPath}/processes/Approve/instances`
+const deadLettersPath = `${apiPath}/processes/Approve/dead-letters`
 const requestsByStatusPath = `${apiPath}/data-sources/RequestsByStatus/rows`
 const requestTotalsPath = `${apiPath}/data-sources/RequestTotals/rows`
 
@@ -100,6 +101,7 @@ const widgetBase: WidgetMetadata = {
   tasksPath: null,
   process: null,
   instancesPath: null,
+  deadLettersPath: null,
   actions: [],
   rowActions: [],
   toolbarActions: [],
@@ -192,6 +194,7 @@ export const processInspectorWidget: WidgetMetadata = {
   type: 'processInspector',
   process: 'Approve',
   instancesPath,
+  deadLettersPath,
 }
 
 const requestsByStatus: DataSourceMetadata = {
@@ -329,6 +332,8 @@ const taskPage: TaskPage = {
       labelKey: 'request.task.review',
       subject: { entity: 'Request', id: requestId, label: 'Standing desks for the new office' },
       dueAt: '2026-03-20T17:00:00.000000Z',
+      claimedBy: null,
+      overdue: false,
       createdAt: '2026-03-04T09:31:00.000000Z',
     },
     {
@@ -339,6 +344,8 @@ const taskPage: TaskPage = {
       labelKey: 'request.task.review',
       subject: { entity: 'Request', id: '8b3e4c5d-6f70-4b82-8c93-b4d5e6f70819', label: 'Whiteboard markers' },
       dueAt: null,
+      claimedBy: null,
+      overdue: false,
       createdAt: '2026-03-05T14:02:00.000000Z',
     },
   ],
@@ -371,6 +378,31 @@ const instancePage: InstancePage = {
   page: 1,
   pageSize: 20,
   totalCount: 2,
+}
+
+const deadLetterPage: DeadLetterPage = {
+  items: [
+    {
+      id: 'd08d91a2-b4c5-4ad7-91e8-092a3b4c5d6e',
+      kind: 'event.deliver',
+      eventId: 'e19ea2b3-c5d6-4be8-a2f9-1a3b4c5d6e7f',
+      triggerId: 'f2afb3c4-d6e7-4cf9-b30a-2b4c5d6e7f80',
+      processInstanceId: null,
+      emailId: null,
+      occurrenceAt: '2026-03-04T09:31:00.000000Z',
+      attempts: 5,
+      lastError: 'System.InvalidOperationException',
+      state: 'open',
+      reason: null,
+      settledBy: null,
+      createdAt: '2026-03-04T09:36:00.000000Z',
+      settledAt: null,
+      commands: ['redeliver', 'discard'],
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 1,
 }
 
 const categoryPage: RecordPage = {
@@ -457,6 +489,7 @@ export const routes: Record<string, () => unknown> = {
   [categoriesPath]: () => categoryPage,
   [tasksPath]: () => taskPage,
   [instancesPath]: () => instancePage,
+  [deadLettersPath]: () => deadLetterPage,
   [requestsByStatusPath]: () => requestsByStatusPage,
   [requestTotalsPath]: () => requestTotalsPage,
   [`/api/sites/${sitePath}/texts/${locale}`]: () => ({ texts: siteTexts }),

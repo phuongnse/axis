@@ -1,5 +1,6 @@
 using System.Net;
 using Axis.Server.Authentication;
+using Axis.Server.Tenancy;
 using Axis.Server.Tests;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
@@ -375,17 +376,18 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
-            app.Use(async (context, nextMiddleware) =>
-            {
-                if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/test/session")
+            // The session store reads the tenant, which the real pipeline resolves only after this filter.
+            app.UseWhen(
+                context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/test/session",
+                branch =>
                 {
-                    await context.SignInAsync(Session.Scheme, Session.CreatePrincipal(tenantId, "anna", "Anna Employee", ["employee"]));
-                    context.Response.StatusCode = StatusCodes.Status204NoContent;
-                    return;
-                }
-
-                await nextMiddleware(context);
-            });
+                    branch.UseTenantResolution();
+                    branch.Run(async context =>
+                    {
+                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal(tenantId, "anna", "Anna Employee", ["employee"]));
+                        context.Response.StatusCode = StatusCodes.Status204NoContent;
+                    });
+                });
             next(app);
         };
     }

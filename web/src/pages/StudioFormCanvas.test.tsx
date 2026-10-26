@@ -82,6 +82,7 @@ const widget: EntityWidgetMetadata = {
   tasksPath: null,
   process: null,
   instancesPath: null,
+  deadLettersPath: null,
   actions: [],
   rowActions: [],
   toolbarActions: [],

@@ -48,6 +48,7 @@ import { SeedGrid } from './SeedGrid'
 import type { FormUse } from './StudioFormUsedOn'
 import type { OpenResource } from './StudioReferences'
 import { TextTable, type TextColumn } from './TextTable'
+import { triggerSchema } from './triggerSchema'
 
 type Content = Record<string, unknown>
 
@@ -887,7 +888,11 @@ export function StudioEditor({
                         <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
                       </Flex>
                     ) : schema ? (
-                      <SchemaForm schema={schema} value={draft} onChange={change} />
+                      <SchemaForm
+                        schema={item.kind === 'trigger' ? triggerSchema(schema, draft) : schema}
+                        value={draft}
+                        onChange={change}
+                      />
                     ) : (
                       <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
                     )}

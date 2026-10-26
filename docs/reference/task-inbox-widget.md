@@ -35,14 +35,19 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     `releaseId`, once per release. Tasks from several releases each show
     their own release's labels. The table stays loading until those texts
     have arrived, and a failed load shows the inbox's load error.
+  - **Tags.** An overdue task shows a red "Overdue" tag with that word
+    beside its due date. A task with `claimedBy` set shows a "Claimed by you"
+    tag beside its label. The task list returns a claimed task only to its
+    claimer, so the signed-in user is always the claimer, and the inbox does
+    not fetch the user.
   - **Paging.** `page` and `pageSize` live in the URL, as for a table. There
     is no sort.
   - **Links.** Each row opens the task page at
     `/{site}/{inboxpage}/{taskId}`, with the inbox page name in lower case.
   - **Signed out.** With nobody signed in, the task API answers `401`, and
     the widget starts sign-in like any other call. The platform texts
-    `shell.tasks.*` hold the column headers, the empty text and the load
-    error.
+    `shell.tasks.*` hold the column headers, the empty text, the load error
+    and the two tags.
 - **Task page**. The address `/{site}/{inboxpage}/{taskId}`
   shows one task, under the page of its task inbox.
   - It loads the texts of the task's `releaseId` with
@@ -63,6 +68,20 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     [form widget conditions](form-widget-conditions.md#form-widget-conditions-and-steps).
     The outcome buttons are on the last step.
   - It has one button per outcome, with the outcome's label.
+  - An overdue task shows the same "Overdue" tag beside the due date.
+  - An open task shows a **Claim** button and a **Release** button, each only
+    when the task read's `commands` lists it, so none when `commands` is
+    empty. `reassign` is ignored. A click posts to the claim or release
+    route, see [task deadlines](task-deadlines.md#claim-and-release), and
+    the page then shows the task the route returns, with its new `commands`.
+    The page keeps the form it already shows, so values the user typed stay.
+    While a click is pending, its button shows as loading and the other is
+    disabled. The page shows no claimed tag, because it does not know the
+    signed-in user's id.
+  - A `403` or `409` from claim or release shows a message that the action is
+    no longer possible, and loads the task again. The message is a platform
+    text, not the server's problem title. Any other failure shows a generic
+    error message.
   - A click sends the outcome, the changed editable values and the record's
     `version` to the complete endpoint. On success it returns to the inbox.
   - A `403` shows a message that the task is assigned to someone else.
@@ -72,7 +91,11 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     that field, and every other key, such as `/outcome`, above the form.
   - A `409` that names keys, such as a stale `/version` or a duplicate
     unique value, is mapped the same way. There is no reload button.
-  - A task that is not `open`, when the page loads or after a `409` loads it
+  - An `expired` task, whose deadline passed before anyone decided it, shows
+    only a message that the deadline passed, with no form, outcome buttons,
+    Claim or Release. A reload after a `409` that comes back `expired` shows
+    it too.
+  - A task that is not `open` and not `expired`, when the page loads or after a `409` loads it
     again, shows only the already completed message, with no form or
     outcome buttons. So nobody retries a decision that cannot succeed.
   - With nobody signed in, the task read answers `401`, and the page starts
@@ -84,11 +107,9 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - The `version` is sent even when no field changed. The task API ignores
     it then.
   - The task page has no history panel.
-  - The platform texts `shell.task.*` hold the assigned elsewhere and
-    already completed messages, and the load and complete errors.
-- **Claim, release, reassign and overdue** _(planned for M14)_. The inbox
-  marks an overdue task and shows who claimed a task. The task page shows
-  Claim, Release and Reassign, see
-  [Inbox and task page](task-deadlines.md#inbox-and-task-page). An `expired`
-  task shows a message that the deadline passed, with no form or outcome
-  buttons.
+  - The platform texts `shell.task.*` hold the assigned elsewhere, already
+    completed and expired messages, the Claim, Release and Reassign labels, the
+    refused and failed messages of those actions, the texts of the Reassign
+    dialog, and the load and complete errors.
+- **Reassign.** The task page shows Reassign, see
+  [Inbox and task page](task-deadlines.md#inbox-and-task-page).

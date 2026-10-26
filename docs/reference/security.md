@@ -110,32 +110,31 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     user agent. The address follows the
     [forwarded headers](host-settings.md#forwarded-headers) rules of
     [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
-- **Session.** One HttpOnly, Secure, SameSite=Lax cookie, `Axis.Session`.
-  - It holds the user id, the display name, the roles and the tenant id.
-  - It holds no access, refresh or ID token, and no token reaches the
-    browser.
-  - It ends 8 hours after sign-in, or after 1 hour without requests,
-    whichever comes first. Every request with a session renews the cookie,
-    so the hour counts from the last request.
-  - _(Planned for M16.)_ The session moves to the server, see
-    [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md):
-    - The session state is a row of `axis.sessions` in the tenant database:
-      a hash of the session id, the user id, the display name, the roles,
-      the time of sign-in and the time of the last request. The table never
-      holds the session id itself, or a token.
-    - The cookie holds only a random session id of at least 128 bits. It
-      holds no claim.
-    - Sign-in always creates a new session id. Sign-out deletes the row, so a
-      copied cookie stops working at once, on every replica.
-    - A request reads the row and updates the time of the last request. A
-      row past one of the two lifetimes counts as no session, and is deleted.
-    - The worker removes expired rows.
-    - `tenant restore` empties the table, so no session comes back with an
-      archive.
-    - The cookie is named `__Host-Axis.Session`, with `Path=/` and no
-      domain, so the browser refuses it on plain http or from a subdomain.
-      In `Development` and `Testing` over plain http it keeps the name
-      `Axis.Session`.
+- **Session.** The session state is a row of `axis.sessions` in the tenant
+  database, see [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
+  - The row holds a hash of the session id, the user id, the display name,
+    the roles, the time of sign-in and the time of the last request. The
+    table never holds the session id itself, or a token, and no token
+    reaches the browser.
+  - The cookie is one HttpOnly, SameSite=Lax cookie. It holds only the random
+    session id, 256 bits, wrapped and protected by the key ring below. It
+    holds no claim. The row's key is the SHA-256 hash of the id.
+  - Sign-in always creates a new session id, even when the browser already
+    sends a valid session, and the old session ends. Sign-out deletes the row,
+    so a copied cookie stops working at once, on every replica.
+  - A request reads the row and updates the time of the last request. A row
+    ends 8 hours after sign-in, or after 1 hour without requests, whichever
+    comes first. A request past either limit counts as no session, and the
+    row is deleted. Every request with a session renews the cookie.
+  - The row has no tenant id, because each tenant has its own database. A
+    cookie on another tenant's host finds no row there, so it counts as no
+    session.
+  - The cookie is named `__Host-Axis.Session`, with `Secure`, `Path=/` and no
+    domain, so the browser refuses it on plain http or from a subdomain. In
+    `Development` and `Testing`, which run over plain http, it keeps the name
+    `Axis.Session`. The name depends only on the environment.
+  - _(Planned for M16.)_ The worker removes expired rows. `tenant restore`
+    empties the table, so no session comes back with an archive.
   - In `Development` and `Testing`, which run over plain http, the session
     cookie and the OIDC helper cookies are Secure only on https requests.
   - Behind a named proxy, the callback and sign-out addresses and the cookie's
@@ -144,19 +143,20 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     [forwarded headers settings](host-settings.md#forwarded-headers).
   - The cookie is protected with a key ring that every server replica shares.
     The keys are in `platform.data_protection_keys`, encrypted with
-    `Platform:SecretKey`, so a session survives a restart and works on every
-    replica. During a key rotation a key that `Platform:PreviousSecretKey`
-    encrypted still decrypts, and `platform rekey` then re-encrypts it, so
-    nobody is signed out. The server fixes the data protection application name to `Axis`,
+    `Platform:SecretKey`. It protects the cookie's session id wrapper, so
+    every replica reads it. The session itself survives a restart and works
+    on every replica because its row is in the database. During a key
+    rotation a key that `Platform:PreviousSecretKey` encrypted still
+    decrypts, and `platform rekey` then re-encrypts it, so nobody is signed
+    out. The server fixes the data protection application name to `Axis`,
     so replicas at different paths read the same keys. A key that does not
     decrypt stops the start.
 - **Tenant binding.** A session whose tenant id differs from the tenant
   [resolved from the host](../architecture.md#request-resolution) counts as no session. So a
   cookie taken to another tenant's host signs nobody in there.
 - **Roles.** The roles come from the roles claim at sign-in and are kept in
-  the session. A role change at the identity provider applies at the next
-  sign-in. Under the server-side session of M16 they are kept in the session
-  row, and the rule does not change.
+  the session row. A role change at the identity provider applies at the next
+  sign-in.
 - **Current user.** `GET /api/me` keeps its shape,
   `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean
   `studio`, true when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set, and the user holds
@@ -214,7 +214,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   [Machine callers](#machine-callers).
 - **Tests.** Tests of sign-in itself start the development realm in Keycloak
   through Testcontainers, and drive its login page. Tests of the session
-  lifetime create the session through a test-only hook and use a test clock.
+  lifetime run on real PostgreSQL, create the session through a test-only hook
+  and use a test clock, so they see the row deleted. Server tests that only
+  need some session use an in-memory session store.
   Tests of [machine callers](#machine-callers) get client credentials tokens
   from the same container, and expire them with a test clock.
   Integration tests of other endpoints sign in through a test authentication
@@ -249,18 +251,18 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 These are test fixtures. Docs and GitHub text name roles instead. A new
 sample reuses a user that holds the role it needs before it adds a user.
 
-| User    | Roles                   | Used by                                                                                          |
-| ------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
+| User    | Roles                   | Used by                                                                                                                                       |
+| ------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
-| `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                                         |
-| `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                         |
-| `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                         |
-| `dung`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                      |
-| `giang` | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                      |
-| `hoa`   | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                         |
-| `khoa`  | `agent`                 | Service desk sample; E2E journeys                                                                |
-| `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                                                |
-| `minh`  | `approver`              | Request approval template journey; E2E journeys                                                  |
+| `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `dung`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                                                                   |
+| `giang` | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                                                                   |
+| `hoa`   | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                                                                      |
+| `khoa`  | `agent`                 | Service desk sample; E2E journeys                                                                                                             |
+| `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                                                                                             |
+| `minh`  | `approver`              | Request approval template journey; E2E journeys                                                                                               |
 
 ## Machine callers
 
@@ -387,6 +389,7 @@ stay session-only until then.
   The server marks each of these routes, so the choice of scheme, the CSRF
   exemption and the test of every route read the same mark and no path is
   matched by text.
+
 - **Not reached.** The task API, the form state endpoint, site and page
   metadata, `GET /api/me`, Studio and the authoring API. A task asks a person
   to decide, so a service account never completes one. A bearer token on these
@@ -431,8 +434,8 @@ stay session-only until then.
 It follows [D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant
 can turn on the FAPI 2.0 Security Profile for sign-in and for machine callers.
 The tenant setting, the client key, the startup check, the machine callers, and
-PAR, `private_key_jwt`, the `iss` check and DPoP at sign-in are built. The
-rotation and verification bullets below are _(planned for M16)_.
+PAR, `private_key_jwt`, the `iss` check, DPoP at sign-in and the client key rotation are built. The
+verification bullet below is _(planned for M16)_.
 
 - **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
   `standard` when unset. Any other value stops the server's start, naming the
@@ -511,8 +514,10 @@ rotation and verification bullets below are _(planned for M16)_.
   under `directory`, the current one and the previous one, and one under
   `configuration`. A tenant under `fapi2` without a key, or with a key without a
   key id, stops the server's start.
-- **Rotation** _(planned for M16)_. The tenant can hold a second key while the identity provider
-  changes over, see [tenant setting commands](tenant-setting-commands.md).
+- **Rotation.** The tenant can hold a second key while the identity provider changes over. The
+  operator registers the public keys at the identity provider, and the server signs with the
+  newest key after its next refresh. `tenant oidc set --client-key` and `--retire-client-key`
+  change the keys, see [tenant setting commands](tenant-setting-commands.md#sign-in-settings).
 - **Verification** _(planned for M16)_. The OpenID Foundation's conformance suite runs by hand
   against the development realm under `fapi2`. Its result is recorded in
   [ASVS](asvs.md). Axis seeks no certification.
@@ -524,7 +529,8 @@ rotation and verification bullets below are _(planned for M16)_.
   has three executors: the PKCE enforcer, the secure client authenticator that
   allows only `client-jwt`, and the signature algorithm check for signed JWT
   client assertions. The client's JWKS holds the public keys of two EC P-256
-  keys, `key-1` and `key-2`. Their private keys are committed as
+  keys, `key-1` and `key-2`. It lists each key under that name and under its key id from
+  `tenant oidc set --client-key`, the JWK thumbprint, so Keycloak accepts both. Their private keys are committed as
   `samples/keycloak/axis-fapi-key-1.pem` and `axis-fapi-key-2.pem`, for
   development and tests only. They are registered on this client of the
   development realm and nowhere else.

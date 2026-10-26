@@ -10,6 +10,7 @@ using Axis.Data.Audit;
 using Axis.Data.Naming;
 using Axis.Data.Records;
 using Axis.Data.Storage;
+using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
@@ -19,6 +20,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using NpgsqlTypes;
 using Record = Axis.Data.Records.Record;
@@ -186,6 +188,16 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         return id;
     }
 
+    /// <summary>Sets the <c>divisor</c> of the request <paramref name="id"/>.</summary>
+    public async Task SetDivisorAsync(Guid id, long divisor)
+    {
+        await using var command = DataSource.CreateCommand(
+            $"UPDATE {RequestTable} SET {Column("divisor")} = @divisor WHERE {Column("id")} = @id");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("divisor", divisor);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
     /// <summary>
     /// Inserts <paramref name="count"/> requests with new titles, <paramref name="amount"/> and
     /// <paramref name="divisor"/> and no department, in one statement.
@@ -300,6 +312,71 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             processInstanceId: instanceId);
         await transaction.CommitAsync();
         return instanceId;
+    }
+
+    /// <summary>
+    /// Retries the failed instance <paramref name="instanceId"/> of <paramref name="process"/> in
+    /// <paramref name="model"/> as an operator with full access would, which queues its step again.
+    /// Asserts the retry and commits it.
+    /// </summary>
+    public async Task RetryAsync(string process, Guid instanceId, ApplicationModel model, CancellationToken cancellationToken)
+    {
+        Assert.True(model.TryGetProcess(process, out var processModel));
+        Assert.True(model.TryGetEntity(processModel.Entity!.Name, out var entity));
+        await using var connection = await DataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var result = await ProcessRetryCommand.RetryAsync(
+            connection,
+            transaction,
+            _tenantId,
+            model,
+            processModel,
+            entity,
+            instanceId,
+            new RecordAccess(true, null),
+            "maria",
+            "Maria",
+            "Fixed",
+            NullLoggerFactory.Instance,
+            cancellationToken);
+        Assert.Equal(ProcessRetryOutcome.Retried, result.Outcome);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Cancels the instance <paramref name="instanceId"/> of <paramref name="process"/> in <paramref name="model"/>
+    /// as the operator <c>maria</c> with full access would, with the reason <c>Fixed</c>. Commits when the
+    /// instance is cancelled and rolls back otherwise.
+    /// </summary>
+    public async Task<ProcessCancelResult> CancelAsync(string process, Guid instanceId, ApplicationModel model, CancellationToken cancellationToken)
+    {
+        Assert.True(model.TryGetProcess(process, out var processModel));
+        Assert.True(model.TryGetEntity(processModel.Entity!.Name, out var entity));
+        await using var connection = await DataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var result = await ProcessCancelCommand.CancelAsync(
+            connection,
+            transaction,
+            model,
+            processModel,
+            entity,
+            instanceId,
+            new RecordAccess(true, null),
+            "maria",
+            "Maria",
+            "Fixed",
+            NullLoggerFactory.Instance,
+            cancellationToken);
+        if (result.Outcome == ProcessCancelOutcome.Cancelled)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+        else
+        {
+            await transaction.RollbackAsync(cancellationToken);
+        }
+
+        return result;
     }
 
     /// <summary>Claims and runs the tenant's due work items until none is left.</summary>

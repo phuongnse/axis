@@ -8,9 +8,10 @@ sections marked _(planned for Mx)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
 The design follows [D74](../decisions/d74-a-visual-process-designer.md). The
-Design tab, the canvas, the existing step panels, undo, Tab and Enter, and the
-diagnostic marks are _(built)_. The palette, the transitions, remove, the panels
-of the new step types and the live region are _(planned for M14)_.
+Design tab, the canvas, the existing step panels, remove, undo, Tab and Enter,
+the diagnostic marks and the live region for removals are _(built)_. The
+palette, the transitions, the panels of the new step types and the live region
+for adds and moves are _(planned for M14)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
   and JSON tabs. The three tabs edit one draft.
@@ -19,8 +20,10 @@ of the new step types and the live region are _(planned for M14)_.
   drawn by React Flow and laid out by dagre, is the Design tab's canvas. The
   designer stores no position. Every edit lays the graph out again, so the
   process file holds no layout. Clicking a node selects its step. Clicking an
-  edge selects the step the edge leaves. The selected step is not written to
-  the URL. _(Planned for M14)_ The canvas becomes editable.
+  edge, or pressing Enter on it, selects that edge and the step it leaves. The
+  selected edge is drawn in the primary colour. The selected step and edge are
+  not written to the URL. _(Planned for M14)_ The canvas becomes editable by
+  the palette and by dragging transitions.
 - **Palette** _(planned for M14)_. It lists the step types: `decision`, `task`, the operations
   (`updateRecord`, `createRecord`, `callConnector`, `raiseEvent`, `notify` and
   the package operations of the application's packages), `timer`,
@@ -38,10 +41,19 @@ of the new step types and the live region are _(planned for M14)_.
   a decision or a task, opens a small menu that lists its branches,
   `otherwise`, its outcomes, or a new branch or outcome. The panel's pickers
   set the same transitions by keyboard.
-- **Remove** _(planned for M14)_. Removing a step removes it from `steps`. Removing an edge clears
-  that transition. A transition left naming a missing step is `AXC0070`, and
-  the graph draws no edge for it. The designer never invents a step or a
+- **Remove** _(built)_. Removing a step removes it from `steps`. Removing an
+  edge clears that transition: its target becomes empty, and its branch or
+  outcome stays. A transition left naming a missing step is `AXC0070`, and the
+  graph draws no edge for it. The designer never invents a step or a
   transition.
+  - The selected step is removed by the card's Remove step button, or by
+    Delete or Backspace in the canvas.
+  - With an edge selected, the panel shows a Remove transition button above the
+    card, and Delete or Backspace in the canvas clears that transition instead.
+    Delete acts on the selection, not on the focused element, and a key
+    pressed outside the canvas, such as in the panel's text fields, removes
+    nothing.
+  - One Undo reverses each removal.
 - **Property panel (existing panels)** _(built)_. Selecting a node opens the
   step's card of the Form tab beside the canvas, with Move up, Move down and
   Remove. Removing the selected step clears the selection. An edit in the
@@ -54,11 +66,16 @@ of the new step types and the live region are _(planned for M14)_.
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)
   cover every edit of a process on all three tabs, with 100 steps, cleared by
   a reload.
-- **Keyboard** _(built)_. Nodes are reached with Tab and opened with Enter, as
-  on the graph. Enter selects the step and opens its card.
-- **Screen readers** _(planned for M14)_. Every add, move and remove has a
-  keyboard way, and a live region says what changed, such as "Step remind added
-  after resolve".
+- **Keyboard** _(built)_. Edges and then nodes are reached with Tab, because the
+  edges come first in the page. Enter selects a node's step and opens its
+  card. Enter or Space on an edge selects that edge. Delete or Backspace
+  removes the selection. Each edge has a name made of its two steps and its
+  branch or outcome, such as "financeCheck to markApproved · otherwise".
+- **Screen readers** _(partly built)_. Every add, move and remove has a
+  keyboard way, and a live region says what changed. Removals are _(built)_: a
+  hidden live region says "Removed step remind" or "Removed transition
+  financeCheck to markApproved". Adds and moves, such as "Step remind added
+  after resolve", are _(planned for M14)_.
 - **Diagnostics** _(built)_. Marks work as on the graph: a marked node has an
   error-coloured border, "has diagnostics" in its text label, and
   `data-marked`.

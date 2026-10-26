@@ -36,6 +36,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
         var samples = Path.Combine(AppContext.BaseDirectory, "Samples");
         CopyDirectory(Path.Combine(samples, "purchase-requests"), _purchaseRequests.Path);
         CopyDirectory(Path.Combine(samples, "leave-requests"), _leaveRequests.Path);
+        AddProcessWithoutSubject(Path.Combine(_leaveRequests.Path, "processes", "daily-reminder.json"));
         CopyDirectory(Path.Combine(samples, "purchase-requests"), _broken.Path);
         RenameApplication(Path.Combine(_broken.Path, "application.json"), "BrokenRequests");
         BreakProcess(Path.Combine(_broken.Path, "processes", "purchase-request-approval.json"));
@@ -99,6 +100,18 @@ public sealed class StudioNamesTests : IAsyncLifetime
         var step = Named(process, "steps", "managerApproval");
         Assert.Equal("task", step.GetProperty("type").GetString());
         Assert.Equal(["approve", "return", "reject"], step.GetProperty("outcomes").EnumerateArray().Select(outcome => outcome.GetString()));
+        Assert.Empty(process.GetProperty("parameters").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Names_list_the_parameters_of_a_process_without_a_subject()
+    {
+        var names = await NamesAsync("LeaveRequests");
+
+        var process = Named(names, "processes", "DailyReminder");
+        var parameter = Assert.Single(process.GetProperty("parameters").EnumerateArray());
+        Assert.Equal("daysOverdue", parameter.GetProperty("name").GetString());
+        Assert.Equal("integer", parameter.GetProperty("type").GetString());
     }
 
     [Fact]
@@ -222,6 +235,21 @@ public sealed class StudioNamesTests : IAsyncLifetime
     {
         var process = JsonNode.Parse(File.ReadAllText(file))!.AsObject();
         process["steps"] = "broken";
+        File.WriteAllText(file, process.ToJsonString());
+    }
+
+    private static void AddProcessWithoutSubject(string file)
+    {
+        var process = new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString(),
+            ["kind"] = "process",
+            ["name"] = "DailyReminder",
+            ["formatVersion"] = 1,
+            ["parameters"] = new JsonArray(new JsonObject { ["name"] = "daysOverdue", ["type"] = "integer" }),
+            ["start"] = "done",
+            ["steps"] = new JsonArray(new JsonObject { ["name"] = "done", ["type"] = "end" }),
+        };
         File.WriteAllText(file, process.ToJsonString());
     }
 

@@ -147,6 +147,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         "tasksPath": null,
         "process": null,
         "instancesPath": null,
+        "deadLettersPath": null,
         "actions": [],
         "rowActions": [
           { "type": "navigate", "page": "ItemForm", "labelKey": "items.open", "parameters": {}, "record": "id", "opensForm": true, "paths": {}, "visibleWhen": null }
@@ -185,7 +186,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     described under **Form metadata** of the [form widget](form-widget.md).
   - Every widget also has `tasksPath`, never left out. It is described under
     the task inbox widget, and is `null` on every other widget.
-  - Every widget also has `process` and `instancesPath`,
+  - Every widget also has `process`, `instancesPath` and `deadLettersPath`,
     never left out. They are described under the process inspector widget, and
     are `null` on every other widget.
   - Every widget also has `detail`, `kpi` and `chart`, never left out. Each is
@@ -233,7 +234,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         {
           "type": "columns",
           "columns": [
-            { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
+            { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "deadLettersPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
             {
               "width": 4,
               "widgets": [
@@ -241,7 +242,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
                   "type": "section",
                   "titleKey": "pages.overview.tasks",
                   "collapsed": false,
-                  "widgets": [{ "type": "taskInbox", "entity": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "access": null }]
+                  "widgets": [{ "type": "taskInbox", "entity": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "deadLettersPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "access": null }]
                 }
               ]
             }
