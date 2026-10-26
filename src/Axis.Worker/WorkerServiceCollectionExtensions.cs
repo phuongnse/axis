@@ -17,11 +17,12 @@ public static class WorkerServiceCollectionExtensions
     /// that <see cref="WorkerHealthEndpoints.MapWorkerHealth"/> serves. Under <c>Tenancy:Source=directory</c> the
     /// tenants are read from the tenant directory over <c>ConnectionStrings:Platform</c> once the worker runs, and again every
     /// <c>Tenancy:RefreshInterval</c>. The dry run of an import fails a file with more data rows than
-    /// <c>Data:ImportMaxRows</c>, which defaults to 10000. Only a worker
+    /// <c>Data:ImportMaxRows</c>, which defaults to 10000. The worker deletes in-app notifications older than
+    /// <c>Notifications:RetentionDays</c>, which defaults to 90. Only a worker
     /// that runs in Development sends connector calls to an <c>http</c> base URL.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker or health configuration is invalid, <c>Data:ImportMaxRows</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
+    /// The tenant, worker or health configuration is invalid, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -92,6 +93,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddModules(configuration, environment);
         services.AddProcesses(environment.IsDevelopment(), options.DeliveryAttempts, ImportMaxRows(configuration));
         services.AddSingleton(options);
+        services.AddSingleton(new NotificationOptions { RetentionDays = RetentionDays(configuration) });
         services.AddSingleton(health);
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<WorkerHealth>();
@@ -117,6 +119,19 @@ public static class WorkerServiceCollectionExtensions
 
         return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var rows) && rows >= 1
             ? rows
+            : throw new InvalidOperationException($"'{setting}' must be an integer of at least 1.");
+    }
+
+    private static int RetentionDays(IConfiguration configuration)
+    {
+        const string setting = "Notifications:RetentionDays";
+        if (configuration[setting] is not { Length: > 0 } text)
+        {
+            return 90;
+        }
+
+        return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var days) && days >= 1
+            ? days
             : throw new InvalidOperationException($"'{setting}' must be an integer of at least 1.");
     }
 }
