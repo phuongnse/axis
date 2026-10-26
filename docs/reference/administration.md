@@ -89,7 +89,7 @@ Every command writes one line per tenant and step to standard output:
 ```
 
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
-`work`, `sessions`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
+`work`, `sessions`, `role-check`, `version`, `compile`, `activate`, `seed`, `indexes`, `dump`, `archive`,
 `check`, `restore`, `status`, `runtime-password`, `schema-password` and `audit`. An `audit` step prints only when it fails, see
 [platform audit records](tenant-setting-commands.md#platform-audit-records). The [publisher](#publisher)
 adds `claim`, `validate` and `rollback`. A line names the
@@ -603,8 +603,14 @@ a missing binding is an `AXC0100` warning and not an error, as
    to the [release history](storage.md#release-history), unless the release is
    already the active one.
 4. `seed`: insert the seed records and write the schedule trigger state.
+5. `indexes`: build the non-unique indexes that activation left out of a table
+   with more than `Activation:InlineRecomputeLimit` rows, with
+   `CREATE INDEX CONCURRENTLY`. An index that PostgreSQL marks invalid, for
+   example after a cancelled build, is dropped and built again. The step holds
+   the tenant's schema lock while it builds, so other activations of the tenant
+   wait. See [Schema planning](storage.md#schema-planning).
 
-Steps 2 and 3 run as the tenant's schema role. Step 4 runs as its runtime role.
+Steps 2, 3 and 5 run as the tenant's schema role. Step 4 runs as its runtime role.
 The tool runs no EF Core migrations. Each step writes one `ok` line. Each error
 diagnostic of a failed step is written as its own line,
 `<tenant> <step> failed: <code> <file> <path>: <message>`, so one run shows every
@@ -617,7 +623,9 @@ release of a failed tenant stays active, and the other tenants continue. So
 tenants can run different releases until `activate` works for all of them. The
 command exits `1` at the end. A `seed` failure happens after activation has
 committed, so the new release stays active, as it does with startup activation.
-Only a `compile` or `activate` failure keeps the previous release.
+An `indexes` failure also happens after activation has committed, so the new
+release stays active, and the next activation builds the index again. Only a
+`compile` or `activate` failure keeps the previous release.
 
 **Exit codes.** `0` when every tenant succeeded, also when none is `active`. `1`
 when at least one tenant failed. `2` for a folder that does not exist, an
@@ -746,9 +754,9 @@ role unless it says otherwise.
    publisher goes on with the next tenant.
 2. `version`: check that the tenant's schema version is the one of this build.
 3. For `publish`: `compile` the snapshot against the tenant database and store
-   its release, `activate` the release, then `seed`. These are the steps of
-   [activate](#activate) and report the same diagnostics. `seed` runs as the
-   runtime role. The compile reads the snapshot's files, never the application
+   its release, `activate` the release, then `seed` and `indexes`. These are the
+   steps of [activate](#activate) and report the same diagnostics. `seed` runs
+   as the runtime role, and `indexes` as the schema role. The compile reads the snapshot's files, never the application
    folder on any disk. A snapshot that cannot be read, because it is not an array of
    `{ file, version, content }` or names a file twice, fails at `compile`
    and stores no release. Activation adds a row to the
@@ -759,11 +767,12 @@ role unless it says otherwise.
    transaction back. It stores no release, adds no history row and seeds
    nothing, and it starts no schedule trigger. It reports the diagnostics of
    activation, so a clean `validate` means an activation with the same input
-   would pass its checks, apart from the seed. The step is called `validate`,
-   and it is the only step after `version`. A snapshot that cannot be read
+   would pass its checks, apart from the seed. It builds no index and prints no
+   `indexes` line. The step is called `validate`, and it is the only step after
+   `version`. A snapshot that cannot be read
    fails at `validate`. The transaction holds the schema lock until it rolls
    back, so other activations of the tenant wait for it.
-5. For `rollback`: the steps are `version`, `rollback`, `activate` and `seed`.
+5. For `rollback`: the steps are `version`, `rollback`, `activate`, `seed` and `indexes`.
    The `rollback` step reads the stored release the request names and rebuilds
    its model from the stored files, as the server does when it serves a release.
    It reads no folder, compiles nothing and stores no new release. It refuses a
@@ -776,7 +785,8 @@ role unless it says otherwise.
    activation adds a row to the [release history](storage.md#release-history)
    with the requesting user and the request id, no label and no note, unless
    the release is already active. `seed` then sets the schedule triggers and
-   the seed records of that release. See [rollback](authoring.md#rollback).
+   the seed records of that release, and `indexes` builds the indexes of that release
+   that its tables lack. See [rollback](authoring.md#rollback).
 6. For `test`: `version`, then the step `test`. It checks, in this order, that
    the setting is set (`AXC0217`), that the snapshot can be read, that it
    compiles, and that every name in the request is a scenario of the
@@ -845,7 +855,7 @@ already active adds no history row.
 previously active release stays active after a failed `compile` or `activate`.
 A `seed` failure happens after activation has committed, so the new release
 stays active and the request ends `failed` with its `releaseId`, as with
-`activate`.
+`activate`. So does an `indexes` failure.
 
 **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the
 request it is running, then exits. A running `test` request is the exception: a

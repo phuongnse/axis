@@ -608,8 +608,10 @@ access. It returns diagnostics, SQL statements and the new records to write.
   The builder runs without a transaction, holds the schema lock that
   activation takes, and uses the schema role. The worker cannot build, because
   its runtime role cannot create indexes, see
-  [D31](../decisions/d31-separate-database-roles.md). Calling the builder from
-  the hosts is _(planned for M15)_. Until then, a deferred index stays missing.
+  [D31](../decisions/d31-separate-database-roles.md). Every host that
+  activates calls the builder after activation commits: `Axis.Admin activate`,
+  the publisher's publish and rollback, and the server's startup activation.
+  A publisher validate builds nothing.
   - Every `reference` column and every child table's `owner_id` gets an
     `ix_` index without being declared. An existing tenant gets them on its
     next activation. A junction table's `target_id` index is created with the
