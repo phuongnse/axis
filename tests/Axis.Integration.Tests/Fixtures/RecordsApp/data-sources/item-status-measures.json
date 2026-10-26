@@ -1,0 +1,23 @@
+{
+  "id": "3f6d1a52-9b7e-4c08-a5d4-7e2b8c9f1a60",
+  "kind": "dataSource",
+  "name": "ItemStatusMeasures",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "status", "path": "status" },
+    { "name": "quantity", "path": "quantity" },
+    { "name": "price", "path": "price" }
+  ],
+  "aggregate": {
+    "groupBy": [],
+    "measures": [
+      { "name": "open", "function": "count", "filter": "status == 'open'" },
+      { "name": "notOpen", "function": "count", "filter": "status != 'open'" },
+      { "name": "openQuantityAvg", "function": "avg", "field": "quantity", "filter": "status == 'open'" },
+      { "name": "notOpenPriceKinds", "function": "countDistinct", "field": "price", "filter": "status != 'open'" },
+      { "name": "largeQuantity", "function": "count", "filter": "quantity > 5" },
+      { "name": "smallQuantity", "function": "count", "filter": "quantity <= 5" }
+    ]
+  }
+}

@@ -9,6 +9,7 @@ export const requiredStepKeys: Record<string, Content> = {
   task: { label: { textKey: '' }, assignee: {}, form: '', outcomes: [] },
   operation: { operation: '', next: '' },
   subProcess: { process: '', next: '' },
+  timer: { wait: '', next: '' },
   end: {},
 }
 
@@ -26,6 +27,7 @@ export const paletteEntries: PaletteEntry[] = [
   ...builtInOperations.map((operation) => ({ key: operation, type: 'operation', operation })),
   { key: packageChoice, type: 'operation', operation: '' },
   { key: 'subProcess', type: 'subProcess' },
+  { key: 'timer', type: 'timer' },
   { key: 'end', type: 'end' },
 ]
 

@@ -18,6 +18,7 @@ const expressionNodes: [kind: string, pointer: string][] = [
   ['entity', '/$defs/field/properties/expression'],
   ['entity', '/$defs/field/properties/default'],
   ['dataSource', '/properties/filter'],
+  ['dataSource', '/$defs/measure/properties/filter'],
   ['rule', '/properties/expression'],
   ['trigger', '/properties/when'],
   ['policy', '/$defs/grant/properties/filter'],

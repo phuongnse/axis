@@ -263,4 +263,5 @@ public static class DiagnosticCodes
     public const string UnknownIndexField = "AXC0275";
     public const string InvalidIndexField = "AXC0276";
     public const string UnknownApplicationTimeZone = "AXC0277";
+    public const string InvalidTimerStep = "AXC0278";
 }

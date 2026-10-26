@@ -325,7 +325,8 @@ internal static class TaskEndpoints
 
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         var readable = TaskCompletionCommand.Readable(active.Model, roles, task.SubjectEntityId);
-        return Results.Ok(FormStateEvaluator.Evaluate(release, form, entity, stored, body.Draft!, body.Touched!, readable, user.Id, now));
+        var sets = await RecordSets.ReadAsync(connection, release, entity, stored, body.Draft!.Input.Links, cancellationToken);
+        return Results.Ok(FormStateEvaluator.Evaluate(release, form, entity, stored, body.Draft!, body.Touched!, readable, user.Id, now, sets));
     }
 
     private static Task<IResult> ClaimAsync(

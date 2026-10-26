@@ -6,7 +6,6 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
-  asvsCheckedChapters,
   asvsListFile,
   asvsStatuses,
   checkDocs,
@@ -133,7 +132,7 @@ describe('checkDocs', () => {
 
 describe('ASVS table', () => {
   const header = ['## Requirements', '', '| Id | Requirement | Status | Evidence |', '| --- | --- | --- | --- |']
-  const row = (id, status = '**Gap**', evidence = 'The M16 issue.') => `| \`${id}\` | Text \\| more. | ${status} | ${evidence} |`
+  const row = (id, status = '**Gap**', evidence = '[#1](https://github.com/o/r/issues/1).') => `| \`${id}\` | Text \\| more. | ${status} | ${evidence} |`
   const table = (...rows) => ['# ASVS', '', ...header, ...rows].join('\n') + '\n'
 
   beforeEach(() => {
@@ -150,7 +149,7 @@ describe('ASVS table', () => {
     write('docs/README.md', '# Documentation\n\n| [Decisions](decisions.md) | [Guide](reference/guide.md) | [ASVS](reference/asvs.md) |\n')
     write('tests/X/FooTests.cs', 'public sealed class FooTests\n{\n}\n')
     write('tests/X/obj/BarTests.cs', 'public sealed class BarTests\n{\n}\n')
-    write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1', '**Met**', '`FooTests`, [doc](guide.md).')))
+    write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1', '**Met**', '`FooTests`, [doc](guide.md).'), row('V9.1.1')))
   })
 
   test('passes on a valid table', () => {
@@ -160,26 +159,26 @@ describe('ASVS table', () => {
   test('passes on every status', () => {
     write(
       'docs/reference/asvs.md',
-      table(row('V1.1.1', `**${asvsStatuses[2]}**`), row('V1.2.1', `**${asvsStatuses[3]}**`, 'No such thing.')),
+      table(row('V1.1.1', `**${asvsStatuses[2]}**`), row('V1.2.1', `**${asvsStatuses[3]}**`, 'No such thing.'), row('V9.1.1')),
     )
 
     assert.deepEqual(messages(), [])
   })
 
   test('reports a repeated id with the line of the first row', () => {
-    write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1'), row('V1.1.1')))
+    write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1'), row('V9.1.1'), row('V1.1.1')))
 
-    assert.deepEqual(messages(), ['docs/reference/asvs.md:9: V1.1.1 has a row already, on line 7'])
+    assert.deepEqual(messages(), ['docs/reference/asvs.md:10: V1.1.1 has a row already, on line 7'])
   })
 
   test('reports an id that is not in the list', () => {
-    write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1'), row('V1.9.9')))
+    write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1'), row('V9.1.1'), row('V1.9.9')))
 
-    assert.deepEqual(messages(), [`docs/reference/asvs.md:9: V1.9.9 is not a Level 1 or Level 2 id in ${asvsListFile}`])
+    assert.deepEqual(messages(), [`docs/reference/asvs.md:10: V1.9.9 is not a Level 1 or Level 2 id in ${asvsListFile}`])
   })
 
   test('reports a status that is not in the list', () => {
-    write('docs/reference/asvs.md', table(row('V1.1.1', '**Done**'), row('V1.2.1', 'Gap')))
+    write('docs/reference/asvs.md', table(row('V1.1.1', '**Done**'), row('V1.2.1', 'Gap'), row('V9.1.1')))
 
     const found = messages()
     assert.equal(found.length, 2)
@@ -188,26 +187,74 @@ describe('ASVS table', () => {
   })
 
   test('reports a row without evidence', () => {
-    write('docs/reference/asvs.md', table(row('V1.1.1', '**Gap**', ''), row('V1.2.1')))
+    write('docs/reference/asvs.md', table(row('V1.1.1', '**Gap**', ''), row('V1.2.1'), row('V9.1.1')))
 
     assert.deepEqual(messages(), ['docs/reference/asvs.md:7: V1.1.1 has no evidence'])
   })
 
-  test('reports a listed id of the checked chapters that has no row, and not one of a later chapter', () => {
+  test('reports every listed id that has no row, whatever its chapter', () => {
     write('docs/reference/asvs.md', table(row('V1.1.1')))
 
-    assert.ok(asvsCheckedChapters < 9)
-    assert.deepEqual(messages(), ['docs/reference/asvs.md:3: V1.2.1 (Level 1) has no row in the requirements table'])
+    assert.deepEqual(messages(), [
+      'docs/reference/asvs.md:3: V1.2.1 (Level 1) has no row in the requirements table',
+      'docs/reference/asvs.md:3: V9.1.1 (Level 1) has no row in the requirements table',
+    ])
   })
 
-  test('accepts a row for a later chapter', () => {
+  test('reports a listed id of chapter V9 or later that has no row', () => {
+    write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1')))
+
+    assert.deepEqual(messages(), ['docs/reference/asvs.md:3: V9.1.1 (Level 1) has no row in the requirements table'])
+  })
+
+  test('passes when every listed id has a row', () => {
     write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1'), row('V9.1.1')))
 
     assert.deepEqual(messages(), [])
   })
 
+  test('reports a Gap row that links no issue', () => {
+    write('docs/reference/asvs.md', table(row('V1.1.1', '**Gap**', 'Planned for M16.'), row('V1.2.1'), row('V9.1.1')))
+
+    assert.deepEqual(messages(), ['docs/reference/asvs.md:7: V1.1.1 is a Gap and links no issue: link the GitHub issue that closes it'])
+  })
+
+  test('does not take a bare issue number or another link for an issue link', () => {
+    write(
+      'docs/reference/asvs.md',
+      table(row('V1.1.1', '**Gap**', 'See #12.'), row('V1.2.1', '**Gap**', '[doc](guide.md).'), row('V9.1.1')),
+    )
+
+    assert.deepEqual(messages(), [
+      'docs/reference/asvs.md:7: V1.1.1 is a Gap and links no issue: link the GitHub issue that closes it',
+      'docs/reference/asvs.md:8: V1.2.1 is a Gap and links no issue: link the GitHub issue that closes it',
+    ])
+  })
+
+  test('passes a Gap row once it links an issue', () => {
+    write(
+      'docs/reference/asvs.md',
+      table(row('V1.1.1', '**Gap**', 'Planned in [#12](https://github.com/phuongnse/axis/issues/12).'), row('V1.2.1'), row('V9.1.1')),
+    )
+
+    assert.deepEqual(messages(), [])
+  })
+
+  test('needs no issue link on a Met, Delegated or Not applicable row', () => {
+    write(
+      'docs/reference/asvs.md',
+      table(
+        row('V1.1.1', '**Met**', '`FooTests`.'),
+        row('V1.2.1', `**${asvsStatuses[2]}**`, 'The identity provider.'),
+        row('V9.1.1', `**${asvsStatuses[3]}**`, 'No such thing.'),
+      ),
+    )
+
+    assert.deepEqual(messages(), [])
+  })
+
   test('reports a Met row that names a test class that no .cs file declares', () => {
-    write('docs/reference/asvs.md', table(row('V1.1.1', '**Met**', '`FooTests` and `MissingTests`.'), row('V1.2.1')))
+    write('docs/reference/asvs.md', table(row('V1.1.1', '**Met**', '`FooTests` and `MissingTests`.'), row('V1.2.1'), row('V9.1.1')))
 
     assert.deepEqual(messages(), [
       'docs/reference/asvs.md:7: V1.1.1 names the test class MissingTests, which no .cs file under tests/ or samples/ declares',
@@ -216,7 +263,7 @@ describe('ASVS table', () => {
 
   test('finds a test class under samples/, and ignores one under obj/', () => {
     write('samples/apps/Y/BazTests.cs', 'public partial class BazTests\n{\n}\n')
-    write('docs/reference/asvs.md', table(row('V1.1.1', '**Met**', '`BazTests`.'), row('V1.2.1', '**Met**', '`BarTests`.')))
+    write('docs/reference/asvs.md', table(row('V1.1.1', '**Met**', '`BazTests`.'), row('V1.2.1', '**Met**', '`BarTests`.'), row('V9.1.1')))
 
     assert.deepEqual(messages(), [
       'docs/reference/asvs.md:8: V1.2.1 names the test class BarTests, which no .cs file under tests/ or samples/ declares',
@@ -224,7 +271,7 @@ describe('ASVS table', () => {
   })
 
   test('does not look for a test class in a Gap row', () => {
-    write('docs/reference/asvs.md', table(row('V1.1.1', '**Gap**', 'Planned with `MissingTests`.'), row('V1.2.1')))
+    write('docs/reference/asvs.md', table(row('V1.1.1', '**Gap**', 'Planned with `MissingTests`, [#1](https://github.com/o/r/issues/1).'), row('V1.2.1'), row('V9.1.1')))
 
     assert.deepEqual(messages(), [])
   })
@@ -252,13 +299,9 @@ describe('the repository ASVS table', () => {
     }
   })
 
-  test(`has exactly one row for each id of chapters V1 to V${asvsCheckedChapters}`, () => {
-    const checked = list.requirements
-      .map(({ id }) => id)
-      .filter((id) => Number(/^V(\d+)\./.exec(id)[1]) <= asvsCheckedChapters)
-
-    assert.ok(checked.length > 0)
-    for (const id of checked) assert.equal(rowIds.filter((rowId) => rowId === id).length, 1, `${id} has one row`)
+  test('has exactly one row for each listed id', () => {
+    assert.ok(list.requirements.length > 0)
+    for (const { id } of list.requirements) assert.equal(rowIds.filter((rowId) => rowId === id).length, 1, `${id} has one row`)
   })
 })
 

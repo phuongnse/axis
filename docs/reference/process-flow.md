@@ -7,9 +7,10 @@ subject. The process resource and the first four step types are in
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-Everything in this file is _(planned for M14)_, except [Loops](#loops) through
-a `task` and the calls in them, the [sub-process step](#sub-process-step) and
-the [create record operation](#create-record-operation), which are built. The design follows
+Everything in this file is _(planned for M14)_, except the
+[Timer step](#timer-step), [Loops](#loops) through a `task` or a `timer` and the
+calls in them, the [sub-process step](#sub-process-step) and the
+[create record operation](#create-record-operation), which are built. The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
@@ -28,20 +29,29 @@ A `timer` step waits for a time, then goes on to `next`:
 { "name": "untilDue", "type": "timer", "until": "dueDate", "next": "remind" }
 ```
 
-- It has exactly one of `wait` and `until`, and a `next`.
+- It has exactly one of `wait` and `until` (`AXC0278`), and a `next`.
 - `wait` is a positive fixed-length duration, by the rule of a task's `dueIn`
-  (`AXC0084`). The time is the step's transaction time plus `wait`.
+  (`AXC0084`, reported at `/steps/{i}/wait`). The time is the step's
+  transaction time plus `wait`.
 - `until` is an expression that gives a `date-time`, with the scope of a
   `when`. A time in the past is due at once. A `null` fails the step.
 - The step's transaction sets the instance `waiting` and queues a
-  `process.timer` work item due at the time. Its history output is
-  `{ "state": "waiting", "dueAt" }`.
+  `process.timer` work item due at the time. The item stores the revision the
+  step left in its `revision` column. Its history output is
+  `{ "state": "waiting", "dueAt" }`. The step writes no audit record while it
+  waits.
 - The item checks that the instance still waits at the revision the step left
-  it at. Then it resumes the instance at `next` and writes `{ "next" }`. An
-  item whose instance moved on, or was cancelled, is deleted with no other
-  write.
+  it at. Then it resumes the instance at `next`, writes `{ "next" }` and the
+  `process.stepCompleted` audit record, and queues the instance's next
+  `process.step` item. An item whose instance moved on, or was cancelled, is
+  deleted with no other write.
+- If the resume itself throws, the waiting instance is marked `failed`, with a
+  history error and a `process.failed` audit record. Otherwise the deleted item
+  would leave the instance waiting for ever. An operator retry then runs the
+  timer step again.
 - A test scenario's `advanceTime` runs due `process.timer` items, as it runs
-  other due work.
+  other due work. A timer also runs after an action when its time has already
+  passed on the scenario clock. A scenario never makes a timer due early.
 
 ## Wait for event step
 
@@ -155,8 +165,8 @@ A `subProcess` step starts another process and waits until it ends:
 ## Loops
 
 A process may loop back to an earlier step when every cycle passes through a
-waiting step. A `task` is built as a waiting step. _(Planned for M14)_ A
-`timer` and a `waitEvent` are waiting steps too. `AXC0073` reports only a
+waiting step. A `task` and a `timer` are built as waiting steps. _(Planned for M14)_ A
+`waitEvent` is a waiting step too. `AXC0073` reports only a
 cycle with no waiting step, which would run for ever. A cycle of `decision` and
 `operation` steps is reported, and so is a cycle through a call step with no
 task in it. See [Compile checks](processes.md#compile-checks).

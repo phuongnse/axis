@@ -466,7 +466,7 @@ internal sealed class MigrationPlanning
             }
 
             List<string> columns = [.. index.Columns.Select(candidate => candidate == from ? to : candidate)];
-            var name = EntityNaming.Index(table.Name, columns);
+            var name = index.Trigram ? EntityNaming.TrigramIndex(table.Name, to) : EntityNaming.Index(table.Name, columns);
             Commands.Add(new SchemaCommand($"ALTER INDEX {EntityNaming.Quote(EntityNaming.Schema)}.{EntityNaming.Quote(index.Name)} RENAME TO {EntityNaming.Quote(name)}"));
             indexes.Add(index with { Name = name, Columns = columns });
         }

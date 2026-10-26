@@ -30,6 +30,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<WorkItemRunner>();
         services.AddSingleton<ReleaseModelCache>();
         services.AddSingleton<IWorkItemHandler, ProcessStepHandler>();
+        services.AddSingleton<IWorkItemHandler, ProcessTimerHandler>();
         services.AddSingleton<IWorkItemHandler, ProcessResumeHandler>();
         services.AddSingleton<IWorkItemHandler, TaskDeadlineHandler>();
         services.AddSingleton(new ConnectorCallSettings(allowHttpConnectorUrls));

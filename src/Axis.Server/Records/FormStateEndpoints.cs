@@ -114,7 +114,8 @@ internal static class FormStateEndpoints
 
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         var readable = RecordFieldAccess.Read(application, user.Roles, entity).Readable;
-        return Results.Ok(FormStateEvaluator.Evaluate(application, model, entity, stored, body.Draft!, body.Touched!, readable, user.Id, now));
+        var sets = await RecordSets.ReadAsync(connection, application, entity, stored, body.Draft!.Input.Links, cancellationToken);
+        return Results.Ok(FormStateEvaluator.Evaluate(application, model, entity, stored, body.Draft!, body.Touched!, readable, user.Id, now, sets));
     }
 
     private static IResult RecordNotFound() => NotFound("No record has this id.");

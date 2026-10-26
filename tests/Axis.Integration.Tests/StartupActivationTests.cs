@@ -393,6 +393,32 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Start_builds_a_new_index_that_activation_deferred_on_a_table_above_the_limit_before_the_server_listens()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField);
+        await StartAsync(a, b, folder);
+        var table = EntityNaming.Table(_noteId);
+        await ScalarAsync(a, $"INSERT INTO {EntityNaming.QualifiedTable(table)} (id, f_title) SELECT gen_random_uuid(), 'n' || n FROM generate_series(1, 25) n");
+        folder.With("entities/note.json", $$"""
+            { "id": "{{_noteId}}", "kind": "entity", "name": "Note", "formatVersion": 1,
+              "indexes": [{ "fields": ["title"] }], "fields": [{{TitleField}}] }
+            """);
+        var logs = new LogCollector();
+
+        await using (var factory = CreateFactory(a, b, folder.Path, logs, new Dictionary<string, string> { ["Activation:InlineRecomputeLimit"] = "10" }))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        var index = EntityNaming.Index(table, ["f_title"]);
+        Assert.Equal(
+            true,
+            await ScalarAsync(a, $"SELECT x.indisvalid FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid WHERE i.relname = '{index}'"));
+        Assert.Contains(logs.Entries, entry => entry.Contains("Built 1 deferred index(es)", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Start_compiles_against_the_installed_packages_and_pins_the_highest_version_in_range()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());

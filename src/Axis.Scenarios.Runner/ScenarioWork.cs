@@ -9,15 +9,16 @@ using Npgsql;
 namespace Axis.Scenarios.Runner;
 
 /// <summary>
-/// Runs the due process step, process resume, connector call, package call and event delivery work items of the
+/// Runs the due process step, process timer, process resume, connector call, package call and event delivery work items of the
 /// scenario's tenant in-process, as the worker would, until none is due. The items run in the order
 /// they were queued, so a clock that steps back during a run cannot reorder them. The handlers are the real
 /// ones, with the scenario's placeholder bindings, so an <c>async</c> event trigger starts its process
 /// here. The scenario's stubs take the place of the HTTP request of a connector call and of the
 /// package operation. A call that no stub answers fails the scenario before it runs. After an action,
 /// schedule triggers, fan-outs and task deadlines stay queued, so none of them fires on the real clock.
-/// <see cref="AdvanceAsync"/> runs them too, and the <c>task.deadline</c> items, after the scenario's <c>now</c> moved,
-/// so a task expires only when the scenario's time reaches its deadline. The items run over
+/// A timer comes due by the scenario's <c>now</c> like every item, so after an action only a timer
+/// whose time has already passed runs. <see cref="AdvanceAsync"/> runs them too, and the <c>task.deadline</c> items,
+/// after the scenario's <c>now</c> moved, so a task expires only when the scenario's time reaches its deadline. The items run over
 /// the scenario's connection string, so they read the scenario's <c>now</c> too, and a due time is
 /// compared with it. Leases keep the database clock.
 /// </summary>
@@ -44,6 +45,7 @@ internal sealed class ScenarioWork : IDisposable
         _client = new ConnectorClient(stubs.HttpHandler);
         _transport = new PackageHttpTransport();
         var handler = new ProcessStepHandler(models, packages, loggerFactory.CreateLogger<ProcessStepHandler>());
+        var timerHandler = new ProcessTimerHandler(models, loggerFactory.CreateLogger<ProcessTimerHandler>());
         IExternalWorkItemHandler[] externalHandlers =
         [
             new ConnectorCallHandler(models, bindings, _client, settings, loggerFactory.CreateLogger<ConnectorCallHandler>()),
@@ -51,9 +53,9 @@ internal sealed class ScenarioWork : IDisposable
             new EventDeliveryHandler(models, new DeliverySettings(5), loggerFactory.CreateLogger<EventDeliveryHandler>()),
         ];
         var resume = new ProcessResumeHandler(models, loggerFactory.CreateLogger<ProcessResumeHandler>());
-        _runner = CreateRunner([handler, resume], externalHandlers, loggerFactory);
+        _runner = CreateRunner([handler, timerHandler, resume], externalHandlers, loggerFactory);
         _timeRunner = CreateRunner(
-            [handler, resume, new TaskDeadlineHandler(models, loggerFactory.CreateLogger<TaskDeadlineHandler>())],
+            [handler, timerHandler, resume, new TaskDeadlineHandler(models, loggerFactory.CreateLogger<TaskDeadlineHandler>())],
             [
                 .. externalHandlers,
                 new TriggerScheduleHandler(models, loggerFactory.CreateLogger<TriggerScheduleHandler>()),
@@ -61,6 +63,9 @@ internal sealed class ScenarioWork : IDisposable
             ],
             loggerFactory);
     }
+
+    /// <summary>The work item kinds the runner of <see cref="AdvanceAsync"/> runs.</summary>
+    internal IReadOnlyList<string> TimeKinds => _timeRunner.Kinds;
 
     private WorkItemRunner CreateRunner(IWorkItemHandler[] handlers, IExternalWorkItemHandler[] externalHandlers, ILoggerFactory loggerFactory) =>
         new(
@@ -172,7 +177,8 @@ internal sealed class ScenarioWork : IDisposable
 
     // The application clock queued an item, and the scenario's time decides when it is due. When the
     // two differ slightly, a waiting item is made due at once, so a step is never skipped. A schedule
-    // item is not among the kinds, so it waits for its occurrence.
+    // item is not among the kinds, so it waits for its occurrence. A timer is not either: its due time
+    // comes from the scenario's clock and is the point of the timer, so it waits until the clock reaches it.
     private async Task<bool> MakeDueAsync(CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(_connectionString);

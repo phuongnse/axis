@@ -639,6 +639,68 @@ public sealed class DataSourceCompilerTests
         Assert.Equal((DiagnosticCodes.MissingTypeProperty, "/parameters/0"), (diagnostic.Code, diagnostic.Path));
     }
 
+    [Theory]
+    [InlineData("lower(number) == 'a'", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("missing > 0", ExpressionDiagnosticCodes.UnknownName)]
+    public void Invalid_measure_filter_is_reported_at_the_measure_filter(string filter, string code)
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            $$"""
+            , "aggregate": { "groupBy": ["number"], "measures": [
+                { "name": "all", "function": "count" },
+                { "name": "some", "function": "count", "filter": "{{filter}}" }
+              ] }
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "data-sources/orders.json", "/aggregate/measures/1/filter"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Valid_measure_filter_is_in_the_model()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }, { "name": "amount", "path": "amount" }]""",
+            """
+            , "aggregate": { "groupBy": ["number"], "measures": [
+                { "name": "all", "function": "count" },
+                { "name": "large", "function": "sum", "field": "amount", "filter": "amount > 100" }
+              ] }
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var measures = Assert.Single(result.Model.DataSources).Aggregate!.Measures;
+        Assert.Null(measures[0].Filter);
+        Assert.NotNull(measures[1].Filter);
+    }
+
+    [Fact]
+    public void Measure_filter_is_not_checked_while_a_parameter_has_a_diagnostic()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order",
+            """[{ "name": "number", "path": "number" }]""",
+            """
+            , "parameters": [{ "name": "statusFilter", "type": "enum" }],
+              "aggregate": { "groupBy": ["number"], "measures": [{ "name": "some", "function": "count", "filter": "missing == statusFilter" }] }
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MissingTypeProperty, "/parameters/0"), (diagnostic.Code, diagnostic.Path));
+    }
+
     [Fact]
     public void Filter_that_calls_a_rule_in_the_sql_subset_compiles()
     {

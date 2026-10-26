@@ -21,7 +21,7 @@ namespace Axis.Server.Applications;
 /// Migrates every configured tenant database and grants its runtime database role its rights (before
 /// and after the migrations) and checks over its own connection that the role can only read and write rows,
 /// then compiles the configured application folders
-/// against the installed extension packages, activates them in it, writes the state of their schedule triggers and writes their seed records. The work runs in <see cref="StartingAsync"/>, before any hosted
+/// against the installed extension packages, activates them in it, writes the state of their schedule triggers, writes their seed records and builds the indexes that activation left out of large tables. The work runs in <see cref="StartingAsync"/>, before any hosted
 /// service starts, so the server is not listening yet. The migrations, release storage, entity
 /// provisioning and the active release use a connection from the tenant's
 /// <c>SchemaConnectionString</c>, which closes when the tenant is done. The runtime database role is the
@@ -139,6 +139,12 @@ internal sealed partial class StartupActivation(
 
                     LogSeeded(seeded.Inserted, seeded.Updated, folder, tenantId);
                 }
+
+                var built = await EntityIndexBuilder.BuildAsync(compiled.Model, schemaConnection, cancellationToken);
+                if (built.Count > 0)
+                {
+                    LogIndexesBuilt(built.Count, folder, tenantId);
+                }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -202,6 +208,9 @@ internal sealed partial class StartupActivation(
 
     [LoggerMessage(LogLevel.Information, "Inserted {Inserted} seed record(s) and updated {Updated} from folder {Folder} for tenant {TenantId}.")]
     private partial void LogSeeded(int inserted, int updated, string folder, string tenantId);
+
+    [LoggerMessage(LogLevel.Information, "Built {Count} deferred index(es) from folder {Folder} for tenant {TenantId}.")]
+    private partial void LogIndexesBuilt(int count, string folder, string tenantId);
 
     [LoggerMessage(LogLevel.Error, "Activating application folder {Folder} for tenant {TenantId} failed.")]
     private partial void LogFailed(Exception exception, string folder, string tenantId);
