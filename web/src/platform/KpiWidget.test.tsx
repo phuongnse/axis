@@ -34,6 +34,7 @@ function kpiWidget(kpi: KpiMetadata): WidgetMetadata {
     tasksPath: null,
     process: null,
     instancesPath: null,
+    deadLettersPath: null,
     actions: [],
     rowActions: [],
     toolbarActions: [],

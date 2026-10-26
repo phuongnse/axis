@@ -42,6 +42,7 @@ const noteWidget: EntityWidgetMetadata = {
   tasksPath: null,
   process: null,
   instancesPath: null,
+  deadLettersPath: null,
   actions: [],
   rowActions: [],
   toolbarActions: [],

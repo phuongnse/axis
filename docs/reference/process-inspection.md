@@ -404,12 +404,12 @@ grant, a required reason and one transaction. The
 
 Two more commands, **redeliver** and **discard**, act on a dead letter of the
 process with the same `retry` grant, a required reason and an audit record, see
-[Dead letters](process-events.md#routes). The widget's buttons for them are
-_(planned for M14)_.
+[Dead letters](process-events.md#routes). The widget shows Redeliver and
+Discard on each open dead letter whose `commands` list them.
 
-_(Planned for M14)_ Cancel also cancels an instance's running sub-processes, and
-an instance without a subject needs only the grant, see
-[process flow](process-flow.md).
+Cancel also cancels an instance's running and waiting sub-processes, see
+[Cancel](#cancel). _(Planned for M14)_ An instance without a subject needs only
+the grant, see [process flow](process-flow.md).
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances/{id}/retry
@@ -527,25 +527,41 @@ the user reads a pending field, see
 
 One transaction does this:
 
-1. It locks the instance's `open` tasks, then the instance, then its call
+1. When the instance is a sub-process, it locks the parent's row first. A
+   cancel of a child and a cancel of its parent then meet on the parent, so
+   the lock order is always parent before child.
+2. It locks the instance's `open` tasks, then the instance, then its call
    rows. A task completion locks the task and then the instance, so locking
    the instance first would deadlock with a manager who approves at the moment
    an operator cancels. A task that was created while the cancel waited for the
    instance lock is closed too.
-2. It requires the instance to be `running` or `waiting`, otherwise `409`.
-3. It requires that no call of the instance is `sending` or `unknown`,
-   otherwise `409`. The problem names the call. The system may have acted, so
-   the call must settle or be [resolved](#resolve) first. Cancel never forgets
-   an external effect.
-4. It sets the instance to `cancelled`, with the next revision and `ended_at`.
-5. It sets the instance's `open` tasks to `cancelled`, and its `pending` calls
-   to `cancelled` with their stored input cleared.
-6. It deletes the instance's work items.
-7. It writes a history row for the step, at the revision the instance had. Its
+3. It requires the instance to be `running` or `waiting`, otherwise `409`.
+4. It repeats step 2 for each `running` or `waiting` child, depth first,
+   before it writes anything.
+5. It requires that no call of the instance or of any child is `sending` or
+   `unknown`, otherwise `409`. The problem names the call. The system may have
+   acted, so the call must settle or be [resolved](#resolve) first. Cancel
+   never forgets an external effect.
+6. It sets the instance and each child to `cancelled`, with the next revision
+   and `ended_at`.
+7. It sets their `open` tasks to `cancelled`, and their `pending` calls to
+   `cancelled` with their stored input cleared.
+8. It deletes their work items.
+9. It writes a history row for the step of each, at the revision it had. Its
    output is `{ "command": "cancel" }`.
-8. It writes the audit record `process.cancelled` for the subject record, with
-   details `{ "step", "reason", "taskIds", "operationIds" }`. The two lists
-   name the tasks and calls it cancelled. The actor is the user.
+10. It writes the audit record `process.cancelled` for the subject record of
+    each, with details `{ "step", "reason", "taskIds", "operationIds" }`. The
+    two lists name the tasks and calls it cancelled. The actor is the user and
+    the reason is the same for every instance.
+
+**Failing a waiting parent.** When the cancelled instance is a child and its
+parent is `waiting` on the sub-process step for this child, the cancel also
+fails the parent's step. The parent becomes `failed` with `ended_at`, and its
+history row has the error `The sub-process of the step '{step}' was cancelled.`
+and the output `{ "childInstanceId" }`. The audit record `process.failed` is
+written with the actor `system` and details `{ "step" }`. A parent that is
+itself being cancelled is not `waiting`, so it ends `cancelled`. A child that
+is already `failed` stays as it is when its parent is cancelled.
 
 A `cancelled` instance does not block a new start for the same record. Its
 cancelled tasks leave every inbox, and a completion of one is `409`, see

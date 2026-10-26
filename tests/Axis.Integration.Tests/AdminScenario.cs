@@ -310,7 +310,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                     if (encrypted is { Length: > 0 })
                     {
                         // Each body line is a secret on its own, because a leaked key keeps its line breaks.
-                        var pem = Cipher.Decrypt(tenant.Id, TenantSecretFields.OidcClientKey, encrypted).Reveal();
+                        var pem = cipher.Decrypt(tenant.Id, TenantSecretFields.OidcClientKey, encrypted).Reveal();
                         secrets.AddRange(PemBodyLines(pem));
                         secrets.Add(string.Concat(PemBodyLines(pem)));
                     }

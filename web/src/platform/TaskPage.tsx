@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Flex, Form, Typography } from 'antd'
+import { Alert, Button, Descriptions, Flex, Form, Space, Tag, Typography } from 'antd'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -6,7 +6,7 @@ import { formatValue } from './formatValue'
 import { buildCompleteBody } from './recordBody'
 import { fetchRecord } from './records'
 import type { WidgetMetadata } from './site'
-import { assignedElsewhere, completeTask, fetchTask, type TaskItem } from './tasks'
+import { assignedElsewhere, completeTask, fetchTask, runTaskCommand, type TaskItem } from './tasks'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
 import { useReleaseTexts } from './useReleaseTexts'
@@ -37,7 +37,12 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * the task with the outcome, the changed editable values and the record's `version`, then returns
  * to the inbox. The form follows the task's form state endpoint: a field the answer hides or locks
  * is not sent. A task that is not open, or that another completion decided first, shows that it is
- * already completed, with no form or buttons. A task assigned to someone else shows only that.
+ * already completed, with no form or buttons. An expired task shows that its deadline passed, with
+ * no form or buttons. A task assigned to someone else shows only that.
+ *
+ * An overdue task shows an "Overdue" tag beside the due date. An open task shows a Claim and a
+ * Release button for each of `claim` and `release` that the task read's `commands` lists. A click
+ * shows the task the route returns. A 403 or 409 shows a message and loads the task again.
  *
  * The page shows the texts of the release the task started on, for the current and the fallback
  * locale, before the site texts and the platform texts. So a label a newer release reworded or
@@ -84,6 +89,23 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
     }
   }
 
+  // The task the route returns replaces the read, but the form stays: a new form object would load
+  // the subject record again and lose what the user typed.
+  const onCommand = async (command: 'claim' | 'release'): Promise<CommandMessage | null> => {
+    try {
+      const result = await runTaskCommand(tasksPath, taskId, command)
+      if (result.ok) {
+        setTask((current) => (isTaskItem(current) ? { ...result.task, form: current.form } : result.task))
+        return null
+      }
+      setTask(await fetchTask(tasksPath, taskId))
+      return { type: 'warning', text: t('shell.task.commandRefused') }
+    } catch (error) {
+      console.warn(`Running '${command}' on the task '${taskId}' failed`, error)
+      return { type: 'error', text: t('shell.task.commandFailed') }
+    }
+  }
+
   if (task === undefined) {
     return null
   }
@@ -111,6 +133,7 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
         onDone={() => navigate(inboxPath)}
         onAssignedElsewhere={() => setTask(assignedElsewhere)}
         onDecided={() => void onDecided()}
+        onCommand={onCommand}
       />
     </TextProvider>
   )
@@ -118,6 +141,12 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
 
 function isTaskItem(task: TaskState | undefined): task is TaskItem {
   return typeof task === 'object' && task !== null
+}
+
+/** The answer to a command that did not succeed, shown above the command buttons. */
+interface CommandMessage {
+  type: 'warning' | 'error'
+  text: string
 }
 
 interface TaskBodyProps {
@@ -128,10 +157,15 @@ interface TaskBodyProps {
   onDone: () => void
   onAssignedElsewhere: () => void
   onDecided: () => void
+  /** Runs the command and returns the message to show, or `null` when it succeeded. */
+  onCommand: (command: 'claim' | 'release') => Promise<CommandMessage | null>
 }
 
-/** The task's label, subject and due date, and its form while it is open. It reads the release texts. */
-function TaskBody({ task, tasksPath, locale, open, onDone, onAssignedElsewhere, onDecided }: TaskBodyProps) {
+/**
+ * The task's label, subject and due date, then its Claim and Release buttons and form while it is
+ * open, or the message that it is expired or completed. It reads the release texts.
+ */
+function TaskBody({ task, tasksPath, locale, open, onDone, onAssignedElsewhere, onDecided, onCommand }: TaskBodyProps) {
   const t = useText()
   return (
     <Flex vertical gap="middle">
@@ -143,22 +177,82 @@ function TaskBody({ task, tasksPath, locale, open, onDone, onAssignedElsewhere, 
           {
             key: 'dueAt',
             label: t('shell.tasks.dueAt'),
-            children: formatValue(dueAtField, task.dueAt, {}, { locale, text: t }),
+            children: (
+              <Space size="small">
+                {formatValue(dueAtField, task.dueAt, {}, { locale, text: t })}
+                {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
+              </Space>
+            ),
           },
         ]}
       />
-      {open ? (
-        <OpenTaskForm
-          task={task}
-          tasksPath={tasksPath}
-          locale={locale}
-          onDone={onDone}
-          onAssignedElsewhere={onAssignedElsewhere}
-          onDecided={onDecided}
-        />
+      {task.state === 'expired' ? (
+        <Alert data-testid="task-expired" type="info" title={t('shell.task.expired')} />
+      ) : open ? (
+        <>
+          <TaskCommands commands={task.commands} onCommand={onCommand} />
+          <OpenTaskForm
+            task={task}
+            tasksPath={tasksPath}
+            locale={locale}
+            onDone={onDone}
+            onAssignedElsewhere={onAssignedElsewhere}
+            onDecided={onDecided}
+          />
+        </>
       ) : (
         <Alert data-testid="task-completed" type="info" title={t('shell.task.completed')} />
       )}
+    </Flex>
+  )
+}
+
+interface TaskCommandsProps {
+  commands: string[]
+  onCommand: (command: 'claim' | 'release') => Promise<CommandMessage | null>
+}
+
+const taskCommands = ['claim', 'release'] as const
+
+/** A button for each of `claim` and `release` that `commands` lists, and the message of a command that failed. */
+function TaskCommands({ commands, onCommand }: TaskCommandsProps) {
+  const t = useText()
+  // The command being sent, so both buttons wait for its answer.
+  const [pending, setPending] = useState<string | null>(null)
+  const [message, setMessage] = useState<CommandMessage | null>(null)
+  const listed = taskCommands.filter((command) => commands.includes(command))
+
+  const run = async (command: (typeof taskCommands)[number]) => {
+    if (pending !== null) {
+      return
+    }
+    setPending(command)
+    setMessage(null)
+    try {
+      setMessage(await onCommand(command))
+    } finally {
+      setPending(null)
+    }
+  }
+
+  if (listed.length === 0 && message === null) {
+    return null
+  }
+  return (
+    <Flex vertical gap="small">
+      {message !== null && <Alert data-testid="task-command-message" type={message.type} title={message.text} />}
+      <Flex gap="small">
+        {listed.map((command) => (
+          <Button
+            key={command}
+            loading={pending === command}
+            disabled={pending !== null && pending !== command}
+            onClick={() => void run(command)}
+          >
+            {t(`shell.task.${command}`)}
+          </Button>
+        ))}
+      </Flex>
     </Flex>
   )
 }
