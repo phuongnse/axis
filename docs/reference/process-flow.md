@@ -8,7 +8,8 @@ subject. The process resource and the first four step types are in
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 Everything in this file is _(planned for M14)_, except [Loops](#loops) through
-a `task` and the calls in them, which are built. The design follows
+a `task` and the calls in them, and the compile checks of the
+[sub-process step](#sub-process-step), which are built. The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
@@ -96,14 +97,30 @@ A `subProcess` step starts another process and waits until it ends:
 { "name": "fulfil", "type": "subProcess", "process": "OrderFulfilment", "subject": "order", "next": "close" }
 ```
 
-- `process` names a process of the same application. A process may not reach
-  itself through sub-process steps, directly or through others. Such a cycle is
-  a new diagnostic.
+- **Compile checks are built, the run is not.** The compiler checks and builds
+  the step, and the instance detail graph shows it as an `operation` step. An
+  instance that reaches it still fails with the engine's error for a step it
+  cannot run, until the engine part is built.
+- `process` names a process of the same application, ignoring letter case,
+  otherwise it is `AXC0250` at `/steps/{i}/process`. A process may not reach
+  itself through sub-process steps, directly or through others. Each step that
+  closes such a loop is `AXC0251` at `/steps/{i}/process`, naming the chain,
+  such as `'A' → 'B' → 'A'`. A process that starts itself is `'A' → 'A'`.
 - `subject` is an expression that gives a reference to a record of the child's
   subject entity. It may be left out when the child's subject entity is the
-  parent's. The child then runs for the same record.
+  parent's. The child then runs for the same record. A missing `subject` is
+  `AXC0252` at `/steps/{i}` when the child's entity is not the parent's or the
+  parent has no subject. It is not checked when either entity is unknown. A
+  `subject` given to a child without a subject is `AXC0252` at
+  `/steps/{i}/subject`. The expression is type-checked over the parent's scope,
+  as a decision `when` is, and keeps its own code.
 - A child without a subject takes `parameters` instead of `subject`, see
-  [Processes without a subject](#processes-without-a-subject).
+  [Processes without a subject](#processes-without-a-subject). `parameters`
+  maps each parameter name of the child to an expression of its type. Every
+  parameter is required. A parameter that is missing is `AXC0253` at
+  `/steps/{i}/parameters`, and one that is unknown or repeated, ignoring
+  letter case, is `AXC0253` at `/steps/{i}/parameters/{name}`. `parameters`
+  given to a child with a subject are `AXC0253` at `/steps/{i}/parameters`.
 - **Start.** The step's transaction starts the child as a
   [start from a trigger](process-events.md#starts-from-triggers) does, as
   `system`, and sets the parent `waiting`. The child is pinned to the
