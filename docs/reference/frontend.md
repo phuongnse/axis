@@ -397,6 +397,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
       - `actions` lists the entity actions of the user's grants on the
         widget's entity, in the order `read`, `create`, `update`, `delete`.
+        A `table` over an entity adds `import` last, when the user holds
+        `import` and `create` on the entity. A form, a detail and a table over
+        a data source never list it. Without a user, as in Studio's draft
+        metadata, every table over an entity lists it.
         On a data source widget it is about the root entity. Record filters
         are not evaluated here, so `update` means that some record may be
         updated, not this one.
@@ -713,6 +717,30 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       running process. In each case the row stays. Any other answer shows
       the generic platform error. The success and the failure messages show
       above the table.
+    - **Import.** A table over an entity has an Import button next to its
+      toolbar actions only when `access.actions` holds `import`. Without it
+      there is no button. The canvas draws it and opens nothing. A click opens
+      a dialog with one file picker for a `.csv` or `.xlsx` file, a Check
+      button and a Close button. Check sends `POST {entity}/imports` with the
+      file as the raw body and `X-Axis-Csrf: 1`. The imports path is the
+      entity's `recordsPath` with its last `/records` swapped for `/imports`.
+      The `Content-Type` comes from the file extension, `text/csv` or the
+      `xlsx` type, because browsers often report a CSV differently. Another
+      extension is refused in the dialog and sends nothing. The dialog reads
+      the import at once and then every second, with no time limit, until it
+      is `checked` or `failed`. Closing the dialog stops the checking. It
+      lists each error as the row and the field's label, for
+      `/rows/{n}/values/{field}`, as a row error for `/rows/{n}`, as a column
+      error for `/columns/{n}`, and as a file error for any other key. A field
+      the table lacks shows its name. Commit shows only when the import is
+      `checked`. It sends `POST {entity}/imports/{id}/commit` and checks
+      every second until the import is `committed` or `failed`. On
+      `committed` the dialog closes, a success message shows above the table
+      and the current page of rows loads again. A `failed` commit lists its
+      errors in the dialog. Picking another file starts a new import. A `403`,
+      `413` or `415` on the upload each shows its own message, and any other
+      failure shows the generic one. The progress and the errors sit in an
+      `aria-live` region, and the picker and every button take the keyboard.
     - **Start process.** A row `startProcess` follows the rules of the form
       widget's **Start process action**, with the row as the subject and
       the same `Idempotency-Key` and `409` text. On `201` it loads the

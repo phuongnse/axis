@@ -61,6 +61,7 @@
     "role.dsonly": "Chỉ nguồn dữ liệu",
     "role.falseOnly": "Chỉ sai",
     "role.failing": "Lỗi bộ lọc",
-    "role.exporter": "Người xuất dữ liệu"
+    "role.exporter": "Người xuất dữ liệu",
+    "role.assigned": "Được giao việc"
   }
 }

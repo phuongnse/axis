@@ -2189,7 +2189,11 @@ public static partial class ApplicationCompiler
         check = typeCheck;
         return CallsRuleWithoutBody(typeCheck, new HashSet<ExpressionRule>(ReferenceEqualityComparer.Instance))
             ? null
-            : SqlTranslator.Translate(parsed.Expression, path => string.Join('.', path), typeCheck).Diagnostic;
+            : SqlTranslator.Translate(
+                parsed.Expression,
+                path => string.Join('.', path),
+                typeCheck,
+                collection: name => new SqlCollection(name, "TRUE", path => string.Join('.', [name, .. path]))).Diagnostic;
     }
 
     /// <summary>

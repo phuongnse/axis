@@ -19,7 +19,11 @@ namespace Axis.Expressions.Sql;
 /// expression's precedence. A call to a named rule is inlined: the rule's body is rendered with
 /// each parameter replaced by the SQL of its argument. Before any SQL is built, the filter with
 /// every rule body inlined is counted against <see cref="ExpressionLimits.MaxInlinedNodes"/>. It
-/// stops at the first construct outside the subset and reports only that one.
+/// stops at the first construct outside the subset and reports only that one. <c>any(list, condition)</c>,
+/// <c>count(list)</c> and <c>count(list, condition)</c> over a child collection or a references field
+/// at the filter's top level are subqueries, <c>EXISTS</c> or <c>count(*)</c>, over the source the
+/// caller's <c>collection</c> callback gives. A row whose condition is null does not count. Without that
+/// callback, and for every other aggregate, an aggregate is not in the subset.
 /// </summary>
 public static class SqlTranslator
 {
@@ -47,14 +51,17 @@ public static class SqlTranslator
     /// translated. <paramref name="parameterPrefix"/> starts each parameter name, so several
     /// translations can share one statement with different prefixes. <paramref name="timeZone"/> is the
     /// application's time zone, which <c>today()</c> and <c>toDate</c> use. It is UTC when null.
+    /// <paramref name="collection"/> gives the subquery source of the child collection or references
+    /// field named in <c>any</c> or <c>count</c>. Without it, every aggregate is not translated.
     /// </summary>
     public static SqlTranslationResult Translate(
         ExpressionNode expression,
         Func<IReadOnlyList<string>, string> column,
         ExpressionCheckResult? check = null,
         string parameterPrefix = "f",
-        TimeZoneInfo? timeZone = null) =>
-        TranslateCountingNodes(expression, column, check, parameterPrefix, timeZone).Result;
+        TimeZoneInfo? timeZone = null,
+        Func<string, SqlCollection>? collection = null) =>
+        TranslateCountingNodes(expression, column, check, parameterPrefix, timeZone, collection).Result;
 
     /// <summary>
     /// Translates like <see cref="Translate"/> and also gives the syntax nodes counted for the
@@ -65,7 +72,8 @@ public static class SqlTranslator
         Func<IReadOnlyList<string>, string> column,
         ExpressionCheckResult? check = null,
         string parameterPrefix = "f",
-        TimeZoneInfo? timeZone = null)
+        TimeZoneInfo? timeZone = null,
+        Func<string, SqlCollection>? collection = null)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(column);
@@ -77,7 +85,13 @@ public static class SqlTranslator
         try
         {
             size.Check(expression, ruleCalls);
-            var sql = new Translation(column, parameters, ruleCalls, parameterPrefix, timeZone ?? TimeZoneInfo.Utc).Render(expression);
+            var sql = new Translation(
+                column,
+                collection,
+                parameters,
+                ruleCalls,
+                parameterPrefix,
+                timeZone ?? TimeZoneInfo.Utc).Render(expression);
             return (new SqlTranslationResult(sql, parameters, null), size.Nodes);
         }
         catch (TranslationFailure failure)
@@ -88,6 +102,7 @@ public static class SqlTranslator
 
     private sealed class Translation(
         Func<IReadOnlyList<string>, string> column,
+        Func<string, SqlCollection>? collection,
         List<SqlValue> parameters,
         IReadOnlyDictionary<CallNode, ExpressionRule> ruleCalls,
         string parameterPrefix,
@@ -99,6 +114,12 @@ public static class SqlTranslator
         /// <summary>The SQL of each parameter of the rule body being rendered, or null at the filter's top level.</summary>
         private Dictionary<string, string>? _bindings;
 
+        /// <summary>The column callback: the filter's, or the item columns of the collection whose condition is being rendered.</summary>
+        private Func<IReadOnlyList<string>, string> _column = column;
+
+        /// <summary>The filter's own column callback, which <see cref="_column"/> is while no collection's condition is being rendered.</summary>
+        private readonly Func<IReadOnlyList<string>, string> _filterColumn = column;
+
         public string Render(ExpressionNode node) => node switch
         {
             IntegerLiteral literal => Parameter(ExpressionTypeKind.Integer, literal.Value),
@@ -108,7 +129,7 @@ public static class SqlTranslator
             NullLiteral => "NULL",
             NameNode name => Name(name),
             MemberNode member => _bindings is null
-                ? column(Path(member))
+                ? _column(Path(member))
                 : throw Fail("Paths that do not start at a field are not translated to SQL", member.Offset),
             CallNode call => Call(call),
             UnaryNode unary => unary.Operator == UnaryOperator.Not
@@ -125,7 +146,7 @@ public static class SqlTranslator
         {
             if (_bindings is null)
             {
-                return column([name.Name]);
+                return _column([name.Name]);
             }
 
             return _bindings.TryGetValue(name.Name, out var sql)
@@ -218,8 +239,9 @@ public static class SqlTranslator
 
             if (signature.IsAggregate)
             {
-                // A collection has no column, so no aggregate is in the subset.
-                throw NotTranslated(name, call.Offset);
+                return name is "any" or "count" && collection is not null
+                    ? Aggregate(call, name)
+                    : throw NotTranslated(name, call.Offset);
             }
 
             switch (name)
@@ -255,6 +277,39 @@ public static class SqlTranslator
                 "currentUser" => "@" + CurrentUserParameter,
                 _ => throw NotTranslated(name, call.Offset),
             };
+        }
+
+        /// <summary>
+        /// <c>any</c> as <c>EXISTS</c> and <c>count</c> as <c>count(*)</c> over the rows of the collection
+        /// that belong to the outer row and, with a condition, make it true, so a null condition keeps no row.
+        /// Only the filter's top level translates one: a rule body has no collections, and an item expression has none either.
+        /// </summary>
+        private string Aggregate(CallNode call, string name)
+        {
+            if (_bindings is not null || !ReferenceEquals(_column, _filterColumn) || call.Arguments[0] is not NameNode list)
+            {
+                throw Fail("Aggregates are only translated at the filter's top level", call.Offset);
+            }
+
+            var source = collection!(list.Name);
+            var where = source.OwnerMatch;
+            if (call.Arguments.Count > 1)
+            {
+                var outer = _column;
+                _column = source.Column;
+                try
+                {
+                    where = $"{where} AND ({Render(call.Arguments[1])})";
+                }
+                finally
+                {
+                    _column = outer;
+                }
+            }
+
+            return name == "any"
+                ? $"EXISTS (SELECT 1 FROM {source.From} WHERE {where})"
+                : $"(SELECT count(*) FROM {source.From} WHERE {where})";
         }
 
         /// <summary>

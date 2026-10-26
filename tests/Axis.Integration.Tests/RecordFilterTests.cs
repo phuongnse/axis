@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Data.Naming;
 using Axis.Server.Tests;
 using static Axis.Integration.Tests.RecordApiFixture;
 
@@ -11,12 +12,14 @@ namespace Axis.Integration.Tests;
 /// <c>false</c> and <c>status is not null</c>, writes items whose status is <c>open</c>, and reaches
 /// the tickets they requested. <c>fred</c> reads items only through <c>false</c>, and <c>faye</c>
 /// through a filter that overflows for an item with a quantity and one that matches items of the
-/// Finance department.
+/// Finance department. <c>ada</c> and <c>abe</c> read jobs through a filter that tests the set of
+/// people each job lists.
 /// </summary>
 public sealed class RecordFilterTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
 {
     private const string Items = "/api/apps/RecordsApp/entities/Item/records";
     private const string Tickets = "/api/apps/RecordsApp/entities/Ticket/records";
+    private const string Jobs = "/api/apps/RecordsApp/entities/Job/records";
     private const string NotFoundTitle = "No record has this id.";
     private const string OutsideTitle = "The record is outside your grants for this action.";
 
@@ -235,6 +238,71 @@ public sealed class RecordFilterTests(RecordApiFixture fixture) : IClassFixture<
             entry => entry.Contains("A record list of entity Item failed", StringComparison.Ordinal)
                 && entry.Contains("grant 1 of policy FailingAccess", StringComparison.Ordinal));
         Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Contains("Desk", StringComparison.Ordinal) || entry.Contains("Chair", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_read_filter_over_a_set_lists_only_the_records_that_list_the_user_and_any_other_is_404()
+    {
+        await fixture.ResetAsync();
+        var ada = await fixture.InsertAsync(TenantA, "Person", new Dictionary<string, string?> { ["userId"] = "ada" });
+        var abe = await fixture.InsertAsync(TenantA, "Person", new Dictionary<string, string?> { ["userId"] = "abe" });
+        var adas = await InsertJobAsync("Paint", ada);
+        var abes = await InsertJobAsync("Wire", abe);
+        var both = await InsertJobAsync("Plumb", ada, abe);
+        var nobody = await InsertJobAsync("Sweep");
+        using var adaClient = fixture.CreateClient().SignedInAs("ada");
+        using var abeClient = fixture.CreateClient().SignedInAs("abe");
+
+        using (var page = await ReadJsonAsync(await SendAsync(adaClient, "GET", Jobs)))
+        {
+            Assert.Equal(new[] { adas, both }.Order(), Ids(page));
+            Assert.Equal(2, page.RootElement.GetProperty("totalCount").GetInt64());
+        }
+
+        using (var page = await ReadJsonAsync(await SendAsync(abeClient, "GET", Jobs)))
+        {
+            Assert.Equal(new[] { abes, both }.Order(), Ids(page));
+            Assert.Equal(2, page.RootElement.GetProperty("totalCount").GetInt64());
+        }
+
+        foreach (var readable in new[] { adas, both })
+        {
+            using var read = await SendAsync(adaClient, "GET", $"{Jobs}/{readable:D}");
+            Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        }
+
+        // A job that lists only someone else, and a job that lists nobody, do not exist for ada.
+        await AssertProblemAsync(await SendAsync(adaClient, "GET", $"{Jobs}/{abes:D}"), HttpStatusCode.NotFound, NotFoundTitle);
+        await AssertProblemAsync(await SendAsync(adaClient, "GET", $"{Jobs}/{nobody:D}"), HttpStatusCode.NotFound, NotFoundTitle);
+        await AssertProblemAsync(await SendAsync(abeClient, "GET", $"{Jobs}/{adas:D}"), HttpStatusCode.NotFound, NotFoundTitle);
+
+        // The job exists, so the 404 comes from the filter alone.
+        Assert.Equal(1L, await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM {JobTable} WHERE id = '{abes:D}'"));
+    }
+
+    private string JobTable
+    {
+        get
+        {
+            Assert.True(fixture.Model.TryGetEntity("Job", out var entity));
+            return EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id));
+        }
+    }
+
+    /// <summary>Inserts a job that lists <paramref name="assignees"/> in its <c>assignees</c> set, by SQL on the junction table.</summary>
+    private async Task<Guid> InsertJobAsync(string title, params Guid[] assignees)
+    {
+        var job = await fixture.InsertAsync(TenantA, "Job", new Dictionary<string, string?> { ["title"] = title });
+        Assert.True(fixture.Model.TryGetEntity("Job", out var entity));
+        var junction = EntityNaming.QualifiedTable(EntityNaming.Junction(entity.Id, "assignees"));
+        for (var position = 0; position < assignees.Length; position++)
+        {
+            await fixture.ExecuteAsync(
+                TenantA,
+                $"INSERT INTO {junction} (owner_id, target_id, position) VALUES ('{job:D}', '{assignees[position]:D}', {position})");
+        }
+
+        return job;
     }
 
     private Task<Guid> InsertItemAsync(string name, string? status) =>

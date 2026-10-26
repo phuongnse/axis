@@ -121,9 +121,10 @@ Two more types exist only inside expressions:
   `references` field. Only [aggregates](#aggregates) accept it, as their first
   argument. Anywhere else it is a type diagnostic. Over a `references` field,
   names in the item expression are the target's own fields, computed ones
-  included. Paths through its references in the item expression are planned
-  _(planned for M15)_, because they need record reads that come with its
-  storage.
+  included. Paths through reference fields in the item expression resolve
+  only in a data source filter and a policy filter, where they become SQL.
+  Everywhere else, the interpreter would need record reads for them, so a
+  path in an item expression is an unknown name.
 
 Rules:
 
@@ -308,7 +309,9 @@ Paths in validations and computed fields are not built. There a path is
   are the child row's fields, computed ones included, and nothing else: no
   field of the owner, no collection and no rule. A `references` field gives a
   `list<Target>` the same way, with the target's fields in the item
-  expression.
+  expression. In a data source filter and a policy filter, the item expression
+  also resolves paths through the reference fields of the child row or the
+  target, such as `any(lines, product.name == 'Desk')`.
 - **Rule call.** A named rule is called like a function, such as
   `isLargeRequest(total)`. Arguments are checked against the rule's typed
   parameters: an integer fits a decimal parameter, and `null` fits any
@@ -350,9 +353,11 @@ Paths in validations and computed fields are not built. There a path is
   data source parameters as plain names, and paths through reference fields.
   It can call the named rules, with fields, paths, parameters and literals as
   arguments. Its child collections and `references` fields type-check in
-  aggregates, but no aggregate is in the [SQL subset](#sql-subset), so one is
-  `AXC0053`. A measure `filter` of a [grouped data source](data-sources.md#aggregates)
-  has the same scope.
+  aggregates, but only `any` and `count` are in the [SQL subset](#sql-subset).
+  Another aggregate is `AXC0053`. Inside an aggregate's item expression, names
+  are the child row's or the target's fields, and paths through their
+  reference fields resolve. A measure `filter` of a
+  [grouped data source](data-sources.md#aggregates) has the same scope.
 - **Scope in a policy filter.** A
   [policy](roles-and-policies.md) filter sees the entity's
   fields, paths through reference fields of up to 3 hops, the named rules and
@@ -360,7 +365,9 @@ Paths in validations and computed fields are not built. There a path is
   and translates it to SQL. It must stay inside the [SQL subset](#sql-subset),
   because record lists, single-record checks and
   [data sources](data-sources.md#authorization) run it as SQL.
-  So it cannot use an aggregate or `lower`, which are `AXC0053`. A rule body
+  So it can use `any` and `count` over a child collection or a `references`
+  field, such as `any(assignees, userId == currentUser())`, but not another
+  aggregate or `lower`, which are `AXC0053`. A rule body
   cannot call `currentUser()`, so a filter passes the user id to a rule as an
   argument, such as `IsRequester(requester, currentUser())`.
 - **Scope in a process expression.** A `startCondition` and a decision
@@ -517,8 +524,9 @@ them over child collections and `references` fields.
 - **`avg`.** It takes integer or decimal items, skips `null` items and is
   `null` when none is left. Its result is a decimal rounded to 6 digits
   after the point.
-- **SQL.** No aggregate is in the SQL subset. From M15 `any` and `count` are,
-  see [SQL subset](#sql-subset) _(planned for M15)_.
+- **SQL.** Only `any` and `count` are in the SQL subset, so a data source or
+  policy filter can use them. The other aggregates are `AXC0053`, see
+  [SQL subset](#sql-subset).
 
 ## Cost bounds
 
@@ -657,14 +665,14 @@ These are left out:
 - **`lower` and `upper`.** Unicode case rules differ between .NET and
   PostgreSQL.
 - **`trim`.** The two systems define whitespace differently.
-- **Aggregates.** A child collection has no column in the entity's table.
-  A filter type-checks with the entity's child collections, so an aggregate
-  in it is `AXC0053`. From M15 `any` and `count` are in the subset, below,
-  and the other aggregates stay out _(planned for M15)_.
+- **Aggregates other than `any` and `count`.** A child collection has no
+  column in the entity's table. A filter type-checks with the entity's child
+  collections, so `sum`, `avg`, `min`, `max` and `all` in it are `AXC0053`.
+  `any` and `count` are in the subset, below.
 
-From M15 _(planned for M15)_, `any(list, condition)`, `count(list)` and
-`count(list, condition)` translate when `list` is a child collection or a
-`references` field of the filter's root entity. See
+`any(list, condition)`, `count(list)` and `count(list, condition)` translate
+when `list` is a child collection or a `references` field of the filter's root
+entity. See
 [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md).
 
 - `any` becomes `EXISTS (SELECT 1 FROM <child or junction> WHERE <owner
@@ -672,8 +680,13 @@ From M15 _(planned for M15)_, `any(list, condition)`, `count(list)` and
   the same shape.
 - The condition is in the subset itself. Its names are the child row's
   fields, or for `references` the target's fields through a join on
-  `target_id`, with paths through their references.
+  `target_id`, with paths through their references. A path is one scalar
+  subquery per step, so it never adds a row. A condition that is outside the
+  subset, such as one that calls `lower`, is `AXC0053` at that call.
 - A `null` condition counts as false, as `WHERE` drops it.
+- A filter that reads a computed field of the child row or the linked record
+  while that field is being recomputed is refused, as one that reads a computed
+  field of the record itself is.
 - The indexes on `owner_id` and `target_id` serve these subqueries.
 
 Rules:
@@ -787,7 +800,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   "needs at least 1 argument", and the count found.
 - **`AXC0053`.** A data source filter, a measure filter or a policy filter uses something outside the
   [SQL subset](#sql-subset), at the operator, call or path step. This
-  includes `/`, `lower`, `upper`, `trim`, every aggregate, a call to a rule
+  includes `/`, `lower`, `upper`, `trim`, every aggregate except `any` and `count`, a call to a rule
   whose body is outside the subset, and a filter whose rule calls inline to
   more than 2,000 syntax nodes. The message names what is not translated, or the rule. It is reported only after the filter type-checks. A migration's `fill` or `convert` value is checked against the subset at `/changes/{i}/value`, even when its type check waits for activation. See [migrations](resource-files.md#resource-file-shape).
 - **`AXC0058`.** A path takes more than 3 hops, at the `.` that goes past

@@ -166,6 +166,24 @@ const texts = {
   'shell.table.deleteMissing': 'This record no longer exists.',
   'shell.table.deleteInUse': 'This record is in use and cannot be deleted.',
   'shell.table.deleteFailed': 'The record could not be deleted.',
+  'shell.table.import': 'Import',
+  'shell.table.importTitle': 'Import records',
+  'shell.table.importChoose': 'Choose a CSV or Excel file',
+  'shell.table.importCheck': 'Check',
+  'shell.table.importChecking': 'Checking the file…',
+  'shell.table.importChecked': 'The file is clean.',
+  'shell.table.importFailed': 'The import failed.',
+  'shell.table.importRow': 'Row',
+  'shell.table.importColumn': 'Column',
+  'shell.table.importFile': 'File',
+  'shell.table.importCommit': 'Commit',
+  'shell.table.importCommitting': 'Creating the records…',
+  'shell.table.imported': 'The records were imported.',
+  'shell.table.importDenied': 'You may not import records here.',
+  'shell.table.importTooLarge': 'The file is too large.',
+  'shell.table.importWrongType': 'Only a CSV or Excel file can be imported.',
+  'shell.table.importUploadFailed': 'The file could not be imported.',
+  'shell.table.importClose': 'Close',
   'shell.navigate.failed': 'The page could not be opened.',
   'shell.form.cancel': 'Cancel',
   'note.delete': 'Delete note',
@@ -1256,5 +1274,139 @@ describe('TableWidget search', () => {
 
     renderWidget('', searchable)
     expect(await screen.findByRole('searchbox', { name: 'Search' })).toBeInTheDocument()
+  })
+})
+
+describe('TableWidget import', () => {
+  const importsPath = '/api/apps/E2eApp/entities/Note/imports'
+  const importId = '6f0c2a54-3b7e-4d1a-9c58-2e4f7a1b9d03'
+  const withImport: WidgetAccess = { ...everyAction, actions: [...everyAction.actions, 'import'] }
+  const importWidget: WidgetMetadata = { ...noteWidget, access: withImport }
+
+  function answer(state: string, errors: Record<string, string[]> = {}, status = 200) {
+    return new Response(JSON.stringify({ id: importId, state, key: null, errors, createdAt: '2026-01-01T00:00:00Z' }), {
+      status,
+    })
+  }
+
+  /** Stubs `fetch`: the records, the upload, then each read of the import in turn, then the commit. */
+  function stubImport(reads: Response[], uploadStatus = 202, commitStatus = 202) {
+    const remaining = [...reads]
+    const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
+      if (input === importsPath) {
+        return uploadStatus === 202 ? answer('pending', {}, 202) : new Response(null, { status: uploadStatus })
+      }
+      if (input === `${importsPath}/${importId}/commit`) {
+        return commitStatus === 202 ? answer('checked', {}, 202) : new Response(null, { status: commitStatus })
+      }
+      if (input === `${importsPath}/${importId}`) {
+        return remaining.shift()!
+      }
+      return new Response(notePage, { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return {
+      records: () => fetchMock.mock.calls.filter(([url]) => url.startsWith(recordsPath)),
+      uploads: () => fetchMock.mock.calls.filter(([url]) => url === importsPath),
+      commits: () => fetchMock.mock.calls.filter(([url]) => url.endsWith('/commit')),
+    }
+  }
+
+  async function chooseAndCheck(name = 'notes.csv') {
+    await userEvent.click(await screen.findByRole('button', { name: 'Import' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = dialog.querySelector('input[type=file]') as HTMLInputElement
+    await userEvent.upload(input, new File(['title\nBuy\n'], name, { type: 'application/vnd.ms-excel' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Check' }))
+    return dialog
+  }
+
+  it('shows the Import button only when the access lists import on an entity table', async () => {
+    stubRecords()
+    renderWidget('', noteWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument()
+  })
+
+  it('shows the Import button when the access lists import', async () => {
+    stubRecords()
+    renderWidget('', importWidget)
+    expect(await screen.findByRole('button', { name: 'Import' })).toBeInTheDocument()
+  })
+
+  it('has no Import button on a data source table', async () => {
+    stubRecords()
+    renderWidget('', { ...noteListWidget, access: withImport })
+    await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument()
+  })
+
+  it('lists the dry run errors by row and field label and offers no Commit', async () => {
+    const { uploads, commits } = stubImport([
+      answer('failed', {
+        '/rows/2/values/title': ['Required.'],
+        '/rows/3': ['Wrong number of cells.'],
+        '/columns/3': ['Unknown field.'],
+        '/columns': ['No header.'],
+      }),
+    ])
+    renderWidget('', importWidget)
+
+    await chooseAndCheck()
+
+    const status = await screen.findByTestId('import-status')
+    await waitFor(() => expect(status).toHaveTextContent('Row 2 · Title: Required.'))
+    expect(status).toHaveTextContent('Row 3: Wrong number of cells.')
+    expect(status).toHaveTextContent('Column 3: Unknown field.')
+    expect(status).toHaveTextContent('File: No header.')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(screen.queryByRole('button', { name: 'Commit' })).not.toBeInTheDocument()
+    const [url, init] = uploads()[0]
+    expect(url).toBe(importsPath)
+    expect(new Headers(init?.headers).get('Content-Type')).toBe('text/csv')
+    expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+    expect(commits()).toHaveLength(0)
+  })
+
+  it('commits a checked import and requests the rows again once it is committed', async () => {
+    const { records, commits } = stubImport([answer('checked'), answer('committed')])
+    renderWidget('', importWidget)
+
+    const dialog = await chooseAndCheck()
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Commit' }))
+
+    expect(await screen.findByTestId('table-action-done')).toHaveTextContent('The records were imported.')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(records()).toHaveLength(2))
+    expect(commits()).toHaveLength(1)
+    expect(new Headers(commits()[0][1]?.headers).get('X-Axis-Csrf')).toBe('1')
+  })
+
+  it('refuses a file that is neither CSV nor xlsx and sends nothing', async () => {
+    const { uploads } = stubImport([])
+    renderWidget('', importWidget)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Import' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = dialog.querySelector('input[type=file]') as HTMLInputElement
+    await userEvent.upload(input, new File(['x'], 'notes.txt', { type: 'text/plain' }), { applyAccept: false })
+
+    expect(await screen.findByTestId('import-problem')).toHaveTextContent('Only a CSV or Excel file can be imported.')
+    expect(within(dialog).getByRole('button', { name: 'Check' })).toBeDisabled()
+    expect(uploads()).toHaveLength(0)
+  })
+
+  it.each([
+    [403, 'You may not import records here.'],
+    [413, 'The file is too large.'],
+    [415, 'Only a CSV or Excel file can be imported.'],
+    [500, 'The file could not be imported.'],
+  ])('shows its own message for an upload answered with %i', async (status, message) => {
+    stubImport([], status)
+    renderWidget('', importWidget)
+
+    await chooseAndCheck()
+
+    expect(await screen.findByTestId('import-problem')).toHaveTextContent(message)
   })
 })

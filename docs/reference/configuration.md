@@ -328,8 +328,8 @@ flowchart LR
      fields and the named rules, and translated to SQL. Its first problem is
      reported at `/filter` with its
      [expression diagnostic](expressions.md#diagnostics) code, and anything
-     outside the SQL subset is `AXC0053`, including an aggregate over a
-     child collection. An enum parameter with a value the compared enum field
+     outside the SQL subset is `AXC0053`, including an aggregate other than
+     `any` and `count` over a child collection or a `references` field. An enum parameter with a value the compared enum field
      lacks is `AXC0047`, and so is a `.` after a field that is not a
      `reference` or after a parameter. A path with more than 3 hops is
      `AXC0058`. A measure `filter` is checked the same way and reported at
@@ -490,7 +490,8 @@ flowchart LR
      translated to SQL. Its first problem is reported at
      `/grants/{i}/filter` with its
      [expression diagnostic](expressions.md#diagnostics) code, and anything
-     outside the SQL subset, such as an aggregate or `lower`, is `AXC0053`.
+     outside the SQL subset, such as an aggregate other than `any` and `count`, or
+     `lower`, is `AXC0053`.
      A name whose role, entity, data source, process or endpoint file was not
      loaded because of its own errors is not reported again.
    - **Connectors.** A [connector](integration-resources.md#connector-resource)'s `timeout` that is not
