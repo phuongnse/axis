@@ -24,9 +24,14 @@ export async function createResource(page: Page, kind: string, value: string, sh
 /**
  * Selects the Form tab of the open resource and waits until it is selected. Under D65 and D66 a page or a form opens on
  * its Design tab, so a spec that uses the fields of its Form tab selects Form first. It does no harm when Form is selected.
+ * It clicks again when the click did not select the tab, because the layout can shift as the web font arrives and a
+ * click just before that can miss.
  */
 export async function openFormTab(page: Page) {
   const tab = page.getByRole('tab', { name: 'Form', exact: true })
-  await tab.click()
-  await expect(tab).toHaveAttribute('aria-selected', 'true')
+  await page.evaluate(() => document.fonts.ready)
+  await expect(async () => {
+    await tab.click()
+    await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 2000 })
+  }).toPass()
 }

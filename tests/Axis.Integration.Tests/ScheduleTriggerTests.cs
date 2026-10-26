@@ -21,6 +21,8 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     private static readonly string[] _nonDeliveryKinds =
     [
         ProcessStarts.StepWorkItemKind,
+        ProcessStarts.TimerWorkItemKind,
+        ProcessStarts.TaskDeadlineWorkItemKind,
         ProcessStarts.ConnectorCallWorkItemKind,
         ProcessStarts.PackageCallWorkItemKind,
         ProcessStarts.TriggerScheduleWorkItemKind,

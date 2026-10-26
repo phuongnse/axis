@@ -10,8 +10,9 @@
 // - docs/decisions.md has one row per decision file, numbered from 1 with no gaps, in order, with
 //   the file's title and status.
 // - docs/reference/asvs.md, when it exists, has one row for each requirement of the committed ASVS list
-//   (docs/reference/asvs-5.0.0.json) in chapters V1 to V8 for now, with no unknown or repeated id, a
-//   status from the list and some evidence. A Met row names only test classes that exist.
+//   (docs/reference/asvs-5.0.0.json), with no unknown or repeated id, a status from the list and some
+//   evidence. A Met row names only test classes that exist. A Gap row links the GitHub issue that
+//   closes it.
 // - A doc under docs/ has at most 1,000 lines, AGENTS.md at most 100 and a SKILL.md under
 //   .claude/skills/ at most 250, so agents can read what they need without reading whole books.
 //
@@ -28,15 +29,13 @@ export const maxAgentsLines = 100
 export const maxSkillLines = 250
 export const asvsListFile = 'docs/reference/asvs-5.0.0.json'
 export const asvsStatuses = ['Met', 'Gap', 'Delegated', 'Not applicable']
-/** The chapters V1 to V<n> of the ASVS list that need a row. The next issue raises it to 17. */
-export const asvsCheckedChapters = 8
 
 const decisionFilePattern = /^d(\d+)-([a-z0-9-]+)\.md$/
 const decisionTitlePattern = /^# D(\d+)\. (.+)$/
 const statusPattern = /^Status: \*\*((?:Agreed|Proposed)\b[^*]*)\*\*$/
 const decisionRowPattern = /^\| \[D(\d+)\]\(decisions\/([^)]+)\) \| (.+?) \| \*\*(.+?)\*\* \|$/
 const asvsFile = 'docs/reference/asvs.md'
-const asvsChapterPattern = /^V(\d+)\./
+const issueLinkPattern = /\]\(https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+\)/
 const cellSeparator = /(?<!\\)\|/
 const testClassPattern = /`([A-Z]\w*Tests)`/g
 const classPattern = /\bclass\s+(\w+)/g
@@ -104,19 +103,19 @@ function checkAsvs(root, asvs, report) {
     if (!asvsStatuses.includes(statusName)) {
       report(asvs, line, `${id} status '${status}' is not one of ${asvsStatuses.map((name) => `**${name}**`).join(', ')}`)
     }
+    const rawEvidence = text[i].split(cellSeparator)[4]
     if (evidence === '') report(asvs, line, `${id} has no evidence`)
     else if (statusName === 'Met') {
-      for (const match of text[i].split(cellSeparator)[4].matchAll(testClassPattern)) {
+      for (const match of rawEvidence.matchAll(testClassPattern)) {
         if (!testClasses().has(match[1])) report(asvs, line, `${id} names the test class ${match[1]}, which no .cs file under tests/ or samples/ declares`)
       }
+    } else if (statusName === 'Gap' && !issueLinkPattern.test(rawEvidence)) {
+      report(asvs, line, `${id} is a Gap and links no issue: link the GitHub issue that closes it`)
     }
   }
 
   for (const { id, level } of list) {
-    const chapter = Number(asvsChapterPattern.exec(id)?.[1])
-    if (chapter <= asvsCheckedChapters && !seen.has(id)) {
-      report(asvs, Math.max(heading, 1), `${id} (Level ${level}) has no row in the requirements table`)
-    }
+    if (!seen.has(id)) report(asvs, Math.max(heading, 1), `${id} (Level ${level}) has no row in the requirements table`)
   }
 }
 

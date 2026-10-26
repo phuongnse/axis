@@ -11,6 +11,14 @@
     "formatVersion": { "const": 1 },
     "label": { "$ref": "#/$defs/textReference" },
     "timeZone": { "type": "string", "minLength": 1 },
+    "fileStorage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["binding"],
+      "properties": {
+        "binding": { "$ref": "#/$defs/name" }
+      }
+    },
     "packages": {
       "type": "array",
       "items": { "$ref": "#/$defs/package" }

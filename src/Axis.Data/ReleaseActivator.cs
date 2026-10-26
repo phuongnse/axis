@@ -246,14 +246,22 @@ public static class ReleaseActivator
         };
 
     /// <summary>
-    /// Reports every binding the tenant lacks or holds with another kind: those of the connectors,
-    /// and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
+    /// Reports every binding the tenant lacks or holds with another kind: the file storage binding of the
+    /// application, those of the connectors, and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
     /// reports every base URL that is not <c>https</c> when <c>http</c> is not allowed. A missing binding is a warning
     /// on a preview tenant. A message names the tenant and the binding, never its value.
     /// </summary>
     private static List<Diagnostic> CheckBindings(ApplicationModel model, ActivationBindings bindings)
     {
         var diagnostics = new List<Diagnostic>();
+        if (model.Manifest.FileStorage is { } storage)
+        {
+            void Report(string code, string message, string path, DiagnosticSeverity severity = DiagnosticSeverity.Error) =>
+                diagnostics.Add(new Diagnostic(code, message, model.Manifest.File, path, model.Manifest.Id, severity));
+
+            CheckBinding(storage.Binding, ActivationBinding.StorageKind, "/fileStorage/binding", bindings, Report);
+        }
+
         foreach (var connector in model.Connectors)
         {
             void Report(string code, string message, string path, DiagnosticSeverity severity = DiagnosticSeverity.Error) =>

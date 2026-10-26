@@ -524,6 +524,24 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
+    public async Task A_timer_waits_until_advance_time_passes_its_wait()
+    {
+        using var folder = TimerApplication(Scenario("CoolDown", Purchasing, CreateRequest + """
+            { "type": "startProcess", "process": "CoolDown", "record": "request", "as": "anna" },
+            { "type": "expectInstance", "process": "CoolDown", "record": "request", "state": "waiting" },
+            { "type": "advanceTime", "by": "PT30M" },
+            { "type": "expectInstance", "process": "CoolDown", "record": "request", "state": "waiting" },
+            { "type": "advanceTime", "by": "PT1H" },
+            { "type": "expectInstance", "process": "CoolDown", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "amount": 5001 } }
+            """, now: ScheduleNow));
+
+        var result = await RunAsync(folder, "CoolDown");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
     public async Task A_task_deadline_moves_the_instance_on_only_after_advance_time_passes_it()
     {
         using var folder = DeadlineApplication(Scenario("TaskDeadline", Purchasing, CreateRequest + StartApproval + """
@@ -1047,6 +1065,13 @@ public sealed class ScenarioRunnerTests
     /// </summary>
     private static TemporaryFolder ScheduleApplication((string Name, string Json) scenario) =>
         Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioScheduleApp");
+
+    /// <summary>
+    /// A copy of the ScenarioPurchaseApp fixture with the ScenarioTimerApp files over it: the process <c>CoolDown</c> waits
+    /// an hour on a timer, then adds 1 to the amount of the purchase request.
+    /// </summary>
+    private static TemporaryFolder TimerApplication((string Name, string Json) scenario) =>
+        Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioTimerApp");
 
     /// <summary>
     /// A copy of the ScenarioPurchaseApp fixture with the ScenarioDeadlineApp files over it: the manager's task expires

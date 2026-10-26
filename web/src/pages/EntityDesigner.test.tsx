@@ -1,9 +1,10 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { fieldSettingNames, fieldSettings, fieldTypes } from '../platform/entityFields'
+import { setAt } from '../platform/jsonPatch'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
@@ -56,6 +57,11 @@ const everySetting = {
   sequence: 'InvoiceNumbers',
   creator: true,
   sensitive: true,
+  maxSize: 1048576,
+  accept: ['application/pdf'],
+  currency: 'VND',
+  currencyField: 'code',
+  valueLabels: { open: { textKey: 'field.total' }, closed: { textKey: 'entity.invoice' } },
 }
 
 const typed = fieldTypes.map((type) => ({
@@ -93,19 +99,48 @@ function renderDesigner(
   readOnly = false,
 ) {
   render(
+    <Providers loaded={loaded}>
+      <EntityDesigner value={value} onChange={onChange} readOnly={readOnly} />
+    </Providers>,
+  )
+  return onChange
+}
+
+function Providers({ loaded, children }: { loaded: StudioNames | null; children: ReactNode }) {
+  return (
     <ThemeModeProvider>
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioNamesContext.Provider value={loaded ?? undefined}>
-            <LabelTextsContext.Provider value={labelContext}>
-              <EntityDesigner value={value} onChange={onChange} readOnly={readOnly} />
-            </LabelTextsContext.Provider>
+            <LabelTextsContext.Provider value={labelContext}>{children}</LabelTextsContext.Provider>
           </StudioNamesContext.Provider>
         </TextProvider>
       </ThemeRoot>
-    </ThemeModeProvider>,
+    </ThemeModeProvider>
   )
-  return onChange
+}
+
+/** The designer over an entity that it edits, as the editor does: each change is applied with `setAt`. */
+function renderEditing(initial: Record<string, unknown>) {
+  function Harness() {
+    const [value, setValue] = useState(initial)
+    return (
+      <>
+        <EntityDesigner
+          value={value}
+          onChange={(pointer, next) => setValue((current) => setAt(current, pointer, next) as Record<string, unknown>)}
+        />
+        <output data-testid="entity-content">{JSON.stringify(value)}</output>
+      </>
+    )
+  }
+  render(
+    <Providers loaded={names}>
+      <Harness />
+    </Providers>,
+  )
+  return () =>
+    (JSON.parse(screen.getByTestId('entity-content').textContent ?? '') as { fields: Record<string, unknown>[] }).fields
 }
 
 afterEach(() => localStorage.clear())
@@ -124,7 +159,12 @@ describe.each(['light', 'dark'])('EntityDesigner in %s mode', (mode) => {
       expect(row).toBeVisible()
       for (const setting of fieldSettingNames) {
         const present = screen.queryByTestId(`studio-field-/fields/${index}/${setting}`) !== null
-        expect(present, `${field.type} ${setting}`).toBe(fieldSettings(field.type).includes(setting))
+        // A money field shows exactly one of its two currency keys, the one the field holds.
+        const expected =
+          field.type === 'money' && (setting === 'currency' || setting === 'currencyField')
+            ? setting === (Object.hasOwn(field, 'currencyField') ? 'currencyField' : 'currency')
+            : fieldSettings(field.type).includes(setting)
+        expect(present, `${field.type} ${setting}`).toBe(expected)
         if (present) {
           expect(row.contains(screen.getByTestId(`studio-field-/fields/${index}/${setting}`))).toBe(true)
         }
@@ -201,6 +241,75 @@ describe('EntityDesigner', () => {
     expect(onChange).toHaveBeenCalledWith('/fields/0/values', undefined)
   })
 
+  it('switches a money field between a fixed code and a currency field', async () => {
+    const fields = renderEditing(
+      entity({
+        fields: [
+          { name: 'code', type: 'text' },
+          { name: 'status', type: 'enum', values: ['open'] },
+          { name: 'amount', type: 'money', currency: 'USD' },
+        ],
+      }),
+    )
+    const amount = within(screen.getByTestId('studio-field-/fields/2'))
+
+    await userEvent.click(amount.getByRole('radio', { name: 'Field' }))
+    expect(fields()[2]).toEqual({ name: 'amount', type: 'money', currencyField: '' })
+
+    await userEvent.click(amount.getByRole('combobox', { name: 'Currency field' }))
+    expect(optionTexts(await openDropdown())).toEqual(['code', 'status'])
+    await chooseOption('code')
+    expect(fields()[2]).toEqual({ name: 'amount', type: 'money', currencyField: 'code' })
+
+    await userEvent.click(amount.getByRole('radio', { name: 'Fixed code' }))
+    expect(fields()[2]).toEqual({ name: 'amount', type: 'money' })
+    await userEvent.type(amount.getByRole('textbox', { name: 'Currency' }), 'vnd')
+    expect(fields()[2]).toEqual({ name: 'amount', type: 'money', currency: 'VND' })
+    await userEvent.clear(amount.getByRole('textbox', { name: 'Currency' }))
+    expect(fields()[2]).toEqual({ name: 'amount', type: 'money' })
+  })
+
+  it('sets and clears the max size and the accepted media types of a file field', async () => {
+    const fields = renderEditing(entity({ fields: [{ name: 'receipt', type: 'file' }] }))
+    const receipt = within(screen.getByTestId('studio-field-/fields/0'))
+
+    await userEvent.type(receipt.getByRole('spinbutton', { name: 'Max size (bytes)' }), '1048576')
+    expect(fields()[0]).toEqual({ name: 'receipt', type: 'file', maxSize: 1048576 })
+
+    const accept = receipt.getByRole('combobox', { name: 'Accepted media types' })
+    await userEvent.type(accept, 'application/pdf')
+    await chooseOption('application/pdf')
+    await userEvent.type(accept, 'image/*')
+    await chooseOption('image/*')
+    expect(fields()[0]).toEqual({
+      name: 'receipt',
+      type: 'file',
+      maxSize: 1048576,
+      accept: ['application/pdf', 'image/*'],
+    })
+
+    await userEvent.clear(receipt.getByRole('spinbutton', { name: 'Max size (bytes)' }))
+    expect(fields()[0]).toEqual({ name: 'receipt', type: 'file', accept: ['application/pdf', 'image/*'] })
+  })
+
+  it('sets the label of each enum value and removes valueLabels with the last one', async () => {
+    const fields = renderEditing(entity({ fields: [{ name: 'status', type: 'enum', values: ['open', 'closed'] }] }))
+    const status = within(screen.getByTestId('studio-field-/fields/0'))
+    const picker = (value: string) => status.getByTestId(`studio-field-/fields/0/valueLabels/${value}`)
+
+    expect(status.getByRole('combobox', { name: 'Label of open' })).toBeInTheDocument()
+    await chooseOption('entity.invoice', picker('closed'))
+    expect(fields()[0].valueLabels).toEqual({ closed: { textKey: 'entity.invoice' } })
+    await chooseOption('field.total', picker('open'))
+    expect(fields()[0].valueLabels).toEqual({ open: { textKey: 'field.total' }, closed: { textKey: 'entity.invoice' } })
+    expect(Object.keys(fields()[0].valueLabels as object)).toEqual(['open', 'closed'])
+
+    await clearSelect(picker('open'))
+    await clearSelect(picker('closed'))
+    expect(fields()[0]).toEqual({ name: 'status', type: 'enum', values: ['open', 'closed'] })
+    expect(Object.hasOwn(fields()[0], 'valueLabels')).toBe(false)
+  })
+
   it('moves, removes and adds a field by replacing the whole array', async () => {
     const value = entity()
     const onChange = renderDesigner(value)
@@ -261,8 +370,15 @@ describe('EntityDesigner', () => {
             maxLength: 20,
             label: { textKey: 'field.total' },
           },
-          { name: 'status', type: 'enum', values: ['open', 'closed'] },
+          {
+            name: 'status',
+            type: 'enum',
+            values: ['open', 'closed'],
+            valueLabels: { open: { textKey: 'field.total' } },
+          },
           { name: 'total', type: 'decimal', precision: 18, scale: 2, expression: 'code' },
+          { name: 'price', type: 'money', currency: 'VND' },
+          { name: 'receipt', type: 'file', maxSize: 1024, accept: ['image/*'] },
         ],
         validations: [{ expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' }],
       }),
@@ -276,9 +392,19 @@ describe('EntityDesigner', () => {
       ...screen.getAllByRole('combobox'),
       ...screen.getAllByRole('checkbox'),
       ...screen.getAllByRole('spinbutton'),
+      ...screen.getAllByRole('radio'),
     ]
     expect(screen.getAllByRole('spinbutton').length).toBeGreaterThan(0)
     expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0)
+    for (const name of ['Fixed code', 'Field']) {
+      expect(screen.getByRole('radio', { name })).toBeDisabled()
+    }
+    for (const name of ['Max size (bytes)']) {
+      expect(screen.getByRole('spinbutton', { name })).toBeDisabled()
+    }
+    for (const name of ['Accepted media types', 'Label of open', 'Label of closed']) {
+      expect(screen.getByRole('combobox', { name })).toBeDisabled()
+    }
     for (const input of inputs) {
       expect(input).toBeDisabled()
     }

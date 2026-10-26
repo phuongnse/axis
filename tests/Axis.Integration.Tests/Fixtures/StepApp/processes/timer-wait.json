@@ -1,0 +1,19 @@
+{
+  "id": "b2f1d7a4-5c3e-4a68-9d10-7e4b8c2a6f31",
+  "kind": "process",
+  "name": "TimerWait",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "pause",
+  "steps": [
+    { "name": "pause", "type": "timer", "wait": "PT1H", "next": "mark" },
+    {
+      "name": "mark",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'submitted'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

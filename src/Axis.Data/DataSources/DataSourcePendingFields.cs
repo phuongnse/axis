@@ -6,7 +6,7 @@ namespace Axis.Data.DataSources;
 
 /// <summary>
 /// Finds the fields a data source query would decide from while they are being recomputed. A sort, a
-/// group field, a measure or a filter that reads a pending computed field would order, group, sum or
+/// group field, a measure, a measure filter or a filter that reads a pending computed field would order, group, sum or
 /// select by a stale stored value. A projected field is not checked, because it shows its stored value.
 /// </summary>
 public static class DataSourcePendingFields
@@ -15,7 +15,8 @@ public static class DataSourcePendingFields
     /// Returns an error message for each part of the query that reads a pending field, keyed
     /// <c>sort</c>, <c>filter</c> or <c>aggregate</c>, or an empty dictionary when none does. The
     /// <paramref name="sort"/> is the order the request uses. A path through reference fields reads a
-    /// field of each entity on it, and the filter includes the body of every rule it calls. The messages
+    /// field of each entity on it, and a filter or a measure filter includes the body of every rule it calls.
+    /// A measure filter is keyed <c>aggregate</c>. The messages
     /// name the field, never a value.
     /// </summary>
     public static async Task<IReadOnlyDictionary<string, string[]>> ReadAsync(
@@ -57,6 +58,11 @@ public static class DataSourcePendingFields
                     AddPath(dataSource, field, aggregated, measure.Name);
                 }
             }
+
+            // Like the data source filter, a measure filter names the path it reads. It decides which rows a
+            // measure counts, so it is reported under aggregate, even for a count.
+            aggregated.AddRange(DataSourceQueries.MeasureFilterFieldsRead(application, dataSource)
+                .Select(read => (read.EntityId, read.Field, Name: read.Path)));
         }
 
         var entityIds = sorted.Concat(aggregated).Select(read => read.EntityId)

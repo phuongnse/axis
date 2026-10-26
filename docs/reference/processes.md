@@ -7,7 +7,8 @@ work, and the tables. The rest of the process reference is in these files:
 - [task-api.md](task-api.md): the task API.
 - [process-flow.md](process-flow.md): timer, wait for event and sub-process
   steps, loops, the `createRecord` operation and processes without a subject.
-  Loops through a `task` are built, the rest is _(planned for M14)_.
+  The timer step and loops through a `task` or a `timer` are built, the rest
+  is _(planned for M14)_.
 - [task-deadlines.md](task-deadlines.md): task escalations, deadlines, claim
   and reassign. Claim and reassign are built, the rest is _(planned for M14)_.
 - [notifications.md](notifications.md): the `notify` operation and in-app and
@@ -20,7 +21,7 @@ work, and the tables. The rest of the process reference is in these files:
   operator commands.
 
 The `process` resource kind is
-built with `decision`, `task`, `operation` and `end` steps, and so are their
+built with `decision`, `task`, `operation`, `end` and `timer` steps, and so are their
 [compile checks](#compile-checks). A compiled process is part of the release
 model. The worker host, its claims (see [Execution](process-execution.md#execution)), the
 [worker settings](process-execution.md#worker-settings), the [start endpoint](#start-endpoint) and
@@ -28,7 +29,7 @@ the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_tasks`, `axis.process_start_receipts`,
 `axis.endpoint_receipts`, `axis.process_work_items`, `axis.connector_calls`,
 `axis.package_calls` and `axis.events` tables are built too. So is the engine that runs
-`decision`, `task`, `operation` and `end` steps, see
+`decision`, `task`, `operation`, `end` and `timer` steps, see
 [Running a step](process-execution.md#running-a-step). The [task API](task-api.md) routes that
 list the user's tasks, read one task and complete one are built. Completing
 a task resumes its `waiting` instance, see
@@ -224,10 +225,11 @@ a payment reference from the sample extension package, see
 
 ## Steps
 
-M3 has four step types. Wait for event and timer come later. The engine runs
-a `subProcess` step, see [Sub-process step](process-flow.md#sub-process-step).
-Its failure handling and cancel rules are _(planned for M14)_, as are `timer`
-and `waitEvent` steps and running the `notify`
+M3 has four step types. The `timer` step is built too. Wait for event comes
+later. The engine runs a `subProcess` step, see
+[Sub-process step](process-flow.md#sub-process-step).
+Its failure handling and cancel rules are _(planned for M14)_, as are `waitEvent`
+steps and running the `notify`
 operation, see [process flow](process-flow.md) and
 [notifications](notifications.md#notify-operation). The compiler already
 checks and builds a `notify` step. The `createRecord` operation is built, see
@@ -284,6 +286,11 @@ checks and builds a `notify` step. The `createRecord` operation is built, see
   the step's transaction, see [Raise event step](process-events.md#raise-event-step).
 - **`end`.** The instance is `completed` when it reaches an `end` step. An
   `end` step has no `next`.
+- **`timer`.** It waits for a time, then goes on to `next`. It has exactly one
+  of `wait`, a positive fixed-length duration, and `until`, an expression that
+  gives a `date-time`. The step's transaction sets the instance `waiting` and
+  queues a `process.timer` work item due at the time. See
+  [Timer step](process-flow.md#timer-step).
 
 ## Compile checks
 
@@ -306,16 +313,16 @@ reported in one pass. See
   subject](process-flow.md#processes-without-a-subject).
 - Step names are unique within the process, ignoring letter case
   (`AXC0069`).
-- `start`, every branch `next`, `otherwise`, the `next` of an operation and
-  every outcome `next` of a task name a step of the process, ignoring letter
+- `start`, every branch `next`, `otherwise`, the `next` of an operation or a
+  timer and every outcome `next` of a task name a step of the process, ignoring letter
   case (`AXC0070`).
 - Every step is reachable from `start` (`AXC0071`).
 - Every step has a path to an `end` step (`AXC0072`).
 - The steps form no cycle that has no waiting step (`AXC0073`). A cycle that
-  passes through a `task` step is allowed, see [Loops](process-flow.md#loops).
-  A cycle of steps that never wait, such as `decision` and `operation` steps,
-  would run for ever and is reported. _(Planned for M14)_ A `timer` or
-  `waitEvent` step is a waiting step too.
+  passes through a `task` or a `timer` step is allowed, see
+  [Loops](process-flow.md#loops). A cycle of steps that never wait, such as
+  `decision` and `operation` steps, would run for ever and is reported.
+  _(Planned for M14)_ A `waitEvent` step is a waiting step too.
 - A decision has at least one branch (`AXC0004`).
 - Each `when` and the `startCondition` expression give a boolean. They see
   the subject entity's fields, computed ones included, `id`, the subject
@@ -367,8 +374,15 @@ reported in one pass. See
   `branches`, `otherwise`, `operation`, `set`, `connector`, `input`,
   `output`, `retry`, `event`, `entity`, `fields` or `next` (`AXC0004`).
 - An `end` step has no `next`, `branches`, `otherwise`, `operation`, `set`,
-  `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` or any
-  task property (`AXC0004`).
+  `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `wait`, `until`
+  or any task property (`AXC0004`).
+- A timer has `next`, and no `branches`, `otherwise`, `operation`, `set`,
+  `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` or any task
+  property (`AXC0004`). It has exactly one of `wait` and `until` (`AXC0278` at
+  `/steps/{i}`). A `wait` is a positive fixed-length duration, by the rule of a
+  task's `dueIn` (`AXC0084` at `/steps/{i}/wait`). An `until` gives a
+  `date-time`, with the same scope as a `when`. A problem is reported at
+  `/steps/{i}/until` with its expression code, such as `AXC0048` for text.
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at
   `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). It must
   name a declared [role](roles-and-policies.md), compared
@@ -555,7 +569,7 @@ these:
 | State | Meaning |
 | --- | --- |
 | `running` | The instance has work that is ready or claimed by a worker. |
-| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations), and for the child of a sub-process step, see [Sub-process step](process-flow.md#sub-process-step). _(Planned for M14)_ It also waits for a timer or an event, see [process flow](process-flow.md). |
+| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations), for the child of a sub-process step, see [Sub-process step](process-flow.md#sub-process-step), and for a timer, see [Timer step](process-flow.md#timer-step). _(Planned for M14)_ It also waits for an event, see [process flow](process-flow.md). |
 | `completed` | The instance reached an `end` step. |
 | `failed` | A step failed. The error is in the history. |
 | `cancelled` | An operator cancelled the instance while it was `running` or `waiting`. It is an end state. See [Cancel](process-inspection.md#cancel). |
@@ -708,7 +722,7 @@ database, with history in `axis.__processes_migrations` (see
   | `step` | `text` | The declared name of the step |
   | `revision` | `bigint` | The instance revision the step ran at |
   | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
-  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "taskId", "next" }` for a task whose deadline expired it, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. `{ "command": "cancel" }` for an operator cancel. `{ "command": "retry" }` for an operator retry. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
+  | `output` | `jsonb`, null | `{ "next" }` for a decision, `{ "next", "subjectVersion" }` for an operation, with the version it wrote, `{ "state": "waiting", "taskId" }` for a task step, with the task it created, `{ "taskId", "outcome", "next" }` for a task completion, plus `subjectVersion` when it wrote values, `{ "taskId", "next" }` for a task whose deadline expired it, `{ "state": "completed" }` for an end step, null for a failed step. `{ "state": "waiting", "operationId" }` for a `callConnector` or package operation step that staged its call. `{ "state": "waiting", "dueAt" }` for a `timer` step, and `{ "next" }` when its timer resumes the instance. `{ "operationId", "outcome", "next" }` when the call succeeds, plus `subjectVersion` when it wrote output fields. `{ "operationId", "outcome": "failed" }` when the call fails. `{ "operationId", "outcome": "unknown" }` for a connector call left unknown with no lookup, and for a package call left unknown. `{ "next", "eventId" }` for a `raiseEvent` step, with the occurrence it stored. `{ "command": "cancel" }` for an operator cancel. `{ "command": "retry" }` for an operator retry. `{ "operationId", "outcome", "next", "resolved": true }` for a call an operator resolved as succeeded, plus `subjectVersion` when it wrote output fields, and `{ "operationId", "outcome": "failed", "resolved": true }` for one resolved as failed |
   | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion, and `deadline` for a task its deadline expired. Null for other steps and failed steps |
   | `error` | `text`, null | The error of a failed step. The exception type, or a fixed text that names the step, part, field pointer or message key. Never the exception message or a value, see [Step errors](process-inspection.md#step-errors-in-inspection) |
   | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -717,7 +731,9 @@ database, with history in `axis.__processes_migrations` (see
 - `axis.process_work_items`: the ready work. Each item has an `id`, its
   `tenant_id`, its `kind`, its `due_at` time, and the `lease_expires_at` and
   `claim_token` of its current claim. A step's item also has the
-  `process_instance_id` of its instance. A worker claims only items of the
+  `process_instance_id` of its instance. A `process.timer` item also has the
+  `revision` of the instance that its timer step left, null for other kinds.
+  The item resumes the instance only while it waits at that revision. A worker claims only items of the
   tenant it polls and only kinds it has a handler for. The claim compares
   `due_at` with the transaction time, which a test scenario's `axis.now` fixes.
   A worker claims the earliest due item first. Each item also has a `seq`, its
@@ -738,6 +754,10 @@ database, with history in `axis.__processes_migrations` (see
   current. A run starts a new trace with a link to that span, see
   [Telemetry](../architecture.md#telemetry). A rescheduled item keeps them.
   Activation that queues a `trigger.schedule` item again replaces them.
+  A `process.timer` item resumes one instance that waits on a `timer` step. It
+  has the `process_instance_id` of the instance and the `revision` the timer
+  step left, and its `due_at` is the time of the timer. See
+  [Timer step](process-flow.md#timer-step).
   Three more kinds come with [schedules](process-events.md#schedules), one with
   [sub-processes](process-flow.md#sub-process-step), one with
   [task deadlines](task-deadlines.md), and one with
@@ -914,10 +934,10 @@ database, with history in `axis.__processes_migrations` (see
 
 ## Limits in M3
 
-- **Loops only through a task.** A process may not contain a cycle that has no
-  `task` step, because it would run for ever. A cycle through a `task` step is
-  allowed, see [Loops](process-flow.md#loops). _(Planned for M14)_ A cycle
-  through a `timer` or `waitEvent` step is allowed too.
+- **Loops only through a waiting step.** A process may not contain a cycle that
+  has no `task` or `timer` step, because it would run for ever. A cycle through
+  a `task` or a `timer` step is allowed, see [Loops](process-flow.md#loops).
+  _(Planned for M14)_ A cycle through a `waitEvent` step is allowed too.
 - **No user check.** The user id that a `user` assignee gives is not checked
   against any list of users. A wrong id creates a task that nobody sees. A
   [reassign](task-deadlines.md#reassign) checks its target against the

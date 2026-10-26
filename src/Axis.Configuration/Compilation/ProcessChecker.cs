@@ -12,7 +12,7 @@ namespace Axis.Configuration.Compilation;
 /// Checks the processes of an application and builds the checked ones. A process names a loaded
 /// entity that is not a child entity. Its step names are unique ignoring letter case, and every
 /// transition names one of them. Every step is reachable from <c>start</c>, has a path to an
-/// <c>end</c> step and is in no cycle. The start condition and each decision <c>when</c> parse and
+/// <c>end</c> step and is in no cycle without a waiting step, a <c>task</c> or a <c>timer</c>. The start condition and each decision <c>when</c> parse and
 /// type-check as a boolean over the subject entity's fields, computed ones included, its child
 /// collections, which only aggregates accept, the named rules, and paths through reference fields
 /// of at most 3 hops. An operation step runs <c>updateRecord</c>, <c>callConnector</c>,
@@ -35,7 +35,9 @@ namespace Axis.Configuration.Compilation;
 /// exactly. Its form is a loaded form over the subject entity, its <c>dueIn</c> is a positive fixed
 /// duration, its outcome names are unique ignoring letter case, and each outcome's <c>next</c> is a
 /// transition. Its <c>deadline</c>'s <c>after</c> is a positive fixed duration too, and its <c>next</c> is a
-/// transition that comes after the outcomes. A <c>notify</c> step is checked by <see cref="CheckNotify"/>.
+/// transition that comes after the outcomes. A timer step has exactly one of <c>wait</c>, a positive
+/// fixed duration, and <c>until</c>, a <c>date-time</c> expression over the same scope.
+/// A <c>notify</c> step is checked by <see cref="CheckNotify"/>.
 /// Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
@@ -195,6 +197,8 @@ internal static class ProcessChecker
 
             CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, findRole, unloadedRoleNames, references, Report);
 
+            CheckTimers(process, scope, references, Report);
+
             CheckTextKeys(process, references, diagnostics);
         }
 
@@ -286,6 +290,8 @@ internal static class ProcessChecker
             references,
             report,
             diagnostics);
+
+        CheckTimers(process, scope, references, report);
 
         CheckSubProcesses(process, null, scope, findEntity, findProcess, unloadedProcessNames, references, report);
 
@@ -669,6 +675,17 @@ internal static class ProcessChecker
             ];
         }
 
+        // A checked timer has exactly one of wait and until, and a valid wait.
+        TimerStepModel BuildTimer(ProcessStepDefinition step)
+        {
+            TimeSpan? wait = step.Wait is { } text && IsoDuration.TryParse(text, out var duration) ? duration : null;
+            return new TimerStepModel(
+                step.Name,
+                wait,
+                step.Until is { } until ? ExpressionModel.Compile(until, scope, ExpressionType.DateTime) : null,
+                Resolve(step.Next!));
+        }
+
         // A checked task has exactly one of user and role, a loaded form and a valid dueIn.
         TaskStepModel BuildTask(ProcessStepDefinition step)
         {
@@ -864,9 +881,10 @@ internal static class ProcessChecker
                         step.Operation!,
                         Assign(entity!, step.Set!),
                         Resolve(step.Next!)),
+                    ProcessStepDefinition.Timer => BuildTimer(step),
                     ProcessStepDefinition.SubProcess => BuildSubProcess(step),
                     ProcessStepDefinition.End => new EndStepModel(step.Name),
-                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, task, operation, subProcess and end steps."),
+                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, task, operation, subProcess, end and timer steps."),
                 })
                 .ToList(),
         };
@@ -1023,8 +1041,8 @@ internal static class ProcessChecker
 
     /// <summary>
     /// Reports each transition that closes a cycle with no waiting step, at that transition, naming
-    /// the steps in the cycle. A <c>task</c> step waits for a person, so its transitions are not
-    /// followed and a loop through one is allowed. The steps are walked depth-first in file order,
+    /// the steps in the cycle. A <c>task</c> step waits for a person and a <c>timer</c> step waits for
+    /// a time, so their transitions are not followed and a loop through one is allowed. The steps are walked depth-first in file order,
     /// each step's transitions in order: the branches, then <c>otherwise</c>, then <c>next</c>, then
     /// the outcomes. A step with two transitions to the same step is reported once.
     /// </summary>
@@ -1040,7 +1058,7 @@ internal static class ProcessChecker
         {
             onPath[index] = true;
             path.Add(index);
-            foreach (var transition in steps[index].Type == ProcessStepDefinition.TaskStep ? [] : (IEnumerable<Transition>)transitions[index])
+            foreach (var transition in steps[index].Type is ProcessStepDefinition.TaskStep or ProcessStepDefinition.Timer ? [] : (IEnumerable<Transition>)transitions[index])
             {
                 if (transition.Target is not { } target)
                 {
@@ -1889,6 +1907,48 @@ internal static class ProcessChecker
         : FieldTypes.Parse(field.Type) == FieldType.ChildCollection ? "is a child collection"
         : FieldTypes.Parse(field.Type) == FieldType.References ? "is a references field"
         : null;
+
+    /// <summary>
+    /// Checks each timer step: it has exactly one of <c>wait</c> and <c>until</c>. A <c>wait</c> is a
+    /// positive fixed duration, as a task's <c>dueIn</c> is. An <c>until</c> type-checks as a
+    /// <c>date-time</c> over <paramref name="scope"/>, and is not checked when the subject entity is
+    /// unknown.
+    /// </summary>
+    private static void CheckTimers(
+        ProcessResource process, ExpressionScope? scope, ReferenceIndexBuilder references, Action<string, string, string> report)
+    {
+        for (var index = 0; index < process.Steps.Count; index++)
+        {
+            var step = process.Steps[index];
+            if (step.Type != ProcessStepDefinition.Timer)
+            {
+                continue;
+            }
+
+            var path = $"/steps/{index}";
+            if ((step.Wait is null) == (step.Until is null))
+            {
+                report(DiagnosticCodes.InvalidTimerStep, "A timer step must have exactly one of 'wait' and 'until'.", path);
+            }
+
+            if (step.Wait is { } wait && !IsoDuration.TryParse(wait, out _))
+            {
+                report(
+                    DiagnosticCodes.InvalidTaskDueIn,
+                    $"The duration '{wait}' is not valid. 'wait' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P3D', 'PT4H' or 'P1DT12H'. Years and months are not allowed.",
+                    $"{path}/wait");
+            }
+
+            if (step.Until is { } until && scope is not null)
+            {
+                var problem = CheckExpression(process, until, scope, ExpressionType.DateTime, $"{path}/until", references);
+                if (problem is not null)
+                {
+                    report(problem.Code, problem.Message, $"{path}/until");
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Checks each task step: its assignee has exactly one of <c>user</c> and <c>role</c>, a

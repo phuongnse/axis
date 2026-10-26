@@ -27,7 +27,7 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
 
 - **Binding.** A named setting that a release refers to by name and never
   holds as a value. M5 has two kinds: `url` and `secret`. M15 adds a third,
-  `storage`, _(planned for M15)_, see **Storage binding** below.
+  `storage`, see **Storage binding** below.
 - **No binding resource.** No resource kind declares bindings. A connector
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
@@ -36,12 +36,14 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   A package operation names them in the `capabilities` of its manifest:
   `urls` need `url` bindings and `secrets` need `secret` bindings.
 - **Where values live.** Under `Tenancy:Source=configuration`, each tenant holds its values in
-  `Tenants:{id}:Bindings:{name}` of the host configuration. Each binding has a `Kind`, `url` or `secret`, and a
+  `Tenants:{id}:Bindings:{name}` of the host configuration. Each binding has a `Kind`, `url`, `secret` or `storage`, and a
   `Value`. The server and the worker must both hold them. Under
   `Tenancy:Source=directory`, the server reads the values from the
   [tenant directory](../architecture.md#tenant-directory) instead, and `secret`
   values are stored encrypted and decrypted when resolved. Under `directory`
-  the worker reads them from the directory too.
+  the worker reads them from the directory too. The directory cannot hold a
+  `storage` binding yet: its table allows only `url` and `secret`, and the
+  admin commands set only those kinds.
 - **Secrets from the environment.** A secret's value is set with an
   environment variable, such as
   `Tenants__default__Bindings__PurchasingSystemToken__Value`. A command-line
@@ -62,8 +64,10 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   binding.
 - **Activation check.** Activating a release for a tenant fails when a
   binding the release uses is missing for that tenant, or is of the wrong
-  kind (`AXC0100`). The release uses the bindings of its connectors, and the
-  `capabilities` of each package operation that a process step uses. The
+  kind (`AXC0100`). The release uses the bindings of its connectors, the
+  `capabilities` of each package operation that a process step uses, and the
+  `fileStorage` binding of its application manifest, which must be a `storage`
+  binding, reported at `/fileStorage/binding`. The
   binding diagnostic names the tenant and the binding.
   Activation checks bindings before it provisions anything, and reports every
   bad binding at once. Startup activation passes in each tenant's bindings,
@@ -75,9 +79,10 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   the binding fails at run time, where the inspector shows it. A binding of the
   wrong kind (`AXC0100`) and an `http` URL outside Development (`AXC0101`) stay
   errors.
-- **Startup check.** A binding whose `Kind` is missing or is not `url` or
-  `secret`, whose `Value` is blank, or a `url` binding whose value is not an
-  absolute `http` or `https` URL, fails startup like the other
+- **Startup check.** A binding whose `Kind` is missing or is not `url`,
+  `secret` or `storage`, whose `Value` is blank, a `url` binding whose value is
+  not an absolute `http` or `https` URL, or a `storage` binding whose value is
+  not `database`, fails startup like the other
   [tenant checks](../architecture.md#tenant-configuration). The message names
   the tenant and the binding, never the value. Under `directory` the same
   check runs when the directory is read, and a `secret` binding must hold a
@@ -85,13 +90,17 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   start and the worker stays not ready.
 - **Resolved at run time.** The worker reads a binding each time it makes a
   call, so changing a secret needs no new release.
-- **Storage binding** _(planned for M15)_. The application manifest names
+- **Storage binding**. The application manifest names
   where the files of its file fields go, as
   `"fileStorage": { "binding": "<name>" }`. That binding has the kind
   `storage`. In M15 its only value is `database`, which stores the bytes in
   the tenant database. Any other value fails the startup check. An
   application without `fileStorage` uses the tenant database too, and its
-  activation needs no binding. Other storage comes later. See
+  activation needs no binding. Activating a release whose `fileStorage`
+  binding is missing, or has another kind, fails with `AXC0100`. Other storage
+  comes later. Under `Tenancy:Source=directory`, an application that names
+  `fileStorage` cannot be activated yet, because the directory cannot hold a
+  `storage` binding. See [the application manifest](resource-files.md#file-storage),
   [file fields](file-fields.md#storage-and-clean-up) and
   [D76](../decisions/d76-file-money-and-enum-label-field-types.md).
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
@@ -110,7 +119,8 @@ The purchasing system's bindings for tenant `default` look like this:
     "ConnectionString": "Host=...",
     "Bindings": {
       "PurchasingSystemUrl": { "Kind": "url", "Value": "https://purchasing.example.test/api" },
-      "PurchasingSystemToken": { "Kind": "secret", "Value": "<from environment>" }
+      "PurchasingSystemToken": { "Kind": "secret", "Value": "<from environment>" },
+      "Files": { "Kind": "storage", "Value": "database" }
     }
   }
 }
