@@ -48,7 +48,8 @@ public static class RecordFilters
                 filter.Syntax,
                 names => Column(application, entity, names, ref subqueries),
                 filter.Check,
-                $"g{index.ToString(CultureInfo.InvariantCulture)}f");
+                $"g{index.ToString(CultureInfo.InvariantCulture)}f",
+                application.TimeZone);
             if (!translated.Succeeded)
             {
                 throw new InvalidOperationException($"The compiler let through a policy filter outside the SQL subset: {translated.Diagnostic.Message}");

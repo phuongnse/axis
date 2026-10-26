@@ -386,6 +386,59 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
+    public void File_field_is_a_uuid_column_with_a_foreign_key_to_the_files_table()
+    {
+        var model = BaseModel();
+        var changed = ChangeOrder(model, fields => [.. fields, Field("receipt", FieldType.File)]);
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(
+            [
+                $"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_receipt" uuid""",
+                FileForeignKey(OrderTable, "f_receipt"),
+            ],
+            plan.Statements);
+    }
+
+    [Fact]
+    public void New_table_with_a_file_field_has_a_uuid_column_and_a_foreign_key_to_the_files_table()
+    {
+        var model = ChangeOrder(BaseModel(), fields => [.. fields, Field("receipt", FieldType.File, required: true)]);
+
+        var plan = SchemaPlanner.Plan(model, CatalogSnapshot.Empty, ProvisioningRecords.Empty);
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Contains(plan.Statements, statement => statement.StartsWith($"""CREATE TABLE "entities"."{OrderTable}" """, StringComparison.Ordinal)
+            && statement.Contains("\"f_receipt\" uuid NOT NULL", StringComparison.Ordinal));
+        Assert.Contains(FileForeignKey(OrderTable, "f_receipt"), plan.Statements);
+    }
+
+    [Fact]
+    public void File_column_without_a_foreign_key_gets_one()
+    {
+        var model = ChangeOrder(BaseModel(), fields => [.. fields, Field("receipt", FieldType.File)]);
+        var catalog = ChangeOrderColumns(Catalog(model, hasRows: true), columns => columns.Select(column => column.Name == "f_receipt" ? column with { ReferencedTable = null } : column));
+
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([FileForeignKey(OrderTable, "f_receipt")], plan.Statements);
+    }
+
+    [Fact]
+    public void File_column_with_its_foreign_key_plans_nothing()
+    {
+        var model = ChangeOrder(BaseModel(), fields => [.. fields, Field("receipt", FieldType.File)]);
+
+        var plan = SchemaPlanner.Plan(model, Catalog(model, hasRows: true), Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
     public void Added_enum_value_is_recorded_without_statements()
     {
         var model = BaseModel();
@@ -941,6 +994,24 @@ public sealed class SchemaPlannerTests
         Assert.Null(plan.Commands[1].Fill);
     }
 
+    [Theory]
+    [InlineData("Asia/Ho_Chi_Minh")]
+    [InlineData("UTC")]
+    public void Pending_fill_with_today_converts_in_the_applications_time_zone(string zoneId)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+        var stored = BaseModel();
+        var release = ChangeOrder(stored, fields => [.. fields, Field("due", FieldType.Date, required: true)]) with { TimeZone = zone };
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Fill, "due", null, null, "today()"));
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var fill = Assert.Single(plan.Commands, command => command.Fill is not null);
+        Assert.Contains("AT TIME ZONE @f0", fill.Sql, StringComparison.Ordinal);
+        Assert.Equal([new SqlValue("f0", ExpressionTypeKind.Text, zone.Id)], fill.Parameters);
+    }
+
     [Fact]
     public void Pending_fill_of_a_missing_required_enum_column_adds_it_without_not_null_then_fills_it_then_makes_it_not_null()
     {
@@ -1192,7 +1263,7 @@ public sealed class SchemaPlannerTests
             [
                 $"""CREATE TABLE "entities"."{supplierTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, CONSTRAINT "pk_{supplierTable}" PRIMARY KEY ("id"))""",
                 $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"))""",
-                $"""CREATE TABLE "entities"."{junction}" ("owner_id" uuid NOT NULL, "target_id" uuid NOT NULL, CONSTRAINT "pk_{junction}" PRIMARY KEY ("owner_id", "target_id"))""",
+                $"""CREATE TABLE "entities"."{junction}" ("owner_id" uuid NOT NULL, "target_id" uuid NOT NULL, "position" integer NOT NULL, CONSTRAINT "pk_{junction}" PRIMARY KEY ("owner_id", "target_id"))""",
                 $"""CREATE INDEX "{EntityNaming.JunctionIndex(junction, "target_id")}" ON "entities"."{junction}" ("target_id")""",
                 $"""ALTER TABLE "entities"."{junction}" ADD CONSTRAINT "{EntityNaming.JunctionForeignKey(junction, "owner_id")}" FOREIGN KEY ("owner_id") REFERENCES "entities"."{OrderTable}" ("id") ON DELETE CASCADE""",
                 $"""ALTER TABLE "entities"."{junction}" ADD CONSTRAINT "{EntityNaming.JunctionForeignKey(junction, "target_id")}" FOREIGN KEY ("target_id") REFERENCES "entities"."{supplierTable}" ("id")""",
@@ -1227,6 +1298,9 @@ public sealed class SchemaPlannerTests
 
     private static string ForeignKey(string table, string column, string targetTable) =>
         $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, column)}" FOREIGN KEY ("{column}") REFERENCES "entities"."{targetTable}" ("id")""";
+
+    private static string FileForeignKey(string table, string column) =>
+        $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, column)}" FOREIGN KEY ("{column}") REFERENCES "axis"."files" ("id")""";
 
     private static void AssertNothingPlanned(SchemaPlan plan)
     {

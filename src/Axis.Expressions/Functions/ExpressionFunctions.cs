@@ -31,6 +31,8 @@ public static class ExpressionFunctions
         new("date", 1, 1),
         new("dateTime", 1, 1),
         new("now", 0, 0),
+        new("today", 0, 0),
+        new("toDate", 1, 1),
         new("currentUser", 0, 0),
     ];
 

@@ -14,6 +14,9 @@ public sealed record ApplicationModel
 
     public required IReadOnlyList<EntityModel> Entities { get; init; }
 
+    /// <summary>The application's time zone, UTC when the manifest names none. It is part of the release.</summary>
+    public TimeZoneInfo TimeZone { get; init; } = TimeZoneInfo.Utc;
+
     /// <summary>The application's sites, in path order.</summary>
     public IReadOnlyList<SiteModel> Sites { get; init; } = [];
 

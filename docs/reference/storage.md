@@ -69,6 +69,18 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     updates and deletes its rows. The worker deletes the expired rows, and
     `tenant restore` empties the table, see
     [sign-in and the session](security.md#sign-in-and-the-session).
+  - `Axis.Data` also owns `axis.files` and `axis.file_contents`, with history
+    in `axis.__data_migrations`. A row of `axis.files` is the details of one
+    uploaded file of a [file field](file-fields.md#storage-and-clean-up): `id`
+    (the primary key), `application_id`, `entity_id`, `field_path` (the field
+    name, or `collection/field` for a field of a child entity),
+    `owner_record_id` (null until the file is attached), `name`, `media_type`,
+    `size`, `sha256` (`bytea`), `storage_kind` (`database`), `state`
+    (`pending`, `attached` or `deleted`), `uploaded_by` and `uploaded_at`. A
+    row of `axis.file_contents` is the bytes (`content`, `bytea`) of the file
+    with the same `file_id`, and is deleted with it. The server reads, inserts,
+    updates and deletes their rows. A file field's column in the `entities`
+    schema is a `uuid` with a foreign key to `axis.files (id)`.
   - `Axis.Data` also owns `axis.user_profiles`, one row for each user who
     signed in, with the display name, email, locale and the first and last
     sign-in. Each sign-in upserts it through `UserProfiles.UpsertAsync`, see
@@ -157,7 +169,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | `child-collection`               | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns)                |
   | `money`                          | `numeric(p,s)`, as `decimal` with its defaults. The currency is the field's or the `currencyField` column's              |
   | `file` _(planned for M15)_       | `uuid` with a foreign key to `axis.files`. See [file fields](file-fields.md#storage-and-clean-up)                        |
-  | `references` _(planned for M15)_ | No column on the owner table. A junction table holds `owner_id` and `target_id`, see [Schema planning](#schema-planning) |
+  | `references`                     | No column on the owner table. A junction table holds `owner_id`, `target_id` and `position`, see [Schema planning](#schema-planning) |
 
 - **SQL safety.** Every SQL statement for entity data is built by the data
   module from compiled metadata. Identifiers are resolved and quoted by the
@@ -324,7 +336,7 @@ What each database role may do:
 | Objects                                                                                                                                                                                                                                                                                                       | Schema database role                                             | Runtime database role                                             |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `entities` tables                                                                                                                                                                                                                                                                                             | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `record_imports` | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `record_imports`, `files`, `file_contents` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                                                                                       | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                                                                                           | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                                                                                            | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |
@@ -611,14 +623,17 @@ access. It returns diagnostics, SQL statements and the new records to write.
 - **Junction tables.** A `references` field gets a junction table with
   `owner_id`, a foreign key to the owner deleted with it, and `target_id`, a
   foreign key to the target that refuses a delete while linked. Its primary
-  key is both columns, and `target_id` has an `ix_` index. A junction table
+  key is both columns, and `target_id` has an `ix_` index. Its `position`
+  holds the zero-based index of the id in the written array, and a read
+  orders by it. A junction table
   whose `target_id` foreign key is missing gets it, and one that points at
   another table than the field's target is `AXC0016` at
   `/fields/{i}/target`. Junction tables are not recorded in
   `provisioned_entities`: the planner finds them in the catalog by the
   `m_` + entity `id` prefix. Removing the field drops nothing and is
-  `AXC0015` at `/fields`, as for a column. The record API does not read or
-  write the links yet. See
+  `AXC0015` at `/fields`, as for a column. The record API writes the whole set
+  of a field in one write and reads it in `position` order. A junction table
+  made before `position` existed is not migrated. See
   [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md).
 
 ## Child tables and computed columns
@@ -744,7 +759,7 @@ schema of the tenant database.
   | ---------------- | --------- | -------------------------------------------------- |
   | `sequence_id`    | `uuid`    | The `sequence` resource `id`                       |
   | `application_id` | `uuid`    | The application `id`                               |
-  | `period`         | `integer` | The UTC year, or 0 when the format has no `{yyyy}` |
+  | `period`         | `integer` | The local year, or 0 when the format has no `{yyyy}` |
   | `last_value`     | `bigint`  | The last number handed out                         |
   - The primary key is `(sequence_id, period)`.
   - For a module sequence, `sequence_id` is the id derived

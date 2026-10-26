@@ -81,7 +81,7 @@ internal static class Models
                     ColumnTypes.Render(field),
                     field.Required,
                     field.Unique,
-                    field.Target is null ? null : EntityNaming.Table(field.Target.Id))),
+                    field.Target is not null ? EntityNaming.Table(field.Target.Id) : field.Type == FieldType.File ? "files" : null)),
             ],
             hasRows)
         {

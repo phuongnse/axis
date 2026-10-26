@@ -382,7 +382,7 @@ internal static class TriggerChecker
         }
 
         var timeZoneId = trigger.TimeZone!;
-        if (!TryFindTimeZone(timeZoneId, out _))
+        if (!IanaTimeZones.TryFind(timeZoneId, out _))
         {
             report(
                 DiagnosticCodes.UnknownTriggerTimeZone,
@@ -550,21 +550,6 @@ internal static class TriggerChecker
     private static DataSourceParameterDefinition? FindParameter(DataSourceResource dataSource, string name) =>
         dataSource.Parameters.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Finds an IANA time zone by its exact id. A Windows id, or an id in another letter case, is not found.</summary>
-    private static bool TryFindTimeZone(string id, out TimeZoneInfo timeZone)
-    {
-        if (TimeZoneInfo.TryFindSystemTimeZoneById(id, out var found)
-            && found.HasIanaId
-            && string.Equals(found.Id, id, StringComparison.Ordinal))
-        {
-            timeZone = found;
-            return true;
-        }
-
-        timeZone = TimeZoneInfo.Utc;
-        return false;
-    }
-
     /// <summary>
     /// Reads the JSON <paramref name="element"/> as a value of <paramref name="parameter"/>'s type, in the
     /// record API's JSON forms: a number for integer and decimal, true or false for boolean and a string for
@@ -652,7 +637,7 @@ internal static class TriggerChecker
         var dataSource = trigger.DataSource is { } dataSourceName
             ? findDataSource(dataSourceName) ?? throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger))
             : null;
-        if (!CronSchedule.TryParse(trigger.Schedule!, out var schedule, out _) || !TryFindTimeZone(trigger.TimeZone!, out var timeZone))
+        if (!CronSchedule.TryParse(trigger.Schedule!, out var schedule, out _) || !IanaTimeZones.TryFind(trigger.TimeZone!, out var timeZone))
         {
             throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
         }
