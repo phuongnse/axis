@@ -1,0 +1,14 @@
+{
+  "id": "8c01a943-9f24-4b31-ac8a-529017bc3c80",
+  "kind": "dataSource",
+  "name": "SearchableItems",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "name", "path": "name" },
+    { "name": "departmentName", "path": "department.name" },
+    { "name": "quantity", "path": "quantity" }
+  ],
+  "sort": "name",
+  "search": true
+}

@@ -59,6 +59,7 @@ internal static partial class AdminCommands
                tenant list
                tenant binding list <id>
                tenant binding set <id> <name> --url <value>
+               tenant binding set <id> <name> --storage database
                tenant binding set <id> <name> --secret
                tenant binding remove <id> <name>
                tenant host add <id> <host>

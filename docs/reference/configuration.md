@@ -312,9 +312,12 @@ flowchart LR
      `/aggregate/measures/{i}/field`. When the data source is grouped, the
      `sort` must exactly match a group field that is not a `reference`, or a
      measure, otherwise it is `AXC0045`. A parameter name that is
-     also a field of the entity, is `page`, `pageSize` or `sort`, or repeats
-     an earlier parameter, all ignoring letter case, is `AXC0054` at
-     `/parameters/{i}/name`. A parameter's type properties are checked as an
+     also a field of the entity, is `page`, `pageSize`, `sort` or `search`, or
+     repeats an earlier parameter, all ignoring letter case, is `AXC0054` at
+     `/parameters/{i}/name`. A data source with `"search": true` and no
+     searched projected field, which is a path that ends at a `searchable`
+     text field or the root's display field projected directly, is `AXC0279`
+     at `/search`, unless a projected path is already `AXC0043`. A parameter's type properties are checked as an
      entity field's, with the same codes (`AXC0012`, `AXC0013`, `AXC0014`,
      `AXC0030`, `AXC0040`) at `/parameters/{i}/...`, and its label joins the
      `AXC0028` check. The `filter` is parsed, type-checked as a boolean over

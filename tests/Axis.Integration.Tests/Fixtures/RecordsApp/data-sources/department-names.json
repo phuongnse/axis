@@ -1,0 +1,10 @@
+{
+  "id": "0cda4ab5-c176-41e6-bab0-e7dc51cf3872",
+  "kind": "dataSource",
+  "name": "DepartmentNames",
+  "formatVersion": 1,
+  "entity": "Department",
+  "fields": [{ "name": "name", "path": "name" }],
+  "sort": "name",
+  "search": true
+}
