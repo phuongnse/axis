@@ -6,8 +6,8 @@ M15 adds indexes, default values and value ranges to entity fields. The owner
 agreed these points on 2026-10-25. All of it is _(planned for M15)_, except that
 the ranges of `integer`, `decimal`, `date`, `date-time` and `text` fields are
 built, and so are the defaults in the record command and the form state
-endpoint, and the form widget shows them on a new record. The Studio designer is not built. See
-[entity field types](../reference/resource-files.md#entity-field-types-and-constraints)
+endpoint, and the form widget shows them on a new record. The Studio designer is
+built. See [entity field types](../reference/resource-files.md#entity-field-types-and-constraints)
 and [schema planning](../reference/storage.md#schema-planning).
 
 The points of "Building an index" are built in the data module: activation

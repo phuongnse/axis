@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import entitySchema from '../../../src/Axis.Configuration/Schemas/entity.schema.json'
 import {
   changeFieldType,
+  editableSettings,
   fieldKeysEditedElsewhere,
   fieldSettingNames,
   fieldSettings,
@@ -10,17 +11,40 @@ import {
 } from './entityFields'
 
 const table: Record<FieldType, string[]> = {
-  text: ['required', 'unique', 'maxLength', 'expression', 'sequence', 'creator', 'sensitive'],
-  integer: ['required', 'unique', 'expression', 'sensitive'],
-  decimal: ['required', 'unique', 'precision', 'scale', 'expression', 'sensitive'],
-  boolean: ['required', 'unique', 'expression', 'sensitive'],
-  date: ['required', 'unique', 'expression', 'sensitive'],
-  'date-time': ['required', 'unique', 'expression', 'sensitive'],
-  enum: ['required', 'unique', 'values', 'valueLabels', 'expression', 'sensitive'],
+  text: [
+    'required',
+    'unique',
+    'maxLength',
+    'minLength',
+    'expression',
+    'sequence',
+    'creator',
+    'searchable',
+    'default',
+    'sensitive',
+  ],
+  integer: ['required', 'unique', 'min', 'max', 'expression', 'default', 'sensitive'],
+  decimal: ['required', 'unique', 'min', 'max', 'precision', 'scale', 'expression', 'default', 'sensitive'],
+  boolean: ['required', 'unique', 'expression', 'default', 'sensitive'],
+  date: ['required', 'unique', 'min', 'max', 'expression', 'default', 'sensitive'],
+  'date-time': ['required', 'unique', 'min', 'max', 'expression', 'default', 'sensitive'],
+  enum: ['required', 'unique', 'values', 'valueLabels', 'expression', 'default', 'sensitive'],
   reference: ['required', 'unique', 'target', 'sensitive'],
   references: ['required', 'target', 'sensitive'],
   'child-collection': ['target'],
-  money: ['required', 'unique', 'precision', 'scale', 'currency', 'currencyField', 'expression', 'sensitive'],
+  money: [
+    'required',
+    'unique',
+    'min',
+    'max',
+    'precision',
+    'scale',
+    'currency',
+    'currencyField',
+    'expression',
+    'default',
+    'sensitive',
+  ],
   file: ['required', 'maxSize', 'accept', 'sensitive'],
 }
 
@@ -59,6 +83,38 @@ describe('fieldSettings', () => {
   })
 })
 
+describe('fieldKeysEditedElsewhere', () => {
+  it('holds only the name, the type and the label', () => {
+    expect(Object.keys(fieldKeysEditedElsewhere)).toEqual(['name', 'type', 'label'])
+  })
+})
+
+describe('editableSettings', () => {
+  const hidden = ['default', 'min', 'max', 'minLength']
+
+  it('offers every setting of the type for a field that computes nothing', () => {
+    expect(editableSettings({ name: 'Code', type: 'text', maxLength: 5 })).toEqual(table.text)
+    expect(editableSettings({ name: 'Code', type: 'text', creator: false })).toEqual(table.text)
+  })
+
+  it.each([
+    ['an expression', { expression: 'a' }],
+    ['a sequence', { sequence: 'Numbers' }],
+    ['creator', { creator: true }],
+  ])('hides default, min, max and minLength next to %s', (_, extra) => {
+    const settings = editableSettings({ name: 'Code', type: 'text', ...extra })
+    expect(settings).toEqual(table.text.filter((setting) => !hidden.includes(setting)))
+    expect(editableSettings({ name: 'N', type: 'integer', ...extra })).toEqual(
+      table.integer.filter((setting) => !hidden.includes(setting)),
+    )
+  })
+
+  it('takes no settings for an unknown type or a field without a type', () => {
+    expect(editableSettings({ name: 'Code', type: 'blob' })).toEqual([])
+    expect(editableSettings({ name: 'Code' })).toEqual([])
+  })
+})
+
 describe('changeFieldType', () => {
   it('keeps the shared settings and drops the ones the new type does not take', () => {
     const field = { name: 'Amount', type: 'decimal', precision: 10, scale: 2, unique: true }
@@ -88,6 +144,22 @@ describe('changeFieldType', () => {
   it('drops the value labels when an enum becomes text', () => {
     const field = { name: 'State', type: 'enum', values: ['open'], valueLabels: { open: { textKey: 'state.open' } } }
     expect(changeFieldType(field, 'text')).toEqual({ name: 'State', type: 'text' })
+  })
+
+  it('keeps min and max when the limit keeps its format and drops them when it changes', () => {
+    const field = { name: 'Count', type: 'integer', min: 0, max: 10, default: '1' }
+    expect(changeFieldType(field, 'decimal')).toEqual({ name: 'Count', type: 'decimal', min: 0, max: 10, default: '1' })
+    expect(changeFieldType(field, 'money')).toEqual({ name: 'Count', type: 'money', min: 0, max: 10, default: '1' })
+    expect(changeFieldType(field, 'date')).toEqual({ name: 'Count', type: 'date', default: '1' })
+    const day = { name: 'Day', type: 'date', min: '2026-01-01' }
+    expect(changeFieldType(day, 'date-time')).toEqual({ name: 'Day', type: 'date-time' })
+    expect(changeFieldType(day, 'date')).toEqual(day)
+  })
+
+  it('keeps the default, the minimum length and searchable that the new type takes', () => {
+    const field = { name: 'Code', type: 'text', minLength: 2, searchable: true, default: "'x'" }
+    expect(changeFieldType(field, 'text')).toEqual(field)
+    expect(changeFieldType(field, 'enum')).toEqual({ name: 'Code', type: 'enum', default: "'x'" })
   })
 
   it('sets the type of a field that has none', () => {
