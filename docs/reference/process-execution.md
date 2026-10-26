@@ -712,6 +712,13 @@ Once a tenant is ready, the worker also deletes the expired rows of its
 without the table yet is skipped. Any other failure is logged as a warning and
 does not hold back the tenant's work items.
 
+The worker also sweeps the files of each ready tenant on the same cadence, with
+its own timer and its own clock: it purges `deleted` files and `pending` files
+uploaded more than 24 hours ago, see
+[storage and clean-up](file-fields.md#storage-and-clean-up). A database without
+the files table yet is skipped. Any other failure is logged as a warning and
+does not hold back the tenant's work items.
+
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Worker:LeaseDuration` | `00:00:30` | How long a claim lasts before another worker can claim the item. |
