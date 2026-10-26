@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Axis.Data.Naming;
 using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -16,7 +17,7 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
     private const string Site = "/api/sites/purchasing";
     private const string Departments = "/api/apps/PurchaseRequests/entities/Department/records";
 
-    private static readonly string[] _steps = ["version", "compile", "activate", "seed"];
+    private static readonly string[] _steps = ["version", "compile", "activate", "seed", "indexes"];
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
@@ -112,6 +113,44 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
         Assert.Equal(1L, await CountAsync(scenario, other, "SELECT count(*) FROM axis.releases"));
 
         await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Activate_builds_a_new_index_that_activation_deferred_on_a_table_above_the_limit()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = (await CreateTenantsAsync(scenario))[0];
+        var folder = Path.Combine(Path.GetTempPath(), $"axis-activate-{Guid.NewGuid():N}");
+        try
+        {
+            CopyFolder(_sample, folder);
+            Assert.Equal(0, (await scenario.RunAsync(["activate", folder, "--tenant", id])).Exit);
+            var table = EntityNaming.Table(Guid.Parse("2deb5acd-dfd8-4c5a-b546-a1aa03df6964"));
+            await ScalarAsync(
+                scenario,
+                id,
+                $"INSERT INTO {EntityNaming.QualifiedTable(table)} (id, f_code, f_name) SELECT gen_random_uuid(), 'IX-' || n, 'Supplier ' || n FROM generate_series(1, 25) n");
+            var file = Path.Combine(folder, "entities", "supplier.json");
+            var text = await File.ReadAllTextAsync(file, CancellationToken);
+            var indexed = text.Replace("\"fields\": [", "\"indexes\": [{ \"fields\": [\"name\"] }],\n  \"fields\": [", StringComparison.Ordinal);
+            Assert.NotEqual(text, indexed);
+            await File.WriteAllTextAsync(file, indexed, CancellationToken);
+
+            var result = await scenario.RunAsync(
+                ["activate", folder, "--tenant", id], extra: new Dictionary<string, string?> { ["Activation:InlineRecomputeLimit"] = "10" });
+
+            Assert.Equal(0, result.Exit);
+            Assert.Equal(_steps.Select(step => $"{id} {step} ok"), result.Output);
+            var index = EntityNaming.Index(table, ["f_name"]);
+            Assert.Equal(true, await ScalarAsync(
+                scenario,
+                id,
+                $"SELECT x.indisvalid FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid WHERE i.relname = '{index}'"));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
     }
 
     [Fact]

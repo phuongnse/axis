@@ -18,10 +18,13 @@ public sealed record CatalogTable(string Name, IReadOnlyList<CatalogColumn> Colu
 /// <summary>
 /// An index of an entity table. <see cref="Columns"/> are the physical column names in index order. <see cref="Valid"/> is
 /// whether PostgreSQL marks the index valid: a cancelled or failed <c>CREATE INDEX CONCURRENTLY</c> leaves an invalid one.
+/// <see cref="Trigram"/> is whether it is a GIN index on <c>lower()</c> of its one column.
 /// </summary>
 public sealed record CatalogIndex(string Name, IReadOnlyList<string> Columns, bool Unique)
 {
     public bool Valid { get; init; } = true;
+
+    public bool Trigram { get; init; }
 }
 
 /// <summary>

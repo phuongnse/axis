@@ -6,6 +6,7 @@ using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Records;
+using Axis.Data.Schema;
 using Axis.Processes.Instances;
 using Npgsql;
 
@@ -54,6 +55,38 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
                 indexes,
                 IndexRowComparer.Instance);
         }
+    }
+
+    [Fact]
+    public async Task Every_searchable_column_and_every_display_column_has_a_trigram_index_that_a_second_provision_leaves_alone()
+    {
+        using var folder = ApplicationFolder(indexes: null);
+        folder.With("entities/order.json", OrderFile(indexes: null, searchableNote: true));
+        var compiled = await CompileAsync(folder);
+
+        Assert.Empty((await ActivateAsync(compiled)).Diagnostics);
+
+        var orderTable = EntityNaming.Table(_orderId);
+        var customerTable = EntityNaming.Table(_customerId);
+        (string Table, string Column)[] expected = [(orderTable, "f_title"), (orderTable, "f_note"), (customerTable, "f_name")];
+        var catalog = await ReadCatalogAsync();
+        foreach (var (table, column) in expected)
+        {
+            var name = EntityNaming.TrigramIndex(table, column);
+            var definition = await ReadIndexDefinitionAsync(name);
+            Assert.Contains("USING gin (lower(", definition, StringComparison.Ordinal);
+            Assert.Contains("gin_trgm_ops", definition, StringComparison.Ordinal);
+            var index = Assert.Single(catalog.Tables.Single(candidate => candidate.Name == table).Indexes, candidate => candidate.Name == name);
+            Assert.True(index.Trigram);
+            Assert.Equal([column], index.Columns);
+        }
+
+        Assert.NotNull(compiled.Model);
+        await using var context = database.CreateContext();
+        var again = await EntityProvisioner.ProvisionAsync(compiled.Model, context, CancellationToken);
+
+        Assert.Empty(again.Diagnostics);
+        Assert.DoesNotContain(again.Statements, statement => statement.Contains("INDEX", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -310,12 +343,13 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
         return await RecordCommands.CreateAsync(connection, compiled.Model!, order, compiled.Release!.Id, values, [], cancellationToken: CancellationToken);
     }
 
-    private string OrderFile(string? indexes, string aName = "a", bool withoutC = false) => OrderFile(
+    private string OrderFile(string? indexes, string aName = "a", bool withoutC = false, bool searchableNote = false) => OrderFile(
         indexes,
         aName,
-        withoutC ? "" : "{ \"name\": \"c\", \"type\": \"integer\" },");
+        withoutC ? "" : "{ \"name\": \"c\", \"type\": \"integer\" },",
+        searchableNote ? "{ \"name\": \"note\", \"type\": \"text\", \"searchable\": true }," : "");
 
-    private string OrderFile(string? indexes, string aName, string cField) =>
+    private string OrderFile(string? indexes, string aName, string cField, string noteField) =>
         $$"""
         { "id": "{{_orderId}}", "kind": "entity", "name": "Order", "formatVersion": 1,
           "displayField": "title",
@@ -324,6 +358,7 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
             { "name": "{{aName}}", "type": "integer" },
             { "name": "b", "type": "integer" },
             {{cField}}
+            {{noteField}}
             { "name": "customer", "type": "reference", "target": "Customer" },
             { "name": "parent", "type": "reference", "target": "Order" },
             { "name": "lines", "type": "child-collection", "target": "OrderLine" }
@@ -378,12 +413,27 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
         await command.ExecuteNonQueryAsync(CancellationToken);
     }
 
+    private async Task<CatalogSnapshot> ReadCatalogAsync()
+    {
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        return await CatalogReader.ReadAsync(connection, null, CancellationToken);
+    }
+
+    private async Task<string> ReadIndexDefinitionAsync(string index)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand("SELECT indexdef FROM pg_indexes WHERE schemaname = 'entities' AND indexname = @name");
+        command.Parameters.AddWithValue("name", index);
+        return (string)(await command.ExecuteScalarAsync(CancellationToken))!;
+    }
+
     private async Task<List<string>> ReadIndexColumnListsAsync(string table) => ColumnLists(await ReadIndexesAsync(table));
 
     private static List<string> ColumnLists(IEnumerable<IndexRow> indexes) =>
         [.. indexes.Select(index => string.Join(',', index.Columns)).Order(StringComparer.Ordinal)];
 
-    /// <summary>The <c>ix_</c> indexes of a table, read from <c>pg_index</c>, with their columns in index order.</summary>
+    /// <summary>The <c>ix_</c> indexes of a table that are built on columns only, read from <c>pg_index</c>, with their columns in index order.</summary>
     private async Task<List<IndexRow>> ReadIndexesAsync(string table)
     {
         await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
@@ -397,7 +447,7 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
             JOIN pg_class i ON i.oid = x.indexrelid
             JOIN pg_class t ON t.oid = x.indrelid
             JOIN pg_namespace n ON n.oid = t.relnamespace
-            WHERE n.nspname = 'entities' AND t.relname = @table AND i.relname LIKE 'ix\_%'
+            WHERE n.nspname = 'entities' AND t.relname = @table AND i.relname LIKE 'ix\_%' AND x.indexprs IS NULL
             """);
         command.Parameters.AddWithValue("table", table);
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);

@@ -25,6 +25,14 @@ public static class FileStore
         RETURNING f.id
         """;
 
+    // The kept ids were attached at their paths by the attach step before this runs.
+    private const string MarkReplacedSql =
+        """
+        UPDATE "axis"."files" SET "state" = 'deleted'
+        WHERE "application_id" = @application AND "owner_record_id" = @record AND "state" = 'attached'
+          AND "field_path" = ANY(@paths) AND NOT ("id" = ANY(@kept))
+        """;
+
     private const string InsertContentSql = """INSERT INTO "axis"."file_contents" ("file_id", "content") VALUES (@id, @content)""";
 
     /// <summary>
@@ -102,5 +110,36 @@ public static class FileStore
         }
 
         return attached;
+    }
+
+    /// <summary>
+    /// Marks <c>deleted</c>, in one statement of the caller's transaction, every file attached to the
+    /// record <paramref name="recordId"/> at one of <paramref name="paths"/> whose id is not in
+    /// <paramref name="kept"/>. Call it after the write attached the files it sends, so each kept id
+    /// is attached at its path. Does nothing without a path.
+    /// </summary>
+    public static async Task MarkReplacedAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        Guid recordId,
+        IReadOnlyList<string> paths,
+        IReadOnlyList<Guid> kept,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(paths);
+        ArgumentNullException.ThrowIfNull(kept);
+
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        await using var command = new NpgsqlCommand(MarkReplacedSql, connection);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("record", recordId);
+        command.Parameters.Add(new NpgsqlParameter("paths", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = paths.ToArray() });
+        command.Parameters.Add(new NpgsqlParameter("kept", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = kept.ToArray() });
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }

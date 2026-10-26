@@ -9,7 +9,7 @@ namespace Axis.Configuration.Model;
 /// money, <see cref="Currency"/> and <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum,
 /// <see cref="Target"/> for reference, references and child collection,
 /// <see cref="TargetDisplayField"/> for reference and references, <see cref="MaxSize"/> and <see cref="Accept"/> for file,
-/// and <see cref="Sequence"/> and <see cref="Creator"/> for text, and <see cref="Default"/> for text,
+/// and <see cref="Sequence"/>, <see cref="Creator"/> and <see cref="Searchable"/> for text, and <see cref="Default"/> for text,
 /// integer, decimal, money, boolean, date, date-time and enum.
 /// </summary>
 public sealed record FieldModel
@@ -77,6 +77,9 @@ public sealed record FieldModel
     /// Clients cannot set it.
     /// </summary>
     public bool Creator { get; init; }
+
+    /// <summary>Whether a search matches the field. Activation gives the field a trigram index.</summary>
+    public bool Searchable { get; init; }
 
     /// <summary>The checked default, applied on create when the body leaves the field out, or null.</summary>
     public ExpressionModel? Default { get; init; }
