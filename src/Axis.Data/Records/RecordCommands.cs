@@ -109,7 +109,9 @@ public static class RecordCommands
     /// reference check. It must be a pending file that <paramref name="uploader"/> uploaded for the same
     /// entity and field path, or a file already attached to this record at that path, which is kept.
     /// Without an <paramref name="uploader"/> nothing new attaches, so any other file id is
-    /// <see cref="RecordWriteOutcome.Invalid"/>.
+    /// <see cref="RecordWriteOutcome.Invalid"/>. After a write, a file that the record no longer holds
+    /// at a written file field, or at the file field of a written collection, becomes <c>deleted</c>
+    /// in the caller's transaction.
     /// </summary>
     public static async Task<RecordWriteResult> UpdateAsync(
         NpgsqlConnection connection,
@@ -165,7 +167,13 @@ public static class RecordCommands
             $"UPDATE {table} SET {string.Join(", ", assignments)} WHERE {idColumn} = @id AND {versionColumn} = @version RETURNING *");
         if (await WriteAsync(command, entity, cancellationToken) is { } result)
         {
-            return await WriteRowsAsync(connection, application, entity, result, rows, links, replace: true, cancellationToken);
+            var written = await WriteRowsAsync(connection, application, entity, result, rows, links, replace: true, cancellationToken);
+            if (written.Outcome == RecordWriteOutcome.Written)
+            {
+                await MarkReplacedFilesAsync(connection, application, id, values, rows, cancellationToken);
+            }
+
+            return written;
         }
 
         // One UPDATE cannot tell an unknown id from a stale version, so the id decides.
@@ -350,22 +358,34 @@ public static class RecordCommands
     }
 
     /// <summary>
-    /// Deletes the record with <paramref name="id"/> and returns the version it had. A record that
-    /// another record references is kept and is <see cref="RecordDeleteOutcome.Referenced"/>.
+    /// Deletes the record with <paramref name="id"/> and returns the version it had. Every file
+    /// attached to it, also a file of a child row, becomes <c>deleted</c> in the same statement. A
+    /// record that another record references is kept with its files and is
+    /// <see cref="RecordDeleteOutcome.Referenced"/>.
     /// </summary>
     public static async Task<RecordDeleteResult> DeleteAsync(
         NpgsqlConnection connection,
+        ApplicationModel application,
         EntityModel entity,
         Guid id,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
 
+        var versionColumn = EntityNaming.Quote(EntityNaming.VersionColumn);
         await using var command = new NpgsqlCommand(
-            $"DELETE FROM {RecordQueries.Table(entity)} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = @id RETURNING {EntityNaming.Quote(EntityNaming.VersionColumn)}",
+            $"""
+            WITH "d" AS (DELETE FROM {RecordQueries.Table(entity)} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = @id RETURNING {versionColumn}),
+            "f" AS (UPDATE "axis"."files" SET "state" = 'deleted'
+                    WHERE "application_id" = @application AND "owner_record_id" = @id AND "state" = 'attached'
+                      AND EXISTS (SELECT 1 FROM "d"))
+            SELECT {versionColumn} FROM "d"
+            """,
             connection);
         command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("application", application.Manifest.Id);
         try
         {
             return await command.ExecuteScalarAsync(cancellationToken) is long version
@@ -725,6 +745,54 @@ public static class RecordCommands
         }
 
         return errors.Count > 0 ? new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: errors) : null;
+    }
+
+    /// <summary>
+    /// After a successful write, marks <c>deleted</c> each file attached to the record at a file field
+    /// of <paramref name="values"/>, or at the file field of a collection in <paramref name="rows"/>,
+    /// whose id the write did not send. A collection with no rows still counts, so the files of its
+    /// removed rows are marked. The paths are the ones <see cref="AttachFilesAsync"/> uses.
+    /// </summary>
+    private static async Task MarkReplacedFilesAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        Guid recordId,
+        IReadOnlyList<RecordValue> values,
+        IReadOnlyList<RecordRows> rows,
+        CancellationToken cancellationToken)
+    {
+        var paths = new List<string>();
+        var kept = new List<Guid>();
+
+        void Collect(RecordValue value)
+        {
+            if (value is { Field.Type: FieldType.File, Value: Guid file })
+            {
+                kept.Add(file);
+            }
+        }
+
+        foreach (var value in values)
+        {
+            if (value.Field.Type == FieldType.File)
+            {
+                paths.Add(value.Field.Name);
+                Collect(value);
+            }
+        }
+
+        foreach (var collection in rows)
+        {
+            paths.AddRange(RecordQueries.Columns(collection.Child)
+                .Where(field => field.Type == FieldType.File)
+                .Select(field => $"{collection.Collection.Name}/{field.Name}"));
+            foreach (var value in collection.Rows.SelectMany(row => row))
+            {
+                Collect(value);
+            }
+        }
+
+        await FileStore.MarkReplacedAsync(connection, application.Manifest.Id, recordId, paths, kept, cancellationToken);
     }
 
     private static async Task AddMissingLinksAsync(

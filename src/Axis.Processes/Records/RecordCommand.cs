@@ -554,7 +554,7 @@ public static class RecordCommand
 
             // The triggers see the record whole, so they are worked out before its row and child rows go.
             var prepared = await DataChangeTriggerStarts.PrepareDeleteAsync(transaction, application, model, recordId, cancellationToken);
-            result = await RecordCommands.DeleteAsync(connection, model, recordId, cancellationToken);
+            result = await RecordCommands.DeleteAsync(connection, application, model, recordId, cancellationToken);
             await CompleteAsync(
                 transaction,
                 result is { Outcome: RecordDeleteOutcome.Deleted, Version: { } version }
