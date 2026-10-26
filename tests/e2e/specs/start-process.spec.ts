@@ -31,7 +31,7 @@ test('a saved note closes through the action, which saves the edited title first
   // The worker runs the first step some time after the start.
   await expect(async () => {
     await page.reload()
-    await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), 'closed', { timeout: 1_000 })
+    await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), 'Closed', { timeout: 1_000 })
   }).toPass({ timeout: 30_000 })
   await expect(title).toHaveValue(`Close ${run} edited`)
 
