@@ -76,8 +76,6 @@ namespace Axis.Server.Records;
 /// </summary>
 internal static class RecordEndpoints
 {
-    private const int MaxSearchLength = 200;
-
     public static void MapRecordEndpoints(this IEndpointRouteBuilder endpoints)
     {
         // An entity of the application has one segment, and an entity of a module has the module id
@@ -284,9 +282,9 @@ internal static class RecordEndpoints
             errors["sort"] = ["Must be a declared field name, optionally preceded by '-'."];
         }
 
-        if (request.Query["search"].Count > 1)
+        if (SearchQuery.IsRepeated(request))
         {
-            errors["search"] = ["Must be given at most once."];
+            errors["search"] = SearchQuery.RepeatedError;
         }
         else if (!string.IsNullOrEmpty(search))
         {
@@ -298,9 +296,9 @@ internal static class RecordEndpoints
             {
                 errors["search"] = ["You may not read the display field."];
             }
-            else if (search.Length > MaxSearchLength || search.Contains('\0', StringComparison.Ordinal))
+            else if (SearchQuery.InvalidError(search) is { } invalid)
             {
-                errors["search"] = [$"Must be at most {MaxSearchLength} characters with no U+0000."];
+                errors["search"] = invalid;
             }
         }
 

@@ -1,0 +1,21 @@
+{
+  "id": "c76deb42-47b3-4c1f-ac02-31663d6724b4",
+  "kind": "entity",
+  "name": "Category",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "category.label"
+  },
+  "displayField": "name",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true,
+      "maxLength": 100,
+      "label": {
+        "textKey": "category.name"
+      }
+    }
+  ]
+}

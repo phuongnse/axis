@@ -32,6 +32,9 @@
     { "dataSource": "ItemsOverflow", "actions": ["read"] },
     { "dataSource": "OverdueTickets", "actions": ["read"] },
     { "dataSource": "ItemNames", "actions": ["read"] },
-    { "dataSource": "ExpenseTotalsByCurrency", "actions": ["read"] }
+    { "dataSource": "ExpenseTotalsByCurrency", "actions": ["read"] },
+    { "dataSource": "SearchableItems", "actions": ["read"] },
+    { "dataSource": "DepartmentNames", "actions": ["read"] },
+    { "dataSource": "SearchableItemCounts", "actions": ["read"] }
   ]
 }

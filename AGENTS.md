@@ -13,8 +13,8 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 - [Concepts](docs/domain/concepts.md) is the vocabulary. Use its terms in code, APIs and UI.
 - [Knowledge](docs/domain/knowledge.md) says why the design rules exist. Check it before you change
   configuration, execution, storage or security behaviour.
-- [Development](docs/development.md) covers running Axis locally, ports and test data: the three
-  samples (purchase requests, leave requests and the service desk), the realm users for each
+- [Development](docs/development.md) covers running Axis locally, ports and test data: the four
+  samples (purchase requests, leave requests, the service desk and asset management), the realm users for each
   sample's roles in the [development users table](docs/reference/security.md#development-users),
   the sample templates in `artifacts/templates`, the `Studio:ApplicationsPath` folder where Studio
   creates applications, and the `axis_scenario` role that runs Studio's test scenarios.

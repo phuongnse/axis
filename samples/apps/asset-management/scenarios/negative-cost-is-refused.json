@@ -1,0 +1,27 @@
+{
+  "id": "0e71cfef-2ce5-4c19-8162-525aa4494e56",
+  "kind": "scenario",
+  "name": "NegativeCostIsRefused",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "quan": [
+      "asset-manager"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "quan",
+      "values": {
+        "name": "Dell Latitude 7440",
+        "currency": "USD",
+        "purchaseCost": -1
+      },
+      "expect": {
+        "invalid": "purchaseCost"
+      }
+    }
+  ]
+}

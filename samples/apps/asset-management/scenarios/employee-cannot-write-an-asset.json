@@ -1,0 +1,73 @@
+{
+  "id": "378dc972-35fc-4f62-992b-2a8cd80ebe33",
+  "kind": "scenario",
+  "name": "EmployeeCannotWriteAnAsset",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "quan": [
+      "asset-manager"
+    ],
+    "lan": [
+      "employee"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "quan",
+      "save": "lanAsset",
+      "values": {
+        "name": "Laptop of Lan",
+        "holder": "lan",
+        "status": "assigned"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "quan",
+      "save": "annaAsset",
+      "values": {
+        "name": "Laptop of Anna",
+        "holder": "anna",
+        "status": "assigned"
+      }
+    },
+    {
+      "type": "updateRecord",
+      "record": "annaAsset",
+      "as": "lan",
+      "values": {
+        "name": "x"
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "updateRecord",
+      "record": "lanAsset",
+      "as": "lan",
+      "values": {
+        "name": "x"
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "lan",
+      "values": {
+        "name": "Own laptop"
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "expectRecord",
+      "record": "annaAsset",
+      "values": {
+        "name": "Laptop of Anna"
+      }
+    }
+  ]
+}

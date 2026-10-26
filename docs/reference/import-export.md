@@ -10,7 +10,7 @@ _(planned for M15)_ are not built yet, and Dn refers to
 Everything on this page is _(planned for M15)_, except the grants, the
 policy matrix, the export routes, and the upload, dry run and commit of a CSV
 or `xlsx` import, which are built. A commit only creates records. `key`
-matching, references and the file cleanup of an import are not built.
+matching and the file cleanup of an import are not built.
 
 ## Grants
 

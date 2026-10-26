@@ -292,6 +292,11 @@ modeling of M15: files, money, labelled enum values, many-to-many, references
 from child rows, import and export. All of it is _(planned for M15)_. See
 [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md).
 
+The folder exists now, with its data, security, pages, dashboard and the
+scenarios of its access rules. It is active in development, Compose and E2E.
+The import, attachment and maintenance scenarios, the Studio journey and the
+warranty reminder stay planned.
+
 ### Data
 
 - **Asset**: number (sequence `AS-{n:6}`), name, category, status (`in-stock`,
@@ -331,7 +336,8 @@ from child rows, import and export. All of it is _(planned for M15)_. See
 ### Pages
 
 The asset register, the asset form, the asset detail page and the dashboard,
-in a site at path `assets`. Texts are in `en` and `vi`.
+in a site at path `asset-management`. The path `assets` is reserved, because the
+SPA serves its bundle there. Texts are in `en` and `vi`.
 
 - The dashboard has asset value by location in each currency, assets by
   status, and a KPI of warranties that end within 30 days.

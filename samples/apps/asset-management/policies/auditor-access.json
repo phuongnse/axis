@@ -1,0 +1,67 @@
+{
+  "id": "b7858128-d873-4b1e-ac77-66aa9672e887",
+  "kind": "policy",
+  "name": "AuditorAccess",
+  "formatVersion": 1,
+  "roles": [
+    "auditor"
+  ],
+  "grants": [
+    {
+      "entity": "Asset",
+      "actions": [
+        "read",
+        "export"
+      ]
+    },
+    {
+      "entity": "Category",
+      "actions": [
+        "read",
+        "export"
+      ]
+    },
+    {
+      "entity": "Location",
+      "actions": [
+        "read",
+        "export"
+      ]
+    },
+    {
+      "entity": "Vendor",
+      "actions": [
+        "read",
+        "export"
+      ]
+    },
+    {
+      "entity": "Software",
+      "actions": [
+        "read",
+        "export"
+      ]
+    },
+    {
+      "dataSource": "AssetValueByLocation",
+      "actions": [
+        "read",
+        "export"
+      ]
+    },
+    {
+      "dataSource": "AssetsByStatus",
+      "actions": [
+        "read",
+        "export"
+      ]
+    },
+    {
+      "dataSource": "WarrantiesEndingSoon",
+      "actions": [
+        "read",
+        "export"
+      ]
+    }
+  ]
+}

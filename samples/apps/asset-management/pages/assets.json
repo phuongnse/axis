@@ -1,0 +1,44 @@
+{
+  "id": "144bfd8f-88d6-4a89-9275-a88b3312cad6",
+  "kind": "page",
+  "name": "Assets",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "pages.assets.title"
+  },
+  "widgets": [
+    {
+      "type": "table",
+      "entity": "Asset",
+      "rowActions": [
+        {
+          "type": "navigate",
+          "page": "AssetForm",
+          "label": {
+            "textKey": "actions.open"
+          },
+          "record": "id"
+        },
+        {
+          "type": "navigate",
+          "page": "AssetDetail",
+          "label": {
+            "textKey": "actions.view"
+          },
+          "parameters": {
+            "asset": "id"
+          }
+        }
+      ],
+      "toolbarActions": [
+        {
+          "type": "navigate",
+          "page": "AssetForm",
+          "label": {
+            "textKey": "actions.new"
+          }
+        }
+      ]
+    }
+  ]
+}

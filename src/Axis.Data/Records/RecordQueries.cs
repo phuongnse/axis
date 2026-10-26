@@ -166,7 +166,7 @@ public static class RecordQueries
         var conditions = new List<string>();
         if (search)
         {
-            conditions.Add($"strpos(lower({row}.{EntityNaming.Quote(EntityNaming.Column(entity.DisplayField!))}), lower(@search)) > 0");
+            conditions.Add(SearchTerm($"{row}.{EntityNaming.Quote(EntityNaming.Column(entity.DisplayField!))}"));
         }
 
         if (condition is not null)
@@ -184,7 +184,10 @@ public static class RecordQueries
             $"SELECT {SelectList(entity, RowAlias)} FROM {table} AS {row}{LabelJoins(entity, RowAlias)}{where} ORDER BY {order} LIMIT @limit OFFSET @offset");
     }
 
-    private static NpgsqlParameter SearchParameter(string search) =>
+    /// <summary>The condition that <paramref name="column"/> contains <c>@search</c>, ignoring letter case.</summary>
+    internal static string SearchTerm(string column) => $"strpos(lower({column}), lower(@search)) > 0";
+
+    internal static NpgsqlParameter SearchParameter(string search) =>
         new("search", NpgsqlDbType.Text) { Value = search };
 
     /// <summary>

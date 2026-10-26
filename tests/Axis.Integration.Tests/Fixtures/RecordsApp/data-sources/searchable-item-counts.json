@@ -1,0 +1,14 @@
+{
+  "id": "92621d08-664f-465f-a549-ea1b20e88113",
+  "kind": "dataSource",
+  "name": "SearchableItemCounts",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [{ "name": "departmentName", "path": "department.name" }],
+  "aggregate": {
+    "groupBy": ["departmentName"],
+    "measures": [{ "name": "count", "function": "count" }]
+  },
+  "sort": "departmentName",
+  "search": true
+}

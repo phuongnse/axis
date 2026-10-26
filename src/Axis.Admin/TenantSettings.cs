@@ -63,8 +63,9 @@ internal static class TenantSettings
     {
         var args = run.Args;
         var isUrl = args.Length == 7 && args[5] == "--url";
+        var isStorage = args.Length == 7 && args[5] == "--storage";
         var isSecret = args.Length == 6 && args[5] == "--secret";
-        if (!(isUrl || isSecret) || !IsName(args[3]) || !IsName(args[4]))
+        if (!(isUrl || isStorage || isSecret) || !IsName(args[3]) || !IsName(args[4]))
         {
             return Usage(run);
         }
@@ -83,6 +84,10 @@ internal static class TenantSettings
             if (isUrl)
             {
                 result = await TenantBindingCommands.SetUrlAsync(platform, run.Command.Name, id, args[4], args[6], run.CancellationToken);
+            }
+            else if (isStorage)
+            {
+                result = await TenantBindingCommands.SetStorageAsync(platform, run.Command.Name, id, args[4], args[6], run.CancellationToken);
             }
             else
             {

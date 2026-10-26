@@ -1,0 +1,24 @@
+{
+  "id": "7f5548ea-a5c3-418d-9e6c-a36b9b7cb44c",
+  "kind": "dataSource",
+  "name": "AssetsByStatus",
+  "formatVersion": 1,
+  "entity": "Asset",
+  "fields": [
+    {
+      "name": "status",
+      "path": "status"
+    }
+  ],
+  "aggregate": {
+    "groupBy": [
+      "status"
+    ],
+    "measures": [
+      {
+        "name": "assetCount",
+        "function": "count"
+      }
+    ]
+  }
+}
