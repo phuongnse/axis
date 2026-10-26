@@ -1,0 +1,28 @@
+{
+  "id": "6748110f-e6b6-4116-af7f-d0c481eb848b",
+  "kind": "seed",
+  "name": "Locations",
+  "formatVersion": 1,
+  "entity": "Location",
+  "sync": true,
+  "records": [
+    {
+      "id": "395edaee-1d88-4d6a-be71-0ade86440ec6",
+      "values": {
+        "name": "Hanoi office"
+      }
+    },
+    {
+      "id": "b66ef840-1658-4a6f-a021-df028febde32",
+      "values": {
+        "name": "Ho Chi Minh City office"
+      }
+    },
+    {
+      "id": "f1a8dd63-7242-44a0-b6c2-23001cd77651",
+      "values": {
+        "name": "Da Nang office"
+      }
+    }
+  ]
+}

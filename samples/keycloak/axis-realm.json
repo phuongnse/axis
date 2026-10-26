@@ -48,6 +48,14 @@
           "clientRole": true
         },
         {
+          "name": "asset-manager",
+          "clientRole": true
+        },
+        {
+          "name": "auditor",
+          "clientRole": true
+        },
+        {
           "name": "purchasing-system",
           "clientRole": true
         },
@@ -475,6 +483,50 @@
       "clientRoles": {
         "axis": [
           "service-desk-lead"
+        ]
+      }
+    },
+    {
+      "id": "quan",
+      "username": "quan",
+      "enabled": true,
+      "email": "quan@axis.local",
+      "emailVerified": true,
+      "firstName": "Quan",
+      "lastName": "Asset Manager",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "asset-manager"
+        ]
+      }
+    },
+    {
+      "id": "thao",
+      "username": "thao",
+      "enabled": true,
+      "email": "thao@axis.local",
+      "emailVerified": true,
+      "firstName": "Thao",
+      "lastName": "Auditor",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "auditor"
         ]
       }
     },

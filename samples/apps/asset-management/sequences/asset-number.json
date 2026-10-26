@@ -1,0 +1,7 @@
+{
+  "id": "c80fef47-c8d3-41af-a2b7-f55f01c447be",
+  "kind": "sequence",
+  "name": "AssetNumber",
+  "formatVersion": 1,
+  "format": "AS-{n:6}"
+}

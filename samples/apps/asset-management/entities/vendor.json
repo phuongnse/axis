@@ -1,0 +1,21 @@
+{
+  "id": "b7335e29-c9a3-4d45-ad8d-fb0a25125e43",
+  "kind": "entity",
+  "name": "Vendor",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "vendor.label"
+  },
+  "displayField": "name",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true,
+      "maxLength": 100,
+      "label": {
+        "textKey": "vendor.name"
+      }
+    }
+  ]
+}
