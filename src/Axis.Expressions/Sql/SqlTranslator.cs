@@ -22,8 +22,8 @@ namespace Axis.Expressions.Sql;
 /// stops at the first construct outside the subset and reports only that one. <c>any(list, condition)</c>,
 /// <c>count(list)</c> and <c>count(list, condition)</c> over a child collection or a references field
 /// at the filter's top level are subqueries, <c>EXISTS</c> or <c>count(*)</c>, over the source the
-/// caller's <c>collection</c> callback gives. A row whose condition is null does not count. No other
-/// aggregate is in the subset.
+/// caller's <c>collection</c> callback gives. A row whose condition is null does not count. Without that
+/// callback, and for every other aggregate, an aggregate is not in the subset.
 /// </summary>
 public static class SqlTranslator
 {
@@ -52,8 +52,7 @@ public static class SqlTranslator
     /// translations can share one statement with different prefixes. <paramref name="timeZone"/> is the
     /// application's time zone, which <c>today()</c> and <c>toDate</c> use. It is UTC when null.
     /// <paramref name="collection"/> gives the subquery source of the child collection or references
-    /// field named in <c>any</c> or <c>count</c>. Without it, a placeholder source is used, which is enough
-    /// to tell whether an expression is in the subset.
+    /// field named in <c>any</c> or <c>count</c>. Without it, every aggregate is not translated.
     /// </summary>
     public static SqlTranslationResult Translate(
         ExpressionNode expression,
@@ -88,7 +87,7 @@ public static class SqlTranslator
             size.Check(expression, ruleCalls);
             var sql = new Translation(
                 column,
-                collection ?? (name => new SqlCollection(name, "TRUE", path => string.Join('.', [name, .. path]))),
+                collection,
                 parameters,
                 ruleCalls,
                 parameterPrefix,
@@ -103,7 +102,7 @@ public static class SqlTranslator
 
     private sealed class Translation(
         Func<IReadOnlyList<string>, string> column,
-        Func<string, SqlCollection> collection,
+        Func<string, SqlCollection>? collection,
         List<SqlValue> parameters,
         IReadOnlyDictionary<CallNode, ExpressionRule> ruleCalls,
         string parameterPrefix,
@@ -240,7 +239,9 @@ public static class SqlTranslator
 
             if (signature.IsAggregate)
             {
-                return name is "any" or "count" ? Aggregate(call, name) : throw NotTranslated(name, call.Offset);
+                return name is "any" or "count" && collection is not null
+                    ? Aggregate(call, name)
+                    : throw NotTranslated(name, call.Offset);
             }
 
             switch (name)
@@ -290,7 +291,7 @@ public static class SqlTranslator
                 throw Fail("Aggregates are only translated at the filter's top level", call.Offset);
             }
 
-            var source = collection(list.Name);
+            var source = collection!(list.Name);
             var where = source.OwnerMatch;
             if (call.Arguments.Count > 1)
             {

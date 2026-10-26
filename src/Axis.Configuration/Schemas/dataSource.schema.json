@@ -90,7 +90,8 @@
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "function": { "enum": ["count", "sum", "min", "max", "avg", "countDistinct"] },
-        "field": { "$ref": "#/$defs/name" }
+        "field": { "$ref": "#/$defs/name" },
+        "filter": { "type": "string", "x-axis-expression": true }
       }
     },
     "parameter": {

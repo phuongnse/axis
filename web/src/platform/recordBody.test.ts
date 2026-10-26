@@ -32,6 +32,17 @@ const fields = [
   field('dueOn', 'date'),
 ]
 
+describe('buildRecordBody for a references field', () => {
+  it('writes the whole array of ids in order, and an empty set as an empty array', () => {
+    const software = [field('title', 'text'), field('software', 'references')]
+
+    expect(buildRecordBody(software, { title: 'Laptop', software: ['b', 'a'] })).toBe(
+      '{"values":{"title":"Laptop","software":["b","a"]}}',
+    )
+    expect(buildRecordBody(software, { software: [] })).toBe('{"values":{"software":[]}}')
+  })
+})
+
 describe('isJsonNumber', () => {
   it('accepts JSON numbers and rejects other text', () => {
     for (const text of ['0', '-7', '12.50', '1e3', '-0.5E-2']) {

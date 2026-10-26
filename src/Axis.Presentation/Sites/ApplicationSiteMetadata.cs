@@ -369,7 +369,7 @@ public sealed record DataSourceColumnMetadata(
 /// One field. Properties the field's type does not have are null: <see cref="MaxLength"/> and
 /// <see cref="MinLength"/> are for text, <see cref="Min"/> and <see cref="Max"/> for integer,
 /// decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal and money, <see cref="Currency"/> and
-/// <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum, <see cref="Target"/> for reference and
+/// <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum, <see cref="Target"/> for reference and references, and
 /// <see cref="Fields"/> for child collection.
 /// </summary>
 /// <param name="Type">The type name as written in entity files, such as <c>date-time</c>.</param>
@@ -404,5 +404,5 @@ public sealed record FieldMetadata(
     ReferenceTarget? Target,
     IReadOnlyList<FieldMetadata>? Fields);
 
-/// <summary>The entity a reference field points to, its display field and the path of its record API.</summary>
+/// <summary>The entity a reference or references field points to, its display field and the path of its record API.</summary>
 public sealed record ReferenceTarget(string Entity, string? DisplayField, string RecordsPath);

@@ -192,7 +192,7 @@ public sealed class TenantOptionsValidatorTests
 
         Assert.Equal(
             [
-                "Tenant 'default' binding 'PurchasingSystemToken' has kind 'password': use 'url' or 'secret'.",
+                "Tenant 'default' binding 'PurchasingSystemToken' has kind 'password': use 'url', 'secret' or 'storage'.",
                 "Tenant 'default' binding 'PurchasingSystemUrl' is not an absolute http or https URL.",
                 "Tenant 'default' binding 'ReportingToken' has no value.",
             ],
@@ -225,7 +225,7 @@ public sealed class TenantOptionsValidatorTests
 
         var problem = Assert.Single(TenantOptionsValidator.Validate(options));
 
-        Assert.Equal("Tenant 'default' binding 'PurchasingSystemToken' has no kind: use 'url' or 'secret'.", problem);
+        Assert.Equal("Tenant 'default' binding 'PurchasingSystemToken' has no kind: use 'url', 'secret' or 'storage'.", problem);
     }
 
     [Theory]
@@ -238,13 +238,37 @@ public sealed class TenantOptionsValidatorTests
 
         var problem = Assert.Single(TenantOptionsValidator.Validate(options));
 
-        Assert.Equal($"Tenant 'default' binding 'PurchasingSystemToken' has kind '{kind}': use 'url' or 'secret'.", problem);
+        Assert.Equal($"Tenant 'default' binding 'PurchasingSystemToken' has kind '{kind}': use 'url', 'secret' or 'storage'.", problem);
+    }
+
+    [Theory]
+    [InlineData("s3://bucket/s3cr3t-value")]
+    [InlineData("Database")]
+    [InlineData("database ")]
+    public void Storage_binding_whose_value_is_not_database_is_named_without_the_value(string value)
+    {
+        var options = Tenants.Options(("default", ["localhost"], Tenants.ConnectionString))
+            .WithBinding("default", "Files", "storage", value);
+
+        var problem = Assert.Single(TenantOptionsValidator.Validate(options));
+
+        Assert.Equal("Tenant 'default' binding 'Files' is a storage binding whose value is not 'database'.", problem);
+    }
+
+    [Fact]
+    public void Storage_binding_whose_value_is_database_passes()
+    {
+        var options = Tenants.Options(("default", ["localhost"], Tenants.ConnectionString))
+            .WithBinding("default", "Files", "storage", "database");
+
+        Assert.Empty(TenantOptionsValidator.Validate(options));
     }
 
     [Theory]
     [InlineData("password", "s3cr3t-value")]
     [InlineData("url", "s3cr3t-value")]
     [InlineData("url", "ftp://s3cr3t-value.example.test")]
+    [InlineData("storage", "s3://bucket/s3cr3t-value")]
     [InlineData(null, "s3cr3t-value")]
     public void Binding_problems_never_contain_the_value(string? kind, string value)
     {

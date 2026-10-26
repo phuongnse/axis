@@ -40,6 +40,13 @@ public static class DeploymentBindingKinds
 {
     public const string Url = "url";
     public const string Secret = "secret";
+    public const string Storage = "storage";
+}
+
+/// <summary>The values a <c>storage</c> deployment binding can have.</summary>
+public static class StorageBindingValues
+{
+    public const string Database = "database";
 }
 
 /// <summary>The sign-in profiles a tenant can have.</summary>

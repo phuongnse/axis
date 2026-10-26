@@ -127,6 +127,41 @@ public sealed class ApplicationSitesTests
         }
     }
 
+    [Fact]
+    public void References_field_names_its_target_as_a_reference_does()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
+        try
+        {
+            Write(root, "application.json", """{ "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }""");
+            Write(root, "entities/software.json", """
+                { "id": "55555555-5555-4555-8555-555555555511", "kind": "entity", "name": "Software", "formatVersion": 1, "displayField": "name",
+                  "fields": [ { "name": "name", "type": "text", "required": true } ] }
+                """);
+            Write(root, "entities/asset.json", """
+                { "id": "55555555-5555-4555-8555-555555555512", "kind": "entity", "name": "Asset", "formatVersion": 1,
+                  "fields": [
+                    { "name": "name", "type": "text" },
+                    { "name": "software", "type": "references", "target": "Software" }
+                  ] }
+                """);
+
+            var result = ApplicationCompiler.Compile(root);
+            Assert.Empty(result.Diagnostics);
+            Assert.NotNull(result.Model);
+
+            var field = ApplicationSites.DescribeEntity(result.Model, "Asset").Fields.Single(field => field.Name == "software");
+
+            Assert.Equal("references", field.Type);
+            Assert.NotNull(field.Target);
+            Assert.Equal(("Software", "name", "/api/apps/Sample/entities/Software/records"), (field.Target.Entity, field.Target.DisplayField, field.Target.RecordsPath));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static void Write(string root, string relativePath, string content)
     {
         var fullPath = Path.Combine(root, relativePath);

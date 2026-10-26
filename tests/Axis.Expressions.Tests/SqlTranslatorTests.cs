@@ -195,7 +195,7 @@ public sealed class SqlTranslatorTests
         var parsed = ExpressionParser.Parse(expression);
         Assert.True(parsed.Succeeded);
 
-        var result = SqlTranslator.Translate(parsed.Expression, Column);
+        var result = SqlTranslator.Translate(parsed.Expression, Column, collection: Lines);
 
         Assert.False(result.Succeeded);
         Assert.Null(result.Sql);
@@ -286,6 +286,21 @@ public sealed class SqlTranslatorTests
         Assert.Equal(expectedParameters, result.Parameters.Select(parameter => (parameter.Name, parameter.Kind, parameter.Value)));
     }
 
+    [Theory]
+    [InlineData("any(lines, ok)", "any")]
+    [InlineData("count(lines) > 1", "count")]
+    public void Any_and_count_are_outside_the_subset_without_a_collection_callback(string expression, string named)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ExpressionDiagnosticCodes.OutsideSqlSubset, result.Diagnostic.Code);
+        Assert.Contains($"Function '{named}'", result.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Path_inside_an_aggregate_is_given_to_the_collections_column_callback_as_its_names()
     {
@@ -316,18 +331,6 @@ public sealed class SqlTranslatorTests
         Assert.Equal(["i"], outer);
         Assert.Equal(["lines"], requested);
         Assert.Equal(["product|name", "qty"], inner);
-    }
-
-    [Fact]
-    public void Aggregate_without_a_collection_callback_translates_over_a_placeholder_source()
-    {
-        var parsed = ExpressionParser.Parse("any(lines, product.name == 'Desk')");
-        Assert.True(parsed.Succeeded);
-
-        var result = SqlTranslator.Translate(parsed.Expression, Column);
-
-        Assert.True(result.Succeeded, result.Diagnostic?.Message);
-        Assert.StartsWith("EXISTS (SELECT 1 FROM lines WHERE TRUE AND (", result.Sql, StringComparison.Ordinal);
     }
 
     [Fact]

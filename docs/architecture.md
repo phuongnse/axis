@@ -39,11 +39,12 @@ flowchart LR
 - **Axis.Worker** executes durable work. It serves health endpoints on its own
   address, see [health checks](#health-checks).
   It runs work items, and through them
-  the `decision`, `task`, `operation`, `subProcess` and `end` steps of process instances.
+  the `decision`, `task`, `operation`, `subProcess`, `end` and `timer` steps of process instances.
   Operation steps include `updateRecord`, `createRecord`, `callConnector` calls with their
   retries and reconciliation, and package operations. `raiseEvent` steps raise
   events. Sub-process steps start a child and resume the parent when it
-  completes. Wait for event and timer steps come later. _(Planned
+  completes. A `timer` step waits for a time and a `process.timer` item resumes
+  it. Wait for event steps come later. _(Planned
   for M14)_ It runs them, task escalations and deadlines, and email sending,
   see [process flow](reference/process-flow.md). It
   delivers raised events to async event triggers, see
@@ -101,7 +102,7 @@ src/
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
   Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
   Axis.Data/              entity storage mapping, schema planning, record commands, data sources
-  Axis.Processes/         work items, decision, task, operation and end steps, task API, the record command, connector calls, package operations, events, triggers and schedules, inbound endpoint starts
+  Axis.Processes/         work items, decision, task, operation, end and timer steps, task API, the record command, connector calls, package operations, events, triggers and schedules, inbound endpoint starts
   Axis.Policy/            policy evaluation: entity, data source and process grants, record filters, field sets
   Axis.Presentation/      site/page/widget metadata served to the SPA
   Axis.Tenancy/           tenant resolution, connection factory, platform schema
@@ -132,7 +133,7 @@ checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the
 shapes of application site metadata), `Axis.Processes` (work items, the
-`decision`, `task`, `operation` and `end` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Administration` (the library behind the `Axis.Admin` commands), `Axis.Worker`, the test projects, the sample extension package
+`decision`, `task`, `operation`, `end` and `timer` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Administration` (the library behind the `Axis.Admin` commands), `Axis.Worker`, the test projects, the sample extension package
 `PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
 
 ## Module rules
@@ -230,9 +231,9 @@ Startup fails with an `InvalidOperationException` naming every problem when:
 - in the server and the worker, the runtime database role
   is a superuser, owns the `axis` or `entities` schema, or may create objects
   in either, or is a member of a role that is or may;
-- a binding has a missing `Kind` or one other than `url` or `secret`, a blank
-  `Value`, or is a `url` binding whose value is not an absolute `http` or
-  `https` URL. The message names the tenant and the binding, never the value;
+- a binding has a missing `Kind` or one other than `url`, `secret` or `storage`, a blank
+  `Value`, is a `url` binding whose value is not an absolute `http` or
+  `https` URL, or is a `storage` binding whose value is not `database`. The message names the tenant and the binding, never the value;
 - outside Development, the configuration source that wins for a `secret`
   binding's `Value` is a file, such as `appsettings.json`. Environment
   variables, command-line arguments, mounted secret files and in-memory
@@ -517,7 +518,7 @@ bindings work. Status rules and publishing are built too.
   for inspection.
 
 The step transactions, the revision check and the history are built for
-`decision`, `task`, `operation` and `end` steps, for the staging and the call
+`decision`, `task`, `operation`, `end` and `timer` steps, for the staging and the call
 of `callConnector` steps, for `raiseEvent` steps with their sync trigger
 starts, and for package operation steps, see
 [Running a step](reference/process-execution.md#running-a-step).

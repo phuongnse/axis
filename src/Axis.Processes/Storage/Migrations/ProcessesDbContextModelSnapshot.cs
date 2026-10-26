@@ -878,6 +878,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
 
+                    b.Property<long?>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
                     b.Property<long>("Seq")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint")

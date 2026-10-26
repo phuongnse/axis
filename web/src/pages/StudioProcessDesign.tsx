@@ -158,7 +158,7 @@ export default function StudioProcessDesign({
     const type = (step as { type?: unknown } | undefined)?.type
     if (selectedTransition) {
       land(insertInto(draft, transitionPointer(selectedTransition), entry), selectedTransition.source)
-    } else if (selected !== null && (type === 'operation' || type === 'subProcess')) {
+    } else if (selected !== null && (type === 'operation' || type === 'subProcess' || type === 'timer')) {
       land(insertInto(draft, `/steps/${selected}/next`, entry), selected)
     } else {
       land(addStep(draft, entry), undefined)

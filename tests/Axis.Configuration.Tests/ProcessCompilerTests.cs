@@ -364,6 +364,99 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
+    public void A_cycle_through_a_timer_compiles()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "amount > 0", "next": "pause" }], "otherwise": "done" },
+              { "name": "pause", "type": "timer", "wait": "PT1H", "next": "check" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_timer_compiles_with_a_wait_or_an_until()
+    {
+        using var folder = Folder(Process(
+            "Order",
+            """
+            [
+              { "name": "pause", "type": "timer", "wait": "P1DT12H", "next": "until" },
+              { "name": "until", "type": "timer", "until": "submittedAt", "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """,
+            start: "pause"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var steps = Assert.Single(result.Model.Processes).Steps;
+        var pause = Assert.IsType<TimerStepModel>(steps[0]);
+        Assert.Equal((TimeSpan.FromHours(36), null, "until"), (pause.Wait, pause.Until, pause.Next));
+        var until = Assert.IsType<TimerStepModel>(steps[1]);
+        Assert.Equal((null, "submittedAt", "done"), (until.Wait, until.Until?.Expression, until.Next));
+        Assert.Equal("date-time", until.Until!.Check.Type?.ToString());
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "pause", "type": "timer", "wait": "PT1H", "until": "now()", "next": "done" }""")]
+    [InlineData("""{ "name": "pause", "type": "timer", "next": "done" }""")]
+    public void A_timer_needs_exactly_one_of_wait_and_until(string step)
+    {
+        using var folder = Folder(Process("Order", $$"""[{{step}}, { "name": "done", "type": "end" }]""", start: "pause"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidTimerStep, "/steps/0", "A timer step must have exactly one of 'wait' and 'until'."),
+            (diagnostic.Code, diagnostic.Path, diagnostic.Message));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("P1M")]
+    [InlineData("PT0S")]
+    [InlineData("soon")]
+    public void A_timer_wait_that_is_not_a_positive_fixed_duration_is_reported_at_its_wait(string wait)
+    {
+        using var folder = Folder(Process(
+            "Order", $$"""[{ "name": "pause", "type": "timer", "wait": "{{wait}}", "next": "done" }, { "name": "done", "type": "end" }]""", start: "pause"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidTaskDueIn, "/steps/0/wait"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains($"'{wait}'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("title", ExpressionDiagnosticCodes.UnknownName)]
+    [InlineData("status", ExpressionDiagnosticCodes.ResultTypeMismatch)]
+    [InlineData("amount", ExpressionDiagnosticCodes.ResultTypeMismatch)]
+    [InlineData("submittedAt +", ExpressionDiagnosticCodes.SyntaxError)]
+    public void A_timer_until_gets_the_usual_expression_diagnostics_at_its_until(string expression, string code)
+    {
+        using var folder = Folder(Process(
+            "Order", $$"""[{ "name": "pause", "type": "timer", "until": "{{expression}}", "next": "done" }, { "name": "done", "type": "end" }]""", start: "pause"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "/steps/0/until"), (diagnostic.Code, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void A_cycle_of_decision_and_operation_steps_is_still_a_cycle()
     {
         using var folder = Folder(Process("Order", """
@@ -1150,6 +1243,13 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "form": "OrderReview" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "next": "done", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }] }""")]
     [InlineData("""{ "name": "submit", "type": "end", "dueIn": "P3D" }""")]
+    [InlineData("""{ "name": "submit", "type": "end", "wait": "PT1H" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "until": "now()", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H" }""")]
+    [InlineData("""{ "name": "submit", "type": "timer", "wait": "", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "set": { "status": "'x'" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "dueIn": "P3D", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "entity": "Order", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "end", "deadline": { "after": "P1D", "next": "done" } }""")]
     [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "deadline": { "after": "P1D", "next": "done" } }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "after": "P1D" } }""")]

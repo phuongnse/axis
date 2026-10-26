@@ -67,6 +67,13 @@
     "noteClose.cannotClose": "Only an open note can be closed.",
     "category.label": "Category",
     "category.name": "Name",
+    "pages.assetForm.title": "Asset",
+    "pages.assetDetail.title": "Asset detail",
+    "software.label": "Software",
+    "software.name": "Name",
+    "asset.label": "Asset",
+    "asset.name": "Name",
+    "asset.software": "Software",
     "role.employee": "Employee",
     "role.departmentManager": "Department manager",
     "role.financeReviewer": "Finance reviewer"

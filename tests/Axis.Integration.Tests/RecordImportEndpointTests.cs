@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Configuration.Packages;
+using Axis.Data.Naming;
 using Axis.Data.Records;
 using Axis.Data.Tests;
 using Axis.Processes.Instances;
@@ -240,6 +241,130 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         Assert.Equal(1L, await ImportCountAsync());
     }
 
+    [Fact]
+    public async Task Committing_a_checked_import_creates_every_row_as_the_uploader_and_audits_the_import()
+    {
+        await ResetAsync();
+        var upload = await UploadAsync(fixture.Client, Tickets, "title,code\nPrinter,p1\nScanner,s1\nDesk,d1\n");
+        await RunChecksAsync();
+        var audits = await fixture.AuditRecordCountAsync(TenantA);
+
+        using var accepted = await CommitAsync(fixture.Client, Tickets, upload.Id);
+
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        Assert.Equal($"{Tickets}/imports/{upload.Id:D}", accepted.Headers.Location!.ToString());
+        Assert.Equal("checked", await StateAsync(upload.Id, Tickets));
+        Assert.Equal(0L, await TicketCountAsync());
+        Assert.Equal(1, await RunCommitsAsync());
+
+        Assert.Equal("committed", await StateAsync(upload.Id, Tickets));
+        Assert.True(await FileClearedAsync(upload.Id));
+        Assert.Equal(3L, await TicketCountAsync());
+        Assert.Equal(3L, await TicketCountAsync("f_requester = 'anna' AND f_number IS NOT NULL"));
+        Assert.Equal(3L, (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(DISTINCT f_number) FROM {TicketTable}"))!);
+        Assert.Equal(
+            3L,
+            (long)(await fixture.ScalarAsync(
+                TenantA,
+                $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.created' AND actor = 'anna' AND actor_name = 'Anna Employee' AND record_id IN (SELECT id FROM {TicketTable})"))!);
+        Assert.Equal(audits + 4, await fixture.AuditRecordCountAsync(TenantA));
+        Assert.Equal(1L, (long)(await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.audit_records WHERE action = 'records.imported'"))!);
+        Assert.Equal(
+            1L,
+            (long)(await fixture.ScalarAsync(
+                TenantA,
+                "SELECT count(*) FROM axis.audit_records WHERE action = 'records.imported' AND actor = 'anna' AND actor_name = 'Anna Employee' AND record_id IS NULL AND process_instance_id IS NULL AND entity_id IS NOT NULL AND details = '{\"created\": 3, \"updated\": 0}'::jsonb"))!);
+        Assert.Equal(0L, (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.process_work_items WHERE kind = '{RecordImports.CommitWorkItemKind}'"))!);
+    }
+
+    [Fact]
+    public async Task A_row_that_fails_at_write_time_rolls_back_every_row_and_fails_the_import_with_that_rows_errors()
+    {
+        await ResetAsync();
+        var upload = await UploadAsync(fixture.Client, Tickets, "title,code\nPrinter,x1\nScanner,x2\nDesk,x1\n");
+        await RunChecksAsync();
+        Assert.Equal("checked", await StateAsync(upload.Id, Tickets));
+        var audits = await fixture.AuditRecordCountAsync(TenantA);
+
+        using var accepted = await CommitAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        Assert.Equal(1, await RunCommitsAsync());
+
+        using var failed = await GetAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        Assert.Equal(["/rows/3/values/code"], failed.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name));
+        Assert.Equal(0L, await TicketCountAsync());
+        Assert.Equal(audits, await fixture.AuditRecordCountAsync(TenantA));
+        Assert.True(await FileClearedAsync(upload.Id));
+
+        // The sequence numbers the failed rows took are handed back.
+        var next = await UploadAsync(fixture.Client, Tickets, "title,code\nLamp,l1\n");
+        await RunChecksAsync();
+        using var again = await CommitAsync(fixture.Client, Tickets, next.Id);
+        await RunCommitsAsync();
+        Assert.Equal("committed", await StateAsync(next.Id, Tickets));
+        Assert.Equal(1L, await TicketCountAsync());
+    }
+
+    [Fact]
+    public async Task Another_user_or_a_user_without_the_grant_cannot_commit_the_import()
+    {
+        await ResetAsync();
+        var upload = await UploadAsync(fixture.Client, Tickets, "title,code\nPrinter,p1\n");
+        await RunChecksAsync();
+        using var fia = fixture.CreateClient().SignedInAs("fia");
+        using var rita = fixture.CreateClient().SignedInAs("rita");
+        using var anonymous = fixture.CreateClient();
+
+        using var other = await CommitAsync(fia, Tickets, upload.Id);
+        using var unknown = await CommitAsync(fixture.Client, Tickets, Guid.NewGuid());
+        using var malformed = await SendAsync(fixture.Client, HttpMethod.Post, $"{Tickets}/imports/nothing/commit", null);
+        using var wrongEntity = await CommitAsync(fixture.Client, Items, upload.Id);
+        using var noGrant = await CommitAsync(rita, Tickets, upload.Id);
+        using var noSession = await CommitAsync(anonymous, Tickets, upload.Id);
+
+        await ReadProblemAsync(other, HttpStatusCode.NotFound);
+        await ReadProblemAsync(unknown, HttpStatusCode.NotFound);
+        await ReadProblemAsync(malformed, HttpStatusCode.NotFound);
+        await ReadProblemAsync(wrongEntity, HttpStatusCode.NotFound);
+        await ReadProblemAsync(noGrant, HttpStatusCode.Forbidden);
+        await ReadProblemAsync(noSession, HttpStatusCode.Unauthorized);
+        Assert.Equal("checked", await StateAsync(upload.Id, Tickets));
+        Assert.Equal(0L, (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.process_work_items WHERE kind = '{RecordImports.CommitWorkItemKind}'"))!);
+        Assert.Equal(0, await RunCommitsAsync());
+        Assert.Equal(0L, await TicketCountAsync());
+    }
+
+    [Fact]
+    public async Task Only_a_checked_import_with_no_commit_queued_can_be_committed()
+    {
+        await ResetAsync();
+        var pending = await UploadAsync(fixture.Client, Tickets, "title,code\nPrinter,p1\n");
+        using var whilePending = await CommitAsync(fixture.Client, Tickets, pending.Id);
+        await RunChecksAsync();
+        var broken = await UploadAsync(fixture.Client, Tickets, "title,code\n,p1\n");
+        await RunChecksAsync();
+        using var whileFailed = await CommitAsync(fixture.Client, Tickets, broken.Id);
+
+        await ReadProblemAsync(whilePending, HttpStatusCode.Conflict);
+        await ReadProblemAsync(whileFailed, HttpStatusCode.Conflict);
+        Assert.Equal("failed", await StateAsync(broken.Id, Tickets));
+
+        using var first = await CommitAsync(fixture.Client, Tickets, pending.Id);
+        using var second = await CommitAsync(fixture.Client, Tickets, pending.Id);
+
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        await ReadProblemAsync(second, HttpStatusCode.Conflict);
+        Assert.Equal(1L, (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.process_work_items WHERE kind = '{RecordImports.CommitWorkItemKind}'"))!);
+        Assert.Equal(1, await RunCommitsAsync());
+        Assert.Equal(1L, await TicketCountAsync());
+
+        using var afterCommit = await CommitAsync(fixture.Client, Tickets, pending.Id);
+        await ReadProblemAsync(afterCommit, HttpStatusCode.Conflict);
+        Assert.Equal(0, await RunCommitsAsync());
+        Assert.Equal(1L, await TicketCountAsync());
+    }
+
     private static async Task<(HttpResponseMessage Response, JsonDocument Body, Guid Id)> UploadAsync(HttpClient client, string path, string csv)
     {
         var response = await SendAsync(client, HttpMethod.Post, $"{path}/imports", csv);
@@ -285,12 +410,12 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
     {
         await fixture.ResetAsync();
         await fixture.ExecuteAsync(TenantA, "DELETE FROM axis.record_imports");
-        await fixture.ExecuteAsync(TenantA, $"DELETE FROM axis.process_work_items WHERE kind = '{RecordImports.CheckWorkItemKind}'");
+        await fixture.ExecuteAsync(TenantA, $"DELETE FROM axis.process_work_items WHERE kind IN ('{RecordImports.CheckWorkItemKind}', '{RecordImports.CommitWorkItemKind}')");
     }
 
-    private async Task<string> StateAsync(Guid id)
+    private async Task<string> StateAsync(Guid id, string path = Items)
     {
-        using var import = await GetAsync(fixture.Client, Items, id);
+        using var import = await GetAsync(fixture.Client, path, id);
         return import.RootElement.GetProperty("state").GetString()!;
     }
 
@@ -309,6 +434,37 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
 
         return ran;
     }
+
+    /// <summary>Claims and runs every commit the tenant has queued, and returns how many ran.</summary>
+    private async Task<int> RunCommitsAsync()
+    {
+        var handler = new RecordImportCommitHandler(new ReleaseModelCache(PackageCatalog.Empty), NullLoggerFactory.Instance, NullLogger<RecordImportCommitHandler>.Instance);
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
+        await connection.OpenAsync(CancellationToken);
+        var ran = 0;
+        while (await WorkItemQueue.ClaimAsync(connection, TenantA, [RecordImports.CommitWorkItemKind], TimeSpan.FromMinutes(5), CancellationToken) is { } item)
+        {
+            Assert.Equal(WorkItemOutcome.Completed, await handler.ExecuteAsync(item, connection, CancellationToken));
+            ran++;
+        }
+
+        return ran;
+    }
+
+    private static Task<HttpResponseMessage> CommitAsync(HttpClient client, string path, Guid id) =>
+        SendAsync(client, HttpMethod.Post, $"{path}/imports/{id:D}/commit", null);
+
+    private string TicketTable
+    {
+        get
+        {
+            Assert.True(fixture.Model.TryGetEntity("Ticket", out var ticket));
+            return EntityNaming.QualifiedTable(EntityNaming.Table(ticket.Id));
+        }
+    }
+
+    private async Task<long> TicketCountAsync(string? where = null) =>
+        (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM {TicketTable}{(where is null ? "" : $" WHERE {where}")}"))!;
 
     private async Task<long> ItemCountAsync() =>
         (await fixture.TableShapeAsync(TenantA, "Item")).RowCount;

@@ -209,6 +209,31 @@ const stepsWidget: EntityWidgetMetadata = {
   },
 }
 
+// A note with only a title and the software it uses, a set of references.
+const softwareWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [
+      { ...field('title', 'text', 'note.title'), required: true, maxLength: 200 },
+      {
+        ...field('software', 'references', 'note.software'),
+        target: { entity: 'Software', displayField: 'name', recordsPath: '/api/apps/E2eApp/entities/Software/records' },
+      },
+    ],
+  },
+}
+
+const wordId = '11111111-1111-4111-8111-111111111111'
+const excelId = '22222222-2222-4222-8222-222222222222'
+const visioId = '33333333-3333-4333-8333-333333333333'
+
+const softwarePageJson = `{"items":[{"id":"${wordId}","version":1,"values":{"name":"Word"},"labels":{}},{"id":"${excelId}","version":1,"values":{"name":"Excel"},"labels":{}},{"id":"${visioId}","version":1,"values":{"name":"Visio"},"labels":{}}],"page":1,"pageSize":20,"totalCount":3}`
+
+function softwareJson(version: number) {
+  return `{"id":"${noteId}","version":${version},"values":{"title":"Laptop","software":["${wordId}","${excelId}"]},"labels":{"software":["Word","Excel"]}}`
+}
+
 const instancesPath = '/api/apps/E2eApp/processes/NoteClose/instances'
 
 // A note form with an action that starts the NoteClose process.
@@ -264,6 +289,9 @@ const texts = {
   'shell.form.clear': 'Clear',
   'shell.form.addRow': 'Add row',
   'shell.form.removeRow': 'Remove',
+  'shell.form.add': 'Add',
+  'shell.form.added': 'Added',
+  'shell.form.removed': 'Removed',
   'shell.lookup.search': 'Search',
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
@@ -284,6 +312,7 @@ const texts = {
   'note.dueAt': 'Due at',
   'note.status': 'Status',
   'note.category': 'Category',
+  'note.software': 'Software',
   'note.lines': 'Lines',
   'noteLine.description': 'Description',
   'noteLine.quantity': 'Quantity',
@@ -723,10 +752,128 @@ describe('FormWidget', () => {
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
   })
 
-  it('has the choose, clear and lookup search texts in every platform locale', () => {
+  it('adds two records to a references field, removes the first, adds a third and sends the ids in pick order', async () => {
+    const requests = stubFetch(
+      { status: 200, body: softwarePageJson },
+      { status: 200, body: softwarePageJson },
+      { status: 200, body: softwarePageJson },
+      { status: 201, body: softwareJson(1) },
+    )
+    renderForm(null, softwareWidget)
+    const announcement = screen.getByTestId('references-software-announcement')
+    expect(announcement).toHaveAttribute('aria-live', 'polite')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add Software' }))
+    await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Word'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(announcement).toHaveTextContent('Added Word')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add Software' }))
+    await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Excel'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(announcement).toHaveTextContent('Added Excel')
+    const list = screen.getByRole('list', { name: 'Software' })
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((item) => item.firstChild?.textContent),
+    ).toEqual(['WordRemove', 'ExcelRemove'])
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Word' }))
+    expect(announcement).toHaveTextContent('Removed Word')
+    expect(screen.getByRole('button', { name: 'Add Software' })).toHaveFocus()
+    expect(screen.queryByRole('button', { name: 'Remove Word' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add Software' }))
+    await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Visio'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    await userEvent.type(screen.getByLabelText('Title'), 'Laptop')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(4))
+    expect(requests()[3]).toEqual({
+      url: recordsPath,
+      method: 'POST',
+      body: `{"values":{"title":"Laptop","software":["${excelId}","${visioId}"]}}`,
+    })
+  })
+
+  it('leaves the set unchanged when a record that is in it is picked again', async () => {
+    stubFetch({ status: 200, body: softwareJson(1) }, { status: 200, body: softwarePageJson })
+    renderForm(noteId, softwareWidget)
+    await screen.findByText('Excel')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add Software' }))
+    await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Word'))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    expect(screen.getByTestId('references-software-announcement')).toBeEmptyDOMElement()
+  })
+
+  it('sends an unchanged set of references only when it changes', async () => {
+    const requests = stubFetch({ status: 200, body: softwareJson(1) }, { status: 200, body: softwareJson(2) })
+    renderForm(noteId, softwareWidget)
+    const title = await screen.findByLabelText('Title')
+
+    await userEvent.type(title, '!')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1].body).toBe('{"version":1,"values":{"title":"Laptop!"}}')
+  })
+
+  it('sends a set that was reordered by removing and adding again', async () => {
+    const requests = stubFetch(
+      { status: 200, body: softwareJson(1) },
+      { status: 200, body: softwarePageJson },
+      { status: 200, body: softwareJson(2) },
+    )
+    renderForm(noteId, softwareWidget)
+    await screen.findByText('Excel')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Word' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add Software' }))
+    await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Word'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(3))
+    expect(requests()[2].body).toBe(`{"version":1,"values":{"software":["${excelId}","${wordId}"]}}`)
+  })
+
+  it('shows the id of a record whose label the user may not read', async () => {
+    stubFetch({
+      status: 200,
+      body: softwareJson(1).replace('"software":["Word","Excel"]', '"software":[null,"Excel"]'),
+    })
+    renderForm(noteId, softwareWidget)
+
+    expect(await screen.findByText(wordId)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: `Remove ${wordId}` })).toBeInTheDocument()
+  })
+
+  it('shows a read-only references field as its labels without Add or Remove buttons', async () => {
+    const readOnlyWidget: EntityWidgetMetadata = {
+      ...softwareWidget,
+      access: { actions: ['read', 'create', 'update'], createFields: ['title'], updateFields: ['title'] },
+    }
+    stubFetch({ status: 200, body: softwareJson(1) })
+    renderForm(noteId, readOnlyWidget)
+
+    expect(await screen.findByLabelText('Software')).toHaveValue('Word, Excel')
+    expect(screen.queryByRole('button', { name: 'Add Software' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument()
+  })
+
+  it('has the choose, clear, add, added, removed and lookup search texts in every platform locale', () => {
     for (const catalog of [platformEnglish, platformVietnamese]) {
       expect(catalog).toHaveProperty(['shell.form.choose'])
       expect(catalog).toHaveProperty(['shell.form.clear'])
+      expect(catalog).toHaveProperty(['shell.form.add'])
+      expect(catalog).toHaveProperty(['shell.form.added'])
+      expect(catalog).toHaveProperty(['shell.form.removed'])
       expect(catalog).toHaveProperty(['shell.lookup.search'])
     }
   })

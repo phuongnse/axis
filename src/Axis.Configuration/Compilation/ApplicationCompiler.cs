@@ -1956,29 +1956,44 @@ public static partial class ApplicationCompiler
                 AddFieldTarget(dataSource, parameterField, path, findEntity, references);
             }
 
-            // A parameter without a usable type would only add noise to the filter's diagnostics.
-            if (diagnostics.Count == countBeforeParameters && dataSource.Filter is { } filter)
+            // A parameter without a usable type would only add noise to the filters' diagnostics.
+            if (diagnostics.Count == countBeforeParameters)
             {
-                var problem = CheckFilter(
-                    filter,
-                    // Module rules are a separate step, so a module data source sees none and cannot call an application rule.
-                    ExpressionScopes.ForDataSource(
-                        entity.Fields,
-                        dataSource.Parameters,
-                        findEntity,
-                        IsModuleResource(dataSource) ? [] : rules,
-                        IsModuleResource(dataSource) ? null : modules),
-                    policyFilter: false,
-                    out var check);
-                if (check is not null)
+                // Module rules are a separate step, so a module data source sees none and cannot call an application rule.
+                var filterScope = ExpressionScopes.ForDataSource(
+                    entity.Fields,
+                    dataSource.Parameters,
+                    findEntity,
+                    IsModuleResource(dataSource) ? [] : rules,
+                    IsModuleResource(dataSource) ? null : modules);
+
+                void CheckDataSourceFilter(string filter, string path)
                 {
-                    references.AddRuleCalls(dataSource, "/filter", check);
+                    var problem = CheckFilter(filter, filterScope, policyFilter: false, out var check);
+                    if (check is not null)
+                    {
+                        references.AddRuleCalls(dataSource, path, check);
+                    }
+
+                    references.RecordExpression(dataSource, path, check?.Type, problem);
+                    if (problem is not null)
+                    {
+                        Report(problem.Code, problem.Message, path);
+                    }
                 }
 
-                references.RecordExpression(dataSource, "/filter", check?.Type, problem);
-                if (problem is not null)
+                if (dataSource.Filter is { } filter)
                 {
-                    Report(problem.Code, problem.Message, "/filter");
+                    CheckDataSourceFilter(filter, "/filter");
+                }
+
+                var measures = dataSource.Aggregate?.Measures ?? [];
+                for (var index = 0; index < measures.Count; index++)
+                {
+                    if (measures[index].Filter is { } measureFilter)
+                    {
+                        CheckDataSourceFilter(measureFilter, $"/aggregate/measures/{index}/filter");
+                    }
                 }
             }
         }
@@ -2138,7 +2153,11 @@ public static partial class ApplicationCompiler
         check = typeCheck;
         return CallsRuleWithoutBody(typeCheck, new HashSet<ExpressionRule>(ReferenceEqualityComparer.Instance))
             ? null
-            : SqlTranslator.Translate(parsed.Expression, path => string.Join('.', path), typeCheck).Diagnostic;
+            : SqlTranslator.Translate(
+                parsed.Expression,
+                path => string.Join('.', path),
+                typeCheck,
+                collection: name => new SqlCollection(name, "TRUE", path => string.Join('.', [name, .. path]))).Diagnostic;
     }
 
     /// <summary>
@@ -2600,6 +2619,8 @@ public static partial class ApplicationCompiler
         DataSourceFieldModel Projected(string name) =>
             fields.First(field => string.Equals(field.Name, name, StringComparison.Ordinal));
 
+        var filterScope = ExpressionScopes.ForDataSource(entity.Fields, parameters, Find, rules, modules);
+
         return new DataSourceModel
         {
             Id = dataSource.Id,
@@ -2608,9 +2629,7 @@ public static partial class ApplicationCompiler
             Entity = new EntityReference(entity.Id, entity.Name),
             Fields = fields,
             Parameters = parameters,
-            Filter = dataSource.Filter is { } filter
-                ? ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(entity.Fields, parameters, Find, rules, modules), ExpressionType.Boolean)
-                : null,
+            Filter = dataSource.Filter is { } filter ? ExpressionModel.Compile(filter, filterScope, ExpressionType.Boolean) : null,
             Aggregate = dataSource.Aggregate is { } aggregate
                 ? new DataSourceAggregateModel(
                     aggregate.GroupBy.Select(Projected).ToList(),
@@ -2618,7 +2637,8 @@ public static partial class ApplicationCompiler
                         .Select(measure => new DataSourceMeasureModel(
                             measure.Name,
                             ParseAggregateFunction(measure.Function),
-                            measure.Field is null ? null : Projected(measure.Field)))
+                            measure.Field is null ? null : Projected(measure.Field),
+                            measure.Filter is { } measureFilter ? ExpressionModel.Compile(measureFilter, filterScope, ExpressionType.Boolean) : null))
                         .ToList())
                 : null,
             Sort = dataSource.Sort is { } sort ? new DataSourceSortModel(descending ? sort[1..] : sort, descending) : null,
