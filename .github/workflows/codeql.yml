@@ -36,7 +36,16 @@ jobs:
             build-mode: none
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - if: matrix.build-mode == 'manual'
+      # The SDK download fails at times, so a failed install is tried once more after a pause.
+      - id: dotnet
+        if: matrix.build-mode == 'manual'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        continue-on-error: true
+        with:
+          global-json-file: global.json
+      - if: matrix.build-mode == 'manual' && steps.dotnet.outcome == 'failure'
+        run: sleep 60
+      - if: matrix.build-mode == 'manual' && steps.dotnet.outcome == 'failure'
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json

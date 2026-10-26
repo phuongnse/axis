@@ -370,6 +370,8 @@ internal sealed class TenantRestore : IAsyncDisposable
             _row.ClaimUserId = directory.ClaimUserId;
             _row.ClaimDisplayName = directory.ClaimDisplayName;
             _row.ClaimRoles = directory.ClaimRoles;
+            _row.ClaimEmail = directory.ClaimEmail;
+            _row.ClaimLocale = directory.ClaimLocale;
             _row.EndpointAudience = directory.EndpointAudience;
             _row.ServiceAudience = directory.ServiceAudience;
             _platform.TenantHosts.AddRange(hosts.Select(host => new TenantHostRow { TenantId = _id, Host = host }));

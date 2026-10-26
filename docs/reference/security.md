@@ -15,7 +15,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 - **Flow.** Sign-in uses the OIDC authorization code flow with PKCE. The
   server is the confidential client: it exchanges the code for tokens, reads
   the claims from the ID token and keeps no token after that (D9). The
-  identity provider returns the code in the query string. Pushed
+  identity provider returns the code in the query string. The request asks
+  for the `openid`, `profile` and `email` scopes. Pushed
   authorization requests stay off until FAPI 2.0 work (D9). Under a tenant's
   `fapi2` profile they are required _(planned for M16)_, see
   [FAPI 2.0 profile](#fapi-20-profile).
@@ -27,10 +28,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   display name and the roles. Each claim name is optional, and the defaults
   are `sub`, `name` and `roles`. The optional `EndpointAudience` is for
   [machine callers](#machine-callers), and the optional `ServiceAudience` is
-  for [service accounts](#service-accounts). _(Planned for M14)_ `Claims` also names
-  `Email` and `Locale`, by default `email` and `locale`, which each sign-in
-  writes to the user's profile, see
-  [User profiles](notifications.md#user-profiles).
+  for [service accounts](#service-accounts). `Claims` also names `Email` and
+  `Locale`, by default `email` and `locale`, which each sign-in writes to the
+  user's profile, see [User profiles](notifications.md#user-profiles).
 
   ```json
   "default": {
@@ -40,7 +40,13 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
       "Authority": "http://localhost:8080/realms/axis",
       "ClientId": "axis",
       "ClientSecret": "...",
-      "Claims": { "UserId": "sub", "DisplayName": "name", "Roles": "roles" }
+      "Claims": {
+        "UserId": "sub",
+        "DisplayName": "name",
+        "Roles": "roles",
+        "Email": "email",
+        "Locale": "locale"
+      }
     }
   }
   ```
@@ -243,7 +249,7 @@ sample reuses a user that holds the role it needs before it adds a user.
 
 | User    | Roles                   | Used by                                                                                          |
 | ------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
-| `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey |
+| `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
 | `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                                         |
 | `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                         |
 | `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                         |
