@@ -5,7 +5,7 @@ import { DetailWidget } from '../platform/DetailWidget'
 import { FormWidget } from '../platform/FormWidget'
 import { KpiWidget } from '../platform/KpiWidget'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
-import type { FieldType, WidgetMetadata } from '../platform/site'
+import type { WidgetMetadata } from '../platform/site'
 import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
@@ -16,6 +16,7 @@ import {
   detailWidget,
   formWidget,
   kpiWidget,
+  type PreviewFieldType,
   locale,
   processInspectorWidget,
   requestId,
@@ -27,7 +28,7 @@ import {
   taskInboxWidget,
 } from './fixtures'
 
-const fieldTypes: readonly FieldType[] = [
+const fieldTypes: readonly PreviewFieldType[] = [
   'text',
   'integer',
   'decimal',

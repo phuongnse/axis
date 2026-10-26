@@ -46,7 +46,15 @@ public sealed record DefinedTyped(string Name, string Type);
 /// <summary>A column of a data source. <paramref name="Type"/> is null when its path does not resolve.</summary>
 public sealed record DefinedColumn(string Name, string? Type);
 
-public sealed record DefinedProcess(Guid Id, string Name, IReadOnlyList<DefinedStep> Steps);
+/// <summary>
+/// A process and its steps. <paramref name="Parameters"/> are the parameters of a process without a subject, in file
+/// order, and empty for a process with a subject.
+/// </summary>
+public sealed record DefinedProcess(
+    Guid Id,
+    string Name,
+    IReadOnlyList<DefinedTyped> Parameters,
+    IReadOnlyList<DefinedStep> Steps);
 
 /// <summary>A process step. <paramref name="Outcomes"/> is empty for a step that is not a task.</summary>
 public sealed record DefinedStep(string Name, string Type, IReadOnlyList<string> Outcomes);

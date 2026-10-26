@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Records;
@@ -11,6 +12,46 @@ namespace Axis.Processes.Instances;
 /// </summary>
 internal static class ProcessParameters
 {
+    private const string DateFormat = "yyyy-MM-dd";
+
+    private const string DateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'";
+
+    /// <summary>
+    /// Maps the CLR <paramref name="values"/> of a trigger, by parameter name ignoring letter case, to the
+    /// stored JSON form of each parameter the process declares. An integer fills a decimal parameter. Returns null when a value is missing or
+    /// its type does not fit the parameter's type.
+    /// </summary>
+    public static JsonObject? ToJson(ProcessModel process, IReadOnlyDictionary<string, object?> values)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        ArgumentNullException.ThrowIfNull(values);
+        var json = new JsonObject();
+        foreach (var parameter in process.Parameters)
+        {
+            var value = values.FirstOrDefault(entry => string.Equals(entry.Key, parameter.Name, StringComparison.OrdinalIgnoreCase)).Value;
+            JsonValue? node = (parameter.Type, value) switch
+            {
+                (FieldType.Text, string text) => JsonValue.Create(text),
+                (FieldType.Integer, long number) => JsonValue.Create(number),
+                (FieldType.Decimal, decimal number) => JsonValue.Create(number),
+                // The checker lets an integer expression fill a decimal parameter, and the interpreter gives a long.
+                (FieldType.Decimal, long number) => JsonValue.Create((decimal)number),
+                (FieldType.Boolean, bool flag) => JsonValue.Create(flag),
+                (FieldType.Date, DateOnly date) => JsonValue.Create(date.ToString(DateFormat, CultureInfo.InvariantCulture)),
+                (FieldType.DateTime, DateTimeOffset time) => JsonValue.Create(time.UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture)),
+                _ => null,
+            };
+            if (node is null)
+            {
+                return null;
+            }
+
+            json[parameter.Name] = node;
+        }
+
+        return json;
+    }
+
     /// <summary>
     /// Maps each parameter the process declares to the CLR value the interpreter reads, matching names
     /// ignoring letter case. A parameter the values lack reads as null.

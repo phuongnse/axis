@@ -2,7 +2,7 @@ import { Button, ConfigProvider, Flex, Form, Input, Space, Table, type TableColu
 import { useMemo, useRef, useState } from 'react'
 import { compactFormTheme } from './antTheme'
 import { FieldInput } from './FieldInput'
-import { formatValue } from './formatValue'
+import { formatValue, moneyCurrency } from './formatValue'
 import type { RecordItem, RecordRow, RecordValue, RowLabels } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { FieldMetadata } from './site'
@@ -114,7 +114,7 @@ export function ChildCollectionTable({
                 <Input
                   readOnly
                   aria-label={`${label} ${index + 1}`}
-                  value={formatValue(child, row[child.name] ?? null, aligned[index] ?? {}, { locale, text: t })}
+                  value={formatValue(child, row[child.name] ?? null, aligned[index] ?? {}, { locale, text: t }, row)}
                 />
               ) : child.type === 'reference' ? (
                 // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
@@ -139,6 +139,7 @@ export function ChildCollectionTable({
                 <FieldInput
                   field={child}
                   value={row[child.name] ?? null}
+                  currency={moneyCurrency(child, row)}
                   onChange={(value) => edit(index, child.name, value)}
                   ariaLabel={`${label} ${index + 1}`}
                 />

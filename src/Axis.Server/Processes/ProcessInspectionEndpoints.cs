@@ -8,6 +8,7 @@ using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Server.Applications;
+using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
@@ -19,7 +20,7 @@ namespace Axis.Server.Processes;
 /// <c>GET /api/apps/{app}/processes/{process}/instances</c> shows the instances of the process,
 /// newest first and paged as the record API pages, whatever release each is pinned to. The
 /// <c>state</c> parameter keeps one state, and <c>subject</c> keeps the instances of one record. A
-/// request is checked in order: session (401), application and process (404), the user's
+/// request is checked in order: session or service account bearer token (401), application and process (404), the user's
 /// <c>inspect</c> grant on the process (403), then the parameters (400), each keyed by its name.
 /// An instance is listed only when its subject record exists and matches one of the user's read
 /// filters on the subject entity in the active release. The user's <c>read</c> grant on that
@@ -56,8 +57,8 @@ internal static class ProcessInspectionEndpoints
 
     public static void MapProcessInspectionEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/apps/{app}/processes/{process}/instances", ListAsync);
-        endpoints.MapGet("/api/apps/{app}/processes/{process}/instances/{id}", GetAsync);
+        endpoints.MapGet("/api/apps/{app}/processes/{process}/instances", ListAsync).WithMetadata(ServiceAccountRoute.Instance);
+        endpoints.MapGet("/api/apps/{app}/processes/{process}/instances/{id}", GetAsync).WithMetadata(ServiceAccountRoute.Instance);
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
@@ -76,7 +77,7 @@ internal static class ProcessInspectionEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(httpContext);
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -188,7 +189,7 @@ internal static class ProcessInspectionEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(httpContext);
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -439,7 +440,7 @@ internal static class ProcessInspectionEndpoints
         return false;
     }
 
-    private static ProcessGraph Graph(ProcessModel model) =>
+    internal static ProcessGraph Graph(ProcessModel model) =>
         new(model.Start, model.Steps.Select(GraphStep).ToList());
 
     // A transition's On is text: a decision branch gives its index and the fallback gives "otherwise".
@@ -463,6 +464,7 @@ internal static class ProcessInspectionEndpoints
             CallConnectorStepModel call => Operation(call.Name, call.Next),
             PackageOperationStepModel package => Operation(package.Name, package.Next),
             RaiseEventStepModel raise => Operation(raise.Name, raise.Next),
+            SubProcessStepModel sub => Operation(sub.Name, sub.Next),
             EndStepModel end => new(end.Name, "end", null, []),
             _ => throw new InvalidOperationException($"Unexpected step type {step.GetType().Name}."),
         };

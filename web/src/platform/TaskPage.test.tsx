@@ -49,6 +49,7 @@ const inboxWidget: WidgetMetadata = {
   tasksPath,
   process: null,
   instancesPath: null,
+  deadLettersPath: null,
   actions: [],
   rowActions: [],
   toolbarActions: [],
@@ -100,6 +101,10 @@ const openTask = {
     { name: 'reject', labelKey: 'task.reject' },
   ],
   dueAt,
+  claimedBy: null,
+  overdue: false,
+  commands: [] as string[],
+  reassignRoles: [],
   createdAt: '2026-10-10T02:05:00.123456Z',
   completedAt: null,
   completedBy: null,
@@ -133,6 +138,8 @@ const completedTask = {
   completedBy: 'maria',
   outcome: 'approve',
 }
+
+const expiredTask = { ...openTask, state: 'expired' }
 
 const subject = JSON.stringify({
   id: subjectId,
@@ -178,9 +185,10 @@ function answer({ status, body }: Answer) {
 function stubTaskApi({
   reads = [{ status: 200, body: openTask }],
   complete = { status: 200, body: completedTask },
+  command = { status: 200, body: { ...openTask, commands: ['release'] } },
   releaseTexts = { status: 200, body: { locale: 'en', texts: {} } },
   states = [{ sections: [], fields: {}, errors: {} }],
-}: { reads?: Answer[]; complete?: Answer; releaseTexts?: Answer; states?: unknown[] } = {}) {
+}: { reads?: Answer[]; complete?: Answer; command?: Answer; releaseTexts?: Answer; states?: unknown[] } = {}) {
   const requests: { method: string; url: string; body?: string }[] = []
   let taskReads = 0
   let stateCalls = 0
@@ -198,6 +206,9 @@ function stubTaskApi({
       if (method === 'POST' && url === `${tasksPath}/${taskId}/complete`) {
         return answer(complete)
       }
+      if (method === 'POST' && (url === `${tasksPath}/${taskId}/claim` || url === `${tasksPath}/${taskId}/release`)) {
+        return answer(command)
+      }
       if (method === 'POST' && url === `${tasksPath}/${taskId}/form-state`) {
         return answer({ status: 200, body: states[Math.min(stateCalls++, states.length - 1)] })
       }
@@ -209,6 +220,9 @@ function stubTaskApi({
   )
   return {
     taskReads: () => requests.filter(({ method, url }) => method === 'GET' && url === `${tasksPath}/${taskId}`),
+    commands: () =>
+      requests.filter(({ method, url }) => method === 'POST' && /\/(claim|release)$/.test(url)).map(({ url }) => url),
+    subjectReads: () => requests.filter(({ method, url }) => method === 'GET' && url === `${recordsPath}/${subjectId}`),
     completions: () => requests.filter(({ method, url }) => method === 'POST' && url.endsWith('/complete')),
     stateRequests: () =>
       requests
@@ -432,6 +446,118 @@ describe('TaskPage', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(api.completions()).toHaveLength(0)
+  })
+
+  it('shows the overdue tag beside the due date of an overdue task only', async () => {
+    stubTaskApi({ reads: [{ status: 200, body: { ...openTask, overdue: true } }] })
+    const { unmount } = renderPage()
+
+    expect(await screen.findByText('Overdue')).toBeInTheDocument()
+    unmount()
+
+    stubTaskApi()
+    renderPage()
+    await screen.findByLabelText('Title')
+    expect(screen.queryByText('Overdue')).not.toBeInTheDocument()
+  })
+
+  it('shows Claim and Release exactly as the commands list them', async () => {
+    for (const [commands, buttons] of [
+      [[], []],
+      [['claim'], ['Claim']],
+      [['release'], ['Release']],
+      [
+        ['claim', 'release', 'reassign'],
+        ['Claim', 'Release'],
+      ],
+    ] as const) {
+      stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands } }] })
+      const { unmount } = renderPage()
+
+      await screen.findByLabelText('Title')
+      expect(screen.queryByRole('button', { name: 'Claim' }) !== null).toBe(buttons.includes('Claim' as never))
+      expect(screen.queryByRole('button', { name: 'Release' }) !== null).toBe(buttons.includes('Release' as never))
+      expect(screen.queryByRole('button', { name: 'Reassign' })).not.toBeInTheDocument()
+      expect(screen.getAllByRole('button')).toHaveLength(buttons.length + 3)
+      unmount()
+    }
+  })
+
+  it('claims the task, shows Release from the answer and keeps what the user typed', async () => {
+    const api = stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands: ['claim'] } }] })
+    renderPage()
+
+    await userEvent.type(await screen.findByLabelText('Comments'), 'Fine')
+    await userEvent.click(screen.getByRole('button', { name: 'Claim' }))
+
+    expect(await screen.findByRole('button', { name: 'Release' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Claim' })).not.toBeInTheDocument()
+    expect(api.commands()).toEqual([`${tasksPath}/${taskId}/claim`])
+    expect(screen.getByLabelText('Comments')).toHaveValue('Fine')
+    expect(api.subjectReads()).toHaveLength(1)
+    expect(api.taskReads()).toHaveLength(1)
+  })
+
+  it('releases the task and shows the commands of the answer', async () => {
+    const api = stubTaskApi({
+      reads: [{ status: 200, body: { ...openTask, commands: ['release'] } }],
+      command: { status: 200, body: { ...openTask, commands: ['claim'] } },
+    })
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Release' }))
+
+    expect(await screen.findByRole('button', { name: 'Claim' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Release' })).not.toBeInTheDocument()
+    expect(api.commands()).toEqual([`${tasksPath}/${taskId}/release`])
+  })
+
+  it('shows a message and loads the task again when claim answers 409 or 403', async () => {
+    for (const status of [409, 403]) {
+      const api = stubTaskApi({
+        reads: [
+          { status: 200, body: { ...openTask, commands: ['claim'] } },
+          { status: 200, body: { ...openTask, commands: [] } },
+        ],
+        command: { status, body: { title: 'Refused.', status } },
+      })
+      const { unmount } = renderPage()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Claim' }))
+
+      expect(await screen.findByTestId('task-command-message')).toHaveTextContent(
+        'This action is no longer possible. The task was loaded again.',
+      )
+      await waitFor(() => expect(api.taskReads()).toHaveLength(2))
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Claim' })).not.toBeInTheDocument())
+      unmount()
+    }
+  })
+
+  it('shows a generic message when claim fails otherwise', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const api = stubTaskApi({
+      reads: [{ status: 200, body: { ...openTask, commands: ['claim'] } }],
+      command: { status: 500 },
+    })
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Claim' }))
+
+    expect(await screen.findByTestId('task-command-message')).toHaveTextContent('The action could not be done.')
+    expect(api.taskReads()).toHaveLength(1)
+  })
+
+  it('shows only the expired message for an expired task', async () => {
+    stubTaskApi({ reads: [{ status: 200, body: { ...expiredTask, commands: ['claim', 'release'] } }] })
+
+    renderPage()
+
+    expect(await screen.findByTestId('task-expired')).toHaveTextContent('The deadline for this task passed.')
+    expect(screen.queryByTestId('task-completed')).not.toBeInTheDocument()
+    expect(screen.getByText('Manager approval')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
   it('shows the not-found page when the task API has no task with the id', async () => {

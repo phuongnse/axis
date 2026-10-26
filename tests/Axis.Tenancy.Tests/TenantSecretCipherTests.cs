@@ -175,9 +175,88 @@ public sealed class TenantSecretCipherTests
         }
     }
 
-    private static TenantSecretCipher CipherFor(byte[] key) =>
+    [Fact]
+    public void A_value_of_the_previous_key_decrypts_and_a_new_value_is_always_encrypted_with_the_current_key()
+    {
+        var oldKey = _key;
+        var newKey = Enumerable.Repeat((byte)1, 32).ToArray();
+        var stored = CipherFor(oldKey).Encrypt("a", TenantSecretFields.RuntimePassword, PlainText);
+        var rotating = CipherFor(newKey, oldKey);
+
+        var rewritten = rotating.Encrypt("a", TenantSecretFields.RuntimePassword, PlainText);
+
+        Assert.True(rotating.HasPreviousKey);
+        Assert.Equal(PlainText, rotating.Decrypt("a", TenantSecretFields.RuntimePassword, stored).Reveal());
+        Assert.Equal(PlainText, CipherFor(newKey).Decrypt("a", TenantSecretFields.RuntimePassword, rewritten).Reveal());
+        Assert.Throws<InvalidOperationException>(() => CipherFor(oldKey).Decrypt("a", TenantSecretFields.RuntimePassword, rewritten));
+    }
+
+    [Fact]
+    public void A_data_protection_key_of_the_previous_key_decrypts()
+    {
+        var id = Guid.NewGuid();
+        var stored = CipherFor(_key).EncryptDataProtectionKey(id, PlainText);
+
+        Assert.Equal(PlainText, CipherFor(new byte[32], _key).DecryptDataProtectionKey(id, stored).Reveal());
+    }
+
+    [Fact]
+    public void A_value_under_neither_key_fails_and_the_error_names_both_settings_and_no_value()
+    {
+        var stored = CipherFor(new byte[32]).Encrypt("a", TenantSecretFields.RuntimePassword, PlainText);
+        var rotating = CipherFor(_key, Enumerable.Repeat((byte)1, 32).ToArray());
+
+        var exception = Assert.Throws<InvalidOperationException>(() => rotating.Decrypt("a", TenantSecretFields.RuntimePassword, stored));
+
+        AssertNames(exception, "a", TenantSecretFields.RuntimePassword);
+        Assert.Contains("Platform:SecretKey", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Platform:PreviousSecretKey", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("not base64!")]
+    [InlineData("AAAAAAAAAAAAAAAAAAAAAA==")]
+    [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")]
+    public void A_malformed_previous_key_is_refused_naming_the_setting_and_not_the_value(string value)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Platform:SecretKey"] = Convert.ToBase64String(_key),
+                ["Platform:PreviousSecretKey"] = value,
+            })
+            .Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => TenantSecretCipher.Load(configuration));
+
+        Assert.Contains("Platform:PreviousSecretKey", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(value, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void A_blank_previous_key_counts_as_not_set(string? value)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Platform:SecretKey"] = Convert.ToBase64String(_key),
+                ["Platform:PreviousSecretKey"] = value,
+            })
+            .Build();
+
+        Assert.False(TenantSecretCipher.Load(configuration).HasPreviousKey);
+    }
+
+    private static TenantSecretCipher CipherFor(byte[] key, byte[]? previousKey = null) =>
         TenantSecretCipher.Load(new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Platform:SecretKey"] = Convert.ToBase64String(key) })
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Platform:SecretKey"] = Convert.ToBase64String(key),
+                ["Platform:PreviousSecretKey"] = previousKey is null ? null : Convert.ToBase64String(previousKey),
+            })
             .Build());
 
     private static void AssertNames(InvalidOperationException exception, string tenantId, string field)

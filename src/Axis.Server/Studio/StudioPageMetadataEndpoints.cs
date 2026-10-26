@@ -155,6 +155,7 @@ internal static partial class StudioPageMetadataEndpoints
             null,
             null,
             null,
+            null,
             [],
             [],
             [],

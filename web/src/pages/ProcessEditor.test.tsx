@@ -11,7 +11,15 @@ import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import { chooseOption, selectRoot } from '../test/antd'
+import { ExpressionCheckContext } from './expressionCheckContext'
 import { ProcessEditor } from './ProcessEditor'
+
+// The expression editor is CodeMirror. The mock shows the names it is offered, which is what these tests check.
+vi.mock('./ExpressionEditor', () => ({
+  default: ({ name, options }: { name: string; options: { label: string }[] }) => (
+    <div role="group" aria-label={name} data-options={options.map((option) => option.label).join(',')} />
+  ),
+}))
 
 const process = {
   id: '4b60c03e-02d0-4329-80c6-75f972190399',
@@ -53,7 +61,14 @@ const process = {
 
 const names = {
   locales: ['en'],
-  entities: [],
+  entities: [
+    {
+      id: 'e1',
+      name: 'PurchaseRequest',
+      module: null,
+      fields: [{ name: 'totalAmount', type: 'decimal', target: null, values: null }],
+    },
+  ],
   dataSources: [],
   processes: [],
   rules: [],
@@ -81,19 +96,28 @@ function ThemeRoot({ children }: { children: ReactNode }) {
 let schema: JsonSchema
 
 /** Applies each change to its own copy of the value, as the Studio editor does, and exposes the latest value. */
-function renderEditor(value: Record<string, unknown> = process) {
+function renderEditor(value: Record<string, unknown> = process, checked = false) {
   const latest = { value }
   function Harness() {
     const [draft, setDraft] = useState(value)
     useEffect(() => {
       latest.value = draft
     })
-    return (
+    const editor = (
       <ProcessEditor
         schema={schema}
         value={draft}
         onChange={(pointer, next) => setDraft((current) => setAt(current, pointer, next) as Record<string, unknown>)}
       />
+    )
+    return checked ? (
+      <ExpressionCheckContext.Provider
+        value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft, names }}
+      >
+        {editor}
+      </ExpressionCheckContext.Provider>
+    ) : (
+      editor
     )
   }
   render(
@@ -247,6 +271,52 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect(screen.queryByTestId('studio-field-/steps/1/assignee/role')).toBeNull()
     await userEvent.type(within(screen.getByTestId('studio-field-/steps/1/assignee/user')).getByRole('textbox'), 'a')
     expect(stepOf(latest, 1).assignee).toEqual({ user: 'a' })
+  })
+
+  it('switches the subject between an entity and parameters and keeps only the chosen key', async () => {
+    const latest = renderEditor(process, true)
+    const offered = async () =>
+      ((await screen.findByRole('group', { name: 'When' })).getAttribute('data-options') ?? '').split(',')
+    // The radio input of a button group has no pointer events, so the click goes to its label.
+    const switchTo = (name: string) => userEvent.click(screen.getByRole('radio', { name }).closest('label')!)
+
+    expect(screen.getByRole('radio', { name: 'Entity' })).toBeChecked()
+    expect(await offered()).toContain('totalAmount')
+
+    await switchTo('Parameters')
+    expect(latest.value).not.toHaveProperty('entity')
+    expect(latest.value.parameters).toEqual([])
+    expect(Object.keys(latest.value)).toEqual(['id', 'kind', 'name', 'formatVersion', 'parameters', 'start', 'steps'])
+    expect(screen.queryByTestId('studio-field-/entity')).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add parameter' }))
+    expect(latest.value.parameters).toEqual([{ name: '', type: 'text' }])
+    await userEvent.type(screen.getByRole('textbox', { name: 'Parameter name' }), 'daysOverdue')
+    await chooseOption('integer', screen.getByTestId('studio-field-/parameters/0/type'))
+    expect(latest.value.parameters).toEqual([{ name: 'daysOverdue', type: 'integer' }])
+    const parameterOptions = await offered()
+    expect(parameterOptions).toContain('daysOverdue')
+    expect(parameterOptions).not.toContain('totalAmount')
+    expect(parameterOptions).not.toContain('id')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove parameter' }))
+    expect(latest.value.parameters).toEqual([])
+
+    await switchTo('Entity')
+    expect(latest.value).not.toHaveProperty('parameters')
+    expect(latest.value.entity).toBe('')
+    expect(Object.keys(latest.value)).toEqual(['id', 'kind', 'name', 'formatVersion', 'entity', 'start', 'steps'])
+    await chooseOption('PurchaseRequest', screen.getByTestId('studio-field-/entity'))
+    expect(latest.value.entity).toBe('PurchaseRequest')
+    expect(await offered()).toEqual(expect.arrayContaining(['id', 'totalAmount']))
+  })
+
+  it('shows a process without a subject in parameters mode', () => {
+    renderEditor({ ...process, entity: undefined, parameters: [{ name: 'daysOverdue', type: 'integer' }] })
+
+    expect(screen.getByRole('radio', { name: 'Parameters' })).toBeChecked()
+    expect(screen.getByRole('textbox', { name: 'Parameter name' })).toHaveValue('daysOverdue')
+    expect(screen.getByTestId('studio-field-/parameters')).toBeVisible()
   })
 
   it('shows an end step as its name and type only', () => {

@@ -224,6 +224,47 @@ public sealed class FormStateEvaluatorTests
         Assert.Contains(key, result.Malformed!.Keys);
     }
 
+    [Fact]
+    public void Left_out_field_of_a_new_record_gets_its_default_and_conditions_see_it()
+    {
+        var form = Form(
+            new FormSectionModel(
+                new TextReference("main"),
+                [new FormFieldModel("name", false), new FormFieldModel("quantity", false), new FormFieldModel("price", false, RequiredWhen: Condition("quantity > 2"))],
+                Name: "main"));
+
+        var state = EvaluateDefaulted(Draft(("name", "Desk")), touched: ["price"], form: form);
+        var withoutDefault = Evaluate(Draft(("name", "Desk")), touched: ["price"], form: form);
+
+        Assert.Equal(3L, state.Defaults["quantity"]!.GetValue<long>());
+        Assert.Equal(["quantity"], state.Defaults.Keys);
+        Assert.True(state.Fields["price"].Required);
+        Assert.Equal(["Required."], state.Errors["/values/price"]);
+        Assert.False(withoutDefault.Fields["price"].Required);
+    }
+
+    [Fact]
+    public void Field_sent_with_a_value_that_does_not_parse_gets_no_default()
+    {
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal) { ["/values/quantity"] = ["Must be a whole number."] };
+        var draft = new RecordDraftResult(new RecordInput { Values = [new RecordValue(_item.Fields[0], "Desk")] }, errors);
+
+        var state = EvaluateDefaulted(draft, touched: ["quantity"]);
+
+        Assert.Empty(state.Defaults);
+        Assert.Equal(["Must be a whole number."], state.Errors["/values/quantity"]);
+    }
+
+    [Fact]
+    public void Stored_record_has_no_defaults()
+    {
+        var stored = Stored(new Dictionary<string, JsonNode?> { ["name"] = "Desk" });
+
+        var state = EvaluateDefaulted(Draft(), touched: [], stored);
+
+        Assert.Empty(state.Defaults);
+    }
+
     [Theory]
     [InlineData("[]")]
     [InlineData("not json")]
@@ -250,6 +291,14 @@ public sealed class FormStateEvaluatorTests
         IReadOnlySet<string>? readable = null,
         FormModel? form = null) =>
         FormStateEvaluator.Evaluate(_application, form ?? _form, _item, stored, draft, new HashSet<string>(touched), readable, "anna", _now);
+
+    private static readonly EntityModel _defaulted = _item with
+    {
+        Fields = [.. _item.Fields.Select(field => field.Name == "quantity" ? field with { Default = ExpressionModel.Compile("3", ExpressionScopes.ForEntity([]), ExpressionType.Integer) } : field)],
+    };
+
+    private static FormState EvaluateDefaulted(RecordDraftResult draft, string[] touched, Record? stored = null, FormModel? form = null) =>
+        FormStateEvaluator.Evaluate(Models.Application(_defaulted), form ?? _form, _defaulted, stored, draft, new HashSet<string>(touched), null, "anna", _now);
 
     private static RecordDraftResult Draft(params (string Name, object? Value)[] values) =>
         new(

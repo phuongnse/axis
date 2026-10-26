@@ -64,8 +64,16 @@ export function expressionScope(
 }
 
 function parameterOptions(kind: string, draft: Record<string, unknown>, pointer: string): ScopeOption[] {
-  const offered = kind === 'rule' || (kind === 'dataSource' && pointer === '/filter')
+  const offered =
+    kind === 'rule' ||
+    (kind === 'dataSource' && pointer === '/filter') ||
+    // A process without a subject has parameters in place of an entity.
+    (kind === 'process' && !hasEntity(draft))
   return offered ? namesOf(draft.parameters).map((name) => option(name, 'parameter', false)) : []
+}
+
+function hasEntity(draft: Record<string, unknown>): boolean {
+  return typeof draft.entity === 'string' && draft.entity !== ''
 }
 
 function fieldOptions(
@@ -84,9 +92,14 @@ function fieldOptions(
   }
   // A form condition reads only the fields the form lists.
   const listed = kind === 'form' ? listedFields(draft) : undefined
-  return found.fields
-    .filter((field) => listed === undefined || listed.has(field.name.toLowerCase()))
-    .map((field) => option(field.name, 'field', false))
+  // The record's `id` is in scope of a process and of a trigger, and it is a reference, so a path cannot start from it.
+  const id = kind === 'process' || kind === 'trigger' ? [option('id', 'parameter', false)] : []
+  return [
+    ...id,
+    ...found.fields
+      .filter((field) => listed === undefined || listed.has(field.name.toLowerCase()))
+      .map((field) => option(field.name, 'field', false)),
+  ]
 }
 
 function listedFields(draft: Record<string, unknown>): Set<string> {
@@ -107,7 +120,7 @@ function entityOf(kind: string, draft: Record<string, unknown>, pointer: string)
     }
     return stringProperty(draft.grants[Number(match[1])], 'entity')
   }
-  if (kind === 'dataSource' || kind === 'process' || kind === 'form') {
+  if (kind === 'dataSource' || kind === 'process' || kind === 'form' || kind === 'trigger') {
     return stringProperty(draft, 'entity')
   }
   return undefined

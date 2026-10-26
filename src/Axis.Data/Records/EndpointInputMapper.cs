@@ -21,8 +21,9 @@ public sealed record EndpointMapResult(
 /// is a value that does not fit the field. An input that cannot be held exactly is an error at
 /// <c>/input/&lt;name&gt;</c>, and then no expression is evaluated. A child collection takes the
 /// rows of its input, which were already parsed against its child entity. Fields the endpoint does
-/// not map are left out, so they are <c>null</c> as in a record API create. A required field that
-/// ends up <c>null</c> is an error at <c>/values/&lt;field&gt;</c>, as it is in a create body.
+/// not map are left out, so they get their default, or <c>null</c> without one, as in a record API
+/// create. A required field that ends up <c>null</c> is an error at <c>/values/&lt;field&gt;</c>, as it
+/// is in a create body, except that a required field with a default may be left out.
 /// </summary>
 public static class EndpointInputMapper
 {
@@ -91,8 +92,14 @@ public static class EndpointInputMapper
         }
 
         // A record API create refuses a required field it leaves out or sets to null, and so does a call.
+        // A required field with a default may be left out, because the create fills it from its default.
         foreach (var field in RecordQueries.Columns(entity).Where(field => field.Required && !field.IsComputed && field.Sequence is null && !field.Creator))
         {
+            if (field.Default is not null && !values.ContainsKey(field.Name))
+            {
+                continue;
+            }
+
             if (values.GetValueOrDefault(field.Name)?.Value is null)
             {
                 errors.TryAdd($"/values/{field.Name}", [Messages.Required]);
