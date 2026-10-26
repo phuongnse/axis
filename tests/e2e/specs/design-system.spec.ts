@@ -20,14 +20,14 @@ const fixtureMarker = 'DesignSystemSample'
 
 const modes = ['light', 'dark'] as const
 
+/** The figure of one state of a preview, found by its caption. */
+const figure = (page: Page, caption: string) => page.getByRole('figure', { name: caption, exact: true })
+
 // Each preview and a locator for its widget. The table and the kpi also draw an empty state, so they are looked up in
-// the "With data" figure.
+// the "With data" figure. A field preview's first state is its typical one.
 const previews: Record<string, (page: Page) => Locator> = {
-  table: (page) =>
-    page
-      .getByRole('figure', { name: 'With data', exact: true })
-      .getByRole('columnheader', { name: 'Title', exact: true }),
-  form: (page) => page.getByRole('button', { name: 'Save', exact: true }),
+  table: (page) => figure(page, 'With data').getByRole('columnheader', { name: 'Title', exact: true }),
+  form: (page) => page.getByRole('button', { name: 'Save', exact: true }).first(),
   taskInbox: (page) => page.getByRole('link', { name: 'Review the request', exact: true }).first(),
   processInspector: (page) => page.getByRole('combobox', { name: 'State', exact: true }),
   detail: (page) => page.getByText('Standing desks for the new office', { exact: true }),
@@ -39,15 +39,16 @@ const previews: Record<string, (page: Page) => Locator> = {
   tabs: (page) => page.getByRole('tab', { name: 'Requests', exact: true }),
   section: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
   states: (page) => page.getByRole('alert').filter({ hasText: 'The records could not be loaded.' }),
-  'field-text': (page) => page.getByLabel('Title', { exact: true }),
-  'field-integer': (page) => page.getByLabel('Quantity', { exact: true }),
-  'field-decimal': (page) => page.getByLabel('Amount', { exact: true }),
-  'field-boolean': (page) => page.getByLabel('Urgent', { exact: true }),
-  'field-date': (page) => page.getByLabel('Needed on', { exact: true }),
-  'field-date-time': (page) => page.getByLabel('Submitted at', { exact: true }),
-  'field-enum': (page) => page.getByLabel('Status', { exact: true }),
-  'field-reference': (page) => page.getByLabel('Category', { exact: true }),
-  'field-child-collection': (page) => page.getByRole('columnheader', { name: 'Description', exact: true }),
+  'field-text': (page) => figure(page, 'Typical').getByLabel('Title', { exact: true }),
+  'field-integer': (page) => figure(page, 'Typical').getByLabel('Quantity', { exact: true }),
+  'field-decimal': (page) => figure(page, 'Typical').getByLabel('Amount', { exact: true }),
+  'field-boolean': (page) => figure(page, 'Typical').getByLabel('Urgent', { exact: true }),
+  'field-date': (page) => figure(page, 'Typical').getByLabel('Needed on', { exact: true }),
+  'field-date-time': (page) => figure(page, 'Typical').getByLabel('Submitted at', { exact: true }),
+  'field-enum': (page) => figure(page, 'Typical').getByLabel('Status', { exact: true }),
+  'field-reference': (page) => figure(page, 'Typical').getByLabel('Category', { exact: true }),
+  'field-child-collection': (page) =>
+    figure(page, 'Reference and computed cells').getByRole('columnheader', { name: 'Description', exact: true }),
 }
 
 /** The text a preview's empty state shows, or none for a preview that draws no empty state. */
@@ -169,9 +170,66 @@ for (const [name, widget] of Object.entries(previews)) {
   }
 }
 
+for (const name of Object.keys(previews).filter((key) => key.startsWith('field-') && key !== 'field-child-collection')) {
+  for (const mode of modes) {
+    test(`the ${name} preview draws its required, read-only and error states in ${mode} mode`, async ({ page }) => {
+      const recording = await openHarness(page, `?preview=${name}&mode=${mode}`)
+
+      // The required asterisk is drawn by CSS on the label, so its computed content is read.
+      await expect
+        .poll(() =>
+          figure(page, 'Required')
+            .locator('label')
+            .first()
+            .evaluate((label) => getComputedStyle(label, '::before').content),
+        )
+        .toContain('*')
+      await expect(figure(page, 'Read-only').getByRole('textbox').first()).toHaveAttribute('readonly')
+      await expect(figure(page, 'Validation error').getByRole('alert')).toHaveText('This value is not valid.')
+      expect(recording.errors).toEqual([])
+    })
+  }
+}
+
+for (const mode of modes) {
+  test(`the field-child-collection preview draws its states in ${mode} mode`, async ({ page }) => {
+    const recording = await openHarness(page, `?preview=field-child-collection&mode=${mode}`)
+
+    const reference = figure(page, 'Reference and computed cells')
+    await expect(reference.getByLabel('Amount 1', { exact: true })).toHaveAttribute('readonly')
+    await expect(
+      reference.getByTestId('reference-lines-0-category').getByRole('button', { name: 'Choose Category 1', exact: true }),
+    ).toBeVisible()
+    await expect(figure(page, 'Cell error').getByTestId('field-error-lines-1-unitPrice')).toHaveText(
+      'Unit price cannot be negative.',
+    )
+    const readOnly = figure(page, 'Read-only')
+    await expect(readOnly.getByLabel('Description 1', { exact: true })).toHaveAttribute('readonly')
+    await expect(readOnly.getByRole('button', { name: 'Add row', exact: true })).toHaveCount(0)
+    const empty = figure(page, 'Empty')
+    await expect(empty.getByRole('button', { name: 'Add row', exact: true })).toBeVisible()
+    await expect(empty.getByLabel('Description 1', { exact: true })).toHaveCount(0)
+    expect(recording.errors).toEqual([])
+  })
+}
+
+for (const mode of modes) {
+  test(`the form preview draws its validation, read-only and wizard states in ${mode} mode`, async ({ page }) => {
+    const recording = await openHarness(page, `?preview=form&mode=${mode}`)
+
+    await expect(figure(page, 'Validation errors').getByTestId('field-error-title')).toHaveText('Enter a title.')
+    await expect(figure(page, 'Read-only by a condition').locator('#amount')).toHaveAttribute('readonly')
+    const wizard = figure(page, 'Wizard steps')
+    await expect(wizard.getByTestId('form-steps')).toBeVisible()
+    await wizard.getByRole('button', { name: 'Next', exact: true }).click()
+    await expect(wizard.locator('#quantity')).toBeVisible()
+    expect(recording.errors).toEqual([])
+  })
+}
+
 test('the field-date-time preview opens its date picker', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-date-time&mode=light')
-  await page.getByLabel('Submitted at', { exact: true }).click()
+  await figure(page, 'Typical').getByLabel('Submitted at', { exact: true }).click()
 
   await expect(page.getByRole('button', { name: 'Next month', exact: true })).toBeVisible()
   expect(recording.errors).toEqual([])
@@ -179,7 +237,10 @@ test('the field-date-time preview opens its date picker', async ({ page }) => {
 
 test('the field-reference preview lists the fixture categories in its lookup', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-reference&mode=light')
-  await page.getByTestId('reference-category').getByRole('button', { name: 'Choose', exact: true }).click()
+  await figure(page, 'Typical')
+    .getByTestId('reference-category')
+    .getByRole('button', { name: 'Choose', exact: true })
+    .click()
 
   const dialog = await waitForDialog(page, 'Category')
   await expect(dialog).toContainText('Office furniture')
@@ -188,10 +249,11 @@ test('the field-reference preview lists the fixture categories in its lookup', a
 
 test('the field-child-collection preview adds a row', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-child-collection&mode=light')
-  await expect(page.getByLabel('Description 2', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Add row', exact: true }).click()
+  const reference = figure(page, 'Reference and computed cells')
+  await expect(reference.getByLabel('Description 2', { exact: true })).toBeVisible()
+  await reference.getByRole('button', { name: 'Add row', exact: true }).click()
 
-  await expect(page.getByLabel('Description 3', { exact: true })).toBeVisible()
+  await expect(reference.getByLabel('Description 3', { exact: true })).toBeVisible()
   expect(recording.errors).toEqual([])
 })
 
@@ -224,7 +286,7 @@ test("a mounted form uses the page's --primary and redraws when it changes", asy
     ;(window as unknown as { Axis: { form: (element: HTMLElement) => void } }).Axis.form(element)
   })
 
-  const save = page.getByRole('button', { name: 'Save', exact: true })
+  const save = page.getByRole('button', { name: 'Save', exact: true }).first()
   const background = () => save.evaluate((button) => getComputedStyle(button).backgroundColor)
   await expect.poll(background).toBe('rgb(19, 194, 194)')
 
@@ -237,15 +299,10 @@ test("a mounted form uses the page's --primary and redraws when it changes", asy
 for (const mode of modes) {
   test(`a form validation message follows the page's --dangerText in ${mode} mode`, async ({ page }) => {
     const recording = await openHarness(page, `?preview=form&mode=${mode}`)
-    await expect(previews.form(page)).toBeVisible()
+    const message = figure(page, 'Validation errors').getByText('Enter a title.', { exact: true })
+    await expect(message).toBeVisible()
     await page.evaluate(() => document.documentElement.style.setProperty('--dangerText', '#13c2c2'))
 
-    const title = page.getByLabel('Title', { exact: true })
-    await title.fill('Standing desks')
-    await title.press('Tab')
-
-    const message = page.getByText('Another request has this title.', { exact: true })
-    await expect(message).toBeVisible()
     await expect.poll(() => message.evaluate((element) => getComputedStyle(element).color)).toBe('rgb(19, 194, 194)')
     expect(recording.errors).toEqual([])
   })

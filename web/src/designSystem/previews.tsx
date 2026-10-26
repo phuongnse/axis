@@ -10,18 +10,24 @@ import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
+import { SubmittedOnMount } from './SubmittedOnMount'
 import {
   blankDetailWidget,
   chartWidget,
   columnsWidget,
   detailWidget,
   emptyKpiWidget,
+  emptyLinesRecord,
   emptyTableWidget,
   emptyTaskInboxWidget,
   failingRoutes,
   failingTableWidget,
-  formWidget,
+  fields,
+  invalidFormRoutes,
+  invalidRequestForm,
   kpiWidget,
+  lockedFormRoutes,
+  lockedRequestForm,
   loadingRoutes,
   loadingTableWidget,
   noRowsPath,
@@ -35,6 +41,8 @@ import {
   tableWidget,
   tabsWidget,
   taskInboxWidget,
+  wizardFormRoutes,
+  wizardRequestForm,
 } from './fixtures'
 
 const fieldTypes: readonly PreviewFieldType[] = [
@@ -93,22 +101,53 @@ function detail(widget: EntityWidgetMetadata): ReactNode {
   return <DetailWidget widget={widget} sitePath={sitePath} recordId={requestId} locale={locale} />
 }
 
+/** The request form over the given metadata, for a new record or the saved one, as the form preview draws it. */
+function requestForm(widget: EntityWidgetMetadata, recordId: string | null): ReactNode {
+  return (
+    <FormWidget widget={widget} sitePath={sitePath} pages={[]} recordId={recordId} returnTo="/ds" locale={locale} />
+  )
+}
+
+/** The states of a field's preview: typical, required, read-only, and a validation error under the input. */
+function fieldStates(type: PreviewFieldType): readonly PreviewState[] {
+  const problem = { [`/values/${fields[type].name}`]: ['preview.error.field'] }
+  return [
+    { caption: 'Typical', draw: () => <FieldPreview type={type} /> },
+    { caption: 'Required', draw: () => <FieldPreview type={type} required /> },
+    { caption: 'Read-only', draw: () => <FieldPreview type={type} readOnly /> },
+    { caption: 'Validation error', draw: () => <FieldPreview type={type} problem={problem} /> },
+  ]
+}
+
+const childCollectionProblem = { '/values/lines/1/unitPrice': ['preview.error.unitPrice'] }
+
+/** The line items' states: reference and computed cells, a cell error, read-only, and no rows. */
+const childCollectionStates: readonly PreviewState[] = [
+  { caption: 'Reference and computed cells', draw: () => <FieldPreview type="child-collection" /> },
+  { caption: 'Cell error', draw: () => <FieldPreview type="child-collection" problem={childCollectionProblem} /> },
+  { caption: 'Read-only', draw: () => <FieldPreview type="child-collection" readOnly /> },
+  { caption: 'Empty', draw: () => <FieldPreview type="child-collection" record={emptyLinesRecord} /> },
+]
+
 /** What a preview draws: its states, each the shared widget component over fixture metadata. */
 export const previews: Record<string, readonly PreviewState[]> = {
   table: withAndWithoutData(
     () => requestTable(tableWidget),
     () => requestTable(emptyTableWidget),
   ),
-  form: typical(() => (
-    <FormWidget
-      widget={formWidget}
-      sitePath={sitePath}
-      pages={[]}
-      recordId={requestId}
-      returnTo="/ds"
-      locale={locale}
-    />
-  )),
+  form: [
+    {
+      caption: 'Validation errors',
+      draw: () => <SubmittedOnMount>{requestForm(invalidRequestForm, null)}</SubmittedOnMount>,
+      routes: invalidFormRoutes,
+    },
+    {
+      caption: 'Read-only by a condition',
+      draw: () => requestForm(lockedRequestForm, requestId),
+      routes: lockedFormRoutes,
+    },
+    { caption: 'Wizard steps', draw: () => requestForm(wizardRequestForm, requestId), routes: wizardFormRoutes },
+  ],
   taskInbox: withAndWithoutData(
     () => inbox(taskInboxWidget),
     () => inbox(emptyTaskInboxWidget),
@@ -141,7 +180,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Loading', draw: () => requestTable(loadingTableWidget), routes: loadingRoutes },
     { caption: 'Load error', draw: () => requestTable(failingTableWidget), routes: failingRoutes },
   ],
-  ...Object.fromEntries(fieldTypes.map((type) => [`field-${type}`, typical(() => <FieldPreview type={type} />)])),
+  ...Object.fromEntries(
+    fieldTypes.map((type) => [
+      `field-${type}`,
+      type === 'child-collection' ? childCollectionStates : fieldStates(type),
+    ]),
+  ),
 }
 
 /** The fixture answers that the states of the previews bring, in one record. */
