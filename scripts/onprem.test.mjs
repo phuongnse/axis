@@ -23,6 +23,7 @@ import { tmpdir } from 'node:os'
 import { join, relative, sep } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { buildImage } from './lib/docker-build.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const composeFile = join(root, 'deploy/compose/compose.yaml')
@@ -386,13 +387,7 @@ describe('the on-premises installation', () => {
       chmodSync(folder, 0o755)
 
       // Step 1, the images. The three targets are tagged with the version that compose.yaml requires.
-      for (const target of targets) {
-        const build = docker(
-          ['build', '--target', target, '--build-arg', `AXIS_VERSION=${version}`, '-t', `${target}:${version}`, '.'],
-          { stdio: 'inherit' },
-        )
-        assert.equal(build.status, 0, `docker build --target ${target} exited with ${build.status}`)
-      }
+      for (const target of targets) await buildImage({ target, version, tag: `${target}:${version}` })
 
       // Step 2, the secret files. The folder and the files are readable by UID 1654.
       const secrets = join(folder, 'secrets')

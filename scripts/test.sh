@@ -15,8 +15,8 @@ run_suite web web npm test --prefix web -- \
   --reporter=default --reporter=junit --outputFile.junit="$results_dir/web.xml"
 
 # The report, smoke test selection, link check, docs structure check, locator check, bundle budget check,
-# design-system bundle check, dependency scan, setup retries, E2E folder comparison, hang guard, dialog
-# and drag helpers and Helm chart scripts' own tests.
+# design-system bundle check, dependency scan, setup retries, image build retries, E2E folder comparison, hang
+# guard, dialog and drag helpers and Helm chart scripts' own tests.
 node --test scripts/test-report.test.mjs || status=1
 node --test scripts/affected.test.mjs || status=1
 node --test scripts/check-links.test.mjs || status=1
@@ -26,6 +26,7 @@ node --test scripts/check-bundle.test.mjs || status=1
 node --test scripts/check-design-system.test.mjs || status=1
 node --test scripts/scan.test.mjs || status=1
 node --test scripts/setup.test.mjs || status=1
+node --test scripts/docker-build.test.mjs || status=1
 node --test tests/e2e/folder-comparison.test.ts || status=1
 node --test tests/e2e/hang-guard.test.ts || status=1
 node --test tests/e2e/dialogs.test.ts || status=1
