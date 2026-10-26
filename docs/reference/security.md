@@ -265,6 +265,7 @@ sample reuses a user that holds the role it needs before it adds a user.
 | `khoa`  | `agent`                 | Service desk sample; E2E journeys                                                                                                             |
 | `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                                                                                             |
 | `minh`  | `approver`              | Request approval template journey; E2E journeys                                                                                               |
+| `nam`   | `service-desk-lead`     | Service desk sample; E2E claim and reassign journey                                                                                           |
 
 ## Machine callers
 

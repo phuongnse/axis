@@ -1073,6 +1073,7 @@ public sealed class ScenarioRunnerTests
     private static TemporaryFolder TimerApplication((string Name, string Json) scenario) =>
         Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioTimerApp");
 
+    /// <summary>
     /// A copy of the ScenarioPurchaseApp fixture with the ScenarioDeadlineApp files over it: the manager's task expires
     /// after one day and the process moves on to the finance approval.
     /// </summary>
