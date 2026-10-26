@@ -19,7 +19,7 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { expressionScope } from './expressionScope'
-import { newGrant, newPolicy, ownGrantIndexes } from './policyMatrixDraft'
+import { newGrant, newPolicy, ownGrantIndexes, targetActions } from './policyMatrixDraft'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -383,9 +383,11 @@ function OwnGrants({
     setState({ loaded, draft: setAt(draft, pointer, value) as Content })
   }
 
+  const accepted = targetActions(target.kind)
+
   function setActions(index: number, ticked: string[]) {
-    const kept = stringsOf((grants[index] as Content).actions).filter((action) => !target.actions.includes(action))
-    edit(`/grants/${index}/actions`, [...target.actions.filter((action) => ticked.includes(action)), ...kept])
+    const kept = stringsOf((grants[index] as Content).actions).filter((action) => !accepted.includes(action))
+    edit(`/grants/${index}/actions`, [...accepted.filter((action) => ticked.includes(action)), ...kept])
   }
 
   function reload() {
@@ -442,7 +444,7 @@ function OwnGrants({
       {own.map((index) => {
         const grant = grants[index] as Content
         const actions = stringsOf(grant.actions)
-        const unaccepted = actions.filter((action) => !target.actions.includes(action))
+        const unaccepted = actions.filter((action) => !accepted.includes(action))
         const filterPath = `/grants/${index}/filter`
         const filter = typeof grant.filter === 'string' ? grant.filter : ''
         return (
@@ -451,8 +453,8 @@ function OwnGrants({
               <strong>{role.accessPolicy.name}</strong>
               <Checkbox.Group
                 data-testid="studio-matrix-actions"
-                options={target.actions}
-                value={actions.filter((action) => target.actions.includes(action))}
+                options={accepted}
+                value={actions.filter((action) => accepted.includes(action))}
                 onChange={(ticked) => setActions(index, ticked)}
               />
               {unaccepted.map((action) => (

@@ -28,7 +28,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
     private static readonly string[] _steps =
     [
-        "check", "entry", "roles", "database", "restore", "grants", "grants", "work", "role-check", "version",
+        "check", "entry", "roles", "database", "restore", "grants", "grants", "work", "sessions", "role-check", "version",
     ];
 
     private static readonly JsonSerializerOptions _web = new(JsonSerializerDefaults.Web);
@@ -49,6 +49,9 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         var file = Path.Combine(folder.Path, "backup.tar");
         var scenario = fixture.Scenario;
         await scenario.SetEmailAndLocaleClaimsAsync(fixture.TenantId, "mail", "lang");
+        await fixture.ExecuteAsync(
+            "INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at) "
+            + "VALUES (sha256(gen_random_uuid()::text::bytea), 'anna', 'Anna Employee', '{employee}', now(), now())");
         Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
         var original = await scenario.RowAsync(fixture.TenantId);
         var originalHosts = await scenario.HostsAsync(fixture.TenantId);
@@ -73,6 +76,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.Equal(
             ["PurchasingSystemToken", "PurchasingSystemUrl"],
             await BindingNamesAsync(newId));
+        Assert.Equal(0, await CountSessionsAsync(newId));
 
         await using var server = CreateDirectoryServer(scenario.Platform);
         using var restored = server.CreateClient().SignedInAs("anna");
@@ -159,7 +163,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         var result = await RestoreAsync(file, id, host);
 
         Assert.Equal(0, result.Exit);
-        string[] steps = ["check", "entry", "roles", "database", "restore", "grants", "migrations", "grants", "work", "role-check", "version"];
+        string[] steps = ["check", "entry", "roles", "database", "restore", "grants", "migrations", "grants", "work", "sessions", "role-check", "version"];
         Assert.Equal(steps.Select(step => $"{id} {step} ok"), result.Output);
         var row = await scenario.RowAsync(id);
         Assert.Equal(TenantSchemaVersion.Current, row.SchemaVersion);
@@ -479,6 +483,17 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
             fixture.Scenario.Platform,
             $"SELECT count(*) FROM platform.tenant_bindings WHERE tenant_id = '{id}' AND secret_value IS NOT NULL",
             CancellationToken))!;
+
+    // Reads the restored tenant's own database as its schema role.
+    private async Task<long> CountSessionsAsync(string id)
+    {
+        var row = await fixture.Scenario.RowAsync(id);
+        var schema = AdminScenario.Cipher.Decrypt(id, TenantSecretFields.SchemaPassword, row.SchemaPassword).Reveal();
+        await using var connection = new NpgsqlConnection(fixture.Scenario.TenantConnectionString(id, row.SchemaUser, schema));
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand("SELECT count(*) FROM axis.sessions", connection);
+        return (long)(await command.ExecuteScalarAsync(CancellationToken))!;
+    }
 
     private async Task<string[]> BindingNamesAsync(string id)
     {

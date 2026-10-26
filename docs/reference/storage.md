@@ -64,7 +64,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     (`bytea`, the primary key, the SHA-256 hash of the session id), `user_id`,
     `display_name`, `roles` (`text[]`), `signed_in_at` and `last_request_at`.
     The table never holds the session id or a token. The server reads, inserts,
-    updates and deletes its rows, see
+    updates and deletes its rows. The worker deletes the expired rows, and
+    `tenant restore` empties the table, see
     [sign-in and the session](security.md#sign-in-and-the-session).
   - `Axis.Data` also owns `axis.files` and `axis.file_contents`, with history
     in `axis.__data_migrations`. A row of `axis.files` is the details of one
