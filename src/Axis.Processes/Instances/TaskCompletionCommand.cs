@@ -160,7 +160,7 @@ public static class TaskCompletionCommand
 
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
             var sent = RecordCommand.SetFields(entity, input).ToList();
-            var sets = entity.Validations.Count > 0 || form.HasRequiredWhen
+            var sets = entity.Validations.Count > 0 || form.HasRequiredWhen || (sent.Count > 0 && form.HasVisibleOrReadOnlyWhen)
                 ? await RecordSets.ReadAsync(connection, release, entity, stored, input.Links, cancellationToken)
                 : RecordSets.Empty;
             var failures = RecordFormRequirements.Merge(
