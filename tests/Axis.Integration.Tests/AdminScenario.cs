@@ -283,10 +283,11 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
     /// <summary>
     /// Checks that no output of any command held the admin password, a generated password, the client secret or a
-    /// connection string with a password.
+    /// connection string with a password. A test that changed the installation key passes a cipher that decrypts the stored values.
     /// </summary>
-    public async Task AssertNoSecretsAsync()
+    public async Task AssertNoSecretsAsync(TenantSecretCipher? cipher = null)
     {
+        cipher ??= Cipher;
         var secrets = new List<string>([.. _adminPasswords, _clientSecret]);
         await using (var context = NewContext())
         {
@@ -295,18 +296,18 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             {
                 if (tenant.SchemaPassword.Length > 0)
                 {
-                    secrets.Add(Cipher.Decrypt(tenant.Id, TenantSecretFields.SchemaPassword, tenant.SchemaPassword).Reveal());
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.SchemaPassword, tenant.SchemaPassword).Reveal());
                 }
 
                 if (tenant.RuntimePassword.Length > 0)
                 {
-                    secrets.Add(Cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
                 }
             }
 
             foreach (var binding in migrated ? await context.TenantBindings.AsNoTracking().Where(row => row.Kind == "secret" && row.SecretValue != null).ToListAsync(CancellationToken) : [])
             {
-                secrets.Add(Cipher.Decrypt(binding.TenantId, TenantSecretFields.Binding(binding.Name), binding.SecretValue!).Reveal());
+                secrets.Add(cipher.Decrypt(binding.TenantId, TenantSecretFields.Binding(binding.Name), binding.SecretValue!).Reveal());
             }
         }
 
