@@ -319,8 +319,11 @@ the operator sets it with
 
 ## Data settings
 
-`Data:QueryTimeout`, `Data:ExportQueryTimeout` and `Data:ExportMaxRows` are
-built. The rest are _(planned for M15)_. The server reads them. See
+`Data:QueryTimeout`, `Data:ExportQueryTimeout`, `Data:ExportMaxRows`,
+`Data:ImportMaxRows` and `Data:ImportMaxBytes` are built. The rest are
+_(planned for M15)_. The server reads `Data:QueryTimeout`,
+`Data:ExportQueryTimeout`, `Data:ExportMaxRows` and `Data:ImportMaxBytes`, and
+the worker reads `Data:ImportMaxRows`. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
@@ -329,8 +332,8 @@ built. The rest are _(planned for M15)_. The server reads them. See
 | `Data:QueryTimeout` | `00:00:10` | The `statement_timeout` of every interactive read: record lists, single reads and histories, data source rows, lookups and page reads. A read past it is a `503`. |
 | `Data:ExportQueryTimeout` | `00:01:00` | The `statement_timeout` of an export's query. An export past it is a `503` and sends no file. |
 | `Data:ExportMaxRows` | `100000` | The most data rows one export file holds, an integer from 1 to 2147483646. The file stops there and the response carries `Axis-Export-Truncated: true`. |
-| `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. |
-| `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. |
+| `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. The worker reads it, and a value that is not an integer of at least 1 stops its start. |
+| `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. A larger upload is a `413`. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
 | `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. A field's `maxSize` cannot exceed it. |
 
 - **Per transaction.** Each timeout is set with `SET LOCAL`, so it never

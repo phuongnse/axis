@@ -30,17 +30,44 @@ internal static class NavigateChecker
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
-        void Report(string code, string message, string path) =>
-            diagnostics.Add(new Diagnostic(code, message, page.File, path, page.Id));
-
         ApplicationCompiler.CheckTextKey(action.Label, page, $"{actionPath}/label", references, diagnostics);
 
         // The schema requires the page of a navigate action.
-        var pageName = action.Page!;
+        var target = CheckTarget(
+            action.Page!, action.Parameters, actionPath, scope, page, loaded.UnloadedPageNames, findPage, references, diagnostics);
+        if (target is not null && action.Record is not null)
+        {
+            CheckRecord(action.Record, actionPath, scope, target, page, findForm, references, diagnostics);
+        }
+    }
+
+    /// <summary>
+    /// Checks the page <paramref name="pageName"/> names and the <paramref name="parameters"/> given to
+    /// it: the page exists, unless its file was not loaded, and gets a <c>navigate page</c> edge from
+    /// <c>{actionPath}/page</c>. Each parameter is a parameter of the page, given once, and its
+    /// expression fits the parameter's type over <paramref name="scope"/>, which may be null. Every required
+    /// parameter is given. Diagnostics are reported on <paramref name="owner"/>. Gives the page, or null
+    /// when it was not found. <paramref name="giver"/> names what gives the parameters in a message.
+    /// </summary>
+    internal static PageResource? CheckTarget(
+        string pageName,
+        IReadOnlyDictionary<string, string>? parameters,
+        string actionPath,
+        ExpressionScope? scope,
+        Resource owner,
+        IReadOnlySet<string> unloadedPageNames,
+        Func<string, PageResource?> findPage,
+        ReferenceIndexBuilder references,
+        List<Diagnostic> diagnostics,
+        string giver = "action")
+    {
+        void Report(string code, string message, string path) =>
+            diagnostics.Add(new Diagnostic(code, message, owner.File, path, owner.Id));
+
         if (findPage(pageName) is not { } target)
         {
             // A page that failed to load has its own diagnostics.
-            if (!loaded.UnloadedPageNames.Contains(pageName))
+            if (!unloadedPageNames.Contains(pageName))
             {
                 Report(
                     DiagnosticCodes.UnknownNavigatePage,
@@ -48,13 +75,13 @@ internal static class NavigateChecker
                     $"{actionPath}/page");
             }
 
-            return;
+            return null;
         }
 
-        references.Add(page, $"{actionPath}/page", ReferenceRelations.NavigatePage, ResourceNode.Of(target));
+        references.Add(owner, $"{actionPath}/page", ReferenceRelations.NavigatePage, ResourceNode.Of(target));
 
         var given = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, expression) in action.Parameters ?? new Dictionary<string, string>())
+        foreach (var (key, expression) in parameters ?? new Dictionary<string, string>())
         {
             var path = $"{actionPath}/parameters/{key}";
             var parameter = target.Parameters.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
@@ -94,7 +121,7 @@ internal static class NavigateChecker
                 problem = check.Diagnostic;
             }
 
-            references.RecordExpression(page, path, type, problem);
+            references.RecordExpression(owner, path, type, problem);
             if (problem is not null)
             {
                 Report(problem.Code, problem.Message, path);
@@ -105,14 +132,11 @@ internal static class NavigateChecker
         {
             Report(
                 DiagnosticCodes.MissingNavigateParameter,
-                $"The parameter '{parameter.Name}' is required by the page '{target.Name}', but the action does not give it.",
+                $"The parameter '{parameter.Name}' is required by the page '{target.Name}', but the {giver} does not give it.",
                 actionPath);
         }
 
-        if (action.Record is not null)
-        {
-            CheckRecord(action.Record, actionPath, scope, target, page, findForm, references, diagnostics);
-        }
+        return target;
     }
 
     /// <summary>

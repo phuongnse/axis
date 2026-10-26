@@ -249,4 +249,12 @@ public static class DiagnosticCodes
     public const string InvalidFileAccept = "AXC0258";
     public const string FileFieldNotAllowed = "AXC0259";
     public const string ActionWithoutRequiredGrant = "AXC0265";
+    public const string EmptyNotifyRecipients = "AXC0266";
+    public const string InvalidNotifyRecipient = "AXC0267";
+    public const string UnknownNotifyRole = "AXC0268";
+    public const string EmptyNotifyChannels = "AXC0269";
+    public const string RoleRecipientWithEmail = "AXC0270";
+    public const string MissingPlaceholderValue = "AXC0271";
+    public const string UnusedPlaceholderValue = "AXC0272";
+    public const string InvalidPlaceholder = "AXC0273";
 }
