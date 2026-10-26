@@ -70,8 +70,11 @@ write records.
   and the field path (`receipt`, or `attachments/file` for a child field).
   Nothing points to it yet. The response has no `Location` header, because a
   pending file cannot be downloaded.
-- **Memory.** The server holds one upload in memory, up to the limit, before
-  it writes the file to the database.
+- **Memory.** The server writes the upload to a temporary file in the system
+  temp folder as it arrives, deletes it when the request ends, and streams it
+  into the database. Memory does not grow with the size of the file.
+  `FilePerformanceTests` fails when the best of three 25 MB uploads takes 5 s
+  or more, or allocates as many bytes as the file.
 - **Attach** _(built)_. A create or update that sends the id attaches the
   file in its transaction: the state becomes `attached` and the owner record
   becomes the root record, also for a field of a child row. The file must be
@@ -113,10 +116,12 @@ service account may download, as they may read records.
 - **Child rows.** A child row has no id of its own, so a download always goes
   by file id. It goes through the owner record, and the user's `read` grant
   must cover the owner's child collection field, such as `attachments`.
-- **Memory.** The server reads the whole file into memory under the
-  interactive query timeout, then sends it. It does not stream from the
-  database. Many large downloads at once raise memory use, up to
-  `Files:MaxSize` each.
+- **Memory.** The checks run under the interactive query timeout. Then the
+  bytes stream from the database to the client with no statement limit, and
+  the answer carries a `Content-Length`. A download holds one database
+  connection until the client has received every byte. `FilePerformanceTests`
+  fails when the best of three 25 MB downloads takes 5 s or more, or allocates
+  as many bytes as the file.
 
 ## Storage and clean-up
 

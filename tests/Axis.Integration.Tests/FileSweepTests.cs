@@ -133,7 +133,7 @@ public sealed class FileSweepTests(PostgreSqlFixture database) : IClassFixture<P
         await FileStore.InsertPendingAsync(
             connection,
             new PendingFile(id, Guid.NewGuid(), Guid.NewGuid(), "receipt", "receipt.pdf", "application/pdf", 3, new byte[32], "anna", uploadedAt),
-            new byte[] { 1, 2, 3 },
+            new MemoryStream([1, 2, 3]),
             CancellationToken);
 
         if (state != "pending")
