@@ -12,7 +12,7 @@ and [schema planning](../reference/storage.md#schema-planning).
 
 The points of "Building an index" are built in the data module: activation
 defers the index, and `EntityIndexBuilder` builds it. The server and admin
-hosts do not call the builder yet, which is _(planned for M15)_.
+hosts call the builder after activation commits.
 
 - **Indexes the platform adds:**
   - Every `reference` column and every child table's `owner_id` gets an
