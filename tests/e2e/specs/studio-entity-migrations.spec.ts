@@ -10,6 +10,13 @@ import { useSession } from "../sessions";
 // Each journey starts a second server and publishes once, which takes a while.
 test.setTimeout(240_000);
 
+/** Slows the page's animations, so a click that does not wait for a dialog to open always lands during its zoom. */
+async function slowAnimations(page: Page) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Animation.enable");
+  await cdp.send("Animation.setPlaybackRate", { playbackRate: 0.2 });
+}
+
 /**
  * A throwaway application with the entity Order, which has the fields `number` and `note`, and a server whose
  * Studio edits it. A migration in the purchase request sample would stop the committed sample from activating
@@ -46,6 +53,7 @@ async function publishedOrder(page: Page, testInfo: TestInfo, prefix: string) {
   const server = await startServer({ Studio__Folders__0: folder });
   try {
     await useSession(page, "hoa");
+    await slowAnimations(page);
     await page.goto(`${server.url}/studio?app=${name}`);
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await confirmDialog(page, "Publish");
