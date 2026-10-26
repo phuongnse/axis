@@ -26,6 +26,6 @@ internal static class AdminProgram
             cancellation.Cancel();
         });
 
-        return await AdminCommands.RunAsync(args, configuration, Console.Out, Console.Error, cancellation.Token);
+        return await AdminCommands.RunAsync(args, configuration, Console.In, Console.Out, Console.Error, cancellation.Token);
     }
 }
