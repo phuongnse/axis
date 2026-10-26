@@ -1,7 +1,20 @@
-import { Alert, Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Select, Table, Typography } from 'antd'
+import {
+  Alert,
+  Button,
+  Checkbox,
+  ConfigProvider,
+  Flex,
+  Input,
+  InputNumber,
+  Radio,
+  Select,
+  Table,
+  Typography,
+} from 'antd'
 import { lazy, Suspense, useContext } from 'react'
 import { changeFieldType, fieldSettings, fieldTypes, type FieldSetting } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
+import { escapePointerSegment } from '../platform/jsonPatch'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -20,8 +33,12 @@ const settingColumns: FieldSetting[] = [
   'maxLength',
   'precision',
   'scale',
+  'maxSize',
+  'accept',
   'target',
+  'currency',
   'values',
+  'valueLabels',
   'expression',
   'sequence',
   'creator',
@@ -348,6 +365,7 @@ function Fields({
                   <Settings
                     index={index}
                     field={isContent(field) ? field : {}}
+                    fields={fields}
                     readOnly={readOnly}
                     onChange={onChange}
                   />
@@ -462,11 +480,13 @@ function Flag({
 function Settings({
   index,
   field,
+  fields,
   readOnly,
   onChange,
 }: {
   index: number
   field: Content
+  fields: unknown[]
   readOnly: boolean
   onChange: ChangeHandler
 }) {
@@ -477,12 +497,12 @@ function Settings({
 
   const labelOf = (setting: FieldSetting) => t(`shell.studio.entity.${setting}`)
 
-  function number(setting: 'maxLength' | 'precision' | 'scale') {
+  function number(setting: 'maxLength' | 'precision' | 'scale' | 'maxSize') {
     return (
       <InputNumber
         aria-label={labelOf(setting)}
         precision={0}
-        min={0}
+        min={setting === 'maxSize' ? 1 : 0}
         value={typeof field[setting] === 'number' ? field[setting] : null}
         onChange={(next) => onChange(`${pointer}/${setting}`, typeof next === 'number' ? next : undefined)}
       />
@@ -504,6 +524,7 @@ function Settings({
       case 'maxLength':
       case 'precision':
       case 'scale':
+      case 'maxSize':
         return number(setting)
       case 'creator':
       case 'sensitive':
@@ -519,6 +540,19 @@ function Settings({
             onChange={(next: string[]) => onChange(`${pointer}/values`, next.length === 0 ? undefined : next)}
           />
         )
+      case 'accept':
+        return (
+          <Select
+            mode="tags"
+            aria-label={labelOf(setting)}
+            virtual={false}
+            style={{ minWidth: 200 }}
+            value={Array.isArray(field.accept) ? field.accept.filter((item) => typeof item === 'string') : []}
+            onChange={(next: string[]) => onChange(`${pointer}/accept`, next.length === 0 ? undefined : next)}
+          />
+        )
+      case 'valueLabels':
+        return <ValueLabels pointer={`${pointer}/valueLabels`} field={field} onChange={onChange} />
       case 'expression':
         return (
           <Expression
@@ -538,7 +572,23 @@ function Settings({
   return (
     <Flex vertical gap="small" style={{ minWidth: 240 }}>
       {shown.map((setting) =>
-        setting === 'target' || setting === 'sequence' ? (
+        setting === 'currency' ? (
+          <CurrencySource
+            key={setting}
+            pointer={pointer}
+            field={field}
+            currencyFields={fields.flatMap((other, position) =>
+              position !== index &&
+              isContent(other) &&
+              (other.type === 'enum' || other.type === 'text') &&
+              typeof other.name === 'string' &&
+              other.name !== ''
+                ? [other.name]
+                : [],
+            )}
+            onChange={onChange}
+          />
+        ) : setting === 'target' || setting === 'sequence' ? (
           <Picker
             key={setting}
             pointer={`${pointer}/${setting}`}
@@ -555,6 +605,136 @@ function Settings({
           </div>
         ),
       )}
+    </Flex>
+  )
+}
+
+/**
+ * The currency of a money field: a fixed code or the name of a field that holds it. The field's keys say which, so
+ * the field holds `currencyField` or `currency`, never both. A typed code is turned into upper case.
+ */
+function CurrencySource({
+  pointer,
+  field,
+  currencyFields,
+  onChange,
+}: {
+  pointer: string
+  field: Content
+  currencyFields: string[]
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const fromField = Object.hasOwn(field, 'currencyField')
+
+  function switchTo(next: 'code' | 'field') {
+    if ((next === 'field') === fromField) {
+      return
+    }
+    const rebuilt: Content = {}
+    for (const [key, value] of Object.entries(field)) {
+      if (key !== 'currency' && key !== 'currencyField') {
+        rebuilt[key] = value
+      }
+    }
+    if (next === 'field') {
+      rebuilt.currencyField = ''
+    }
+    onChange(pointer, rebuilt)
+  }
+
+  return (
+    <Flex vertical gap="small">
+      <div>
+        <div>{t('shell.studio.entity.currencySource')}</div>
+        <Radio.Group
+          role="radiogroup"
+          aria-label={t('shell.studio.entity.currencySource')}
+          value={fromField ? 'field' : 'code'}
+          onChange={(event) => switchTo(event.target.value)}
+        >
+          <Radio value="code">{t('shell.studio.entity.currencyFixed')}</Radio>
+          <Radio value="field">{t('shell.studio.entity.currencyFromField')}</Radio>
+        </Radio.Group>
+      </div>
+      {fromField ? (
+        <Picker
+          pointer={`${pointer}/currencyField`}
+          label={t('shell.studio.entity.currencyField')}
+          options={currencyFields}
+          value={field.currencyField}
+          required
+          onPick={(next) => onChange(`${pointer}/currencyField`, next ?? '')}
+        />
+      ) : (
+        <div data-testid={`studio-field-${pointer}/currency`}>
+          <div>{t('shell.studio.entity.currency')}</div>
+          <Input
+            aria-label={t('shell.studio.entity.currency')}
+            value={text(field.currency)}
+            onChange={(event) =>
+              onChange(`${pointer}/currency`, event.target.value === '' ? undefined : event.target.value.toUpperCase())
+            }
+          />
+        </div>
+      )}
+    </Flex>
+  )
+}
+
+/**
+ * A label picker for each value of an enum field. Each change writes the whole `valueLabels` map, in the order of
+ * `values`, and the last cleared label removes the key.
+ */
+function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Content; onChange: ChangeHandler }) {
+  const t = useText()
+  const names = useContext(StudioNamesContext)
+  const values = Array.isArray(field.values) ? field.values.filter((item) => typeof item === 'string') : []
+  const labels = isContent(field.valueLabels) ? field.valueLabels : {}
+
+  function write(value: string, key: string | undefined) {
+    const merged: Content = { ...labels }
+    if (key === undefined) {
+      delete merged[value]
+    } else {
+      merged[value] = { textKey: key }
+    }
+    const ordered: Content = {}
+    for (const name of [...values, ...Object.keys(merged)]) {
+      if (Object.hasOwn(merged, name) && !Object.hasOwn(ordered, name)) {
+        ordered[name] = merged[name]
+      }
+    }
+    onChange(pointer, Object.keys(ordered).length === 0 ? undefined : ordered)
+  }
+
+  return (
+    <Flex vertical gap="small">
+      {values.map((value) => {
+        const name = `${t('shell.studio.entity.valueLabel')} ${value}`
+        const current = labels[value]
+        const key = isContent(current) && typeof current.textKey === 'string' ? current.textKey : undefined
+        return (
+          <div key={value} data-testid={`studio-field-${pointer}/${escapePointerSegment(value)}`}>
+            <div>{name}</div>
+            {names === undefined ? (
+              <Input
+                aria-label={name}
+                value={text(key)}
+                onChange={(event) => write(value, event.target.value === '' ? undefined : event.target.value)}
+              />
+            ) : (
+              <ReferencePicker
+                name={name}
+                value={key}
+                required={false}
+                options={referenceOptions(names, 'text', undefined, pointer)}
+                onChange={(next) => write(value, next)}
+              />
+            )}
+          </div>
+        )
+      })}
     </Flex>
   )
 }

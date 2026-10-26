@@ -165,6 +165,70 @@ test.describe('Studio creates a resource from a starter', () => {
     await expect(field.getByTestId('studio-expression-type')).toContainText('integer')
   })
 
+  test('an author builds money, file, references and labelled enum fields in the designer', async ({ page }) => {
+    await useSession(page, 'hoa')
+    await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+    const entityName = page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name', exact: true })
+    const savedFields = async (file: string) =>
+      (JSON.parse(await readFile(path.join(copy, 'entities', file), 'utf8')) as { fields: unknown[] }).fields
+    const tag = async (field: string, value: string) => {
+      const combobox = page.getByTestId(field).getByRole('combobox')
+      await combobox.fill(value)
+      await combobox.press('Enter')
+      await combobox.press('Escape')
+    }
+
+    await createResource(page, 'entity', 'ShipmentLine')
+    await expect(entityName).toHaveValue('ShipmentLine')
+    await addField(page, 1, 'supplier', 'reference')
+    await pick(page, 'studio-field-/fields/1/target', 'Supplier')
+    const lineDiagnostics = await save(page)
+
+    await createResource(page, 'entity', 'Shipment')
+    await expect(entityName).toHaveValue('Shipment')
+    await expect(page.getByTestId('studio-resource-details')).toContainText('entities/shipment.json')
+
+    await addField(page, 1, 'currencyCode', 'enum')
+    await tag('studio-field-/fields/1/values', 'VND')
+    await tag('studio-field-/fields/1/values', 'USD')
+    await pick(page, 'studio-field-/fields/1/valueLabels/VND', 'nav.suppliers')
+    await pick(page, 'studio-field-/fields/1/valueLabels/USD', 'nav.departments')
+
+    await addField(page, 2, 'amount', 'money')
+    await page.getByTestId('studio-field-/fields/2').getByRole('radio', { name: 'Field', exact: true }).check()
+    await pick(page, 'studio-field-/fields/2/currencyField', 'currencyCode')
+
+    await addField(page, 3, 'receipt', 'file')
+    await page.getByTestId('studio-field-/fields/3/maxSize').getByRole('spinbutton').fill('1048576')
+    await tag('studio-field-/fields/3/accept', 'application/pdf')
+    await tag('studio-field-/fields/3/accept', 'image/*')
+
+    await addField(page, 4, 'departments', 'references')
+    await pick(page, 'studio-field-/fields/4/target', 'Department')
+    await addField(page, 5, 'lines', 'child-collection')
+    await pick(page, 'studio-field-/fields/5/target', 'ShipmentLine')
+
+    const diagnostics = [...lineDiagnostics, ...(await save(page))]
+    expect(diagnostics.filter((diagnostic) => diagnostic.file.startsWith('entities/shipment'))).toEqual([])
+    expect(await savedFields('shipment-line.json')).toEqual([
+      { name: 'name', type: 'text' },
+      { name: 'supplier', type: 'reference', target: 'Supplier' },
+    ])
+    expect(await savedFields('shipment.json')).toEqual([
+      { name: 'name', type: 'text' },
+      {
+        name: 'currencyCode',
+        type: 'enum',
+        values: ['VND', 'USD'],
+        valueLabels: { VND: { textKey: 'nav.suppliers' }, USD: { textKey: 'nav.departments' } },
+      },
+      { name: 'amount', type: 'money', currencyField: 'currencyCode' },
+      { name: 'receipt', type: 'file', maxSize: 1048576, accept: ['application/pdf', 'image/*'] },
+      { name: 'departments', type: 'references', target: 'Department' },
+      { name: 'lines', type: 'child-collection', target: 'ShipmentLine' },
+    ])
+  })
+
   test('a click on the disabled Create button fails within the action timeout and names the button', async ({ page }) => {
     await useSession(page, 'hoa')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)

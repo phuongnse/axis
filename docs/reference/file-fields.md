@@ -147,4 +147,4 @@ This is _(planned for M15)_.
   upload button and, when the field is not required, a remove button. The
   upload starts when the user picks a file, and the save sends the id.
 - A table cell and a detail show the file name as a download link.
-- Studio's entity designer edits `maxSize` and `accept`.
+- Studio's entity designer edits `maxSize` and `accept` _(built)_.
