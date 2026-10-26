@@ -1,0 +1,10 @@
+{
+  "id": "dc7d51b8-db78-4238-a9da-bda59ac72a6d",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.exporter": "Exporter"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "5f9eabcb-24b4-4b09-8210-9e745d2ae38b",
+  "kind": "entity",
+  "name": "Department",
+  "formatVersion": 1,
+  "displayField": "name",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true,
+      "maxLength": 100
+    }
+  ]
+}

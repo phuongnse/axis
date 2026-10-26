@@ -10,7 +10,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
-using Npgsql;
 using static Axis.Integration.Tests.RecordApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -121,20 +120,15 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
         var connectionString = scenario.TenantConnectionString(id, row.SchemaUser, password);
         const string count = "SELECT count(*) FROM pg_extension WHERE extname = 'pg_trgm'";
 
-        string old;
         await using (var context = new DataDbContext(new DbContextOptionsBuilder<DataDbContext>().UseNpgsql(connectionString).Options))
         {
             var migrations = context.Database.GetMigrations().Order(StringComparer.Ordinal).ToArray();
-            Assert.Equal(TenantSchemaVersion.Current, migrations[^1]);
             await context.GetService<IMigrator>().MigrateAsync(migrations[^2], CancellationToken);
             Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(connectionString, count, CancellationToken));
-
-            await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync(CancellationToken);
-            old = await TenantSchemaVersion.ReadAsync(connection, CancellationToken);
         }
 
-        await scenario.SetSchemaVersionAsync(id, old);
+        // The newest migration of the tenant schema is not always one of the data context, so the recorded version is set by hand.
+        await scenario.SetSchemaVersionAsync(id, OldVersion);
 
         var result = await scenario.RunAsync(["migrate", "--tenant", id]);
 

@@ -163,6 +163,10 @@
             "after": { "type": "string", "minLength": 1 },
             "next": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "/name" } }
           }
+        },
+        "escalations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/escalation" }
         }
       },
       "allOf": [
@@ -194,6 +198,7 @@
               "dueIn": false,
               "outcomes": false,
               "deadline": false,
+              "escalations": false,
               "wait": false,
               "until": false
             }
@@ -244,6 +249,7 @@
               "dueIn": false,
               "outcomes": false,
               "deadline": false,
+              "escalations": false,
               "wait": false,
               "until": false
             }
@@ -275,6 +281,7 @@
               "dueIn": false,
               "outcomes": false,
               "deadline": false,
+              "escalations": false,
               "wait": false,
               "until": false
             }
@@ -309,6 +316,7 @@
               "dueIn": false,
               "outcomes": false,
               "deadline": false,
+              "escalations": false,
               "wait": false,
               "until": false
             }
@@ -342,7 +350,8 @@
               "form": false,
               "dueIn": false,
               "outcomes": false,
-              "deadline": false
+              "deadline": false,
+              "escalations": false
             }
           }
         },
@@ -466,6 +475,34 @@
       "properties": {
         "user": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "role": { "type": "string", "minLength": 1, "x-axis-reference": "role" }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["after"],
+      "properties": {
+        "after": { "type": "string", "minLength": 1 },
+        "reassign": { "$ref": "#/$defs/assignee" },
+        "notify": { "$ref": "#/$defs/escalationNotify" }
+      }
+    },
+    "escalationNotify": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["to", "channels", "message"],
+      "properties": {
+        "to": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/recipient" }
+        },
+        "channels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["inApp", "email"] }
+        },
+        "message": { "$ref": "#/$defs/notifyMessage" },
+        "open": { "$ref": "#/$defs/notifyOpen" }
       }
     },
     "recipient": {

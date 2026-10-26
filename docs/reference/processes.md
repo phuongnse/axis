@@ -264,7 +264,8 @@ operation is built, see
     step. When the task is still `open` after that time, the task becomes
     `expired` and the instance moves to `next`, see
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
-    _(Planned for M14)_ `escalations`, see the same section.
+    `escalations` is optional and checked in the same section. Running them is
+    _(planned for M14)_.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
     the task is completed with it.
@@ -954,8 +955,7 @@ database, with history in `axis.__processes_migrations` (see
   | `id` | `uuid` | A version 7 UUID. The row's `notification.email` item names it in `email_id`, without a foreign key |
   | `application_id`, `release_id` | `uuid` | The application, and the release the notifying instance is pinned to, which gave the texts |
   | `notification_id`, `step` | `uuid`, `text` | The step run's notification id, which all its emails share, and the name of the `notify` step |
-  | `address` | `text` | The address the email goes to, not validated when staged |
-  | `locale` | `text`, null | The locale of the texts. Null when the release has none |
+  | `address`, `locale` | `text`, `text` null | The address the email goes to, not validated when staged, and the locale of the texts. The locale is null when the release has none |
   | `subject`, `body` | `text` | The rendered subject, and the plain text body with the page link if any |
   | `message_id` | `text` | The `Message-ID` header. A unique index keeps it once |
   | `state` | `text` | `pending` or `sent`, `pending` at first |

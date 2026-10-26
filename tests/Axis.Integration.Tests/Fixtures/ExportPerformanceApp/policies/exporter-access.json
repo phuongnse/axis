@@ -1,0 +1,24 @@
+{
+  "id": "1cb876e4-b29b-423c-96d9-b509d9c89982",
+  "kind": "policy",
+  "name": "ExporterAccess",
+  "formatVersion": 1,
+  "roles": [
+    "exporter"
+  ],
+  "grants": [
+    {
+      "entity": "Request",
+      "actions": [
+        "read",
+        "export"
+      ]
+    },
+    {
+      "entity": "Department",
+      "actions": [
+        "read"
+      ]
+    }
+  ]
+}
