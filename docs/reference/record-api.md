@@ -715,8 +715,9 @@ the active release, ignoring letter case.
   as on writes.
 - `touched` lists the fields the user has changed or left. It may be empty.
 
-The draft is the stored record, when there is one, overlaid with `values`.
-Computed fields are calculated on it.
+The draft is the stored record, when there is one, overlaid with `values`. For
+a new record, each field that `values` leaves out first takes its `default`, as
+a create does. Computed fields are calculated on it.
 
 ```json
 {
@@ -725,7 +726,8 @@ Computed fields are calculated on it.
     "status": { "visible": true, "required": false, "readOnly": false },
     "resolution": { "visible": true, "required": true, "readOnly": false }
   },
-  "errors": { "/values/resolution": ["Required."] }
+  "errors": { "/values/resolution": ["Required."] },
+  "defaults": {}
 }
 ```
 
@@ -744,6 +746,22 @@ Computed fields are calculated on it.
 - `errors` holds the parse errors, "Required." for an empty required field, the
   computed-field errors and the entity's validation messages, keyed as on a
   write. It holds only keys of fields that the user touched and may read.
+- `defaults` holds, for a new record, the `default` of each field of the form
+  that the user may read and that `values` leaves out, in form order. The values
+  are in the [value format](#request-bodies-and-values), so a date-time is UTC
+  text and a decimal shows its scale. The conditions and messages above are
+  worked out with them in place, so a form can show what a save would store.
+  - A field that `values` sends, even as `null`, is not in `defaults`. Neither
+    is a field whose value does not fit its type, because the user's text must
+    stay.
+  - A default that gives `null` for an optional field is `null` in `defaults`.
+  - A default that cannot be computed is left out, and its message is in
+    `errors` under the touched-field rule. The other defaults stay in.
+  - A field that is not on the form, or that the user may not read, is not in
+    `defaults`. A save still gives a field that is not on the form its default.
+  - `now()` is the time of this call, not of the save.
+  - It is `{}` for a record id, and on the
+    [task form state](task-api.md) route.
 - A value that does not fit its field, or a computed field that cannot be
   computed, is a message in `errors` of a `200` answer, so that one bad value
   does not stop the other fields from getting their states. A `400` is only for

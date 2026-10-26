@@ -5,9 +5,10 @@ using Messages = Axis.Data.Records.RecordInputMessages;
 namespace Axis.Data.Records;
 
 /// <summary>
-/// The values of a create with each left-out field set from its default, or the errors that refuse
-/// the create. <see cref="Errors"/> is keyed by JSON Pointer in ordinal key order, and is null when
-/// every default got a value.
+/// The values of a create with each left-out field set from its default, in column order, and the
+/// errors that refuse the create. A default that fails is missing from <see cref="Values"/>, and the
+/// defaults that worked stay in. <see cref="Errors"/> is keyed by JSON Pointer in ordinal key order,
+/// and is null when every default got a value. A caller that creates a record checks the errors first.
 /// </summary>
 public sealed record RecordDefaultsResult(
     IReadOnlyList<RecordValue> Values,
@@ -58,14 +59,9 @@ public static class RecordDefaults
             }
         }
 
-        if (errors.Count > 0)
-        {
-            return new RecordDefaultsResult(values, errors);
-        }
-
         var byName = values.ToDictionary(value => value.Field.Name, StringComparer.Ordinal);
         return new RecordDefaultsResult(
             [.. columns.Select(field => byName.GetValueOrDefault(field.Name) ?? filled.GetValueOrDefault(field.Name)).OfType<RecordValue>()],
-            null);
+            errors.Count > 0 ? errors : null);
     }
 }

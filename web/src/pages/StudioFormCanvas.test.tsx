@@ -237,7 +237,6 @@ function renderEditor(onOpen: OpenResource = vi.fn()) {
               resources={[item]}
               path={null}
               diagnosticPaths={[]}
-              onOpenPath={vi.fn()}
               onOpen={onOpen}
               onSaved={vi.fn()}
               onTextsWritten={vi.fn()}

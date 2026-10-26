@@ -540,7 +540,8 @@ new check is a new compile diagnostic.
   holds for the record API, the record command, inbound endpoints and seed
   records. A required field with a default may be left out of a create, and
   `now()` is the start time of the write transaction. An update never applies
-  a default. A default on a field of a child entity does nothing for its rows
+  a default. The [form state endpoint](record-api.md#form-state) returns the
+  defaults of a new record, and the form widget shows them on a new form. A default on a field of a child entity does nothing for its rows
   yet. `file` and `references` are refused when those types arrive.
 - **`searchable`.** On a `text` field. `search` reads every searchable field,
   and the display field is always searchable. See
@@ -557,14 +558,14 @@ new check is a new compile diagnostic.
   ignoring letter case. They are the index columns, in order. An empty list,
   a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
 - **Field types.** An index holds a field that has a column. A
-  `child-collection` field is `AXC0252`. `references` and `file` fields join
+  `child-collection` field is `AXC0256`. `references` and `file` fields join
   it when they are built.
 - **Compile diagnostics.** Each is reported in the entity file:
-  - `AXC0250`: an index lists the same fields in the same order as an earlier
+  - `AXC0254`: an index lists the same fields in the same order as an earlier
     one, at `/indexes/{j}/fields`.
-  - `AXC0251`: a name in `fields` is no field of the entity, at
+  - `AXC0255`: a name in `fields` is no field of the entity, at
     `/indexes/{j}/fields/{k}`.
-  - `AXC0252`: a field of a type an index cannot hold, at the same path.
+  - `AXC0256`: a field of a type an index cannot hold, at the same path.
 - **Every reference.** Every `reference` field and every child table's
   `owner_id` is indexed without a declaration.
 

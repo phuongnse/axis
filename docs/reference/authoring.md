@@ -375,7 +375,7 @@ agrees it. The answer is:
 - **`actions`.** On a target, they are the actions it accepts, in the order
   [roles and policies](roles-and-policies.md) lists them. An
   entity takes `read`, `create`, `update` and `delete`. A data source takes
-  `read`. A process takes `start`, `inspect`, `cancel`, `retry` and `resolve`.
+  `read`. A process takes `start`, `inspect`, `cancel`, `retry`, `resolve` and `reassign`.
   An endpoint takes `invoke`.
 - **Rows and cells.** Each declared role is one row, in the order of the
   `roles` resources. Each row has one cell per column, in column order, empty

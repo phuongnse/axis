@@ -329,11 +329,13 @@ public static class ApplicationSites
             dataSource.PageSize,
             // A grouped row holds the group fields, then the measures, not the projected fields.
             dataSource.Aggregate is { } aggregate
-                ? [.. aggregate.GroupBy.Select(field => Column(application, field)), .. aggregate.Measures.Select(measure => Measure(aggregate, measure))]
-                : [.. dataSource.Fields.Select(field => Column(application, field))]);
+                ? [.. aggregate.GroupBy.Select(field => Column(application, field, aggregate.GroupBy)), .. aggregate.Measures.Select(measure => Measure(aggregate, measure))]
+                : [.. dataSource.Fields.Select(field => Column(application, field, dataSource.Fields))]);
     }
 
-    private static DataSourceColumnMetadata Column(ApplicationModel application, DataSourceFieldModel column) =>
+    // A money column names its fixed currency or the sibling column that holds it.
+    private static DataSourceColumnMetadata Column(
+        ApplicationModel application, DataSourceFieldModel column, IEnumerable<DataSourceFieldModel> siblings) =>
         new(
             column.Name,
             FieldTypes.Name(column.Field.Type),
@@ -342,6 +344,10 @@ public static class ApplicationSites
             LabelKeys(column.Field.Values, column.Field.ValueLabels),
             column.Field.Type == FieldType.Reference
                 ? new ReferenceTarget(column.Field.Target!.Name, column.Field.TargetDisplayField, RecordsPath(application, column.Field.Target.Name))
+                : null,
+            Currency: column.Field.Type == FieldType.Money ? column.Field.Currency : null,
+            CurrencyColumn: column.Field is { Type: FieldType.Money, CurrencyField: { } currencyField }
+                ? CurrencyColumnOf(siblings, column, currencyField)?.Name
                 : null);
 
     // A measure has no label, so its header is its name. A count is an integer. A sum of integers or
@@ -363,14 +369,14 @@ public static class ApplicationSites
 
         return field.CurrencyField is null
             ? new(measure.Name, type, null, null, null, null, Currency: field.Currency)
-            : new(measure.Name, type, null, null, null, null, CurrencyColumn: CurrencyGroup(aggregate, measure.Field!, field.CurrencyField)?.Name);
+            : new(measure.Name, type, null, null, null, null, CurrencyColumn: CurrencyColumnOf(aggregate.GroupBy, measure.Field!, field.CurrencyField)?.Name);
     }
 
-    // The group field that reads the currency field on the same record as the money field: the same
+    // The column that reads the currency field on the same record as the money field: the same
     // reference fields, then the currency field. The model holds resolved names, so they compare exactly.
-    private static DataSourceFieldModel? CurrencyGroup(
-        DataSourceAggregateModel aggregate, DataSourceFieldModel money, string currencyField) =>
-        aggregate.GroupBy.FirstOrDefault(group =>
+    private static DataSourceFieldModel? CurrencyColumnOf(
+        IEnumerable<DataSourceFieldModel> columns, DataSourceFieldModel money, string currencyField) =>
+        columns.FirstOrDefault(group =>
             group.Path.Count == money.Path.Count
             && string.Equals(group.Field.Name, currencyField, StringComparison.Ordinal)
             && group.Path.Take(group.Path.Count - 1).Zip(money.Path, (left, right) => string.Equals(left.Name, right.Name, StringComparison.Ordinal)).All(same => same));
@@ -399,6 +405,8 @@ public static class ApplicationSites
             field.MaxLength,
             field.Precision,
             field.Scale,
+            field.Currency,
+            field.CurrencyField,
             field.Min,
             field.Max,
             field.MinLength,

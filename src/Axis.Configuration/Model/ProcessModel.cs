@@ -176,5 +176,26 @@ public sealed record RaiseEventStepModel(string Name, string Event, IReadOnlyLis
 /// </summary>
 public sealed record EventPayloadModel(string Field, ExpressionModel Value);
 
+/// <summary>
+/// A <c>subProcess</c> step: it starts the process <see cref="ProcessId"/>, named <see cref="Process"/>
+/// by its declared name, and moves to <see cref="Next"/> when that process ends. <see cref="Subject"/>
+/// gives the record the child runs for, a reference to the child's subject entity, or is null when
+/// the child has no subject or runs for the parent's own record. <see cref="Parameters"/> are the
+/// values of a child without a subject, in the child's declaration order.
+/// </summary>
+public sealed record SubProcessStepModel(
+    string Name,
+    Guid ProcessId,
+    string Process,
+    ExpressionModel? Subject,
+    IReadOnlyList<SubProcessParameterModel> Parameters,
+    string Next) : ProcessStepModel(Name);
+
+/// <summary>
+/// A parameter a <c>subProcess</c> step gives: the child's declared parameter name, and the
+/// expression over the parent's scope that gives its value, checked against the parameter's type.
+/// </summary>
+public sealed record SubProcessParameterModel(string Parameter, ExpressionModel Value);
+
 /// <summary>An end step. An instance that reaches it is completed.</summary>
 public sealed record EndStepModel(string Name) : ProcessStepModel(Name);

@@ -72,7 +72,7 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
       return t('shell.kpi.empty')
     }
     const column = columns.find((candidate) => candidate.name === measure)
-    return column ? formatValue(column, value, row!.labels, { locale, text: t }) : String(value)
+    return column ? formatValue(column, value, row!.labels, { locale, text: t }, row!.values) : String(value)
   }
 
   const { measure, labelKey, comparison, navigate } = kpi!

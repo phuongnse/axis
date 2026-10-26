@@ -67,12 +67,12 @@ test('a note is created and edited in the form, in light and dark mode', async (
   await pick(page, 'Due at', '2026-10-07 10:30:00')
   // Enter in a picker confirms the value and does not send the form.
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
-  await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'open')
+  await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'In progress')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
-  for (const text of [`C-${run}`, '7', '12.50', 'Yes', 'open', 'Oct 7, 2026', '10:30:00']) {
+  for (const text of [`C-${run}`, '7', '12.50', 'Yes', 'In progress', 'Oct 7, 2026', '10:30:00']) {
     await expect(row).toContainText(text)
   }
 

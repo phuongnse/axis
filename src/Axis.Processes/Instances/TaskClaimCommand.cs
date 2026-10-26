@@ -15,7 +15,7 @@ public enum TaskClaimOutcome
     /// <summary>The task does not exist, or belongs to another application.</summary>
     NotFound,
 
-    /// <summary>The actor may not act on the task, or may not release a claim another holder made.</summary>
+    /// <summary>The actor may not act on the task, or may not release a claim another holder made, and holds no <c>reassign</c> grant.</summary>
     Denied,
 
     /// <summary>The task is not open.</summary>
@@ -37,7 +37,8 @@ public enum TaskClaimOutcome
 /// it (denied), that it is open (not open), that it is assigned to a role (not a role task) and that
 /// it is not claimed (already claimed). A release checks that the task exists, that the actor may
 /// act on it, that it is open, that it is claimed (not claimed) and that the actor is the claimer
-/// (denied). Each then writes the claim and appends the audit record <c>task.claimed</c> or
+/// (denied). An actor who holds <c>reassign</c> on the task's process needs neither the role nor to be the
+/// claimer, so the caller says so with <c>mayReassign</c>. Each then writes the claim and appends the audit record <c>task.claimed</c> or
 /// <c>task.released</c>. A role assignee counts only when <see cref="RecordActor.Roles"/>, the
 /// roles the actor holds in the active release, include it.
 /// The command never commits or rolls back. A result other than <see cref="TaskClaimOutcome.Done"/>
@@ -90,11 +91,13 @@ public static class TaskClaimCommand
     }
 
     /// <inheritdoc cref="ClaimLockedAsync"/>
+    /// <param name="mayReassign">Whether the actor holds <c>reassign</c> on the task's process in the active release.</param>
     public static async Task<TaskClaimOutcome> ReleaseLockedAsync(
         NpgsqlTransaction transaction,
         Guid applicationId,
         ProcessTaskRow? task,
         RecordActor actor,
+        bool mayReassign,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transaction);
@@ -105,7 +108,7 @@ public static class TaskClaimCommand
             return TaskClaimOutcome.NotFound;
         }
 
-        if (!TaskQueries.MayAct(task, actor.Id, actor.Roles))
+        if (!mayReassign && !TaskQueries.MayAct(task, actor.Id, actor.Roles))
         {
             return TaskClaimOutcome.Denied;
         }
@@ -120,7 +123,7 @@ public static class TaskClaimCommand
             return TaskClaimOutcome.NotClaimed;
         }
 
-        if (!string.Equals(task.ClaimedBy, actor.Id, StringComparison.Ordinal))
+        if (!mayReassign && !string.Equals(task.ClaimedBy, actor.Id, StringComparison.Ordinal))
         {
             return TaskClaimOutcome.Denied;
         }

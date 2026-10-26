@@ -2,15 +2,16 @@
 
 Detailed reference for `Axis.Admin`, the command-line host
 that a platform operator runs to create tenants, migrate tenant databases,
-activate releases, and back up and restore tenants. It follows
+activate releases, rotate the installation key, and back up and restore tenants. It follows
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md)
 and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
-`tenant list`, `tenant backup`, `tenant restore`, `tenant binding list|set|remove`,
-`tenant host add|remove|move`, `migrate`, `activate`, `publisher` and `version`. The commands that
-change a tenant after it is created and rotate keys are in
-[tenant setting commands](tenant-setting-commands.md). The sign-in settings and the key rotation
+`tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant binding list|set|remove`,
+`tenant host add|remove|move`, `migrate`, `activate`, `platform rekey`, `publisher` and `version`.
+`platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). The
+commands that change a tenant after it is created are in
+[tenant setting commands](tenant-setting-commands.md). The client key options of `tenant oidc set`
 are _(planned for M16)_ on the same page. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
 [startup activation](host-settings.md#startup-activation).
@@ -36,6 +37,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create`, `tenant restore` and `tenant rotate-passwords` read it, so `migrate` needs no admin role. See [admin settings](host-settings.md#admin-settings). |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
+| `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key). |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
 | `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads it. An unset value is `Production`. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
@@ -43,7 +45,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
 | `Tenancy:Source` | `Tenancy__Source` | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
 | none | `AXIS_BINDING_SECRET` | The value of the `secret` binding that `tenant binding set --secret` sets. When it is unset, the value comes from standard input. It is never a command-line option. Only that command reads it. |
-| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. Only `tenant create` and `tenant restore` read it. It is never a command-line option, so it does not appear in a process list. |
+| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. `tenant create` and `tenant restore` read it, and so does `tenant oidc set --client-secret`, which reads the first line of standard input when the variable is not set. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
 A missing or invalid setting exits with code 2 before any tenant work. The
@@ -53,6 +55,9 @@ message names the setting and never holds its value.
 `ConnectionStrings:PlatformSchema`. They decrypt nothing and create no role or
 database, so they need neither `Platform:SecretKey`, `Admin:ConnectionString`
 nor `AXIS_OIDC_CLIENT_SECRET`.
+
+`platform rekey` reads only `ConnectionStrings:PlatformSchema`, `Platform:SecretKey` and
+`Platform:PreviousSecretKey`. It needs no admin role, no client secret and no `Tenancy:Source`.
 
 The `tenant binding` and `tenant host` commands read `ConnectionStrings:PlatformSchema` and
 need `Tenancy:Source=directory`. Only `tenant binding set --secret` also reads
@@ -190,7 +195,8 @@ with code 2.
   `PUBLIC`, and grants both only to the runtime role. Without this, any login
   role of the database server could connect to the tenant database.
 - The command sets no claim names, endpoint audience or service audience. They stay empty, so the
-  hosts use their defaults. It sets no deployment binding either, except the
+  hosts use their defaults. [`tenant oidc set`](tenant-setting-commands.md#sign-in-settings) sets
+  them later. It sets no deployment binding either, except the
   `url` bindings that `--binding` gives a preview tenant.
 
 **Names.** The role and database names come from the id. PostgreSQL names hold
@@ -452,7 +458,8 @@ option or a missing setting.
 
 Set each `secret` binding with
 [`tenant binding set <id> <name> --secret`](tenant-setting-commands.md#deployment-bindings).
-`tenant oidc set --client-secret` sets the OIDC client secret _(planned for M16)_, see
+[`tenant oidc set --client-secret`](tenant-setting-commands.md#sign-in-settings) sets the OIDC
+client secret again, see
 [tenant setting commands](tenant-setting-commands.md).
 
 **Restoring over an existing tenant.** There is no in-place overwrite.
@@ -880,6 +887,14 @@ installation. See [D45](../decisions/d45-tenant-backup-and-restore.md). The oper
 Point-in-time recovery and restoring into another installation are out of scope,
 see [Not built yet](#not-built-yet).
 
+## Platform rekey
+
+`platform rekey` re-encrypts every tenant secret and every stored data protection key with
+`Platform:SecretKey`, after the installation key changed. It works under both tenancy sources, takes
+no other argument and writes one platform audit record with no tenant. It prints one line,
+`platform rekey ok: <n> tenant secrets, <m> data protection keys`. The steps, the exit codes and
+the locks are in [installation key](tenant-setting-commands.md#installation-key).
+
 ## Version
 
 `version` prints the Axis version on one line. It takes no
@@ -892,14 +907,11 @@ admin host carries the same version in its OCI label, see
 - Deleting a tenant.
 - An HTTP API for provisioning.
 - Moving a tenant to another database server.
-- Commands that set a tenant's claim names or endpoint audience. `tenant create`
-  sets none of them, so they stay empty. `tenant oidc set` is _(planned for M16)_,
+- Commands that set a tenant's client key. `tenant oidc set --client-key` is _(planned for M16)_,
   see [tenant setting commands](tenant-setting-commands.md) and
   [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md).
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation.
 - Overwriting a tenant in place with a restore.
-- Rotating the installation key. It is _(planned for M16)_, see
-  [installation key](tenant-setting-commands.md#installation-key). The platform audit records of
-  the setting commands are planned with them, see
+- The platform audit records of the sign-in setting commands are planned with them, see
   [platform audit records](tenant-setting-commands.md#platform-audit-records).
