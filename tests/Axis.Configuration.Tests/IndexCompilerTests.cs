@@ -15,6 +15,7 @@ public sealed class IndexCompilerTests
         { """[{ "fields": ["quantity", "nope"] }]""", DiagnosticCodes.UnknownIndexField, "/indexes/0/fields/1", "'nope'" },
         { """[{ "fields": ["quantity"] }, { "fields": ["lines"] }]""", DiagnosticCodes.InvalidIndexField, "/indexes/1/fields/0", "'child-collection'" },
         { """[{ "fields": ["quantity", "receipt"] }]""", DiagnosticCodes.InvalidIndexField, "/indexes/0/fields/1", "'file'" },
+        { """[{ "fields": ["quantity", "tags"] }]""", DiagnosticCodes.InvalidIndexField, "/indexes/0/fields/1", "'references'" },
         { """[{ "fields": [] }]""", DiagnosticCodes.SchemaViolation, "/indexes/0/fields", "" },
         { """[{ "fields": ["quantity", "quantity"] }]""", DiagnosticCodes.SchemaViolation, "/indexes/0/fields", "" },
         { """[{ "unique": true }]""", DiagnosticCodes.SchemaViolation, "/indexes/0", "" },
@@ -105,6 +106,7 @@ public sealed class IndexCompilerTests
                     { "name": "status", "type": "enum", "values": ["open", "closed"] },
                     { "name": "lines", "type": "child-collection", "target": "OrderLine" },
                     { "name": "receipt", "type": "file" },
+                    { "name": "tags", "type": "references", "target": "Customer" },
                     { "name": "customer", "type": "reference", "target": "Customer" }
                   ]{{(indexes is null ? "" : $", \"indexes\": {indexes}")}} }
                 """)

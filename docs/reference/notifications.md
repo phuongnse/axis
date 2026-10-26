@@ -5,8 +5,9 @@ notifications, user profiles and the mail settings. The conventions of
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-The [user profiles](#user-profiles) section is built. Everything else in this file
-is _(planned for M14)_. The design follows
+The [user profiles](#user-profiles) section and the compile checks of the notify
+operation and of placeholders are built. Everything else in this file is
+_(planned for M14)_. The design follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
 [D75](../decisions/d75-the-application-time-zone.md). New compile problems are
@@ -31,18 +32,33 @@ listed as new diagnostics.
 }
 ```
 
-- `to` is a non-empty list. Each recipient has exactly one of:
+- `to` is a non-empty list (`AXC0266` at `/steps/{i}/to`). Each recipient has
+  exactly one of (`AXC0267` at `/steps/{i}/to/{j}`):
   - `user`, an expression that gives a user id, as a task's `user` assignee;
-  - `role`, a declared role name;
+  - `role`, a declared role name, compared exactly (`AXC0268` at
+    `/steps/{i}/to/{j}/role` for an unknown one). A role whose file failed to
+    load is not reported again;
   - `email`, an expression that gives an address. It is for the `email`
     channel only.
-- `channels` is a non-empty list of `inApp` and `email`.
-- A `role` recipient with the `email` channel is a new diagnostic. Axis has no
-  directory to expand a role into addresses.
-- `message.subject` and `message.body` are text keys. `values` maps each
-  placeholder name to an expression with the scope of a `when`.
+- `user` and `email` are `text` expressions with the scope of a `when`. A
+  problem is reported with its expression code at `/steps/{i}/to/{j}/user` or
+  `/steps/{i}/to/{j}/email`.
+- `channels` is a non-empty list of `inApp` and `email` (`AXC0269` at
+  `/steps/{i}/channels`). A channel named twice is a schema violation
+  (`AXC0004`).
+- A `role` recipient with the `email` channel is `AXC0270` at
+  `/steps/{i}/to/{j}/role`. Axis has no directory to expand a role into
+  addresses.
+- `message.subject` and `message.body` are text keys, checked as a label is at
+  `/steps/{i}/message/subject` and `/steps/{i}/message/body`. `values` maps
+  each placeholder name to an expression with the scope of a `when`. A problem
+  is reported at `/steps/{i}/message/values/{name}`. A value may have any type,
+  because it is formatted by its type, so only its syntax, names and rules are
+  checked.
 - `open` is optional. It names a page of the application and maps its page
-  parameters, as a navigate action does. The in-app notification opens it.
+  parameters, as a navigate action does (`AXC0232` to `AXC0234`, at
+  `/steps/{i}/open`). The page is a `navigate page` edge in the reference
+  index. The in-app notification opens it.
 - The step stores the notification and stages its emails in its own
   transaction, then goes to `next`. A step that rolls back sends nothing. Its
   history output is `{ "next", "notificationId" }`.
@@ -54,15 +70,20 @@ listed as new diagnostics.
 A text value may hold named placeholders, such as
 `"Ticket {number} is resolved: {resolution}"`.
 
-- A name is ASCII letters and digits. `{{` and `}}` write a brace.
-- Each placeholder of a message's texts needs a key in `values`, and each key
-  of `values` must appear in the subject or the body, in every locale. Each
-  mismatch is a new diagnostic at `/steps/{i}/message`.
-- A value whose expression reads a field marked `sensitive`, directly or
-  through a path, is a new diagnostic. A notification never carries a
-  sensitive value.
-- Values are formatted in the recipient's locale: numbers with its separators,
-  enum values as written, and dates and times in the application's time zone.
+- A name is ASCII letters and digits. `{{` and `}}` write a brace. A name and a
+  `values` key match exactly, letter case included.
+- Each placeholder of a message's texts needs a key in `values` (`AXC0271`),
+  and each key of `values` must appear in the subject or the body (`AXC0272`),
+  in every locale that has both texts. Each mismatch is reported at
+  `/steps/{i}/message`, naming the locale and the name.
+- A lone or invalid brace is `AXC0273` at `/steps/{i}/message`. A locale with
+  one is reported for that brace only.
+- _(Planned for M14)_ A value whose expression reads a field marked
+  `sensitive`, directly or through a path, is a new diagnostic. A notification
+  never carries a sensitive value.
+- _(Planned for M14)_ Values are formatted in the recipient's locale: numbers
+  with its separators, enum values as written, and dates and times in the
+  application's time zone.
 
 ## In-app notifications
 

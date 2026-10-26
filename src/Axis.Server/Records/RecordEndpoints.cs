@@ -526,7 +526,7 @@ internal static class RecordEndpoints
     private static RecordActor Actor(CurrentUserResponse user) => new(user.Id, user.DisplayName, user.Roles);
 
     // The route of a module entity has a module segment before the entity name.
-    private static string EntityName(HttpContext context, string entity) =>
+    internal static string EntityName(HttpContext context, string entity) =>
         context.GetRouteValue("module") is string module ? $"{module}/{entity}" : entity;
 
     private static RecordBodyReader BodyReader(HttpRequest request) =>
@@ -545,7 +545,7 @@ internal static class RecordEndpoints
     /// Finds the application and the entity in its active release, or the 404 that says which is
     /// missing. A child entity has no record routes: its rows are served through the owner record.
     /// </summary>
-    private static async Task<(ApplicationModel? Application, EntityModel? Entity, IResult? NotFound, Guid ReleaseId)> ResolveEntityAsync(
+    internal static async Task<(ApplicationModel? Application, EntityModel? Entity, IResult? NotFound, Guid ReleaseId)> ResolveEntityAsync(
         string app,
         string entity,
         ActiveApplicationResolver resolver,

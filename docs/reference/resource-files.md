@@ -575,14 +575,14 @@ new check is a new compile diagnostic.
   ignoring letter case. They are the index columns, in order. An empty list,
   a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
 - **Field types.** An index holds a field that has a column. A
-  `child-collection` or `file` field is `AXC0268`. A `references` field joins
-  them when it is built.
+  `child-collection`, `references` or `file` field is `AXC0276`. A `references`
+  field has no column, because a junction table holds its links.
 - **Compile diagnostics.** Each is reported in the entity file:
-  - `AXC0266`: an index lists the same fields in the same order as an earlier
+  - `AXC0274`: an index lists the same fields in the same order as an earlier
     one, at `/indexes/{j}/fields`.
-  - `AXC0267`: a name in `fields` is no field of the entity, at
+  - `AXC0275`: a name in `fields` is no field of the entity, at
     `/indexes/{j}/fields/{k}`.
-  - `AXC0268`: a field of a type an index cannot hold, at the same path.
+  - `AXC0276`: a field of a type an index cannot hold, at the same path.
 - **Every reference.** Every `reference` field and every child table's
   `owner_id` is indexed without a declaration.
 
