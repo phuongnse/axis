@@ -39,7 +39,7 @@ internal static partial class QueryTimeout
                 {
                     return await next(invocation);
                 }
-                catch (Exception exception) when (!context.RequestAborted.IsCancellationRequested && IsTimeout(exception))
+                catch (Exception exception) when (!context.RequestAborted.IsCancellationRequested && !context.Response.HasStarted && IsTimeout(exception))
                 {
                     var tenant = context.RequestServices.GetRequiredService<ITenantContextAccessor>().Current?.TenantId;
                     var application = context.GetRouteValue("app") as string;
