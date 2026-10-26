@@ -25,6 +25,10 @@ The CodeQL workflow, `.github/workflows/codeql.yml`, scans C# and TypeScript on 
 critical alert. It is not a NexKit check and does not run on NexKit's branches. NexKit starts it on
 `main` after each merge.
 
+CI and CodeQL take the .NET SDK that `global.json` names from a cache keyed on that file. When the
+cache misses, [`scripts/install-dotnet.sh`](../scripts/install-dotnet.sh) downloads the SDK into
+`~/.cache/axis-dotnet` with up to 4 tries. CI moves to a newer SDK only when `global.json` changes.
+
 The bundle budget, `web/bundle-budget.json`, keeps the SPA's first load small. The main bundle is the
 entry script of `index.html` and the scripts it preloads, gzipped. Its baseline is 537,019 bytes,
 built from commit `ad13bd4`, the last commit before any M12 code. It may grow by 50 KB over that.
