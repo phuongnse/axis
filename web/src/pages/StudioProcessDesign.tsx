@@ -1,6 +1,7 @@
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { Button, Flex, Menu, Typography } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { innermostCollision, silent } from './designDrag'
@@ -33,12 +34,14 @@ import StudioProcessGraph from './StudioProcessGraph'
  * region says what was added, after which step, or why nothing was.
  */
 export default function StudioProcessDesign({
+  schema,
   draft,
   diagnosticPaths,
   selected,
   onSelect,
   onChange,
 }: {
+  schema: JsonSchema
   draft: Record<string, unknown>
   diagnosticPaths: readonly string[]
   selected: number | null
@@ -269,6 +272,7 @@ export default function StudioProcessDesign({
                     </Flex>
                   ) : null}
                   <ProcessStepPanel
+                    schema={schema}
                     value={draft}
                     index={selected}
                     onChange={onChange}

@@ -76,7 +76,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
     arrays with add and remove. `id`, `kind` and fixed values such as
     `formatVersion` are read-only. Labels are the property names as written in
     the schema, without translation. A part the form cannot show, such as
-    `oneOf`, `anyOf` or a map, points to the JSON view. A map whose keys carry a
+    `anyOf` or a map, points to the JSON view. A `oneOf` whose current value is
+    text, or empty, shows its text alternative, such as a `groupBy` name. A `oneOf` with an
+    object value, such as a `groupBy` entry with a `bucket`, points to the JSON view. A map whose keys carry a
     reference mark is the exception, see **Reference pickers** below. A text resource's
     `texts` map shows in the Text editor, see **Editors by kind** below. An
     `allOf` whose items hold only `if`, `then` and `else` shows its
@@ -101,7 +103,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     a value it does not show, so unknown keys stay as they are. See
     **Editors by kind** below. The seed editor, the scenario editor, the
     connector editor, the page editor, the endpoint mapping rows, the text
-    editor, the process editor's step list, with its decision, end, task and operation
+    editor, the process editor's step list, with its decision, end, task, timer and operation
     panels, and the entity designer are built.
 - **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
@@ -443,7 +445,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
 - **Editors by kind.** Studio uses a typed editor for the kinds listed here, the entity
   designer for `entity`, and the generic form for every other kind. The seed editor,
   the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the form steps panel, the text
-  editor, the process editor's step list, with its decision, end, task and operation panels, and the entity designer are
+  editor, the process editor's step list, with its decision, end, task, timer and operation panels, and the entity designer are
   built. The last column lists what still needs the JSON view, because the form cannot show it.
 
   | Kind          | Editor                                                          | Still needs the JSON view                                             |
