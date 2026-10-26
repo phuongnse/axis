@@ -165,7 +165,10 @@ outcomes. Operators inspect the approvals and change nothing:
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
   the entity's fields, paths through `reference` fields of up to 3 hops, the
-  named rules and [`currentUser()`](expressions.md#current-user). Without it,
+  named rules and [`currentUser()`](expressions.md#current-user). `any` and
+  `count` test a child collection or a `references` field of the entity, so
+  `any(assignees, userId == currentUser())` reads only the records that list
+  the user. Without it,
   the grant covers every record. On `read`, `update` and
   `delete` the stored record must match it. On `create` and `update` the new
   record must match it too. The employee's write grant above keeps a request
@@ -256,7 +259,7 @@ Compile checks, each a compile error:
   is `AXC0094`.
 - A `filter` that is not boolean is `AXC0048`, and one that uses something
   outside the [SQL subset](expressions.md#sql-subset), such as an aggregate
-  or `lower`, is `AXC0053`. It gets the other
+  other than `any` and `count`, or `lower`, is `AXC0053`. It gets the other
   [expression diagnostics](expressions.md#diagnostics) too.
 - `currentUser()` anywhere but a policy filter is `AXC0095`.
 

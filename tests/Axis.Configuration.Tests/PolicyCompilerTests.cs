@@ -345,7 +345,7 @@ public sealed class PolicyCompilerTests
     [Theory]
     [InlineData("amount + 1", ExpressionDiagnosticCodes.ResultTypeMismatch, "boolean")]
     [InlineData("lower(owner) == 'a'", ExpressionDiagnosticCodes.OutsideSqlSubset, "Function 'lower'")]
-    [InlineData("count(lines) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset, "Function 'count'")]
+    [InlineData("sum(lines, quantity) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset, "Function 'sum'")]
     [InlineData("owner ==", ExpressionDiagnosticCodes.SyntaxError, "character")]
     [InlineData("nope == currentUser()", ExpressionDiagnosticCodes.UnknownName, "'nope'")]
     public void A_filter_that_is_not_boolean_or_not_in_the_sql_subset_is_reported_at_the_filter(string filter, string code, string messagePart)
@@ -359,6 +359,46 @@ public sealed class PolicyCompilerTests
         Assert.Contains(messagePart, diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
     }
+
+    [Theory]
+    [InlineData("any(lines, quantity > 2)")]
+    [InlineData("count(lines) > 0")]
+    [InlineData("count(lines, quantity > 2) >= 2")]
+    [InlineData("any(lines, department.name == 'Sales')")]
+    public void A_filter_with_any_or_count_over_a_child_collection_compiles(string filter)
+    {
+        using var folder = FolderWithLineFields(filter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_condition_inside_any_that_is_not_in_the_sql_subset_is_reported_at_the_filter()
+    {
+        using var folder = FolderWithLineFields("any(lines, lower(note) == 'a')");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, PolicyFile, "/grants/0/filter"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("Function 'lower'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    /// <summary>A read grant on <c>Request</c> with <paramref name="filter"/>, where a request line also has a note and a department.</summary>
+    private static TemporaryFolder FolderWithLineFields(string filter) =>
+        Folder(Policy("""["employee"]""", $$"""[{ "entity": "Request", "actions": ["read"], "filter": "{{filter}}" }]"""))
+            .With("entities/request-line.json", """
+                { "id": "11111111-1111-4111-8111-111111111103", "kind": "entity", "name": "RequestLine", "formatVersion": 1,
+                  "fields": [
+                    { "name": "quantity", "type": "integer" },
+                    { "name": "note", "type": "text" },
+                    { "name": "department", "type": "reference", "target": "Department" }
+                  ] }
+                """);
 
     public static TheoryData<string, string, string, string> CurrentUserOutsidePolicyFilters => new()
     {

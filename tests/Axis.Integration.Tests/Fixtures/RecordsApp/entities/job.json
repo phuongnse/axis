@@ -1,0 +1,11 @@
+{
+  "id": "5e1d7a20-8c4b-4f3e-9b2a-3d6c1e0f4a41",
+  "kind": "entity",
+  "name": "Job",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "assignees", "type": "references", "target": "Person" }
+  ]
+}

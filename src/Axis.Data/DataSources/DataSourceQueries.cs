@@ -19,7 +19,9 @@ namespace Axis.Data.DataSources;
 /// <c>@p1</c>, … in declaration order. Each distinct path
 /// through reference fields, from the projection, the labels, the sort or the filter, is one left
 /// join on the target's id, so a page is one statement plus the count whatever its size, and a
-/// null reference gives null related values without hiding the row. A grouped data source groups
+/// null reference gives null related values without hiding the row. <c>any</c> and <c>count</c> in the
+/// filter are subqueries over a child collection or a references field, with their own paths inside,
+/// so they never add a join or a row. A grouped data source groups
 /// the filtered rows by its group fields, and each row of a page is one group.
 /// </summary>
 public static class DataSourceQueries
@@ -257,7 +259,8 @@ public static class DataSourceQueries
     /// <summary>
     /// The filter as SQL and the values it names, or null and no values without a filter. A bare
     /// name in the filter is a parameter, matched ignoring letter case, or else a column of the root
-    /// row. A longer path is a column of a joined target.
+    /// row. A longer path is a column of a joined target. The names inside <c>any</c> and <c>count</c>
+    /// are columns of the child row or the linked record, and a path there is a scalar subquery.
     /// </summary>
     private static (string? Sql, IReadOnlyList<SqlValue> Values) Filter(
         ApplicationModel application, DataSourceModel dataSource, Joins joins)
@@ -267,6 +270,9 @@ public static class DataSourceQueries
             return (null, []);
         }
 
+        var aliases = new AliasCounter();
+        var root = application.FindEntity(dataSource.Entity.Id)
+            ?? throw new InvalidOperationException($"The data source '{dataSource.Name}' names an entity that is not in the application.");
         var translated = SqlTranslator.Translate(
             filter.Syntax,
             names =>
@@ -285,7 +291,13 @@ public static class DataSourceQueries
                 return joins.ColumnOf(ResolvePath(application, dataSource, names));
             },
             filter.Check,
-            timeZone: application.TimeZone);
+            timeZone: application.TimeZone,
+            collection: list => RecordFilters.Collection(
+                application,
+                root,
+                list,
+                $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}",
+                aliases));
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The compiler let through a filter outside the SQL subset: {translated.Diagnostic.Message}");
@@ -298,7 +310,8 @@ public static class DataSourceQueries
     /// The entity id, the field name and the dotted path of every field the data source's filter reads,
     /// in the order the translation finds them, with the body of each rule it calls inlined. A bare
     /// name that is a parameter reads no field. Each step of a path through reference fields reads a
-    /// field of the entity before it.
+    /// field of the entity before it. A name or path inside <c>any</c> or <c>count</c> starts at the child
+    /// or linked entity, and its dotted path starts with the list's name.
     /// </summary>
     internal static IReadOnlyList<(Guid EntityId, string Field, string Path)> FilterFieldsRead(
         ApplicationModel application, DataSourceModel dataSource)
@@ -309,6 +322,8 @@ public static class DataSourceQueries
             return read;
         }
 
+        var root = application.FindEntity(dataSource.Entity.Id)
+            ?? throw new InvalidOperationException($"The data source '{dataSource.Name}' names an entity that is not in the application.");
         var translated = SqlTranslator.Translate(
             filter.Syntax,
             names =>
@@ -329,7 +344,23 @@ public static class DataSourceQueries
 
                 return "NULL";
             },
-            filter.Check);
+            filter.Check,
+            collection: list => new SqlCollection(
+                "NULL",
+                "TRUE",
+                names =>
+                {
+                    var item = RecordFilters.ItemEntity(application, root, list);
+                    var entityId = item.Id;
+                    var path = $"{list}.{string.Join('.', names)}";
+                    foreach (var field in ResolvePath(application, item.Name, names))
+                    {
+                        read.Add((entityId, field.Name, path));
+                        entityId = field.Target?.Id ?? Guid.Empty;
+                    }
+
+                    return "NULL";
+                }));
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The compiler let through a filter outside the SQL subset: {translated.Diagnostic.Message}");
@@ -339,10 +370,13 @@ public static class DataSourceQueries
     }
 
     /// <summary>The fields a filter path names, from the root entity through each reference's target, ignoring letter case.</summary>
-    private static List<FieldModel> ResolvePath(ApplicationModel application, DataSourceModel dataSource, IReadOnlyList<string> names)
+    private static List<FieldModel> ResolvePath(ApplicationModel application, DataSourceModel dataSource, IReadOnlyList<string> names) =>
+        ResolvePath(application, dataSource.Entity.Name, names);
+
+    /// <summary>The fields a path names, from the entity <paramref name="entityName"/> through each reference's target, ignoring letter case.</summary>
+    private static List<FieldModel> ResolvePath(ApplicationModel application, string? entityName, IReadOnlyList<string> names)
     {
         var path = new List<FieldModel>(names.Count);
-        var entityName = dataSource.Entity.Name;
         foreach (var name in names)
         {
             if (entityName is null

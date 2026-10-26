@@ -175,6 +175,8 @@ public sealed class RecordApiFixture : IAsyncLifetime
                 new TestIdentity("fred", "Fred False", "false-only"),
                 new TestIdentity("faye", "Faye Failing", "failing"),
                 new TestIdentity("eve", "Eve Exporter", "exporter"),
+                new TestIdentity("ada", "Ada Assigned", "assigned"),
+                new TestIdentity("abe", "Abe Assigned", "assigned"),
                 new TestIdentity(SqlTextUser, "Mallory", "filtered"));
         });
         _client = _factory.CreateClient().SignedInAs("anna");
@@ -223,7 +225,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
         return id;
     }
 
-    /// <summary>Deletes every row of the fixture entities in both tenants; items first, as they reference departments.</summary>
+    /// <summary>Deletes every row of the fixture entities in both tenants; items first, as they reference departments, and jobs before the people they list.</summary>
     public async Task ResetAsync()
     {
         Assert.True(Model.TryGetEntity("Item", out var item));
@@ -237,9 +239,11 @@ public sealed class RecordApiFixture : IAsyncLifetime
         Assert.True(Model.TryGetEntity("Expense", out var expense));
         Assert.True(Model.TryGetEntity("Reminder", out var reminder));
         Assert.True(Model.TryGetEntity("Gauge", out var gauge));
+        Assert.True(Model.TryGetEntity("Job", out var job));
+        Assert.True(Model.TryGetEntity("Person", out var person));
         foreach (var dataSource in _dataSources.Values)
         {
-            foreach (var entity in new[] { item, department, order, bundle, workstation, product, ticket, reading, expense, reminder, gauge })
+            foreach (var entity in new[] { item, department, order, bundle, workstation, product, ticket, reading, expense, reminder, gauge, job, person })
             {
                 await using var command = dataSource.CreateCommand($"DELETE FROM {EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id))}");
                 await command.ExecuteNonQueryAsync();

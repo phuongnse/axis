@@ -61,6 +61,7 @@
     "role.dsonly": "Data source only",
     "role.falseOnly": "False only",
     "role.failing": "Failing",
-    "role.exporter": "Exporter"
+    "role.exporter": "Exporter",
+    "role.assigned": "Assigned"
   }
 }
