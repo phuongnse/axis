@@ -386,6 +386,59 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
+    public void File_field_is_a_uuid_column_with_a_foreign_key_to_the_files_table()
+    {
+        var model = BaseModel();
+        var changed = ChangeOrder(model, fields => [.. fields, Field("receipt", FieldType.File)]);
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(
+            [
+                $"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_receipt" uuid""",
+                FileForeignKey(OrderTable, "f_receipt"),
+            ],
+            plan.Statements);
+    }
+
+    [Fact]
+    public void New_table_with_a_file_field_has_a_uuid_column_and_a_foreign_key_to_the_files_table()
+    {
+        var model = ChangeOrder(BaseModel(), fields => [.. fields, Field("receipt", FieldType.File, required: true)]);
+
+        var plan = SchemaPlanner.Plan(model, CatalogSnapshot.Empty, ProvisioningRecords.Empty);
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Contains(plan.Statements, statement => statement.StartsWith($"""CREATE TABLE "entities"."{OrderTable}" """, StringComparison.Ordinal)
+            && statement.Contains("\"f_receipt\" uuid NOT NULL", StringComparison.Ordinal));
+        Assert.Contains(FileForeignKey(OrderTable, "f_receipt"), plan.Statements);
+    }
+
+    [Fact]
+    public void File_column_without_a_foreign_key_gets_one()
+    {
+        var model = ChangeOrder(BaseModel(), fields => [.. fields, Field("receipt", FieldType.File)]);
+        var catalog = ChangeOrderColumns(Catalog(model, hasRows: true), columns => columns.Select(column => column.Name == "f_receipt" ? column with { ReferencedTable = null } : column));
+
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([FileForeignKey(OrderTable, "f_receipt")], plan.Statements);
+    }
+
+    [Fact]
+    public void File_column_with_its_foreign_key_plans_nothing()
+    {
+        var model = ChangeOrder(BaseModel(), fields => [.. fields, Field("receipt", FieldType.File)]);
+
+        var plan = SchemaPlanner.Plan(model, Catalog(model, hasRows: true), Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
     public void Added_enum_value_is_recorded_without_statements()
     {
         var model = BaseModel();
@@ -1227,6 +1280,9 @@ public sealed class SchemaPlannerTests
 
     private static string ForeignKey(string table, string column, string targetTable) =>
         $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, column)}" FOREIGN KEY ("{column}") REFERENCES "entities"."{targetTable}" ("id")""";
+
+    private static string FileForeignKey(string table, string column) =>
+        $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, column)}" FOREIGN KEY ("{column}") REFERENCES "axis"."files" ("id")""";
 
     private static void AssertNothingPlanned(SchemaPlan plan)
     {

@@ -24,7 +24,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Two tenant databases in one PostgreSQL container, each with both migrations applied and the
 /// RecordsApp fixture application activated, served by the real server on hosts
-/// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp fixture
+/// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp and FilesApp fixtures
 /// activated, and a compiled release of an application that was never activated. The test
 /// authentication scheme signs in <c>anna</c>, an employee with every grant of both applications,
 /// and users with fewer grants: <c>binh</c> holds no role, <c>rita</c> is a reader, <c>uma</c>
@@ -126,6 +126,11 @@ public sealed class RecordApiFixture : IAsyncLifetime
                 Assert.Empty(second.Diagnostics);
                 var secondActivated = await ReleaseActivator.ActivateAsync(second, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance);
                 Assert.Empty(secondActivated.Diagnostics);
+
+                var files = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "FilesApp"), configuration);
+                Assert.Empty(files.Diagnostics);
+                var filesActivated = await ReleaseActivator.ActivateAsync(files, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance);
+                Assert.Empty(filesActivated.Diagnostics);
 
                 using var dormant = new TemporaryFolder().With(
                     "application.json",

@@ -26,6 +26,8 @@ public static class ColumnTypes
             // Enum values are recorded by the planner, not enforced by a CHECK constraint.
             FieldType.Enum => Text,
             FieldType.Reference => "uuid",
+            // The column holds the id of a row of axis.files.
+            FieldType.File => "uuid",
             _ => throw new ArgumentOutOfRangeException(nameof(field), field.Type, "Unknown field type."),
         };
 
