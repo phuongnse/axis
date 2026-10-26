@@ -259,6 +259,41 @@ public static class RecordQueries
     }
 
     /// <summary>
+    /// Finds the ids of the records of <paramref name="entity"/> whose display field equals <paramref name="value"/>
+    /// exactly, at most two, so a caller can tell none, one and more than one apart. The records' filters are not
+    /// applied. An entity without a display field gives none. The command joins the transaction that
+    /// <paramref name="connection"/> has open.
+    /// </summary>
+    public static async Task<IReadOnlyList<Guid>> FindByDisplayValueAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        string value,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(value);
+
+        var ids = new List<Guid>();
+        if (entity.DisplayField is null)
+        {
+            return ids;
+        }
+
+        var id = EntityNaming.Quote(EntityNaming.IdColumn);
+        var display = EntityNaming.Quote(EntityNaming.Column(entity.DisplayField));
+        await using var command = new NpgsqlCommand($"SELECT {id} FROM {Table(entity)} WHERE {display} = @value LIMIT 2", connection);
+        command.Parameters.Add(new NpgsqlParameter("value", NpgsqlDbType.Text) { Value = value });
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            ids.Add(reader.GetGuid(0));
+        }
+
+        return ids;
+    }
+
+    /// <summary>
     /// Reads the row of the record with <paramref name="id"/>, with its labels but without the rows
     /// of its child collections, in one command. <see langword="null"/> when there is none.
     /// </summary>

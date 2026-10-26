@@ -16,8 +16,10 @@ internal sealed record RecordImportSettings(int MaxRows);
 /// workbook, whichever format the import stored. It checks every row
 /// as a create of the entity checks it, as the uploader: the row is parsed, the fields it sets must be covered
 /// by the uploader's <c>create</c> grants, then the defaults, the computed fields and the entity's validations
-/// run. It writes no record, no audit record and no sequence number, and it does not read storage, so it cannot
-/// see a reference to a record that does not exist or a unique value that is taken. The work runs in one
+/// run. A reference cell that holds a display value instead of a record id is looked up in storage first, see
+/// <see cref="RecordImportReferences"/>, and a value that matches no record or more than one is an error at its
+/// field. It writes no record, no audit record and no sequence number, and it reads no other storage, so it cannot
+/// see a reference to a record id that does not exist or a unique value that is taken. The work runs in one
 /// transaction that holds the application's start lock shared, with the application's active release, the way
 /// a create resolves its release.
 /// The import ends <c>checked</c> when no row has an error, and <c>failed</c> with every error otherwise. A row
@@ -62,7 +64,7 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
         else
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            Check(application, entity, new RecordActor(import.UploaderId, import.UploaderName, import.UploaderRoles), import.Format, import.File ?? [], now, errors);
+            await CheckAsync(connection, application, entity, new RecordActor(import.UploaderId, import.UploaderName, import.UploaderRoles), import.Format, import.File ?? [], now, errors, cancellationToken);
         }
 
         await RecordImports.FinishCheckAsync(
@@ -76,14 +78,16 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
     }
 
     // Adds the errors of every row to errors, in the order of the file.
-    private void Check(
+    private async Task CheckAsync(
+        NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
         RecordActor actor,
         string format,
         byte[] file,
         DateTimeOffset now,
-        Dictionary<string, string[]> errors)
+        Dictionary<string, string[]> errors,
+        CancellationToken cancellationToken)
     {
         IRecordImportFile reader = format == RecordImportFormats.Xlsx ? RecordImportXlsx.Open(file) : RecordImportCsv.Open(file);
         if (reader.HeaderError is { } headerError)
@@ -109,6 +113,7 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
             return;
         }
 
+        var references = RecordImportReferences.Create(application, actor.Roles, columns);
         foreach (var row in reader.Rows())
         {
             if (row.Number > settings.MaxRows)
@@ -124,10 +129,12 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
                 continue;
             }
 
-            var parse = RecordCommand.ParseCreate(application, entity, actor, columns.Body(cells));
+            var (resolved, lookupErrors) = await references.ResolveAsync(connection, cells, cancellationToken);
+            var parse = RecordCommand.ParseCreate(application, entity, actor, columns.Body(resolved));
             if (parse.Failure is { } failure)
             {
                 Add(errors, prefix, failure.Errors!);
+                Add(errors, prefix, lookupErrors);
                 continue;
             }
 
@@ -135,11 +142,18 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
             {
                 Add(errors, prefix, prepareErrors);
             }
+
+            Add(errors, prefix, lookupErrors);
         }
     }
 
-    private static void Add(Dictionary<string, string[]> errors, string prefix, IDictionary<string, string[]> rowErrors)
+    private static void Add(Dictionary<string, string[]> errors, string prefix, IDictionary<string, string[]>? rowErrors)
     {
+        if (rowErrors is null)
+        {
+            return;
+        }
+
         foreach (var (pointer, messages) in rowErrors)
         {
             errors[prefix + pointer] = messages;

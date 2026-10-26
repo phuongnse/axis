@@ -618,7 +618,9 @@ The `role` and `policy` resource files are described in
 - **Labels and lookups.** The label of a referenced record shows when the
   user may read the target entity's display field. The target's record
   filters do not hide it. Lookups list target records through the record
-  API, so through the user's read filters.
+  API, so through the user's read filters. An import's lookup of a display
+  value in a reference cell follows the label rule, not the lookup rule, see
+  [import](import-export.md#import).
 - **Data sources.** A data source needs a `read` grant on it and a `read`
   grant on its root entity. The root entity's read filters are added to the
   data source's own filter in SQL. A data source that projects or aggregates

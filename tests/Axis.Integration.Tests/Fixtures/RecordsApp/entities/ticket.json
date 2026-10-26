@@ -9,6 +9,7 @@
     { "name": "code", "type": "text", "maxLength": 20, "unique": true },
     { "name": "priority", "type": "integer" },
     { "name": "dueAt", "type": "date-time" },
+    { "name": "product", "type": "reference", "target": "Product" },
     { "name": "requester", "type": "text", "maxLength": 100, "creator": true }
   ],
   "validations": [

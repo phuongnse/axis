@@ -81,7 +81,7 @@ public sealed class RecordFieldAccess
             .Select(field => field.Name)
             .ToHashSet(StringComparer.Ordinal);
 
-    private static bool CanReadLabel(ApplicationModel application, List<string> held, FieldModel reference) =>
+    internal static bool CanReadLabel(ApplicationModel application, List<string> held, FieldModel reference) =>
         application.FindEntity(reference.Target!.Id) is { } target
         && CanRead(PolicyEvaluator.Fields(application, held, target, PolicyAction.Read), reference.TargetDisplayField!);
 

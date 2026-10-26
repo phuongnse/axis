@@ -15,7 +15,8 @@ namespace Axis.Processes.Records;
 /// the import stored, as the dry run does, and creates every row of the file as the uploader, with the roles stored at upload, through <see cref="RecordCommand.CreateInTransactionAsync"/>,
 /// so a row passes the same checks as a record API create: the grants, the record filters, the defaults, the
 /// sequences, the creator fields, the computed fields, the validations and the <c>record.created</c> audit record,
-/// and it starts the data change triggers that match it. Every row is written in one transaction that holds the
+/// and it starts the data change triggers that match it. A reference cell that holds a display value is turned into a record id
+/// before the row is created, as in the dry run, see <see cref="RecordImportReferences"/>. Every row is written in one transaction that holds the
 /// application's start lock shared, with the application's active release, or no row is written.
 /// The import ends <c>committed</c> when every row is written, with one <c>records.imported</c> audit record
 /// that holds the entity and the counts, and <c>failed</c> when a row is refused at write time, for example on
@@ -137,6 +138,7 @@ internal sealed partial class RecordImportCommitHandler(
             return 0;
         }
 
+        var references = RecordImportReferences.Create(application, actor.Roles, columns);
         await transaction.SaveAsync(RowsSavepoint, cancellationToken);
         var created = 0;
         foreach (var row in reader.Rows())
@@ -145,6 +147,14 @@ internal sealed partial class RecordImportCommitHandler(
             if (row.Cells is not { } cells)
             {
                 errors[prefix] = [row.Error!];
+            }
+            else if (await references.ResolveAsync(connection, cells, cancellationToken) is var (resolved, lookupErrors) && lookupErrors is not null)
+            {
+                LogReferenceRefused(item.Id, row.Number);
+                foreach (var (pointer, messages) in lookupErrors)
+                {
+                    errors[prefix + pointer] = messages;
+                }
             }
             else
             {
@@ -156,7 +166,7 @@ internal sealed partial class RecordImportCommitHandler(
                     releaseId,
                     entity,
                     actor,
-                    columns.Body(cells),
+                    columns.Body(resolved),
                     now,
                     loggerFactory,
                     cancellationToken);
@@ -220,6 +230,9 @@ internal sealed partial class RecordImportCommitHandler(
 
     [LoggerMessage(LogLevel.Warning, "Record import {ImportId} failed its commit: the active release has no entity {EntityId}.")]
     private partial void LogNoEntity(Guid importId, Guid entityId);
+
+    [LoggerMessage(LogLevel.Warning, "Record import commit work item {ItemId} failed at row {Row} on a display value that matches no record or more than one, so no row was written.")]
+    private partial void LogReferenceRefused(Guid itemId, int row);
 
     [LoggerMessage(LogLevel.Warning, "Record import commit work item {ItemId} failed at row {Row} with outcome {Outcome}, so no row was written.")]
     private partial void LogRowRefused(Guid itemId, int row, RecordCommandOutcome outcome);
