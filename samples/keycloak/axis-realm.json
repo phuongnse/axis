@@ -209,7 +209,7 @@
         "token.endpoint.auth.signing.alg": "ES256",
         "use.jwks.url": "false",
         "use.jwks.string": "true",
-        "jwks.string": "{\"keys\":[{\"kty\":\"EC\",\"x\":\"rGTy1TGk-1cS1k0hNdvOJ0sJWSkVfTyx3_Z9QTPwxXo\",\"y\":\"nI8Vhzj6ezbaT6FZh_OeYRdcgVv8OeOitsZca3QNNOc\",\"crv\":\"P-256\",\"kid\":\"key-1\",\"use\":\"sig\",\"alg\":\"ES256\"},{\"kty\":\"EC\",\"x\":\"B-t2hith012YRuDz5Ed1O-hXah_MZGBX29jiBb8pQ44\",\"y\":\"lC256uEhJvcOxMQ2VkuPC8ybFMx27tksPLwp7Bfg-F4\",\"crv\":\"P-256\",\"kid\":\"key-2\",\"use\":\"sig\",\"alg\":\"ES256\"}]}"
+        "jwks.string": "{\"keys\":[{\"kty\":\"EC\",\"x\":\"rGTy1TGk-1cS1k0hNdvOJ0sJWSkVfTyx3_Z9QTPwxXo\",\"y\":\"nI8Vhzj6ezbaT6FZh_OeYRdcgVv8OeOitsZca3QNNOc\",\"crv\":\"P-256\",\"kid\":\"key-1\",\"use\":\"sig\",\"alg\":\"ES256\"},{\"kty\":\"EC\",\"x\":\"B-t2hith012YRuDz5Ed1O-hXah_MZGBX29jiBb8pQ44\",\"y\":\"lC256uEhJvcOxMQ2VkuPC8ybFMx27tksPLwp7Bfg-F4\",\"crv\":\"P-256\",\"kid\":\"key-2\",\"use\":\"sig\",\"alg\":\"ES256\"},{\"kty\":\"EC\",\"x\":\"rGTy1TGk-1cS1k0hNdvOJ0sJWSkVfTyx3_Z9QTPwxXo\",\"y\":\"nI8Vhzj6ezbaT6FZh_OeYRdcgVv8OeOitsZca3QNNOc\",\"crv\":\"P-256\",\"kid\":\"c78k1xDMCWYQ6xjENt1SIlXg-51NnvHQaVaO5rwsk4k\",\"use\":\"sig\",\"alg\":\"ES256\"},{\"kty\":\"EC\",\"x\":\"B-t2hith012YRuDz5Ed1O-hXah_MZGBX29jiBb8pQ44\",\"y\":\"lC256uEhJvcOxMQ2VkuPC8ybFMx27tksPLwp7Bfg-F4\",\"crv\":\"P-256\",\"kid\":\"9WHVOfd_bSEKHv5990xfBx9M4tKFIPnKDyERLW9seMI\",\"use\":\"sig\",\"alg\":\"ES256\"}]}"
       },
       "protocolMappers": [
         {
