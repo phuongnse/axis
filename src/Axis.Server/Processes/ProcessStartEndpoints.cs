@@ -8,6 +8,7 @@ using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Server.Applications;
+using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Server.Records;
 using Axis.Server.Tenancy;
@@ -19,12 +20,12 @@ namespace Axis.Server.Processes;
 
 /// <summary>
 /// The endpoint that starts a process instance for one subject record. The instance is pinned to
-/// the release active when the request is resolved. A request is checked in order: session (401),
+/// the release active when the request is resolved. A request is checked in order: session or service account bearer token (401),
 /// application and process (404), the user's <c>start</c> grant on the process (403), content type
 /// (415), body (400), <c>Idempotency-Key</c> (400). Then one transaction claims the key's receipt,
 /// locks the subject record, checks that the user may read it and reads it (400), checks the start
 /// condition (400), inserts the instance (409) and its first work item, and appends the audit
-/// record <c>process.started</c>, whose actor is the session user. A record the user may not read
+/// record <c>process.started</c>, whose actor is the session user or the service account. A record the user may not read
 /// gets the same 400 as one that does not exist, so the two cannot be told apart. Before it locks
 /// the record, the transaction answers 409 when a <c>read</c> filter of the user's grants reads a
 /// computed field that is being recomputed, whatever the record. A repeat with a
@@ -44,7 +45,8 @@ internal static class ProcessStartEndpoints
     private const int MaxIdempotencyKeyLength = 255;
 
     public static void MapProcessEndpoints(this IEndpointRouteBuilder endpoints) =>
-        endpoints.MapPost("/api/apps/{app}/processes/{process}/instances", StartAsync);
+        endpoints.MapPost("/api/apps/{app}/processes/{process}/instances", StartAsync)
+            .WithMetadata(ServiceAccountRoute.Instance);
 
     // The body is read here rather than bound, so the content type is checked before any of the
     // body is read and every malformed body is the same validation problem.
@@ -60,7 +62,7 @@ internal static class ProcessStartEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(request.HttpContext);
         }
 
         // A release change under the start lock sends the request back to resolution, so every check runs on the new release.
