@@ -1,0 +1,24 @@
+{
+  "id": "ca09464f-ec83-4677-9c43-82821444c489",
+  "kind": "process",
+  "name": "NotifyByEmail",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "tell",
+  "steps": [
+    {
+      "name": "tell",
+      "type": "operation",
+      "operation": "notify",
+      "to": [{ "user": "title" }],
+      "channels": ["email"],
+      "message": {
+        "subject": { "textKey": "request.notice.subject" },
+        "body": { "textKey": "request.notice.body" },
+        "values": { "title": "title", "amount": "amount" }
+      },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

@@ -10,6 +10,8 @@
     "request.amountNegative": "The amount cannot be negative.",
     "request.approve": "Approve the request",
     "request.decide": "Decide on the request",
+    "request.notice.body": "Amount {amount}.",
+    "request.notice.subject": "Request {title}",
     "request.settle": "Settle the request",
     "requestDecision.main": "Decision",
     "requestReview.main": "Request",
