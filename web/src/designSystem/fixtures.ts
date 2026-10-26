@@ -332,6 +332,8 @@ const taskPage: TaskPage = {
       labelKey: 'request.task.review',
       subject: { entity: 'Request', id: requestId, label: 'Standing desks for the new office' },
       dueAt: '2026-03-20T17:00:00.000000Z',
+      claimedBy: null,
+      overdue: false,
       createdAt: '2026-03-04T09:31:00.000000Z',
     },
     {
@@ -342,6 +344,8 @@ const taskPage: TaskPage = {
       labelKey: 'request.task.review',
       subject: { entity: 'Request', id: '8b3e4c5d-6f70-4b82-8c93-b4d5e6f70819', label: 'Whiteboard markers' },
       dueAt: null,
+      claimedBy: null,
+      overdue: false,
       createdAt: '2026-03-05T14:02:00.000000Z',
     },
   ],

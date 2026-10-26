@@ -9,7 +9,11 @@ export interface TaskSubject {
   label: string | null
 }
 
-/** An open task as the task API lists it. `dueAt` is `null` when the step has no `dueIn`. */
+/**
+ * An open task as the task API lists it. `dueAt` is `null` when the step has no `dueIn`. `claimedBy`
+ * is the user id of the claimer, or `null` while the task is unclaimed. `overdue` is set once the
+ * due date has passed.
+ */
 export interface TaskListItem {
   id: string
   /** The release the task started on. Its labels come from that release's texts. */
@@ -19,6 +23,8 @@ export interface TaskListItem {
   labelKey: string
   subject: TaskSubject
   dueAt: string | null
+  claimedBy: string | null
+  overdue: boolean
   createdAt: string
 }
 
@@ -39,9 +45,18 @@ export interface TaskOutcome {
 /** The form a task is completed on, with its entity's metadata so the task page knows each field's type. */
 export type TaskForm = FormMetadata & { entity: EntityMetadata }
 
+/** A role of the active release that a task may be reassigned to. `labelKey` is `null` for a role with no label. */
+export interface ReassignRole {
+  name: string
+  labelKey: string | null
+}
+
 /**
  * One task in any state, as the task API reads it. `assignee` has the user id or the role name, and
  * the other is `null`. `completedAt`, `completedBy` and `outcome` are `null` while the task is open.
+ * `claimedBy` is the claimer's user id, or `null`. `overdue` is set once the due date has passed.
+ * `commands` lists what the signed-in user may do on the task now, from `claim`, `release` and
+ * `reassign`. `reassignRoles` is empty unless `commands` holds `reassign`.
  */
 export interface TaskItem {
   id: string
@@ -57,6 +72,10 @@ export interface TaskItem {
   form: TaskForm
   outcomes: TaskOutcome[]
   dueAt: string | null
+  claimedBy: string | null
+  overdue: boolean
+  commands: string[]
+  reassignRoles: ReassignRole[]
   createdAt: string
   completedAt: string | null
   completedBy: string | null
@@ -65,6 +84,9 @@ export interface TaskItem {
 
 /** The outcome of completing a task, or the problem the server reported. */
 export type CompleteResult = { ok: true } | { ok: false; problem: RecordProblem }
+
+/** The task after a claim or release, or the status the task API refused it with. */
+export type TaskCommandResult = { ok: true; task: TaskItem } | { ok: false; status: number }
 
 /** What the task API answers when the signed-in user may not act on the task. */
 export const assignedElsewhere = 'assignedElsewhere'
@@ -126,4 +148,24 @@ export async function completeTask(tasksPath: string, id: string, body: string):
     }
   }
   throw new Error(`Completing the task '${id}' of '${tasksPath}' failed with status ${response.status}.`)
+}
+
+/**
+ * Claims or releases a task and returns the task as the route answers it. A 403 or 409 comes back
+ * as the status. A 401 starts sign-in and throws, as any other failure does.
+ */
+export async function runTaskCommand(
+  tasksPath: string,
+  id: string,
+  command: 'claim' | 'release',
+): Promise<TaskCommandResult> {
+  const response = await apiFetch(`${tasksPath}/${id}/${command}`, { method: 'POST' })
+  if (response.ok) {
+    // A task read holds no field values, so plain numbers are safe.
+    return { ok: true, task: JSON.parse(await response.text()) as TaskItem }
+  }
+  if (response.status === 403 || response.status === 409) {
+    return { ok: false, status: response.status }
+  }
+  throw new Error(`Running '${command}' on the task '${id}' of '${tasksPath}' failed with status ${response.status}.`)
 }
