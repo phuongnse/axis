@@ -994,6 +994,24 @@ public sealed class SchemaPlannerTests
         Assert.Null(plan.Commands[1].Fill);
     }
 
+    [Theory]
+    [InlineData("Asia/Ho_Chi_Minh")]
+    [InlineData("UTC")]
+    public void Pending_fill_with_today_converts_in_the_applications_time_zone(string zoneId)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+        var stored = BaseModel();
+        var release = ChangeOrder(stored, fields => [.. fields, Field("due", FieldType.Date, required: true)]) with { TimeZone = zone };
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Fill, "due", null, null, "today()"));
+
+        var plan = SchemaPlanner.Plan(release, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var fill = Assert.Single(plan.Commands, command => command.Fill is not null);
+        Assert.Contains("AT TIME ZONE @f0", fill.Sql, StringComparison.Ordinal);
+        Assert.Equal([new SqlValue("f0", ExpressionTypeKind.Text, zone.Id)], fill.Parameters);
+    }
+
     [Fact]
     public void Pending_fill_of_a_missing_required_enum_column_adds_it_without_not_null_then_fills_it_then_makes_it_not_null()
     {

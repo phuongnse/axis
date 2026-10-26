@@ -107,7 +107,7 @@ public static class SeedApplier
                 }
                 else
                 {
-                    var defaults = RecordDefaults.Apply(entity, input.Values, now);
+                    var defaults = RecordDefaults.Apply(entity, input.Values, now, model.TimeZone);
                     if (defaults.Errors is { } defaultErrors)
                     {
                         await transaction.RollbackAsync(cancellationToken);
@@ -131,7 +131,7 @@ public static class SeedApplier
                     continue;
                 }
 
-                var defaults = RecordDefaults.Apply(entity, input.Values, now);
+                var defaults = RecordDefaults.Apply(entity, input.Values, now, model.TimeZone);
                 if (defaults.Errors is { } defaultErrors)
                 {
                     await transaction.RollbackAsync(cancellationToken);

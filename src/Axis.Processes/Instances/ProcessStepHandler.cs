@@ -217,7 +217,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             }
 
             var values = ProcessParameters.Values(process, instance.Parameters);
-            evaluate = expression => Task.FromResult(ProcessParameters.Evaluate(expression, values, instance.Now));
+            evaluate = expression => Task.FromResult(ProcessParameters.Evaluate(expression, values, instance.Now, model.TimeZone));
         }
 
         string state;

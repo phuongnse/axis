@@ -759,7 +759,7 @@ schema of the tenant database.
   | ---------------- | --------- | -------------------------------------------------- |
   | `sequence_id`    | `uuid`    | The `sequence` resource `id`                       |
   | `application_id` | `uuid`    | The application `id`                               |
-  | `period`         | `integer` | The UTC year, or 0 when the format has no `{yyyy}` |
+  | `period`         | `integer` | The local year, or 0 when the format has no `{yyyy}` |
   | `last_value`     | `bigint`  | The last number handed out                         |
   - The primary key is `(sequence_id, period)`.
   - For a module sequence, `sequence_id` is the id derived

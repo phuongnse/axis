@@ -273,7 +273,7 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: errors);
         }
 
-        var defaults = RecordDefaults.Apply(entity, converted, now);
+        var defaults = RecordDefaults.Apply(entity, converted, now, application.TimeZone);
         if (defaults.Errors is { } defaultErrors)
         {
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: defaultErrors);
@@ -358,8 +358,8 @@ public static class RecordCommands
 
     /// <summary>
     /// Adds the next number of each sequence field to <paramref name="values"/>, which never
-    /// holds one: the parser refuses it. The UTC year comes from the transaction time, read once, so
-    /// the period a number is counted in and the year it shows are the same.
+    /// holds one: the parser refuses it. The year is the local year in the application's time zone at
+    /// the transaction time, read once, so the period a number is counted in and the year it shows are the same.
     /// </summary>
     private static async Task<IReadOnlyList<RecordValue>> WithSequenceNumbersAsync(
         NpgsqlConnection connection,
@@ -378,7 +378,7 @@ public static class RecordCommands
         var numbered = new List<RecordValue>(values);
         foreach (var field in sequenceFields)
         {
-            var number = await SequenceCounters.NextAsync(connection, application.Manifest.Id, field.Sequence!, now, cancellationToken);
+            var number = await SequenceCounters.NextAsync(connection, application.Manifest.Id, field.Sequence!, now, application.TimeZone, cancellationToken);
             numbered.Add(new RecordValue(field, number));
         }
 

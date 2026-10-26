@@ -17,7 +17,8 @@ public sealed record RecordDefaultsResult(
 /// <summary>
 /// Fills the fields a create leaves out from their compiled <c>default</c>, which is an expression
 /// over no fields. A field the body sends, even as <c>null</c>, keeps its value. <c>now()</c> in a
-/// default is the start time of the write transaction. A run-time error is an error at
+/// default is the start time of the write transaction, and <c>today()</c> and <c>toDate</c> use
+/// <paramref name="timeZone"/>, the application's time zone. A run-time error is an error at
 /// <c>/values/&lt;field&gt;</c> with <see cref="RecordInputMessages.NotComputable"/>, as is a value
 /// that does not fit the field. A default that gives <c>null</c> for a required field is a
 /// <see cref="RecordInputMessages.Required"/> error. Only the owner's fields get defaults: the rows of
@@ -25,10 +26,11 @@ public sealed record RecordDefaultsResult(
 /// </summary>
 public static class RecordDefaults
 {
-    public static RecordDefaultsResult Apply(EntityModel entity, IReadOnlyList<RecordValue> values, DateTimeOffset now)
+    public static RecordDefaultsResult Apply(EntityModel entity, IReadOnlyList<RecordValue> values, DateTimeOffset now, TimeZoneInfo timeZone)
     {
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(timeZone);
 
         var columns = RecordQueries.Columns(entity);
         var given = values.Select(value => value.Field.Name).ToHashSet(StringComparer.Ordinal);
@@ -41,7 +43,7 @@ public static class RecordDefaults
         var filled = new Dictionary<string, RecordValue>(StringComparer.Ordinal);
         foreach (var field in columns.Where(field => field.Default is not null && !given.Contains(field.Name)))
         {
-            var result = ExpressionInterpreter.Evaluate(field.Default!.Syntax, field.Default.Check, new ExpressionValues([]), records: null, now: now);
+            var result = ExpressionInterpreter.Evaluate(field.Default!.Syntax, field.Default.Check, new ExpressionValues([]), records: null, now: now, timeZone: timeZone);
             RecordValue? value = null;
             var message = result.Succeeded ? RecordComputer.ToRecordValue(field, result.Value, out value) : Messages.NotComputable;
             if (message is null && value!.Value is null && field.Required)

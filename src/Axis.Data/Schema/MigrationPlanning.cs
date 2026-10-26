@@ -176,7 +176,7 @@ internal sealed class MigrationPlanning
             throw new InvalidOperationException($"The fill value does not parse, though the compiler checked it: {parsed.Diagnostic.Message}");
         }
 
-        var translated = SqlTranslator.Translate(parsed.Expression!, Column);
+        var translated = SqlTranslator.Translate(parsed.Expression!, Column, timeZone: _model.TimeZone);
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The fill value does not translate to SQL, though the compiler checked it: {translated.Diagnostic.Message}");
@@ -273,7 +273,7 @@ internal sealed class MigrationPlanning
             throw new InvalidOperationException($"The convert value does not parse, though the compiler checked it: {parsed.Diagnostic.Message}");
         }
 
-        var translated = SqlTranslator.Translate(parsed.Expression!, Column);
+        var translated = SqlTranslator.Translate(parsed.Expression!, Column, timeZone: _model.TimeZone);
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The convert value does not translate to SQL, though the compiler checked it: {translated.Diagnostic.Message}");

@@ -272,7 +272,7 @@ public static class RecordCommand
 
         // The defaults and the creator fields are set before the computed fields and validations, so they
         // see the record as it will be stored.
-        var defaults = RecordDefaults.Apply(model, input.Values, now);
+        var defaults = RecordDefaults.Apply(model, input.Values, now, application.TimeZone);
         if (defaults.Errors is { } defaultErrors)
         {
             return new RecordCreatePrepared(null, defaultErrors);

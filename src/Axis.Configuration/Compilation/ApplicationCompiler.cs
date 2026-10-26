@@ -242,12 +242,22 @@ public static partial class ApplicationCompiler
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
+        var timeZone = TimeZoneInfo.Utc;
         var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics, references);
             (modules, moduleFiles, moduleResources) = ModuleChecker.Check(manifest, installedModules, diagnostics, references);
             declaredPackageIds = new HashSet<string>(manifest.Packages.Select(package => package.Id), StringComparer.Ordinal);
+            if (manifest.TimeZone is { } timeZoneId && !IanaTimeZones.TryFind(timeZoneId, out timeZone))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.UnknownApplicationTimeZone,
+                    $"The time zone '{timeZoneId}' is not known. Use an IANA id such as 'Asia/Ho_Chi_Minh', written with its exact letter case.",
+                    manifest.File,
+                    "/timeZone",
+                    manifest.Id));
+            }
         }
 
         // A pinned module's entities, sequences, seeds, events, data sources and forms come before the application's own, so a
@@ -592,6 +602,7 @@ public static partial class ApplicationCompiler
         var model = new ApplicationModel
         {
             Manifest = loaded.Application,
+            TimeZone = timeZone,
             Entities = entities,
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),

@@ -3,7 +3,8 @@
 Status: **Agreed**
 
 M14 gives each application a time zone. The owner agreed this on 2026-10-25.
-It is _(planned for M14)_. See
+The manifest key, `today()`, `toDate` and the local year of sequences are
+built. Notification dates are still _(planned for M14)_. See
 [application time zone](../reference/resource-files.md#application-time-zone).
 It settles the time zone rule that
 [D22](d22-current-time-and-time-zones.md) waits for.
@@ -11,7 +12,7 @@ It settles the time zone rule that
 - **Manifest key:** the `application` manifest gets an optional `timeZone`, an
   IANA time zone id such as `Asia/Ho_Chi_Minh`. Without it, the time zone is
   `UTC`, so applications that exist today behave as before. An unknown id is a
-  new diagnostic.
+  new diagnostic, `AXC0277`.
 - **What uses it:**
   - `today()` gives the date in the application's time zone at the
     transaction's time. `toDate(date-time)` takes the calendar date of an
