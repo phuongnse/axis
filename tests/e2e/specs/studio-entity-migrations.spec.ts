@@ -4,7 +4,7 @@ import path from "node:path";
 import { expect, test } from "../test";
 import type { Page, TestInfo } from "@playwright/test";
 import { startServer } from "../activate";
-import { confirmDialog } from "../dialogs";
+import { confirmDialog, waitForDialog } from "../dialogs";
 import { useSession } from "../sessions";
 
 // Each journey starts a second server and publishes once, which takes a while.
@@ -101,7 +101,7 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
       await page.getByRole("button", { name: "Save", exact: true }).click();
       const question = page.getByTestId("studio-migration-question");
       await expect(question).toContainText("note → remark");
-      await page.getByRole("button", { name: "Keep data", exact: true }).click();
+      await confirmDialog(page, "Keep data");
 
       await expect(page.getByTestId("studio-saved")).toBeVisible();
       expect(await savedMigration(folder)).toEqual([
@@ -141,7 +141,7 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
       await expect(page.getByTestId("studio-migration-question")).toContainText(
         "note",
       );
-      await page.getByRole("button", { name: "Drop data", exact: true }).click();
+      await confirmDialog(page, "Drop data");
 
       await expect(page.getByTestId("studio-saved")).toBeVisible();
       expect(await savedMigration(folder)).toEqual([
@@ -169,8 +169,11 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
       await expect(page.getByTestId("studio-migration-question")).toContainText(
         "number",
       );
-      await page.getByRole("textbox", { name: "Convert expression", exact: true }).fill("number");
-      await page.getByRole("button", { name: "Add convert", exact: true }).click();
+      const dialog = await waitForDialog(page);
+      await dialog
+        .getByRole("textbox", { name: "Convert expression", exact: true })
+        .fill("number");
+      await confirmDialog(page, "Add convert");
 
       await expect(page.getByTestId("studio-saved")).toBeVisible();
       expect(await savedMigration(folder)).toEqual([
