@@ -93,6 +93,7 @@ public static class ApplicationSites
             widget.Type == WidgetType.TaskInbox ? $"/api/apps/{application.Manifest.Name}/tasks" : null,
             widget.Process?.Name,
             widget.Process is { } process ? $"/api/apps/{application.Manifest.Name}/processes/{process.Name}/instances" : null,
+            widget.Process is { } deadLetterProcess ? $"/api/apps/{application.Manifest.Name}/processes/{deadLetterProcess.Name}/dead-letters" : null,
             [.. widget.Actions.Select(action => Action(application, action, rowEntity))],
             [.. widget.RowActions.Select(action => Action(application, action, rowEntity))],
             [.. widget.ToolbarActions.Select(action => Action(application, action, null))],

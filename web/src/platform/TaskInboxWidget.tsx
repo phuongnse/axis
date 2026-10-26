@@ -1,4 +1,4 @@
-import { Alert, Table, type TableColumnsType, type TableProps } from 'antd'
+import { Alert, Space, Table, Tag, type TableColumnsType, type TableProps } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { formatValue } from './formatValue'
@@ -37,6 +37,9 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * first, with no due date last. Each row links to the task's address under the inbox page. Paging
  * lives in the URL as the task API's `page` and `pageSize`, as on a table. With nobody signed in, the
  * task API's 401 starts sign-in.
+ *
+ * An overdue task shows an "Overdue" tag beside its due date, and a task the user claimed shows a
+ * "Claimed by you" tag beside its label.
  *
  * A row's label comes from the texts of the release its task started on, then the site texts and
  * the platform texts. The table stays loading until the texts of every release on the page have
@@ -108,7 +111,13 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
           const label = releaseCatalog
             ? resolveText(task.labelKey, [releaseCatalog, ...catalogs], development)
             : t(task.labelKey)
-          return <Link to={`${taskPath}/${task.id}`}>{label}</Link>
+          // The task list returns a claimed task only to its claimer, so a claimer here is the signed-in user.
+          return (
+            <Space size="small">
+              <Link to={`${taskPath}/${task.id}`}>{label}</Link>
+              {task.claimedBy !== null && <Tag color="blue">{t('shell.tasks.claimedByYou')}</Tag>}
+            </Space>
+          )
         },
       },
       {
@@ -119,7 +128,12 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
       {
         key: 'dueAt',
         title: t('shell.tasks.dueAt'),
-        render: (_value: unknown, task: TaskListItem) => formatValue(dueAtField, task.dueAt, {}, { locale, text: t }),
+        render: (_value: unknown, task: TaskListItem) => (
+          <Space size="small">
+            {formatValue(dueAtField, task.dueAt, {}, { locale, text: t })}
+            {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
+          </Space>
+        ),
       },
     ],
     [locale, t, taskPath, releaseCatalogs, catalogs, development],

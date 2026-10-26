@@ -35,6 +35,7 @@ function chartWidget(chart: ChartMetadata): WidgetMetadata {
     tasksPath: null,
     process: null,
     instancesPath: null,
+    deadLettersPath: null,
     actions: [],
     rowActions: [],
     toolbarActions: [],

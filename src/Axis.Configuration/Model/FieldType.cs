@@ -15,5 +15,6 @@ public enum FieldType
     Enum,
     Reference,
     ChildCollection,
+    File,
     Money,
 }

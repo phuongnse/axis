@@ -193,4 +193,48 @@ test.describe('Studio edits a process in the process editor', () => {
       await writeFile(target, original)
     }
   })
+
+  test('an author moves an edge in the panel, removes a step by keyboard, sees the diagnostic after a save and undoes it', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    const id = await processId(page)
+    const target = path.join(copy, file)
+    const original = await readFile(target, 'utf8')
+
+    try {
+      // The earlier journeys changed the copy, so the steps are found by name.
+      const content = JSON.parse(original) as { steps: { name: string }[] }
+      const indexOf = (name: string) => content.steps.findIndex((step) => step.name === name)
+      const first = 0
+      const removed = indexOf('markReturned')
+      expect(removed).toBeGreaterThan(0)
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+
+      const edge = page.getByTestId(`rf__edge-/steps/${first}/next`)
+      await expect(edge).toHaveAccessibleName(/^submit to \w+ · next$/)
+      await page.getByTestId(`studio-graph-node-${first}`).click()
+      await pick(page, `/steps/${first}/next`, 'done')
+      await expect(edge).toHaveAccessibleName('submit to done · next')
+
+      const node = page.getByTestId(`studio-graph-node-${removed}`)
+      await node.focus()
+      await page.keyboard.press('Enter')
+      await expect(page.getByTestId(`studio-step-${removed}`)).toContainText('markReturned')
+      await page.keyboard.press('Delete')
+      await expect(page.getByTestId('studio-process-announcement')).toHaveText('Removed step markReturned')
+      await expect(page.getByTestId(`studio-graph-node-${content.steps.length - 1}`)).toHaveCount(0)
+
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
+      await expect(page.getByTestId('studio-saved')).toBeVisible()
+      await expect(page.getByTestId('studio-diagnostics')).toContainText('AXC0070')
+
+      await page.getByRole('tab', { name: 'Design', exact: true }).click()
+      await page.getByRole('button', { name: 'Undo', exact: true }).click()
+      // The save marked steps by the saved file's numbers, so the restored node may carry another node's mark.
+      await expect(page.getByTestId(`studio-graph-node-${removed}`)).toHaveAccessibleName(/^markReturned · operation/)
+    } finally {
+      await writeFile(target, original)
+    }
+  })
 })

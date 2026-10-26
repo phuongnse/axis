@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -35,6 +35,7 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
 }
 
 const tasksPath = '/api/apps/PurchasingApp/tasks'
+const usersUrl = '/api/apps/PurchasingApp/users'
 const recordsPath = '/api/apps/PurchasingApp/entities/PurchaseRequest/records'
 const taskId = '0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01'
 const subjectId = '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b'
@@ -49,6 +50,7 @@ const inboxWidget: WidgetMetadata = {
   tasksPath,
   process: null,
   instancesPath: null,
+  deadLettersPath: null,
   actions: [],
   rowActions: [],
   toolbarActions: [],
@@ -100,6 +102,10 @@ const openTask = {
     { name: 'reject', labelKey: 'task.reject' },
   ],
   dueAt,
+  claimedBy: null,
+  overdue: false,
+  commands: [] as string[],
+  reassignRoles: [],
   createdAt: '2026-10-10T02:05:00.123456Z',
   completedAt: null,
   completedBy: null,
@@ -134,6 +140,8 @@ const completedTask = {
   outcome: 'approve',
 }
 
+const expiredTask = { ...openTask, state: 'expired' }
+
 const subject = JSON.stringify({
   id: subjectId,
   version: 3,
@@ -154,6 +162,7 @@ const texts = {
   'task.approve': 'Approve',
   'task.return': 'Return',
   'task.reject': 'Reject',
+  'role.finance': 'Finance team',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -178,9 +187,20 @@ function answer({ status, body }: Answer) {
 function stubTaskApi({
   reads = [{ status: 200, body: openTask }],
   complete = { status: 200, body: completedTask },
+  command = { status: 200, body: { ...openTask, commands: ['release'] } },
+  reassign = { status: 200, body: { ...openTask, assignee: { user: null, role: 'procurement' } } },
+  users = { status: 200, body: { items: [] } },
   releaseTexts = { status: 200, body: { locale: 'en', texts: {} } },
   states = [{ sections: [], fields: {}, errors: {} }],
-}: { reads?: Answer[]; complete?: Answer; releaseTexts?: Answer; states?: unknown[] } = {}) {
+}: {
+  reads?: Answer[]
+  complete?: Answer
+  command?: Answer
+  reassign?: Answer
+  users?: Answer | ((search: string) => Answer)
+  releaseTexts?: Answer
+  states?: unknown[]
+} = {}) {
   const requests: { method: string; url: string; body?: string }[] = []
   let taskReads = 0
   let stateCalls = 0
@@ -198,6 +218,16 @@ function stubTaskApi({
       if (method === 'POST' && url === `${tasksPath}/${taskId}/complete`) {
         return answer(complete)
       }
+      if (method === 'POST' && (url === `${tasksPath}/${taskId}/claim` || url === `${tasksPath}/${taskId}/release`)) {
+        return answer(command)
+      }
+      if (method === 'POST' && url === `${tasksPath}/${taskId}/reassign`) {
+        return answer(reassign)
+      }
+      if (method === 'GET' && url.startsWith(`${usersUrl}?search=`)) {
+        const search = decodeURIComponent(url.slice(`${usersUrl}?search=`.length))
+        return answer(typeof users === 'function' ? users(search) : users)
+      }
       if (method === 'POST' && url === `${tasksPath}/${taskId}/form-state`) {
         return answer({ status: 200, body: states[Math.min(stateCalls++, states.length - 1)] })
       }
@@ -209,6 +239,17 @@ function stubTaskApi({
   )
   return {
     taskReads: () => requests.filter(({ method, url }) => method === 'GET' && url === `${tasksPath}/${taskId}`),
+    commands: () =>
+      requests.filter(({ method, url }) => method === 'POST' && /\/(claim|release)$/.test(url)).map(({ url }) => url),
+    subjectReads: () => requests.filter(({ method, url }) => method === 'GET' && url === `${recordsPath}/${subjectId}`),
+    reassigns: () =>
+      requests
+        .filter(({ method, url }) => method === 'POST' && url.endsWith('/reassign'))
+        .map(({ body }) => JSON.parse(body ?? '{}') as Record<string, unknown>),
+    userSearches: () =>
+      requests
+        .filter(({ method, url }) => method === 'GET' && url.startsWith(`${usersUrl}?search=`))
+        .map(({ url }) => decodeURIComponent(url.slice(`${usersUrl}?search=`.length))),
     completions: () => requests.filter(({ method, url }) => method === 'POST' && url.endsWith('/complete')),
     stateRequests: () =>
       requests
@@ -432,6 +473,302 @@ describe('TaskPage', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(api.completions()).toHaveLength(0)
+  })
+
+  it('shows the overdue tag beside the due date of an overdue task only', async () => {
+    stubTaskApi({ reads: [{ status: 200, body: { ...openTask, overdue: true } }] })
+    const { unmount } = renderPage()
+
+    expect(await screen.findByText('Overdue')).toBeInTheDocument()
+    unmount()
+
+    stubTaskApi()
+    renderPage()
+    await screen.findByLabelText('Title')
+    expect(screen.queryByText('Overdue')).not.toBeInTheDocument()
+  })
+
+  it('shows Claim, Release and Reassign exactly as the commands list them', async () => {
+    for (const [commands, buttons] of [
+      [[], []],
+      [['claim'], ['Claim']],
+      [['release'], ['Release']],
+      [['reassign'], ['Reassign']],
+      [
+        ['claim', 'release', 'reassign'],
+        ['Claim', 'Release', 'Reassign'],
+      ],
+    ] as const) {
+      stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands } }] })
+      const { unmount } = renderPage()
+
+      await screen.findByLabelText('Title')
+      expect(screen.queryByRole('button', { name: 'Claim' }) !== null).toBe(buttons.includes('Claim' as never))
+      expect(screen.queryByRole('button', { name: 'Release' }) !== null).toBe(buttons.includes('Release' as never))
+      expect(screen.queryByRole('button', { name: 'Reassign' }) !== null).toBe(buttons.includes('Reassign' as never))
+      expect(screen.getAllByRole('button')).toHaveLength(buttons.length + 3)
+      unmount()
+    }
+  })
+
+  it('claims the task, shows Release from the answer and keeps what the user typed', async () => {
+    const api = stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands: ['claim'] } }] })
+    renderPage()
+
+    await userEvent.type(await screen.findByLabelText('Comments'), 'Fine')
+    await userEvent.click(screen.getByRole('button', { name: 'Claim' }))
+
+    expect(await screen.findByRole('button', { name: 'Release' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Claim' })).not.toBeInTheDocument()
+    expect(api.commands()).toEqual([`${tasksPath}/${taskId}/claim`])
+    expect(screen.getByLabelText('Comments')).toHaveValue('Fine')
+    expect(api.subjectReads()).toHaveLength(1)
+    expect(api.taskReads()).toHaveLength(1)
+  })
+
+  it('releases the task and shows the commands of the answer', async () => {
+    const api = stubTaskApi({
+      reads: [{ status: 200, body: { ...openTask, commands: ['release'] } }],
+      command: { status: 200, body: { ...openTask, commands: ['claim'] } },
+    })
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Release' }))
+
+    expect(await screen.findByRole('button', { name: 'Claim' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Release' })).not.toBeInTheDocument()
+    expect(api.commands()).toEqual([`${tasksPath}/${taskId}/release`])
+  })
+
+  it('shows a message and loads the task again when claim answers 409 or 403', async () => {
+    for (const status of [409, 403]) {
+      const api = stubTaskApi({
+        reads: [
+          { status: 200, body: { ...openTask, commands: ['claim'] } },
+          { status: 200, body: { ...openTask, commands: [] } },
+        ],
+        command: { status, body: { title: 'Refused.', status } },
+      })
+      const { unmount } = renderPage()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Claim' }))
+
+      expect(await screen.findByTestId('task-command-message')).toHaveTextContent(
+        'This action is no longer possible. The task was loaded again.',
+      )
+      await waitFor(() => expect(api.taskReads()).toHaveLength(2))
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Claim' })).not.toBeInTheDocument())
+      unmount()
+    }
+  })
+
+  describe('reassign', () => {
+    const roles = [
+      { name: 'procurement', labelKey: null },
+      { name: 'finance', labelKey: 'role.finance' },
+    ]
+    const reassignable = { ...openTask, commands: ['reassign'], reassignRoles: roles }
+    const reads = [{ status: 200, body: reassignable }]
+    const people = {
+      status: 200,
+      body: {
+        items: [
+          { id: 'u-ann', displayName: 'Ann Lee' },
+          { id: 'u-bao', displayName: 'Bao Tran' },
+        ],
+      },
+    }
+
+    async function openDialog() {
+      await userEvent.click(await screen.findByRole('button', { name: 'Reassign' }))
+      return screen.findByRole('dialog')
+    }
+
+    it('sends the chosen role with the reason and goes to the inbox', async () => {
+      const api = stubTaskApi({ reads })
+      renderPage()
+      const dialog = await openDialog()
+
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Role' }))
+      expect(await screen.findByTitle('procurement')).toBeInTheDocument()
+      expect(screen.getByTitle('Finance team')).toBeInTheDocument()
+      await userEvent.click(screen.getByTitle('procurement'))
+      await userEvent.type(within(dialog).getByLabelText('Reason'), 'Agent on leave.')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/e2e\/tasks$/))
+      expect(api.reassigns()).toEqual([{ role: 'procurement', reason: 'Agent on leave.' }])
+    })
+
+    it('sends the person found by name with the reason', async () => {
+      const api = stubTaskApi({
+        reads,
+        users: (search) => (search === 'bao' ? { status: 200, body: { items: [people.body.items[1]] } } : people),
+      })
+      renderPage()
+      const dialog = await openDialog()
+
+      await userEvent.click(within(dialog).getByRole('radio', { name: 'Person' }))
+      const picker = within(dialog).getByRole('combobox', { name: 'Person' })
+      await userEvent.click(picker)
+      expect(await screen.findByTitle('Ann Lee')).toBeInTheDocument()
+      await userEvent.type(picker, 'bao')
+      await waitFor(() => expect(screen.queryByTitle('Ann Lee')).not.toBeInTheDocument())
+      await userEvent.click(await screen.findByTitle('Bao Tran'))
+      await userEvent.type(within(dialog).getByLabelText('Reason'), 'Knows the vendor.')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/e2e\/tasks$/))
+      expect(api.reassigns()).toEqual([{ user: 'u-bao', reason: 'Knows the vendor.' }])
+      expect(api.userSearches()).toEqual(['', 'b', 'ba', 'bao'])
+    })
+
+    it('needs a target and a reason before it sends', async () => {
+      const api = stubTaskApi({ reads })
+      renderPage()
+      const dialog = await openDialog()
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
+
+      expect(await within(dialog).findByText('Choose who gets the task.')).toBeInTheDocument()
+      expect(within(dialog).getByText('Enter a reason.')).toBeInTheDocument()
+      expect(api.reassigns()).toEqual([])
+    })
+
+    it('shows a 400 under the field it names, with the dialog still open', async () => {
+      for (const [kind, pointer] of [
+        ['role', '/reason'],
+        ['user', '/user'],
+      ] as const) {
+        const api = stubTaskApi({
+          reads,
+          users: people,
+          reassign: {
+            status: 400,
+            body: { title: 'Invalid.', status: 400, errors: { [pointer]: ['Not allowed here.'] } },
+          },
+        })
+        const { unmount } = renderPage()
+        const dialog = await openDialog()
+
+        if (kind === 'user') {
+          await userEvent.click(within(dialog).getByRole('radio', { name: 'Person' }))
+          await userEvent.click(within(dialog).getByRole('combobox', { name: 'Person' }))
+          await userEvent.click(await screen.findByTitle('Ann Lee'))
+        } else {
+          await userEvent.click(within(dialog).getByRole('combobox', { name: 'Role' }))
+          await userEvent.click(await screen.findByTitle('procurement'))
+        }
+        await userEvent.type(within(dialog).getByLabelText('Reason'), 'Because.')
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
+
+        const message = await within(dialog).findByText('Not allowed here.')
+        const field =
+          kind === 'user'
+            ? within(dialog).getByRole('combobox', { name: 'Person' })
+            : within(dialog).getByRole('textbox', { name: 'Reason' })
+        expect(message.closest('.ant-form-item')).toContainElement(field)
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+        expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/tasks/${taskId}`)
+        expect(api.reassigns()).toHaveLength(1)
+        unmount()
+      }
+    })
+
+    it('shows a problem on the whole body above the form', async () => {
+      stubTaskApi({
+        reads,
+        reassign: { status: 400, body: { title: 'Invalid.', status: 400, errors: { '': ['Choose one target.'] } } },
+      })
+      renderPage()
+      const dialog = await openDialog()
+
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Role' }))
+      await userEvent.click(await screen.findByTitle('procurement'))
+      await userEvent.type(within(dialog).getByLabelText('Reason'), 'Because.')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
+
+      expect(await within(dialog).findByTestId('task-reassign-error')).toHaveTextContent('Choose one target.')
+    })
+
+    it('closes the dialog, loads the task again and shows the refusal on a 409 or 403', async () => {
+      for (const status of [409, 403]) {
+        const api = stubTaskApi({
+          reads: [reads[0], { status: 200, body: { ...openTask, commands: [] } }],
+          reassign: { status, body: { title: 'Refused.', status } },
+        })
+        const { unmount } = renderPage()
+        const dialog = await openDialog()
+
+        await userEvent.click(within(dialog).getByRole('combobox', { name: 'Role' }))
+        await userEvent.click(await screen.findByTitle('procurement'))
+        await userEvent.type(within(dialog).getByLabelText('Reason'), 'Because.')
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+        expect(await screen.findByTestId('task-command-message')).toHaveTextContent(
+          'This action is no longer possible. The task was loaded again.',
+        )
+        await waitFor(() => expect(api.taskReads()).toHaveLength(2))
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Reassign' })).not.toBeInTheDocument())
+        unmount()
+      }
+    })
+
+    it('shows a generic message in the open dialog when reassigning fails otherwise', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      stubTaskApi({ reads, reassign: { status: 500 } })
+      renderPage()
+      const dialog = await openDialog()
+
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Role' }))
+      await userEvent.click(await screen.findByTitle('procurement'))
+      await userEvent.type(within(dialog).getByLabelText('Reason'), 'Because.')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
+
+      expect(await within(dialog).findByTestId('task-reassign-error')).toHaveTextContent(
+        'The action could not be done.',
+      )
+      expect(within(dialog).getByLabelText('Reason')).toHaveValue('Because.')
+    })
+
+    it('keeps the dialog usable when the people cannot be listed', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      stubTaskApi({ reads, users: { status: 403 } })
+      renderPage()
+      const dialog = await openDialog()
+
+      await userEvent.click(within(dialog).getByRole('radio', { name: 'Person' }))
+      await userEvent.click(within(dialog).getByRole('radio', { name: 'Role' }))
+
+      expect(within(dialog).getByRole('combobox', { name: 'Role' })).toBeInTheDocument()
+    })
+  })
+
+  it('shows a generic message when claim fails otherwise', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const api = stubTaskApi({
+      reads: [{ status: 200, body: { ...openTask, commands: ['claim'] } }],
+      command: { status: 500 },
+    })
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Claim' }))
+
+    expect(await screen.findByTestId('task-command-message')).toHaveTextContent('The action could not be done.')
+    expect(api.taskReads()).toHaveLength(1)
+  })
+
+  it('shows only the expired message for an expired task', async () => {
+    stubTaskApi({ reads: [{ status: 200, body: { ...expiredTask, commands: ['claim', 'release'] } }] })
+
+    renderPage()
+
+    expect(await screen.findByTestId('task-expired')).toHaveTextContent('The deadline for this task passed.')
+    expect(screen.queryByTestId('task-completed')).not.toBeInTheDocument()
+    expect(screen.getByText('Manager approval')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
   it('shows the not-found page when the task API has no task with the id', async () => {

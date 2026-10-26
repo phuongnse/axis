@@ -13,9 +13,9 @@ The design follows
 `task.deadline` work item are built. [Claim and release](#claim-and-release) and
 the `claimed_by` and `claimed_at` columns are built, and so are release by a
 `reassign` grant and [reassign](#reassign) with its user picker. The
-[overdue](#task-states) rule and the server half of the
-[inbox and task page](#inbox-and-task-page) are built. Escalations are
-_(planned for M14)_.
+[overdue](#task-states) rule and the [inbox and task page](#inbox-and-task-page)
+are built: the inbox marks, and Claim, Release and the Reassign dialog on the
+task page. Escalations are _(planned for M14)_.
 
 ## Escalations and deadline
 
@@ -195,7 +195,7 @@ and `process_instance_id`. _(Planned for M14)_ It also adds the kind
 
 ## Inbox and task page
 
-The task API tells the page what to show. The UI below is _(planned for M14)_.
+The task API tells the page what to show.
 
 - A single read, and the claim, release, reassign and complete responses, add
   `commands`: the actions the signed-in user may take on the task now, from
@@ -214,10 +214,30 @@ The task API tells the page what to show. The UI below is _(planned for M14)_.
   task's role gets `403` on a read, so they see `reassign` only in the claim,
   release and reassign responses.
 
-_(Planned for M14)_ The UI is not built yet.
+The [task inbox widget](task-inbox-widget.md) and the task page use these
+fields.
 
-- The [task inbox widget](task-inbox-widget.md) marks an overdue task and
-  shows who claimed a task.
-- The task page shows **Claim** on an unclaimed role task, **Release** to the
-  claimer, and **Reassign** to a user with the grant. Reassign opens a dialog
-  with a role list, the user picker and the reason.
+- The inbox shows an "Overdue" tag beside the due date of an `overdue` task, and
+  a "Claimed by you" tag on a row whose `claimedBy` is set.
+- The task page shows the "Overdue" tag. It shows **Claim** and **Release** when
+  `commands` lists them, and shows the task the route returns. A `403` or `409`
+  shows a message and loads the task again.
+- An `expired` task shows that its deadline passed, with no form or buttons.
+- The task page shows **Reassign** when `commands` lists it. It opens a dialog
+  that works from the keyboard. The user chooses a role or a person, and types
+  a required reason of at most 500 characters.
+  - The role list is `reassignRoles`, each shown by its label, or by its name
+    when `labelKey` is `null`.
+  - The person picker lists the first 20 people when it opens and asks the
+    [user picker](#reassign) again as the user types. It shows each display name.
+    The page takes its address from the inbox's `tasksPath`, by replacing the
+    trailing `/tasks` with `/users`. If the picker cannot load, its list stays
+    empty and choosing a role still works.
+  - On success the page goes to the inbox page's plain address.
+  - A `400` shows each message under the role, person or reason field its
+    pointer names, and a problem keyed `""` above the form. The dialog stays
+    open.
+  - A `403` or `409` closes the dialog, loads the task again and shows the same
+    message as Claim and Release.
+  - Any other failure shows a generic message in the dialog and keeps what the
+    user typed.

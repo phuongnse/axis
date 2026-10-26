@@ -1,6 +1,7 @@
 import { Alert, Flex, Select, Table, type TableColumnsType, type TableProps } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { DeadLetterList } from './DeadLetterList'
 import { formatValue } from './formatValue'
 import {
   fetchInstances,
@@ -46,7 +47,8 @@ const endedAtField = { name: 'endedAt', type: 'date-time' } as const
  * page. A `403` shows that the user may not inspect the process. With nobody signed in, the
  * inspection API's 401 starts sign-in.
  *
- * The step column shows the step's name, because a list row carries no label key.
+ * The step column shows the step's name, because a list row carries no label key. Under the list, the
+ * process's open dead letters have their own list, which has its own page number.
  */
 export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: ProcessInspectorWidgetProps) {
   const t = useText()
@@ -205,6 +207,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
         }}
         onChange={onChange}
       />
+      <DeadLetterList deadLettersPath={widget.deadLettersPath!} locale={locale} />
     </Flex>
   )
 }

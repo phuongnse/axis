@@ -308,6 +308,7 @@ public static class ExpressionScopes
             FieldType.DateTime => ExpressionType.DateTime,
             FieldType.Enum => ExpressionType.Enum(name, values ?? []),
             FieldType.Reference => ExpressionType.Reference(target ?? ""),
+            FieldType.File => ExpressionType.File,
             FieldType.ChildCollection => null,
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown field type."),
         };

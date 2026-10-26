@@ -1,17 +1,4 @@
-import {
-  Alert,
-  Button,
-  Descriptions,
-  Empty,
-  Flex,
-  Form,
-  Input,
-  Modal,
-  Table,
-  Tag,
-  Typography,
-  type TableColumnsType,
-} from 'antd'
+import { Alert, Button, Descriptions, Empty, Flex, Table, Tag, Typography, type TableColumnsType } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatValue } from './formatValue'
 import {
@@ -28,6 +15,7 @@ import {
   type InstanceTask,
   type PathEntry,
 } from './inspection'
+import { ReasonDialog } from './ReasonDialog'
 import { ResolveDialog } from './ResolveDialog'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
@@ -327,93 +315,22 @@ function InstanceCommands({ instance, instancesPath, onChanged }: InstanceComman
         </Button>
       ))}
       {open && (
-        <CommandDialog
-          command={open}
-          instance={instance}
-          instancesPath={instancesPath}
+        <ReasonDialog
+          title={t(`shell.inspector.commands.${open}`)}
+          onSend={(reason) => sendCommand(instancesPath, instance.id, open, reason)}
           onClose={() => setOpen(undefined)}
           onChanged={onChanged}
-        />
+        >
+          {open === 'retry' && retryWarns(instance) && (
+            <Alert
+              data-testid="inspector-retry-warning"
+              type="warning"
+              title={t('shell.inspector.commands.retryWarning')}
+            />
+          )}
+        </ReasonDialog>
       )}
     </Flex>
-  )
-}
-
-interface CommandDialogProps {
-  command: InstanceCommand
-  instance: InstanceDetail
-  instancesPath: string
-  onClose: () => void
-  onChanged: () => void
-}
-
-const reasonMaxLength = 500
-
-/**
- * The dialog that asks for the reason of a command and sends it. A refusal shows the server's problem
- * title, and any other failure shows a generic text. Retry warns first when the failed call may have
- * acted before it failed.
- */
-function CommandDialog({ command, instance, instancesPath, onClose, onChanged }: CommandDialogProps) {
-  const t = useText()
-  const [form] = Form.useForm<{ reason: string }>()
-  const [sending, setSending] = useState(false)
-  const [error, setError] = useState<string>()
-
-  const send = async () => {
-    const { reason } = await form.validateFields()
-    setSending(true)
-    setError(undefined)
-    try {
-      const result = await sendCommand(instancesPath, instance.id, command, reason)
-      if (result.ok) {
-        onClose()
-        onChanged()
-      } else {
-        setError(result.problem.title)
-      }
-    } catch (failure) {
-      console.warn(`Sending '${command}' to the instance '${instance.id}' failed`, failure)
-      setError(t('shell.inspector.commands.failed'))
-    } finally {
-      setSending(false)
-    }
-  }
-
-  return (
-    <Modal
-      open
-      title={t(`shell.inspector.commands.${command}`)}
-      okText={t('shell.inspector.commands.send')}
-      cancelText={t('shell.inspector.commands.close')}
-      confirmLoading={sending}
-      onOk={() => void send().catch(() => undefined)}
-      onCancel={onClose}
-      destroyOnHidden
-    >
-      <Flex vertical gap="middle">
-        {command === 'retry' && retryWarns(instance) && (
-          <Alert
-            data-testid="inspector-retry-warning"
-            type="warning"
-            title={t('shell.inspector.commands.retryWarning')}
-          />
-        )}
-        <Form form={form} layout="vertical">
-          <Form.Item
-            name="reason"
-            label={t('shell.inspector.commands.reason')}
-            rules={[
-              { required: true, whitespace: true, message: t('shell.inspector.commands.reasonRequired') },
-              { max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') },
-            ]}
-          >
-            <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
-          </Form.Item>
-        </Form>
-        {error !== undefined && <Alert data-testid="inspector-command-error" type="error" title={error} />}
-      </Flex>
-    </Modal>
   )
 }
 

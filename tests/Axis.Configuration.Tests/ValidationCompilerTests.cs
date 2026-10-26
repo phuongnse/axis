@@ -27,6 +27,7 @@ public sealed class ValidationCompilerTests
         { """{ "expression": "all(lines, quantity > 0)", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "'quantity'" },
         // Only data source filters and process conditions follow paths.
         { """{ "expression": "customer.name == 'x'", "message": { "textKey": "order.quantityPositive" }, "field": "customer" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "Unknown field 'name' after '.'" },
+        { """{ "expression": "receipt == null", "message": { "textKey": "order.quantityPositive" }, "field": "receipt" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "A file allows only 'is null' and 'is not null'" },
         { """{ "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "nope" }""", DiagnosticCodes.UnknownValidationField, "/validations/0/field", "'nope'" },
         { """{ "expression": "quantity > 0", "message": { "textKey": "order.missing" }, "field": "quantity" }""", DiagnosticCodes.MissingTextKey, "/validations/0/message/textKey", "'order.missing'" },
     };
@@ -113,6 +114,22 @@ public sealed class ValidationCompilerTests
         Assert.All(order.Validations, validation => Assert.True(validation.Check.Succeeded));
     }
 
+    [Theory]
+    [InlineData("receipt is not null")]
+    [InlineData("receipt is null or quantity > 0")]
+    public void Validation_can_test_a_file_field_for_null(string expression)
+    {
+        using var folder = Folder($$"""
+            [{ "expression": "{{expression}}", "message": { "textKey": "order.quantityPositive" }, "field": "receipt" }]
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(Assert.Single(result.Model.Entities.Single(entity => entity.Name == "Order").Validations).Check.Succeeded);
+    }
+
     [Fact]
     public void Validation_can_compare_a_field_with_the_current_time()
     {
@@ -139,7 +156,8 @@ public sealed class ValidationCompilerTests
                     { "name": "dueAt", "type": "date-time" },
                     { "name": "status", "type": "enum", "values": ["open", "closed"] },
                     { "name": "lines", "type": "child-collection", "target": "OrderLine" },
-                    { "name": "customer", "type": "reference", "target": "Customer" }
+                    { "name": "customer", "type": "reference", "target": "Customer" },
+                    { "name": "receipt", "type": "file" }
                   ]{{(validations is null ? "" : $", \"validations\": {validations}")}} }
                 """)
             .With("entities/order-line.json", """
