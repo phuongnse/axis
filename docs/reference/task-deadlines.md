@@ -12,8 +12,10 @@ The design follows
 `deadline`, the `expired` task state, the `expired_at` column and the
 `task.deadline` work item are built. [Claim and release](#claim-and-release) and
 the `claimed_by` and `claimed_at` columns are built, and so are release by a
-`reassign` grant and [reassign](#reassign) with its user picker. Escalations and
-overdue tasks are _(planned for M14)_.
+`reassign` grant and [reassign](#reassign) with its user picker. The
+[overdue](#task-states) rule and the server half of the
+[inbox and task page](#inbox-and-task-page) are built. Escalations are
+_(planned for M14)_.
 
 ## Escalations and deadline
 
@@ -94,9 +96,10 @@ leaves every inbox and cannot be completed. The task API answers a completion
 of it with the `409` it gives for a completed task. An expired task reads with
 `state` `expired`. The API does not return `expired_at`.
 
-**Overdue** _(planned for M14)_. A task is overdue when it is `open` and its `due_at` has passed.
-The task API's list and read add `"overdue": true|false`, worked out when read.
-Nothing is stored.
+**Overdue.** A task is overdue when it is `open` and its `due_at` is before the
+database's current time. The task API's list and read add
+`"overdue": true|false`, worked out when read with database time. Nothing is
+stored. A completed, cancelled or expired task is never overdue.
 
 ## Claim and release
 
@@ -192,7 +195,26 @@ and `process_instance_id`. _(Planned for M14)_ It also adds the kind
 
 ## Inbox and task page
 
-_(Planned for M14)_ This section is not built yet.
+The task API tells the page what to show. The UI below is _(planned for M14)_.
+
+- A single read, and the claim, release, reassign and complete responses, add
+  `commands`: the actions the signed-in user may take on the task now, from
+  `claim`, `release` and `reassign`, always in that order. It is empty unless
+  the task is `open`, because each of these actions refuses a task that is not.
+  - `claim` is listed for an unclaimed role task that the user may act on, that
+    is, they hold its role.
+  - `release` is listed for a claimed task when the user holds `reassign`, or
+    when the user is the claimer and may still act on the task.
+  - `reassign` is listed when the user holds the `reassign` grant on the task's
+    process in the active release.
+- The same responses add `reassignRoles`: the `{ name, labelKey }` of each role
+  of the active release, ordered by name. `labelKey` is `null` for a role with
+  no label. It is empty unless `commands` holds `reassign`.
+- Who may read a task does not change. A user with the grant but without the
+  task's role gets `403` on a read, so they see `reassign` only in the claim,
+  release and reassign responses.
+
+_(Planned for M14)_ The UI is not built yet.
 
 - The [task inbox widget](task-inbox-widget.md) marks an overdue task and
   shows who claimed a task.
