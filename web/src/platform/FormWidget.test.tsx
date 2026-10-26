@@ -1156,6 +1156,60 @@ describe('FormWidget', () => {
       })
     })
 
+    describe('defaults', () => {
+      const withDefaults = (defaults: string) => `{"sections":[],"fields":{},"errors":{},"defaults":${defaults}}`
+
+      it('fills untouched empty fields of a new record, keeps a typed value and does not send a default', async () => {
+        let answerFirst: (answer: string) => void = () => {}
+        const first = new Promise<string>((resolve) => (answerFirst = resolve))
+        stateAnswers = [first]
+        const requests = stubFetch({ status: 201, body: noteJson('Pen', 1) })
+        const user = renderWithTimers()
+        await waitFor(() => expect(stateRequests()).toHaveLength(1))
+
+        await user.type(screen.getByLabelText('Title'), 'Pen')
+        await act(async () => {
+          answerFirst(withDefaults('{"title":"Untitled","priority":3}'))
+          await vi.advanceTimersByTimeAsync(50)
+        })
+        expect(screen.getByLabelText('Title')).toHaveValue('Pen')
+        await waitFor(() => expect(screen.getByLabelText('Priority')).toHaveValue('3'))
+
+        await act(() => vi.advanceTimersByTimeAsync(300))
+        await waitFor(() => expect(stateRequests()).toHaveLength(2))
+        expect(stateRequests()[1].body).toEqual({ recordId: null, values: { title: 'Pen' }, touched: ['title'] })
+
+        await user.click(screen.getByRole('button', { name: 'Save' }))
+        await waitFor(() => expect(requests()).toHaveLength(1))
+        expect(requests()[0].body).toBe('{"values":{"title":"Pen"}}')
+      })
+
+      it('sends null when the user clears a default', async () => {
+        stateAnswers = [withDefaults('{"priority":3}')]
+        const requests = stubFetch({ status: 201, body: noteJson('Pen', 1) })
+        const user = renderWithTimers()
+        await waitFor(() => expect(screen.getByLabelText('Priority')).toHaveValue('3'))
+
+        await user.clear(screen.getByLabelText('Priority'))
+        await user.type(screen.getByLabelText('Title'), 'Pen')
+        await user.click(screen.getByRole('button', { name: 'Save' }))
+        await waitFor(() => expect(requests()).toHaveLength(1))
+        expect(requests()[0].body).toBe('{"values":{"title":"Pen","priority":null}}')
+      })
+
+      it('ignores the defaults of a saved record', async () => {
+        stateAnswers = [withDefaults('{"priority":3,"status":"open"}')]
+        stubFetch({ status: 200, body: sectionsJson(1) })
+        renderWithTimers(noteId)
+        await waitFor(() => expect(stateRequests()).toHaveLength(1))
+
+        await waitFor(() => expect(screen.getByLabelText('Priority')).toHaveValue('7'))
+        await act(() => vi.advanceTimersByTimeAsync(50))
+        expect(screen.getByLabelText('Priority')).toHaveValue('7')
+        expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue('')
+      })
+    })
+
     it('shows a message under a touched field inside an alert, and none under an untouched field', async () => {
       const errors =
         '{"sections":[],"fields":{},"errors":{"/values/priority":["note.amountPositive"],"/values/title":["Required."]}}'
